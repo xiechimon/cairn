@@ -44,6 +44,8 @@ export function upsertGithubConnection(
   input: {
     teamId: string;
     login: string;
+    githubUserId?: number | null;
+    githubName?: string | null;
     accessToken: string;
     scope: string;
     refreshToken?: string | null | undefined;
@@ -61,6 +63,8 @@ export function upsertGithubConnection(
     .values({
       teamId: input.teamId,
       login: input.login,
+      githubUserId: input.githubUserId ?? null,
+      githubName: input.githubName ?? null,
       accessTokenCipher,
       refreshTokenCipher,
       accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
@@ -72,6 +76,8 @@ export function upsertGithubConnection(
       target: githubConnection.teamId,
       set: {
         login: input.login,
+        githubUserId: input.githubUserId ?? null,
+        githubName: input.githubName ?? null,
         accessTokenCipher,
         refreshTokenCipher,
         accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,

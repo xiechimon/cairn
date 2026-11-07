@@ -15,6 +15,7 @@ import { blockingWorkerQuestions } from './worker-question-store.js';
 
 export function desiredAction(
   snapshot: {
+    humanOverride?: boolean;
     state: string;
     isDraft: boolean;
     labels: readonly string[];
@@ -22,7 +23,7 @@ export function desiredAction(
   },
   local: { dismissed: boolean; activeStep: boolean; blockingQuestion: boolean },
 ): 'addLabel' | 'convertToDraft' | 'markReady' | 'removeLabel' | null {
-  if (local.dismissed || snapshot.state !== 'OPEN') return null;
+  if (snapshot.humanOverride || local.dismissed || snapshot.state !== 'OPEN') return null;
   const labelPresent = snapshot.labels.includes(CAIRN_REVIEW_HOLD_LABEL);
   if (snapshot.findings.length > 0) {
     if (snapshot.isDraft) return null;
@@ -88,7 +89,7 @@ export async function reconcilePrReviewFindings(
       });
     }
   }
-  if (pull.findings.length > 0) {
+  if (pull.findings.length > 0 && !pull.humanOverride) {
     if (!row.autoFix) {
       const wakeLedger = deps.db
         .select()

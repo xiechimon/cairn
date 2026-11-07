@@ -14,7 +14,7 @@ export type AppTokenReason =
 type Repository = { owner: string; repo: string };
 const appFetches = new Map<
   string,
-  { expiresAt: number; fetch: (inner: FetchLike, repo: Repository) => FetchLike }
+  { expiresAt: number; appSlug?: string; fetch: (inner: FetchLike, repo: Repository) => FetchLike }
 >();
 const scopes = new WeakMap<FetchLike, Repository>();
 const fallbackCounts = new Map<AppTokenReason, number>();
@@ -23,11 +23,12 @@ export function registerAppToken(
   token: AppToken,
   expiresAt: number,
   fetch: (inner: FetchLike, repo: Repository) => FetchLike,
+  appSlug?: string,
 ): void {
   for (const [value, entry] of appFetches) {
     if (entry.expiresAt <= Date.now()) appFetches.delete(value);
   }
-  appFetches.set(token, { expiresAt, fetch });
+  appFetches.set(token, { expiresAt, fetch, appSlug });
 }
 
 export function isAppToken(token: string): token is AppToken {
@@ -81,4 +82,9 @@ export function tokenValue(token: GithubWriteToken): string {
 
 export function githubUnattributedCounts(): ReadonlyMap<AppTokenReason, number> {
   return new Map(fallbackCounts);
+}
+
+export function githubAppBotLogin(token: string): string | null {
+  const slug = appFetches.get(token)?.appSlug;
+  return slug ? `${slug}[bot]`.toLowerCase() : null;
 }

@@ -38,6 +38,7 @@ import {
 import {
   addChiefWatch,
   clearChiefWake,
+  parseChiefTrigger,
   removeChiefWatches,
   requireTurnProvenance,
   setChiefWake,
@@ -485,7 +486,10 @@ export async function executeChiefTool(
         projectId,
         title: str(params, 'title'),
         spec: str(params, 'spec'),
-        createdBy: ctx.chiefAgentId,
+        createdBy:
+          ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
+            ? ctx.userId
+            : ctx.chiefAgentId,
         ownerId: ctx.userId,
         orchestration: { threadId: ctx.threadId },
         ...(output !== undefined ? { output } : {}),

@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import type { BoundGitCredentials, GitCredentials } from '@cairn/shared';
 import { describe, expect, onTestFinished, test } from 'vitest';
-import { commitEnv, runGit } from '../src/git.js';
+import { commitEnv, runGit, withGitCredentialFallback } from '../src/git.js';
 import { buildCreateTagTool } from '../src/tag-tool.js';
 import { testTempDir } from './test-temp-dir.js';
 
@@ -344,4 +344,38 @@ describe('create_tag — github shape real push (HTTP + x-access-token Basic aut
       await w.http.close();
     }
   });
+});
+
+test('App tag pushes refresh expired credentials once through the step operation', async () => {
+  const w = await makeHttpWorld('app-refresh', PROBE_CRED);
+  try {
+    await w.commit('a.txt', 'tagged work');
+    const expired = {
+      username: 'x-access-token',
+      password: 'expired-fixture',
+      url: w.remoteUrl,
+      kind: 'app' as const,
+    };
+    let refreshes = 0;
+    const tool = buildCreateTagTool({
+      repoDir: w.work,
+      cred: expired,
+      identity: IDENTITY,
+      withCredentials: async (operation) => {
+        await withGitCredentialFallback(operation, expired, {
+          what: 'tag push',
+          allowMachineFallback: true,
+          refresh: async () => {
+            refreshes++;
+            return { ...PROBE_CRED, url: w.remoteUrl, kind: 'app' };
+          },
+        });
+      },
+    });
+    expect(await tool.execute({ tag: 'v6.0.0' })).toContain('created and pushed');
+    expect(refreshes).toBe(1);
+    expect(await remoteTags(w.remoteBare)).toContain('v6.0.0');
+  } finally {
+    await w.http.close();
+  }
 });

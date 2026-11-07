@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -85,7 +85,9 @@ class FakeClient implements MachineApi {
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   transcripts: TranscriptUpload[] = [];
+  sessionUploads: string[] = [];
   git: GitCredentials | null = null;
+  replacement: GitCredentials | null = null;
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -118,7 +120,10 @@ class FakeClient implements MachineApi {
         models: [{ id: 'stub-model', name: 'stub-model' }],
       },
       secrets: {},
-      git: this.git,
+      git:
+        this.calls.filter((call) => call === 'token').length > 1
+          ? (this.replacement ?? this.git)
+          : this.git,
     };
   }
   async skillsManifest() {
@@ -142,6 +147,7 @@ class FakeClient implements MachineApi {
   }
   async putUpload(_url: string, _headers: Record<string, string>, body: TranscriptUpload | string) {
     if (typeof body !== 'string') this.transcripts.push(body);
+    else this.sessionUploads.push(body);
   }
   async done(stepId: string, body: MachineDoneBody) {
     this.doneBodies.push({ stepId, body });
@@ -216,13 +222,18 @@ function fakeWorkspace(opts: {
   return { ws, calls, pushes };
 }
 
-function completingBackend(onSession?: (opts: SessionOpts) => void, echo?: string): AgentBackend {
+function completingBackend(
+  onSession?: (opts: SessionOpts) => void,
+  echo?: string,
+  sessionFile?: string,
+): AgentBackend {
   return {
     capabilities: PI_CAPABILITIES,
     async createSession(opts): Promise<AgentSessionHandle> {
       onSession?.(opts);
       return {
         sessionId: 'pi-sess-cred',
+        ...(sessionFile ? { sessionFile } : {}),
         events: (async function* () {
           if (echo) {
             yield { type: 'text_delta', text: echo.slice(0, 5) } as never;
@@ -248,22 +259,30 @@ async function setup(
     workspace: ReturnType<typeof fakeWorkspace>;
     onSession?: (opts: SessionOpts) => void;
     echo?: string;
+    sessionText?: string;
+    replacement?: GitCredentials;
+    now?: () => number;
   },
 ) {
   probeMock.mockReset();
   probeMock.mockResolvedValue(null);
   const home = testTempDir('cairn-runner-cred-');
+  const sessionFile = join(home, 'session.jsonl');
+  if (opts.sessionText) writeFileSync(sessionFile, opts.sessionText);
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   client.git = opts.git ?? null;
+  client.replacement = opts.replacement ?? null;
   const journal = new StepJournal(paths.outboxDir);
   mkdirSync(join(home, 'workspaces'), { recursive: true });
   await runStep(
     {
+      ...(opts.now ? { now: opts.now } : {}),
       client,
       journal,
-      backendFor: () => completingBackend(opts.onSession, opts.echo),
+      backendFor: () =>
+        completingBackend(opts.onSession, opts.echo, opts.sessionText ? sessionFile : undefined),
       logger,
       paths,
       workspace: opts.workspace.ws,
@@ -469,7 +488,9 @@ test('App git authentication failure never retries with machine user credentials
     claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
     { git: { ...GITHUB_TOKEN, kind: 'app' }, workspace },
   );
-  expect(workspace.pushes).toHaveLength(1);
+  expect(workspace.pushes).toHaveLength(2);
+  expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
+  expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
   expect(client.doneBodies[0]?.body.status).toBe('failed');
 });
 
@@ -491,3 +512,56 @@ test('step shell credentials are erased when backend session creation fails', as
   expect(held?.GITHUB_TOKEN === undefined).toBe(true);
   expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
 });
+
+test.each(['auth', 'age', 'twice'] as const)(
+  'refreshes a long-step App credential once: %s',
+  async (scenario) => {
+    let clock = 1000;
+    let attempts = 0;
+    const replacement = {
+      ...GITHUB_TOKEN,
+      kind: 'app' as const,
+      password: 'refreshed-fixture-value',
+    };
+    const workspace = fakeWorkspace({
+      pushWithToken: async () => {
+        attempts++;
+        if (scenario === 'twice' || (scenario === 'auth' && attempts === 1))
+          throw new Error(`Authentication failed ${replacement.password}`);
+      },
+    });
+    const { client, lines, paths } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      {
+        git: { ...GITHUB_TOKEN, kind: 'app' },
+        replacement,
+        sessionText: `${JSON.stringify({ text: `${GITHUB_TOKEN.password} ${replacement.password}` })}\n`,
+        workspace,
+        now: () => clock,
+        onSession: () => {
+          if (scenario === 'age') clock += 51 * 60000;
+        },
+      },
+    );
+    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
+    for (const file of readdirSync(paths.outboxDir)) {
+      const content = readFileSync(join(paths.outboxDir, file), 'utf8');
+      expect(
+        content.includes(GITHUB_TOKEN.password) || content.includes(replacement.password),
+      ).toBe(false);
+    }
+    expect(client.sessionUploads.length).toBeGreaterThan(0);
+    expect(client.sessionUploads.join('').includes(GITHUB_TOKEN.password)).toBe(false);
+    expect(workspace.pushes).toHaveLength(scenario === 'age' ? 1 : 2);
+    expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
+    expect(client.doneBodies[0]?.body.status).toBe(scenario === 'twice' ? 'failed' : 'success');
+    expect(
+      JSON.stringify([
+        client.doneBodies,
+        client.transcripts,
+        client.sessionUploads,
+        lines,
+      ]).includes(replacement.password),
+    ).toBe(false);
+  },
+);

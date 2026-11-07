@@ -7,6 +7,7 @@ import type {
   AgentSessionHandle,
   AgentTodoItem,
   AgentTokenUsage,
+  BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
@@ -93,7 +94,12 @@ import {
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { buildExecutorRecord } from './executor-record.js';
-import { GitPushHookError, gitCredentialEnv, withGitCredentialFallback } from './git.js';
+import {
+  GitPushHookError,
+  gitCredentialEnv,
+  isGitAuthFailure,
+  withGitCredentialFallback,
+} from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
@@ -106,6 +112,7 @@ import { readSessionJsonlForUpload } from './session-jsonl.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
+import { ensureStepCoauthor } from './step-attribution.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
@@ -549,7 +556,20 @@ async function runClaimedStep(
   const tokenRes = await client.token(stepId);
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
   credentialCleanups.push(() => clearCredentials(creds));
-  const redact = credentialRedactor(creds.claudeSubscriptionToken, creds.git?.password);
+  const credentialValues = [creds.claudeSubscriptionToken, creds.git?.password];
+  const redactors = [credentialRedactor(...credentialValues)];
+  const redact = <T>(value: T): T => redactors.reduce((result, next) => next(result), value);
+  let credentialIssuedAt = now();
+  const refreshGit = async () => {
+    const fresh = (await client.token(stepId)).git;
+    if (fresh?.kind !== 'app' || creds.git === null)
+      throw new Error('App credential refresh unavailable');
+    credentialValues.push(fresh.password);
+    redactors.push(credentialRedactor(fresh.password));
+    creds.git = { ...fresh, url: creds.git.url };
+    credentialIssuedAt = now();
+    return creds.git;
+  };
   client = guardCredentialOutputs(client, redact);
   journal = guardCredentialOutputs(journal, redact);
   logger = guardCredentialOutputs(logger, redact);
@@ -673,18 +693,33 @@ async function runClaimedStep(
       return;
     }
     try {
-      ws = await deps.workspace.prepare({
-        projectId: claimed.project?.id ?? '',
-        conversationId: convId,
-        cloneUrl: repo.cloneUrl,
-        repoKind: repo.kind,
-        baseBranch: repo.baseBranch,
-        workspacesRoot: deps.workspacesDir,
-        credentials: creds.git,
-        localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
-        machineCredentialFallback: repo.kind === 'github',
-        ...(readonlyWorkspace ? { readonly: true } : {}),
-      });
+      const workspace = deps.workspace;
+      const prepare = () =>
+        workspace.prepare({
+          projectId: claimed.project?.id ?? '',
+          conversationId: convId,
+          cloneUrl: repo.cloneUrl,
+          repoKind: repo.kind,
+          baseBranch: repo.baseBranch,
+          workspacesRoot: deps.workspacesDir,
+          credentials: creds.git,
+          localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
+          machineCredentialFallback: repo.kind === 'github',
+          ...(readonlyWorkspace ? { readonly: true } : {}),
+        });
+      const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
+      await withGitCredentialFallback(
+        async () => {
+          prepared.workspace = await prepare();
+        },
+        creds.git,
+        {
+          what: 'prepare',
+          allowMachineFallback: false,
+          refresh: refreshGit,
+        },
+      );
+      ws = prepared.workspace;
     } catch (err) {
       clearCredentials(creds);
       await failStep(
@@ -775,8 +810,39 @@ async function runClaimedStep(
     name: claimed.agent?.displayName ?? 'cairn-agent',
     email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
   };
+  const withStepGit = async (
+    operation: (credential: BoundGitCredentials | null) => Promise<void>,
+  ) => {
+    let refreshed = false;
+    const refresh = async () => {
+      if (refreshed) throw new Error('App credential authentication failed after refresh');
+      refreshed = true;
+      return refreshGit();
+    };
+    if (creds.git?.kind === 'app' && now() - credentialIssuedAt >= 50 * 60_000) await refresh();
+    return withGitCredentialFallback(operation, creds.git, {
+      what: 'push',
+      allowMachineFallback: repo?.kind === 'github',
+      refresh,
+      onFallback: (reason) =>
+        logger.step(
+          `git push auth failed (per-step token), retrying with machine credentials: ${reason}`,
+        ),
+    });
+  };
   const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
-    ? buildCreateTagTool({ repoDir: ws?.cwd ?? null, cred: creds.git, identity: stepIdentity })
+    ? buildCreateTagTool({
+        repoDir: ws?.cwd ?? null,
+        cred: creds.git,
+        identity: stepIdentity,
+        withCredentials: async (operation) => {
+          try {
+            await withStepGit(operation);
+          } catch (error) {
+            throw new Error(redact(error instanceof Error ? error.message : String(error)));
+          }
+        },
+      })
     : null;
   const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
     (t): t is LocalToolDef => t !== null,
@@ -1835,6 +1901,17 @@ async function runClaimedStep(
     }
   }
 
+  const pushStep = (git: WorktreeOps, workspace: PreparedWorkspace) =>
+    withStepGit(async (credential) => {
+      await ensureStepCoauthor(
+        workspace.cwd,
+        workspace.branch,
+        headAtStart,
+        tokenRes.coAuthor ?? null,
+        credential,
+      );
+      await git.push(workspace.cwd, workspace.branch, credential);
+    });
   let headCommit: string | null = null;
   let branchDrift: { expected: string; actual: string } | null = null;
   let artifactBranches: string[] = [];
@@ -1862,9 +1939,12 @@ async function runClaimedStep(
           createdAt: now(),
         });
       }
+      const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
       const committed = await git.commitAll(
         ws.cwd,
-        `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`,
+        tokenRes.coAuthor
+          ? `${commitMessage}\n\nCo-authored-by: ${tokenRes.coAuthor.name} <${tokenRes.coAuthor.email}>`
+          : commitMessage,
         stepIdentity,
       );
       if (claimed.step.kind === 'merge') {
@@ -1891,19 +1971,7 @@ async function runClaimedStep(
         });
         logger.step(`push skipped: agent lacks ${AGENT_TOOL_PUSH} permission`);
       } else if (pushWarranted) {
-        const pushSource = await withGitCredentialFallback(
-          (cred) => git.push(ws.cwd, ws.branch, cred),
-          creds.git,
-          {
-            what: 'push',
-            allowMachineFallback: repo?.kind === 'github',
-            onFallback: (reason) => {
-              logger.step(
-                `git push auth failed (per-step token), retrying with machine credentials: ${reason}`,
-              );
-            },
-          },
-        );
+        const pushSource = await pushStep(git, ws);
         if (pushSource === 'machine') {
           transcript.upsert({
             id: `git-credential-${stepId}`,
@@ -1930,7 +1998,9 @@ async function runClaimedStep(
           );
         }
       }
-      headCommit = committed.head ?? (await git.headCommit(ws.cwd));
+      headCommit = tokenRes.coAuthor
+        ? await git.headCommit(ws.cwd)
+        : (committed.head ?? (await git.headCommit(ws.cwd)));
       const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
       if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
         try {
@@ -1963,6 +2033,7 @@ async function runClaimedStep(
   if (
     isBuildStepKind(claimed.step.kind) &&
     lastError !== null &&
+    !isGitAuthFailure(lastError) &&
     !stopped &&
     ws !== null &&
     ws.readonly !== true &&
@@ -1979,10 +2050,7 @@ async function runClaimedStep(
         pushAllowed &&
         (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0
       ) {
-        await withGitCredentialFallback((cred) => git.push(ws.cwd, ws.branch, cred), creds.git, {
-          what: 'push',
-          allowMachineFallback: repo?.kind === 'github',
-        });
+        await pushStep(git, ws);
         headCommit = await git.headCommit(ws.cwd);
         preservedCommits =
           (await git.commitsAhead?.(ws.cwd, ws.defaultBranch)) ??
@@ -2113,16 +2181,12 @@ async function runClaimedStep(
       : {}),
   };
   const redactedSessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
-  const sessionFileForUpload = prepareCredentialSessionUpload(
-    prepareCredentialSessionUpload(
-      handle?.sessionFile,
-      creds.git?.password,
-      redactedSessionFile,
-      (message) => logger.step(message),
-    ),
-    creds.claudeSubscriptionToken,
-    redactedSessionFile,
-    (message) => logger.step(message),
+  const sessionFileForUpload = credentialValues.reduce<string | undefined>(
+    (source, credential) =>
+      prepareCredentialSessionUpload(source, credential, redactedSessionFile, (message) =>
+        logger.step(message),
+      ),
+    handle?.sessionFile,
   );
   journal.update(stepId, {
     state: 'awaiting-upload',

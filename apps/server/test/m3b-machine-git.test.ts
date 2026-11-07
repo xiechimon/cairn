@@ -520,6 +520,8 @@ test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
       {
         teamId: w.s.team.id,
         login: 'human',
+        githubUserId: 12,
+        githubName: 'Human',
         accessToken: 'identity-test-user',
         scope: 'repo',
       },
@@ -534,6 +536,11 @@ test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
       expect(response.status).toBe(200);
       const result = machineTokenResponseSchema.parse(await response.json());
       expect(result.git?.password === (reason === null ? app : 'identity-test-user')).toBe(true);
+      expect(result.coAuthor).toEqual({
+        name: 'Human',
+        login: 'human',
+        email: '12+human@users.noreply.github.com',
+      });
       expect(result.git?.kind).toBe(reason === null ? 'app' : 'unattributed');
       expect(info).toHaveBeenCalledWith(
         'github step credential',

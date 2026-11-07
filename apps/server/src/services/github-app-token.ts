@@ -76,7 +76,11 @@ async function mintToken(socketPath: string, force: boolean) {
   });
   const value = mintResponseSchema.parse(payload);
   if (Date.parse(value.expiresAt) <= Date.now() + 300_000) throw new Error('mint token expiring');
-  return { token: value.token as AppToken, expiresAt: Date.parse(value.expiresAt) };
+  return {
+    token: value.token as AppToken,
+    expiresAt: Date.parse(value.expiresAt),
+    appSlug: value.appSlug,
+  };
 }
 
 async function installation(deps: GithubAppTokenDeps, force: boolean) {
@@ -100,11 +104,16 @@ async function loadInstallation(deps: GithubAppTokenDeps, path: string, force: b
   const fetchImpl = deps.fetchImpl ?? fetch;
   for (let attempt = 0; attempt < 2; attempt++) {
     const minted = await mintToken(path, force || attempt > 0);
-    registerAppToken(minted.token, minted.expiresAt, (inner, target) => async (input, init) => {
-      const response = await appGithubFetch({ ...deps, fetchImpl: inner }, target, input, init);
-      if (response === null) throw new Error('GitHub App token refresh unavailable');
-      return response;
-    });
+    registerAppToken(
+      minted.token,
+      minted.expiresAt,
+      (inner, target) => async (input, init) => {
+        const response = await appGithubFetch({ ...deps, fetchImpl: inner }, target, input, init);
+        if (response === null) throw new Error('GitHub App token refresh unavailable');
+        return response;
+      },
+      minted.appSlug,
+    );
     const repositories = new Set<string>();
     let retry = false;
     for (let page = 1; ; page++) {
@@ -166,8 +175,9 @@ async function repoToken(deps: GithubAppTokenDeps, repo: Repository, force: bool
 export function appTokenOrNull(
   deps: GithubAppTokenDeps,
   repo: Repository,
+  force = false,
 ): Promise<AppToken | null> {
-  return repoToken(deps, repo, false);
+  return repoToken(deps, repo, force);
 }
 
 export async function appGithubFetch(

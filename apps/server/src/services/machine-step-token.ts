@@ -11,6 +11,7 @@ import {
 } from './credentials.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
+import { humanWorkIdentity } from './github-work-attribution.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -43,7 +44,8 @@ export async function stepToken(
     git = issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId });
   } else if (projectRow?.repoKind === 'github' && todoRow) {
     const ref = githubRepoOfProject(projectRow);
-    const githubToken = ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref);
+    const githubToken =
+      ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref, true);
     console.info('github step credential', {
       stepId,
       kind: githubToken === null ? 'none' : isAppToken(githubToken) ? 'app' : 'unattributed',
@@ -58,6 +60,10 @@ export async function stepToken(
         : null;
   }
   return {
+    coAuthor:
+      todoRow && stepRow?.scheduleId == null
+        ? humanWorkIdentity(deps.db, todoRow, buildRow?.triggerSource)
+        : null,
     provider: toProviderConfig(
       bundle.provider,
       stepRow?.fallback?.model?.provider ?? agentRow?.provider,
@@ -113,5 +119,6 @@ function chiefStepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     git: null,
+    coAuthor: null,
   };
 }

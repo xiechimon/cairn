@@ -12,7 +12,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, project, step, threadPr, todo } from '../src/db/schema.js';
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
 import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
-import type { AutonomousToken } from '../src/lib/github-token.js';
+import { type AppToken, type AutonomousToken, registerAppToken } from '../src/lib/github-token.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
 import { createPrWakes } from '../src/services/pr-wakes.js';
@@ -85,6 +85,7 @@ function fixture() {
     timeline: [{ __typename: 'PullRequestCommit', commit: { oid: 'abc' } }] as unknown[],
     failure: null as null | { operation: string; kind: string },
     resolved: false,
+    resolvedBy: null as string | null,
     findingId: 'RT_1',
     outdated: false,
     login: 'chatgpt-codex-connector[bot]',
@@ -144,11 +145,20 @@ function fixture() {
     const failure = state.failure?.operation === operation ? state.failure.kind : null;
     if (failure) state.failure = null;
     if (query.includes('mutation') && state.apply && (!failure || failure === 'lost')) {
-      if (operation === 'addLabel') state.labels.push(CAIRN_REVIEW_HOLD_LABEL);
-      else if (operation === 'removeLabel') {
+      if (operation === 'addLabel') {
+        state.labels.push(CAIRN_REVIEW_HOLD_LABEL);
+        state.timeline.push({
+          __typename: 'LabeledEvent',
+          actor: { login: 'cairnwright', __typename: 'Bot' },
+          label: { name: CAIRN_REVIEW_HOLD_LABEL },
+          createdAt: '2026-11-07T01:01:00Z',
+        });
+      } else if (operation === 'removeLabel') {
         state.labels = state.labels.filter((name) => name !== CAIRN_REVIEW_HOLD_LABEL);
         state.timeline.push({
           __typename: 'UnlabeledEvent',
+          actor: { login: 'cairnwright', __typename: 'Bot' },
+          createdAt: '2026-11-07T01:02:00Z',
           label: { name: CAIRN_REVIEW_HOLD_LABEL },
         });
       } else state.draft = operation === 'convert';
@@ -166,6 +176,7 @@ function fixture() {
           {
             id: state.findingId,
             isResolved: state.resolved,
+            resolvedBy: state.resolvedBy ? { login: state.resolvedBy } : null,
             isOutdated: state.outdated,
             path: 'a.ts',
             line: 7,
@@ -694,7 +705,7 @@ test('a human marking a held PR ready is converted back until findings resolve',
   expect(f.state.labels).toEqual([]);
 });
 
-test('review snapshots do not request or depend on timeline events', async () => {
+test('review snapshots request actor timeline evidence', async () => {
   const f = fixture();
   const implementation = f.fetch.getMockImplementation()!;
   f.fetch.mockImplementation(async (url, init) => {
@@ -709,7 +720,7 @@ test('review snapshots do not request or depend on timeline events', async () =>
   expect(snapshot.findings).toHaveLength(1);
   expect(snapshot).not.toHaveProperty('overridden');
   expect(snapshot).not.toHaveProperty('timeline');
-  expect(f.queries[0]).not.toMatch(
+  expect(f.queries[0]).toMatch(
     /timelineItems|UNLABELED_EVENT|PULL_REQUEST_COMMIT|HEAD_REF_FORCE_PUSHED_EVENT/,
   );
 });
@@ -890,3 +901,83 @@ test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
     }
   },
 );
+
+test.each(['app-removal', 'human-removal', 'human-ready', 'unattributed', 'new-head'])(
+  'actor override convergence: %s',
+  async (scenario) => {
+    const f = fixture();
+    registerAppToken('fake' as AppToken, Date.now() + 3600000, (inner) => inner, 'cairnwright');
+    f.state.timeline = [
+      {
+        __typename: 'PullRequestCommit',
+        commit: { oid: 'abc', committedDate: '2026-11-07T01:00:00Z', pushedDate: null },
+      },
+      {
+        __typename: 'LabeledEvent',
+        actor: {
+          login: scenario === 'unattributed' ? 'human' : 'Cairnwright',
+          __typename: scenario === 'unattributed' ? 'User' : 'Bot',
+        },
+        label: { name: CAIRN_REVIEW_HOLD_LABEL },
+        createdAt: '2026-11-07T01:01:00Z',
+      },
+      {
+        __typename: scenario === 'human-ready' ? 'ReadyForReviewEvent' : 'UnlabeledEvent',
+        actor: {
+          login: scenario === 'app-removal' ? 'cairnwright' : 'human',
+          __typename: scenario === 'app-removal' ? 'Bot' : 'User',
+        },
+        label: { name: CAIRN_REVIEW_HOLD_LABEL },
+        createdAt: '2026-11-07T01:02:00Z',
+      },
+    ];
+    if (scenario === 'human-ready') f.state.labels = [CAIRN_REVIEW_HOLD_LABEL];
+    if (scenario === 'new-head') {
+      f.state.head = 'next';
+      f.state.timeline.push({
+        __typename: 'PullRequestCommit',
+        commit: { oid: 'next', committedDate: '2026-11-07T01:03:00Z', pushedDate: null },
+      });
+    }
+    await f.reconcile();
+    const overridden = ['human-removal', 'human-ready'].includes(scenario);
+    expect(f.queries.some((q) => q.includes('mutation'))).toBe(!overridden);
+  },
+);
+test.each(['human', 'cairnwright[bot]'])(
+  'resolved threads are not findings regardless of resolver: %s',
+  async (resolver) => {
+    const f = fixture();
+    f.state.resolved = true;
+    f.state.resolvedBy = resolver;
+    expect(await f.reconcile()).toEqual([]);
+    f.state.resolved = false;
+    expect(await f.reconcile()).toHaveLength(1);
+    expect(f.queries.some((query) => query.includes('addLabelsToLabelable'))).toBe(true);
+  },
+);
+
+test('App release converges and a same-head new finding re-holds', async () => {
+  const f = fixture();
+  registerAppToken('fake' as AppToken, Date.now() + 3600000, (inner) => inner, 'cairnwright');
+  f.state.timeline = [
+    {
+      __typename: 'PullRequestCommit',
+      commit: { oid: 'abc', committedDate: '2026-11-07T01:00:00Z', pushedDate: null },
+    },
+  ];
+  await f.reconcile();
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  f.state.resolved = true;
+  await f.reconcile();
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+  expect(f.state.labels).toEqual([]);
+  f.state.findingId = 'RT_new';
+  f.state.resolved = false;
+  await f.reconcile();
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.state.labels).toContain(CAIRN_REVIEW_HOLD_LABEL);
+});

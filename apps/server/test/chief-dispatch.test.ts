@@ -106,3 +106,15 @@ describe('merge_builds machine entry hard-refused (#1256)', () => {
     expect(steps).toHaveLength(0);
   });
 });
+
+test.each(['Please implement this', '[wake:gate] provenance=test\nReview task'])(
+  'records the requesting actor from the coordinator turn: %s',
+  async (turnPrompt) => {
+    const created = (await relay(
+      'create_todo',
+      { projectId: H.projectId, title: 'Requested task', spec: 'Implement' },
+      { turnPrompt },
+    )) as { createdBy: string | null };
+    expect(created.createdBy).toBe(turnPrompt.startsWith('[wake:') ? AGENT_ID : H.userId);
+  },
+);

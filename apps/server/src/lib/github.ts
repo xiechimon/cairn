@@ -493,15 +493,28 @@ export async function githubUserRepos(
   return repos;
 }
 
-export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
+export async function githubUserIdentity(
+  fetchImpl: FetchLike,
+  token: string,
+): Promise<{ login: string; id: number; name: string | null }> {
   const data = (await readJson(fetchImpl, `${githubApiBaseUrl()}/user`, {
     ...API_HEADERS,
     authorization: `Bearer ${token}`,
-  })) as { login?: unknown };
-  if (typeof data.login !== 'string' || data.login === '') {
-    throw new HttpError(502, 'github user response missing login');
+  })) as { login?: unknown; id?: unknown; name?: unknown };
+  if (
+    typeof data.login !== 'string' ||
+    data.login === '' ||
+    typeof data.id !== 'number' ||
+    !Number.isSafeInteger(data.id) ||
+    data.id <= 0
+  ) {
+    throw new HttpError(502, 'github user response missing identity');
   }
-  return data.login;
+  return { login: data.login, id: data.id, name: typeof data.name === 'string' ? data.name : null };
+}
+
+export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
+  return (await githubUserIdentity(fetchImpl, token)).login;
 }
 
 export interface GithubLabel {

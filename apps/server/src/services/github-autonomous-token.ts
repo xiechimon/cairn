@@ -7,6 +7,7 @@ export async function autonomousToken(
   deps: GithubTokenDeps,
   teamId: string,
   repo: { owner: string; repo: string },
+  force = false,
 ): Promise<AutonomousToken | null> {
   let reason: AppTokenReason = 'app-token-unavailable';
   const app = await appTokenOrNull(
@@ -21,6 +22,7 @@ export async function autonomousToken(
       },
     },
     repo,
+    force,
   );
   if (app !== null) return app;
   const user = await userTokenOrNull(deps, teamId);

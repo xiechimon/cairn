@@ -4,7 +4,12 @@ import { afterEach, expect, expectTypeOf, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../src/config.js';
 import { type FetchLike, githubCreateCommitStatus } from '../src/lib/github.js';
-import { type AppToken, tokenValue, type UserToken } from '../src/lib/github-token.js';
+import {
+  type AppToken,
+  githubAppBotLogin,
+  tokenValue,
+  type UserToken,
+} from '../src/lib/github-token.js';
 import { appGithubFetch, appTokenOrNull } from '../src/services/github-app-token.js';
 import * as connection from '../src/services/github-connection.js';
 
@@ -74,6 +79,7 @@ test('uninstalled repository fails closed; membership cached with token and case
   vi.stubGlobal('fetch', fetch);
   const token = await appTokenOrNull(deps, repo);
   expect(token && tokenValue(token)).toBe('app-1');
+  expect(token && githubAppBotLogin(token)).toBe('cairnwright[bot]');
   expect(await appTokenOrNull(deps, { owner: 'OCTO', repo: 'ALPHA' })).toBe(token);
   expect(await appTokenOrNull(deps, { owner: 'octo', repo: 'other' })).toBeNull();
   expect(reason).toHaveBeenLastCalledWith({
@@ -340,4 +346,15 @@ test('shared installation token retains the requested repository on refresh afte
   );
   expect(listing).toBe(2);
   expect(writes).toBe(1);
+});
+
+test('step credential refresh explicitly bypasses the mint cache', async () => {
+  const { deps, refreshes } = await mint();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => installed()),
+  );
+  await appTokenOrNull(deps, repo);
+  await appTokenOrNull(deps, repo, true);
+  expect(refreshes).toEqual([false, true]);
 });

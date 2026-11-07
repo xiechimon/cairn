@@ -17,7 +17,7 @@ const LOOPBACK_URL_HOSTS = ['127.0.0.1', 'localhost', '[::1]'];
 
 export function runGit(
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string } = {},
 ): Promise<GitRunResult> {
   return new Promise((resolve, reject) => {
     const env = { ...process.env, ...opts.env };
@@ -31,6 +31,7 @@ export function runGit(
       windowsHide: true,
       ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
     });
+    if (opts.input !== undefined) child.stdin.end(opts.input);
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     child.stdout.on('data', (c: Buffer) => stdout.push(c));
@@ -49,7 +50,7 @@ export function runGit(
 
 export async function runGitOk(
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string } = {},
 ): Promise<string> {
   const r = await runGit(args, opts);
   if (r.code === 0) return r.stdout.trim();
@@ -157,6 +158,7 @@ export interface GitCredentialFallbackOpts {
   what: string;
   allowMachineFallback: boolean;
   onFallback?: (reason: GitFallbackReason) => void;
+  refresh?: () => Promise<BoundGitCredentials>;
 }
 
 export async function withGitCredentialFallback(
@@ -173,6 +175,12 @@ export async function withGitCredentialFallback(
     return 'integration';
   } catch (err) {
     const first = err instanceof Error ? err.message : String(err);
+    if (cred.kind === 'app' && opts.refresh && isGitAuthFailure(first)) {
+      const fresh = await opts.refresh();
+      if (fresh.kind !== 'app') throw new Error('App credential refresh unavailable');
+      await op(fresh);
+      return 'integration';
+    }
     if (
       cred.kind === 'app' ||
       err instanceof GitPushHookError ||
