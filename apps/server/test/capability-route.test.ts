@@ -2,7 +2,13 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { machine as machineTable, step, stepRoute, todo as todoTable } from '../src/db/schema.js';
+import {
+  claudeSubscription,
+  machine as machineTable,
+  step,
+  stepRoute,
+  todo as todoTable,
+} from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { profileForStep } from '../src/services/routing-rules.js';
 import { recordStepRoute } from '../src/services/step-route.js';
@@ -209,6 +215,55 @@ describe('one path decides what a dispatched step runs on', () => {
 });
 
 describe('the router agrees with what dispatch can execute', () => {
+  test('a team subscription makes a machine with an expired local login usable', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
+    w.s.db
+      .update(machineTable)
+      .set({
+        claudeCodeReport: {
+          ...row.claudeCodeReport!,
+          login: { state: 'expired', expiresAt: nowMs() - HOUR_MS },
+        },
+      })
+      .where(eq(machineTable.id, w.machineId))
+      .run();
+    const todoRow = await buildTodo(w, 'rename one label');
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ provider: 'openai-codex' });
+    w.s.db
+      .insert(claudeSubscription)
+      .values({
+        id: 'sub-1',
+        teamId: w.s.team.id,
+        label: 'team',
+        tokenCipher: 'cipher',
+        expiresAt: null,
+        createdAt: nowMs(),
+      })
+      .run();
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-haiku-5-5',
+    });
+  });
+
+  test('citation checkers keep their rule instead of being routed', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
+    w.s.db
+      .update(todoTable)
+      .set({ sourceKind: 'research-citation-check' })
+      .where(eq(todoTable.id, todoRow.id))
+      .run();
+    const checker = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoRow.id)).get()!;
+    expect(profileForStep(w.s.db, checker, 'build')).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+  });
+
   test('an expired weekly window no longer rejects Claude', async () => {
     const w = await setupWorld();
     equipMachine(w, {

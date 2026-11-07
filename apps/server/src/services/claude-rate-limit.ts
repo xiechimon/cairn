@@ -12,6 +12,7 @@ import {
   parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, type QuotaWaitRow, step, team, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
@@ -28,7 +29,7 @@ type StepRow = typeof step.$inferSelect;
 type AgentRow = RouteProfile;
 
 export function claudeUsageGatePasses(
-  deps: Pick<MachineDeps, 'db'>,
+  deps: { db: Pick<Db, 'select'> },
   machineRow: Pick<typeof machine.$inferSelect, 'teamId' | 'claudeCodeReport'>,
   model: Pick<AgentRow, 'provider' | 'modelId'>,
 ): boolean {

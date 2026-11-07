@@ -177,7 +177,7 @@ export function profileForStep(
   const base = ruleProfileForStep(db, todoRow, kind);
   if (base === null) return null;
   const route = routeForStep(db, todoRow, kind);
-  if (route?.use !== 'session') return base;
+  if (route?.use !== 'session' || todoRow.sourceKind === 'research-citation-check') return base;
   if (base.provider === null || !ROUTED_PROVIDERS.includes(base.provider)) return base;
   const decision = decideStepRoute(db, todoRow, kind, stepId, {
     machineId: base.machineId,

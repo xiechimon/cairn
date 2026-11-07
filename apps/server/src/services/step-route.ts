@@ -2,6 +2,7 @@ import {
   type CapabilityCandidate,
   CODEX_MODEL,
   classifyDifficulty,
+  claudeLoginBlocksClaim,
   claudeRateBlock,
   type RequiredCapabilities,
   type RouteWorkDecision,
@@ -10,10 +11,11 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { machine, type step, stepRoute, team, type todo } from '../db/schema.js';
+import { machine, type step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { claudeUsageGatePasses } from './claude-rate-limit.js';
+import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { missingCapabilityItems } from './dispatch-eligibility.js';
-import { machineUsesClaudeSubscription } from './model-routing.js';
 
 type StepRouteRow = typeof stepRoute.$inferSelect;
 type RoutedTodo = Pick<typeof todo.$inferSelect, 'teamId'> &
@@ -60,22 +62,22 @@ export function capabilityCandidates(
   constraints: RouteConstraints,
 ): CapabilityCandidate[] {
   const now = nowMs();
-  const allowPaid =
-    db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage === 'allow-paid';
   const candidates: CapabilityCandidate[] = [];
   for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
     if (!machineSatisfies(row, constraints)) continue;
     const report = row.claudeCodeReport;
     const claudeInstalled =
       report?.installed === true && row.enabledRuntimes.includes('claude-code');
-    const paid = !machineUsesClaudeSubscription(report) && !allowPaid;
     const claudeUsable =
       claudeInstalled &&
       row.online &&
-      !paid &&
+      claudeUsageGatePasses({ db }, row, {
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+      }) &&
       claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
       report?.auth?.state !== 'not-logged-in' &&
-      report?.login?.state !== 'expired';
+      (hasActiveClaudeSubscription({ db }, teamId) || !claudeLoginBlocksClaim(report?.login, now));
     for (const modelId of CLAUDE_MODELS) {
       candidates.push({
         harness: 'claude-code',
