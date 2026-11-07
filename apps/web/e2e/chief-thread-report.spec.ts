@@ -218,10 +218,66 @@ test('a thread-message marker names the sender', async ({ page }) => {
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  const rows = stream.getByTestId('thread-message-marker');
-  await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toHaveText('你直接对 #9 说：JSON please');
-  await expect(rows.nth(1)).toHaveText('Coordinator 直接对 #9 说：Use CSV instead');
+  const row = stream.getByTestId('thread-activity');
+  await expect(row.getByTestId('thread-activity-summary')).toHaveText('任务 #9 · 2 次追问');
+  await expect(row.getByRole('link')).toHaveCount(1);
+  await expect(row.getByRole('link')).toHaveText('#9');
+  await expect(row.getByTestId('thread-activity-event')).toHaveCount(0);
+  await row.getByTestId('thread-activity-toggle').click();
+  const events = row.getByTestId('thread-activity-event');
+  await expect(events).toHaveText(['你：JSON please', 'Coordinator：Use CSV instead']);
+  await expect(row.getByRole('link')).toHaveCount(1);
+});
+
+test('events about one thread coalesce, repeated statuses dedupe, another thread breaks the group', async ({
+  page,
+}) => {
+  const event = (
+    id: string,
+    content: Record<string, unknown>,
+    createdAt: number,
+    thread = { todoId: TASK.id, seqNum: TASK.seqNum },
+  ) => ({
+    id,
+    role: 'system',
+    content: JSON.stringify({ ...thread, title: TASK.title, ...content }),
+    createdAt,
+  });
+  const message = (id: string, createdAt: number, thread?: { todoId: string; seqNum: number }) =>
+    event(
+      id,
+      { kind: 'thread-message', excerpt: id, delivered: 'steer', conversationId: 'build-1', by: 'user' },
+      createdAt,
+      thread,
+    );
+  const review = (id: string, createdAt: number) =>
+    event(id, { kind: 'thread-report', phase: 'review' }, createdAt);
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      message('one', 20),
+      message('two', 21),
+      review('r1', 22),
+      review('r2', 23),
+      message('elsewhere', 24, { todoId: 'other-todo', seqNum: 3 }),
+    ],
+    todos: [],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  const group = stream.getByTestId('thread-activity');
+  await expect(group).toHaveCount(1);
+  await expect(group.getByTestId('thread-activity-summary')).toHaveText(`任务 #9 · 2 次追问 · 审阅中`);
+  await group.getByTestId('thread-activity-toggle').click();
+  await expect(group.getByTestId('thread-activity-event')).toHaveCount(3);
+  await expect(stream.getByTestId('thread-message-marker')).toHaveText('你直接对 #3 说：elsewhere');
+  const box = await group.getByTestId('thread-activity-summary').boundingBox();
+  const chat = await stream.boundingBox();
+  if (box === null || chat === null) throw new Error('no box');
+  expect(box.x - chat.x).toBeLessThan(40);
+  const decoration = await group.getByTestId('thread-activity-summary').evaluate((node) => getComputedStyle(node).textDecorationLine);
+  expect(decoration).toBe('none');
 });
 
 test('a parked question keeps its reply after a later review report', async ({ page }) => {

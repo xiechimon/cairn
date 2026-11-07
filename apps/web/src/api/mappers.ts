@@ -133,6 +133,18 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
     : { label: '排队中：等空闲机器（前面 {ahead} 个）', vars: { ahead } };
 }
 
+function connectingLine(queue: NonNullable<StepRow['queue']>): {
+  label: string;
+  vars?: Record<string, string | number>;
+  detail?: { label: string; vars: Record<string, string | number> };
+} {
+  const full = queueLabel(queue);
+  if (queue.hold != null || queue.blocked != null) return full;
+  return queue.waitingFor != null
+    ? { label: '正在连接 {machine}...', vars: { machine: queue.waitingFor.name }, detail: full }
+    : { label: '处理中...', detail: full };
+}
+
 function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
   label: string;
   vars: Record<string, string | number>;
@@ -1596,11 +1608,12 @@ export function mapChief(
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
-        const queued = queueLabel(turnQueue);
+        const queued = connectingLine(turnQueue);
         chiefStream.push({
           kind: 'streaming',
           label: queued.label,
-          labelVars: queued.vars,
+          ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
+          ...(queued.detail !== undefined ? { labelDetail: queued.detail } : {}),
         });
       } else {
         const actLabel = opts.activity != null ? activityLabel(opts.activity) : null;

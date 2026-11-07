@@ -270,12 +270,20 @@ const HEAD_SIZE: Record<number, string> = {
   6: 'text-ui',
 };
 
-function HeadingTag({ level, segments }: { level: number; segments: DocSegment[] }) {
+function HeadingTag({
+  level,
+  segments,
+  conversational,
+}: {
+  level: number;
+  segments: DocSegment[];
+  conversational: boolean;
+}) {
   const clamped = Math.min(6, Math.max(1, level));
   const Tag = `h${clamped}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
   return (
     <Tag
-      className={`chat-md-head chat-md-head--${clamped} mt-3 mb-1 font-semibold text-(--foreground) first:mt-0 ${HEAD_SIZE[clamped] ?? 'text-ui'}`}
+      className={`chat-md-head chat-md-head--${clamped} mt-3 mb-1 font-semibold text-(--foreground) first:mt-0 ${conversational ? 'text-card-title' : (HEAD_SIZE[clamped] ?? 'text-ui')}`}
     >
       <Segments segments={segments} codeClassName="chat-code" />
     </Tag>
@@ -446,7 +454,13 @@ function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }>
   );
 }
 
-export function ChatMarkdown({ text }: { text: string }) {
+export function ChatMarkdown({
+  text,
+  conversational = false,
+}: {
+  text: string;
+  conversational?: boolean;
+}) {
   const blocks = useMemo(() => parseChatMarkdown(text), [text]);
   const [preview, setPreview] = useState<{ name: string; src: string } | null>(null);
   return (
@@ -454,7 +468,14 @@ export function ChatMarkdown({ text }: { text: string }) {
       {blocks.map((block, i) => {
         switch (block.kind) {
           case 'head':
-            return <HeadingTag key={i} level={block.level} segments={block.segments} />;
+            return (
+              <HeadingTag
+                key={i}
+                level={block.level}
+                segments={block.segments}
+                conversational={conversational}
+              />
+            );
           case 'ordered':
             return (
               <div
