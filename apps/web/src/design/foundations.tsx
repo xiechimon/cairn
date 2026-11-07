@@ -303,7 +303,7 @@ function Swatch({ name, cssVar }: { name: string; cssVar: string }) {
   return (
     <Button
       variant="ghost"
-      className="h-auto flex-col items-stretch gap-0 overflow-hidden border-border bg-card p-0 text-left font-normal hover:bg-card hover:shadow-(--e1) dark:hover:bg-card"
+      className="h-auto flex-col items-stretch gap-0 overflow-hidden border-border bg-card p-0 text-left font-normal hover:bg-card dark:hover:bg-card"
       onClick={() => {
         navigator.clipboard
           ?.writeText(`var(${cssVar})`)

@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "2defb94fff14a296c1213bc9b7984051d406705a",
-    "date": "2026-11-06"
+    "sha": "749f36b74e21db2872e3c5c07992137171bf2519",
+    "date": "2026-11-07"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -45,8 +45,8 @@
       "kind": "registry",
       "upstreamItem": "button",
       "status": "deviated",
-      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries.",
-      "hash": "e7a480b92aa514297f53d119a578a6501b4d6f78b97205a8b2d1a1a1a02c2dae"
+      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries. Owner hover policy: pressed buttons stay flat and color transitions exclude box-shadow.",
+      "hash": "8b64311a7995b43251cfba06ccab90751422146af2fd5477396aef965802fb7c"
     },
     "card.tsx": {
       "kind": "registry",
