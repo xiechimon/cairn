@@ -134,6 +134,12 @@ export function capMemories<T extends InjectedMemory & { updatedAt: number }>(
     keep.add(row.id);
   }
   const shown = rows.filter((row) => keep.has(row.id));
+  const newest = byRecency[0];
+  if (shown.length === 0 && newest !== undefined && Number.isFinite(capTokens)) {
+    const room = Math.max(1, Math.floor(capTokens / 1.25) - newest.title.length);
+    const content = `${newest.content.slice(0, room)} …`;
+    return { shown: [{ ...newest, content }], omitted: rows.length - 1 };
+  }
   return { shown, omitted: rows.length - shown.length };
 }
 

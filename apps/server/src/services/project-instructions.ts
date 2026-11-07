@@ -50,7 +50,7 @@ export function projectTurnContextTraced(
   const memories = injected.memories;
   const sections = [
     ...(row.instructions != null ? [`## 项目说明（${name}）\n${row.instructions}`] : []),
-    ...(memories.length > 0
+    ...(memories.length > 0 || injected.omitted > 0
       ? [
           `## 项目记忆（${name}）\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}${
             injected.omitted > 0

@@ -51,6 +51,14 @@ describe('capMemories', () => {
     expect(omitted).toBe(1);
   });
 
+  test('when every entry alone exceeds the cap, the newest is cut to fit and the rest are counted', () => {
+    const rows = ['a', 'b', 'c'].map((id, i) => row(id, 'x'.repeat(20_000), i));
+    const { shown, omitted } = capMemories(rows, 500);
+    expect(shown.map((r) => r.id)).toEqual(['c']);
+    expect(shown[0]?.content.length).toBeLessThan(500);
+    expect(omitted).toBe(2);
+  });
+
   test('shows everything when it all fits', () => {
     expect(capMemories([row('a', 'x', 1), row('b', 'y', 2)], 1000)).toMatchObject({ omitted: 0 });
   });
@@ -98,6 +106,21 @@ describe('project memory is loaded only for a routed project', () => {
         threadId: H.threadId,
       }),
     ).toBeNull();
+  });
+
+  test('a project whose memories are all oversized still gets a cut entry and the overflow notice', () => {
+    for (const id of ['p1', 'p2', 'p3']) {
+      put(id, 'w'.repeat(30_000), { projectId: H.projectId, updatedAt: Number(id.slice(1)) });
+    }
+    const traced = projectTurnContextTraced(
+      H.s.db,
+      { teamId: H.teamId, agentId: AGENT_ID, projectId: H.projectId, threadId: H.threadId },
+      800,
+    );
+    expect(traced?.memoryIds).toEqual(['p3']);
+    expect(traced?.memoriesOmitted).toBe(2);
+    expect(traced?.text).toContain('另有 2 条项目记忆');
+    expect(traced?.text.length).toBeLessThan(3_000);
   });
 
   test('a routed project loads its own memories and never another project’s or team-wide ones', () => {
