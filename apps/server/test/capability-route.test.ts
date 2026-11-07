@@ -146,7 +146,7 @@ async function claim(w: World): Promise<ClaimedStep | null> {
 }
 
 describe('one path decides what a dispatched step runs on', () => {
-  test('easy work goes to Haiku, hard work to Opus, on the same rule row', async () => {
+  test('easy work goes to Haiku, hard work to Codex, on the same rule row', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const easy = await buildTodo(w, 'rename one label');
@@ -156,8 +156,8 @@ describe('one path decides what a dispatched step runs on', () => {
     });
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
-      provider: 'claude-code',
-      modelId: 'claude-opus-5-5',
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
     });
   });
 
@@ -171,13 +171,13 @@ describe('one path decides what a dispatched step runs on', () => {
     });
   });
 
-  test('no Codex connection: review stays pinned to Codex and cannot run on Claude', async () => {
+  test('review steps keep their own rule and are never routed', async () => {
     const w = await setupWorld();
-    equipMachine(w, { claude: true, codex: false });
+    equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
     expect(profileForStep(w.s.db, todoRow, 'review')).toMatchObject({
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
     });
   });
 

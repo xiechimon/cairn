@@ -41,18 +41,10 @@ const build = (difficulty: RouteWorkRequest['difficulty']): RouteWorkRequest => 
 describe('implementation routing by difficulty', () => {
   const all = [...claudeOn('m1'), codexOn('m1')];
 
-  test('hard work goes to Opus, keeping Codex free to review it independently', () => {
+  test('hard work goes to the strongest available model', () => {
     const decision = routeWork(build('hard'), all);
-    expect(decision.chosen).toMatchObject({ modelId: 'claude-opus-5-5', harness: 'claude-code' });
-    expect(decision.reason).toBe('hard: claude-opus-5-5 ranked first');
-  });
-
-  test('hard work falls to Codex only when no Claude model is usable', () => {
-    const decision = routeWork(build('hard'), [
-      ...claudeOn('m1', { weeklyUsedPercent: 90 }),
-      codexOn('m1'),
-    ]);
     expect(decision.chosen).toMatchObject({ modelId: 'gpt-6.1-sol', harness: 'pi' });
+    expect(decision.reason).toBe('hard: gpt-6.1-sol ranked first');
   });
 
   test('standard work goes to Sonnet', () => {
@@ -71,55 +63,27 @@ describe('implementation routing by difficulty', () => {
 });
 
 describe('failure modes', () => {
-  test('no Codex connection: implementation stays on Claude', () => {
+  test('no Codex connection: hard work falls to Opus and the decision says why', () => {
     const decision = routeWork(build('hard'), claudeOn('m1'));
     expect(decision.chosen?.modelId).toBe('claude-opus-5-5');
-    expect(decision.rejected).toEqual([]);
-  });
-
-  test('no Claude connection: the decision records why each Claude model was skipped', () => {
-    const decision = routeWork(build('hard'), [codexOn('m1')]);
-    expect(decision.chosen?.modelId).toBe('gpt-6.1-sol');
     expect(decision.rejected).toContainEqual({
-      modelId: 'claude-opus-5-5',
+      modelId: 'gpt-6.1-sol',
       machineId: null,
       why: 'no-candidate',
     });
   });
 
-  test('no Codex connection: review is unroutable, never a Claude model', () => {
-    const decision = routeWork({ kind: 'review', difficulty: 'standard' }, claudeOn('m1'));
-    expect(decision.chosen).toBeNull();
-    expect(decision.reason).toBe('review requires openai-codex/gpt-6.1-sol: none available');
-  });
-
-  test('review goes to Codex whatever implemented', () => {
-    const decision = routeWork({ kind: 'review', difficulty: 'easy' }, [
-      ...claudeOn('m1'),
-      codexOn('m2'),
-    ]);
-    expect(decision.chosen).toMatchObject({ provider: 'openai-codex', machineId: 'm2' });
-  });
-
   test('quota exhausted: a candidate at 70% weekly use is rejected', () => {
     const decision = routeWork(build('hard'), [
-      codexOn('m1'),
-      ...claudeOn('m1', { weeklyUsedPercent: 70 }),
+      codexOn('m1', { weeklyUsedPercent: 70 }),
+      ...claudeOn('m1'),
     ]);
-    expect(decision.chosen?.modelId).toBe('gpt-6.1-sol');
+    expect(decision.chosen?.modelId).toBe('claude-opus-5-5');
     expect(decision.rejected).toContainEqual({
-      modelId: 'claude-opus-5-5',
+      modelId: 'gpt-6.1-sol',
       machineId: 'm1',
       why: 'quota',
     });
-  });
-
-  test('quota exhausted on Codex leaves review waiting, not switching', () => {
-    const decision = routeWork({ kind: 'review', difficulty: 'standard' }, [
-      codexOn('m1', { weeklyUsedPercent: 100 }),
-      ...claudeOn('m1'),
-    ]);
-    expect(decision.chosen).toBeNull();
   });
 
   test('harness missing on the machine: the candidate is rejected with a harness reason', () => {

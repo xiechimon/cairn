@@ -388,7 +388,7 @@ describe('in-product merge gate', () => {
           return [];
         });
       expect(runs).toHaveLength(1);
-      expect(runs[0]?.modelId).toBe('gpt-6.1-sol');
+      expect(runs[0]?.modelId).toBe('gpt-5.4');
       expect(runs[0]?.action).toBe('auto-merge-off');
       expect(runs[0]?.parsedVerdict).toBe('pass');
       expect(runs[0]?.structuredOutcome).toBe('pass');

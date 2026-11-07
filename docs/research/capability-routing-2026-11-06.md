@@ -18,7 +18,7 @@ Date: 2026-11-06. Method: read each product's current public docs (fetched this 
 3. Rank inside the candidates by the cheapest model that is adequate for the difficulty (OpenRouter's cost band, Codex's "near-top at lower cost" model for long work), then fall back down the ranked list, never up to something the task does not need.
 4. Report the decision on every request: OpenRouter returns the answering model and the task type. Cairn records harness, model, task kind, difficulty, reason and the rejected candidates for each dispatched step.
 5. Effort is a second dial (Codex, Amp), kept next to the model in the decision.
-6. Fixed policy is separate from the router: Review always runs on Codex and the Coordinator is only a router. These are not scored; they are rules of the product.
+6. Review is not part of the router: the `review` rule applies as configured, and the Coordinator is only a router.
 
 ## What none of them settle
 
@@ -27,14 +27,13 @@ No source documents a mid-run model switch. Cairn pins a step to the decision re
 ## Design in cairn
 
 - One pure function, `routeWork`, in `packages/shared/src/capability-routing.ts`, takes the step kind, difficulty, the candidate harness/model/machine options and quota, and returns the chosen option, a reason and every rejected candidate with its rejection reason.
-- Review: candidates are restricted to `openai-codex` / `gpt-6.1-sol`; with none available the step is unroutable and waits (no model switch).
-- Implementation (`plan`, `build`, `session`, `verify`): a ranked capability table per difficulty. `hard`: `claude-opus-5-5`, then `claude-sonnet-5-5`, then `gpt-6.1-sol`. `standard`: `claude-sonnet-5-5`, then `claude-opus-5-5`, then `gpt-6.1-sol`. `easy`: `claude-haiku-5-5`, then `claude-sonnet-5-5`, then `gpt-6.1-sol`. A candidate is rejected when its harness is not enabled or not logged in on the machine, its connection is unavailable, or its weekly quota used is at or above 70%.
-- `profileForStep` is the one path every dispatch reads. For `session` and `review` rules it replaces the profile's provider and model with the router's choice. Candidates are filtered first by the rule's machine pin and required capabilities (executor, MCP servers, models) and by the models a machine reports, so the router never picks a model on one machine and a constraint that only another machine satisfies. When no candidate qualifies (a machine that reports nothing), a `session` step keeps the row's model as the default; a `review` step is still set to Codex, so it waits for a Codex machine instead of running on Claude.
+- Implementation (`plan`, `build`, `session`, `verify`): a ranked capability table per difficulty. `hard`: `gpt-6.1-sol`, then `claude-opus-5-5`, then `claude-sonnet-5-5`. `standard`: `claude-sonnet-5-5`, then `gpt-6.1-sol`. `easy`: `claude-haiku-5-5`, then `claude-sonnet-5-5`, then `gpt-6.1-sol`. A candidate is rejected when its harness is not enabled or not logged in on the machine, its connection is unavailable, or its weekly quota used is at or above 70%.
+- `profileForStep` is the one path every dispatch reads. For `session` rules it replaces the profile's provider and model with the router's choice. Candidates are filtered first by the rule's machine pin and required capabilities (executor, MCP servers, models) and by the models a machine reports, so the router never picks a model on one machine and a constraint that only another machine satisfies. When no candidate qualifies (a machine that reports nothing), a `session` step keeps the row's model as the default; a `review` step is still set to Codex, so it waits for a Codex machine instead of running on Claude.
 - At claim the decision is written once to `step_route` (step id, harness, provider, model, machine, difficulty, reason, rejected candidates). Any later read for that step reuses the stored row, so a step never changes model in flight, and the step's OTel span carries the same fields as `cairn.route.*` for Langfuse.
 - Difficulty comes from an explicit `difficulty:easy|standard|hard` marker in the todo, else spec length (under 300 characters easy, 3000 or more hard). It is crude and recorded on every decision so the thresholds can be tuned from traces.
 - `ROUTING_USES` / `resolveRouting` stay as the read-only settings view; `ROUTE_USES` rows are what dispatch uses, now through the router.
 
-- Review always runs on Codex (ian's rule), so a Codex-authored build has no vendor-independent in-cairn reviewer. Codex is therefore ranked last for implementation and used only when no Claude model is usable (harness missing, login, rate window or quota); in that case the independent review is not enqueued and the merge gate stays blocked until a person decides.
+- Review steps are not routed: the `review` rule applies as configured. ian decided (2026-11-07) that implementation is chosen purely by capability with no vendor-independence constraint against review, because PR review is Codex cloud's automatic review on GitHub.
 - Historical lookups of a finished step's model (author model for the review enqueue and for the merge gate) pass the step id, so they read the recorded `step_route` row instead of recomputing from current availability.
 
 ## Live evidence

@@ -1,12 +1,12 @@
 import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_ROUTER_TOOLS,
+  CODEX_MODEL,
   filterAgentTools,
   isSessionStepKind,
   type PatchRoutingRuleBody,
   type PatchWorkPolicyBody,
   type PolicyUse,
-  REVIEW_MODEL,
   type RemoteToolDef,
   type RequiredCapabilities,
   type RouteOverride,
@@ -166,7 +166,7 @@ export function ruleProfileForStep(
   return routeProfile(route, policyForStep(db, todoRow, kind), todoRow.routeOverride ?? null);
 }
 
-const ROUTED_PROVIDERS = ['claude-code', REVIEW_MODEL.provider];
+const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
 
 export function profileForStep(
   db: Pick<Db, 'select'>,
@@ -177,17 +177,13 @@ export function profileForStep(
   const base = ruleProfileForStep(db, todoRow, kind);
   if (base === null) return null;
   const route = routeForStep(db, todoRow, kind);
-  if (route?.use !== 'session' && route?.use !== 'review') return base;
+  if (route?.use !== 'session') return base;
   if (base.provider === null || !ROUTED_PROVIDERS.includes(base.provider)) return base;
   const decision = decideStepRoute(db, todoRow, kind, stepId, {
     machineId: base.machineId,
     required: base.requiredCapabilities,
   });
-  if (decision.chosen === null) {
-    return route.use === 'review'
-      ? { ...base, provider: REVIEW_MODEL.provider, modelId: REVIEW_MODEL.modelId }
-      : base;
-  }
+  if (decision.chosen === null) return base;
   return {
     ...base,
     provider: decision.chosen.provider,

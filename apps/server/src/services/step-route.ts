@@ -1,8 +1,8 @@
 import {
   type CapabilityCandidate,
+  CODEX_MODEL,
   classifyDifficulty,
   claudeRateBlock,
-  REVIEW_MODEL,
   type RequiredCapabilities,
   type RouteWorkDecision,
   routeWork,
@@ -92,8 +92,8 @@ export function capabilityCandidates(
     const piEnabled = row.enabledRuntimes.includes('pi');
     candidates.push({
       harness: 'pi',
-      provider: REVIEW_MODEL.provider,
-      modelId: REVIEW_MODEL.modelId,
+      provider: CODEX_MODEL.provider,
+      modelId: CODEX_MODEL.modelId,
       machineId: row.id,
       available:
         piEnabled &&

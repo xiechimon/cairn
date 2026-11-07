@@ -573,7 +573,10 @@ async function tryClaim(
           .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
           .run();
         if (res.changes === 0) return false;
-        if (cand.todoRow.sourceKind !== 'research-citation-check') {
+        if (
+          cand.stepRow.kind !== 'review' &&
+          cand.todoRow.sourceKind !== 'research-citation-check'
+        ) {
           recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
         }
         if (skillInjection.hits.length > 0) {

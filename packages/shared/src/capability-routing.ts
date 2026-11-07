@@ -45,12 +45,12 @@ export interface RouteWorkDecision {
   rejected: RouteRejection[];
 }
 
-export const REVIEW_MODEL = { provider: 'openai-codex', modelId: 'gpt-6.1-sol' } as const;
+export const CODEX_MODEL = { provider: 'openai-codex', modelId: 'gpt-6.1-sol' } as const;
 export const QUOTA_REJECT_PERCENT = 70;
 
 const RANKING: Record<Difficulty, readonly string[]> = {
-  hard: ['claude-opus-5-5', 'claude-sonnet-5-5', 'gpt-6.1-sol'],
-  standard: ['claude-sonnet-5-5', 'claude-opus-5-5', 'gpt-6.1-sol'],
+  hard: ['gpt-6.1-sol', 'claude-opus-5-5', 'claude-sonnet-5-5'],
+  standard: ['claude-sonnet-5-5', 'gpt-6.1-sol'],
   easy: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'gpt-6.1-sol'],
 };
 
@@ -116,15 +116,11 @@ export function routeWork(
       rejected: [],
     };
   }
-  const review = request.kind === 'review';
-  const ranking = review ? [REVIEW_MODEL.modelId] : RANKING[difficulty];
+  const ranking = RANKING[difficulty];
   const rejected: RouteRejection[] = [];
   for (const modelId of ranking) {
     const pool = candidates.filter(
-      (candidate) =>
-        candidate.modelId === modelId &&
-        !banned(candidate.modelId) &&
-        (!review || candidate.provider === REVIEW_MODEL.provider),
+      (candidate) => candidate.modelId === modelId && !banned(candidate.modelId),
     );
     if (pool.length === 0) {
       rejected.push({ modelId, machineId: null, why: 'no-candidate' });
@@ -143,9 +139,8 @@ export function routeWork(
       return {
         chosen: choiceOf(best),
         difficulty,
-        reason: review
-          ? 'review: Codex'
-          : rank === 0
+        reason:
+          rank === 0
             ? `${difficulty}: ${modelId} ranked first`
             : `${difficulty}: ${modelId} ranked ${rank + 1}, higher ranks unavailable`,
         rejected,
@@ -155,9 +150,7 @@ export function routeWork(
   return {
     chosen: null,
     difficulty,
-    reason: review
-      ? `review requires ${REVIEW_MODEL.provider}/${REVIEW_MODEL.modelId}: none available`
-      : `${difficulty}: no available candidate`,
+    reason: `${difficulty}: no available candidate`,
     rejected,
   };
 }
