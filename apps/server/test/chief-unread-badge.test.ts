@@ -46,7 +46,7 @@ interface TurnWorld {
   teamId: string;
   threadId: string;
   claim(): Promise<ClaimedStep>;
-  done(stepId: string, text: string): Promise<void>;
+  done(stepId: string, text: string, promptRow?: string): Promise<void>;
 }
 
 async function setupTurn(content: string): Promise<TurnWorld> {
@@ -77,7 +77,7 @@ async function setupTurn(content: string): Promise<TurnWorld> {
       if (!body.step) throw new Error('no chief step claimed');
       return claimedStepSchema.parse(body.step);
     },
-    async done(stepId: string, text: string) {
+    async done(stepId: string, text: string, promptRow?: string) {
       const urlsRes = await call(s.app, 'POST', `/api/machine/upload-urls/${stepId}`, {
         cred: token,
         body: { files: [{ name: 'transcript.json' }] },
@@ -91,6 +91,16 @@ async function setupTurn(content: string): Promise<TurnWorld> {
         body: {
           stepId,
           messages: [
+            ...(promptRow === undefined
+              ? []
+              : [
+                  {
+                    id: `user-${stepId}`,
+                    role: 'user',
+                    content: promptRow,
+                    createdAt: Date.now(),
+                  },
+                ]),
             { id: `asst-${stepId}`, role: 'assistant', content: text, createdAt: Date.now() },
           ],
         },
@@ -156,6 +166,20 @@ describe('chief unread badge (#1303)', () => {
     await w.done(wake.step.id, '关口汇报：方案已停住。');
     expect(chiefNotif(w.s, w.threadId)?.readAt).toBeNull();
     expect(await unreadChief(w.s, w.teamId)).toContain(w.threadId);
+  });
+
+  test('a wake-only turn whose transcript carries its own prompt row writes no notification', async () => {
+    const w = await setupTurn('回头提醒');
+    const wakePrompt = '[wake:wake] 回头核实任务状态并向用户汇报。';
+    w.s.db
+      .update(stepTable)
+      .set({ prompt: wakePrompt })
+      .where(eq(stepTable.buildId, w.threadId))
+      .run();
+    const claimed = await w.claim();
+    await w.done(claimed.step.id, '机器回头：任务仍在跑，无需处理。', wakePrompt);
+    expect(chiefNotif(w.s, w.threadId)).toBeUndefined();
+    expect(await unreadChief(w.s, w.teamId)).not.toContain(w.threadId);
   });
 
   test('a wake turn that consumed a composer message notifies its answer', async () => {
