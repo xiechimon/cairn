@@ -1,0 +1,1073 @@
+[
+ {
+  "label": "settle-dialog",
+  "anchor": {
+   "type": "mark"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 103,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [
+   [
+    -5,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": null
+ },
+ {
+  "label": "hover-nav",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div#20"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 34,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -106
+ },
+ {
+  "label": "nav-page-1",
+  "error": "Error: no box",
+  "anchor": {
+   "type": "mark"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 96,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -102
+ },
+ {
+  "label": "open-select",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span[tid=select-value]\"English\"#37"
+  },
+  "firstChangeMs": 27,
+  "settleMs": 144,
+  "rafFrames": 61,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=dialog][aria=Settings]#4",
+    "prop": "outlineColor",
+    "fromInputMs": 27,
+    "input": "click span[tid=select-value]\"English\"#37",
+    "firstMs": 27,
+    "lastMs": 27,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(29, 35, 31)",
+    "values": [
+     [
+      27,
+      "rgb(29, 35, 31)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][aria=Settings]#4",
+    "prop": "outlineWidth",
+    "fromInputMs": 27,
+    "input": "click span[tid=select-value]\"English\"#37",
+    "firstMs": 27,
+    "lastMs": 27,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "3px",
+    "values": [
+     [
+      27,
+      "3px"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=listbox]#148",
+    "prop": "rect",
+    "fromInputMs": 44,
+    "input": "click span[tid=select-value]\"English\"#37",
+    "firstMs": 44,
+    "lastMs": 144,
+    "durationMs": 100,
+    "steps": 7,
+    "to": "203,205.5,136,64",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.226
+     ],
+     [
+      33,
+      0.571
+     ],
+     [
+      50,
+      0.798
+     ],
+     [
+      67,
+      0.929
+     ],
+     [
+      83,
+      0.988
+     ],
+     [
+      100,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=option][tid=select-item]#149",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "focusin div[role=option][tid=select-item]#149",
+    "firstMs": 61,
+    "lastMs": 144,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "203,237.5,136,32",
+    "values": [
+     [
+      61,
+      "208.4,229.7,130.7,30.8"
+     ],
+     [
+      77,
+      "206,233.3,133.1,31.3"
+     ],
+     [
+      94,
+      "204.4,235.5,134.7,31.7"
+     ],
+     [
+      111,
+      "203.5,236.7,135.5,31.9"
+     ],
+     [
+      127,
+      "203.1,237.3,135.9,32"
+     ],
+     [
+      144,
+      "203,237.5,136,32"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 49,
+    "target": "button[role=combobox][aria=Language][tid=select-trigger]#36",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 49,
+    "target": "body#136",
+    "add": [
+     "div#142"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#142",
+    "add": [
+     "div[role=presentation]#143"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#142",
+    "add": [
+     "div[role=presentation]#144"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "span#35",
+    "add": [
+     "span#145"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "span#35",
+    "add": [
+     "span#146"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "span#35",
+    "add": [
+     "span#147"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 7,
+  "strip": "strips/open-select.jpg (7 of 7 frames)",
+  "prevFrame": -139
+ },
+ {
+  "label": "close-select",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=option][tid=select-item]#149"
+  },
+  "firstChangeMs": 26,
+  "settleMs": 159,
+  "rafFrames": 56,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=listbox]#148",
+    "prop": "rect",
+    "fromInputMs": 26,
+    "input": "keydown div[role=option][tid=select-item]#149",
+    "firstMs": 26,
+    "lastMs": 26,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,0,0,0",
+    "values": [
+     [
+      26,
+      "0,0,0,0"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox][aria=Language][tid=select-trigger]#36",
+    "prop": "boxShadow",
+    "fromInputMs": 26,
+    "input": "keydown div[role=option][tid=select-item]#149",
+    "firstMs": 26,
+    "lastMs": 26,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "color(srgb 0.247059 0.423529 0.207843 / 0.22) 0px 0px 0px 3px",
+    "values": [
+     [
+      26,
+      "color(srgb 0.247059 0.423529 0.207843 / 0.22) 0px 0px 0px 3px"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox][aria=Language][tid=select-trigger]#36",
+    "prop": "borderTopColor",
+    "fromInputMs": 26,
+    "input": "keydown div[role=option][tid=select-item]#149",
+    "firstMs": 26,
+    "lastMs": 159,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(63, 108, 53)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.149
+     ],
+     [
+      33,
+      0.44
+     ],
+     [
+      50,
+      0.688
+     ],
+     [
+      67,
+      0.83
+     ],
+     [
+      83,
+      0.915
+     ],
+     [
+      100,
+      0.965
+     ],
+     [
+      117,
+      0.993
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#144",
+    "prop": "rect",
+    "fromInputMs": 26,
+    "input": "keydown div[role=option][tid=select-item]#149",
+    "firstMs": 26,
+    "lastMs": 26,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,0,0,0",
+    "values": [
+     [
+      26,
+      "0,0,0,0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#144",
+    "prop": "opacity",
+    "fromInputMs": 26,
+    "input": "keydown div[role=option][tid=select-item]#149",
+    "firstMs": 26,
+    "lastMs": 26,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0",
+    "values": [
+     [
+      26,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#144",
+    "prop": "transform",
+    "fromInputMs": 26,
+    "input": "keydown div[role=option][tid=select-item]#149",
+    "firstMs": 26,
+    "lastMs": 26,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "none",
+    "values": [
+     [
+      26,
+      "none"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 10,
+    "target": "button[role=combobox][aria=Language][tid=select-trigger]#36",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 10,
+    "target": "div[role=presentation][aria=Language][tid=select-content]#151",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 10,
+    "target": "div[role=presentation]#144",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 10,
+    "target": "span#35",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 10,
+    "target": "span#35",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 10,
+    "target": "span#35",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 29,
+    "target": "div#142",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation]#144",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation]#144",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation]#144",
+    "attr": "hidden",
+    "v": ""
+   }
+  ],
+  "mutationCount": 10,
+  "strip": "strips/close-select.jpg (10 of 10 frames)",
+  "prevFrame": -107
+ },
+ {
+  "label": "nav-page-2",
+  "error": "Error: no box",
+  "anchor": {
+   "type": "mark"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 97,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -108
+ },
+ {
+  "label": "nav-appearance",
+  "error": "Error: no box",
+  "anchor": {
+   "type": "mark"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 96,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -115
+ },
+ {
+  "label": "scroll-settings",
+  "anchor": {
+   "type": "wheel",
+   "target": "div#20"
+  },
+  "firstChangeMs": 29,
+  "settleMs": 229,
+  "rafFrames": 69,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=page-col]#19",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 3,
+    "to": "16,-420,343,1352.8",
+    "values": [
+     [
+      29,
+      "16,-60,343,1352.8"
+     ],
+     [
+      79,
+      "16,-180,343,1352.8"
+     ],
+     [
+      179,
+      "16,-420,343,1352.8"
+     ]
+    ]
+   },
+   {
+    "el": "div#20",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 3,
+    "to": "16,-404,343,1336.8",
+    "values": [
+     [
+      29,
+      "16,-44,343,1336.8"
+     ],
+     [
+      79,
+      "16,-164,343,1336.8"
+     ],
+     [
+      179,
+      "16,-404,343,1336.8"
+     ]
+    ]
+   },
+   {
+    "el": "div#21",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "16,-404,343,56",
+    "values": [
+     [
+      29,
+      "16,-44,343,56"
+     ],
+     [
+      179,
+      "16,-404,343,56"
+     ]
+    ]
+   },
+   {
+    "el": "span#22",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "20,-404,56,56",
+    "values": [
+     [
+      29,
+      "20,-44,56,56"
+     ],
+     [
+      179,
+      "20,-404,56,56"
+     ]
+    ]
+   },
+   {
+    "el": "span[tid=avatar]#23",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "20,-404,56,56",
+    "values": [
+     [
+      29,
+      "20,-44,56,56"
+     ],
+     [
+      179,
+      "20,-404,56,56"
+     ]
+    ]
+   },
+   {
+    "el": "img[tid=avatar-image]#24",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "20,-404,56,56",
+    "values": [
+     [
+      29,
+      "20,-44,56,56"
+     ],
+     [
+      179,
+      "20,-404,56,56"
+     ]
+    ]
+   },
+   {
+    "el": "div#25",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "92,-389,133.3,26",
+    "values": [
+     [
+      29,
+      "92,-29,133.3,26"
+     ],
+     [
+      179,
+      "92,-389,133.3,26"
+     ]
+    ]
+   },
+   {
+    "el": "h2\"Owner\"#26",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "92,-389,133.3,26",
+    "values": [
+     [
+      29,
+      "92,-29,133.3,26"
+     ],
+     [
+      179,
+      "92,-389,133.3,26"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"Edit name\"#27",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "241.3,-392,113.7,32",
+    "values": [
+     [
+      29,
+      "241.3,-32,113.7,32"
+     ],
+     [
+      179,
+      "241.3,-392,113.7,32"
+     ]
+    ]
+   },
+   {
+    "el": "svg#28",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "254.3,-384,16,16",
+    "values": [
+     [
+      29,
+      "254.3,-24,16,16"
+     ],
+     [
+      179,
+      "254.3,-384,16,16"
+     ]
+    ]
+   },
+   {
+    "el": "path#29",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "255.7,-381.3,12,12",
+    "values": [
+     [
+      29,
+      "255.7,-21.3,12,12"
+     ],
+     [
+      179,
+      "255.7,-381.3,12,12"
+     ]
+    ]
+   },
+   {
+    "el": "path#30",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "259.7,-382.7,9.4,9.4",
+    "values": [
+     [
+      29,
+      "259.7,-22.7,9.4,9.4"
+     ],
+     [
+      179,
+      "259.7,-382.7,9.4,9.4"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=card]#31",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "16,-324,343,260.9",
+    "values": [
+     [
+      29,
+      "16,36,343,260.9"
+     ],
+     [
+      179,
+      "16,-324,343,260.9"
+     ]
+    ]
+   },
+   {
+    "el": "div#32",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 179,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "16,-324,343,52",
+    "values": [
+     [
+      29,
+      "16,36,343,52"
+     ],
+     [
+      179,
+      "16,-324,343,52"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox][aria=Language][tid=select-trigger]#36",
+    "prop": "rect",
+    "fromInputMs": 29,
+    "input": "wheel div#20",
+    "firstMs": 29,
+    "lastMs": 229,
+    "durationMs": 200,
+    "steps": 5,
+    "to": "253.2,-434.5,89.8,32",
+    "values": [
+     [
+      29,
+      "253.2,45.5,89.8,32"
+     ],
+     [
+      79,
+      "253.2,-74.5,89.8,32"
+     ],
+     [
+      129,
+      "253.2,-194.5,89.8,32"
+     ],
+     [
+      179,
+      "253.2,-314.5,89.8,32"
+     ],
+     [
+      229,
+      "253.2,-434.5,89.8,32"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=card-content]#67",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[tid=empty]#68",
+    "firstMs": 79,
+    "lastMs": 129,
+    "durationMs": 50,
+    "steps": 2,
+    "to": "16,307.8,343,235",
+    "values": [
+     [
+      79,
+      "16,427.8,343,235"
+     ],
+     [
+      129,
+      "16,307.8,343,235"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    29,
+    [
+     120,
+     0
+    ]
+   ],
+   [
+    79,
+    [
+     240,
+     0
+    ]
+   ],
+   [
+    129,
+    [
+     360,
+     0
+    ]
+   ],
+   [
+    179,
+    [
+     480,
+     0
+    ]
+   ],
+   [
+    229,
+    [
+     600,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/scroll-settings.jpg (5 of 5 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "close-dialog",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[role=combobox][aria=Language][tid=select-trigger]#36"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 74,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [
+   [
+    70,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 169,
+    "target": "body#136",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 169,
+    "target": "div#164",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "aside"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 169,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 169,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 169,
+    "target": "body#136",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 169,
+    "target": "div#142",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 169,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 169,
+    "target": "div#1",
+    "add": [
+     "div#165"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 207,
+    "target": "div#180",
+    "add": [
+     "a[tid=composer-setup-chip]\"Connect a model source\"#181"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 207,
+    "target": "div#180",
+    "add": [
+     "span[tid=composer-setup-hint]\"Add a provider, or sign \"#182"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 10,
+  "strip": "strips/close-dialog.jpg (3 of 3 frames)",
+  "prevFrame": -113
+ }
+]

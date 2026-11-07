@@ -1,0 +1,180 @@
+[
+ {
+  "label": "hover-cards",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div#47"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 332,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [
+   [
+    -22,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 14,
+    "target": "span#68",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "span#68",
+    "add": [
+     "time\"~\"#139"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "span#76",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "span#76",
+    "add": [
+     "span#140"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 552,
+    "target": "span#99",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 552,
+    "target": "span#99",
+    "add": [
+     "time\"~\"#141"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1085,
+    "target": "span#125",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 1085,
+    "target": "span#125",
+    "add": [
+     "time\"~\"#142"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 8,
+  "strip": "strips/hover-cards.jpg (2 of 2 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "hover-primary",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div#18"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 256,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -122
+ },
+ {
+  "label": "press-primary",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#43"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 4,
+  "rafFrames": 211,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#40",
+    "prop": "outlineColor",
+    "fromInputMs": 3,
+    "input": "focusin button#40",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(255, 255, 255)",
+    "values": [
+     [
+      4,
+      "rgb(255, 255, 255)"
+     ]
+    ]
+   },
+   {
+    "el": "button#40",
+    "prop": "outlineWidth",
+    "fromInputMs": 3,
+    "input": "focusin button#40",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "2.4px",
+    "values": [
+     [
+      4,
+      "2.4px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/press-primary.jpg (2 of 2 frames)",
+  "prevFrame": -101
+ }
+]

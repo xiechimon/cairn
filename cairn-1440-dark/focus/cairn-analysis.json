@@ -1,0 +1,566 @@
+[
+ {
+  "label": "tab-1",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[tid=chief-composer-input]#189"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 31,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [
+   [
+    0,
+    [
+     125,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 9,
+    "target": "body#202",
+    "add": [
+     "div#203"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 9,
+    "target": "div#203",
+    "add": [
+     "div[role=presentation]#204"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/tab-1.jpg (16 of 31 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "tab-2",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Add attachment][tid=tooltip-trigger]#193"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 35,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 6,
+    "target": "div#206",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 6,
+    "target": "div[tid=tooltip-content]\"Add attachment\"#205",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 6,
+    "target": "div[role=presentation]#204",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 22,
+    "target": "body#202",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 22,
+    "target": "div#203",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 5,
+  "strip": "strips/tab-2.jpg (16 of 29 frames)",
+  "prevFrame": -114
+ },
+ {
+  "label": "tab-3",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#195"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 35,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-3.jpg (16 of 29 frames)",
+  "prevFrame": -106
+ },
+ {
+  "label": "tab-4",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Send][tid=button]#198"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-4.jpg (16 of 29 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "tab-5",
+  "anchor": {
+   "type": "keydown",
+   "target": "body#202"
+  },
+  "firstChangeMs": 2,
+  "settleMs": 135,
+  "rafFrames": 37,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[aria=Search][tid=tooltip-trigger]#9",
+    "prop": "outlineColor",
+    "fromInputMs": 1,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#9",
+    "firstMs": 2,
+    "lastMs": 135,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(156, 199, 139)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.034
+     ],
+     [
+      33,
+      0.172
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.69
+     ],
+     [
+      83,
+      0.828
+     ],
+     [
+      100,
+      0.931
+     ],
+     [
+      117,
+      0.966
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Search][tid=tooltip-trigger]#9",
+    "prop": "outlineWidth",
+    "fromInputMs": 1,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#9",
+    "firstMs": 2,
+    "lastMs": 18,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "2px",
+    "values": [
+     [
+      2,
+      "3px"
+     ],
+     [
+      18,
+      "2px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 6,
+    "target": "body#202",
+    "add": [
+     "div#207"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 6,
+    "target": "div#207",
+    "add": [
+     "div[role=presentation]#208"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/tab-5.jpg (16 of 30 frames)",
+  "prevFrame": -115
+ },
+ {
+  "label": "tab-6",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Search][tid=tooltip-trigger]#9"
+  },
+  "firstChangeMs": 6,
+  "settleMs": 139,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[aria=Collapse sidebar][tid=button]#13",
+    "prop": "outlineColor",
+    "fromInputMs": 5,
+    "input": "focusin button[aria=Collapse sidebar][tid=button]#13",
+    "firstMs": 6,
+    "lastMs": 139,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(156, 199, 139)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.034
+     ],
+     [
+      33,
+      0.172
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.69
+     ],
+     [
+      83,
+      0.828
+     ],
+     [
+      100,
+      0.931
+     ],
+     [
+      117,
+      0.966
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Collapse sidebar][tid=button]#13",
+    "prop": "outlineWidth",
+    "fromInputMs": 5,
+    "input": "focusin button[aria=Collapse sidebar][tid=button]#13",
+    "firstMs": 6,
+    "lastMs": 22,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "2px",
+    "values": [
+     [
+      6,
+      "3px"
+     ],
+     [
+      22,
+      "2px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 10,
+    "target": "div#209",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 10,
+    "target": "div[tid=tooltip-content]#210",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 10,
+    "target": "div[role=presentation]#208",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 25,
+    "target": "body#202",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 25,
+    "target": "div#207",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 5,
+  "strip": "strips/tab-6.jpg (16 of 31 frames)",
+  "prevFrame": -111
+ },
+ {
+  "label": "tab-7",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Collapse sidebar][tid=button]#13"
+  },
+  "firstChangeMs": 3,
+  "settleMs": 153,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=sidebar-nav-row]#18",
+    "prop": "outlineColor",
+    "fromInputMs": 2,
+    "input": "focusin button[tid=sidebar-nav-row]#18",
+    "firstMs": 3,
+    "lastMs": 153,
+    "durationMs": 150,
+    "steps": 10,
+    "to": "rgb(156, 199, 139)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.034
+     ],
+     [
+      33,
+      0.172
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.839
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.966
+     ],
+     [
+      133,
+      0.989
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-nav-row]#18",
+    "prop": "outlineWidth",
+    "fromInputMs": 2,
+    "input": "focusin button[tid=sidebar-nav-row]#18",
+    "firstMs": 3,
+    "lastMs": 19,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "2px",
+    "values": [
+     [
+      3,
+      "3px"
+     ],
+     [
+      19,
+      "2px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-7.jpg (16 of 32 frames)",
+  "prevFrame": -114
+ },
+ {
+  "label": "tab-8",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=sidebar-nav-row]#18"
+  },
+  "firstChangeMs": 1,
+  "settleMs": 152,
+  "rafFrames": 37,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=button]#31",
+    "prop": "outlineColor",
+    "fromInputMs": 0,
+    "input": "focusin button[tid=button]#31",
+    "firstMs": 1,
+    "lastMs": 152,
+    "durationMs": 150,
+    "steps": 10,
+    "to": "rgb(156, 199, 139)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.034
+     ],
+     [
+      33,
+      0.172
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.839
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.966
+     ],
+     [
+      133,
+      0.989
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]#31",
+    "prop": "outlineWidth",
+    "fromInputMs": 0,
+    "input": "focusin button[tid=button]#31",
+    "firstMs": 1,
+    "lastMs": 18,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "2px",
+    "values": [
+     [
+      1,
+      "3px"
+     ],
+     [
+      18,
+      "2px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-8.jpg (16 of 32 frames)",
+  "prevFrame": -115
+ }
+]

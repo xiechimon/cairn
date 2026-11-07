@@ -1,0 +1,494 @@
+[
+ {
+  "label": "tab-1",
+  "anchor": {
+   "type": "keydown",
+   "target": "body#173"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 67,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [
+   [
+    -6,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 12,
+    "target": "div#174",
+    "add": [
+     "div#175"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 12,
+    "target": "div#175",
+    "add": [
+     "div#176"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 125,
+    "target": "body#173",
+    "add": [
+     "div#177"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 125,
+    "target": "body#173",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 4,
+  "strip": "strips/tab-1.jpg (8 of 8 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "tab-2",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=sidebar-compact-trigger]#9"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 105,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 11,
+    "target": "div[role=tooltip]#179",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 11,
+    "target": "div[role=presentation]#178",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 11,
+    "target": "div#174",
+    "add": [
+     "div#185"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 11,
+    "target": "div#185",
+    "add": [
+     "div#186"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 16,
+    "target": "div#174",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 16,
+    "target": "div#175",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-2.jpg (7 of 7 frames)",
+  "prevFrame": -124
+ },
+ {
+  "label": "tab-3",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#22"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 94,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 11,
+    "target": "div[role=tooltip]#188",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 11,
+    "target": "div[role=presentation]#187",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 15,
+    "target": "div#174",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 15,
+    "target": "div#185",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 4,
+  "strip": "strips/tab-3.jpg (16 of 21 frames)",
+  "prevFrame": -121
+ },
+ {
+  "label": "tab-4",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=textbox][tid=chat-input]#62"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 104,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 11,
+    "target": "div#174",
+    "add": [
+     "div#196"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 11,
+    "target": "div#196",
+    "add": [
+     "div#197"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/tab-4.jpg (8 of 8 frames)",
+  "prevFrame": -112
+ },
+ {
+  "label": "tab-5",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=chat-input-attach]#73"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 104,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 11,
+    "target": "div[role=tooltip]#199",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 11,
+    "target": "div[role=presentation]#198",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 11,
+    "target": "div#174",
+    "add": [
+     "div#203"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 11,
+    "target": "div#203",
+    "add": [
+     "div#204"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 16,
+    "target": "div#174",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 16,
+    "target": "div#196",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-5.jpg (7 of 7 frames)",
+  "prevFrame": -113
+ },
+ {
+  "label": "tab-6",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#85"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 112,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 10,
+    "target": "div[role=tooltip]#205",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div[role=presentation]#206",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div#174",
+    "add": [
+     "div#207"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 10,
+    "target": "div#207",
+    "add": [
+     "div#208"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div#174",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div#203",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-6.jpg (8 of 8 frames)",
+  "prevFrame": -106
+ },
+ {
+  "label": "tab-7",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#91"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 110,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 10,
+    "target": "div[role=tooltip]#209",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div[role=presentation]#210",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div#174",
+    "add": [
+     "div#211"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 10,
+    "target": "div#211",
+    "add": [
+     "div#212"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 15,
+    "target": "div#174",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 15,
+    "target": "div#207",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-7.jpg (7 of 7 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "tab-8",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=chat-input-send]#105"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 110,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 14,
+    "target": "div[role=tooltip]#213",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 14,
+    "target": "div[role=presentation]#214",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 18,
+    "target": "div#174",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 18,
+    "target": "div#211",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 4,
+  "strip": "strips/tab-8.jpg (16 of 21 frames)",
+  "prevFrame": -102
+ }
+]

@@ -1,0 +1,5749 @@
+[
+ {
+  "label": "scroll-up",
+  "anchor": {
+   "type": "wheel",
+   "target": "~"
+  },
+  "firstChangeMs": -18,
+  "settleMs": 527,
+  "rafFrames": 330,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "rect",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -18,
+    "lastMs": 16,
+    "durationMs": 34,
+    "steps": 2,
+    "to": "846,760,36,36",
+    "values": [
+     [
+      -18,
+      "846,759.7,36,36"
+     ],
+     [
+      16,
+      "846,760,36,36"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "opacity",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -18,
+    "lastMs": 344,
+    "durationMs": 361,
+    "steps": 16,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      178,
+      0.017
+     ],
+     [
+      184,
+      0.033
+     ],
+     [
+      217,
+      0.306
+     ],
+     [
+      234,
+      0.527
+     ],
+     [
+      245,
+      0.647
+     ],
+     [
+      256,
+      0.738
+     ],
+     [
+      261,
+      0.776
+     ],
+     [
+      273,
+      0.838
+     ],
+     [
+      289,
+      0.905
+     ],
+     [
+      295,
+      0.921
+     ],
+     [
+      317,
+      0.969
+     ],
+     [
+      339,
+      0.993
+     ],
+     [
+      345,
+      0.996
+     ],
+     [
+      356,
+      1
+     ],
+     [
+      361,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=textbox][tid=chat-input]#548",
+    "prop": "rect",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -18,
+    "lastMs": 16,
+    "durationMs": 34,
+    "steps": 2,
+    "to": "494,827.5,710,21",
+    "values": [
+     [
+      -18,
+      "494,827.2,710,21"
+     ],
+     [
+      16,
+      "494,827.5,710,21"
+     ]
+    ]
+   },
+   {
+    "el": "div#442",
+    "prop": "rect",
+    "fromInputMs": 3,
+    "input": "pointerover ~",
+    "firstMs": -7,
+    "lastMs": 527,
+    "durationMs": 534,
+    "steps": 7,
+    "to": "496,244,736,1656.9",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      22,
+      0.095
+     ],
+     [
+      128,
+      0.286
+     ],
+     [
+      206,
+      0.381
+     ],
+     [
+      245,
+      0.476
+     ],
+     [
+      489,
+      0.952
+     ],
+     [
+      534,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#443",
+    "prop": "rect",
+    "fromInputMs": 3,
+    "input": "pointerover ~",
+    "firstMs": -7,
+    "lastMs": 527,
+    "durationMs": 534,
+    "steps": 7,
+    "to": "496,244,736,1656.9",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      22,
+      0.095
+     ],
+     [
+      128,
+      0.286
+     ],
+     [
+      206,
+      0.381
+     ],
+     [
+      245,
+      0.476
+     ],
+     [
+      489,
+      0.952
+     ],
+     [
+      534,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=code-block-copy]#632",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 527,
+    "durationMs": 528,
+    "steps": 9,
+    "to": "1195.2,581.8,28,28",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.151
+     ],
+     [
+      61,
+      0.302
+     ],
+     [
+      122,
+      0.357
+     ],
+     [
+      345,
+      0.471
+     ],
+     [
+      395,
+      0.622
+     ],
+     [
+      439,
+      0.773
+     ],
+     [
+      483,
+      0.924
+     ],
+     [
+      528,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button#633",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 527,
+    "durationMs": 528,
+    "steps": 12,
+    "to": "494,1908.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.095
+     ],
+     [
+      61,
+      0.19
+     ],
+     [
+      122,
+      0.286
+     ],
+     [
+      200,
+      0.381
+     ],
+     [
+      239,
+      0.476
+     ],
+     [
+      300,
+      0.571
+     ],
+     [
+      345,
+      0.667
+     ],
+     [
+      395,
+      0.762
+     ],
+     [
+      439,
+      0.857
+     ],
+     [
+      483,
+      0.952
+     ],
+     [
+      528,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-read-aloud]#634",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 527,
+    "durationMs": 528,
+    "steps": 12,
+    "to": "518,1908.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.095
+     ],
+     [
+      61,
+      0.19
+     ],
+     [
+      122,
+      0.286
+     ],
+     [
+      200,
+      0.381
+     ],
+     [
+      239,
+      0.476
+     ],
+     [
+      300,
+      0.571
+     ],
+     [
+      345,
+      0.667
+     ],
+     [
+      395,
+      0.762
+     ],
+     [
+      439,
+      0.857
+     ],
+     [
+      483,
+      0.952
+     ],
+     [
+      528,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button#635",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 527,
+    "durationMs": 528,
+    "steps": 12,
+    "to": "542,1908.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.095
+     ],
+     [
+      61,
+      0.19
+     ],
+     [
+      122,
+      0.286
+     ],
+     [
+      200,
+      0.381
+     ],
+     [
+      239,
+      0.476
+     ],
+     [
+      300,
+      0.571
+     ],
+     [
+      345,
+      0.667
+     ],
+     [
+      395,
+      0.762
+     ],
+     [
+      439,
+      0.857
+     ],
+     [
+      483,
+      0.952
+     ],
+     [
+      528,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button#636",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 527,
+    "durationMs": 528,
+    "steps": 12,
+    "to": "566,1908.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.095
+     ],
+     [
+      61,
+      0.19
+     ],
+     [
+      122,
+      0.286
+     ],
+     [
+      200,
+      0.381
+     ],
+     [
+      239,
+      0.476
+     ],
+     [
+      300,
+      0.571
+     ],
+     [
+      345,
+      0.667
+     ],
+     [
+      395,
+      0.762
+     ],
+     [
+      439,
+      0.857
+     ],
+     [
+      483,
+      0.952
+     ],
+     [
+      528,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-retry]#637",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 527,
+    "durationMs": 528,
+    "steps": 12,
+    "to": "590,1908.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.095
+     ],
+     [
+      61,
+      0.19
+     ],
+     [
+      122,
+      0.286
+     ],
+     [
+      200,
+      0.381
+     ],
+     [
+      239,
+      0.476
+     ],
+     [
+      300,
+      0.571
+     ],
+     [
+      345,
+      0.667
+     ],
+     [
+      395,
+      0.762
+     ],
+     [
+      439,
+      0.857
+     ],
+     [
+      483,
+      0.952
+     ],
+     [
+      528,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 527,
+    "durationMs": 528,
+    "steps": 12,
+    "to": "614,1908.9,86.3,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.095
+     ],
+     [
+      61,
+      0.19
+     ],
+     [
+      122,
+      0.286
+     ],
+     [
+      200,
+      0.381
+     ],
+     [
+      239,
+      0.476
+     ],
+     [
+      300,
+      0.571
+     ],
+     [
+      345,
+      0.667
+     ],
+     [
+      395,
+      0.762
+     ],
+     [
+      439,
+      0.857
+     ],
+     [
+      483,
+      0.952
+     ],
+     [
+      528,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "opacity",
+    "fromInputMs": 8,
+    "input": "pointerover ~",
+    "firstMs": -1,
+    "lastMs": 216,
+    "durationMs": 217,
+    "steps": 11,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      95,
+      0.004
+     ],
+     [
+      106,
+      0.251
+     ],
+     [
+      117,
+      0.608
+     ],
+     [
+      122,
+      0.746
+     ],
+     [
+      139,
+      0.903
+     ],
+     [
+      145,
+      0.927
+     ],
+     [
+      161,
+      0.968
+     ],
+     [
+      167,
+      0.976
+     ],
+     [
+      200,
+      0.999
+     ],
+     [
+      217,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#441",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "wheel ~",
+    "firstMs": 16,
+    "lastMs": 238,
+    "durationMs": 222,
+    "steps": 3,
+    "to": "496,-452,736,1692.9",
+    "values": [
+     [
+      16,
+      "496,-932,736,1692.9"
+     ],
+     [
+      121,
+      "496,-692,736,1692.9"
+     ],
+     [
+      238,
+      "496,-452,736,1692.9"
+     ]
+    ]
+   },
+   {
+    "el": "div#652",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 4,
+    "to": "496.8,422.8,734.4,483",
+    "values": [
+     [
+      299,
+      "496.8,62.8,734.4,483"
+     ],
+     [
+      344,
+      "496.8,182.8,734.4,483"
+     ],
+     [
+      394,
+      "496.8,302.8,734.4,483"
+     ],
+     [
+      438,
+      "496.8,422.8,734.4,483"
+     ]
+    ]
+   },
+   {
+    "el": "pre#653",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 4,
+    "to": "496.8,422.8,734.4,483",
+    "values": [
+     [
+      299,
+      "496.8,62.8,734.4,483"
+     ],
+     [
+      344,
+      "496.8,182.8,734.4,483"
+     ],
+     [
+      394,
+      "496.8,302.8,734.4,483"
+     ],
+     [
+      438,
+      "496.8,422.8,734.4,483"
+     ]
+    ]
+   },
+   {
+    "el": "code#654",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 4,
+    "to": "510.8,436.8,706.4,455",
+    "values": [
+     [
+      299,
+      "510.8,76.8,706.4,455"
+     ],
+     [
+      344,
+      "510.8,196.8,706.4,455"
+     ],
+     [
+      394,
+      "510.8,316.8,706.4,455"
+     ],
+     [
+      438,
+      "510.8,436.8,706.4,455"
+     ]
+    ]
+   },
+   {
+    "el": "span#650",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 4,
+    "to": "510.8,436.8,706.4,455",
+    "values": [
+     [
+      299,
+      "510.8,76.8,706.4,455"
+     ],
+     [
+      344,
+      "510.8,196.8,706.4,455"
+     ],
+     [
+      394,
+      "510.8,316.8,706.4,455"
+     ],
+     [
+      438,
+      "510.8,436.8,706.4,455"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#655",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "510.8,439.2,462,17.6",
+    "values": [
+     [
+      299,
+      "510.8,79.2,462,17.6"
+     ],
+     [
+      438,
+      "510.8,439.2,462,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#656",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "510.8,439.2,25.2,17.6",
+    "values": [
+     [
+      299,
+      "510.8,79.2,25.2,17.6"
+     ],
+     [
+      438,
+      "510.8,439.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#657",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "544.4,439.2,109.2,17.6",
+    "values": [
+     [
+      299,
+      "544.4,79.2,109.2,17.6"
+     ],
+     [
+      438,
+      "544.4,439.2,109.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#658",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "653.6,439.2,8.4,17.6",
+    "values": [
+     [
+      299,
+      "653.6,79.2,8.4,17.6"
+     ],
+     [
+      438,
+      "653.6,439.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#659",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "662,439.2,33.6,17.6",
+    "values": [
+     [
+      299,
+      "662,79.2,33.6,17.6"
+     ],
+     [
+      438,
+      "662,439.2,33.6,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#660",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "695.6,439.2,8.4,17.6",
+    "values": [
+     [
+      299,
+      "695.6,79.2,8.4,17.6"
+     ],
+     [
+      438,
+      "695.6,439.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#661",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "746,439.2,8.4,17.6",
+    "values": [
+     [
+      299,
+      "746,79.2,8.4,17.6"
+     ],
+     [
+      438,
+      "746,439.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#662",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "754.4,439.2,25.2,17.6",
+    "values": [
+     [
+      299,
+      "754.4,79.2,25.2,17.6"
+     ],
+     [
+      438,
+      "754.4,439.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#663",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "779.6,439.2,16.8,17.6",
+    "values": [
+     [
+      299,
+      "779.6,79.2,16.8,17.6"
+     ],
+     [
+      438,
+      "779.6,439.2,16.8,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#664",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "804.8,439.2,50.4,17.6",
+    "values": [
+     [
+      299,
+      "804.8,79.2,50.4,17.6"
+     ],
+     [
+      438,
+      "804.8,439.2,50.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#665",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "855.2,439.2,8.4,17.6",
+    "values": [
+     [
+      299,
+      "855.2,79.2,8.4,17.6"
+     ],
+     [
+      438,
+      "855.2,439.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#666",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel span#650",
+    "firstMs": 299,
+    "lastMs": 438,
+    "durationMs": 139,
+    "steps": 2,
+    "to": "872,439.2,25.2,17.6",
+    "values": [
+     [
+      299,
+      "872,79.2,25.2,17.6"
+     ],
+     [
+      438,
+      "872,439.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "ul#676",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel li\"~\"#675",
+    "firstMs": 483,
+    "lastMs": 527,
+    "durationMs": 44,
+    "steps": 2,
+    "to": "496,421,736,95.2",
+    "values": [
+     [
+      483,
+      "496,361,736,95.2"
+     ],
+     [
+      527,
+      "496,421,736,95.2"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -18,
+    [
+     1260,
+     0,
+     0
+    ]
+   ],
+   [
+    16,
+    [
+     1140,
+     0,
+     0
+    ]
+   ],
+   [
+    60,
+    [
+     1020,
+     0,
+     0
+    ]
+   ],
+   [
+    121,
+    [
+     900,
+     0,
+     0
+    ]
+   ],
+   [
+    199,
+    [
+     780,
+     0,
+     0
+    ]
+   ],
+   [
+    238,
+    [
+     660,
+     0,
+     0
+    ]
+   ],
+   [
+    299,
+    [
+     540,
+     0,
+     0
+    ]
+   ],
+   [
+    344,
+    [
+     420,
+     0,
+     0
+    ]
+   ],
+   [
+    394,
+    [
+     300,
+     0,
+     0
+    ]
+   ],
+   [
+    438,
+    [
+     180,
+     0,
+     0
+    ]
+   ],
+   [
+    483,
+    [
+     60,
+     0,
+     0
+    ]
+   ],
+   [
+    527,
+    [
+     0,
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 3,
+    "target": "div#631",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 3,
+    "target": "div#631",
+    "add": [
+     "button[tid=code-block-copy]#632"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [
+     "button#633"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [
+     "button[tid=action-bar-read-aloud]#634"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [
+     "button#635"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [
+     "button#636"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [
+     "button[tid=action-bar-retry]#637"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 3,
+    "target": "div[role=toolbar][tid=message-actions]#489",
+    "add": [
+     "time\"~\"#638"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 141,
+    "target": "button[tid=jump-to-latest]#530",
+    "attr": "aria-hidden",
+    "v": "false"
+   }
+  ],
+  "mutationCount": 15,
+  "strip": "strips/scroll-up.jpg (16 of 40 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "hover-jump",
+  "anchor": {
+   "type": "pointerover",
+   "target": "li\"~\"#675"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 1093,
+  "rafFrames": 236,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "li\"~\"#675",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover li\"~\"#675",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "526,495.2,650,21",
+    "values": [
+     [
+      4,
+      "526,495.2,650,21"
+     ]
+    ]
+   },
+   {
+    "el": "code\"~\"#677",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover li\"~\"#675",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "566.4,497.4,105.1,18.8",
+    "values": [
+     [
+      4,
+      "566.4,497.4,105.1,18.8"
+     ]
+    ]
+   },
+   {
+    "el": "code\"~\"#678",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover li\"~\"#675",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "944.5,497.4,24.2,18.8",
+    "values": [
+     [
+      4,
+      "944.5,497.4,24.2,18.8"
+     ]
+    ]
+   },
+   {
+    "el": "div#441",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover p\"~\"#720",
+    "firstMs": 9,
+    "lastMs": 9,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,208,736,1692.9",
+    "values": [
+     [
+      9,
+      "496,208,736,1692.9"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group]#651",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,571,736,515.6",
+    "values": [
+     [
+      15,
+      "496,571,736,515.6"
+     ]
+    ]
+   },
+   {
+    "el": "div#652",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496.8,602.8,734.4,483",
+    "values": [
+     [
+      15,
+      "496.8,602.8,734.4,483"
+     ]
+    ]
+   },
+   {
+    "el": "pre#653",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496.8,602.8,734.4,483",
+    "values": [
+     [
+      15,
+      "496.8,602.8,734.4,483"
+     ]
+    ]
+   },
+   {
+    "el": "code#654",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,616.8,706.4,455",
+    "values": [
+     [
+      15,
+      "510.8,616.8,706.4,455"
+     ]
+    ]
+   },
+   {
+    "el": "span#650",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,616.8,706.4,455",
+    "values": [
+     [
+      15,
+      "510.8,616.8,706.4,455"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#655",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,619.2,462,17.6",
+    "values": [
+     [
+      15,
+      "510.8,619.2,462,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#656",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,619.2,25.2,17.6",
+    "values": [
+     [
+      15,
+      "510.8,619.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#657",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "544.4,619.2,109.2,17.6",
+    "values": [
+     [
+      15,
+      "544.4,619.2,109.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#658",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "653.6,619.2,8.4,17.6",
+    "values": [
+     [
+      15,
+      "653.6,619.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#659",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "662,619.2,33.6,17.6",
+    "values": [
+     [
+      15,
+      "662,619.2,33.6,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#660",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "695.6,619.2,8.4,17.6",
+    "values": [
+     [
+      15,
+      "695.6,619.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#661",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "746,619.2,8.4,17.6",
+    "values": [
+     [
+      15,
+      "746,619.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#662",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "754.4,619.2,25.2,17.6",
+    "values": [
+     [
+      15,
+      "754.4,619.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#663",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "779.6,619.2,16.8,17.6",
+    "values": [
+     [
+      15,
+      "779.6,619.2,16.8,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#664",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover pre#653",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "804.8,619.2,50.4,17.6",
+    "values": [
+     [
+      15,
+      "804.8,619.2,50.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#665",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 20,
+    "lastMs": 20,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "855.2,619.2,8.4,17.6",
+    "values": [
+     [
+      20,
+      "855.2,619.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#666",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 20,
+    "lastMs": 20,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "872,619.2,25.2,17.6",
+    "values": [
+     [
+      20,
+      "872,619.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "boxShadow",
+    "fromInputMs": 3,
+    "input": "pointerover span\"~\"#531",
+    "firstMs": 31,
+    "lastMs": 937,
+    "durationMs": 906,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      31,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      937,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "opacity",
+    "fromInputMs": 14,
+    "input": "pointerover span\"~\"#531",
+    "firstMs": 43,
+    "lastMs": 104,
+    "durationMs": 61,
+    "steps": 10,
+    "to": "0",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.468
+     ],
+     [
+      11,
+      0.763
+     ],
+     [
+      17,
+      0.871
+     ],
+     [
+      22,
+      0.925
+     ],
+     [
+      28,
+      0.957
+     ],
+     [
+      33,
+      0.977
+     ],
+     [
+      39,
+      0.989
+     ],
+     [
+      45,
+      0.996
+     ],
+     [
+      61,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "::beforebg",
+    "fromInputMs": 36,
+    "input": "pointerover span\"~\"#531",
+    "firstMs": 65,
+    "lastMs": 1093,
+    "durationMs": 1028,
+    "steps": 21,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      -1
+     ],
+     [
+      22,
+      -1.5
+     ],
+     [
+      39,
+      -5
+     ],
+     [
+      50,
+      -6.5
+     ],
+     [
+      67,
+      -9
+     ],
+     [
+      78,
+      -9.75
+     ],
+     [
+      100,
+      -10.75
+     ],
+     [
+      128,
+      -11.5
+     ],
+     [
+      900,
+      -10.75
+     ],
+     [
+      911,
+      -9.75
+     ],
+     [
+      922,
+      -9
+     ],
+     [
+      928,
+      -7.75
+     ],
+     [
+      934,
+      -6.5
+     ],
+     [
+      939,
+      -5.75
+     ],
+     [
+      950,
+      -4
+     ],
+     [
+      961,
+      -3
+     ],
+     [
+      972,
+      -1.5
+     ],
+     [
+      978,
+      -1
+     ],
+     [
+      1000,
+      0
+     ],
+     [
+      1028,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 3,
+    "input": "pointerover div#8",
+    "firstMs": 965,
+    "lastMs": 1087,
+    "durationMs": 122,
+    "steps": 19,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.149
+     ],
+     [
+      11,
+      0.339
+     ],
+     [
+      17,
+      0.551
+     ],
+     [
+      22,
+      0.71
+     ],
+     [
+      28,
+      0.798
+     ],
+     [
+      33,
+      0.853
+     ],
+     [
+      39,
+      0.89
+     ],
+     [
+      50,
+      0.936
+     ],
+     [
+      56,
+      0.952
+     ],
+     [
+      61,
+      0.964
+     ],
+     [
+      72,
+      0.98
+     ],
+     [
+      78,
+      0.986
+     ],
+     [
+      83,
+      0.991
+     ],
+     [
+      89,
+      0.994
+     ],
+     [
+      100,
+      0.998
+     ],
+     [
+      106,
+      0.999
+     ],
+     [
+      111,
+      1
+     ],
+     [
+      122,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-jump.jpg (16 of 45 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "jump-to-latest",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#531"
+  },
+  "firstChangeMs": -96,
+  "settleMs": 343,
+  "rafFrames": 311,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "::beforebg",
+    "fromInputMs": 162,
+    "input": "pointerover span\"~\"#531",
+    "firstMs": -96,
+    "lastMs": 293,
+    "durationMs": 389,
+    "steps": 14,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      261,
+      0.06
+     ],
+     [
+      273,
+      0.14
+     ],
+     [
+      284,
+      0.2
+     ],
+     [
+      289,
+      0.3
+     ],
+     [
+      295,
+      0.4
+     ],
+     [
+      300,
+      0.46
+     ],
+     [
+      306,
+      0.52
+     ],
+     [
+      311,
+      0.6
+     ],
+     [
+      323,
+      0.68
+     ],
+     [
+      328,
+      0.8
+     ],
+     [
+      339,
+      0.84
+     ],
+     [
+      361,
+      0.92
+     ],
+     [
+      389,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "846,759.7,36,36",
+    "values": [
+     [
+      132,
+      "846,759.7,36,36"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "boxShadow",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      132,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "div#429",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "298.4,-1207,1131.2,2106.7",
+    "values": [
+     [
+      132,
+      "298.4,-1207,1131.2,2106.7"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chat-column]#430",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "468,-1207,792,2106.7",
+    "values": [
+     [
+      132,
+      "468,-1207,792,2106.7"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-list]#431",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "480,-1207,768,1998.7",
+    "values": [
+     [
+      132,
+      "480,-1207,768,1998.7"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=code-block-copy]#632",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1195.2,-212.2,28,28",
+    "values": [
+     [
+      132,
+      "1195.2,-212.2,28,28"
+     ]
+    ]
+   },
+   {
+    "el": "button#633",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "494,648.9,24,24",
+    "values": [
+     [
+      132,
+      "494,648.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-read-aloud]#634",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "518,648.9,24,24",
+    "values": [
+     [
+      132,
+      "518,648.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#635",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "542,648.9,24,24",
+    "values": [
+     [
+      132,
+      "542,648.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#636",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "566,648.9,24,24",
+    "values": [
+     [
+      132,
+      "566,648.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-retry]#637",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "590,648.9,24,24",
+    "values": [
+     [
+      132,
+      "590,648.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "click span\"~\"#531",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "614,648.9,86.3,24",
+    "values": [
+     [
+      132,
+      "614,648.9,86.3,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "opacity",
+    "fromInputMs": 10,
+    "input": "pointerover div#526",
+    "firstMs": 143,
+    "lastMs": 343,
+    "durationMs": 200,
+    "steps": 36,
+    "to": "0",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.005
+     ],
+     [
+      11,
+      0.016
+     ],
+     [
+      17,
+      0.031
+     ],
+     [
+      22,
+      0.053
+     ],
+     [
+      28,
+      0.083
+     ],
+     [
+      33,
+      0.123
+     ],
+     [
+      44,
+      0.235
+     ],
+     [
+      50,
+      0.306
+     ],
+     [
+      56,
+      0.381
+     ],
+     [
+      61,
+      0.456
+     ],
+     [
+      67,
+      0.527
+     ],
+     [
+      72,
+      0.59
+     ],
+     [
+      78,
+      0.646
+     ],
+     [
+      83,
+      0.695
+     ],
+     [
+      89,
+      0.738
+     ],
+     [
+      94,
+      0.775
+     ],
+     [
+      100,
+      0.808
+     ],
+     [
+      106,
+      0.837
+     ],
+     [
+      111,
+      0.862
+     ],
+     [
+      117,
+      0.884
+     ],
+     [
+      122,
+      0.904
+     ],
+     [
+      128,
+      0.921
+     ],
+     [
+      133,
+      0.935
+     ],
+     [
+      139,
+      0.948
+     ],
+     [
+      144,
+      0.959
+     ],
+     [
+      150,
+      0.969
+     ],
+     [
+      156,
+      0.977
+     ],
+     [
+      161,
+      0.983
+     ],
+     [
+      167,
+      0.989
+     ],
+     [
+      172,
+      0.993
+     ],
+     [
+      178,
+      0.996
+     ],
+     [
+      183,
+      0.998
+     ],
+     [
+      189,
+      1
+     ],
+     [
+      194,
+      null
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    132,
+    [
+     1260,
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 132,
+    "target": "button[tid=jump-to-latest]#530",
+    "attr": "aria-hidden",
+    "v": "true"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/jump-to-latest.jpg (16 of 43 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "hover-reply-actions",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[tid=transcript-list]#431"
+  },
+  "firstChangeMs": 5,
+  "settleMs": 1194,
+  "rafFrames": 267,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div#765",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-1203,736,0",
+    "values": [
+     [
+      5,
+      "496,-1203,736,0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=status]#682",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "495,-1204,1,1",
+    "values": [
+     [
+      5,
+      "495,-1204,1,1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=feed]#432",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-1203,736,1875.9",
+    "values": [
+     [
+      5,
+      "496,-1203,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "p\"~\"#683",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "495,-1204,1,1",
+    "values": [
+     [
+      5,
+      "495,-1204,1,1"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-sizer]#433",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-1203,736,1875.9",
+    "values": [
+     [
+      5,
+      "496,-1203,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-leading]#434",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-1203,736,1875.9",
+    "values": [
+     [
+      5,
+      "496,-1203,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "div#766",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-1203,736,0",
+    "values": [
+     [
+      5,
+      "496,-1203,736,0"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=seek-back-shield]#435",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-1203,736,1875.9",
+    "values": [
+     [
+      5,
+      "496,-1203,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-spacer]#767",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[tid=transcript-list]#431",
+    "firstMs": 5,
+    "lastMs": 5,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-1203,736,0",
+    "values": [
+     [
+      5,
+      "496,-1203,736,0"
+     ]
+    ]
+   },
+   {
+    "el": "button#633",
+    "prop": "color",
+    "fromInputMs": 5,
+    "input": "pointerover span\"~\"#783",
+    "firstMs": 27,
+    "lastMs": 394,
+    "durationMs": 367,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.6)",
+    "values": [
+     [
+      27,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      394,
+      "rgba(0, 0, 0, 0.6)"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "opacity",
+    "fromInputMs": 110,
+    "input": "pointerover span\"~\"#783",
+    "firstMs": 132,
+    "lastMs": 1138,
+    "durationMs": 1006,
+    "steps": 33,
+    "to": "0",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      -1.309
+     ],
+     [
+      12,
+      -2.815
+     ],
+     [
+      17,
+      -4.539
+     ],
+     [
+      23,
+      -5.744
+     ],
+     [
+      28,
+      -6.429
+     ],
+     [
+      34,
+      -6.859
+     ],
+     [
+      39,
+      -7.151
+     ],
+     [
+      45,
+      -7.357
+     ],
+     [
+      50,
+      -7.513
+     ],
+     [
+      56,
+      -7.634
+     ],
+     [
+      62,
+      -7.729
+     ],
+     [
+      67,
+      -7.802
+     ],
+     [
+      73,
+      -7.86
+     ],
+     [
+      78,
+      -7.906
+     ],
+     [
+      84,
+      -7.941
+     ],
+     [
+      89,
+      -7.967
+     ],
+     [
+      95,
+      -7.987
+     ],
+     [
+      100,
+      -8.001
+     ],
+     [
+      106,
+      -8.009
+     ],
+     [
+      112,
+      -8.013
+     ],
+     [
+      117,
+      -8.014
+     ],
+     [
+      950,
+      -5.829
+     ],
+     [
+      956,
+      -2.593
+     ],
+     [
+      962,
+      -0.606
+     ],
+     [
+      967,
+      0.119
+     ],
+     [
+      973,
+      0.493
+     ],
+     [
+      978,
+      0.708
+     ],
+     [
+      984,
+      0.843
+     ],
+     [
+      989,
+      0.924
+     ],
+     [
+      995,
+      0.972
+     ],
+     [
+      1000,
+      0.995
+     ],
+     [
+      1006,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#803",
+    "prop": "rect",
+    "fromInputMs": 311,
+    "input": "pointerover span\"~\"#783",
+    "firstMs": 333,
+    "lastMs": 394,
+    "durationMs": 61,
+    "steps": 8,
+    "to": "482.5,621.6,47.7,23.5",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#803",
+    "prop": "opacity",
+    "fromInputMs": 311,
+    "input": "pointerover span\"~\"#783",
+    "firstMs": 333,
+    "lastMs": 394,
+    "durationMs": 61,
+    "steps": 9,
+    "to": "0",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#803",
+    "prop": "scale",
+    "fromInputMs": 311,
+    "input": "pointerover span\"~\"#783",
+    "firstMs": 333,
+    "lastMs": 394,
+    "durationMs": 61,
+    "steps": 9,
+    "to": "0.98",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#807",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "pointerover span\"~\"#787",
+    "firstMs": 394,
+    "lastMs": 438,
+    "durationMs": 45,
+    "steps": 3,
+    "to": "488.8,621.6,82.3,23.5",
+    "values": [
+     [
+      394,
+      "488.8,621.6,82.3,23.5"
+     ],
+     [
+      433,
+      "488,621,84,24"
+     ],
+     [
+      438,
+      "488.8,621.6,82.3,23.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#807",
+    "prop": "opacity",
+    "fromInputMs": 2,
+    "input": "pointerover span\"~\"#787",
+    "firstMs": 394,
+    "lastMs": 438,
+    "durationMs": 45,
+    "steps": 3,
+    "to": "0",
+    "values": [
+     [
+      394,
+      "0"
+     ],
+     [
+      433,
+      "1"
+     ],
+     [
+      438,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#807",
+    "prop": "scale",
+    "fromInputMs": 2,
+    "input": "pointerover span\"~\"#787",
+    "firstMs": 394,
+    "lastMs": 438,
+    "durationMs": 45,
+    "steps": 3,
+    "to": "0.98",
+    "values": [
+     [
+      394,
+      "0.98"
+     ],
+     [
+      433,
+      "none"
+     ],
+     [
+      438,
+      "0.98"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-read-aloud]#634",
+    "prop": "color",
+    "fromInputMs": 2,
+    "input": "pointerover span\"~\"#787",
+    "firstMs": 394,
+    "lastMs": 438,
+    "durationMs": 45,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.6)",
+    "values": [
+     [
+      394,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      438,
+      "rgba(0, 0, 0, 0.6)"
+     ]
+    ]
+   },
+   {
+    "el": "button#635",
+    "prop": "color",
+    "fromInputMs": 2,
+    "input": "pointerover span\"~\"#791",
+    "firstMs": 438,
+    "lastMs": 461,
+    "durationMs": 22,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.6)",
+    "values": [
+     [
+      438,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      461,
+      "rgba(0, 0, 0, 0.6)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#815",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span\"~\"#795",
+    "firstMs": 461,
+    "lastMs": 494,
+    "durationMs": 33,
+    "steps": 3,
+    "to": "529,621.6,98.4,23.5",
+    "values": [
+     [
+      461,
+      "529,621.6,98.4,23.5"
+     ],
+     [
+      488,
+      "528,621,100.4,24"
+     ],
+     [
+      494,
+      "529,621.6,98.4,23.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#815",
+    "prop": "opacity",
+    "fromInputMs": 4,
+    "input": "pointerover span\"~\"#795",
+    "firstMs": 461,
+    "lastMs": 494,
+    "durationMs": 33,
+    "steps": 3,
+    "to": "0",
+    "values": [
+     [
+      461,
+      "0"
+     ],
+     [
+      488,
+      "1"
+     ],
+     [
+      494,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#815",
+    "prop": "scale",
+    "fromInputMs": 4,
+    "input": "pointerover span\"~\"#795",
+    "firstMs": 461,
+    "lastMs": 494,
+    "durationMs": 33,
+    "steps": 3,
+    "to": "0.98",
+    "values": [
+     [
+      461,
+      "0.98"
+     ],
+     [
+      488,
+      "none"
+     ],
+     [
+      494,
+      "0.98"
+     ]
+    ]
+   },
+   {
+    "el": "button#636",
+    "prop": "color",
+    "fromInputMs": 4,
+    "input": "pointerover span\"~\"#795",
+    "firstMs": 461,
+    "lastMs": 494,
+    "durationMs": 33,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.6)",
+    "values": [
+     [
+      461,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      494,
+      "rgba(0, 0, 0, 0.6)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#819",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "pointerover span#793",
+    "firstMs": 494,
+    "lastMs": 1155,
+    "durationMs": 661,
+    "steps": 11,
+    "to": "577.5,621.6,48.4,23.5",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#819",
+    "prop": "opacity",
+    "fromInputMs": 7,
+    "input": "pointerover span#793",
+    "firstMs": 494,
+    "lastMs": 1194,
+    "durationMs": 700,
+    "steps": 23,
+    "to": "7.27763e-05",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#819",
+    "prop": "scale",
+    "fromInputMs": 7,
+    "input": "pointerover span#793",
+    "firstMs": 494,
+    "lastMs": 1194,
+    "durationMs": 700,
+    "steps": 24,
+    "to": "0.980001",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      22,
+      null
+     ],
+     [
+      578,
+      20000
+     ],
+     [
+      589,
+      17784
+     ],
+     [
+      594,
+      15095
+     ],
+     [
+      600,
+      11742
+     ],
+     [
+      606,
+      7969
+     ],
+     [
+      611,
+      5149
+     ],
+     [
+      617,
+      3583
+     ],
+     [
+      622,
+      2604
+     ],
+     [
+      628,
+      1955
+     ],
+     [
+      633,
+      1479
+     ],
+     [
+      639,
+      1124
+     ],
+     [
+      644,
+      856
+     ],
+     [
+      650,
+      640
+     ],
+     [
+      656,
+      474
+     ],
+     [
+      661,
+      346
+     ],
+     [
+      667,
+      245
+     ],
+     [
+      672,
+      165
+     ],
+     [
+      678,
+      105
+     ],
+     [
+      684,
+      60
+     ],
+     [
+      689,
+      30
+     ],
+     [
+      695,
+      11
+     ],
+     [
+      700,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-retry]#637",
+    "prop": "color",
+    "fromInputMs": 7,
+    "input": "pointerover span#793",
+    "firstMs": 494,
+    "lastMs": 866,
+    "durationMs": 372,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.6)",
+    "values": [
+     [
+      494,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      866,
+      "rgba(0, 0, 0, 0.6)"
+     ]
+    ]
+   },
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 1,
+    "input": "pointerover div#8",
+    "firstMs": 888,
+    "lastMs": 1011,
+    "durationMs": 122,
+    "steps": 23,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      5,
+      0.11
+     ],
+     [
+      11,
+      0.244
+     ],
+     [
+      17,
+      0.412
+     ],
+     [
+      22,
+      0.604
+     ],
+     [
+      28,
+      0.744
+     ],
+     [
+      33,
+      0.822
+     ],
+     [
+      39,
+      0.87
+     ],
+     [
+      44,
+      0.903
+     ],
+     [
+      50,
+      0.926
+     ],
+     [
+      56,
+      0.944
+     ],
+     [
+      61,
+      0.957
+     ],
+     [
+      67,
+      0.968
+     ],
+     [
+      72,
+      0.976
+     ],
+     [
+      78,
+      0.983
+     ],
+     [
+      83,
+      0.988
+     ],
+     [
+      89,
+      0.992
+     ],
+     [
+      94,
+      0.995
+     ],
+     [
+      100,
+      0.997
+     ],
+     [
+      106,
+      0.998
+     ],
+     [
+      111,
+      0.999
+     ],
+     [
+      117,
+      1
+     ],
+     [
+      122,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 340,
+    "target": "div#800",
+    "add": [
+     "div#801"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 340,
+    "target": "div#801",
+    "add": [
+     "div#802"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 415,
+    "target": "div[role=tooltip]#803",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 415,
+    "target": "div[role=presentation]#804",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 415,
+    "target": "div#800",
+    "add": [
+     "div#805"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 415,
+    "target": "div#805",
+    "add": [
+     "div#806"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 428,
+    "target": "div#800",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 428,
+    "target": "div#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 453,
+    "target": "div[role=tooltip]#807",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 453,
+    "target": "div[role=presentation]#808",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 453,
+    "target": "div#800",
+    "add": [
+     "div#809"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 453,
+    "target": "div#809",
+    "add": [
+     "div#810"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 462,
+    "target": "div#800",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 462,
+    "target": "div#805",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 481,
+    "target": "div[role=tooltip]#811",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 481,
+    "target": "div[role=presentation]#812",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 481,
+    "target": "div#800",
+    "add": [
+     "div#813"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 481,
+    "target": "div#813",
+    "add": [
+     "div#814"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 491,
+    "target": "div#800",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 491,
+    "target": "div#809",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 511,
+    "target": "div[role=tooltip]#815",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 511,
+    "target": "div[role=presentation]#816",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 511,
+    "target": "div#800",
+    "add": [
+     "div#817"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 511,
+    "target": "div#817",
+    "add": [
+     "div#818"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 520,
+    "target": "div#800",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 520,
+    "target": "div#813",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1075,
+    "target": "div[role=tooltip]#819",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 1075,
+    "target": "div[role=presentation]#820",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 1207,
+    "target": "div#800",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1207,
+    "target": "div#817",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 30,
+  "strip": "strips/hover-reply-actions.jpg (16 of 55 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "scroll-to-code",
+  "anchor": {
+   "type": "wheel",
+   "target": "p\"~\"#471"
+  },
+  "firstChangeMs": -2,
+  "settleMs": 354,
+  "rafFrames": 231,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div#442",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover ~",
+    "firstMs": -2,
+    "lastMs": 209,
+    "durationMs": 211,
+    "steps": 5,
+    "to": "496,-416,736,1656.9",
+    "values": [
+     [
+      -2,
+      "496,-1016,736,1656.9"
+     ],
+     [
+      15,
+      "496,-896,736,1656.9"
+     ],
+     [
+      104,
+      "496,-656,736,1656.9"
+     ],
+     [
+      159,
+      "496,-536,736,1656.9"
+     ],
+     [
+      209,
+      "496,-416,736,1656.9"
+     ]
+    ]
+   },
+   {
+    "el": "div#443",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover ~",
+    "firstMs": -2,
+    "lastMs": 209,
+    "durationMs": 211,
+    "steps": 5,
+    "to": "496,-416,736,1656.9",
+    "values": [
+     [
+      -2,
+      "496,-1016,736,1656.9"
+     ],
+     [
+      15,
+      "496,-896,736,1656.9"
+     ],
+     [
+      104,
+      "496,-656,736,1656.9"
+     ],
+     [
+      159,
+      "496,-536,736,1656.9"
+     ],
+     [
+      209,
+      "496,-416,736,1656.9"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "846,760,36,36",
+    "values": [
+     [
+      15,
+      "846,760,36,36"
+     ]
+    ]
+   },
+   {
+    "el": "div#441",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 209,
+    "durationMs": 194,
+    "steps": 3,
+    "to": "496,-452,736,1692.9",
+    "values": [
+     [
+      15,
+      "496,-932,736,1692.9"
+     ],
+     [
+      104,
+      "496,-692,736,1692.9"
+     ],
+     [
+      209,
+      "496,-452,736,1692.9"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=code-block-copy]#632",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 354,
+    "durationMs": 339,
+    "steps": 5,
+    "to": "1195.2,281.8,28,28",
+    "values": [
+     [
+      15,
+      "1195.2,-92.2,28,28"
+     ],
+     [
+      59,
+      "1195.2,27.8,28,28"
+     ],
+     [
+      104,
+      "1195.2,71,28,28"
+     ],
+     [
+      304,
+      "1195.2,161.8,28,28"
+     ],
+     [
+      354,
+      "1195.2,281.8,28,28"
+     ]
+    ]
+   },
+   {
+    "el": "button#633",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 354,
+    "durationMs": 339,
+    "steps": 8,
+    "to": "494,1608.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.143
+     ],
+     [
+      89,
+      0.286
+     ],
+     [
+      145,
+      0.429
+     ],
+     [
+      194,
+      0.571
+     ],
+     [
+      239,
+      0.714
+     ],
+     [
+      289,
+      0.857
+     ],
+     [
+      339,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-read-aloud]#634",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 354,
+    "durationMs": 339,
+    "steps": 8,
+    "to": "518,1608.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.143
+     ],
+     [
+      89,
+      0.286
+     ],
+     [
+      145,
+      0.429
+     ],
+     [
+      194,
+      0.571
+     ],
+     [
+      239,
+      0.714
+     ],
+     [
+      289,
+      0.857
+     ],
+     [
+      339,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button#635",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 354,
+    "durationMs": 339,
+    "steps": 8,
+    "to": "542,1608.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.143
+     ],
+     [
+      89,
+      0.286
+     ],
+     [
+      145,
+      0.429
+     ],
+     [
+      194,
+      0.571
+     ],
+     [
+      239,
+      0.714
+     ],
+     [
+      289,
+      0.857
+     ],
+     [
+      339,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button#636",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 354,
+    "durationMs": 339,
+    "steps": 8,
+    "to": "566,1608.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.143
+     ],
+     [
+      89,
+      0.286
+     ],
+     [
+      145,
+      0.429
+     ],
+     [
+      194,
+      0.571
+     ],
+     [
+      239,
+      0.714
+     ],
+     [
+      289,
+      0.857
+     ],
+     [
+      339,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-retry]#637",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 354,
+    "durationMs": 339,
+    "steps": 8,
+    "to": "590,1608.9,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.143
+     ],
+     [
+      89,
+      0.286
+     ],
+     [
+      145,
+      0.429
+     ],
+     [
+      194,
+      0.571
+     ],
+     [
+      239,
+      0.714
+     ],
+     [
+      289,
+      0.857
+     ],
+     [
+      339,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "rect",
+    "fromInputMs": 15,
+    "input": "wheel p\"~\"#471",
+    "firstMs": 15,
+    "lastMs": 354,
+    "durationMs": 339,
+    "steps": 8,
+    "to": "614,1608.9,86.3,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.143
+     ],
+     [
+      89,
+      0.286
+     ],
+     [
+      145,
+      0.429
+     ],
+     [
+      194,
+      0.571
+     ],
+     [
+      239,
+      0.714
+     ],
+     [
+      289,
+      0.857
+     ],
+     [
+      339,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "opacity",
+    "fromInputMs": 7,
+    "input": "wheel p\"~\"#445",
+    "firstMs": 104,
+    "lastMs": 226,
+    "durationMs": 122,
+    "steps": 23,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.112
+     ],
+     [
+      11,
+      0.244
+     ],
+     [
+      17,
+      0.413
+     ],
+     [
+      22,
+      0.605
+     ],
+     [
+      28,
+      0.743
+     ],
+     [
+      33,
+      0.822
+     ],
+     [
+      39,
+      0.87
+     ],
+     [
+      44,
+      0.902
+     ],
+     [
+      50,
+      0.926
+     ],
+     [
+      56,
+      0.944
+     ],
+     [
+      61,
+      0.957
+     ],
+     [
+      67,
+      0.968
+     ],
+     [
+      72,
+      0.976
+     ],
+     [
+      78,
+      0.983
+     ],
+     [
+      83,
+      0.988
+     ],
+     [
+      89,
+      0.992
+     ],
+     [
+      94,
+      0.995
+     ],
+     [
+      100,
+      0.997
+     ],
+     [
+      105,
+      0.998
+     ],
+     [
+      111,
+      0.999
+     ],
+     [
+      117,
+      1
+     ],
+     [
+      122,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "opacity",
+    "fromInputMs": 21,
+    "input": "pointerover p\"~\"#445",
+    "firstMs": 126,
+    "lastMs": 320,
+    "durationMs": 194,
+    "steps": 36,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.005
+     ],
+     [
+      11,
+      0.016
+     ],
+     [
+      17,
+      0.031
+     ],
+     [
+      22,
+      0.053
+     ],
+     [
+      28,
+      0.084
+     ],
+     [
+      33,
+      0.123
+     ],
+     [
+      39,
+      0.174
+     ],
+     [
+      44,
+      0.235
+     ],
+     [
+      50,
+      0.305
+     ],
+     [
+      56,
+      0.381
+     ],
+     [
+      61,
+      0.456
+     ],
+     [
+      67,
+      0.526
+     ],
+     [
+      72,
+      0.59
+     ],
+     [
+      78,
+      0.646
+     ],
+     [
+      83,
+      0.694
+     ],
+     [
+      89,
+      0.738
+     ],
+     [
+      94,
+      0.775
+     ],
+     [
+      100,
+      0.808
+     ],
+     [
+      106,
+      0.837
+     ],
+     [
+      111,
+      0.862
+     ],
+     [
+      117,
+      0.884
+     ],
+     [
+      122,
+      0.903
+     ],
+     [
+      128,
+      0.921
+     ],
+     [
+      133,
+      0.935
+     ],
+     [
+      139,
+      0.948
+     ],
+     [
+      144,
+      0.959
+     ],
+     [
+      150,
+      0.969
+     ],
+     [
+      156,
+      0.977
+     ],
+     [
+      161,
+      0.983
+     ],
+     [
+      167,
+      0.989
+     ],
+     [
+      172,
+      0.993
+     ],
+     [
+      178,
+      0.996
+     ],
+     [
+      183,
+      0.998
+     ],
+     [
+      189,
+      1
+     ],
+     [
+      194,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group]#651",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,31,736,515.6",
+    "values": [
+     [
+      254,
+      "496,31,736,515.6"
+     ]
+    ]
+   },
+   {
+    "el": "div#652",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 354,
+    "durationMs": 100,
+    "steps": 3,
+    "to": "496.8,302.8,734.4,483",
+    "values": [
+     [
+      254,
+      "496.8,62.8,734.4,483"
+     ],
+     [
+      304,
+      "496.8,182.8,734.4,483"
+     ],
+     [
+      354,
+      "496.8,302.8,734.4,483"
+     ]
+    ]
+   },
+   {
+    "el": "pre#653",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 354,
+    "durationMs": 100,
+    "steps": 3,
+    "to": "496.8,302.8,734.4,483",
+    "values": [
+     [
+      254,
+      "496.8,62.8,734.4,483"
+     ],
+     [
+      304,
+      "496.8,182.8,734.4,483"
+     ],
+     [
+      354,
+      "496.8,302.8,734.4,483"
+     ]
+    ]
+   },
+   {
+    "el": "code#654",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 354,
+    "durationMs": 100,
+    "steps": 3,
+    "to": "510.8,316.8,706.4,455",
+    "values": [
+     [
+      254,
+      "510.8,76.8,706.4,455"
+     ],
+     [
+      304,
+      "510.8,196.8,706.4,455"
+     ],
+     [
+      354,
+      "510.8,316.8,706.4,455"
+     ]
+    ]
+   },
+   {
+    "el": "span#650",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 354,
+    "durationMs": 100,
+    "steps": 3,
+    "to": "510.8,316.8,706.4,455",
+    "values": [
+     [
+      254,
+      "510.8,76.8,706.4,455"
+     ],
+     [
+      304,
+      "510.8,196.8,706.4,455"
+     ],
+     [
+      354,
+      "510.8,316.8,706.4,455"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#655",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,79.2,462,17.6",
+    "values": [
+     [
+      254,
+      "510.8,79.2,462,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#656",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,79.2,25.2,17.6",
+    "values": [
+     [
+      254,
+      "510.8,79.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#657",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "544.4,79.2,109.2,17.6",
+    "values": [
+     [
+      254,
+      "544.4,79.2,109.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#658",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "653.6,79.2,8.4,17.6",
+    "values": [
+     [
+      254,
+      "653.6,79.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#659",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "662,79.2,33.6,17.6",
+    "values": [
+     [
+      254,
+      "662,79.2,33.6,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#660",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "695.6,79.2,8.4,17.6",
+    "values": [
+     [
+      254,
+      "695.6,79.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#661",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "746,79.2,8.4,17.6",
+    "values": [
+     [
+      254,
+      "746,79.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#662",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "754.4,79.2,25.2,17.6",
+    "values": [
+     [
+      254,
+      "754.4,79.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#663",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "779.6,79.2,16.8,17.6",
+    "values": [
+     [
+      254,
+      "779.6,79.2,16.8,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#664",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "804.8,79.2,50.4,17.6",
+    "values": [
+     [
+      254,
+      "804.8,79.2,50.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#665",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "855.2,79.2,8.4,17.6",
+    "values": [
+     [
+      254,
+      "855.2,79.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#666",
+    "prop": "rect",
+    "fromInputMs": 8,
+    "input": "wheel span#650",
+    "firstMs": 254,
+    "lastMs": 254,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "872,79.2,25.2,17.6",
+    "values": [
+     [
+      254,
+      "872,79.2,25.2,17.6"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    15,
+    [
+     1140,
+     0,
+     0
+    ]
+   ],
+   [
+    59,
+    [
+     1020,
+     0,
+     0
+    ]
+   ],
+   [
+    104,
+    [
+     900,
+     0,
+     0
+    ]
+   ],
+   [
+    159,
+    [
+     780,
+     0,
+     0
+    ]
+   ],
+   [
+    209,
+    [
+     660,
+     0,
+     0
+    ]
+   ],
+   [
+    254,
+    [
+     540,
+     0,
+     0
+    ]
+   ],
+   [
+    304,
+    [
+     420,
+     0,
+     0
+    ]
+   ],
+   [
+    354,
+    [
+     300,
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 115,
+    "target": "button[tid=jump-to-latest]#530",
+    "attr": "aria-hidden",
+    "v": "false"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/scroll-to-code.jpg (16 of 35 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "hover-code-block",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span\"~\"#744"
+  },
+  "firstChangeMs": 6,
+  "settleMs": 1373,
+  "rafFrames": 310,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=group]#651",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,271,736,515.6",
+    "values": [
+     [
+      6,
+      "496,271,736,515.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#655",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,319.2,462,17.6",
+    "values": [
+     [
+      6,
+      "510.8,319.2,462,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#656",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "510.8,319.2,25.2,17.6",
+    "values": [
+     [
+      6,
+      "510.8,319.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#657",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "544.4,319.2,109.2,17.6",
+    "values": [
+     [
+      6,
+      "544.4,319.2,109.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#658",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "653.6,319.2,8.4,17.6",
+    "values": [
+     [
+      6,
+      "653.6,319.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#659",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "662,319.2,33.6,17.6",
+    "values": [
+     [
+      6,
+      "662,319.2,33.6,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#660",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "695.6,319.2,8.4,17.6",
+    "values": [
+     [
+      6,
+      "695.6,319.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#661",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "746,319.2,8.4,17.6",
+    "values": [
+     [
+      6,
+      "746,319.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#662",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "754.4,319.2,25.2,17.6",
+    "values": [
+     [
+      6,
+      "754.4,319.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#663",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "779.6,319.2,16.8,17.6",
+    "values": [
+     [
+      6,
+      "779.6,319.2,16.8,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#664",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "804.8,319.2,50.4,17.6",
+    "values": [
+     [
+      6,
+      "804.8,319.2,50.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#665",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "855.2,319.2,8.4,17.6",
+    "values": [
+     [
+      6,
+      "855.2,319.2,8.4,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#666",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover span#650",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "872,319.2,25.2,17.6",
+    "values": [
+     [
+      6,
+      "872,319.2,25.2,17.6"
+     ]
+    ]
+   },
+   {
+    "el": "div#429",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "298.4,-247,1131.2,2106.7",
+    "values": [
+     [
+      1239,
+      "298.4,-247,1131.2,2106.7"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chat-column]#430",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "468,-247,792,2106.7",
+    "values": [
+     [
+      1239,
+      "468,-247,792,2106.7"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-list]#431",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "480,-247,768,1998.7",
+    "values": [
+     [
+      1239,
+      "480,-247,768,1998.7"
+     ]
+    ]
+   },
+   {
+    "el": "div#765",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-243,736,0",
+    "values": [
+     [
+      1239,
+      "496,-243,736,0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=status]#682",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "495,-244,1,1",
+    "values": [
+     [
+      1239,
+      "495,-244,1,1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=feed]#432",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-243,736,1875.9",
+    "values": [
+     [
+      1239,
+      "496,-243,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "p\"~\"#683",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "495,-244,1,1",
+    "values": [
+     [
+      1239,
+      "495,-244,1,1"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-sizer]#433",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-243,736,1875.9",
+    "values": [
+     [
+      1239,
+      "496,-243,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-leading]#434",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-243,736,1875.9",
+    "values": [
+     [
+      1239,
+      "496,-243,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "div#766",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-243,736,0",
+    "values": [
+     [
+      1239,
+      "496,-243,736,0"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=seek-back-shield]#435",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-243,736,1875.9",
+    "values": [
+     [
+      1239,
+      "496,-243,736,1875.9"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-spacer]#767",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div#429",
+    "firstMs": 1239,
+    "lastMs": 1239,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "496,-243,736,0",
+    "values": [
+     [
+      1239,
+      "496,-243,736,0"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "opacity",
+    "fromInputMs": 5,
+    "input": "pointerover span#61",
+    "firstMs": 1245,
+    "lastMs": 1301,
+    "durationMs": 56,
+    "steps": 9,
+    "to": "0",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.474
+     ],
+     [
+      11,
+      0.762
+     ],
+     [
+      17,
+      0.871
+     ],
+     [
+      28,
+      0.957
+     ],
+     [
+      39,
+      0.99
+     ],
+     [
+      45,
+      0.996
+     ],
+     [
+      51,
+      0.999
+     ],
+     [
+      56,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 10,
+    "input": "pointerover span#61",
+    "firstMs": 1251,
+    "lastMs": 1373,
+    "durationMs": 123,
+    "steps": 17,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.111
+     ],
+     [
+      11,
+      0.246
+     ],
+     [
+      22,
+      0.602
+     ],
+     [
+      34,
+      0.826
+     ],
+     [
+      39,
+      0.873
+     ],
+     [
+      45,
+      0.905
+     ],
+     [
+      51,
+      0.928
+     ],
+     [
+      56,
+      0.945
+     ],
+     [
+      67,
+      0.969
+     ],
+     [
+      73,
+      0.977
+     ],
+     [
+      84,
+      0.988
+     ],
+     [
+      89,
+      0.992
+     ],
+     [
+      101,
+      0.997
+     ],
+     [
+      106,
+      0.999
+     ],
+     [
+      117,
+      1
+     ],
+     [
+      123,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-code-block.jpg (14 of 14 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "open-side-panel",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#415"
+  },
+  "firstChangeMs": 2,
+  "settleMs": 124,
+  "rafFrames": 252,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#410",
+    "prop": "outlineColor",
+    "fromInputMs": 2,
+    "input": "pointerdown span\"~\"#415",
+    "firstMs": 2,
+    "lastMs": 2,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      2,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "button#410",
+    "prop": "outlineWidth",
+    "fromInputMs": 2,
+    "input": "pointerdown span\"~\"#415",
+    "firstMs": 2,
+    "lastMs": 2,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "2.4px",
+    "values": [
+     [
+      2,
+      "2.4px"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "686,760,36,36",
+    "values": [
+     [
+      124,
+      "686,760,36,36"
+     ]
+    ]
+   },
+   {
+    "el": "aside#624",
+    "prop": "opacity",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1",
+    "values": [
+     [
+      124,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "aside#624",
+    "prop": "boxShadow",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "none",
+    "values": [
+     [
+      124,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "aside#624",
+    "prop": "clipPath",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "none",
+    "values": [
+     [
+      124,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=code-block-copy]#632",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1035.2,281.8,28,28",
+    "values": [
+     [
+      124,
+      "1035.2,281.8,28,28"
+     ]
+    ]
+   },
+   {
+    "el": "button#633",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "334,1608.9,24,24",
+    "values": [
+     [
+      124,
+      "334,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-read-aloud]#634",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "358,1608.9,24,24",
+    "values": [
+     [
+      124,
+      "358,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#635",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "382,1608.9,24,24",
+    "values": [
+     [
+      124,
+      "382,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#636",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "406,1608.9,24,24",
+    "values": [
+     [
+      124,
+      "406,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-retry]#637",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "430,1608.9,24,24",
+    "values": [
+     [
+      124,
+      "430,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "click span\"~\"#415",
+    "firstMs": 124,
+    "lastMs": 124,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "454,1608.9,86.3,24",
+    "values": [
+     [
+      124,
+      "454,1608.9,86.3,24"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 147,
+    "target": "aside#624",
+    "add": [
+     "div#866"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 147,
+    "target": "div#867",
+    "add": [
+     "div#868"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 147,
+    "target": "aside#624",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 338,
+    "target": "div#868",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 338,
+    "target": "div#868",
+    "add": [
+     "div#869"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 556,
+    "target": "div#869",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "svg"
+    ]
+   },
+   {
+    "t": 556,
+    "target": "div#869",
+    "add": [
+     "svg#870"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 7,
+  "strip": "strips/open-side-panel.jpg (4 of 4 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "close-side-panel",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#415"
+  },
+  "firstChangeMs": 125,
+  "settleMs": 125,
+  "rafFrames": 257,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#530",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "846,760,36,36",
+    "values": [
+     [
+      125,
+      "846,760,36,36"
+     ]
+    ]
+   },
+   {
+    "el": "aside#624",
+    "prop": "opacity",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0",
+    "values": [
+     [
+      125,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "aside#624",
+    "prop": "boxShadow",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.06) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.06) 0px 4px 12px 0px, rgba(0, 0, 0, 0.08) 0px 16px 40px 0px",
+    "values": [
+     [
+      125,
+      "rgba(0, 0, 0, 0.06) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.06) 0px 4px 12px 0px, rgb"
+     ]
+    ]
+   },
+   {
+    "el": "aside#624",
+    "prop": "clipPath",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "inset(0px -60px)",
+    "values": [
+     [
+      125,
+      "inset(0px -60px)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=code-block-copy]#632",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1195.2,281.8,28,28",
+    "values": [
+     [
+      125,
+      "1195.2,281.8,28,28"
+     ]
+    ]
+   },
+   {
+    "el": "button#633",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "494,1608.9,24,24",
+    "values": [
+     [
+      125,
+      "494,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-read-aloud]#634",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "518,1608.9,24,24",
+    "values": [
+     [
+      125,
+      "518,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#635",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "542,1608.9,24,24",
+    "values": [
+     [
+      125,
+      "542,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#636",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "566,1608.9,24,24",
+    "values": [
+     [
+      125,
+      "566,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-retry]#637",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "590,1608.9,24,24",
+    "values": [
+     [
+      125,
+      "590,1608.9,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#638",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "click span\"~\"#415",
+    "firstMs": 125,
+    "lastMs": 125,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "614,1608.9,86.3,24",
+    "values": [
+     [
+      125,
+      "614,1608.9,86.3,24"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 127,
+    "target": "aside#624",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 127,
+    "target": "aside#624",
+    "attr": "aria-hidden",
+    "v": "true"
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/close-side-panel.jpg (4 of 4 frames)",
+  "prevFrame": -102
+ }
+]

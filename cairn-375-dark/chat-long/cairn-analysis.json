@@ -1,0 +1,2459 @@
+[
+ {
+  "label": "scroll-up",
+  "anchor": {
+   "type": "wheel",
+   "target": "div[role=log][tid=chief-stream]#30"
+  },
+  "firstChangeMs": -20,
+  "settleMs": 930,
+  "rafFrames": 122,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#106",
+    "prop": "opacity",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -20,
+    "lastMs": 96,
+    "durationMs": 117,
+    "steps": 2,
+    "to": "1",
+    "values": [
+     [
+      -20,
+      "0"
+     ],
+     [
+      96,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=log][tid=chief-stream]#30",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover div[tid=chief-bubble]\"滚动保留探针第 39 条：检查最小化后滚动位置是\"#84",
+    "firstMs": -3,
+    "lastMs": 930,
+    "durationMs": 933,
+    "steps": 15,
+    "to": "0,-730,375,3474",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.053
+     ],
+     [
+      133,
+      0.158
+     ],
+     [
+      183,
+      0.211
+     ],
+     [
+      283,
+      0.316
+     ],
+     [
+      333,
+      0.368
+     ],
+     [
+      383,
+      0.421
+     ],
+     [
+      483,
+      0.526
+     ],
+     [
+      533,
+      0.579
+     ],
+     [
+      633,
+      0.684
+     ],
+     [
+      683,
+      0.737
+     ],
+     [
+      733,
+      0.789
+     ],
+     [
+      833,
+      0.895
+     ],
+     [
+      883,
+      0.947
+     ],
+     [
+      933,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "section[aria=Home overview][tid=home-c-lead]#142",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "16,-716,343,108",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=greeting]#143",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "16,-692,343,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "h2\"Good evening, Xmon Dai\"#144",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "16,-692,343,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "p[tid=home-c-since]\"Sun, September 20 · 1 wa\"#145",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "16,-658,343,18",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=message-scroller-item]#146",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "16,-584,343,61",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg]#147",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "16,-584,343,61",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-col]#148",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "67.5,-584,291.5,61",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-bubble]\"滚动保留探针第 1 条：检查最小化后滚动位置是否\"#149",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "67.5,-584,291.5,61",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-tools]#150",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "307,-523,52,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Copy][tid=button]#151",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "307,-523,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#152",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "312.5,-517.5,13,13",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "rect#153",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 30,
+    "lastMs": 930,
+    "durationMs": 900,
+    "steps": 8,
+    "to": "317.4,-512.6,7,7",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0.167
+     ],
+     [
+      250,
+      0.278
+     ],
+     [
+      350,
+      0.389
+     ],
+     [
+      600,
+      0.667
+     ],
+     [
+      700,
+      0.778
+     ],
+     [
+      800,
+      0.889
+     ],
+     [
+      900,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -20,
+    [
+     3058,
+     0
+    ]
+   ],
+   [
+    30,
+    [
+     2938,
+     0
+    ]
+   ],
+   [
+    80,
+    [
+     2818,
+     0
+    ]
+   ],
+   [
+    130,
+    [
+     2698,
+     0
+    ]
+   ],
+   [
+    180,
+    [
+     2578,
+     0
+    ]
+   ],
+   [
+    230,
+    [
+     2458,
+     0
+    ]
+   ],
+   [
+    280,
+    [
+     2338,
+     0
+    ]
+   ],
+   [
+    330,
+    [
+     2218,
+     0
+    ]
+   ],
+   [
+    380,
+    [
+     2098,
+     0
+    ]
+   ],
+   [
+    430,
+    [
+     1978,
+     0
+    ]
+   ],
+   [
+    480,
+    [
+     1858,
+     0
+    ]
+   ],
+   [
+    530,
+    [
+     1738,
+     0
+    ]
+   ],
+   [
+    580,
+    [
+     1618,
+     0
+    ]
+   ],
+   [
+    630,
+    [
+     1498,
+     0
+    ]
+   ],
+   [
+    680,
+    [
+     1378,
+     0
+    ]
+   ],
+   [
+    730,
+    [
+     1258,
+     0
+    ]
+   ],
+   [
+    780,
+    [
+     1138,
+     0
+    ]
+   ],
+   [
+    830,
+    [
+     1018,
+     0
+    ]
+   ],
+   [
+    880,
+    [
+     898,
+     0
+    ]
+   ],
+   [
+    930,
+    [
+     778,
+     0
+    ]
+   ],
+   [
+    980,
+    [
+     658,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 86,
+    "target": "button[tid=jump-to-latest]#106",
+    "attr": "aria-hidden",
+    "v": "false"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/scroll-up.jpg (16 of 25 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "hover-jump",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[tid=chief-bubble]\"滚动保留探针第 11 条：检查最小化后滚动位置是\"#260"
+  },
+  "firstChangeMs": 13,
+  "settleMs": 80,
+  "rafFrames": 88,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=log][tid=chief-stream]#30",
+    "prop": "rect",
+    "fromInputMs": 13,
+    "input": "pointerover div[tid=chief-bubble]\"滚动保留探针第 11 条：检查最小化后滚动位置是\"#26",
+    "firstMs": 13,
+    "lastMs": 13,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,-610,375,3474",
+    "values": [
+     [
+      13,
+      "0,-610,375,3474"
+     ]
+    ]
+   },
+   {
+    "el": "section[aria=Home overview][tid=home-c-lead]#142",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,-596,343,108",
+    "values": [
+     [
+      63,
+      "16,-596,343,108"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=greeting]#143",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,-572,343,32",
+    "values": [
+     [
+      63,
+      "16,-572,343,32"
+     ]
+    ]
+   },
+   {
+    "el": "h2\"Good evening, Xmon Dai\"#144",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,-572,343,32",
+    "values": [
+     [
+      63,
+      "16,-572,343,32"
+     ]
+    ]
+   },
+   {
+    "el": "p[tid=home-c-since]\"Sun, September 20 · 1 wa\"#145",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,-538,343,18",
+    "values": [
+     [
+      63,
+      "16,-538,343,18"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=message-scroller-item]#146",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,-464,343,61",
+    "values": [
+     [
+      63,
+      "16,-464,343,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg]#147",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,-464,343,61",
+    "values": [
+     [
+      63,
+      "16,-464,343,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-col]#148",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "67.5,-464,291.5,61",
+    "values": [
+     [
+      63,
+      "67.5,-464,291.5,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-bubble]\"滚动保留探针第 1 条：检查最小化后滚动位置是否\"#149",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "67.5,-464,291.5,61",
+    "values": [
+     [
+      63,
+      "67.5,-464,291.5,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-tools]#150",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "307,-403,52,24",
+    "values": [
+     [
+      63,
+      "307,-403,52,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Copy][tid=button]#151",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "307,-403,24,24",
+    "values": [
+     [
+      63,
+      "307,-403,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "svg#152",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "312.5,-397.5,13,13",
+    "values": [
+     [
+      63,
+      "312.5,-397.5,13,13"
+     ]
+    ]
+   },
+   {
+    "el": "rect#153",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=log][tid=chief-stream]#30",
+    "firstMs": 63,
+    "lastMs": 63,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "317.4,-392.6,7,7",
+    "values": [
+     [
+      63,
+      "317.4,-392.6,7,7"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=message-scroller-item]#192",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[tid=chief-bubble]\"滚动保留探针第 13 条：检查最小化后滚动位置是\"#19",
+    "firstMs": 80,
+    "lastMs": 80,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,532,343,61",
+    "values": [
+     [
+      80,
+      "16,532,343,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg]#193",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[tid=chief-bubble]\"滚动保留探针第 13 条：检查最小化后滚动位置是\"#19",
+    "firstMs": 80,
+    "lastMs": 80,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,532,343,61",
+    "values": [
+     [
+      80,
+      "16,532,343,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-col]#194",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[tid=chief-bubble]\"滚动保留探针第 13 条：检查最小化后滚动位置是\"#19",
+    "firstMs": 80,
+    "lastMs": 80,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "67.5,532,291.5,61",
+    "values": [
+     [
+      80,
+      "67.5,532,291.5,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-bubble]\"滚动保留探针第 13 条：检查最小化后滚动位置是\"#191",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[tid=chief-bubble]\"滚动保留探针第 13 条：检查最小化后滚动位置是\"#19",
+    "firstMs": 80,
+    "lastMs": 80,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "67.5,532,291.5,61",
+    "values": [
+     [
+      80,
+      "67.5,532,291.5,61"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-jump.jpg (1 of 1 frames)",
+  "prevFrame": -103
+ },
+ {
+  "label": "jump-to-latest",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[tid=jump-to-latest]#106"
+  },
+  "firstChangeMs": 594,
+  "settleMs": 594,
+  "rafFrames": 97,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#106",
+    "prop": "opacity",
+    "fromInputMs": 594,
+    "input": "click button[tid=jump-to-latest]#106",
+    "firstMs": 594,
+    "lastMs": 594,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0",
+    "values": [
+     [
+      594,
+      "0"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    44,
+    [
+     660,
+     0
+    ]
+   ],
+   [
+    61,
+    [
+     667,
+     0
+    ]
+   ],
+   [
+    78,
+    [
+     681,
+     0
+    ]
+   ],
+   [
+    94,
+    [
+     701,
+     0
+    ]
+   ],
+   [
+    111,
+    [
+     732,
+     0
+    ]
+   ],
+   [
+    128,
+    [
+     774,
+     0
+    ]
+   ],
+   [
+    144,
+    [
+     834,
+     0
+    ]
+   ],
+   [
+    161,
+    [
+     915,
+     0
+    ]
+   ],
+   [
+    178,
+    [
+     1029,
+     0
+    ]
+   ],
+   [
+    194,
+    [
+     1183,
+     0
+    ]
+   ],
+   [
+    211,
+    [
+     1377,
+     0
+    ]
+   ],
+   [
+    228,
+    [
+     1586,
+     0
+    ]
+   ],
+   [
+    244,
+    [
+     1777,
+     0
+    ]
+   ],
+   [
+    261,
+    [
+     1940,
+     0
+    ]
+   ],
+   [
+    278,
+    [
+     2076,
+     0
+    ]
+   ],
+   [
+    294,
+    [
+     2190,
+     0
+    ]
+   ],
+   [
+    311,
+    [
+     2287,
+     0
+    ]
+   ],
+   [
+    328,
+    [
+     2371,
+     0
+    ]
+   ],
+   [
+    344,
+    [
+     2445,
+     0
+    ]
+   ],
+   [
+    361,
+    [
+     2510,
+     0
+    ]
+   ],
+   [
+    378,
+    [
+     2567,
+     0
+    ]
+   ],
+   [
+    394,
+    [
+     2619,
+     0
+    ]
+   ],
+   [
+    411,
+    [
+     2665,
+     0
+    ]
+   ],
+   [
+    428,
+    [
+     2706,
+     0
+    ]
+   ],
+   [
+    444,
+    [
+     2744,
+     0
+    ]
+   ],
+   [
+    461,
+    [
+     2778,
+     0
+    ]
+   ],
+   [
+    478,
+    [
+     2809,
+     0
+    ]
+   ],
+   [
+    494,
+    [
+     2838,
+     0
+    ]
+   ],
+   [
+    511,
+    [
+     2863,
+     0
+    ]
+   ],
+   [
+    528,
+    [
+     2887,
+     0
+    ]
+   ],
+   [
+    544,
+    [
+     2908,
+     0
+    ]
+   ],
+   [
+    561,
+    [
+     2927,
+     0
+    ]
+   ],
+   [
+    578,
+    [
+     2945,
+     0
+    ]
+   ],
+   [
+    594,
+    [
+     2961,
+     0
+    ]
+   ],
+   [
+    611,
+    [
+     2975,
+     0
+    ]
+   ],
+   [
+    628,
+    [
+     2988,
+     0
+    ]
+   ],
+   [
+    644,
+    [
+     2999,
+     0
+    ]
+   ],
+   [
+    661,
+    [
+     3010,
+     0
+    ]
+   ],
+   [
+    678,
+    [
+     3019,
+     0
+    ]
+   ],
+   [
+    694,
+    [
+     3027,
+     0
+    ]
+   ],
+   [
+    711,
+    [
+     3034,
+     0
+    ]
+   ],
+   [
+    728,
+    [
+     3040,
+     0
+    ]
+   ],
+   [
+    744,
+    [
+     3045,
+     0
+    ]
+   ],
+   [
+    761,
+    [
+     3049,
+     0
+    ]
+   ],
+   [
+    778,
+    [
+     3052,
+     0
+    ]
+   ],
+   [
+    794,
+    [
+     3055,
+     0
+    ]
+   ],
+   [
+    811,
+    [
+     3057,
+     0
+    ]
+   ],
+   [
+    828,
+    [
+     3058,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 579,
+    "target": "button[tid=jump-to-latest]#106",
+    "attr": "aria-hidden",
+    "v": "true"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/jump-to-latest.jpg (16 of 41 frames)",
+  "prevFrame": -106
+ },
+ {
+  "label": "hover-reply-actions",
+  "anchor": {
+   "type": "pointerover",
+   "target": "header[tid=home-c-pane-buttons]#10"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 43,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -101
+ },
+ {
+  "label": "scroll-to-code",
+  "anchor": {
+   "type": "wheel",
+   "target": "div[role=log][tid=chief-stream]#30"
+  },
+  "firstChangeMs": -1,
+  "settleMs": 382,
+  "rafFrames": 78,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=log][tid=chief-stream]#30",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover div[tid=chief-bubble]\"滚动保留探针第 39 条：检查最小化后滚动位置是\"#84",
+    "firstMs": -1,
+    "lastMs": 382,
+    "durationMs": 383,
+    "steps": 7,
+    "to": "0,-2050,375,3474",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.125
+     ],
+     [
+      133,
+      0.375
+     ],
+     [
+      183,
+      0.5
+     ],
+     [
+      283,
+      0.75
+     ],
+     [
+      333,
+      0.875
+     ],
+     [
+      383,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "section[aria=Home overview][tid=home-c-lead]#142",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "16,-2036,343,108",
+    "values": [
+     [
+      32,
+      "16,-2876,343,108"
+     ],
+     [
+      182,
+      "16,-2516,343,108"
+     ],
+     [
+      282,
+      "16,-2276,343,108"
+     ],
+     [
+      382,
+      "16,-2036,343,108"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=greeting]#143",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "16,-2012,343,32",
+    "values": [
+     [
+      32,
+      "16,-2852,343,32"
+     ],
+     [
+      182,
+      "16,-2492,343,32"
+     ],
+     [
+      282,
+      "16,-2252,343,32"
+     ],
+     [
+      382,
+      "16,-2012,343,32"
+     ]
+    ]
+   },
+   {
+    "el": "h2\"Good evening, Xmon Dai\"#144",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "16,-2012,343,32",
+    "values": [
+     [
+      32,
+      "16,-2852,343,32"
+     ],
+     [
+      182,
+      "16,-2492,343,32"
+     ],
+     [
+      282,
+      "16,-2252,343,32"
+     ],
+     [
+      382,
+      "16,-2012,343,32"
+     ]
+    ]
+   },
+   {
+    "el": "p[tid=home-c-since]\"Sun, September 20 · 1 wa\"#145",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "16,-1978,343,18",
+    "values": [
+     [
+      32,
+      "16,-2818,343,18"
+     ],
+     [
+      182,
+      "16,-2458,343,18"
+     ],
+     [
+      282,
+      "16,-2218,343,18"
+     ],
+     [
+      382,
+      "16,-1978,343,18"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=message-scroller-item]#146",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "16,-1904,343,61",
+    "values": [
+     [
+      32,
+      "16,-2744,343,61"
+     ],
+     [
+      182,
+      "16,-2384,343,61"
+     ],
+     [
+      282,
+      "16,-2144,343,61"
+     ],
+     [
+      382,
+      "16,-1904,343,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg]#147",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "16,-1904,343,61",
+    "values": [
+     [
+      32,
+      "16,-2744,343,61"
+     ],
+     [
+      182,
+      "16,-2384,343,61"
+     ],
+     [
+      282,
+      "16,-2144,343,61"
+     ],
+     [
+      382,
+      "16,-1904,343,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-col]#148",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "67.5,-1904,291.5,61",
+    "values": [
+     [
+      32,
+      "67.5,-2744,291.5,61"
+     ],
+     [
+      182,
+      "67.5,-2384,291.5,61"
+     ],
+     [
+      282,
+      "67.5,-2144,291.5,61"
+     ],
+     [
+      382,
+      "67.5,-1904,291.5,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-bubble]\"滚动保留探针第 1 条：检查最小化后滚动位置是否\"#149",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "67.5,-1904,291.5,61",
+    "values": [
+     [
+      32,
+      "67.5,-2744,291.5,61"
+     ],
+     [
+      182,
+      "67.5,-2384,291.5,61"
+     ],
+     [
+      282,
+      "67.5,-2144,291.5,61"
+     ],
+     [
+      382,
+      "67.5,-1904,291.5,61"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-tools]#150",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "307,-1843,52,24",
+    "values": [
+     [
+      32,
+      "307,-2683,52,24"
+     ],
+     [
+      182,
+      "307,-2323,52,24"
+     ],
+     [
+      282,
+      "307,-2083,52,24"
+     ],
+     [
+      382,
+      "307,-1843,52,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Copy][tid=button]#151",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "307,-1843,24,24",
+    "values": [
+     [
+      32,
+      "307,-2683,24,24"
+     ],
+     [
+      182,
+      "307,-2323,24,24"
+     ],
+     [
+      282,
+      "307,-2083,24,24"
+     ],
+     [
+      382,
+      "307,-1843,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "svg#152",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "312.5,-1837.5,13,13",
+    "values": [
+     [
+      32,
+      "312.5,-2677.5,13,13"
+     ],
+     [
+      182,
+      "312.5,-2317.5,13,13"
+     ],
+     [
+      282,
+      "312.5,-2077.5,13,13"
+     ],
+     [
+      382,
+      "312.5,-1837.5,13,13"
+     ]
+    ]
+   },
+   {
+    "el": "rect#153",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel div[role=log][tid=chief-stream]#30",
+    "firstMs": 32,
+    "lastMs": 382,
+    "durationMs": 350,
+    "steps": 4,
+    "to": "317.4,-1832.6,7,7",
+    "values": [
+     [
+      32,
+      "317.4,-2672.6,7,7"
+     ],
+     [
+      182,
+      "317.4,-2312.6,7,7"
+     ],
+     [
+      282,
+      "317.4,-2072.6,7,7"
+     ],
+     [
+      382,
+      "317.4,-1832.6,7,7"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#106",
+    "prop": "opacity",
+    "fromInputMs": 16,
+    "input": "pointerover span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#50",
+    "firstMs": 99,
+    "lastMs": 99,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1",
+    "values": [
+     [
+      99,
+      "1"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    32,
+    [
+     2938,
+     0
+    ]
+   ],
+   [
+    82,
+    [
+     2818,
+     0
+    ]
+   ],
+   [
+    132,
+    [
+     2698,
+     0
+    ]
+   ],
+   [
+    182,
+    [
+     2578,
+     0
+    ]
+   ],
+   [
+    232,
+    [
+     2458,
+     0
+    ]
+   ],
+   [
+    282,
+    [
+     2338,
+     0
+    ]
+   ],
+   [
+    332,
+    [
+     2218,
+     0
+    ]
+   ],
+   [
+    382,
+    [
+     2098,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 85,
+    "target": "button[tid=jump-to-latest]#106",
+    "attr": "aria-hidden",
+    "v": "false"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/scroll-to-code.jpg (10 of 10 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "hover-code-block",
+  "anchor": {
+   "type": "pointerover",
+   "target": "header[tid=home-c-pane-buttons]#10"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 31,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -100
+ },
+ {
+  "label": "open-side-panel",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[tid=button]\"View thread\"#126"
+  },
+  "firstChangeMs": 128,
+  "settleMs": 378,
+  "rafFrames": 79,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=message-scroller]#429",
+    "prop": "rect",
+    "fromInputMs": 128,
+    "input": "click button[tid=button]\"View thread\"#126",
+    "firstMs": 128,
+    "lastMs": 362,
+    "durationMs": 233,
+    "steps": 14,
+    "to": "0,73,375,581",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.017
+     ],
+     [
+      50,
+      0.067
+     ],
+     [
+      67,
+      0.183
+     ],
+     [
+      83,
+      0.375
+     ],
+     [
+      100,
+      0.567
+     ],
+     [
+      117,
+      0.708
+     ],
+     [
+      133,
+      0.808
+     ],
+     [
+      150,
+      0.883
+     ],
+     [
+      167,
+      0.925
+     ],
+     [
+      183,
+      0.958
+     ],
+     [
+      200,
+      0.983
+     ],
+     [
+      217,
+      0.992
+     ],
+     [
+      233,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#430",
+    "prop": "rect",
+    "fromInputMs": 128,
+    "input": "click button[tid=button]\"View thread\"#126",
+    "firstMs": 128,
+    "lastMs": 362,
+    "durationMs": 233,
+    "steps": 14,
+    "to": "171.5,610,32,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.017
+     ],
+     [
+      50,
+      0.067
+     ],
+     [
+      67,
+      0.183
+     ],
+     [
+      83,
+      0.375
+     ],
+     [
+      100,
+      0.567
+     ],
+     [
+      117,
+      0.708
+     ],
+     [
+      133,
+      0.808
+     ],
+     [
+      150,
+      0.883
+     ],
+     [
+      167,
+      0.925
+     ],
+     [
+      183,
+      0.958
+     ],
+     [
+      200,
+      0.983
+     ],
+     [
+      217,
+      0.992
+     ],
+     [
+      233,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "aside[aria=在 README.md 末尾追加一行「r3 lifecycle probe」]#428",
+    "prop": "rect",
+    "fromInputMs": 128,
+    "input": "click button[tid=button]\"View thread\"#126",
+    "firstMs": 128,
+    "lastMs": 362,
+    "durationMs": 233,
+    "steps": 14,
+    "to": "0,0,375,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.017
+     ],
+     [
+      50,
+      0.067
+     ],
+     [
+      67,
+      0.183
+     ],
+     [
+      83,
+      0.375
+     ],
+     [
+      100,
+      0.567
+     ],
+     [
+      117,
+      0.708
+     ],
+     [
+      133,
+      0.808
+     ],
+     [
+      150,
+      0.883
+     ],
+     [
+      167,
+      0.925
+     ],
+     [
+      183,
+      0.958
+     ],
+     [
+      200,
+      0.983
+     ],
+     [
+      217,
+      0.992
+     ],
+     [
+      233,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "aside[aria=在 README.md 末尾追加一行「r3 lifecycle probe」]#428",
+    "prop": "opacity",
+    "fromInputMs": 128,
+    "input": "click button[tid=button]\"View thread\"#126",
+    "firstMs": 128,
+    "lastMs": 378,
+    "durationMs": 250,
+    "steps": 15,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.014
+     ],
+     [
+      50,
+      0.067
+     ],
+     [
+      67,
+      0.186
+     ],
+     [
+      83,
+      0.375
+     ],
+     [
+      100,
+      0.569
+     ],
+     [
+      117,
+      0.712
+     ],
+     [
+      133,
+      0.811
+     ],
+     [
+      150,
+      0.881
+     ],
+     [
+      167,
+      0.929
+     ],
+     [
+      183,
+      0.962
+     ],
+     [
+      200,
+      0.983
+     ],
+     [
+      217,
+      0.995
+     ],
+     [
+      233,
+      1
+     ],
+     [
+      250,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "aside[aria=在 README.md 末尾追加一行「r3 lifecycle probe」]#428",
+    "prop": "translate",
+    "fromInputMs": 128,
+    "input": "click button[tid=button]\"View thread\"#126",
+    "firstMs": 128,
+    "lastMs": 378,
+    "durationMs": 250,
+    "steps": 15,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div#427",
+    "prop": "opacity",
+    "fromInputMs": 128,
+    "input": "click button[tid=button]\"View thread\"#126",
+    "firstMs": 128,
+    "lastMs": 345,
+    "durationMs": 217,
+    "steps": 13,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.017
+     ],
+     [
+      50,
+      0.085
+     ],
+     [
+      67,
+      0.237
+     ],
+     [
+      83,
+      0.457
+     ],
+     [
+      100,
+      0.647
+     ],
+     [
+      117,
+      0.776
+     ],
+     [
+      133,
+      0.863
+     ],
+     [
+      150,
+      0.921
+     ],
+     [
+      167,
+      0.959
+     ],
+     [
+      183,
+      0.983
+     ],
+     [
+      200,
+      0.996
+     ],
+     [
+      217,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 143,
+    "target": "div#6",
+    "add": [
+     "div#427"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 143,
+    "target": "div#6",
+    "add": [
+     "aside[aria=在 README.md 末尾追加一行「r3 lifecycle probe」]#428"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/open-side-panel.jpg (16 of 16 frames)",
+  "prevFrame": -138
+ },
+ {
+  "label": "close-side-panel",
+  "anchor": {
+   "type": "keydown",
+   "target": "body#322"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 79,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 68,
+    "target": "div#6",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 68,
+    "target": "div#6",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "aside"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/close-side-panel.jpg (1 of 1 frames)",
+  "prevFrame": -113
+ }
+]

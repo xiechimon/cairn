@@ -1,0 +1,39 @@
+{
+ "regions": [
+  {
+   "name": "greeting",
+   "box": [
+    0,
+    0.06896551724137931,
+    1,
+    0.7684729064039408
+   ],
+   "from": 38.769999999999996,
+   "to": 39.010000000000005
+  },
+  {
+   "name": "recent-artifacts",
+   "box": [
+    0,
+    0.9852216748768473,
+    1,
+    0.014778325123152709
+   ],
+   "from": 38.769999999999996,
+   "to": 39.010000000000005
+  },
+  {
+   "name": "capabilities-values",
+   "box": [
+    0.042666666666666665,
+    0.06896551724137931,
+    0.9146666666666666,
+    0.9113300492610837
+   ],
+   "from": 4.359999999999999,
+   "to": 6.42
+  }
+ ],
+ "reviewedClean": true,
+ "reviewedBy": "design-owner session, 2026-11-07: every claude.ai video viewed on 0.5 fps contact sheets and its last 6 s; capabilities and palette windows checked frame by frame; strips and pairs are built from the same redacted frames"
+}

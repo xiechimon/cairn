@@ -1,0 +1,45 @@
+[
+ {
+  "label": "hover-cards",
+  "anchor": {
+   "type": "pointerover",
+   "target": "h2\"Good evening, Xmon Dai\"#31"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 66,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [
+   [
+    -27,
+    [
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": null
+ },
+ {
+  "label": "hover-primary",
+  "anchor": {
+   "type": "pointerover",
+   "target": "header[tid=home-c-hero]#29"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 93,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -100
+ }
+]

@@ -1,0 +1,413 @@
+[
+ {
+  "label": "hover-cards",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span[tid=brand-mark]#7"
+  },
+  "firstChangeMs": 86,
+  "settleMs": 220,
+  "rafFrames": 102,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=sidebar-project-row]#47",
+    "prop": "backgroundColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 86,
+    "lastMs": 220,
+    "durationMs": 133,
+    "steps": 8,
+    "to": "rgba(230, 232, 226, 0.05)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      1
+     ],
+     [
+      33,
+      1
+     ],
+     [
+      50,
+      1
+     ],
+     [
+      67,
+      1
+     ],
+     [
+      83,
+      1
+     ],
+     [
+      100,
+      1
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-project-row]#47",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 86,
+    "lastMs": 220,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-project-row]#47",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 86,
+    "lastMs": 220,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"r3-lifecycle\"#50",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 86,
+    "lastMs": 220,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"r3-lifecycle\"#50",
+    "prop": "borderTopColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 86,
+    "lastMs": 220,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"r3-lifecycle\"#50",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 86,
+    "lastMs": 220,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -30,
+    [
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-cards.jpg (11 of 11 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "hover-primary",
+  "anchor": {
+   "type": "pointerover",
+   "target": "button[aria=Search][tid=tooltip-trigger]#9"
+  },
+  "firstChangeMs": 90,
+  "settleMs": 90,
+  "rafFrames": 94,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=button]\"Settings\"#88",
+    "prop": "backgroundColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Settings\"#88",
+    "firstMs": 90,
+    "lastMs": 90,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "oklab(0.927781 -0.00430253 0.00707078 / 0.8)",
+    "values": [
+     [
+      90,
+      "oklab(0.927781 -0.00430253 0.00707078 / 0.8)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 14,
+    "target": "body#124",
+    "add": [
+     "div#126"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 14,
+    "target": "div#126",
+    "add": [
+     "div[role=presentation]#127"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 29,
+    "target": "div#128",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 29,
+    "target": "div[tid=tooltip-content]#129",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation]#127",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 32,
+    "target": "body#124",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 32,
+    "target": "div#126",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 7,
+  "strip": "strips/hover-primary.jpg (3 of 3 frames)",
+  "prevFrame": -110
+ }
+]

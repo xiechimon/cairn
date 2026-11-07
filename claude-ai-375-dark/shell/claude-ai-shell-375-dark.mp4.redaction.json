@@ -1,0 +1,46 @@
+{
+ "regions": [
+  {
+   "name": "drawer",
+   "box": [
+    0,
+    0.3078817733990148,
+    1,
+    0.6921182266009852
+   ],
+   "from": 0.41,
+   "to": 5.23
+  },
+  {
+   "name": "drawer",
+   "box": [
+    0,
+    0.3078817733990148,
+    1,
+    0.6921182266009852
+   ],
+   "from": 18.080000000000002,
+   "to": 19.93
+  },
+  {
+   "name": "greeting",
+   "box": [
+    0,
+    0.06896551724137931,
+    1,
+    0.7684729064039408
+   ]
+  },
+  {
+   "name": "recent-artifacts",
+   "box": [
+    0,
+    0.9852216748768473,
+    1,
+    0.014778325123152709
+   ]
+  }
+ ],
+ "reviewedClean": true,
+ "reviewedBy": "design-owner session, 2026-11-07: every claude.ai video viewed on 0.5 fps contact sheets and its last 6 s; capabilities and palette windows checked frame by frame; strips and pairs are built from the same redacted frames"
+}

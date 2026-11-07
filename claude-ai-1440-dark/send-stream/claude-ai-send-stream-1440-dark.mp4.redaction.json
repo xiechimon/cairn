@@ -1,0 +1,37 @@
+{
+ "regions": [
+  {
+   "name": "sidebar-from-pinned",
+   "box": [
+    0,
+    0.2777777777777778,
+    0.2013888888888889,
+    0.7222222222222222
+   ]
+  },
+  {
+   "name": "greeting",
+   "box": [
+    0,
+    0.3411111111111111,
+    1,
+    0.11777777777777777
+   ],
+   "from": 0.05,
+   "to": 5.98
+  },
+  {
+   "name": "recent-artifacts",
+   "box": [
+    0,
+    0.6088888888888889,
+    1,
+    0.39111111111111113
+   ],
+   "from": 0.05,
+   "to": 5.98
+  }
+ ],
+ "reviewedClean": true,
+ "reviewedBy": "design-owner session, 2026-11-07: every claude.ai video viewed on 0.5 fps contact sheets and its last 6 s; capabilities and palette windows checked frame by frame; strips and pairs are built from the same redacted frames"
+}

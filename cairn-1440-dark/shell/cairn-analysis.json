@@ -1,0 +1,2187 @@
+[
+ {
+  "label": "hover-sidebar-rows",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span#6"
+  },
+  "firstChangeMs": 529,
+  "settleMs": 1112,
+  "rafFrames": 122,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=sidebar-thread-row]#30",
+    "prop": "backgroundColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]#31",
+    "firstMs": 529,
+    "lastMs": 912,
+    "durationMs": 383,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      529,
+      "rgba(230, 232, 226, 0.05)"
+     ],
+     [
+      912,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-project-row]#47",
+    "prop": "backgroundColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 979,
+    "lastMs": 1112,
+    "durationMs": 133,
+    "steps": 8,
+    "to": "rgba(230, 232, 226, 0.05)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      1
+     ],
+     [
+      33,
+      1
+     ],
+     [
+      50,
+      1
+     ],
+     [
+      67,
+      1
+     ],
+     [
+      83,
+      1
+     ],
+     [
+      100,
+      1
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-project-row]#47",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 979,
+    "lastMs": 1112,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-project-row]#47",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 979,
+    "lastMs": 1112,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"r3-lifecycle\"#50",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 979,
+    "lastMs": 1112,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"r3-lifecycle\"#50",
+    "prop": "borderTopColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 979,
+    "lastMs": 1112,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"r3-lifecycle\"#50",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=sidebar-project-row]#47",
+    "firstMs": 979,
+    "lastMs": 1112,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.18
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.7
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -4,
+    [
+     125,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-sidebar-rows.jpg (16 of 80 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "close-drawer",
+  "anchor": {
+   "type": "mark"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 60,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/close-drawer.jpg (16 of 30 frames)",
+  "prevFrame": -103
+ },
+ {
+  "label": "hover-composer-plus",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div\"Needs you\"#28"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 112,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-composer-plus.jpg (16 of 31 frames)",
+  "prevFrame": -110
+ },
+ {
+  "label": "press-composer-plus",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[tid=button]\"Reply\"#185"
+  },
+  "firstChangeMs": 232,
+  "settleMs": 382,
+  "rafFrames": 74,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=needs-you-item]#175",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "focusin textarea[aria=Reply to #1][tid=input-group-control",
+    "firstMs": 232,
+    "lastMs": 232,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "476,654,728,120",
+    "values": [
+     [
+      232,
+      "476,654,728,120"
+     ]
+    ]
+   },
+   {
+    "el": "article[tid=thread-card]#176",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "focusin textarea[aria=Reply to #1][tid=input-group-control",
+    "firstMs": 232,
+    "lastMs": 232,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "476,654,728,120",
+    "values": [
+     [
+      232,
+      "476,654,728,120"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group][tid=thread-reply]#210",
+    "prop": "borderTopColor",
+    "fromInputMs": 1,
+    "input": "focusin textarea[aria=Reply to #1][tid=input-group-control",
+    "firstMs": 232,
+    "lastMs": 382,
+    "durationMs": 150,
+    "steps": 10,
+    "to": "rgb(156, 199, 139)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.035
+     ],
+     [
+      33,
+      0.176
+     ],
+     [
+      50,
+      0.459
+     ],
+     [
+      67,
+      0.694
+     ],
+     [
+      83,
+      0.835
+     ],
+     [
+      100,
+      0.918
+     ],
+     [
+      117,
+      0.965
+     ],
+     [
+      133,
+      0.988
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    265,
+    [
+     207,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 231,
+    "target": "button[tid=button]\"Collapse\"#185",
+    "chars": 8
+   },
+   {
+    "t": 231,
+    "target": "article[tid=thread-card]#176",
+    "add": [
+     "div#208"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/press-composer-plus.jpg (16 of 36 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "close-plus-menu",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[aria=Reply to #1][tid=input-group-control]#207"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 53,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/close-plus-menu.jpg (16 of 30 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "type-composer",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "textarea[aria=Reply to #1][tid=input-group-control]#207"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 227,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 7,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"H\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 1
+   },
+   {
+    "t": 81,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"Ho\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 2
+   },
+   {
+    "t": 154,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 3
+   },
+   {
+    "t": 228,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 4
+   },
+   {
+    "t": 302,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How s\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 5
+   },
+   {
+    "t": 375,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How sh\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 6
+   },
+   {
+    "t": 449,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How sho\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 7
+   },
+   {
+    "t": 523,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How shou\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 8
+   },
+   {
+    "t": 597,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How shoul\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 9
+   },
+   {
+    "t": 669,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 10
+   },
+   {
+    "t": 743,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 11
+   },
+   {
+    "t": 816,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 12
+   },
+   {
+    "t": 890,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 13
+   },
+   {
+    "t": 963,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a s\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 14
+   },
+   {
+    "t": 1036,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a si\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 15
+   },
+   {
+    "t": 1108,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sid\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 16
+   },
+   {
+    "t": 1181,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a side\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 17
+   },
+   {
+    "t": 1254,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sideb\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 18
+   },
+   {
+    "t": 1328,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sideba\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 19
+   },
+   {
+    "t": 1401,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 20
+   },
+   {
+    "t": 1475,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 21
+   },
+   {
+    "t": 1547,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar r\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 22
+   },
+   {
+    "t": 1619,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar ro\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 23
+   },
+   {
+    "t": 1692,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 24
+   },
+   {
+    "t": 1766,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 25
+   },
+   {
+    "t": 1840,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 26
+   },
+   {
+    "t": 1912,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 27
+   },
+   {
+    "t": 1985,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 28
+   },
+   {
+    "t": 2058,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 29
+   },
+   {
+    "t": 2133,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 30
+   },
+   {
+    "t": 2208,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 31
+   },
+   {
+    "t": 2281,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 32
+   },
+   {
+    "t": 2354,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 33
+   },
+   {
+    "t": 2427,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 34
+   },
+   {
+    "t": 2499,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 35
+   },
+   {
+    "t": 2573,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 36
+   },
+   {
+    "t": 2645,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 37
+   },
+   {
+    "t": 2718,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 38
+   },
+   {
+    "t": 2791,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 39
+   },
+   {
+    "t": 2863,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 40
+   },
+   {
+    "t": 2936,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 41
+   },
+   {
+    "t": 3010,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 42
+   }
+  ],
+  "mutationCount": 42,
+  "strip": "strips/type-composer.jpg (16 of 31 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "clear-composer",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#207"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 43,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/clear-composer.jpg (16 of 30 frames)",
+  "prevFrame": -112
+ },
+ {
+  "label": "open-model-menu",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#195"
+  },
+  "firstChangeMs": 15,
+  "settleMs": 115,
+  "rafFrames": 68,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div#187",
+    "prop": "boxShadow",
+    "fromInputMs": 12,
+    "input": "focusin button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 15,
+    "lastMs": 65,
+    "durationMs": 50,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      15,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      65,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#223",
+    "prop": "rect",
+    "fromInputMs": 45,
+    "input": "focusin button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 48,
+    "lastMs": 115,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "516,644,320,180",
+    "values": [
+     [
+      48,
+      "516,651.3,313.2,176.2"
+     ],
+     [
+      65,
+      "516,647.4,316.8,178.2"
+     ],
+     [
+      82,
+      "516,645.3,318.8,179.3"
+     ],
+     [
+      98,
+      "516,644.3,319.7,179.9"
+     ],
+     [
+      115,
+      "516,644,320,180"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#223",
+    "prop": "opacity",
+    "fromInputMs": 45,
+    "input": "focusin button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 48,
+    "lastMs": 115,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "1",
+    "values": [
+     [
+      48,
+      "0.577049"
+     ],
+     [
+      65,
+      "0.802403"
+     ],
+     [
+      82,
+      "0.925508"
+     ],
+     [
+      98,
+      "0.983404"
+     ],
+     [
+      115,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#223",
+    "prop": "transform",
+    "fromInputMs": 45,
+    "input": "focusin button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 48,
+    "lastMs": 115,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "none",
+    "values": [
+     [
+      48,
+      "matrix3d(0.978852, 0, 0, 0, 0, 0.978852, 0, 0, 0, 0, 0.978852, 0, 0, 3.3836, 0, "
+     ],
+     [
+      65,
+      "matrix3d(0.99012, 0, 0, 0, 0, 0.99012, 0, 0, 0, 0, 0.99012, 0, 0, 1.58077, 0, 1)"
+     ],
+     [
+      82,
+      "matrix3d(0.996275, 0, 0, 0, 0, 0.996275, 0, 0, 0, 0, 0.996275, 0, 0, 0.595936, 0"
+     ],
+     [
+      98,
+      "matrix3d(0.99917, 0, 0, 0, 0, 0.99917, 0, 0, 0, 0, 0.99917, 0, 0, 0.132767, 0, 1"
+     ],
+     [
+      115,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#223",
+    "prop": "filter",
+    "fromInputMs": 45,
+    "input": "focusin button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 48,
+    "lastMs": 115,
+    "durationMs": 67,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      48,
+      "blur(0px)"
+     ],
+     [
+      115,
+      "none"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 46,
+    "target": "div#192",
+    "add": [
+     "span#215"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 46,
+    "target": "div#192",
+    "add": [
+     "span#216"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 46,
+    "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#195",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 46,
+    "target": "body#202",
+    "add": [
+     "div#217"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 46,
+    "target": "div#217",
+    "add": [
+     "div[role=presentation]#218"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 46,
+    "target": "div#217",
+    "add": [
+     "div[role=presentation]#219"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 46,
+    "target": "div#192",
+    "add": [
+     "span#220"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 46,
+    "target": "div#192",
+    "add": [
+     "span#221"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 46,
+    "target": "div#192",
+    "add": [
+     "span#222"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 9,
+  "strip": "strips/open-model-menu.jpg (16 of 31 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "hover-model-menu",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#223"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 87,
+  "rafFrames": 114,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=menuitemradio][tid=dropdown-menu-radio-item]#228",
+    "prop": "backgroundColor",
+    "fromInputMs": 4,
+    "input": "pointerover div[role=menu][aria=Send to][tid=dropdown-menu-con",
+    "firstMs": 4,
+    "lastMs": 87,
+    "durationMs": 83,
+    "steps": 2,
+    "to": "rgba(230, 232, 226, 0.1)",
+    "values": [
+     [
+      4,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      87,
+      "rgba(230, 232, 226, 0.1)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menuitemradio][tid=dropdown-menu-radio-item]#236",
+    "prop": "backgroundColor",
+    "fromInputMs": 4,
+    "input": "pointerover div[role=menu][aria=Send to][tid=dropdown-menu-con",
+    "firstMs": 4,
+    "lastMs": 54,
+    "durationMs": 50,
+    "steps": 2,
+    "to": "rgba(230, 232, 226, 0.1)",
+    "values": [
+     [
+      4,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      54,
+      "rgba(230, 232, 226, 0.1)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-model-menu.jpg (16 of 28 frames)",
+  "prevFrame": -129
+ },
+ {
+  "label": "close-model-menu",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#223"
+  },
+  "firstChangeMs": 31,
+  "settleMs": 165,
+  "rafFrames": 61,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "textarea[tid=chief-composer-input]#189",
+    "prop": "outlineColor",
+    "fromInputMs": 4,
+    "input": "focusin textarea[tid=chief-composer-input]#189",
+    "firstMs": 31,
+    "lastMs": 165,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(156, 199, 139)",
+    "curve": null
+   },
+   {
+    "el": "textarea[tid=chief-composer-input]#189",
+    "prop": "outlineWidth",
+    "fromInputMs": 4,
+    "input": "focusin textarea[tid=chief-composer-input]#189",
+    "firstMs": 31,
+    "lastMs": 31,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "2px",
+    "values": [
+     [
+      31,
+      "2px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 19,
+    "target": "div#192",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 19,
+    "target": "div#192",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 19,
+    "target": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#223",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 19,
+    "target": "div[role=presentation]#219",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 19,
+    "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#195",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 19,
+    "target": "div#192",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 19,
+    "target": "div#192",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 19,
+    "target": "div#192",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 27,
+    "target": "body#202",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 27,
+    "target": "div#217",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 27,
+    "target": "div#217",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 11,
+  "strip": "strips/close-model-menu.jpg (16 of 31 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "collapse-sidebar",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[aria=Collapse sidebar][tid=button]#13"
+  },
+  "firstChangeMs": 11,
+  "settleMs": 128,
+  "rafFrames": 86,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[aria=Collapse sidebar][tid=button]#13",
+    "prop": "boxShadow",
+    "fromInputMs": 10,
+    "input": "focusin button[aria=Collapse sidebar][tid=button]#13",
+    "firstMs": 11,
+    "lastMs": 11,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      11,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "aside#4",
+    "prop": "rect",
+    "fromInputMs": 6,
+    "input": "pointerover aside#4",
+    "firstMs": 128,
+    "lastMs": 128,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,0,40,900",
+    "values": [
+     [
+      128,
+      "0,0,40,900"
+     ]
+    ]
+   },
+   {
+    "el": "div#63",
+    "prop": "rect",
+    "fromInputMs": 6,
+    "input": "pointerover aside#4",
+    "firstMs": 128,
+    "lastMs": 128,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "40,8,1392,884",
+    "values": [
+     [
+      128,
+      "40,8,1392,884"
+     ]
+    ]
+   },
+   {
+    "el": "div#64",
+    "prop": "rect",
+    "fromInputMs": 6,
+    "input": "pointerover aside#4",
+    "firstMs": 128,
+    "lastMs": 128,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "40,8,1392,884",
+    "values": [
+     [
+      128,
+      "40,8,1392,884"
+     ]
+    ]
+   },
+   {
+    "el": "div#65",
+    "prop": "rect",
+    "fromInputMs": 6,
+    "input": "pointerover aside#4",
+    "firstMs": 128,
+    "lastMs": 128,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "40,8,1392,884",
+    "values": [
+     [
+      128,
+      "40,8,1392,884"
+     ]
+    ]
+   },
+   {
+    "el": "section[aria=Conversation with the Coordinator][tid=home-c]#66",
+    "prop": "rect",
+    "fromInputMs": 6,
+    "input": "pointerover aside#4",
+    "firstMs": 128,
+    "lastMs": 128,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "40,8,1392,884",
+    "values": [
+     [
+      128,
+      "40,8,1392,884"
+     ]
+    ]
+   },
+   {
+    "el": "div#208",
+    "prop": "rect",
+    "fromInputMs": 6,
+    "input": "pointerover aside#4",
+    "firstMs": 128,
+    "lastMs": 128,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "384,694,704,74",
+    "values": [
+     [
+      128,
+      "384,694,704,74"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [
+     "button[aria=Expand sidebar][tid=button]#251"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [
+     "button[aria=Search][tid=tooltip-trigger]#252"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 130,
+    "target": "nav#25",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 130,
+    "target": "nav#25",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 130,
+    "target": "nav#25",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 130,
+    "target": "nav#25",
+    "add": [
+     "a[aria=Coordinator 1]#253"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 130,
+    "target": "nav#25",
+    "add": [
+     "button[aria=Collapse Project][tid=button]#254"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 130,
+    "target": "nav#25",
+    "add": [
+     "a[aria=r3-lifecycle]#255"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [
+     "a[aria=1 online][tid=sidebar-attention]#256"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [
+     "a[aria=Settings][tid=sidebar-settings]#257"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 130,
+    "target": "aside#4",
+    "add": [
+     "a[aria=Activity][tid=sidebar-activity]#258"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 14,
+  "strip": "strips/collapse-sidebar.jpg (16 of 31 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "expand-sidebar",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[aria=Expand sidebar][tid=button]#251"
+  },
+  "firstChangeMs": 15,
+  "settleMs": 132,
+  "rafFrames": 86,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#251",
+    "prop": "boxShadow",
+    "fromInputMs": 14,
+    "input": "focusin button[aria=Expand sidebar][tid=button]#251",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      15,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "aside#4",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover aside#4",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,0,248,900",
+    "values": [
+     [
+      132,
+      "0,0,248,900"
+     ]
+    ]
+   },
+   {
+    "el": "div#208",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover aside#4",
+    "firstMs": 132,
+    "lastMs": 132,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "488,694,704,74",
+    "values": [
+     [
+      132,
+      "488,694,704,74"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "a"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "a"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "a"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [
+     "div[tid=team-row]#283"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [
+     "div#284"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 133,
+    "target": "nav#25",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "a"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "nav#25",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "nav#25",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "a"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 133,
+    "target": "nav#25",
+    "add": [
+     "div[tid=thread-groups]#285"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 133,
+    "target": "nav#25",
+    "add": [
+     "div[tid=project-group]#286"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 133,
+    "target": "nav#25",
+    "add": [
+     "button[tid=sidebar-project-row]#287"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 133,
+    "target": "aside#4",
+    "add": [
+     "div[tid=sidebar-footer]#288"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 14,
+  "strip": "strips/expand-sidebar.jpg (16 of 31 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "open-settings-dialog",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "svg#303"
+  },
+  "firstChangeMs": 172,
+  "settleMs": 372,
+  "rafFrames": 103,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "aside[role=dialog][aria=Coordinator]#316",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "focusin div[role=dialog][aria=Settings]#311",
+    "firstMs": 172,
+    "lastMs": 372,
+    "durationMs": 200,
+    "steps": 12,
+    "to": "1268,640,152,240",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.527
+     ],
+     [
+      50,
+      0.779
+     ],
+     [
+      67,
+      0.878
+     ],
+     [
+      83,
+      0.926
+     ],
+     [
+      100,
+      0.955
+     ],
+     [
+      117,
+      0.973
+     ],
+     [
+      133,
+      0.985
+     ],
+     [
+      150,
+      0.992
+     ],
+     [
+      167,
+      0.997
+     ],
+     [
+      183,
+      0.999
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "aside[role=dialog][aria=Coordinator]#316",
+    "prop": "transform",
+    "fromInputMs": 1,
+    "input": "focusin div[role=dialog][aria=Settings]#311",
+    "firstMs": 172,
+    "lastMs": 372,
+    "durationMs": 200,
+    "steps": 12,
+    "to": "matrix3d(0.4, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 1)",
+    "curve": null
+   }
+  ],
+  "scroll": [
+   [
+    172,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 3,
+    "target": "div#309",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 3,
+    "target": "div[tid=tooltip-content]\"Settings\"#310",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 3,
+    "target": "div[role=presentation]#305",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 8,
+    "target": "body#202",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 8,
+    "target": "div#304",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 207,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 207,
+    "target": "div#1",
+    "add": [
+     "div#312"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 207,
+    "target": "div#1",
+    "add": [
+     "div[tid=settings-backdrop]#313"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 207,
+    "target": "div#1",
+    "add": [
+     "div[role=dialog][aria=Settings]#311"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 207,
+    "target": "img[tid=avatar-image]#314",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 207,
+    "target": "body#202",
+    "add": [
+     "div#315"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 207,
+    "target": "div#315",
+    "add": [
+     "aside[role=dialog][aria=Coordinator]#316"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 12,
+  "strip": "strips/open-settings-dialog.jpg (16 of 21 frames)",
+  "prevFrame": -111
+ },
+ {
+  "label": "close-settings-dialog",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=dialog][aria=Settings]#311"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 78,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 56,
+    "target": "body#202",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 56,
+    "target": "div#315",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "aside"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 56,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 56,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 56,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 56,
+    "target": "div#1",
+    "add": [
+     "div#552"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 61,
+    "target": "body#202",
+    "add": [
+     "div#554"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 61,
+    "target": "div#554",
+    "add": [
+     "div[role=presentation]#555"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 8,
+  "strip": "strips/close-settings-dialog.jpg (16 of 21 frames)",
+  "prevFrame": -116
+ }
+]

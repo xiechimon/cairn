@@ -1,0 +1,350 @@
+[
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "shell",
+  "video": "claude-ai-1440-dark/shell/claude-ai-shell-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "chat-long",
+  "video": "claude-ai-1440-dark/chat-long/claude-ai-chat-long-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "send-stream",
+  "video": "claude-ai-1440-dark/send-stream/claude-ai-send-stream-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "artifact",
+  "video": "claude-ai-1440-dark/artifact/claude-ai-artifact-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "tool-search",
+  "video": "claude-ai-1440-dark/tool-search/claude-ai-tool-search-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "search-palette",
+  "video": "claude-ai-1440-dark/search-palette/claude-ai-search-palette-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "focus",
+  "video": "claude-ai-1440-dark/focus/claude-ai-focus-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "settings",
+  "video": "claude-ai-1440-dark/settings/claude-ai-settings-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "claude-ai",
+  "journey": "projects",
+  "video": "claude-ai-1440-dark/projects/claude-ai-projects-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "cairn",
+  "journey": "shell",
+  "video": "cairn-1440-dark/shell/cairn-shell-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "cairn",
+  "journey": "chat-long",
+  "video": "cairn-1440-dark/chat-long/cairn-chat-long-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "cairn",
+  "journey": "send-stream",
+  "video": "cairn-1440-dark/send-stream/cairn-send-stream-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "cairn",
+  "journey": "search-palette",
+  "video": "cairn-1440-dark/search-palette/cairn-search-palette-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "cairn",
+  "journey": "focus",
+  "video": "cairn-1440-dark/focus/cairn-focus-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "cairn",
+  "journey": "settings",
+  "video": "cairn-1440-dark/settings/cairn-settings-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-dark",
+  "product": "cairn",
+  "journey": "projects",
+  "video": "cairn-1440-dark/projects/cairn-projects-1440-dark.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "claude-ai",
+  "journey": "shell",
+  "video": "claude-ai-1440-light/shell/claude-ai-shell-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "claude-ai",
+  "journey": "chat-long",
+  "video": "claude-ai-1440-light/chat-long/claude-ai-chat-long-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "claude-ai",
+  "journey": "search-palette",
+  "video": "claude-ai-1440-light/search-palette/claude-ai-search-palette-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "claude-ai",
+  "journey": "focus",
+  "video": "claude-ai-1440-light/focus/claude-ai-focus-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "claude-ai",
+  "journey": "settings",
+  "video": "claude-ai-1440-light/settings/claude-ai-settings-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "claude-ai",
+  "journey": "projects",
+  "video": "claude-ai-1440-light/projects/claude-ai-projects-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "cairn",
+  "journey": "shell",
+  "video": "cairn-1440-light/shell/cairn-shell-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "cairn",
+  "journey": "chat-long",
+  "video": "cairn-1440-light/chat-long/cairn-chat-long-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "cairn",
+  "journey": "send-stream",
+  "video": "cairn-1440-light/send-stream/cairn-send-stream-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "cairn",
+  "journey": "search-palette",
+  "video": "cairn-1440-light/search-palette/cairn-search-palette-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "cairn",
+  "journey": "focus",
+  "video": "cairn-1440-light/focus/cairn-focus-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "cairn",
+  "journey": "settings",
+  "video": "cairn-1440-light/settings/cairn-settings-1440-light.mp4"
+ },
+ {
+  "combo": "1440-light",
+  "product": "cairn",
+  "journey": "projects",
+  "video": "cairn-1440-light/projects/cairn-projects-1440-light.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "shell",
+  "video": "claude-ai-375-dark/shell/claude-ai-shell-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "chat-long",
+  "video": "claude-ai-375-dark/chat-long/claude-ai-chat-long-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "send-stream",
+  "video": "claude-ai-375-dark/send-stream/claude-ai-send-stream-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "artifact",
+  "video": "claude-ai-375-dark/artifact/claude-ai-artifact-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "tool-search",
+  "video": "claude-ai-375-dark/tool-search/claude-ai-tool-search-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "search-palette",
+  "video": "claude-ai-375-dark/search-palette/claude-ai-search-palette-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "focus",
+  "video": "claude-ai-375-dark/focus/claude-ai-focus-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "settings",
+  "video": "claude-ai-375-dark/settings/claude-ai-settings-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "claude-ai",
+  "journey": "projects",
+  "video": "claude-ai-375-dark/projects/claude-ai-projects-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "cairn",
+  "journey": "shell",
+  "video": "cairn-375-dark/shell/cairn-shell-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "cairn",
+  "journey": "chat-long",
+  "video": "cairn-375-dark/chat-long/cairn-chat-long-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "cairn",
+  "journey": "send-stream",
+  "video": "cairn-375-dark/send-stream/cairn-send-stream-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "cairn",
+  "journey": "search-palette",
+  "video": "cairn-375-dark/search-palette/cairn-search-palette-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "cairn",
+  "journey": "focus",
+  "video": "cairn-375-dark/focus/cairn-focus-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "cairn",
+  "journey": "settings",
+  "video": "cairn-375-dark/settings/cairn-settings-375-dark.mp4"
+ },
+ {
+  "combo": "375-dark",
+  "product": "cairn",
+  "journey": "projects",
+  "video": null
+ },
+ {
+  "combo": "375-light",
+  "product": "claude-ai",
+  "journey": "shell",
+  "video": "claude-ai-375-light/shell/claude-ai-shell-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "claude-ai",
+  "journey": "chat-long",
+  "video": "claude-ai-375-light/chat-long/claude-ai-chat-long-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "claude-ai",
+  "journey": "search-palette",
+  "video": "claude-ai-375-light/search-palette/claude-ai-search-palette-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "claude-ai",
+  "journey": "focus",
+  "video": "claude-ai-375-light/focus/claude-ai-focus-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "claude-ai",
+  "journey": "settings",
+  "video": "claude-ai-375-light/settings/claude-ai-settings-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "claude-ai",
+  "journey": "projects",
+  "video": "claude-ai-375-light/projects/claude-ai-projects-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "cairn",
+  "journey": "shell",
+  "video": "cairn-375-light/shell/cairn-shell-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "cairn",
+  "journey": "chat-long",
+  "video": "cairn-375-light/chat-long/cairn-chat-long-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "cairn",
+  "journey": "send-stream",
+  "video": "cairn-375-light/send-stream/cairn-send-stream-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "cairn",
+  "journey": "search-palette",
+  "video": "cairn-375-light/search-palette/cairn-search-palette-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "cairn",
+  "journey": "focus",
+  "video": "cairn-375-light/focus/cairn-focus-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "cairn",
+  "journey": "settings",
+  "video": "cairn-375-light/settings/cairn-settings-375-light.mp4"
+ },
+ {
+  "combo": "375-light",
+  "product": "cairn",
+  "journey": "projects",
+  "video": null
+ }
+]

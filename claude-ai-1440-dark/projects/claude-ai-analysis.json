@@ -1,0 +1,556 @@
+[
+ {
+  "label": "hover-cards",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span\"~\"#20"
+  },
+  "firstChangeMs": 23,
+  "settleMs": 1767,
+  "rafFrames": 319,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "a#35",
+    "prop": "backgroundColor",
+    "fromInputMs": 3,
+    "input": "pointerover div#34",
+    "firstMs": 23,
+    "lastMs": 28,
+    "durationMs": 6,
+    "steps": 2,
+    "to": "rgba(255, 255, 255, 0.075)",
+    "values": [
+     [
+      23,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      28,
+      "rgba(255, 255, 255, 0.075)"
+     ]
+    ]
+   },
+   {
+    "el": "span#40",
+    "prop": "opacity",
+    "fromInputMs": 3,
+    "input": "pointerover div#34",
+    "firstMs": 23,
+    "lastMs": 28,
+    "durationMs": 6,
+    "steps": 2,
+    "to": "1",
+    "values": [
+     [
+      23,
+      "0"
+     ],
+     [
+      28,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "div#416",
+    "prop": "::afterbg",
+    "fromInputMs": 3,
+    "input": "pointerover div#416",
+    "firstMs": 45,
+    "lastMs": 1101,
+    "durationMs": 1056,
+    "steps": 2,
+    "to": "rgba(255, 255, 255, 0.03)",
+    "values": [
+     [
+      45,
+      "hsl(none 0% 100% / 0.05)"
+     ],
+     [
+      1101,
+      "rgba(255, 255, 255, 0.03)"
+     ]
+    ]
+   },
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 1,
+    "input": "pointerover div#8",
+    "firstMs": 1651,
+    "lastMs": 1767,
+    "durationMs": 117,
+    "steps": 22,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.152
+     ],
+     [
+      11,
+      0.337
+     ],
+     [
+      17,
+      0.55
+     ],
+     [
+      22,
+      0.709
+     ],
+     [
+      28,
+      0.799
+     ],
+     [
+      33,
+      0.854
+     ],
+     [
+      39,
+      0.89
+     ],
+     [
+      44,
+      0.917
+     ],
+     [
+      50,
+      0.937
+     ],
+     [
+      56,
+      0.952
+     ],
+     [
+      61,
+      0.964
+     ],
+     [
+      67,
+      0.973
+     ],
+     [
+      72,
+      0.98
+     ],
+     [
+      78,
+      0.986
+     ],
+     [
+      83,
+      0.991
+     ],
+     [
+      89,
+      0.994
+     ],
+     [
+      94,
+      0.997
+     ],
+     [
+      100,
+      0.998
+     ],
+     [
+      106,
+      0.999
+     ],
+     [
+      111,
+      1
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -5,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 54,
+    "target": "span#431",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 54,
+    "target": "span#431",
+    "add": [
+     "time\"~\"#502"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 54,
+    "target": "span#439",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 54,
+    "target": "span#439",
+    "add": [
+     "span#503"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 591,
+    "target": "span#462",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 591,
+    "target": "span#462",
+    "add": [
+     "time\"~\"#504"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1127,
+    "target": "span#488",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 1127,
+    "target": "span#488",
+    "add": [
+     "time\"~\"#505"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 8,
+  "strip": "strips/hover-cards.jpg (16 of 46 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "hover-primary",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span[role=radio]#26"
+  },
+  "firstChangeMs": 955,
+  "settleMs": 1083,
+  "rafFrames": 262,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 5,
+    "input": "pointerover div#8",
+    "firstMs": 955,
+    "lastMs": 1083,
+    "durationMs": 128,
+    "steps": 23,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      12,
+      0.122
+     ],
+     [
+      17,
+      0.256
+     ],
+     [
+      23,
+      0.424
+     ],
+     [
+      28,
+      0.615
+     ],
+     [
+      34,
+      0.75
+     ],
+     [
+      39,
+      0.825
+     ],
+     [
+      45,
+      0.873
+     ],
+     [
+      50,
+      0.904
+     ],
+     [
+      56,
+      0.928
+     ],
+     [
+      62,
+      0.945
+     ],
+     [
+      67,
+      0.958
+     ],
+     [
+      73,
+      0.968
+     ],
+     [
+      78,
+      0.977
+     ],
+     [
+      84,
+      0.983
+     ],
+     [
+      89,
+      0.988
+     ],
+     [
+      95,
+      0.992
+     ],
+     [
+      100,
+      0.995
+     ],
+     [
+      106,
+      0.997
+     ],
+     [
+      112,
+      0.999
+     ],
+     [
+      117,
+      1
+     ],
+     [
+      123,
+      1
+     ],
+     [
+      128,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-primary.jpg (16 of 27 frames)",
+  "prevFrame": -100
+ },
+ {
+  "label": "press-primary",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#407"
+  },
+  "firstChangeMs": 0,
+  "settleMs": 405,
+  "rafFrames": 214,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#404",
+    "prop": "outlineColor",
+    "fromInputMs": 6,
+    "input": "pointerover span\"~\"#407",
+    "firstMs": 0,
+    "lastMs": 0,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(25, 25, 25)",
+    "values": [
+     [
+      0,
+      "rgb(25, 25, 25)"
+     ]
+    ]
+   },
+   {
+    "el": "button#404",
+    "prop": "outlineWidth",
+    "fromInputMs": 6,
+    "input": "pointerover span\"~\"#407",
+    "firstMs": 0,
+    "lastMs": 0,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "2.4px",
+    "values": [
+     [
+      0,
+      "2.4px"
+     ]
+    ]
+   },
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 4,
+    "input": "pointerover div#8",
+    "firstMs": 278,
+    "lastMs": 405,
+    "durationMs": 128,
+    "steps": 23,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.111
+     ],
+     [
+      17,
+      0.245
+     ],
+     [
+      22,
+      0.413
+     ],
+     [
+      28,
+      0.601
+     ],
+     [
+      33,
+      0.742
+     ],
+     [
+      39,
+      0.821
+     ],
+     [
+      44,
+      0.87
+     ],
+     [
+      50,
+      0.903
+     ],
+     [
+      56,
+      0.926
+     ],
+     [
+      61,
+      0.944
+     ],
+     [
+      67,
+      0.957
+     ],
+     [
+      72,
+      0.968
+     ],
+     [
+      78,
+      0.976
+     ],
+     [
+      83,
+      0.983
+     ],
+     [
+      89,
+      0.988
+     ],
+     [
+      94,
+      0.992
+     ],
+     [
+      100,
+      0.995
+     ],
+     [
+      106,
+      0.997
+     ],
+     [
+      111,
+      0.998
+     ],
+     [
+      117,
+      0.999
+     ],
+     [
+      122,
+      1
+     ],
+     [
+      128,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/press-primary.jpg (16 of 26 frames)",
+  "prevFrame": -100
+ }
+]

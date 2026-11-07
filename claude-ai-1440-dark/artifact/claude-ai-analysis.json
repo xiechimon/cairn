@@ -1,0 +1,5516 @@
+[
+ {
+  "label": "type-artifact-prompt",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "div[role=textbox][tid=chat-input]#426"
+  },
+  "firstChangeMs": 7,
+  "settleMs": 2086,
+  "rafFrames": 480,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "p\"~\"#427",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 2086,
+    "durationMs": 2079,
+    "steps": 22,
+    "to": "552,428,632,42",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0
+     ],
+     [
+      61,
+      0
+     ],
+     [
+      89,
+      0
+     ],
+     [
+      111,
+      0
+     ],
+     [
+      134,
+      0
+     ],
+     [
+      178,
+      0
+     ],
+     [
+      200,
+      0
+     ],
+     [
+      228,
+      0
+     ],
+     [
+      250,
+      0
+     ],
+     [
+      272,
+      0
+     ],
+     [
+      295,
+      0
+     ],
+     [
+      317,
+      0
+     ],
+     [
+      361,
+      0
+     ],
+     [
+      384,
+      0
+     ],
+     [
+      406,
+      0
+     ],
+     [
+      428,
+      0
+     ],
+     [
+      456,
+      0
+     ],
+     [
+      500,
+      0
+     ],
+     [
+      523,
+      0
+     ],
+     [
+      545,
+      0
+     ],
+     [
+      2079,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "opacity",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "1",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "transform",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "scale",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "translate",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "rotate",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "backgroundColor",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "color",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "rgba(255, 255, 255, 0.93)",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "boxShadow",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "borderTopColor",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "rgba(255, 255, 255, 0.04)",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "outlineColor",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "rgb(81, 156, 237)",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "outlineWidth",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "2.4px",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "filter",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "clipPath",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "p\"~\"#427",
+    "prop": "visibility",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 7,
+    "lastMs": 552,
+    "durationMs": 545,
+    "steps": 21,
+    "to": "visible",
+    "curve": null
+   }
+  ],
+  "scroll": [
+   [
+    -15,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [
+   [
+    -15,
+    [
+     0
+    ]
+   ]
+  ],
+  "mutations": [
+   {
+    "t": 11,
+    "target": "p\"~\"#427",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 1
+   },
+   {
+    "t": 11,
+    "target": "p\"~\"#427",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "br"
+    ]
+   },
+   {
+    "t": 11,
+    "target": "p\"~\"#427",
+    "chars": 1
+   },
+   {
+    "t": 18,
+    "target": "p\"~\"#427",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 1
+   },
+   {
+    "t": 22,
+    "target": "div#532",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 27,
+    "target": "div#421",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 46,
+    "target": "p\"~\"#427",
+    "chars": 2
+   },
+   {
+    "t": 70,
+    "target": "p\"~\"#427",
+    "chars": 3
+   },
+   {
+    "t": 95,
+    "target": "p\"~\"#427",
+    "chars": 4
+   },
+   {
+    "t": 118,
+    "target": "p\"~\"#427",
+    "chars": 5
+   },
+   {
+    "t": 141,
+    "target": "p\"~\"#427",
+    "chars": 6
+   },
+   {
+    "t": 163,
+    "target": "p\"~\"#427",
+    "chars": 7
+   },
+   {
+    "t": 186,
+    "target": "p\"~\"#427",
+    "chars": 8
+   },
+   {
+    "t": 209,
+    "target": "p\"~\"#427",
+    "chars": 9
+   },
+   {
+    "t": 232,
+    "target": "p\"~\"#427",
+    "chars": 10
+   },
+   {
+    "t": 254,
+    "target": "p\"~\"#427",
+    "chars": 11
+   },
+   {
+    "t": 277,
+    "target": "p\"~\"#427",
+    "chars": 12
+   },
+   {
+    "t": 299,
+    "target": "p\"~\"#427",
+    "chars": 13
+   },
+   {
+    "t": 322,
+    "target": "p\"~\"#427",
+    "chars": 14
+   },
+   {
+    "t": 345,
+    "target": "p\"~\"#427",
+    "chars": 15
+   },
+   {
+    "t": 368,
+    "target": "p\"~\"#427",
+    "chars": 16
+   },
+   {
+    "t": 390,
+    "target": "p\"~\"#427",
+    "chars": 17
+   },
+   {
+    "t": 414,
+    "target": "p\"~\"#427",
+    "chars": 18
+   },
+   {
+    "t": 438,
+    "target": "p\"~\"#427",
+    "chars": 19
+   },
+   {
+    "t": 460,
+    "target": "p\"~\"#427",
+    "chars": 20
+   },
+   {
+    "t": 483,
+    "target": "p\"~\"#427",
+    "chars": 21
+   },
+   {
+    "t": 505,
+    "target": "p\"~\"#427",
+    "chars": 22
+   },
+   {
+    "t": 528,
+    "target": "p\"~\"#427",
+    "chars": 23
+   },
+   {
+    "t": 550,
+    "target": "p\"~\"#427",
+    "chars": 24
+   },
+   {
+    "t": 572,
+    "target": "p\"~\"#427",
+    "chars": 25
+   },
+   {
+    "t": 594,
+    "target": "p\"~\"#427",
+    "chars": 26
+   },
+   {
+    "t": 616,
+    "target": "p\"~\"#427",
+    "chars": 27
+   },
+   {
+    "t": 639,
+    "target": "p\"~\"#427",
+    "chars": 28
+   },
+   {
+    "t": 663,
+    "target": "p\"~\"#427",
+    "chars": 29
+   },
+   {
+    "t": 685,
+    "target": "p\"~\"#427",
+    "chars": 30
+   },
+   {
+    "t": 707,
+    "target": "p\"~\"#427",
+    "chars": 31
+   },
+   {
+    "t": 730,
+    "target": "p\"~\"#427",
+    "chars": 32
+   },
+   {
+    "t": 753,
+    "target": "p\"~\"#427",
+    "chars": 33
+   },
+   {
+    "t": 776,
+    "target": "p\"~\"#427",
+    "chars": 34
+   },
+   {
+    "t": 798,
+    "target": "p\"~\"#427",
+    "chars": 35
+   },
+   {
+    "t": 821,
+    "target": "p\"~\"#427",
+    "chars": 36
+   },
+   {
+    "t": 845,
+    "target": "p\"~\"#427",
+    "chars": 37
+   },
+   {
+    "t": 868,
+    "target": "p\"~\"#427",
+    "chars": 38
+   },
+   {
+    "t": 890,
+    "target": "p\"~\"#427",
+    "chars": 39
+   },
+   {
+    "t": 912,
+    "target": "p\"~\"#427",
+    "chars": 40
+   },
+   {
+    "t": 936,
+    "target": "p\"~\"#427",
+    "chars": 41
+   },
+   {
+    "t": 959,
+    "target": "p\"~\"#427",
+    "chars": 42
+   },
+   {
+    "t": 982,
+    "target": "p\"~\"#427",
+    "chars": 43
+   },
+   {
+    "t": 1004,
+    "target": "p\"~\"#427",
+    "chars": 44
+   },
+   {
+    "t": 1026,
+    "target": "p\"~\"#427",
+    "chars": 45
+   },
+   {
+    "t": 1049,
+    "target": "p\"~\"#427",
+    "chars": 46
+   },
+   {
+    "t": 1072,
+    "target": "p\"~\"#427",
+    "chars": 47
+   },
+   {
+    "t": 1095,
+    "target": "p\"~\"#427",
+    "chars": 48
+   },
+   {
+    "t": 1118,
+    "target": "p\"~\"#427",
+    "chars": 49
+   },
+   {
+    "t": 1140,
+    "target": "p\"~\"#427",
+    "chars": 50
+   },
+   {
+    "t": 1162,
+    "target": "p\"~\"#427",
+    "chars": 51
+   },
+   {
+    "t": 1185,
+    "target": "p\"~\"#427",
+    "chars": 52
+   },
+   {
+    "t": 1207,
+    "target": "p\"~\"#427",
+    "chars": 53
+   },
+   {
+    "t": 1229,
+    "target": "p\"~\"#427",
+    "chars": 54
+   },
+   {
+    "t": 1251,
+    "target": "p\"~\"#427",
+    "chars": 55
+   }
+  ],
+  "mutationCount": 104,
+  "strip": "strips/type-artifact-prompt.jpg (16 of 102 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "send-artifact",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=textbox][tid=chat-input]#426"
+  },
+  "firstChangeMs": 37,
+  "settleMs": 2855,
+  "rafFrames": 439,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[tid=chat-extra-space]#644",
+    "prop": "rect",
+    "fromInputMs": 37,
+    "input": "keydown div[role=textbox][tid=chat-input]#426",
+    "firstMs": 37,
+    "lastMs": 1182,
+    "durationMs": 1145,
+    "steps": 4,
+    "to": "496,358.8,736,433.2",
+    "values": [
+     [
+      37,
+      "496,323.8,736,468.2"
+     ],
+     [
+      760,
+      "496,355.8,736,436.2"
+     ],
+     [
+      782,
+      "496,353.8,736,438.2"
+     ],
+     [
+      1182,
+      "496,358.8,736,433.2"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "rect",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "18,430.5,154.9,21",
+    "values": [
+     [
+      604,
+      "18,430.5,53.4,21"
+     ],
+     [
+      1182,
+      "18,430.5,154.9,21"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "opacity",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "1",
+    "values": [
+     [
+      604,
+      "1"
+     ],
+     [
+      1182,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "transform",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      604,
+      "none"
+     ],
+     [
+      1182,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "scale",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      604,
+      "none"
+     ],
+     [
+      1182,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "translate",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      604,
+      "none"
+     ],
+     [
+      1182,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "rotate",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      604,
+      "none"
+     ],
+     [
+      1182,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "backgroundColor",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      604,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      1182,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "color",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "rgba(255, 255, 255, 0.93)",
+    "values": [
+     [
+      604,
+      "rgba(255, 255, 255, 0.93)"
+     ],
+     [
+      1182,
+      "rgba(255, 255, 255, 0.93)"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "boxShadow",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      604,
+      "none"
+     ],
+     [
+      1182,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "borderTopColor",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "rgba(255, 255, 255, 0.04)",
+    "values": [
+     [
+      604,
+      "rgba(255, 255, 255, 0.04)"
+     ],
+     [
+      1182,
+      "rgba(255, 255, 255, 0.04)"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "outlineColor",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "rgb(81, 156, 237)",
+    "values": [
+     [
+      604,
+      "rgb(81, 156, 237)"
+     ],
+     [
+      1182,
+      "rgb(81, 156, 237)"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "outlineWidth",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "2.4px",
+    "values": [
+     [
+      604,
+      "2.4px"
+     ],
+     [
+      1182,
+      "2.4px"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "filter",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      604,
+      "none"
+     ],
+     [
+      1182,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "clipPath",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      604,
+      "none"
+     ],
+     [
+      1182,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#674",
+    "prop": "visibility",
+    "fromInputMs": 316,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 604,
+    "lastMs": 1182,
+    "durationMs": 578,
+    "steps": 2,
+    "to": "visible",
+    "values": [
+     [
+      604,
+      "visible"
+     ],
+     [
+      1182,
+      "visible"
+     ]
+    ]
+   },
+   {
+    "el": "div#684",
+    "prop": "rect",
+    "fromInputMs": 894,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 1182,
+    "lastMs": 1560,
+    "durationMs": 378,
+    "steps": 56,
+    "to": "496,185.4,736,21",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      56,
+      0.009
+     ],
+     [
+      67,
+      0.017
+     ],
+     [
+      72,
+      0.034
+     ],
+     [
+      78,
+      0.043
+     ],
+     [
+      84,
+      0.06
+     ],
+     [
+      89,
+      0.078
+     ],
+     [
+      95,
+      0.086
+     ],
+     [
+      100,
+      0.112
+     ],
+     [
+      106,
+      0.129
+     ],
+     [
+      111,
+      0.147
+     ],
+     [
+      117,
+      0.172
+     ],
+     [
+      122,
+      0.198
+     ],
+     [
+      128,
+      0.216
+     ],
+     [
+      134,
+      0.241
+     ],
+     [
+      139,
+      0.267
+     ],
+     [
+      145,
+      0.293
+     ],
+     [
+      150,
+      0.319
+     ],
+     [
+      156,
+      0.345
+     ],
+     [
+      161,
+      0.371
+     ],
+     [
+      167,
+      0.397
+     ],
+     [
+      172,
+      0.422
+     ],
+     [
+      178,
+      0.448
+     ],
+     [
+      184,
+      0.474
+     ],
+     [
+      189,
+      0.5
+     ],
+     [
+      195,
+      0.526
+     ],
+     [
+      200,
+      0.552
+     ],
+     [
+      206,
+      0.578
+     ],
+     [
+      211,
+      0.603
+     ],
+     [
+      217,
+      0.621
+     ],
+     [
+      222,
+      0.647
+     ],
+     [
+      228,
+      0.672
+     ],
+     [
+      234,
+      0.69
+     ],
+     [
+      239,
+      0.716
+     ],
+     [
+      245,
+      0.733
+     ],
+     [
+      250,
+      0.75
+     ],
+     [
+      256,
+      0.767
+     ],
+     [
+      261,
+      0.793
+     ],
+     [
+      267,
+      0.81
+     ],
+     [
+      272,
+      0.828
+     ],
+     [
+      278,
+      0.836
+     ],
+     [
+      284,
+      0.853
+     ],
+     [
+      289,
+      0.871
+     ],
+     [
+      295,
+      0.879
+     ],
+     [
+      300,
+      0.897
+     ],
+     [
+      306,
+      0.905
+     ],
+     [
+      311,
+      0.914
+     ],
+     [
+      317,
+      0.931
+     ],
+     [
+      322,
+      0.94
+     ],
+     [
+      328,
+      0.948
+     ],
+     [
+      334,
+      0.957
+     ],
+     [
+      339,
+      0.966
+     ],
+     [
+      350,
+      0.974
+     ],
+     [
+      356,
+      0.983
+     ],
+     [
+      367,
+      0.991
+     ],
+     [
+      378,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#684",
+    "prop": "opacity",
+    "fromInputMs": 894,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 1182,
+    "lastMs": 1471,
+    "durationMs": 289,
+    "steps": 45,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.003
+     ],
+     [
+      56,
+      0.006
+     ],
+     [
+      61,
+      0.014
+     ],
+     [
+      67,
+      0.023
+     ],
+     [
+      72,
+      0.036
+     ],
+     [
+      78,
+      0.05
+     ],
+     [
+      84,
+      0.067
+     ],
+     [
+      89,
+      0.085
+     ],
+     [
+      95,
+      0.104
+     ],
+     [
+      100,
+      0.127
+     ],
+     [
+      106,
+      0.149
+     ],
+     [
+      111,
+      0.174
+     ],
+     [
+      117,
+      0.2
+     ],
+     [
+      122,
+      0.227
+     ],
+     [
+      128,
+      0.254
+     ],
+     [
+      134,
+      0.283
+     ],
+     [
+      139,
+      0.311
+     ],
+     [
+      145,
+      0.34
+     ],
+     [
+      150,
+      0.37
+     ],
+     [
+      156,
+      0.401
+     ],
+     [
+      161,
+      0.431
+     ],
+     [
+      167,
+      0.461
+     ],
+     [
+      172,
+      0.492
+     ],
+     [
+      178,
+      0.522
+     ],
+     [
+      184,
+      0.552
+     ],
+     [
+      189,
+      0.581
+     ],
+     [
+      195,
+      0.611
+     ],
+     [
+      200,
+      0.64
+     ],
+     [
+      206,
+      0.668
+     ],
+     [
+      211,
+      0.696
+     ],
+     [
+      217,
+      0.724
+     ],
+     [
+      222,
+      0.75
+     ],
+     [
+      228,
+      0.776
+     ],
+     [
+      234,
+      0.801
+     ],
+     [
+      239,
+      0.826
+     ],
+     [
+      245,
+      0.85
+     ],
+     [
+      250,
+      0.873
+     ],
+     [
+      256,
+      0.895
+     ],
+     [
+      261,
+      0.916
+     ],
+     [
+      267,
+      0.936
+     ],
+     [
+      272,
+      0.955
+     ],
+     [
+      278,
+      0.974
+     ],
+     [
+      284,
+      0.991
+     ],
+     [
+      289,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#684",
+    "prop": "transform",
+    "fromInputMs": 894,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 1182,
+    "lastMs": 1588,
+    "durationMs": 406,
+    "steps": 66,
+    "to": "matrix(1, 0, 0, 1, 0, -1.6286)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.002
+     ],
+     [
+      56,
+      0.006
+     ],
+     [
+      61,
+      0.012
+     ],
+     [
+      67,
+      0.02
+     ],
+     [
+      72,
+      0.031
+     ],
+     [
+      78,
+      0.043
+     ],
+     [
+      84,
+      0.057
+     ],
+     [
+      89,
+      0.073
+     ],
+     [
+      95,
+      0.09
+     ],
+     [
+      100,
+      0.109
+     ],
+     [
+      106,
+      0.128
+     ],
+     [
+      111,
+      0.15
+     ],
+     [
+      117,
+      0.172
+     ],
+     [
+      122,
+      0.195
+     ],
+     [
+      128,
+      0.219
+     ],
+     [
+      134,
+      0.243
+     ],
+     [
+      139,
+      0.268
+     ],
+     [
+      145,
+      0.293
+     ],
+     [
+      150,
+      0.319
+     ],
+     [
+      156,
+      0.345
+     ],
+     [
+      161,
+      0.37
+     ],
+     [
+      167,
+      0.397
+     ],
+     [
+      172,
+      0.423
+     ],
+     [
+      178,
+      0.448
+     ],
+     [
+      184,
+      0.475
+     ],
+     [
+      189,
+      0.5
+     ],
+     [
+      195,
+      0.525
+     ],
+     [
+      200,
+      0.55
+     ],
+     [
+      206,
+      0.575
+     ],
+     [
+      211,
+      0.599
+     ],
+     [
+      217,
+      0.623
+     ],
+     [
+      222,
+      0.645
+     ],
+     [
+      228,
+      0.667
+     ],
+     [
+      234,
+      0.689
+     ],
+     [
+      239,
+      0.71
+     ],
+     [
+      245,
+      0.731
+     ],
+     [
+      250,
+      0.75
+     ],
+     [
+      256,
+      0.769
+     ],
+     [
+      261,
+      0.787
+     ],
+     [
+      267,
+      0.805
+     ],
+     [
+      272,
+      0.821
+     ],
+     [
+      278,
+      0.837
+     ],
+     [
+      284,
+      0.853
+     ],
+     [
+      289,
+      0.867
+     ],
+     [
+      295,
+      0.88
+     ],
+     [
+      300,
+      0.893
+     ],
+     [
+      306,
+      0.905
+     ],
+     [
+      311,
+      0.916
+     ],
+     [
+      317,
+      0.926
+     ],
+     [
+      322,
+      0.936
+     ],
+     [
+      328,
+      0.945
+     ],
+     [
+      334,
+      0.953
+     ],
+     [
+      339,
+      0.96
+     ],
+     [
+      345,
+      0.967
+     ],
+     [
+      350,
+      0.973
+     ],
+     [
+      356,
+      0.978
+     ],
+     [
+      361,
+      0.983
+     ],
+     [
+      367,
+      0.987
+     ],
+     [
+      373,
+      0.99
+     ],
+     [
+      378,
+      0.994
+     ],
+     [
+      384,
+      0.996
+     ],
+     [
+      389,
+      0.998
+     ],
+     [
+      395,
+      0.999
+     ],
+     [
+      400,
+      1
+     ],
+     [
+      406,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#685",
+    "prop": "rect",
+    "fromInputMs": 894,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 1182,
+    "lastMs": 1594,
+    "durationMs": 411,
+    "steps": 2,
+    "to": "494,211,738,24",
+    "values": [
+     [
+      1182,
+      "494,216,738,24"
+     ],
+     [
+      1594,
+      "494,211,738,24"
+     ]
+    ]
+   },
+   {
+    "el": "span#692",
+    "prop": "rect",
+    "fromInputMs": 2378,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 2666,
+    "lastMs": 2816,
+    "durationMs": 150,
+    "steps": 19,
+    "to": "532,184.5,211,21",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.033
+     ],
+     [
+      22,
+      0.133
+     ],
+     [
+      28,
+      0.233
+     ],
+     [
+      33,
+      0.367
+     ],
+     [
+      39,
+      0.467
+     ],
+     [
+      45,
+      0.533
+     ],
+     [
+      50,
+      0.6
+     ],
+     [
+      56,
+      0.667
+     ],
+     [
+      61,
+      0.7
+     ],
+     [
+      67,
+      0.733
+     ],
+     [
+      72,
+      0.767
+     ],
+     [
+      78,
+      0.8
+     ],
+     [
+      83,
+      0.833
+     ],
+     [
+      89,
+      0.867
+     ],
+     [
+      100,
+      0.9
+     ],
+     [
+      111,
+      0.933
+     ],
+     [
+      128,
+      0.967
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#692",
+    "prop": "opacity",
+    "fromInputMs": 2378,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 2666,
+    "lastMs": 2855,
+    "durationMs": 189,
+    "steps": 34,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.01
+     ],
+     [
+      17,
+      0.046
+     ],
+     [
+      22,
+      0.128
+     ],
+     [
+      28,
+      0.247
+     ],
+     [
+      33,
+      0.364
+     ],
+     [
+      39,
+      0.462
+     ],
+     [
+      45,
+      0.538
+     ],
+     [
+      50,
+      0.601
+     ],
+     [
+      56,
+      0.655
+     ],
+     [
+      61,
+      0.7
+     ],
+     [
+      67,
+      0.739
+     ],
+     [
+      72,
+      0.773
+     ],
+     [
+      78,
+      0.803
+     ],
+     [
+      83,
+      0.83
+     ],
+     [
+      89,
+      0.853
+     ],
+     [
+      94,
+      0.874
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.909
+     ],
+     [
+      111,
+      0.923
+     ],
+     [
+      117,
+      0.936
+     ],
+     [
+      122,
+      0.947
+     ],
+     [
+      128,
+      0.957
+     ],
+     [
+      133,
+      0.966
+     ],
+     [
+      139,
+      0.973
+     ],
+     [
+      145,
+      0.98
+     ],
+     [
+      150,
+      0.985
+     ],
+     [
+      156,
+      0.99
+     ],
+     [
+      161,
+      0.993
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      172,
+      0.998
+     ],
+     [
+      178,
+      0.999
+     ],
+     [
+      183,
+      1
+     ],
+     [
+      189,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#692",
+    "prop": "transform",
+    "fromInputMs": 2378,
+    "input": "pointerover div[tid=chat-extra-space]#644",
+    "firstMs": 2666,
+    "lastMs": 2855,
+    "durationMs": 189,
+    "steps": 34,
+    "to": "none",
+    "curve": null
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 33,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 33,
+    "target": "button[tid=chat-input-send]#467",
+    "add": [
+     "span#623"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 71,
+    "target": "p#427",
+    "add": [
+     "br#624"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div#379",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "header"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#379",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#384",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div[role=textbox][tid=chat-input]#426",
+    "add": [
+     "p#626"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[role=textbox][tid=chat-input]#426",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "p"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#395",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#384",
+    "add": [
+     "div[tid=wiggle-controls-actions]#627"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div#395",
+    "add": [
+     "div[tid=chat-stale-nav-frame]#628"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[role=status][tid=response-status-announcer]\"~\"#629",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 20
+   },
+   {
+    "t": 284,
+    "target": "body#630",
+    "add": [
+     "div#631"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[tid=chat-header]#632",
+    "add": [
+     "div#633"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[role=toolbar]#634",
+    "add": [
+     "div#635"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[tid=chat-header]#632",
+    "add": [
+     "div#636"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[tid=composer-invite-slot]#637",
+    "attr": "hidden",
+    "v": "~"
+   },
+   {
+    "t": 284,
+    "target": "div#638",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#638",
+    "add": [
+     "div#639"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div#384",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 284,
+    "target": "div#640",
+    "add": [
+     "div[tid=wiggle-controls-actions]#641"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div#639",
+    "add": [
+     "div[role=textbox][tid=chat-input]#625"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div#639",
+    "add": [
+     "span[role=status]#642"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[role=textbox][tid=chat-input]#625",
+    "add": [
+     "p#643"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 284,
+    "target": "div[role=textbox][tid=chat-input]#625",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "p"
+    ]
+   },
+   {
+    "t": 340,
+    "target": "div#649",
+    "add": [
+     "div[tid=chat-engine-warmup]#650"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 8
+   },
+   {
+    "t": 348,
+    "target": "strong\"~\"#652",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 348,
+    "target": "strong\"~\"#652",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 348,
+    "target": "strong\"~\"#652",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 2
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 5
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [
+     "em\"~\"#653"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 11
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [
+     "code\"~\"#654"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 348,
+    "target": "p\"~\"#651",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 1
+   },
+   {
+    "t": 348,
+    "target": "div#655",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 1
+   },
+   {
+    "t": 348,
+    "target": "div#655",
+    "add": [
+     "ul#656"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 384,
+    "target": "div#649",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 389,
+    "target": "div[tid=transcript-trailing]#657",
+    "add": [
+     "div#658"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 469,
+    "target": "span#659",
+    "add": [
+     "span[tid=held-voice-control]#660"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 469,
+    "target": "div#661",
+    "add": [
+     "span#662"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 469,
+    "target": "div[tid=wiggle-controls-actions-group]#663",
+    "add": [
+     "span#664"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 469,
+    "target": "div#665",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 469,
+    "target": "div#665",
+    "add": [
+     "div#666"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 509,
+    "target": "div#667",
+    "add": [
+     "span#668"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 509,
+    "target": "div#669",
+    "add": [
+     "aside#670"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 521,
+    "target": "div#671",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 521,
+    "target": "div#671",
+    "add": [
+     "div#672"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 614,
+    "target": "span#673",
+    "add": [
+     "span\"~\"#674"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 614,
+    "target": "span#673",
+    "add": [
+     "span[role=status]#675"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 781,
+    "target": "div#676",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 781,
+    "target": "div#676",
+    "add": [
+     "div#677"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 781,
+    "target": "div[tid=assistant-message]#678",
+    "add": [
+     "div#679"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1001,
+    "target": "span[tid=TurnStatusClayMark]#680",
+    "add": [
+     "span#681"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1013,
+    "target": "span[tid=TurnStatusClayMark]#680",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1182,
+    "target": "span\"~\"#682",
+    "chars": 24
+   }
+  ],
+  "mutationCount": 75,
+  "strip": "strips/send-artifact.jpg (16 of 217 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "artifact-stream",
+  "anchor": {
+   "type": "pointerover",
+   "target": "iframe#724"
+  },
+  "firstChangeMs": 26,
+  "settleMs": 1409,
+  "rafFrames": 3401,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div#685",
+    "prop": "rect",
+    "fromInputMs": 26,
+    "input": "pointerover iframe#724",
+    "firstMs": 26,
+    "lastMs": 1120,
+    "durationMs": 1094,
+    "steps": 3,
+    "to": "308.4,399,385.2,24",
+    "values": [
+     [
+      26,
+      "308.4,316,385.2,24"
+     ],
+     [
+      1042,
+      "308.4,357,385.2,24"
+     ],
+     [
+      1120,
+      "308.4,399,385.2,24"
+     ]
+    ]
+   },
+   {
+    "el": "div#688",
+    "prop": "rect",
+    "fromInputMs": 26,
+    "input": "pointerover iframe#724",
+    "firstMs": 26,
+    "lastMs": 26,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "310.4,202,383.2,28",
+    "values": [
+     [
+      26,
+      "310.4,202,383.2,28"
+     ]
+    ]
+   },
+   {
+    "el": "span#709",
+    "prop": "rect",
+    "fromInputMs": 26,
+    "input": "pointerover iframe#724",
+    "firstMs": 26,
+    "lastMs": 1248,
+    "durationMs": 1222,
+    "steps": 31,
+    "to": "316.5,202.5,103.1,21",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      1050,
+      0
+     ],
+     [
+      1056,
+      0.067
+     ],
+     [
+      1061,
+      0.13
+     ],
+     [
+      1067,
+      0.194
+     ],
+     [
+      1072,
+      0.254
+     ],
+     [
+      1078,
+      0.311
+     ],
+     [
+      1083,
+      0.365
+     ],
+     [
+      1089,
+      0.418
+     ],
+     [
+      1094,
+      0.468
+     ],
+     [
+      1111,
+      0.599
+     ],
+     [
+      1117,
+      0.639
+     ],
+     [
+      1122,
+      0.676
+     ],
+     [
+      1128,
+      0.709
+     ],
+     [
+      1133,
+      0.739
+     ],
+     [
+      1139,
+      0.769
+     ],
+     [
+      1144,
+      0.796
+     ],
+     [
+      1150,
+      0.819
+     ],
+     [
+      1156,
+      0.839
+     ],
+     [
+      1161,
+      0.863
+     ],
+     [
+      1167,
+      0.88
+     ],
+     [
+      1172,
+      0.896
+     ],
+     [
+      1178,
+      0.913
+     ],
+     [
+      1183,
+      0.93
+     ],
+     [
+      1189,
+      0.94
+     ],
+     [
+      1194,
+      0.953
+     ],
+     [
+      1200,
+      0.963
+     ],
+     [
+      1206,
+      0.973
+     ],
+     [
+      1211,
+      0.983
+     ],
+     [
+      1217,
+      0.99
+     ],
+     [
+      1222,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#729",
+    "prop": "opacity",
+    "fromInputMs": 26,
+    "input": "pointerover iframe#724",
+    "firstMs": 26,
+    "lastMs": 43,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "1",
+    "values": [
+     [
+      26,
+      "0"
+     ],
+     [
+      43,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "div#729",
+    "prop": "visibility",
+    "fromInputMs": 26,
+    "input": "pointerover iframe#724",
+    "firstMs": 26,
+    "lastMs": 1248,
+    "durationMs": 1222,
+    "steps": 2,
+    "to": "visible",
+    "values": [
+     [
+      26,
+      "hidden"
+     ],
+     [
+      1248,
+      "visible"
+     ]
+    ]
+   },
+   {
+    "el": "span#709",
+    "prop": "transform",
+    "fromInputMs": 1042,
+    "input": "pointerover iframe#724",
+    "firstMs": 1042,
+    "lastMs": 1248,
+    "durationMs": 206,
+    "steps": 31,
+    "to": "matrix(1, 0, 0, 1, 0, -3)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.029
+     ],
+     [
+      39,
+      0.093
+     ],
+     [
+      45,
+      0.204
+     ],
+     [
+      50,
+      0.324
+     ],
+     [
+      56,
+      0.429
+     ],
+     [
+      61,
+      0.512
+     ],
+     [
+      67,
+      0.579
+     ],
+     [
+      72,
+      0.636
+     ],
+     [
+      78,
+      0.684
+     ],
+     [
+      94,
+      0.792
+     ],
+     [
+      100,
+      0.82
+     ],
+     [
+      106,
+      0.845
+     ],
+     [
+      111,
+      0.867
+     ],
+     [
+      117,
+      0.886
+     ],
+     [
+      122,
+      0.903
+     ],
+     [
+      128,
+      0.918
+     ],
+     [
+      133,
+      0.932
+     ],
+     [
+      139,
+      0.943
+     ],
+     [
+      145,
+      0.954
+     ],
+     [
+      150,
+      0.963
+     ],
+     [
+      156,
+      0.971
+     ],
+     [
+      161,
+      0.978
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      172,
+      0.988
+     ],
+     [
+      178,
+      0.992
+     ],
+     [
+      183,
+      0.995
+     ],
+     [
+      189,
+      0.997
+     ],
+     [
+      195,
+      0.999
+     ],
+     [
+      200,
+      1
+     ],
+     [
+      206,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#750",
+    "prop": "rect",
+    "fromInputMs": 1042,
+    "input": "pointerover iframe#724",
+    "firstMs": 1042,
+    "lastMs": 1409,
+    "durationMs": 367,
+    "steps": 33,
+    "to": "314.4,205.5,198.5,21",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.063
+     ],
+     [
+      45,
+      0.122
+     ],
+     [
+      50,
+      0.181
+     ],
+     [
+      56,
+      0.237
+     ],
+     [
+      61,
+      0.291
+     ],
+     [
+      67,
+      0.341
+     ],
+     [
+      72,
+      0.391
+     ],
+     [
+      78,
+      0.438
+     ],
+     [
+      94,
+      0.559
+     ],
+     [
+      100,
+      0.597
+     ],
+     [
+      106,
+      0.631
+     ],
+     [
+      111,
+      0.662
+     ],
+     [
+      117,
+      0.691
+     ],
+     [
+      122,
+      0.719
+     ],
+     [
+      128,
+      0.744
+     ],
+     [
+      133,
+      0.766
+     ],
+     [
+      139,
+      0.784
+     ],
+     [
+      145,
+      0.806
+     ],
+     [
+      150,
+      0.822
+     ],
+     [
+      156,
+      0.837
+     ],
+     [
+      161,
+      0.853
+     ],
+     [
+      167,
+      0.869
+     ],
+     [
+      172,
+      0.878
+     ],
+     [
+      178,
+      0.891
+     ],
+     [
+      183,
+      0.9
+     ],
+     [
+      189,
+      0.909
+     ],
+     [
+      195,
+      0.919
+     ],
+     [
+      200,
+      0.925
+     ],
+     [
+      206,
+      0.934
+     ],
+     [
+      306,
+      0.994
+     ],
+     [
+      339,
+      0.997
+     ],
+     [
+      367,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#750",
+    "prop": "opacity",
+    "fromInputMs": 1042,
+    "input": "pointerover iframe#724",
+    "firstMs": 1042,
+    "lastMs": 1348,
+    "durationMs": 306,
+    "steps": 31,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.009
+     ],
+     [
+      45,
+      0.047
+     ],
+     [
+      50,
+      0.129
+     ],
+     [
+      56,
+      0.249
+     ],
+     [
+      61,
+      0.366
+     ],
+     [
+      67,
+      0.461
+     ],
+     [
+      72,
+      0.537
+     ],
+     [
+      78,
+      0.601
+     ],
+     [
+      94,
+      0.739
+     ],
+     [
+      100,
+      0.773
+     ],
+     [
+      106,
+      0.803
+     ],
+     [
+      111,
+      0.83
+     ],
+     [
+      117,
+      0.854
+     ],
+     [
+      122,
+      0.874
+     ],
+     [
+      128,
+      0.892
+     ],
+     [
+      133,
+      0.909
+     ],
+     [
+      139,
+      0.923
+     ],
+     [
+      145,
+      0.936
+     ],
+     [
+      150,
+      0.947
+     ],
+     [
+      156,
+      0.957
+     ],
+     [
+      161,
+      0.966
+     ],
+     [
+      167,
+      0.974
+     ],
+     [
+      172,
+      0.98
+     ],
+     [
+      178,
+      0.985
+     ],
+     [
+      183,
+      0.99
+     ],
+     [
+      189,
+      0.993
+     ],
+     [
+      195,
+      0.996
+     ],
+     [
+      200,
+      0.998
+     ],
+     [
+      206,
+      0.999
+     ],
+     [
+      306,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#750",
+    "prop": "transform",
+    "fromInputMs": 1042,
+    "input": "pointerover iframe#724",
+    "firstMs": 1042,
+    "lastMs": 1348,
+    "durationMs": 306,
+    "steps": 31,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div#751",
+    "prop": "rect",
+    "fromInputMs": 1042,
+    "input": "pointerover iframe#724",
+    "firstMs": 1042,
+    "lastMs": 1120,
+    "durationMs": 78,
+    "steps": 2,
+    "to": "310.4,328,383.2,63",
+    "values": [
+     [
+      1042,
+      "310.4,328,383.2,21"
+     ],
+     [
+      1120,
+      "310.4,328,383.2,63"
+     ]
+    ]
+   },
+   {
+    "el": "span#709",
+    "prop": "opacity",
+    "fromInputMs": 1076,
+    "input": "pointerover iframe#724",
+    "firstMs": 1076,
+    "lastMs": 1248,
+    "durationMs": 172,
+    "steps": 30,
+    "to": "0",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.066
+     ],
+     [
+      11,
+      0.18
+     ],
+     [
+      17,
+      0.304
+     ],
+     [
+      22,
+      0.411
+     ],
+     [
+      28,
+      0.498
+     ],
+     [
+      33,
+      0.567
+     ],
+     [
+      39,
+      0.625
+     ],
+     [
+      44,
+      0.675
+     ],
+     [
+      61,
+      0.786
+     ],
+     [
+      67,
+      0.815
+     ],
+     [
+      72,
+      0.84
+     ],
+     [
+      78,
+      0.863
+     ],
+     [
+      83,
+      0.883
+     ],
+     [
+      89,
+      0.9
+     ],
+     [
+      94,
+      0.916
+     ],
+     [
+      100,
+      0.93
+     ],
+     [
+      106,
+      0.942
+     ],
+     [
+      111,
+      0.952
+     ],
+     [
+      117,
+      0.962
+     ],
+     [
+      122,
+      0.97
+     ],
+     [
+      128,
+      0.977
+     ],
+     [
+      133,
+      0.983
+     ],
+     [
+      139,
+      0.988
+     ],
+     [
+      144,
+      0.992
+     ],
+     [
+      150,
+      0.995
+     ],
+     [
+      156,
+      0.997
+     ],
+     [
+      161,
+      0.999
+     ],
+     [
+      167,
+      1
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#753",
+    "prop": "opacity",
+    "fromInputMs": 1120,
+    "input": "pointerover iframe#724",
+    "firstMs": 1120,
+    "lastMs": 1393,
+    "durationMs": 272,
+    "steps": 24,
+    "to": "0.63903",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      22,
+      0.022
+     ],
+     [
+      28,
+      0.043
+     ],
+     [
+      33,
+      0.065
+     ],
+     [
+      39,
+      0.087
+     ],
+     [
+      45,
+      0.109
+     ],
+     [
+      50,
+      0.13
+     ],
+     [
+      56,
+      0.152
+     ],
+     [
+      61,
+      0.174
+     ],
+     [
+      67,
+      0.196
+     ],
+     [
+      72,
+      0.218
+     ],
+     [
+      78,
+      0.239
+     ],
+     [
+      83,
+      0.261
+     ],
+     [
+      89,
+      0.283
+     ],
+     [
+      95,
+      0.304
+     ],
+     [
+      100,
+      0.326
+     ],
+     [
+      106,
+      0.348
+     ],
+     [
+      111,
+      0.37
+     ],
+     [
+      117,
+      0.391
+     ],
+     [
+      122,
+      0.413
+     ],
+     [
+      128,
+      0.435
+     ],
+     [
+      228,
+      0.826
+     ],
+     [
+      261,
+      0.956
+     ],
+     [
+      272,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#685",
+    "prop": "visibility",
+    "fromInputMs": 1248,
+    "input": "pointerover iframe#724",
+    "firstMs": 1248,
+    "lastMs": 1248,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "visible",
+    "values": [
+     [
+      1248,
+      "visible"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": -7,
+    "target": "div#718",
+    "add": [
+     "div[role=region]#719"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -7,
+    "target": "div[role=none]#720",
+    "add": [
+     "div#721"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -7,
+    "target": "div[role=none]#720",
+    "attr": "aria-hidden",
+    "v": "false"
+   },
+   {
+    "t": -7,
+    "target": "div#667",
+    "attr": "hidden",
+    "v": "~"
+   },
+   {
+    "t": -7,
+    "target": "div[tid=wiggle-controls-actions-group]#663",
+    "attr": "hidden",
+    "v": "~"
+   },
+   {
+    "t": -7,
+    "target": "span#712",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": -7,
+    "target": "span#710",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": -7,
+    "target": "span#710",
+    "add": [
+     "span\"~\"#722"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -7,
+    "target": "aside#670",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": -7,
+    "target": "aside#670",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -7,
+    "target": "div#723",
+    "add": [
+     "iframe#724"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 23,
+    "target": "div#728",
+    "add": [
+     "div#729"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 23,
+    "target": "div#730",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 188,
+    "target": "span\"~\"#702",
+    "chars": 3
+   },
+   {
+    "t": 280,
+    "target": "span\"~\"#731",
+    "chars": 4
+   },
+   {
+    "t": 280,
+    "target": "button#732",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 280,
+    "target": "div#733",
+    "add": [
+     "span#734"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 280,
+    "target": "div#733",
+    "add": [
+     "span#735"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 280,
+    "target": "div#736",
+    "add": [
+     "button[tid=chat-pop-out]#737"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 496,
+    "target": "span#738",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 496,
+    "target": "span#738",
+    "add": [
+     "span\"~\"#739"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 496,
+    "target": "span\"~\"#740",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 496,
+    "target": "span\"~\"#740",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 8
+   },
+   {
+    "t": 496,
+    "target": "div#741",
+    "add": [
+     "span\"~\"#742"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 496,
+    "target": "div#743",
+    "add": [
+     "div#744"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 507,
+    "target": "div#745",
+    "add": [
+     "span#746"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 507,
+    "target": "div#747",
+    "add": [
+     "span\"~\"#748"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 557,
+    "target": "span\"~\"#749",
+    "chars": 1
+   },
+   {
+    "t": 1071,
+    "target": "div#696",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1071,
+    "target": "span#709",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 1071,
+    "target": "span#691",
+    "add": [
+     "span#750"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1071,
+    "target": "div#696",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1071,
+    "target": "div#688",
+    "attr": "data-state",
+    "v": "~"
+   },
+   {
+    "t": 1071,
+    "target": "div#676",
+    "add": [
+     "div#751"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1131,
+    "target": "p#752",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1131,
+    "target": "p#752",
+    "add": [
+     "span\"~\"#753"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "h3\"~\"#754",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 1342,
+    "target": "h3\"~\"#754",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 88
+   },
+   {
+    "t": 1342,
+    "target": "div#685",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1342,
+    "target": "div#685",
+    "add": [
+     "div[role=toolbar][tid=message-actions]#755"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "div#729",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 1342,
+    "target": "div#756",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1342,
+    "target": "div#756",
+    "add": [
+     "div#757"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "span#659",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1342,
+    "target": "div#758",
+    "add": [
+     "button#759"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "div#758",
+    "add": [
+     "span\"~\"#760"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "span#761",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1342,
+    "target": "span#761",
+    "add": [
+     "svg#762"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "div[role=status][tid=response-status-announcer]\"~\"#629",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 28
+   },
+   {
+    "t": 1342,
+    "target": "div#763",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1342,
+    "target": "div#763",
+    "add": [
+     "div[role=toolbar][tid=user-message-actions]#764"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [
+     "button[tid=user-message-retry]#765"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1342,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [
+     "button[tid=action-bar-retry]#766"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1351,
+    "target": "span#691",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1360,
+    "target": "span\"~\"#673",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1360,
+    "target": "span\"~\"#673",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1360,
+    "target": "span\"~\"#673",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 24
+   },
+   {
+    "t": 1405,
+    "target": "p\"~\"#752",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1405,
+    "target": "p\"~\"#752",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1405,
+    "target": "p\"~\"#752",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 70
+   }
+  ],
+  "mutationCount": 62,
+  "strip": "strips/artifact-stream.jpg (16 of 163 frames)",
+  "prevFrame": -135
+ },
+ {
+  "label": "hover-artifact-card",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div#645"
+  },
+  "firstChangeMs": 1,
+  "settleMs": 1062,
+  "rafFrames": 260,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div#645",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover div#645",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "288,0,428,900",
+    "values": [
+     [
+      1,
+      "288,0,428,900"
+     ]
+    ]
+   },
+   {
+    "el": "div#646",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover div#645",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "298.4,53,407.2,847",
+    "values": [
+     [
+      1,
+      "298.4,53,407.2,847"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chat-column]#647",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover div#645",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "298.4,53,407.2,847",
+    "values": [
+     [
+      1,
+      "298.4,53,407.2,847"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chat-column]#647",
+    "prop": "translate",
+    "fromInputMs": 1,
+    "input": "pointerover div#645",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "none",
+    "values": [
+     [
+      1,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=transcript-list]#648",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover div#645",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "310.4,53,383.2,716",
+    "values": [
+     [
+      1,
+      "310.4,53,383.2,716"
+     ]
+    ]
+   },
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 4,
+    "input": "pointerover div#8",
+    "firstMs": 940,
+    "lastMs": 1062,
+    "durationMs": 122,
+    "steps": 21,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.246
+     ],
+     [
+      17,
+      0.41
+     ],
+     [
+      22,
+      0.602
+     ],
+     [
+      28,
+      0.743
+     ],
+     [
+      33,
+      0.821
+     ],
+     [
+      44,
+      0.902
+     ],
+     [
+      50,
+      0.926
+     ],
+     [
+      56,
+      0.944
+     ],
+     [
+      61,
+      0.957
+     ],
+     [
+      67,
+      0.968
+     ],
+     [
+      72,
+      0.976
+     ],
+     [
+      78,
+      0.983
+     ],
+     [
+      83,
+      0.988
+     ],
+     [
+      89,
+      0.992
+     ],
+     [
+      94,
+      0.995
+     ],
+     [
+      100,
+      0.997
+     ],
+     [
+      106,
+      0.998
+     ],
+     [
+      111,
+      0.999
+     ],
+     [
+      117,
+      1
+     ],
+     [
+      122,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 14,
+    "target": "div#1036",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div#1036",
+    "add": [
+     "button[tid=frame-card-share]#1037"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [
+     "button#1038"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [
+     "button[tid=action-bar-read-aloud]#1039"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [
+     "button#1040"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [
+     "button#1041"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [
+     "button[tid=action-bar-retry]#1042"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div[role=toolbar][tid=message-actions]#755",
+    "add": [
+     "time\"~\"#1043"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "time"
+    ]
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [
+     "time\"~\"#1046"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [
+     "button[tid=user-message-retry]#1047"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [
+     "button[tid=user-message-edit]#1048"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 25,
+    "target": "div[role=toolbar][tid=user-message-actions]#764",
+    "add": [
+     "button[tid=user-message-copy]#1049"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 22,
+  "strip": "strips/hover-artifact-card.jpg (16 of 18 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "close-artifact-panel",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#1026"
+  },
+  "firstChangeMs": 1,
+  "settleMs": 101,
+  "rafFrames": 275,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "aside#670",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1120,45,320,855",
+    "values": [
+     [
+      1,
+      "1120,45,320,855"
+     ]
+    ]
+   },
+   {
+    "el": "aside#670",
+    "prop": "backgroundColor",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(25, 25, 25)",
+    "values": [
+     [
+      1,
+      "rgb(25, 25, 25)"
+     ]
+    ]
+   },
+   {
+    "el": "aside#670",
+    "prop": "borderTopColor",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(255, 255, 255, 0.1)",
+    "values": [
+     [
+      1,
+      "rgba(255, 255, 255, 0.1)"
+     ]
+    ]
+   },
+   {
+    "el": "div#633",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 101,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "288,0,820,45",
+    "values": [
+     [
+      1,
+      "288,0,1140,45"
+     ],
+     [
+      101,
+      "288,0,820,45"
+     ]
+    ]
+   },
+   {
+    "el": "div#635",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 101,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "288,0,820,45",
+    "values": [
+     [
+      1,
+      "288,0,1140,45"
+     ],
+     [
+      101,
+      "288,0,820,45"
+     ]
+    ]
+   },
+   {
+    "el": "div#636",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "288,44.2,1152,0.8",
+    "values": [
+     [
+      1,
+      "288,44.2,1152,0.8"
+     ]
+    ]
+   },
+   {
+    "el": "div#639",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "328,824,716,28",
+    "values": [
+     [
+      1,
+      "328,824,716,28"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=textbox][tid=chat-input]#625",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "334,827.5,710,21",
+    "values": [
+     [
+      1,
+      "334,827.5,710,21"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=textbox][tid=chat-input]#625",
+    "prop": "outlineColor",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(81, 156, 237)",
+    "values": [
+     [
+      1,
+      "rgb(81, 156, 237)"
+     ]
+    ]
+   },
+   {
+    "el": "p#643",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "334,827.5,710,21",
+    "values": [
+     [
+      1,
+      "334,827.5,710,21"
+     ]
+    ]
+   },
+   {
+    "el": "span#664",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1345.6,8,76,28",
+    "values": [
+     [
+      1,
+      "1345.6,8,76,28"
+     ]
+    ]
+   },
+   {
+    "el": "span#668",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1295.2,8,46.4,28",
+    "values": [
+     [
+      1,
+      "1295.2,8,46.4,28"
+     ]
+    ]
+   },
+   {
+    "el": "div#685",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "334,357,738,24",
+    "values": [
+     [
+      1,
+      "334,357,738,24"
+     ]
+    ]
+   },
+   {
+    "el": "div#688",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "336,181,736,28",
+    "values": [
+     [
+      1,
+      "336,181,736,28"
+     ]
+    ]
+   },
+   {
+    "el": "span#693",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1035.2,868,45.8,24",
+    "values": [
+     [
+      1,
+      "1035.2,868,45.8,24"
+     ]
+    ]
+   },
+   {
+    "el": "div#715",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1120.8,45,319.2,258.8",
+    "values": [
+     [
+      1,
+      "1120.8,45,319.2,258.8"
+     ]
+    ]
+   },
+   {
+    "el": "iframe#724",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "-10000,0,723.2,855",
+    "values": [
+     [
+      1,
+      "-10000,0,723.2,855"
+     ]
+    ]
+   },
+   {
+    "el": "iframe#724",
+    "prop": "visibility",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      1,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "div#729",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "320,793,768,23",
+    "values": [
+     [
+      1,
+      "320,793,768,23"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#742",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "443.2,256.5,65.9,17",
+    "values": [
+     [
+      1,
+      "443.2,256.5,65.9,17"
+     ]
+    ]
+   },
+   {
+    "el": "span#750",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "340,184.5,198.5,21",
+    "values": [
+     [
+      1,
+      "340,184.5,198.5,21"
+     ]
+    ]
+   },
+   {
+    "el": "div#751",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "336,307,736,42",
+    "values": [
+     [
+      1,
+      "336,307,736,42"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=toolbar][tid=message-actions]#755",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "334,357,738,24",
+    "values": [
+     [
+      1,
+      "334,357,738,24"
+     ]
+    ]
+   },
+   {
+    "el": "div#757",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1052,824,28,28",
+    "values": [
+     [
+      1,
+      "1052,824,28,28"
+     ]
+    ]
+   },
+   {
+    "el": "button#759",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "355,868,24,24",
+    "values": [
+     [
+      1,
+      "355,868,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=toolbar][tid=user-message-actions]#764",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "950.4,155,121.6,24",
+    "values": [
+     [
+      1,
+      "950.4,155,121.6,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=frame-card-share]#1037",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "852,241,28,28",
+    "values": [
+     [
+      1,
+      "852,241,28,28"
+     ]
+    ]
+   },
+   {
+    "el": "button#1038",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "334,357,24,24",
+    "values": [
+     [
+      1,
+      "334,357,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-read-aloud]#1039",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "358,357,24,24",
+    "values": [
+     [
+      1,
+      "358,357,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#1040",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "382,357,24,24",
+    "values": [
+     [
+      1,
+      "382,357,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button#1041",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "406,357,24,24",
+    "values": [
+     [
+      1,
+      "406,357,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=action-bar-retry]#1042",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "430,357,24,24",
+    "values": [
+     [
+      1,
+      "430,357,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#1043",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "454,357,49.6,24",
+    "values": [
+     [
+      1,
+      "454,357,49.6,24"
+     ]
+    ]
+   },
+   {
+    "el": "time\"~\"#1046",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "950.4,155,49.6,24",
+    "values": [
+     [
+      1,
+      "950.4,155,49.6,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=user-message-retry]#1047",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1000,155,24,24",
+    "values": [
+     [
+      1,
+      "1000,155,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=user-message-edit]#1048",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1024,155,24,24",
+    "values": [
+     [
+      1,
+      "1024,155,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=user-message-copy]#1049",
+    "prop": "rect",
+    "fromInputMs": 0,
+    "input": "pointerover div#718",
+    "firstMs": 1,
+    "lastMs": 1,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1048,155,24,24",
+    "values": [
+     [
+      1,
+      "1048,155,24,24"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 58,
+    "target": "div[role=none]#720",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 58,
+    "target": "div#736",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "button"
+    ]
+   },
+   {
+    "t": 58,
+    "target": "body#630",
+    "add": [
+     "div#1051"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 58,
+    "target": "div#723",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "iframe"
+    ]
+   },
+   {
+    "t": 58,
+    "target": "div#1051",
+    "add": [
+     "iframe#724"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 58,
+    "target": "div#718",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 58,
+    "target": "div[role=none]#720",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 58,
+    "target": "div#667",
+    "attr": "hidden",
+    "v": "~"
+   },
+   {
+    "t": 58,
+    "target": "div[tid=wiggle-controls-actions-group]#663",
+    "attr": "hidden",
+    "v": "~"
+   },
+   {
+    "t": 58,
+    "target": "span#710",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 58,
+    "target": "span#710",
+    "add": [
+     "span#1052"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 58,
+    "target": "span#712",
+    "add": [
+     "span\"~\"#1053"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 58,
+    "target": "aside#670",
+    "add": [
+     "div#1054"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 58,
+    "target": "aside#670",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 85,
+    "target": "div#728",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 85,
+    "target": "div#730",
+    "attr": "aria-hidden",
+    "v": "~"
+   }
+  ],
+  "mutationCount": 16,
+  "strip": "strips/close-artifact-panel.jpg (16 of 21 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "open-artifact-panel",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#682"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 187,
+  "rafFrames": 311,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#790",
+    "prop": "outlineColor",
+    "fromInputMs": 2,
+    "input": "focusin button#790",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(255, 255, 255, 0.93)",
+    "values": [
+     [
+      4,
+      "rgba(255, 255, 255, 0.93)"
+     ]
+    ]
+   },
+   {
+    "el": "button#790",
+    "prop": "outlineWidth",
+    "fromInputMs": 2,
+    "input": "focusin button#790",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "2.4px",
+    "values": [
+     [
+      4,
+      "2.4px"
+     ]
+    ]
+   },
+   {
+    "el": "div#786",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "focusin button#790",
+    "firstMs": 4,
+    "lastMs": 126,
+    "durationMs": 122,
+    "steps": 2,
+    "to": "296,8,178.9,28",
+    "values": [
+     [
+      4,
+      "296,8,201.7,28"
+     ],
+     [
+      126,
+      "296,8,178.9,28"
+     ]
+    ]
+   },
+   {
+    "el": "div#787",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "focusin button#790",
+    "firstMs": 4,
+    "lastMs": 126,
+    "durationMs": 122,
+    "steps": 2,
+    "to": "296,8,178.9,28",
+    "values": [
+     [
+      4,
+      "296,8,201.7,28"
+     ],
+     [
+      126,
+      "296,8,178.9,28"
+     ]
+    ]
+   },
+   {
+    "el": "input[tid=name-session]#1129",
+    "prop": "boxShadow",
+    "fromInputMs": 3,
+    "input": "pointerover div#787",
+    "firstMs": 126,
+    "lastMs": 187,
+    "durationMs": 61,
+    "steps": 12,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "curve": null
+   },
+   {
+    "el": "input[tid=name-session]#1129",
+    "prop": "borderTopColor",
+    "fromInputMs": 3,
+    "input": "pointerover div#787",
+    "firstMs": 126,
+    "lastMs": 187,
+    "durationMs": 61,
+    "steps": 12,
+    "to": "rgba(255, 255, 255, 0.04)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.022
+     ],
+     [
+      11,
+      0.112
+     ],
+     [
+      17,
+      0.303
+     ],
+     [
+      22,
+      0.547
+     ],
+     [
+      28,
+      0.724
+     ],
+     [
+      33,
+      0.838
+     ],
+     [
+      39,
+      0.912
+     ],
+     [
+      44,
+      0.955
+     ],
+     [
+      50,
+      0.983
+     ],
+     [
+      56,
+      0.997
+     ],
+     [
+      61,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "input[tid=name-session]#1129",
+    "prop": "outlineColor",
+    "fromInputMs": 3,
+    "input": "pointerover div#787",
+    "firstMs": 126,
+    "lastMs": 187,
+    "durationMs": 61,
+    "steps": 12,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0
+     ],
+     [
+      11,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      22,
+      0
+     ],
+     [
+      28,
+      0
+     ],
+     [
+      33,
+      0
+     ],
+     [
+      39,
+      0
+     ],
+     [
+      44,
+      0
+     ],
+     [
+      50,
+      0
+     ],
+     [
+      56,
+      0
+     ],
+     [
+      61,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 130,
+    "target": "div#787",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 130,
+    "target": "div#787",
+    "add": [
+     "input[tid=name-session]#1129"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/open-artifact-panel.jpg (8 of 8 frames)",
+  "prevFrame": -101
+ }
+]

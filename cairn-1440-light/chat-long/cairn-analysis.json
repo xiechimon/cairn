@@ -1,0 +1,2246 @@
+[
+ {
+  "label": "scroll-up",
+  "anchor": {
+   "type": "wheel",
+   "target": "span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144"
+  },
+  "firstChangeMs": -35,
+  "settleMs": 882,
+  "rafFrames": 123,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "opacity",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -35,
+    "lastMs": 99,
+    "durationMs": 133,
+    "steps": 2,
+    "to": "1",
+    "values": [
+     [
+      -35,
+      "0"
+     ],
+     [
+      99,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=log][tid=chief-stream]#87",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "455,56,760,2574",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "section[aria=Home overview][tid=home-c-lead]#273",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "471,70,728,108",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=greeting]#274",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "471,94,728,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "h2\"Good evening, Xmon Dai\"#275",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "471,94,728,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "p[tid=home-c-since]\"Sun, September 20 · 1 wa\"#276",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "471,128,728,18",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=message-scroller-item]#277",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "471,202,728,38.5",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg]#278",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "471,202,728,38.5",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-col]#279",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "580.2,202,618.8,38.5",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-bubble]\"滚动保留探针第 1 条：检查最小化后滚动位置是否\"#280",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "803.2,202,395.8,38.5",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-tools]#281",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "1147,240.5,52,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Copy][tid=button]#282",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "1147,240.5,24,24",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#283",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "1152.5,246,13,13",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "rect#284",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "wheel div[role=log][tid=chief-stream]#87",
+    "firstMs": 532,
+    "lastMs": 882,
+    "durationMs": 350,
+    "steps": 8,
+    "to": "1157.4,250.9,7,7",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.157
+     ],
+     [
+      100,
+      0.313
+     ],
+     [
+      150,
+      0.47
+     ],
+     [
+      200,
+      0.627
+     ],
+     [
+      250,
+      0.783
+     ],
+     [
+      300,
+      0.94
+     ],
+     [
+      350,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -35,
+    [
+     2086,
+     0
+    ]
+   ],
+   [
+    32,
+    [
+     1966,
+     0
+    ]
+   ],
+   [
+    82,
+    [
+     1846,
+     0
+    ]
+   ],
+   [
+    132,
+    [
+     1726,
+     0
+    ]
+   ],
+   [
+    182,
+    [
+     1606,
+     0
+    ]
+   ],
+   [
+    232,
+    [
+     1486,
+     0
+    ]
+   ],
+   [
+    282,
+    [
+     1366,
+     0
+    ]
+   ],
+   [
+    332,
+    [
+     1246,
+     0
+    ]
+   ],
+   [
+    382,
+    [
+     1126,
+     0
+    ]
+   ],
+   [
+    432,
+    [
+     1006,
+     0
+    ]
+   ],
+   [
+    482,
+    [
+     886,
+     0
+    ]
+   ],
+   [
+    532,
+    [
+     766,
+     0
+    ]
+   ],
+   [
+    582,
+    [
+     646,
+     0
+    ]
+   ],
+   [
+    632,
+    [
+     526,
+     0
+    ]
+   ],
+   [
+    682,
+    [
+     406,
+     0
+    ]
+   ],
+   [
+    732,
+    [
+     286,
+     0
+    ]
+   ],
+   [
+    782,
+    [
+     166,
+     0
+    ]
+   ],
+   [
+    832,
+    [
+     46,
+     0
+    ]
+   ],
+   [
+    882,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 86,
+    "target": "button[tid=jump-to-latest]#200",
+    "attr": "aria-hidden",
+    "v": "false"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/scroll-up.jpg (16 of 22 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "hover-jump",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[tid=chief-bubble]\"滚动保留探针第 5 条：检查最小化后滚动位置是否\"#330"
+  },
+  "firstChangeMs": 83,
+  "settleMs": 999,
+  "rafFrames": 87,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "color",
+    "fromInputMs": 15,
+    "input": "pointerover button[tid=jump-to-latest]#200",
+    "firstMs": 83,
+    "lastMs": 999,
+    "durationMs": 917,
+    "steps": 2,
+    "to": "rgb(75, 83, 77)",
+    "values": [
+     [
+      83,
+      "rgb(29, 35, 31)"
+     ],
+     [
+      999,
+      "rgb(75, 83, 77)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "outlineColor",
+    "fromInputMs": 15,
+    "input": "pointerover button[tid=jump-to-latest]#200",
+    "firstMs": 83,
+    "lastMs": 999,
+    "durationMs": 917,
+    "steps": 2,
+    "to": "rgb(75, 83, 77)",
+    "values": [
+     [
+      83,
+      "rgb(29, 35, 31)"
+     ],
+     [
+      999,
+      "rgb(75, 83, 77)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-jump.jpg (9 of 9 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "jump-to-latest",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[tid=jump-to-latest]#200"
+  },
+  "firstChangeMs": 682,
+  "settleMs": 932,
+  "rafFrames": 103,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "opacity",
+    "fromInputMs": 559,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 682,
+    "lastMs": 682,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0",
+    "values": [
+     [
+      682,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "color",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(75, 83, 77)",
+    "values": [
+     [
+      932,
+      "rgb(75, 83, 77)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "outlineColor",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(75, 83, 77)",
+    "values": [
+     [
+      932,
+      "rgb(75, 83, 77)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=log][tid=chief-stream]#87",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "455,-2030,760,2574",
+    "values": [
+     [
+      932,
+      "455,-2030,760,2574"
+     ]
+    ]
+   },
+   {
+    "el": "section[aria=Home overview][tid=home-c-lead]#273",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-2016,728,108",
+    "values": [
+     [
+      932,
+      "471,-2016,728,108"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=greeting]#274",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1992,728,32",
+    "values": [
+     [
+      932,
+      "471,-1992,728,32"
+     ]
+    ]
+   },
+   {
+    "el": "h2\"Good evening, Xmon Dai\"#275",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1992,728,32",
+    "values": [
+     [
+      932,
+      "471,-1992,728,32"
+     ]
+    ]
+   },
+   {
+    "el": "p[tid=home-c-since]\"Sun, September 20 · 1 wa\"#276",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1958,728,18",
+    "values": [
+     [
+      932,
+      "471,-1958,728,18"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=message-scroller-item]#277",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1884,728,38.5",
+    "values": [
+     [
+      932,
+      "471,-1884,728,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg]#278",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1884,728,38.5",
+    "values": [
+     [
+      932,
+      "471,-1884,728,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-col]#279",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "580.2,-1884,618.8,38.5",
+    "values": [
+     [
+      932,
+      "580.2,-1884,618.8,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-bubble]\"滚动保留探针第 1 条：检查最小化后滚动位置是否\"#280",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "803.2,-1884,395.8,38.5",
+    "values": [
+     [
+      932,
+      "803.2,-1884,395.8,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-tools]#281",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1147,-1845.5,52,24",
+    "values": [
+     [
+      932,
+      "1147,-1845.5,52,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Copy][tid=button]#282",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1147,-1845.5,24,24",
+    "values": [
+     [
+      932,
+      "1147,-1845.5,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "svg#283",
+    "prop": "rect",
+    "fromInputMs": 809,
+    "input": "click button[tid=jump-to-latest]#200",
+    "firstMs": 932,
+    "lastMs": 932,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1152.5,-1840,13,13",
+    "values": [
+     [
+      932,
+      "1152.5,-1840,13,13"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    165,
+    [
+     2,
+     0
+    ]
+   ],
+   [
+    182,
+    [
+     10,
+     0
+    ]
+   ],
+   [
+    199,
+    [
+     23,
+     0
+    ]
+   ],
+   [
+    215,
+    [
+     44,
+     0
+    ]
+   ],
+   [
+    232,
+    [
+     76,
+     0
+    ]
+   ],
+   [
+    249,
+    [
+     122,
+     0
+    ]
+   ],
+   [
+    265,
+    [
+     186,
+     0
+    ]
+   ],
+   [
+    282,
+    [
+     277,
+     0
+    ]
+   ],
+   [
+    299,
+    [
+     405,
+     0
+    ]
+   ],
+   [
+    315,
+    [
+     576,
+     0
+    ]
+   ],
+   [
+    332,
+    [
+     770,
+     0
+    ]
+   ],
+   [
+    349,
+    [
+     953,
+     0
+    ]
+   ],
+   [
+    365,
+    [
+     1107,
+     0
+    ]
+   ],
+   [
+    382,
+    [
+     1234,
+     0
+    ]
+   ],
+   [
+    399,
+    [
+     1340,
+     0
+    ]
+   ],
+   [
+    415,
+    [
+     1429,
+     0
+    ]
+   ],
+   [
+    432,
+    [
+     1505,
+     0
+    ]
+   ],
+   [
+    449,
+    [
+     1571,
+     0
+    ]
+   ],
+   [
+    465,
+    [
+     1629,
+     0
+    ]
+   ],
+   [
+    482,
+    [
+     1680,
+     0
+    ]
+   ],
+   [
+    499,
+    [
+     1726,
+     0
+    ]
+   ],
+   [
+    515,
+    [
+     1766,
+     0
+    ]
+   ],
+   [
+    532,
+    [
+     1803,
+     0
+    ]
+   ],
+   [
+    549,
+    [
+     1836,
+     0
+    ]
+   ],
+   [
+    565,
+    [
+     1865,
+     0
+    ]
+   ],
+   [
+    582,
+    [
+     1892,
+     0
+    ]
+   ],
+   [
+    599,
+    [
+     1916,
+     0
+    ]
+   ],
+   [
+    615,
+    [
+     1938,
+     0
+    ]
+   ],
+   [
+    632,
+    [
+     1957,
+     0
+    ]
+   ],
+   [
+    649,
+    [
+     1975,
+     0
+    ]
+   ],
+   [
+    665,
+    [
+     1991,
+     0
+    ]
+   ],
+   [
+    682,
+    [
+     2006,
+     0
+    ]
+   ],
+   [
+    699,
+    [
+     2018,
+     0
+    ]
+   ],
+   [
+    715,
+    [
+     2030,
+     0
+    ]
+   ],
+   [
+    732,
+    [
+     2040,
+     0
+    ]
+   ],
+   [
+    749,
+    [
+     2049,
+     0
+    ]
+   ],
+   [
+    765,
+    [
+     2057,
+     0
+    ]
+   ],
+   [
+    782,
+    [
+     2064,
+     0
+    ]
+   ],
+   [
+    799,
+    [
+     2069,
+     0
+    ]
+   ],
+   [
+    815,
+    [
+     2074,
+     0
+    ]
+   ],
+   [
+    832,
+    [
+     2078,
+     0
+    ]
+   ],
+   [
+    849,
+    [
+     2081,
+     0
+    ]
+   ],
+   [
+    865,
+    [
+     2084,
+     0
+    ]
+   ],
+   [
+    882,
+    [
+     2085,
+     0
+    ]
+   ],
+   [
+    899,
+    [
+     2086,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 667,
+    "target": "button[tid=jump-to-latest]#200",
+    "attr": "aria-hidden",
+    "v": "true"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/jump-to-latest.jpg (16 of 45 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "hover-reply-actions",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144"
+  },
+  "firstChangeMs": 10,
+  "settleMs": 10,
+  "rafFrames": 181,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=chief-msg-col]#140",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 10,
+    "lastMs": 10,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,247.5,728,22.5",
+    "values": [
+     [
+      10,
+      "471,247.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=bubble]#141",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 10,
+    "lastMs": 10,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,247.5,728,22.5",
+    "values": [
+     [
+      10,
+      "471,247.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=bubble-content]#142",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 10,
+    "lastMs": 10,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,247.5,728,22.5",
+    "values": [
+     [
+      10,
+      "471,247.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "p#143",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 10,
+    "lastMs": 10,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,247.5,728,22.5",
+    "values": [
+     [
+      10,
+      "471,247.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "pointerover span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 10,
+    "lastMs": 10,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,248.5,638.8,19",
+    "values": [
+     [
+      10,
+      "471,248.5,638.8,19"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-reply-actions.jpg (2 of 2 frames)",
+  "prevFrame": -106
+ },
+ {
+  "label": "scroll-to-code",
+  "anchor": {
+   "type": "wheel",
+   "target": "span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144"
+  },
+  "firstChangeMs": 32,
+  "settleMs": 99,
+  "rafFrames": 78,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=chief-msg-col]#140",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,367.5,728,22.5",
+    "values": [
+     [
+      32,
+      "471,367.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=bubble]#141",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,367.5,728,22.5",
+    "values": [
+     [
+      32,
+      "471,367.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=bubble-content]#142",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,367.5,728,22.5",
+    "values": [
+     [
+      32,
+      "471,367.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "p#143",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,367.5,728,22.5",
+    "values": [
+     [
+      32,
+      "471,367.5,728,22.5"
+     ]
+    ]
+   },
+   {
+    "el": "span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "prop": "rect",
+    "fromInputMs": 32,
+    "input": "wheel span\"第 36 条回执：这条只负责撑高消息流，让滚动位\"#144",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,368.5,638.8,19",
+    "values": [
+     [
+      32,
+      "471,368.5,638.8,19"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "opacity",
+    "fromInputMs": 16,
+    "input": "pointerover span\"第 34 条回执：这条只负责撑高消息流，让滚动位\"#119",
+    "firstMs": 99,
+    "lastMs": 99,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1",
+    "values": [
+     [
+      99,
+      "1"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    32,
+    [
+     1966,
+     0
+    ]
+   ],
+   [
+    82,
+    [
+     1846,
+     0
+    ]
+   ],
+   [
+    132,
+    [
+     1726,
+     0
+    ]
+   ],
+   [
+    182,
+    [
+     1606,
+     0
+    ]
+   ],
+   [
+    232,
+    [
+     1486,
+     0
+    ]
+   ],
+   [
+    282,
+    [
+     1366,
+     0
+    ]
+   ],
+   [
+    332,
+    [
+     1246,
+     0
+    ]
+   ],
+   [
+    382,
+    [
+     1126,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 86,
+    "target": "button[tid=jump-to-latest]#200",
+    "attr": "aria-hidden",
+    "v": "false"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/scroll-to-code.jpg (10 of 10 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "hover-code-block",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[tid=chief-msg-col]#425"
+  },
+  "firstChangeMs": 6,
+  "settleMs": 23,
+  "rafFrames": 34,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=log][tid=chief-stream]#87",
+    "prop": "rect",
+    "fromInputMs": 6,
+    "input": "pointerover div[tid=chief-msg-col]#425",
+    "firstMs": 6,
+    "lastMs": 6,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "455,-1070,760,2574",
+    "values": [
+     [
+      6,
+      "455,-1070,760,2574"
+     ]
+    ]
+   },
+   {
+    "el": "section[aria=Home overview][tid=home-c-lead]#273",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1056,728,108",
+    "values": [
+     [
+      23,
+      "471,-1056,728,108"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=greeting]#274",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1032,728,32",
+    "values": [
+     [
+      23,
+      "471,-1032,728,32"
+     ]
+    ]
+   },
+   {
+    "el": "h2\"Good evening, Xmon Dai\"#275",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-1032,728,32",
+    "values": [
+     [
+      23,
+      "471,-1032,728,32"
+     ]
+    ]
+   },
+   {
+    "el": "p[tid=home-c-since]\"Sun, September 20 · 1 wa\"#276",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-998,728,18",
+    "values": [
+     [
+      23,
+      "471,-998,728,18"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=message-scroller-item]#277",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-924,728,38.5",
+    "values": [
+     [
+      23,
+      "471,-924,728,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg]#278",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "471,-924,728,38.5",
+    "values": [
+     [
+      23,
+      "471,-924,728,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-col]#279",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "580.2,-924,618.8,38.5",
+    "values": [
+     [
+      23,
+      "580.2,-924,618.8,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-bubble]\"滚动保留探针第 1 条：检查最小化后滚动位置是否\"#280",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "803.2,-924,395.8,38.5",
+    "values": [
+     [
+      23,
+      "803.2,-924,395.8,38.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=chief-msg-tools]#281",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1147,-885.5,52,24",
+    "values": [
+     [
+      23,
+      "1147,-885.5,52,24"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Copy][tid=button]#282",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1147,-885.5,24,24",
+    "values": [
+     [
+      23,
+      "1147,-885.5,24,24"
+     ]
+    ]
+   },
+   {
+    "el": "svg#283",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "pointerover div[role=region][aria=Messages][tid=chief-body]#86",
+    "firstMs": 23,
+    "lastMs": 23,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1152.5,-880,13,13",
+    "values": [
+     [
+      23,
+      "1152.5,-880,13,13"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-code-block.jpg (2 of 2 frames)",
+  "prevFrame": -110
+ },
+ {
+  "label": "open-side-panel",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[tid=button]\"View thread\"#220"
+  },
+  "firstChangeMs": 181,
+  "settleMs": 331,
+  "rafFrames": 85,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=message-scroller]#85",
+    "prop": "rect",
+    "fromInputMs": 60,
+    "input": "click button[tid=button]\"View thread\"#220",
+    "firstMs": 181,
+    "lastMs": 181,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "248,56,764,648",
+    "values": [
+     [
+      181,
+      "248,56,764,648"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "rect",
+    "fromInputMs": 60,
+    "input": "click button[tid=button]\"View thread\"#220",
+    "firstMs": 181,
+    "lastMs": 181,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "614,660,32,32",
+    "values": [
+     [
+      181,
+      "614,660,32,32"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Thread usage][tid=button]#585",
+    "prop": "backgroundColor",
+    "fromInputMs": 60,
+    "input": "click button[tid=button]\"View thread\"#220",
+    "firstMs": 181,
+    "lastMs": 331,
+    "durationMs": 150,
+    "steps": 10,
+    "to": "rgb(236, 238, 232)",
+    "curve": null
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "rect",
+    "fromInputMs": 60,
+    "input": "click button[tid=button]\"View thread\"#220",
+    "firstMs": 181,
+    "lastMs": 181,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "889.4,742,92.6,26",
+    "values": [
+     [
+      181,
+      "889.4,742,92.6,26"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "backgroundColor",
+    "fromInputMs": 60,
+    "input": "click button[tid=button]\"View thread\"#220",
+    "firstMs": 181,
+    "lastMs": 181,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(253, 253, 251)",
+    "values": [
+     [
+      181,
+      "rgb(253, 253, 251)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "color",
+    "fromInputMs": 60,
+    "input": "click button[tid=button]\"View thread\"#220",
+    "firstMs": 181,
+    "lastMs": 181,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(75, 83, 77)",
+    "values": [
+     [
+      181,
+      "rgb(75, 83, 77)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "outlineColor",
+    "fromInputMs": 60,
+    "input": "click button[tid=button]\"View thread\"#220",
+    "firstMs": 181,
+    "lastMs": 181,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(75, 83, 77)",
+    "values": [
+     [
+      181,
+      "rgb(75, 83, 77)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 184,
+    "target": "div[tid=sidebar-thread-row]#30",
+    "attr": "data-open",
+    "v": ""
+   },
+   {
+    "t": 184,
+    "target": "div#63",
+    "add": [
+     "div#579"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 184,
+    "target": "div#63",
+    "add": [
+     "aside[aria=在 README.md 末尾追加一行「r3 lifecycle probe」]#580"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 3,
+  "strip": "strips/open-side-panel.jpg (12 of 12 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "close-side-panel",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=button]\"View thread\"#220"
+  },
+  "firstChangeMs": 44,
+  "settleMs": 44,
+  "rafFrames": 78,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[tid=message-scroller]#85",
+    "prop": "rect",
+    "fromInputMs": 44,
+    "input": "keydown button[tid=button]\"View thread\"#220",
+    "firstMs": 44,
+    "lastMs": 44,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "248,56,1184,648",
+    "values": [
+     [
+      44,
+      "248,56,1184,648"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=jump-to-latest]#200",
+    "prop": "rect",
+    "fromInputMs": 44,
+    "input": "keydown button[tid=button]\"View thread\"#220",
+    "firstMs": 44,
+    "lastMs": 44,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "824,660,32,32",
+    "values": [
+     [
+      44,
+      "824,660,32,32"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "rect",
+    "fromInputMs": 44,
+    "input": "keydown button[tid=button]\"View thread\"#220",
+    "firstMs": 44,
+    "lastMs": 44,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1099.4,742,92.6,26",
+    "values": [
+     [
+      44,
+      "1099.4,742,92.6,26"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "backgroundColor",
+    "fromInputMs": 44,
+    "input": "keydown button[tid=button]\"View thread\"#220",
+    "firstMs": 44,
+    "lastMs": 44,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(236, 238, 232)",
+    "values": [
+     [
+      44,
+      "rgb(236, 238, 232)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "color",
+    "fromInputMs": 44,
+    "input": "keydown button[tid=button]\"View thread\"#220",
+    "firstMs": 44,
+    "lastMs": 44,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(29, 35, 31)",
+    "values": [
+     [
+      44,
+      "rgb(29, 35, 31)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View thread\"#220",
+    "prop": "outlineColor",
+    "fromInputMs": 44,
+    "input": "keydown button[tid=button]\"View thread\"#220",
+    "firstMs": 44,
+    "lastMs": 44,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(29, 35, 31)",
+    "values": [
+     [
+      44,
+      "rgb(29, 35, 31)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 36,
+    "target": "div[tid=sidebar-thread-row]#30",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 36,
+    "target": "div#63",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 36,
+    "target": "div#63",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "aside"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 3,
+  "strip": "strips/close-side-panel.jpg (1 of 1 frames)",
+  "prevFrame": -106
+ }
+]

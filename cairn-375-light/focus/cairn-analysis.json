@@ -1,0 +1,365 @@
+[
+ {
+  "label": "tab-1",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[tid=chief-composer-input]#125"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 32,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [
+   [
+    56,
+    [
+     245,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 49,
+    "target": "body#138",
+    "add": [
+     "div#139"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#139",
+    "add": [
+     "div[role=presentation]#140"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/tab-1.jpg (16 of 30 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "tab-2",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Add attachment][tid=tooltip-trigger]#129"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 15,
+    "target": "div#142",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 15,
+    "target": "div[tid=tooltip-content]\"Add attachment\"#141",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 15,
+    "target": "div[role=presentation]#140",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 30,
+    "target": "body#138",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 30,
+    "target": "div#139",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 5,
+  "strip": "strips/tab-2.jpg (16 of 30 frames)",
+  "prevFrame": -106
+ },
+ {
+  "label": "tab-3",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#131"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-3.jpg (16 of 28 frames)",
+  "prevFrame": -106
+ },
+ {
+  "label": "tab-4",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Send][tid=button]#134"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-4.jpg (16 of 25 frames)",
+  "prevFrame": -109
+ },
+ {
+  "label": "tab-5",
+  "anchor": {
+   "type": "keydown",
+   "target": "body#138"
+  },
+  "firstChangeMs": 6,
+  "settleMs": 140,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "outlineColor",
+    "fromInputMs": 6,
+    "input": "focusin button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 6,
+    "lastMs": 140,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(63, 108, 53)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.04
+     ],
+     [
+      33,
+      0.16
+     ],
+     [
+      50,
+      0.44
+     ],
+     [
+      67,
+      0.68
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "outlineWidth",
+    "fromInputMs": 6,
+    "input": "focusin button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 6,
+    "lastMs": 23,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "2px",
+    "values": [
+     [
+      6,
+      "3px"
+     ],
+     [
+      23,
+      "2px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-5.jpg (16 of 31 frames)",
+  "prevFrame": -110
+ },
+ {
+  "label": "tab-6",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Expand sidebar][tid=button]#3"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 37,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-6.jpg (16 of 32 frames)",
+  "prevFrame": -114
+ },
+ {
+  "label": "tab-7",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=machines-button]#12"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 36,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 22,
+    "target": "body#138",
+    "add": [
+     "div#143"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 22,
+    "target": "div#143",
+    "add": [
+     "div[role=presentation]#144"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/tab-7.jpg (16 of 29 frames)",
+  "prevFrame": -112
+ },
+ {
+  "label": "tab-8",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Tasks][tid=tooltip-trigger]#17"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 38,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 43,
+    "target": "div#145",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 43,
+    "target": "div[tid=tooltip-content]\"Tasks\"#146",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 43,
+    "target": "div[role=presentation]#144",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 43,
+    "target": "body#138",
+    "add": [
+     "div#147"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 43,
+    "target": "div#147",
+    "add": [
+     "div[role=presentation]#148"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 57,
+    "target": "body#138",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 57,
+    "target": "div#143",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 7,
+  "strip": "strips/tab-8.jpg (16 of 32 frames)",
+  "prevFrame": -115
+ }
+]

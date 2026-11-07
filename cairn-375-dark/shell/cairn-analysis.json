@@ -1,0 +1,4581 @@
+[
+ {
+  "label": "hover-sidebar-rows",
+  "anchor": {
+   "type": "pointerover",
+   "target": "button[aria=Expand sidebar][tid=button]#3"
+  },
+  "firstChangeMs": 28,
+  "settleMs": 228,
+  "rafFrames": 179,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "aside#146",
+    "prop": "rect",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "0,0,288,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.017
+     ],
+     [
+      33,
+      0.085
+     ],
+     [
+      50,
+      0.236
+     ],
+     [
+      67,
+      0.456
+     ],
+     [
+      83,
+      0.647
+     ],
+     [
+      100,
+      0.776
+     ],
+     [
+      117,
+      0.862
+     ],
+     [
+      133,
+      0.921
+     ],
+     [
+      150,
+      0.959
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "rect",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "0,0,288,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.017
+     ],
+     [
+      33,
+      0.085
+     ],
+     [
+      50,
+      0.236
+     ],
+     [
+      67,
+      0.456
+     ],
+     [
+      83,
+      0.647
+     ],
+     [
+      100,
+      0.776
+     ],
+     [
+      117,
+      0.862
+     ],
+     [
+      133,
+      0.921
+     ],
+     [
+      150,
+      0.959
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "opacity",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.017
+     ],
+     [
+      33,
+      0.086
+     ],
+     [
+      50,
+      0.237
+     ],
+     [
+      67,
+      0.456
+     ],
+     [
+      83,
+      0.647
+     ],
+     [
+      100,
+      0.776
+     ],
+     [
+      117,
+      0.862
+     ],
+     [
+      133,
+      0.921
+     ],
+     [
+      150,
+      0.959
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "transform",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "filter",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      28,
+      "blur(0px)"
+     ],
+     [
+      228,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "boxShadow",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 44,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      28,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      44,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#141",
+    "prop": "opacity",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 128,
+    "durationMs": 100,
+    "steps": 7,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.221
+     ],
+     [
+      33,
+      0.577
+     ],
+     [
+      50,
+      0.802
+     ],
+     [
+      67,
+      0.924
+     ],
+     [
+      83,
+      0.984
+     ],
+     [
+      100,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#141",
+    "prop": "transform",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 128,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      28,
+      "matrix(1, 0, 0, 1, 0, 0)"
+     ],
+     [
+      128,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#141",
+    "prop": "filter",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 128,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      28,
+      "blur(0px)"
+     ],
+     [
+      128,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Search][tid=tooltip-trigger]#148",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 44,
+    "lastMs": 228,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "218,20,28,28",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.447
+     ],
+     [
+      67,
+      0.641
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -6,
+    [
+     245,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 42,
+    "target": "button[aria=Expand sidebar][tid=button]#3",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 42,
+    "target": "body#138",
+    "add": [
+     "div[tid=dialog-portal]#139"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 42,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [
+     "div[role=presentation]#140"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 42,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [
+     "div[role=presentation][tid=dialog-overlay]#141"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 42,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [
+     "span#142"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 42,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [
+     "div[role=dialog][tid=dialog-content]#143"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 42,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [
+     "span#144"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 42,
+    "target": "div\"Sample data (scenario ch\"#145",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 42,
+    "target": "div#2",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 42,
+    "target": "div[role=presentation]#140",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 42,
+    "target": "div[role=presentation][tid=dialog-overlay]#141",
+    "attr": "aria-hidden",
+    "v": "true"
+   }
+  ],
+  "mutationCount": 11,
+  "strip": "strips/hover-sidebar-rows.jpg (16 of 31 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "close-drawer",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[aria=Search][tid=tooltip-trigger]#148"
+  },
+  "firstChangeMs": 14,
+  "settleMs": 231,
+  "rafFrames": 61,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "transform",
+    "fromInputMs": 14,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 14,
+    "lastMs": 214,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "matrix(1, 0, 0, 1, -288, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.017
+     ],
+     [
+      33,
+      0.085
+     ],
+     [
+      50,
+      0.236
+     ],
+     [
+      67,
+      0.457
+     ],
+     [
+      83,
+      0.647
+     ],
+     [
+      100,
+      0.776
+     ],
+     [
+      117,
+      0.862
+     ],
+     [
+      133,
+      0.921
+     ],
+     [
+      150,
+      0.959
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "filter",
+    "fromInputMs": 14,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 14,
+    "lastMs": 14,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "blur(0px)",
+    "values": [
+     [
+      14,
+      "blur(0px)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Search][tid=tooltip-trigger]#148",
+    "prop": "boxShadow",
+    "fromInputMs": 14,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 14,
+    "lastMs": 14,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      14,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#141",
+    "prop": "transform",
+    "fromInputMs": 14,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 14,
+    "lastMs": 114,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      14,
+      "matrix(1, 0, 0, 1, 0, 0)"
+     ],
+     [
+      114,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#141",
+    "prop": "filter",
+    "fromInputMs": 14,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 14,
+    "lastMs": 114,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      14,
+      "blur(0px)"
+     ],
+     [
+      114,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "aside#146",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-288,0,288,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-288,0,288,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#143",
+    "prop": "opacity",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "6.88862e-09",
+    "curve": null
+   },
+   {
+    "el": "div[tid=team-row]#150",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-276,12,264,44",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#149",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-276,12,204,44",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span[tid=brand-mark]#151",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-268,23,22,22",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"Cairn\"#152",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-238,21,51,26",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Search][tid=tooltip-trigger]#148",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-70,20,28,28",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#160",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-64,26,16,16",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#161",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-52.9,37.1,2.9,2.9",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "circle#162",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-62,28,10.7,10.7",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Collapse sidebar][tid=button]#163",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-40,20,28,28",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#164",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-34,26,16,16",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "rect#165",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-32,28,12,12",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#166",
+    "prop": "rect",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 214,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "-28,28,0,12",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.448
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#141",
+    "prop": "opacity",
+    "fromInputMs": 31,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 31,
+    "lastMs": 114,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "1",
+    "values": [
+     [
+      31,
+      "0.779102"
+     ],
+     [
+      47,
+      "0.42336"
+     ],
+     [
+      64,
+      "0.197825"
+     ],
+     [
+      81,
+      "0.0751228"
+     ],
+     [
+      97,
+      "0.0164343"
+     ],
+     [
+      114,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "backgroundColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      231,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "color",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "outlineColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#4",
+    "prop": "color",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#4",
+    "prop": "borderTopColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#4",
+    "prop": "outlineColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "rect#5",
+    "prop": "color",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "rect#5",
+    "prop": "borderTopColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "rect#5",
+    "prop": "outlineColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "path#147",
+    "prop": "color",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "path#147",
+    "prop": "borderTopColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   },
+   {
+    "el": "path#147",
+    "prop": "outlineColor",
+    "fromInputMs": 231,
+    "input": "keydown button[aria=Search][tid=tooltip-trigger]#148",
+    "firstMs": 231,
+    "lastMs": 231,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(180, 186, 179)",
+    "values": [
+     [
+      231,
+      "rgb(180, 186, 179)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 13,
+    "target": "button[aria=Expand sidebar][tid=button]#3",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 13,
+    "target": "div[role=presentation][tid=dialog-overlay]#141",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 13,
+    "target": "div[role=dialog][tid=dialog-content]#143",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 13,
+    "target": "div\"Sample data (scenario ch\"#145",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 13,
+    "target": "div#2",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 13,
+    "target": "div[role=presentation]#140",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 13,
+    "target": "div[role=presentation][tid=dialog-overlay]#141",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 234,
+    "target": "body#138",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 234,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 234,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 234,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 234,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 234,
+    "target": "div[tid=dialog-portal]#139",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 13,
+  "strip": "strips/close-drawer.jpg (16 of 27 frames)",
+  "prevFrame": -103
+ },
+ {
+  "label": "hover-composer-plus",
+  "anchor": {
+   "type": "pointerover",
+   "target": "code\"docs/verify/\"#55"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 112,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-composer-plus.jpg (16 of 31 frames)",
+  "prevFrame": -110
+ },
+ {
+  "label": "press-composer-plus",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[tid=button]\"Reply\"#121"
+  },
+  "firstChangeMs": 176,
+  "settleMs": 176,
+  "rafFrames": 61,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "section[aria=Needs you][tid=needs-you]#107",
+    "prop": "rect",
+    "fromInputMs": 159,
+    "input": "focusin textarea[aria=Reply to #1][tid=input-group-control",
+    "firstMs": 176,
+    "lastMs": 176,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,550,343,144",
+    "values": [
+     [
+      176,
+      "16,550,343,144"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=needs-you-item]#111",
+    "prop": "rect",
+    "fromInputMs": 159,
+    "input": "focusin textarea[aria=Reply to #1][tid=input-group-control",
+    "firstMs": 176,
+    "lastMs": 176,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,574,343,120",
+    "values": [
+     [
+      176,
+      "16,574,343,120"
+     ]
+    ]
+   },
+   {
+    "el": "article[tid=thread-card]#112",
+    "prop": "rect",
+    "fromInputMs": 159,
+    "input": "focusin textarea[aria=Reply to #1][tid=input-group-control",
+    "firstMs": 176,
+    "lastMs": 176,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "16,574,343,120",
+    "values": [
+     [
+      176,
+      "16,574,343,120"
+     ]
+    ]
+   },
+   {
+    "el": "div#120",
+    "prop": "rect",
+    "fromInputMs": 159,
+    "input": "focusin textarea[aria=Reply to #1][tid=input-group-control",
+    "firstMs": 176,
+    "lastMs": 176,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "175.6,580,171.4,26",
+    "values": [
+     [
+      176,
+      "175.6,580,171.4,26"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    59,
+    [
+     327,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 18,
+    "target": "button[tid=button]\"Collapse\"#121",
+    "chars": 8
+   },
+   {
+    "t": 18,
+    "target": "article[tid=thread-card]#112",
+    "add": [
+     "div#223"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/press-composer-plus.jpg (16 of 31 frames)",
+  "prevFrame": -107
+ },
+ {
+  "label": "close-plus-menu",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[aria=Reply to #1][tid=input-group-control]#222"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 55,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/close-plus-menu.jpg (16 of 31 frames)",
+  "prevFrame": -115
+ },
+ {
+  "label": "type-composer",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "textarea[aria=Reply to #1][tid=input-group-control]#222"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 228,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 6,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"H\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 1
+   },
+   {
+    "t": 79,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"Ho\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 2
+   },
+   {
+    "t": 152,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 3
+   },
+   {
+    "t": 225,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 4
+   },
+   {
+    "t": 299,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How s\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 5
+   },
+   {
+    "t": 372,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How sh\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 6
+   },
+   {
+    "t": 446,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How sho\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 7
+   },
+   {
+    "t": 519,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How shou\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 8
+   },
+   {
+    "t": 593,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How shoul\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 9
+   },
+   {
+    "t": 668,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 10
+   },
+   {
+    "t": 741,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 11
+   },
+   {
+    "t": 815,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 12
+   },
+   {
+    "t": 888,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 13
+   },
+   {
+    "t": 961,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a s\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 14
+   },
+   {
+    "t": 1035,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a si\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 15
+   },
+   {
+    "t": 1108,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sid\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 16
+   },
+   {
+    "t": 1182,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a side\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 17
+   },
+   {
+    "t": 1256,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sideb\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 18
+   },
+   {
+    "t": 1330,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sideba\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 19
+   },
+   {
+    "t": 1405,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 20
+   },
+   {
+    "t": 1479,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 21
+   },
+   {
+    "t": 1554,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar r\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 22
+   },
+   {
+    "t": 1627,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar ro\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 23
+   },
+   {
+    "t": 1702,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 24
+   },
+   {
+    "t": 1776,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 25
+   },
+   {
+    "t": 1849,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 26
+   },
+   {
+    "t": 1924,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 27
+   },
+   {
+    "t": 1998,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 28
+   },
+   {
+    "t": 2072,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 29
+   },
+   {
+    "t": 2145,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 30
+   },
+   {
+    "t": 2219,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 31
+   },
+   {
+    "t": 2292,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 32
+   },
+   {
+    "t": 2365,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 33
+   },
+   {
+    "t": 2440,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 34
+   },
+   {
+    "t": 2513,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 35
+   },
+   {
+    "t": 2588,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 36
+   },
+   {
+    "t": 2661,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 37
+   },
+   {
+    "t": 2735,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 38
+   },
+   {
+    "t": 2808,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 39
+   },
+   {
+    "t": 2881,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 40
+   },
+   {
+    "t": 2956,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 41
+   },
+   {
+    "t": 3030,
+    "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222",
+    "add": [],
+    "addN": 0,
+    "rm": [],
+    "rmN": 0,
+    "chars": 42
+   }
+  ],
+  "mutationCount": 42,
+  "strip": "strips/type-composer.jpg (16 of 31 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "clear-composer",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[aria=Reply to #1][tid=input-group-control]\"How should a sidebar row\"#222"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 42,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/clear-composer.jpg (16 of 31 frames)",
+  "prevFrame": -103
+ },
+ {
+  "label": "open-model-menu",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#131"
+  },
+  "firstChangeMs": 20,
+  "settleMs": 170,
+  "rafFrames": 60,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div#123",
+    "prop": "boxShadow",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 170,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      20,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      170,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#131",
+    "prop": "backgroundColor",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 53,
+    "durationMs": 33,
+    "steps": 2,
+    "to": "rgb(42, 48, 43)",
+    "values": [
+     [
+      20,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      53,
+      "rgb(42, 48, 43)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#131",
+    "prop": "color",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 53,
+    "durationMs": 33,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      53,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#131",
+    "prop": "outlineColor",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 53,
+    "durationMs": 33,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      53,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#132",
+    "prop": "color",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 170,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      170,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#132",
+    "prop": "borderTopColor",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 170,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      170,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#132",
+    "prop": "outlineColor",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 170,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      170,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "path#133",
+    "prop": "color",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 170,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      170,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "path#133",
+    "prop": "borderTopColor",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 170,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      170,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "path#133",
+    "prop": "outlineColor",
+    "fromInputMs": 20,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 20,
+    "lastMs": 170,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      20,
+      "rgb(163, 170, 164)"
+     ],
+     [
+      170,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#239",
+    "prop": "rect",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "50,564,320,180",
+    "values": [
+     [
+      53,
+      "50.4,571.3,313.2,176.2"
+     ],
+     [
+      70,
+      "50.2,567.4,316.8,178.2"
+     ],
+     [
+      87,
+      "50.1,565.3,318.8,179.3"
+     ],
+     [
+      103,
+      "50,564.3,319.7,179.9"
+     ],
+     [
+      120,
+      "50,564,320,180"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#239",
+    "prop": "opacity",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "1",
+    "values": [
+     [
+      53,
+      "0.575268"
+     ],
+     [
+      70,
+      "0.802403"
+     ],
+     [
+      87,
+      "0.924995"
+     ],
+     [
+      103,
+      "0.983404"
+     ],
+     [
+      120,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#239",
+    "prop": "transform",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "none",
+    "values": [
+     [
+      53,
+      "matrix3d(0.978763, 0, 0, 0, 0, 0.978763, 0, 0, 0, 0, 0.978763, 0, 0, 3.39786, 0,"
+     ],
+     [
+      70,
+      "matrix3d(0.99012, 0, 0, 0, 0, 0.99012, 0, 0, 0, 0, 0.99012, 0, 0, 1.58077, 0, 1)"
+     ],
+     [
+      87,
+      "matrix3d(0.99625, 0, 0, 0, 0, 0.99625, 0, 0, 0, 0, 0.99625, 0, 0, 0.600037, 0, 1"
+     ],
+     [
+      103,
+      "matrix3d(0.99917, 0, 0, 0, 0, 0.99917, 0, 0, 0, 0, 0.99917, 0, 0, 0.132767, 0, 1"
+     ],
+     [
+      120,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#239",
+    "prop": "filter",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      53,
+      "blur(0px)"
+     ],
+     [
+      120,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group][tid=dropdown-menu-group]#240",
+    "prop": "rect",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "54,568,312,172",
+    "values": [
+     [
+      53,
+      "54.3,575.3,305.4,168.3"
+     ],
+     [
+      70,
+      "54.2,571.4,308.9,170.3"
+     ],
+     [
+      87,
+      "54.1,569.3,310.8,171.4"
+     ],
+     [
+      103,
+      "54,568.3,311.7,171.9"
+     ],
+     [
+      120,
+      "54,568,312,172"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group][tid=dropdown-menu-radio-group]#241",
+    "prop": "rect",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "54,596,312,144",
+    "values": [
+     [
+      53,
+      "54.3,602.7,305.4,140.9"
+     ],
+     [
+      70,
+      "54.2,599.1,308.9,142.6"
+     ],
+     [
+      87,
+      "54.1,597.2,310.8,143.5"
+     ],
+     [
+      103,
+      "54,596.3,311.7,143.9"
+     ],
+     [
+      120,
+      "54,596,312,144"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menuitemradio][tid=dropdown-menu-radio-item]#242",
+    "prop": "rect",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "54,596,312,48",
+    "values": [
+     [
+      53,
+      "54.3,602.7,305.4,47"
+     ],
+     [
+      70,
+      "54.2,599.1,308.9,47.5"
+     ],
+     [
+      87,
+      "54.1,597.2,310.8,47.8"
+     ],
+     [
+      103,
+      "54,596.3,311.7,48"
+     ],
+     [
+      120,
+      "54,596,312,48"
+     ]
+    ]
+   },
+   {
+    "el": "span#243",
+    "prop": "rect",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "64,602,187.5,36",
+    "values": [
+     [
+      53,
+      "64.1,608.5,183.5,35.2"
+     ],
+     [
+      70,
+      "64.1,605,185.6,35.6"
+     ],
+     [
+      87,
+      "64,603.2,186.8,35.9"
+     ],
+     [
+      103,
+      "64,602.3,187.3,36"
+     ],
+     [
+      120,
+      "64,602,187.5,36"
+     ]
+    ]
+   },
+   {
+    "el": "span\"Coordinator\"#238",
+    "prop": "rect",
+    "fromInputMs": 53,
+    "input": "click button[aria=Talk to a thread][tid=dropdown-menu-tr",
+    "firstMs": 53,
+    "lastMs": 120,
+    "durationMs": 67,
+    "steps": 5,
+    "to": "64,602,187.5,20",
+    "values": [
+     [
+      53,
+      "64.1,608.5,183.5,19.6"
+     ],
+     [
+      70,
+      "64.1,605,185.6,19.8"
+     ],
+     [
+      87,
+      "64,603.2,186.8,19.9"
+     ],
+     [
+      103,
+      "64,602.3,187.3,20"
+     ],
+     [
+      120,
+      "64,602,187.5,20"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 49,
+    "target": "div#128",
+    "add": [
+     "span#230"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#128",
+    "add": [
+     "span#231"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#131",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 49,
+    "target": "body#138",
+    "add": [
+     "div#232"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#232",
+    "add": [
+     "div[role=presentation]#233"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#232",
+    "add": [
+     "div[role=presentation]#234"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#128",
+    "add": [
+     "span#235"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#128",
+    "add": [
+     "span#236"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 49,
+    "target": "div#128",
+    "add": [
+     "span#237"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 9,
+  "strip": "strips/open-model-menu.jpg (16 of 32 frames)",
+  "prevFrame": -113
+ },
+ {
+  "label": "hover-model-menu",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span\"Coordinator\"#238"
+  },
+  "firstChangeMs": -67,
+  "settleMs": -67,
+  "rafFrames": 110,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=menuitemradio][tid=dropdown-menu-radio-item]#242",
+    "prop": "backgroundColor",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -67,
+    "lastMs": -67,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(230, 232, 226, 0.1)",
+    "values": [
+     [
+      -67,
+      "rgba(230, 232, 226, 0.1)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-model-menu.jpg (16 of 30 frames)",
+  "prevFrame": -100
+ },
+ {
+  "label": "close-model-menu",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#239"
+  },
+  "firstChangeMs": 31,
+  "settleMs": 165,
+  "rafFrames": 61,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "textarea[tid=chief-composer-input]#125",
+    "prop": "outlineColor",
+    "fromInputMs": 11,
+    "input": "focusin textarea[tid=chief-composer-input]#125",
+    "firstMs": 31,
+    "lastMs": 165,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(156, 199, 139)",
+    "curve": null
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 11,
+    "target": "div#128",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 11,
+    "target": "div#128",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 11,
+    "target": "div[role=menu][aria=Send to][tid=dropdown-menu-content]#239",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 11,
+    "target": "div[role=presentation]#234",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 11,
+    "target": "button[aria=Talk to a thread][tid=dropdown-menu-trigger]#131",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 11,
+    "target": "div#128",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 11,
+    "target": "div#128",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 11,
+    "target": "div#128",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 19,
+    "target": "body#138",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 19,
+    "target": "div#232",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 19,
+    "target": "div#232",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 11,
+  "strip": "strips/close-model-menu.jpg (16 of 31 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "collapse-sidebar",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "button[aria=Expand sidebar][tid=button]#3"
+  },
+  "firstChangeMs": 28,
+  "settleMs": 228,
+  "rafFrames": 80,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "aside#268",
+    "prop": "rect",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "0,0,288,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.017
+     ],
+     [
+      33,
+      0.085
+     ],
+     [
+      50,
+      0.236
+     ],
+     [
+      67,
+      0.459
+     ],
+     [
+      83,
+      0.646
+     ],
+     [
+      100,
+      0.776
+     ],
+     [
+      117,
+      0.863
+     ],
+     [
+      133,
+      0.921
+     ],
+     [
+      150,
+      0.96
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "rect",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "0,0,288,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.017
+     ],
+     [
+      33,
+      0.085
+     ],
+     [
+      50,
+      0.236
+     ],
+     [
+      67,
+      0.459
+     ],
+     [
+      83,
+      0.646
+     ],
+     [
+      100,
+      0.776
+     ],
+     [
+      117,
+      0.863
+     ],
+     [
+      133,
+      0.921
+     ],
+     [
+      150,
+      0.96
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "opacity",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.017
+     ],
+     [
+      33,
+      0.086
+     ],
+     [
+      50,
+      0.237
+     ],
+     [
+      67,
+      0.459
+     ],
+     [
+      83,
+      0.646
+     ],
+     [
+      100,
+      0.776
+     ],
+     [
+      117,
+      0.862
+     ],
+     [
+      133,
+      0.921
+     ],
+     [
+      150,
+      0.96
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "transform",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "filter",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 228,
+    "durationMs": 200,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      28,
+      "blur(0px)"
+     ],
+     [
+      228,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#264",
+    "prop": "opacity",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 128,
+    "durationMs": 100,
+    "steps": 7,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.221
+     ],
+     [
+      33,
+      0.577
+     ],
+     [
+      50,
+      0.802
+     ],
+     [
+      67,
+      0.926
+     ],
+     [
+      83,
+      0.983
+     ],
+     [
+      100,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#264",
+    "prop": "transform",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 128,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      28,
+      "matrix(1, 0, 0, 1, 0, 0)"
+     ],
+     [
+      128,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#264",
+    "prop": "filter",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 128,
+    "durationMs": 100,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      28,
+      "blur(0px)"
+     ],
+     [
+      128,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "backgroundColor",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 28,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(42, 48, 43)",
+    "values": [
+     [
+      28,
+      "rgb(42, 48, 43)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "color",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 28,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      28,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Expand sidebar][tid=button]#3",
+    "prop": "outlineColor",
+    "fromInputMs": 28,
+    "input": "click button[aria=Expand sidebar][tid=button]#3",
+    "firstMs": 28,
+    "lastMs": 28,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      28,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "button[aria=Search][tid=tooltip-trigger]#269",
+    "prop": "rect",
+    "fromInputMs": 14,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 45,
+    "lastMs": 228,
+    "durationMs": 183,
+    "steps": 12,
+    "to": "218,20,28,28",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.069
+     ],
+     [
+      33,
+      0.223
+     ],
+     [
+      50,
+      0.449
+     ],
+     [
+      67,
+      0.64
+     ],
+     [
+      83,
+      0.772
+     ],
+     [
+      100,
+      0.86
+     ],
+     [
+      117,
+      0.919
+     ],
+     [
+      133,
+      0.959
+     ],
+     [
+      150,
+      0.983
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#4",
+    "prop": "color",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#4",
+    "prop": "borderTopColor",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "svg#4",
+    "prop": "outlineColor",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "rect#5",
+    "prop": "color",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "rect#5",
+    "prop": "borderTopColor",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "rect#5",
+    "prop": "outlineColor",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "path#147",
+    "prop": "color",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "path#147",
+    "prop": "borderTopColor",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   },
+   {
+    "el": "path#147",
+    "prop": "outlineColor",
+    "fromInputMs": 147,
+    "input": "focusin button[aria=Search][tid=tooltip-trigger]#269",
+    "firstMs": 178,
+    "lastMs": 178,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(230, 232, 226)",
+    "values": [
+     [
+      178,
+      "rgb(230, 232, 226)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 29,
+    "target": "button[aria=Expand sidebar][tid=button]#3",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 29,
+    "target": "body#138",
+    "add": [
+     "div[tid=dialog-portal]#262"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 29,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [
+     "div[role=presentation]#263"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 29,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [
+     "div[role=presentation][tid=dialog-overlay]#264"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 29,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [
+     "span#265"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 29,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [
+     "div[role=dialog][tid=dialog-content]#266"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 29,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [
+     "span#267"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 29,
+    "target": "div\"Sample data (scenario ch\"#145",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 29,
+    "target": "div#2",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation]#263",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation][tid=dialog-overlay]#264",
+    "attr": "aria-hidden",
+    "v": "true"
+   }
+  ],
+  "mutationCount": 11,
+  "strip": "strips/collapse-sidebar.jpg (16 of 31 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "expand-sidebar",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span[tid=brand-mark]#272"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 79,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/expand-sidebar.jpg (16 of 30 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "open-settings-dialog",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "svg#317"
+  },
+  "firstChangeMs": 20,
+  "settleMs": 304,
+  "rafFrames": 96,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "transform",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 87,
+    "durationMs": 67,
+    "steps": 4,
+    "to": "matrix(1, 0, 0, 1, -68.0854, 0)",
+    "values": [
+     [
+      20,
+      "matrix(1, 0, 0, 1, 0, 0)"
+     ],
+     [
+      54,
+      "matrix(1, 0, 0, 1, -4.92017, 0)"
+     ],
+     [
+      70,
+      "matrix(1, 0, 0, 1, -24.6033, 0)"
+     ],
+     [
+      87,
+      "matrix(1, 0, 0, 1, -68.0854, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "filter",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 20,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "blur(0px)",
+    "values": [
+     [
+      20,
+      "blur(0px)"
+     ]
+    ]
+   },
+   {
+    "el": "div[tid=sidebar-footer]#315",
+    "prop": "rect",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 87,
+    "durationMs": 67,
+    "steps": 4,
+    "to": "-56.1,762,264,40",
+    "values": [
+     [
+      20,
+      "12,762,264,40"
+     ],
+     [
+      54,
+      "7.1,762,264,40"
+     ],
+     [
+      70,
+      "-12.6,762,264,40"
+     ],
+     [
+      87,
+      "-56.1,762,264,40"
+     ]
+    ]
+   },
+   {
+    "el": "a[aria=Settings][tid=sidebar-settings]#316",
+    "prop": "rect",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 87,
+    "durationMs": 67,
+    "steps": 4,
+    "to": "-56.1,770,32,32",
+    "values": [
+     [
+      20,
+      "12,770,32,32"
+     ],
+     [
+      54,
+      "7.1,770,32,32"
+     ],
+     [
+      70,
+      "-12.6,770,32,32"
+     ],
+     [
+      87,
+      "-56.1,770,32,32"
+     ]
+    ]
+   },
+   {
+    "el": "svg#317",
+    "prop": "rect",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 87,
+    "durationMs": 67,
+    "steps": 4,
+    "to": "-49.1,777,18,18",
+    "values": [
+     [
+      20,
+      "19,777,18,18"
+     ],
+     [
+      54,
+      "14.1,777,18,18"
+     ],
+     [
+      70,
+      "-5.6,777,18,18"
+     ],
+     [
+      87,
+      "-49.1,777,18,18"
+     ]
+    ]
+   },
+   {
+    "el": "path#318",
+    "prop": "rect",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 87,
+    "durationMs": 67,
+    "steps": 4,
+    "to": "-46.8,778.5,13.4,15",
+    "values": [
+     [
+      20,
+      "21.3,778.5,13.4,15"
+     ],
+     [
+      54,
+      "16.4,778.5,13.4,15"
+     ],
+     [
+      70,
+      "-3.3,778.5,13.4,15"
+     ],
+     [
+      87,
+      "-46.8,778.5,13.4,15"
+     ]
+    ]
+   },
+   {
+    "el": "circle#319",
+    "prop": "rect",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 87,
+    "durationMs": 67,
+    "steps": 4,
+    "to": "-42.3,783.8,4.5,4.5",
+    "values": [
+     [
+      20,
+      "25.8,783.8,4.5,4.5"
+     ],
+     [
+      54,
+      "20.8,783.8,4.5,4.5"
+     ],
+     [
+      70,
+      "1.1,783.8,4.5,4.5"
+     ],
+     [
+      87,
+      "-42.3,783.8,4.5,4.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#264",
+    "prop": "transform",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 20,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "matrix(1, 0, 0, 1, 0, 0)",
+    "values": [
+     [
+      20,
+      "matrix(1, 0, 0, 1, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#264",
+    "prop": "filter",
+    "fromInputMs": 20,
+    "input": "click svg#317",
+    "firstMs": 20,
+    "lastMs": 20,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "blur(0px)",
+    "values": [
+     [
+      20,
+      "blur(0px)"
+     ]
+    ]
+   },
+   {
+    "el": "aside#268",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "click svg#317",
+    "firstMs": 54,
+    "lastMs": 87,
+    "durationMs": 33,
+    "steps": 3,
+    "to": "-68.1,0,288,812",
+    "values": [
+     [
+      54,
+      "-4.9,0,288,812"
+     ],
+     [
+      70,
+      "-24.6,0,288,812"
+     ],
+     [
+      87,
+      "-68.1,0,288,812"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "click svg#317",
+    "firstMs": 54,
+    "lastMs": 87,
+    "durationMs": 33,
+    "steps": 3,
+    "to": "-68.1,0,288,812",
+    "values": [
+     [
+      54,
+      "-4.9,0,288,812"
+     ],
+     [
+      70,
+      "-24.6,0,288,812"
+     ],
+     [
+      87,
+      "-68.1,0,288,812"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=dialog-content]#266",
+    "prop": "opacity",
+    "fromInputMs": 54,
+    "input": "click svg#317",
+    "firstMs": 54,
+    "lastMs": 87,
+    "durationMs": 33,
+    "steps": 3,
+    "to": "0.763592",
+    "values": [
+     [
+      54,
+      "0.982916"
+     ],
+     [
+      70,
+      "0.914572"
+     ],
+     [
+      87,
+      "0.763592"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#264",
+    "prop": "opacity",
+    "fromInputMs": 54,
+    "input": "click svg#317",
+    "firstMs": 54,
+    "lastMs": 87,
+    "durationMs": 33,
+    "steps": 3,
+    "to": "0.197746",
+    "values": [
+     [
+      54,
+      "0.781094"
+     ],
+     [
+      70,
+      "0.423217"
+     ],
+     [
+      87,
+      "0.197746"
+     ]
+    ]
+   },
+   {
+    "el": "aside[role=dialog][aria=Coordinator]#332",
+    "prop": "rect",
+    "fromInputMs": 104,
+    "input": "click svg#317",
+    "firstMs": 104,
+    "lastMs": 304,
+    "durationMs": 200,
+    "steps": 10,
+    "to": "211.4,552,143.6,240",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      67,
+      0.878
+     ],
+     [
+      83,
+      0.926
+     ],
+     [
+      100,
+      0.955
+     ],
+     [
+      117,
+      0.973
+     ],
+     [
+      133,
+      0.985
+     ],
+     [
+      150,
+      0.992
+     ],
+     [
+      167,
+      0.997
+     ],
+     [
+      183,
+      0.999
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "aside[role=dialog][aria=Coordinator]#332",
+    "prop": "transform",
+    "fromInputMs": 104,
+    "input": "click svg#317",
+    "firstMs": 104,
+    "lastMs": 304,
+    "durationMs": 200,
+    "steps": 10,
+    "to": "matrix3d(0.4, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 1)",
+    "curve": null
+   }
+  ],
+  "scroll": [
+   [
+    104,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 27,
+    "target": "button[aria=Expand sidebar][tid=button]#3",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 27,
+    "target": "div[role=presentation][tid=dialog-overlay]#264",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 27,
+    "target": "div[role=dialog][tid=dialog-content]#266",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 27,
+    "target": "div\"Sample data (scenario ch\"#145",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 27,
+    "target": "div#2",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 27,
+    "target": "div[role=presentation]#263",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 27,
+    "target": "div[role=presentation][tid=dialog-overlay]#264",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 168,
+    "target": "body#138",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 168,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 168,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 168,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 168,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 168,
+    "target": "div[tid=dialog-portal]#262",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 168,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 168,
+    "target": "div#1",
+    "add": [
+     "div#328"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 168,
+    "target": "div#1",
+    "add": [
+     "div[tid=settings-backdrop]#329"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 168,
+    "target": "div#1",
+    "add": [
+     "div[role=dialog][aria=Settings]#327"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 168,
+    "target": "img[tid=avatar-image]#330",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 168,
+    "target": "body#138",
+    "add": [
+     "div#331"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 168,
+    "target": "div#331",
+    "add": [
+     "aside[role=dialog][aria=Coordinator]#332"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 20,
+  "strip": "strips/open-settings-dialog.jpg (16 of 18 frames)",
+  "prevFrame": -113
+ },
+ {
+  "label": "close-settings-dialog",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=dialog][aria=Settings]#327"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 78,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 49,
+    "target": "body#138",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 49,
+    "target": "div#331",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "aside"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 49,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 49,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 49,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 49,
+    "target": "div#1",
+    "add": [
+     "div#532"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/close-settings-dialog.jpg (16 of 22 frames)",
+  "prevFrame": -105
+ }
+]

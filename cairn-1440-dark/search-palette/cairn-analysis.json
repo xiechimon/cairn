@@ -1,0 +1,2527 @@
+[
+ {
+  "label": "open-palette",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[tid=chief-composer-input]#189"
+  },
+  "firstChangeMs": 35,
+  "settleMs": 252,
+  "rafFrames": 74,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "rect",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 135,
+    "durationMs": 100,
+    "steps": 7,
+    "to": "400,146,640,250",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.445
+     ],
+     [
+      33,
+      0.687
+     ],
+     [
+      50,
+      0.836
+     ],
+     [
+      67,
+      0.938
+     ],
+     [
+      83,
+      0.984
+     ],
+     [
+      100,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "opacity",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 135,
+    "durationMs": 100,
+    "steps": 7,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.442
+     ],
+     [
+      33,
+      0.685
+     ],
+     [
+      50,
+      0.839
+     ],
+     [
+      67,
+      0.934
+     ],
+     [
+      83,
+      0.985
+     ],
+     [
+      100,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "transform",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 152,
+    "durationMs": 117,
+    "steps": 8,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "filter",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 152,
+    "durationMs": 117,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      35,
+      "blur(0px)"
+     ],
+     [
+      152,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "input[aria=Search][tid=input]#202",
+    "prop": "rect",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 135,
+    "durationMs": 100,
+    "steps": 7,
+    "to": "438,159.5,586,20",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.444
+     ],
+     [
+      33,
+      0.684
+     ],
+     [
+      50,
+      0.838
+     ],
+     [
+      67,
+      0.932
+     ],
+     [
+      83,
+      0.983
+     ],
+     [
+      100,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "input[aria=Search][tid=input]#202",
+    "prop": "outlineColor",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 185,
+    "durationMs": 150,
+    "steps": 10,
+    "to": "rgb(156, 199, 139)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.034
+     ],
+     [
+      33,
+      0.172
+     ],
+     [
+      50,
+      0.46
+     ],
+     [
+      67,
+      0.69
+     ],
+     [
+      83,
+      0.839
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      117,
+      0.966
+     ],
+     [
+      133,
+      0.989
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#206",
+    "prop": "opacity",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 235,
+    "durationMs": 200,
+    "steps": 13,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.071
+     ],
+     [
+      33,
+      0.22
+     ],
+     [
+      50,
+      0.408
+     ],
+     [
+      67,
+      0.575
+     ],
+     [
+      83,
+      0.705
+     ],
+     [
+      100,
+      0.802
+     ],
+     [
+      117,
+      0.873
+     ],
+     [
+      133,
+      0.925
+     ],
+     [
+      150,
+      0.96
+     ],
+     [
+      167,
+      0.983
+     ],
+     [
+      183,
+      0.996
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#206",
+    "prop": "transform",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 252,
+    "durationMs": 217,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      35,
+      "matrix(1, 0, 0, 1, 0, 0)"
+     ],
+     [
+      252,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#206",
+    "prop": "filter",
+    "fromInputMs": 34,
+    "input": "keydown textarea[tid=chief-composer-input]#189",
+    "firstMs": 35,
+    "lastMs": 252,
+    "durationMs": 217,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      35,
+      "blur(0px)"
+     ],
+     [
+      252,
+      "none"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    35,
+    [
+     125,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 44,
+    "target": "body#203",
+    "add": [
+     "div#204"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 44,
+    "target": "div#204",
+    "add": [
+     "div[role=presentation]#205"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 44,
+    "target": "div#204",
+    "add": [
+     "div[role=presentation][tid=dialog-overlay]#206"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 44,
+    "target": "div#204",
+    "add": [
+     "span#207"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 44,
+    "target": "div#204",
+    "add": [
+     "div[role=presentation][tid=dialog-content]#208"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 44,
+    "target": "div#204",
+    "add": [
+     "span#209"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 44,
+    "target": "div\"Sample data (scenario ch\"#2",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 44,
+    "target": "div#3",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 44,
+    "target": "div[role=presentation]#205",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 44,
+    "target": "div[role=presentation][tid=dialog-overlay]#206",
+    "attr": "aria-hidden",
+    "v": "true"
+   }
+  ],
+  "mutationCount": 10,
+  "strip": "strips/open-palette.jpg (16 of 31 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "type-query",
+  "anchor": {
+   "type": "keydown",
+   "target": "input[aria=Search][tid=input]#202"
+  },
+  "firstChangeMs": 10,
+  "settleMs": 144,
+  "rafFrames": 137,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 10,
+    "lastMs": 144,
+    "durationMs": 133,
+    "steps": 2,
+    "to": "400,146,640,246",
+    "values": [
+     [
+      10,
+      "400,146,640,366"
+     ],
+     [
+      144,
+      "400,146,640,246"
+     ]
+    ]
+   },
+   {
+    "el": "div\"Not what you wanted?\"#259",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 10,
+    "lastMs": 144,
+    "durationMs": 133,
+    "steps": 2,
+    "to": "406,290,628,28",
+    "values": [
+     [
+      10,
+      "406,410,628,28"
+     ],
+     [
+      144,
+      "406,290,628,28"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View all 2 in Activity\"#260",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 10,
+    "lastMs": 144,
+    "durationMs": 133,
+    "steps": 2,
+    "to": "406,318,628,32",
+    "values": [
+     [
+      10,
+      "406,438,628,32"
+     ],
+     [
+      144,
+      "406,318,628,32"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "div\"Tasks\"#252"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "button[tid=button]#253"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "button[tid=button]#254"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "div\"Project\"#255"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "button[tid=button]#256"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "div\"Agents\"#257"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "button[tid=button]#258"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "div\"Not what you wanted?\"#259"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 35,
+    "target": "div#215",
+    "add": [
+     "button[tid=button]\"View all 2 in Activity\"#260"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 42,
+    "target": "img[tid=avatar-image]#261",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 151,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 151,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 151,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 151,
+    "target": "div#215",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "button"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 19,
+  "strip": "strips/type-query.jpg (16 of 30 frames)",
+  "prevFrame": -123
+ },
+ {
+  "label": "hover-results",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[role=presentation][tid=dialog-overlay]#206"
+  },
+  "firstChangeMs": 105,
+  "settleMs": 1838,
+  "rafFrames": 141,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=button]#253",
+    "prop": "backgroundColor",
+    "fromInputMs": 32,
+    "input": "pointerover span\"在 README.md 末尾追加一行「r3 li\"#265",
+    "firstMs": 105,
+    "lastMs": 655,
+    "durationMs": 550,
+    "steps": 17,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      33,
+      0
+     ],
+     [
+      50,
+      0
+     ],
+     [
+      67,
+      0
+     ],
+     [
+      83,
+      0
+     ],
+     [
+      100,
+      0
+     ],
+     [
+      133,
+      0
+     ],
+     [
+      400,
+      0
+     ],
+     [
+      417,
+      0
+     ],
+     [
+      433,
+      0
+     ],
+     [
+      450,
+      0
+     ],
+     [
+      467,
+      0
+     ],
+     [
+      483,
+      0
+     ],
+     [
+      500,
+      0
+     ],
+     [
+      517,
+      0
+     ],
+     [
+      550,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]#254",
+    "prop": "backgroundColor",
+    "fromInputMs": 15,
+    "input": "pointerover span\"在 README.md 末尾追加一行「r3 li\"#274",
+    "firstMs": 505,
+    "lastMs": 1838,
+    "durationMs": 1333,
+    "steps": 19,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      33,
+      0
+     ],
+     [
+      50,
+      0
+     ],
+     [
+      67,
+      0
+     ],
+     [
+      83,
+      0
+     ],
+     [
+      100,
+      0
+     ],
+     [
+      133,
+      0
+     ],
+     [
+      433,
+      0
+     ],
+     [
+      450,
+      0
+     ],
+     [
+      467,
+      0
+     ],
+     [
+      483,
+      0
+     ],
+     [
+      500,
+      0
+     ],
+     [
+      517,
+      0
+     ],
+     [
+      533,
+      0
+     ],
+     [
+      550,
+      0
+     ],
+     [
+      583,
+      1
+     ],
+     [
+      1317,
+      0
+     ],
+     [
+      1333,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View all 2 in Activity\"#260",
+    "prop": "backgroundColor",
+    "fromInputMs": 49,
+    "input": "pointerover button[tid=button]\"View all 2 in Activity\"#260",
+    "firstMs": 1005,
+    "lastMs": 1555,
+    "durationMs": 550,
+    "steps": 17,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      33,
+      0
+     ],
+     [
+      50,
+      0
+     ],
+     [
+      67,
+      0
+     ],
+     [
+      83,
+      0
+     ],
+     [
+      100,
+      0
+     ],
+     [
+      133,
+      0
+     ],
+     [
+      400,
+      0
+     ],
+     [
+      417,
+      0
+     ],
+     [
+      433,
+      0
+     ],
+     [
+      450,
+      0
+     ],
+     [
+      467,
+      0
+     ],
+     [
+      483,
+      0
+     ],
+     [
+      500,
+      0
+     ],
+     [
+      517,
+      0
+     ],
+     [
+      550,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"Syntax\"#246",
+    "prop": "backgroundColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1572,
+    "durationMs": 150,
+    "steps": 10,
+    "to": "oklab(0.301546 -0.0105699 0.00605369 / 0.5)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.033
+     ],
+     [
+      33,
+      0.174
+     ],
+     [
+      50,
+      0.457
+     ],
+     [
+      67,
+      0.695
+     ],
+     [
+      83,
+      0.837
+     ],
+     [
+      100,
+      0.921
+     ],
+     [
+      117,
+      0.969
+     ],
+     [
+      133,
+      0.993
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"Syntax\"#246",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"Syntax\"#246",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#247",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#247",
+    "prop": "borderTopColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "svg#247",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "circle#248",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "circle#248",
+    "prop": "borderTopColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "circle#248",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#249",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#249",
+    "prop": "borderTopColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#249",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#295",
+    "prop": "color",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#295",
+    "prop": "borderTopColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "path#295",
+    "prop": "outlineColor",
+    "fromInputMs": 16,
+    "input": "pointerover button[tid=button]\"Syntax\"#246",
+    "firstMs": 1422,
+    "lastMs": 1555,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(230, 232, 226)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.03
+     ],
+     [
+      33,
+      0.179
+     ],
+     [
+      50,
+      0.463
+     ],
+     [
+      67,
+      0.701
+     ],
+     [
+      83,
+      0.836
+     ],
+     [
+      100,
+      0.925
+     ],
+     [
+      117,
+      0.97
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-results.jpg (16 of 122 frames)",
+  "prevFrame": -112
+ },
+ {
+  "label": "arrow-results",
+  "anchor": {
+   "type": "keydown",
+   "target": "input[aria=Search][tid=input]#202"
+  },
+  "firstChangeMs": 32,
+  "settleMs": 682,
+  "rafFrames": 88,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "button[tid=button]#253",
+    "prop": "backgroundColor",
+    "fromInputMs": 32,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 32,
+    "lastMs": 415,
+    "durationMs": 383,
+    "steps": 17,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      33,
+      0
+     ],
+     [
+      50,
+      0
+     ],
+     [
+      67,
+      0
+     ],
+     [
+      83,
+      0
+     ],
+     [
+      100,
+      0
+     ],
+     [
+      133,
+      0
+     ],
+     [
+      250,
+      0
+     ],
+     [
+      267,
+      0
+     ],
+     [
+      283,
+      0
+     ],
+     [
+      300,
+      0
+     ],
+     [
+      317,
+      0
+     ],
+     [
+      333,
+      0
+     ],
+     [
+      350,
+      0
+     ],
+     [
+      367,
+      0
+     ],
+     [
+      383,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]#254",
+    "prop": "backgroundColor",
+    "fromInputMs": 25,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 282,
+    "lastMs": 682,
+    "durationMs": 400,
+    "steps": 17,
+    "to": "rgba(0, 0, 0, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      33,
+      0
+     ],
+     [
+      50,
+      0
+     ],
+     [
+      67,
+      0
+     ],
+     [
+      83,
+      0
+     ],
+     [
+      100,
+      0
+     ],
+     [
+      133,
+      0
+     ],
+     [
+      267,
+      0
+     ],
+     [
+      283,
+      0
+     ],
+     [
+      300,
+      0
+     ],
+     [
+      317,
+      0
+     ],
+     [
+      333,
+      0
+     ],
+     [
+      350,
+      0
+     ],
+     [
+      367,
+      0
+     ],
+     [
+      383,
+      0
+     ],
+     [
+      400,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View all 2 in Activity\"#260",
+    "prop": "backgroundColor",
+    "fromInputMs": 29,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 549,
+    "lastMs": 682,
+    "durationMs": 133,
+    "steps": 8,
+    "to": "rgba(230, 232, 226, 0.1)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.125
+     ],
+     [
+      33,
+      0.448
+     ],
+     [
+      50,
+      0.688
+     ],
+     [
+      67,
+      0.813
+     ],
+     [
+      83,
+      0.896
+     ],
+     [
+      100,
+      0.979
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/arrow-results.jpg (16 of 54 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "close-palette",
+  "anchor": {
+   "type": "keydown",
+   "target": "input[aria=Search][tid=input]#202"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 354,
+  "rafFrames": 81,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "scale",
+    "fromInputMs": 4,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 4,
+    "lastMs": 137,
+    "durationMs": 133,
+    "steps": 7,
+    "to": "0.98",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      50,
+      0.441
+     ],
+     [
+      67,
+      0.685
+     ],
+     [
+      83,
+      0.84
+     ],
+     [
+      100,
+      0.934
+     ],
+     [
+      117,
+      0.985
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#206",
+    "prop": "transform",
+    "fromInputMs": 4,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "matrix(1, 0, 0, 1, 0, 0)",
+    "values": [
+     [
+      4,
+      "matrix(1, 0, 0, 1, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#206",
+    "prop": "filter",
+    "fromInputMs": 4,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "blur(0px)",
+    "values": [
+     [
+      4,
+      "blur(0px)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "406.4,146,627.2,241.1",
+    "values": [
+     [
+      54,
+      "402.8,146,634.4,243.8"
+     ],
+     [
+      70,
+      "404.4,146,631.2,242.6"
+     ],
+     [
+      87,
+      "405.4,146,629.3,241.9"
+     ],
+     [
+      104,
+      "406,146,628,241.4"
+     ],
+     [
+      120,
+      "406.3,146,627.4,241.2"
+     ],
+     [
+      137,
+      "406.4,146,627.2,241.1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][aria=Search]#210",
+    "prop": "opacity",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "0",
+    "values": [
+     [
+      54,
+      "0.558679"
+     ],
+     [
+      70,
+      "0.314669"
+     ],
+     [
+      87,
+      "0.160362"
+     ],
+     [
+      104,
+      "0.065986"
+     ],
+     [
+      120,
+      "0.0153412"
+     ],
+     [
+      137,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation][tid=dialog-overlay]#206",
+    "prop": "opacity",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 187,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "0.0396208",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.169
+     ],
+     [
+      33,
+      0.38
+     ],
+     [
+      50,
+      0.568
+     ],
+     [
+      67,
+      0.714
+     ],
+     [
+      83,
+      0.823
+     ],
+     [
+      100,
+      0.902
+     ],
+     [
+      117,
+      0.96
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "input[aria=Search][tid=input]#202",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "443.6,159.2,574.3,19.6",
+    "values": [
+     [
+      54,
+      "440.5,159.4,580.8,19.8"
+     ],
+     [
+      70,
+      "441.9,159.3,578,19.7"
+     ],
+     [
+      87,
+      "442.7,159.3,576.2,19.7"
+     ],
+     [
+      104,
+      "443.3,159.2,575.1,19.6"
+     ],
+     [
+      120,
+      "443.6,159.2,574.5,19.6"
+     ],
+     [
+      137,
+      "443.6,159.2,574.3,19.6"
+     ]
+    ]
+   },
+   {
+    "el": "div\"Tasks\"#252",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "412.3,197,615.4,27.4",
+    "values": [
+     [
+      54,
+      "408.8,197.5,622.5,27.8"
+     ],
+     [
+      70,
+      "410.3,197.3,619.4,27.6"
+     ],
+     [
+      87,
+      "411.3,197.1,617.5,27.5"
+     ],
+     [
+      104,
+      "411.9,197,616.3,27.5"
+     ],
+     [
+      120,
+      "412.2,197,615.6,27.4"
+     ],
+     [
+      137,
+      "412.3,197,615.4,27.4"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]#253",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "412.3,224.4,615.4,31.4",
+    "values": [
+     [
+      54,
+      "408.8,225.3,622.5,31.7"
+     ],
+     [
+      70,
+      "410.3,224.9,619.4,31.6"
+     ],
+     [
+      87,
+      "411.3,224.7,617.5,31.5"
+     ],
+     [
+      104,
+      "411.9,224.5,616.3,31.4"
+     ],
+     [
+      120,
+      "412.2,224.4,615.6,31.4"
+     ],
+     [
+      137,
+      "412.3,224.4,615.4,31.4"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]#254",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "412.3,255.8,615.4,31.4",
+    "values": [
+     [
+      54,
+      "408.8,257,622.5,31.7"
+     ],
+     [
+      70,
+      "410.3,256.5,619.4,31.6"
+     ],
+     [
+      87,
+      "411.3,256.1,617.5,31.5"
+     ],
+     [
+      104,
+      "411.9,255.9,616.3,31.4"
+     ],
+     [
+      120,
+      "412.2,255.8,615.6,31.4"
+     ],
+     [
+      137,
+      "412.3,255.8,615.4,31.4"
+     ]
+    ]
+   },
+   {
+    "el": "div\"Not what you wanted?\"#259",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "412.3,287.1,615.4,27.4",
+    "values": [
+     [
+      54,
+      "408.8,288.7,622.5,27.8"
+     ],
+     [
+      70,
+      "410.3,288,619.4,27.6"
+     ],
+     [
+      87,
+      "411.3,287.6,617.5,27.5"
+     ],
+     [
+      104,
+      "411.9,287.3,616.3,27.5"
+     ],
+     [
+      120,
+      "412.2,287.2,615.6,27.4"
+     ],
+     [
+      137,
+      "412.3,287.1,615.4,27.4"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View all 2 in Activity\"#260",
+    "prop": "rect",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 137,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "412.3,314.6,615.4,31.4",
+    "values": [
+     [
+      54,
+      "408.8,316.5,622.5,31.7"
+     ],
+     [
+      70,
+      "410.3,315.6,619.4,31.6"
+     ],
+     [
+      87,
+      "411.3,315.1,617.5,31.5"
+     ],
+     [
+      104,
+      "411.9,314.8,616.3,31.4"
+     ],
+     [
+      120,
+      "412.2,314.6,615.6,31.4"
+     ],
+     [
+      137,
+      "412.3,314.6,615.4,31.4"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=button]\"View all 2 in Activity\"#260",
+    "prop": "backgroundColor",
+    "fromInputMs": 54,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 54,
+    "lastMs": 170,
+    "durationMs": 117,
+    "steps": 8,
+    "to": "rgba(230, 232, 226, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.163
+     ],
+     [
+      33,
+      0.439
+     ],
+     [
+      50,
+      0.694
+     ],
+     [
+      67,
+      0.837
+     ],
+     [
+      83,
+      0.918
+     ],
+     [
+      100,
+      0.959
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "textarea[tid=chief-composer-input]#189",
+    "prop": "outlineColor",
+    "fromInputMs": 204,
+    "input": "keydown input[aria=Search][tid=input]#202",
+    "firstMs": 204,
+    "lastMs": 354,
+    "durationMs": 150,
+    "steps": 10,
+    "to": "rgb(156, 199, 139)",
+    "curve": null
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 32,
+    "target": "div[role=presentation][tid=dialog-overlay]#206",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 32,
+    "target": "div[role=presentation][tid=dialog-content]#208",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 32,
+    "target": "div\"Sample data (scenario ch\"#2",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 32,
+    "target": "div#3",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 32,
+    "target": "div[role=presentation]#205",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 32,
+    "target": "div[role=presentation][tid=dialog-overlay]#206",
+    "attr": "aria-hidden",
+    "v": "null"
+   },
+   {
+    "t": 211,
+    "target": "body#203",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 211,
+    "target": "div#204",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 211,
+    "target": "div#204",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 211,
+    "target": "div#204",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 211,
+    "target": "div#204",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 211,
+    "target": "div#204",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   }
+  ],
+  "mutationCount": 12,
+  "strip": "strips/close-palette.jpg (16 of 35 frames)",
+  "prevFrame": -113
+ }
+]

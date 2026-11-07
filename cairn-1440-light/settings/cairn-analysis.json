@@ -1,0 +1,840 @@
+[
+ {
+  "label": "settle-dialog",
+  "anchor": {
+   "type": "mark"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 103,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [
+   [
+    -7,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": null
+ },
+ {
+  "label": "hover-nav",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[tid=empty]#153"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 33,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-nav.jpg (3 of 3 frames)",
+  "prevFrame": -116
+ },
+ {
+  "label": "nav-page-1",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"Account\"#19"
+  },
+  "firstChangeMs": 15,
+  "settleMs": 15,
+  "rafFrames": 103,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=dialog][aria=Settings]#4",
+    "prop": "outlineColor",
+    "fromInputMs": 14,
+    "input": "focusin a#15",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(29, 35, 31)",
+    "values": [
+     [
+      15,
+      "rgb(29, 35, 31)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][aria=Settings]#4",
+    "prop": "outlineWidth",
+    "fromInputMs": 14,
+    "input": "focusin a#15",
+    "firstMs": 15,
+    "lastMs": 15,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "3px",
+    "values": [
+     [
+      15,
+      "3px"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -101
+ },
+ {
+  "label": "open-select",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span[tid=select-value]\"English\"#122"
+  },
+  "firstChangeMs": 32,
+  "settleMs": 132,
+  "rafFrames": 67,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=listbox]#246",
+    "prop": "rect",
+    "fromInputMs": 30,
+    "input": "focusin button[role=combobox][aria=Language][tid=select-tr",
+    "firstMs": 32,
+    "lastMs": 132,
+    "durationMs": 100,
+    "steps": 7,
+    "to": "1068,230,136,64",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.226
+     ],
+     [
+      33,
+      0.571
+     ],
+     [
+      50,
+      0.798
+     ],
+     [
+      67,
+      0.929
+     ],
+     [
+      83,
+      0.988
+     ],
+     [
+      100,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=option][tid=select-item]#247",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "focusin div[role=option][tid=select-item]#247",
+    "firstMs": 49,
+    "lastMs": 132,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "1068,262,136,32",
+    "values": [
+     [
+      49,
+      "1073.5,254.2,130.7,30.8"
+     ],
+     [
+      65,
+      "1071,257.8,133.1,31.3"
+     ],
+     [
+      82,
+      "1069.4,260,134.6,31.7"
+     ],
+     [
+      99,
+      "1068.5,261.2,135.5,31.9"
+     ],
+     [
+      115,
+      "1068.1,261.8,135.9,32"
+     ],
+     [
+      132,
+      "1068,262,136,32"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 38,
+    "target": "button[role=combobox][aria=Language][tid=select-trigger]#121",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 38,
+    "target": "body#232",
+    "add": [
+     "div#240"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 38,
+    "target": "div#240",
+    "add": [
+     "div[role=presentation]#241"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 38,
+    "target": "div#240",
+    "add": [
+     "div[role=presentation]#242"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 38,
+    "target": "span#120",
+    "add": [
+     "span#243"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 38,
+    "target": "span#120",
+    "add": [
+     "span#244"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 38,
+    "target": "span#120",
+    "add": [
+     "span#245"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 7,
+  "strip": "strips/open-select.jpg (8 of 8 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "close-select",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=option][tid=select-item]#247"
+  },
+  "firstChangeMs": 31,
+  "settleMs": 164,
+  "rafFrames": 54,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "div[role=listbox]#246",
+    "prop": "rect",
+    "fromInputMs": 9,
+    "input": "focusin button[role=combobox][aria=Language][tid=select-tr",
+    "firstMs": 31,
+    "lastMs": 31,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,0,0,0",
+    "values": [
+     [
+      31,
+      "0,0,0,0"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox][aria=Language][tid=select-trigger]#121",
+    "prop": "boxShadow",
+    "fromInputMs": 9,
+    "input": "focusin button[role=combobox][aria=Language][tid=select-tr",
+    "firstMs": 31,
+    "lastMs": 31,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "color(srgb 0.247059 0.423529 0.207843 / 0.22) 0px 0px 0px 3px",
+    "values": [
+     [
+      31,
+      "color(srgb 0.247059 0.423529 0.207843 / 0.22) 0px 0px 0px 3px"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox][aria=Language][tid=select-trigger]#121",
+    "prop": "borderTopColor",
+    "fromInputMs": 9,
+    "input": "focusin button[role=combobox][aria=Language][tid=select-tr",
+    "firstMs": 31,
+    "lastMs": 164,
+    "durationMs": 133,
+    "steps": 9,
+    "to": "rgb(63, 108, 53)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0.149
+     ],
+     [
+      33,
+      0.44
+     ],
+     [
+      50,
+      0.688
+     ],
+     [
+      67,
+      0.83
+     ],
+     [
+      83,
+      0.915
+     ],
+     [
+      100,
+      0.965
+     ],
+     [
+      117,
+      0.993
+     ],
+     [
+      133,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#242",
+    "prop": "rect",
+    "fromInputMs": 9,
+    "input": "focusin button[role=combobox][aria=Language][tid=select-tr",
+    "firstMs": 31,
+    "lastMs": 31,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,0,0,0",
+    "values": [
+     [
+      31,
+      "0,0,0,0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#242",
+    "prop": "opacity",
+    "fromInputMs": 9,
+    "input": "focusin button[role=combobox][aria=Language][tid=select-tr",
+    "firstMs": 31,
+    "lastMs": 31,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0",
+    "values": [
+     [
+      31,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#242",
+    "prop": "transform",
+    "fromInputMs": 9,
+    "input": "focusin button[role=combobox][aria=Language][tid=select-tr",
+    "firstMs": 31,
+    "lastMs": 31,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "none",
+    "values": [
+     [
+      31,
+      "none"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 7,
+    "target": "button[role=combobox][aria=Language][tid=select-trigger]#121",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation][aria=Language][tid=select-content]#249",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#242",
+    "attr": "data-open",
+    "v": "null"
+   },
+   {
+    "t": 7,
+    "target": "span#120",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 7,
+    "target": "span#120",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 7,
+    "target": "span#120",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 21,
+    "target": "div#240",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 21,
+    "target": "div[role=presentation]#242",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 21,
+    "target": "div[role=presentation]#242",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "span"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 21,
+    "target": "div[role=presentation]#242",
+    "attr": "hidden",
+    "v": ""
+   }
+  ],
+  "mutationCount": 10,
+  "strip": "strips/close-select.jpg (10 of 10 frames)",
+  "prevFrame": -103
+ },
+ {
+  "label": "nav-page-2",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"Machines\"#57"
+  },
+  "firstChangeMs": 166,
+  "settleMs": 316,
+  "rafFrames": 102,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "span\"Machines\"#57",
+    "prop": "rect",
+    "fromInputMs": 44,
+    "input": "click span\"Machines\"#57",
+    "firstMs": 166,
+    "lastMs": 166,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "156,331,150,20",
+    "values": [
+     [
+      166,
+      "156,331,150,20"
+     ]
+    ]
+   },
+   {
+    "el": "a#53",
+    "prop": "backgroundColor",
+    "fromInputMs": 111,
+    "input": "click span\"Machines\"#57",
+    "firstMs": 232,
+    "lastMs": 316,
+    "durationMs": 83,
+    "steps": 6,
+    "to": "rgb(210, 214, 204)",
+    "values": [
+     [
+      232,
+      "rgb(218, 221, 213)"
+     ],
+     [
+      249,
+      "rgb(215, 218, 210)"
+     ],
+     [
+      265,
+      "rgb(213, 216, 207)"
+     ],
+     [
+      282,
+      "rgb(212, 215, 206)"
+     ],
+     [
+      299,
+      "rgb(211, 215, 205)"
+     ],
+     [
+      316,
+      "rgb(210, 214, 204)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 204,
+    "target": "h1\"Machines\"#93",
+    "chars": 8
+   },
+   {
+    "t": 204,
+    "target": "body#232",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 204,
+    "target": "div#240",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 204,
+    "target": "div[tid=settings-body]#98",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 204,
+    "target": "div[tid=settings-body]#98",
+    "add": [
+     "div#257"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 5,
+  "strip": "strips/nav-page-2.jpg (16 of 21 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "nav-appearance",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"Appearance\"#27"
+  },
+  "firstChangeMs": -85,
+  "settleMs": 281,
+  "rafFrames": 103,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "a#20",
+    "prop": "backgroundColor",
+    "fromInputMs": 183,
+    "input": "pointerover span\"Appearance\"#27",
+    "firstMs": -85,
+    "lastMs": 281,
+    "durationMs": 367,
+    "steps": 7,
+    "to": "rgb(210, 214, 204)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      283,
+      0.182
+     ],
+     [
+      300,
+      0.455
+     ],
+     [
+      317,
+      0.727
+     ],
+     [
+      333,
+      0.818
+     ],
+     [
+      350,
+      0.909
+     ],
+     [
+      367,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 167,
+    "target": "h1\"Appearance\"#93",
+    "chars": 10
+   },
+   {
+    "t": 167,
+    "target": "div[tid=settings-body]#98",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 167,
+    "target": "div[tid=settings-body]#98",
+    "add": [
+     "div#291"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 3,
+  "strip": "strips/nav-appearance.jpg (13 of 13 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "scroll-settings",
+  "anchor": {
+   "type": "wheel",
+   "target": "div#292"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 69,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": null,
+  "prevFrame": -101
+ },
+ {
+  "label": "close-dialog",
+  "anchor": {
+   "type": "keydown",
+   "target": "a#20"
+  },
+  "firstChangeMs": 7,
+  "settleMs": 7,
+  "rafFrames": 78,
+  "rafIntervalMedianMs": 16.7,
+  "changes": [
+   {
+    "el": "a#20",
+    "prop": "boxShadow",
+    "fromInputMs": 7,
+    "input": "keydown a#20",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      7,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 70,
+    "target": "body#232",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 70,
+    "target": "div#305",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "aside"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 70,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 70,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 70,
+    "target": "div#1",
+    "add": [],
+    "addN": 0,
+    "rm": [
+     "div"
+    ],
+    "rmN": 1
+   },
+   {
+    "t": 70,
+    "target": "div#1",
+    "add": [
+     "div#306"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 96,
+    "target": "div#321",
+    "add": [
+     "a[tid=composer-setup-chip]\"Connect a model source\"#322"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   },
+   {
+    "t": 96,
+    "target": "div#321",
+    "add": [
+     "span[tid=composer-setup-hint]\"Add a provider, or sign \"#323"
+    ],
+    "addN": 1,
+    "rm": [],
+    "rmN": 0
+   }
+  ],
+  "mutationCount": 8,
+  "strip": "strips/close-dialog.jpg (3 of 3 frames)",
+  "prevFrame": -109
+ }
+]

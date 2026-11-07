@@ -1,0 +1,2381 @@
+[
+ {
+  "label": "settle-dialog",
+  "anchor": {
+   "type": "mark"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 279,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [
+   [
+    -2,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 606,
+    "target": "body#724",
+    "add": [
+     "div#725"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 606,
+    "target": "body#724",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/settle-dialog.jpg (1 of 1 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "hover-nav",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[role=presentation]#535"
+  },
+  "firstChangeMs": 27,
+  "settleMs": 1160,
+  "rafFrames": 647,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#547",
+    "prop": "backgroundColor",
+    "fromInputMs": 5,
+    "input": "pointerover div#544",
+    "firstMs": 27,
+    "lastMs": 1160,
+    "durationMs": 1133,
+    "steps": 3,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      27,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      33,
+      "rgba(0, 0, 0, 0.05)"
+     ],
+     [
+      1160,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button#551",
+    "prop": "backgroundColor",
+    "fromInputMs": 5,
+    "input": "pointerover div#544",
+    "firstMs": 27,
+    "lastMs": 1160,
+    "durationMs": 1133,
+    "steps": 3,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      27,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      399,
+      "rgba(0, 0, 0, 0.05)"
+     ],
+     [
+      1160,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button#555",
+    "prop": "backgroundColor",
+    "fromInputMs": 5,
+    "input": "pointerover div#544",
+    "firstMs": 27,
+    "lastMs": 1160,
+    "durationMs": 1133,
+    "steps": 3,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      27,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      782,
+      "rgba(0, 0, 0, 0.05)"
+     ],
+     [
+      1160,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-nav.jpg (7 of 7 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "nav-page-1",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#575"
+  },
+  "firstChangeMs": 126,
+  "settleMs": 126,
+  "rafFrames": 311,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#573",
+    "prop": "backgroundColor",
+    "fromInputMs": 1,
+    "input": "click span\"~\"#575",
+    "firstMs": 126,
+    "lastMs": 126,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.1)",
+    "values": [
+     [
+      126,
+      "rgba(0, 0, 0, 0.1)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 161,
+    "target": "h2\"~\"#606",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 13
+   },
+   {
+    "t": 161,
+    "target": "div#607",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 161,
+    "target": "div#607",
+    "add": [
+     "div#730"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 3,
+  "strip": "strips/nav-page-1.jpg (5 of 5 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "nav-page-2",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#571"
+  },
+  "firstChangeMs": 126,
+  "settleMs": 154,
+  "rafFrames": 308,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#569",
+    "prop": "backgroundColor",
+    "fromInputMs": 3,
+    "input": "click span\"~\"#571",
+    "firstMs": 126,
+    "lastMs": 126,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.1)",
+    "values": [
+     [
+      126,
+      "rgba(0, 0, 0, 0.1)"
+     ]
+    ]
+   },
+   {
+    "el": "div#730",
+    "prop": "opacity",
+    "fromInputMs": 14,
+    "input": "click span\"~\"#571",
+    "firstMs": 137,
+    "lastMs": 154,
+    "durationMs": 17,
+    "steps": 3,
+    "to": "0.974204",
+    "values": [
+     [
+      137,
+      "0.998753"
+     ],
+     [
+      143,
+      "0.994682"
+     ],
+     [
+      154,
+      "0.974204"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 168,
+    "target": "h2\"~\"#606",
+    "chars": 12
+   },
+   {
+    "t": 168,
+    "target": "div#607",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 168,
+    "target": "div#607",
+    "add": [
+     "div#822"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 3,
+  "strip": "strips/nav-page-2.jpg (6 of 6 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "nav-appearance",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#563"
+  },
+  "firstChangeMs": 126,
+  "settleMs": 137,
+  "rafFrames": 308,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button#561",
+    "prop": "backgroundColor",
+    "fromInputMs": 4,
+    "input": "click span\"~\"#563",
+    "firstMs": 126,
+    "lastMs": 126,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.1)",
+    "values": [
+     [
+      126,
+      "rgba(0, 0, 0, 0.1)"
+     ]
+    ]
+   },
+   {
+    "el": "div#822",
+    "prop": "opacity",
+    "fromInputMs": 15,
+    "input": "click span\"~\"#563",
+    "firstMs": 137,
+    "lastMs": 137,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0.998752",
+    "values": [
+     [
+      137,
+      "0.998752"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 159,
+    "target": "h2\"~\"#606",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 10
+   },
+   {
+    "t": 159,
+    "target": "div#607",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 159,
+    "target": "div#607",
+    "add": [
+     "div#933"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 3,
+  "strip": "strips/nav-appearance.jpg (5 of 5 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "open-select",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#955"
+  },
+  "firstChangeMs": 5,
+  "settleMs": 71,
+  "rafFrames": 201,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "button[role=combobox]#954",
+    "prop": "outlineColor",
+    "fromInputMs": 3,
+    "input": "focusin button[role=combobox]#954",
+    "firstMs": 5,
+    "lastMs": 21,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "rgba(35, 112, 205, 0)",
+    "values": [
+     [
+      5,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      21,
+      "rgba(35, 112, 205, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox]#954",
+    "prop": "outlineWidth",
+    "fromInputMs": 3,
+    "input": "focusin button[role=combobox]#954",
+    "firstMs": 5,
+    "lastMs": 21,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "1.6px",
+    "values": [
+     [
+      5,
+      "2.4px"
+     ],
+     [
+      21,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=listbox]#965",
+    "prop": "outlineColor",
+    "fromInputMs": 8,
+    "input": "focusin button[role=combobox]#954",
+    "firstMs": 10,
+    "lastMs": 21,
+    "durationMs": 11,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      10,
+      "rgb(35, 112, 205)"
+     ],
+     [
+      21,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "div#953",
+    "prop": "backgroundColor",
+    "fromInputMs": 9,
+    "input": "focusin div[role=listbox]#965",
+    "firstMs": 32,
+    "lastMs": 71,
+    "durationMs": 39,
+    "steps": 7,
+    "to": "rgba(0, 0, 0, 0.1)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.267
+     ],
+     [
+      11,
+      0.556
+     ],
+     [
+      17,
+      0.689
+     ],
+     [
+      22,
+      0.867
+     ],
+     [
+      28,
+      0.956
+     ],
+     [
+      39,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 18,
+    "target": "button[role=combobox]#954",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 18,
+    "target": "div#727",
+    "add": [
+     "div#959"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 18,
+    "target": "div#959",
+    "add": [
+     "div#960"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 18,
+    "target": "div#952",
+    "add": [
+     "span#961"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 18,
+    "target": "div#952",
+    "add": [
+     "span#962"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 18,
+    "target": "div#952",
+    "add": [
+     "span#963"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/open-select.jpg (8 of 8 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "close-select",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=listbox]#965"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 77,
+  "rafFrames": 162,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=listbox]#965",
+    "prop": "outlineColor",
+    "fromInputMs": 4,
+    "input": "keydown div[role=listbox]#965",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      4,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=listbox]#965",
+    "prop": "outlineWidth",
+    "fromInputMs": 4,
+    "input": "keydown div[role=listbox]#965",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1.6px",
+    "values": [
+     [
+      4,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "div#953",
+    "prop": "boxShadow",
+    "fromInputMs": 10,
+    "input": "keydown div[role=listbox]#965",
+    "firstMs": 10,
+    "lastMs": 77,
+    "durationMs": 67,
+    "steps": 12,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "curve": null
+   },
+   {
+    "el": "button[role=combobox]#954",
+    "prop": "outlineColor",
+    "fromInputMs": 10,
+    "input": "keydown div[role=listbox]#965",
+    "firstMs": 10,
+    "lastMs": 10,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      10,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "div#953",
+    "prop": "backgroundColor",
+    "fromInputMs": 8,
+    "input": "focusin button[role=combobox]#954",
+    "firstMs": 21,
+    "lastMs": 60,
+    "durationMs": 39,
+    "steps": 7,
+    "to": "rgba(0, 0, 0, 0.05)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.25
+     ],
+     [
+      11,
+      0.479
+     ],
+     [
+      17,
+      0.646
+     ],
+     [
+      23,
+      0.792
+     ],
+     [
+      28,
+      0.896
+     ],
+     [
+      39,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 5,
+    "target": "button[role=combobox]#954",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 5,
+    "target": "div[role=dialog]#964",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 5,
+    "target": "div[role=presentation]#1057",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 5,
+    "target": "div#952",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 5,
+    "target": "div#952",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 5,
+    "target": "div#952",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 12,
+    "target": "div#727",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 12,
+    "target": "div#959",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 8,
+  "strip": "strips/close-select.jpg (9 of 9 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "scroll-settings",
+  "anchor": {
+   "type": "wheel",
+   "target": "div[role=group]#1004"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 202,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/scroll-settings.jpg (8 of 8 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "close-dialog",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[role=combobox]#954"
+  },
+  "firstChangeMs": 1,
+  "settleMs": 196,
+  "rafFrames": 219,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog]#536",
+    "prop": "scale",
+    "fromInputMs": 1,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 1,
+    "lastMs": 196,
+    "durationMs": 195,
+    "steps": 19,
+    "to": "0.980011",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.13
+     ],
+     [
+      17,
+      0.242
+     ],
+     [
+      28,
+      0.42
+     ],
+     [
+      45,
+      0.61
+     ],
+     [
+      56,
+      0.7
+     ],
+     [
+      67,
+      0.77
+     ],
+     [
+      78,
+      0.824
+     ],
+     [
+      89,
+      0.868
+     ],
+     [
+      100,
+      0.901
+     ],
+     [
+      111,
+      0.928
+     ],
+     [
+      122,
+      0.949
+     ],
+     [
+      139,
+      0.971
+     ],
+     [
+      145,
+      0.977
+     ],
+     [
+      150,
+      0.982
+     ],
+     [
+      167,
+      0.992
+     ],
+     [
+      172,
+      0.995
+     ],
+     [
+      183,
+      0.998
+     ],
+     [
+      195,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "input#1073",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 1,
+    "lastMs": 196,
+    "durationMs": 195,
+    "steps": 16,
+    "to": "217.3,57,1,1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.126
+     ],
+     [
+      17,
+      0.243
+     ],
+     [
+      28,
+      0.417
+     ],
+     [
+      45,
+      0.612
+     ],
+     [
+      56,
+      0.699
+     ],
+     [
+      67,
+      0.767
+     ],
+     [
+      78,
+      0.825
+     ],
+     [
+      89,
+      0.864
+     ],
+     [
+      100,
+      0.893
+     ],
+     [
+      111,
+      0.922
+     ],
+     [
+      122,
+      0.942
+     ],
+     [
+      139,
+      0.971
+     ],
+     [
+      150,
+      0.981
+     ],
+     [
+      167,
+      0.99
+     ],
+     [
+      195,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#536",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 196,
+    "durationMs": 184,
+    "steps": 18,
+    "to": "218.2,58,1003.5,784",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.129
+     ],
+     [
+      17,
+      0.331
+     ],
+     [
+      34,
+      0.551
+     ],
+     [
+      45,
+      0.652
+     ],
+     [
+      56,
+      0.736
+     ],
+     [
+      67,
+      0.798
+     ],
+     [
+      78,
+      0.848
+     ],
+     [
+      89,
+      0.888
+     ],
+     [
+      100,
+      0.916
+     ],
+     [
+      111,
+      0.938
+     ],
+     [
+      128,
+      0.966
+     ],
+     [
+      134,
+      0.972
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      156,
+      0.989
+     ],
+     [
+      161,
+      0.994
+     ],
+     [
+      172,
+      0.994
+     ],
+     [
+      184,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#536",
+    "prop": "opacity",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 196,
+    "durationMs": 184,
+    "steps": 18,
+    "to": "0.000549657",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.129
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.552
+     ],
+     [
+      45,
+      0.655
+     ],
+     [
+      56,
+      0.736
+     ],
+     [
+      67,
+      0.798
+     ],
+     [
+      78,
+      0.848
+     ],
+     [
+      89,
+      0.887
+     ],
+     [
+      100,
+      0.917
+     ],
+     [
+      111,
+      0.941
+     ],
+     [
+      128,
+      0.967
+     ],
+     [
+      134,
+      0.974
+     ],
+     [
+      139,
+      0.979
+     ],
+     [
+      156,
+      0.991
+     ],
+     [
+      161,
+      0.994
+     ],
+     [
+      172,
+      0.998
+     ],
+     [
+      184,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#933",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 15,
+    "to": "426,101.1,795.8,740.9",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.128
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.553
+     ],
+     [
+      45,
+      0.66
+     ],
+     [
+      56,
+      0.738
+     ],
+     [
+      67,
+      0.801
+     ],
+     [
+      78,
+      0.851
+     ],
+     [
+      89,
+      0.887
+     ],
+     [
+      100,
+      0.922
+     ],
+     [
+      111,
+      0.943
+     ],
+     [
+      128,
+      0.972
+     ],
+     [
+      134,
+      0.979
+     ],
+     [
+      156,
+      0.993
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#935",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 196,
+    "durationMs": 184,
+    "steps": 18,
+    "to": "441.7,116.8,754.2,709.1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.127
+     ],
+     [
+      17,
+      0.336
+     ],
+     [
+      34,
+      0.552
+     ],
+     [
+      45,
+      0.657
+     ],
+     [
+      56,
+      0.731
+     ],
+     [
+      67,
+      0.799
+     ],
+     [
+      78,
+      0.843
+     ],
+     [
+      89,
+      0.888
+     ],
+     [
+      100,
+      0.918
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      128,
+      0.963
+     ],
+     [
+      134,
+      0.97
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      156,
+      0.993
+     ],
+     [
+      161,
+      0.993
+     ],
+     [
+      172,
+      1
+     ],
+     [
+      184,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "section#936",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 17,
+    "to": "441.7,116.8,754.2,345",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.127
+     ],
+     [
+      17,
+      0.336
+     ],
+     [
+      34,
+      0.552
+     ],
+     [
+      45,
+      0.657
+     ],
+     [
+      56,
+      0.731
+     ],
+     [
+      67,
+      0.799
+     ],
+     [
+      78,
+      0.843
+     ],
+     [
+      89,
+      0.888
+     ],
+     [
+      100,
+      0.918
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      128,
+      0.963
+     ],
+     [
+      134,
+      0.97
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      156,
+      0.993
+     ],
+     [
+      161,
+      0.993
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#937",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 16,
+    "to": "441.7,152.1,754.2,309.7",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.127
+     ],
+     [
+      17,
+      0.336
+     ],
+     [
+      34,
+      0.552
+     ],
+     [
+      45,
+      0.657
+     ],
+     [
+      56,
+      0.731
+     ],
+     [
+      67,
+      0.799
+     ],
+     [
+      78,
+      0.843
+     ],
+     [
+      89,
+      0.888
+     ],
+     [
+      100,
+      0.918
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      128,
+      0.963
+     ],
+     [
+      134,
+      0.97
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      156,
+      0.993
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group]#1004",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 16,
+    "to": "441.7,410,754.2,51.7",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.127
+     ],
+     [
+      17,
+      0.336
+     ],
+     [
+      34,
+      0.552
+     ],
+     [
+      45,
+      0.657
+     ],
+     [
+      56,
+      0.731
+     ],
+     [
+      67,
+      0.799
+     ],
+     [
+      78,
+      0.843
+     ],
+     [
+      89,
+      0.888
+     ],
+     [
+      100,
+      0.918
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      128,
+      0.963
+     ],
+     [
+      134,
+      0.97
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      156,
+      0.993
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#1005",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 196,
+    "durationMs": 184,
+    "steps": 17,
+    "to": "441.7,426.5,639.9,19.6",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.132
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.553
+     ],
+     [
+      45,
+      0.658
+     ],
+     [
+      56,
+      0.737
+     ],
+     [
+      67,
+      0.798
+     ],
+     [
+      78,
+      0.842
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      100,
+      0.912
+     ],
+     [
+      111,
+      0.939
+     ],
+     [
+      128,
+      0.965
+     ],
+     [
+      134,
+      0.974
+     ],
+     [
+      139,
+      0.974
+     ],
+     [
+      156,
+      0.991
+     ],
+     [
+      172,
+      0.991
+     ],
+     [
+      184,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#1006",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 196,
+    "durationMs": 184,
+    "steps": 17,
+    "to": "441.7,426.5,639.9,19.6",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.132
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.553
+     ],
+     [
+      45,
+      0.658
+     ],
+     [
+      56,
+      0.737
+     ],
+     [
+      67,
+      0.798
+     ],
+     [
+      78,
+      0.842
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      100,
+      0.912
+     ],
+     [
+      111,
+      0.939
+     ],
+     [
+      128,
+      0.965
+     ],
+     [
+      134,
+      0.974
+     ],
+     [
+      139,
+      0.974
+     ],
+     [
+      156,
+      0.991
+     ],
+     [
+      172,
+      0.991
+     ],
+     [
+      184,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#1007",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 14,
+    "to": "441.7,426.5,45.7,19.6",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.14
+     ],
+     [
+      17,
+      0.34
+     ],
+     [
+      34,
+      0.56
+     ],
+     [
+      45,
+      0.66
+     ],
+     [
+      56,
+      0.74
+     ],
+     [
+      67,
+      0.8
+     ],
+     [
+      78,
+      0.84
+     ],
+     [
+      89,
+      0.88
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      128,
+      0.96
+     ],
+     [
+      139,
+      0.98
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div\"~\"#1008",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 168,
+    "durationMs": 156,
+    "steps": 14,
+    "to": "440.7,435.8,1,1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.14
+     ],
+     [
+      17,
+      0.34
+     ],
+     [
+      34,
+      0.56
+     ],
+     [
+      45,
+      0.66
+     ],
+     [
+      56,
+      0.74
+     ],
+     [
+      67,
+      0.8
+     ],
+     [
+      78,
+      0.84
+     ],
+     [
+      89,
+      0.88
+     ],
+     [
+      100,
+      0.92
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      128,
+      0.96
+     ],
+     [
+      134,
+      0.98
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#1009",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 15,
+    "to": "1109.1,422.6,86.8,27.4",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.13
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.565
+     ],
+     [
+      45,
+      0.667
+     ],
+     [
+      56,
+      0.739
+     ],
+     [
+      67,
+      0.812
+     ],
+     [
+      78,
+      0.855
+     ],
+     [
+      89,
+      0.899
+     ],
+     [
+      100,
+      0.928
+     ],
+     [
+      111,
+      0.942
+     ],
+     [
+      128,
+      0.971
+     ],
+     [
+      134,
+      0.986
+     ],
+     [
+      156,
+      1
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#1010",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 15,
+    "to": "1109.1,422.6,86.8,27.4",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.13
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.565
+     ],
+     [
+      45,
+      0.667
+     ],
+     [
+      56,
+      0.739
+     ],
+     [
+      67,
+      0.812
+     ],
+     [
+      78,
+      0.855
+     ],
+     [
+      89,
+      0.899
+     ],
+     [
+      100,
+      0.928
+     ],
+     [
+      111,
+      0.942
+     ],
+     [
+      128,
+      0.971
+     ],
+     [
+      134,
+      0.986
+     ],
+     [
+      156,
+      1
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox]#1011",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 168,
+    "durationMs": 156,
+    "steps": 14,
+    "to": "1109.1,422.6,79,27.4",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.13
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.565
+     ],
+     [
+      45,
+      0.667
+     ],
+     [
+      56,
+      0.739
+     ],
+     [
+      67,
+      0.812
+     ],
+     [
+      78,
+      0.855
+     ],
+     [
+      89,
+      0.899
+     ],
+     [
+      100,
+      0.928
+     ],
+     [
+      111,
+      0.942
+     ],
+     [
+      128,
+      0.971
+     ],
+     [
+      134,
+      0.986
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#1012",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 173,
+    "durationMs": 161,
+    "steps": 15,
+    "to": "1116.9,426.5,47.6,19.6",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.129
+     ],
+     [
+      17,
+      0.329
+     ],
+     [
+      34,
+      0.543
+     ],
+     [
+      45,
+      0.657
+     ],
+     [
+      56,
+      0.729
+     ],
+     [
+      67,
+      0.8
+     ],
+     [
+      78,
+      0.843
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      100,
+      0.914
+     ],
+     [
+      111,
+      0.943
+     ],
+     [
+      128,
+      0.971
+     ],
+     [
+      139,
+      0.986
+     ],
+     [
+      156,
+      0.986
+     ],
+     [
+      161,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#1013",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 15,
+    "to": "1170.4,428.4,15.7,15.7",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.125
+     ],
+     [
+      17,
+      0.338
+     ],
+     [
+      34,
+      0.55
+     ],
+     [
+      45,
+      0.65
+     ],
+     [
+      56,
+      0.738
+     ],
+     [
+      67,
+      0.8
+     ],
+     [
+      78,
+      0.85
+     ],
+     [
+      89,
+      0.888
+     ],
+     [
+      100,
+      0.913
+     ],
+     [
+      111,
+      0.938
+     ],
+     [
+      128,
+      0.963
+     ],
+     [
+      134,
+      0.975
+     ],
+     [
+      156,
+      0.988
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[role=combobox]#954",
+    "prop": "rect",
+    "fromInputMs": 12,
+    "input": "keydown button[role=combobox]#954",
+    "firstMs": 12,
+    "lastMs": 184,
+    "durationMs": 172,
+    "steps": 15,
+    "to": "1108.3,370.8,79.7,27.4",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.13
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      34,
+      0.551
+     ],
+     [
+      45,
+      0.652
+     ],
+     [
+      56,
+      0.725
+     ],
+     [
+      67,
+      0.797
+     ],
+     [
+      78,
+      0.841
+     ],
+     [
+      89,
+      0.884
+     ],
+     [
+      100,
+      0.913
+     ],
+     [
+      111,
+      0.942
+     ],
+     [
+      128,
+      0.957
+     ],
+     [
+      134,
+      0.971
+     ],
+     [
+      156,
+      0.986
+     ],
+     [
+      172,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 7,
+    "target": "div#726",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#535",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=dialog]#536",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#1074",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "style\"~\"#1075",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "link#1076",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "link#1077",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "link#1078",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#1",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#1079",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#534",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#535",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "style\"~\"#1080",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#1081",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#1082",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#1083",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 213,
+    "target": "div#726",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 213,
+    "target": "div#727",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 213,
+    "target": "div#727",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 19,
+  "strip": "strips/close-dialog.jpg (16 of 20 frames)",
+  "prevFrame": -105
+ }
+]

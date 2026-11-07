@@ -1,0 +1,2712 @@
+[
+ {
+  "label": "open-palette",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=textbox][tid=chat-input]#423"
+  },
+  "firstChangeMs": 3,
+  "settleMs": 392,
+  "rafFrames": 207,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=listbox]#649",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "keydown div[role=textbox][tid=chat-input]#423",
+    "firstMs": 3,
+    "lastMs": 392,
+    "durationMs": 389,
+    "steps": 2,
+    "to": "394.8,270.1,650.4,407",
+    "values": [
+     [
+      3,
+      "394.8,270.1,650.4,0"
+     ],
+     [
+      392,
+      "394.8,270.1,650.4,407"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -2,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 91,
+    "target": "body#621",
+    "add": [
+     "div#622"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 91,
+    "target": "div#622",
+    "add": [
+     "div[role=presentation]#623"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 91,
+    "target": "body#621",
+    "add": [
+     "div#624"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 91,
+    "target": "div#622",
+    "add": [
+     "div#625"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 91,
+    "target": "div#626",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "style\"~\"#627",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "link#628",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "link#629",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "link#630",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#631",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#632",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#633",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#634",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "header#377",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#635",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#636",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#396",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#637",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div[role=textbox][tid=chat-input]#423",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#427",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#428",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#638",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#478",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#529",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#639",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#640",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "iframe#641",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#642",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "style\"~\"#643",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#644",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#645",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#646",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div[role=presentation]#623",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div[role=presentation]#647",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 91,
+    "target": "div#624",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 402,
+    "target": "div#650",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 402,
+    "target": "div[role=listbox]#649",
+    "add": [
+     "div[role=group]#651"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 402,
+    "target": "div[role=listbox]#649",
+    "add": [
+     "div[role=group]#652"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 402,
+    "target": "div[role=listbox]#649",
+    "add": [
+     "div[role=group]#653"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 402,
+    "target": "div#654",
+    "add": [
+     "div#655"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 40,
+  "strip": "strips/open-palette.jpg (16 of 21 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "type-query",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[role=combobox]#620"
+  },
+  "firstChangeMs": 5,
+  "settleMs": 2133,
+  "rafFrames": 377,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "408.8,176.4,576.4,32",
+    "values": [
+     [
+      5,
+      "408.8,176.4,576.4,32"
+     ],
+     [
+      116,
+      "408.8,176.4,576.4,32"
+     ],
+     [
+      211,
+      "408.8,176.4,576.4,32"
+     ],
+     [
+      316,
+      "408.8,176.4,576.4,32"
+     ],
+     [
+      416,
+      "408.8,176.4,576.4,32"
+     ],
+     [
+      538,
+      "408.8,176.4,576.4,32"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "opacity",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "1",
+    "values": [
+     [
+      5,
+      "1"
+     ],
+     [
+      116,
+      "1"
+     ],
+     [
+      211,
+      "1"
+     ],
+     [
+      316,
+      "1"
+     ],
+     [
+      416,
+      "1"
+     ],
+     [
+      538,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "transform",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "none",
+    "values": [
+     [
+      5,
+      "none"
+     ],
+     [
+      116,
+      "none"
+     ],
+     [
+      211,
+      "none"
+     ],
+     [
+      316,
+      "none"
+     ],
+     [
+      416,
+      "none"
+     ],
+     [
+      538,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "scale",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "none",
+    "values": [
+     [
+      5,
+      "none"
+     ],
+     [
+      116,
+      "none"
+     ],
+     [
+      211,
+      "none"
+     ],
+     [
+      316,
+      "none"
+     ],
+     [
+      416,
+      "none"
+     ],
+     [
+      538,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "translate",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "none",
+    "values": [
+     [
+      5,
+      "none"
+     ],
+     [
+      116,
+      "none"
+     ],
+     [
+      211,
+      "none"
+     ],
+     [
+      316,
+      "none"
+     ],
+     [
+      416,
+      "none"
+     ],
+     [
+      538,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "rotate",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "none",
+    "values": [
+     [
+      5,
+      "none"
+     ],
+     [
+      116,
+      "none"
+     ],
+     [
+      211,
+      "none"
+     ],
+     [
+      316,
+      "none"
+     ],
+     [
+      416,
+      "none"
+     ],
+     [
+      538,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "backgroundColor",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      5,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      116,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      211,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      316,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      416,
+      "rgba(0, 0, 0, 0)"
+     ],
+     [
+      538,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "color",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      5,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      116,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      211,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      316,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      416,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      538,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "boxShadow",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      5,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      116,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      211,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      316,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      416,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ],
+     [
+      538,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "borderTopColor",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "rgba(0, 0, 0, 0.08)",
+    "values": [
+     [
+      5,
+      "rgba(0, 0, 0, 0.08)"
+     ],
+     [
+      116,
+      "rgba(0, 0, 0, 0.08)"
+     ],
+     [
+      211,
+      "rgba(0, 0, 0, 0.08)"
+     ],
+     [
+      316,
+      "rgba(0, 0, 0, 0.08)"
+     ],
+     [
+      416,
+      "rgba(0, 0, 0, 0.08)"
+     ],
+     [
+      538,
+      "rgba(0, 0, 0, 0.08)"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "outlineColor",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      5,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      116,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      211,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      316,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      416,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      538,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "outlineWidth",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "2.4px",
+    "values": [
+     [
+      5,
+      "2.4px"
+     ],
+     [
+      116,
+      "2.4px"
+     ],
+     [
+      211,
+      "2.4px"
+     ],
+     [
+      316,
+      "2.4px"
+     ],
+     [
+      416,
+      "2.4px"
+     ],
+     [
+      538,
+      "2.4px"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "filter",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "none",
+    "values": [
+     [
+      5,
+      "none"
+     ],
+     [
+      116,
+      "none"
+     ],
+     [
+      211,
+      "none"
+     ],
+     [
+      316,
+      "none"
+     ],
+     [
+      416,
+      "none"
+     ],
+     [
+      538,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "clipPath",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "none",
+    "values": [
+     [
+      5,
+      "none"
+     ],
+     [
+      116,
+      "none"
+     ],
+     [
+      211,
+      "none"
+     ],
+     [
+      316,
+      "none"
+     ],
+     [
+      416,
+      "none"
+     ],
+     [
+      538,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "textarea[role=combobox]\"~\"#620",
+    "prop": "visibility",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 538,
+    "durationMs": 533,
+    "steps": 6,
+    "to": "visible",
+    "values": [
+     [
+      5,
+      "visible"
+     ],
+     [
+      116,
+      "visible"
+     ],
+     [
+      211,
+      "visible"
+     ],
+     [
+      316,
+      "visible"
+     ],
+     [
+      416,
+      "visible"
+     ],
+     [
+      538,
+      "visible"
+     ]
+    ]
+   },
+   {
+    "el": "div#655",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 5,
+    "lastMs": 1905,
+    "durationMs": 1900,
+    "steps": 43,
+    "to": "575.3,327.9,95.8,18",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      78,
+      -0.063
+     ],
+     [
+      83,
+      -0.07
+     ],
+     [
+      89,
+      -0.076
+     ],
+     [
+      94,
+      -0.081
+     ],
+     [
+      100,
+      -0.085
+     ],
+     [
+      111,
+      -0.092
+     ],
+     [
+      117,
+      -0.094
+     ],
+     [
+      128,
+      -0.098
+     ],
+     [
+      133,
+      -0.1
+     ],
+     [
+      139,
+      -0.101
+     ],
+     [
+      144,
+      -0.103
+     ],
+     [
+      150,
+      -0.103
+     ],
+     [
+      156,
+      -0.104
+     ],
+     [
+      161,
+      -0.105
+     ],
+     [
+      172,
+      -0.106
+     ],
+     [
+      178,
+      -0.106
+     ],
+     [
+      183,
+      -0.107
+     ],
+     [
+      200,
+      -0.107
+     ],
+     [
+      1767,
+      0.359
+     ],
+     [
+      1773,
+      0.461
+     ],
+     [
+      1778,
+      0.548
+     ],
+     [
+      1784,
+      0.619
+     ],
+     [
+      1789,
+      0.68
+     ],
+     [
+      1795,
+      0.732
+     ],
+     [
+      1800,
+      0.775
+     ],
+     [
+      1806,
+      0.814
+     ],
+     [
+      1811,
+      0.845
+     ],
+     [
+      1823,
+      0.896
+     ],
+     [
+      1828,
+      0.915
+     ],
+     [
+      1834,
+      0.932
+     ],
+     [
+      1839,
+      0.946
+     ],
+     [
+      1845,
+      0.958
+     ],
+     [
+      1850,
+      0.967
+     ],
+     [
+      1856,
+      0.976
+     ],
+     [
+      1862,
+      0.983
+     ],
+     [
+      1867,
+      0.988
+     ],
+     [
+      1873,
+      0.992
+     ],
+     [
+      1878,
+      0.995
+     ],
+     [
+      1884,
+      0.997
+     ],
+     [
+      1889,
+      0.999
+     ],
+     [
+      1895,
+      1
+     ],
+     [
+      1900,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=listbox]#649",
+    "prop": "rect",
+    "fromInputMs": 39,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 39,
+    "lastMs": 438,
+    "durationMs": 400,
+    "steps": 5,
+    "to": "394.8,270.1,650.4,36",
+    "values": [
+     [
+      39,
+      "394.8,270.1,650.4,324"
+     ],
+     [
+      133,
+      "394.8,270.1,650.4,144"
+     ],
+     [
+      227,
+      "394.8,270.1,650.4,252"
+     ],
+     [
+      333,
+      "394.8,270.1,650.4,180"
+     ],
+     [
+      438,
+      "394.8,270.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=option]#806",
+    "prop": "rect",
+    "fromInputMs": 39,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 39,
+    "lastMs": 133,
+    "durationMs": 94,
+    "steps": 2,
+    "to": "394.8,306.1,650.4,36",
+    "values": [
+     [
+      39,
+      "394.8,378.1,650.4,36"
+     ],
+     [
+      133,
+      "394.8,306.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=option]#810",
+    "prop": "rect",
+    "fromInputMs": 39,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 39,
+    "lastMs": 133,
+    "durationMs": 94,
+    "steps": 2,
+    "to": "394.8,342.1,650.4,36",
+    "values": [
+     [
+      39,
+      "394.8,522,650.4,36"
+     ],
+     [
+      133,
+      "394.8,342.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=option]#811",
+    "prop": "rect",
+    "fromInputMs": 39,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 39,
+    "lastMs": 333,
+    "durationMs": 294,
+    "steps": 4,
+    "to": "394.8,414.1,650.4,36",
+    "values": [
+     [
+      39,
+      "394.8,558,650.4,36"
+     ],
+     [
+      133,
+      "394.8,378.1,650.4,36"
+     ],
+     [
+      227,
+      "394.8,486.1,650.4,36"
+     ],
+     [
+      333,
+      "394.8,414.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group]#801",
+    "prop": "rect",
+    "fromInputMs": 39,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 39,
+    "lastMs": 438,
+    "durationMs": 400,
+    "steps": 5,
+    "to": "394.8,270.1,650.4,36",
+    "values": [
+     [
+      39,
+      "394.8,270.1,650.4,324"
+     ],
+     [
+      133,
+      "394.8,270.1,650.4,144"
+     ],
+     [
+      227,
+      "394.8,270.1,650.4,252"
+     ],
+     [
+      333,
+      "394.8,270.1,650.4,180"
+     ],
+     [
+      438,
+      "394.8,270.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "div#802",
+    "prop": "rect",
+    "fromInputMs": 39,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 39,
+    "lastMs": 438,
+    "durationMs": 400,
+    "steps": 22,
+    "to": "394.8,306.1,650.4,425",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.074
+     ],
+     [
+      50,
+      0.082
+     ],
+     [
+      56,
+      0.089
+     ],
+     [
+      61,
+      0.095
+     ],
+     [
+      67,
+      0.099
+     ],
+     [
+      78,
+      0.107
+     ],
+     [
+      83,
+      0.11
+     ],
+     [
+      94,
+      0.662
+     ],
+     [
+      100,
+      0.664
+     ],
+     [
+      106,
+      0.666
+     ],
+     [
+      111,
+      0.667
+     ],
+     [
+      117,
+      0.668
+     ],
+     [
+      122,
+      0.669
+     ],
+     [
+      128,
+      0.67
+     ],
+     [
+      139,
+      0.671
+     ],
+     [
+      144,
+      0.671
+     ],
+     [
+      150,
+      0.671
+     ],
+     [
+      156,
+      0.672
+     ],
+     [
+      189,
+      0.343
+     ],
+     [
+      294,
+      0.562
+     ],
+     [
+      400,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#648",
+    "prop": "rect",
+    "fromInputMs": 83,
+    "input": "keydown textarea[role=combobox]#620",
+    "firstMs": 83,
+    "lastMs": 1905,
+    "durationMs": 1823,
+    "steps": 26,
+    "to": "384,158.1,672,158.8",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      1689,
+      0.42
+     ],
+     [
+      1695,
+      0.513
+     ],
+     [
+      1700,
+      0.591
+     ],
+     [
+      1706,
+      0.656
+     ],
+     [
+      1711,
+      0.711
+     ],
+     [
+      1717,
+      0.757
+     ],
+     [
+      1722,
+      0.797
+     ],
+     [
+      1728,
+      0.831
+     ],
+     [
+      1734,
+      0.86
+     ],
+     [
+      1745,
+      0.906
+     ],
+     [
+      1750,
+      0.923
+     ],
+     [
+      1756,
+      0.938
+     ],
+     [
+      1761,
+      0.951
+     ],
+     [
+      1767,
+      0.961
+     ],
+     [
+      1773,
+      0.971
+     ],
+     [
+      1778,
+      0.978
+     ],
+     [
+      1784,
+      0.984
+     ],
+     [
+      1789,
+      0.989
+     ],
+     [
+      1795,
+      0.993
+     ],
+     [
+      1800,
+      0.996
+     ],
+     [
+      1806,
+      0.998
+     ],
+     [
+      1811,
+      0.999
+     ],
+     [
+      1817,
+      1
+     ],
+     [
+      1823,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[role=option]#826",
+    "prop": "rect",
+    "fromInputMs": 18,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 227,
+    "lastMs": 333,
+    "durationMs": 106,
+    "steps": 2,
+    "to": "394.8,342.1,650.4,36",
+    "values": [
+     [
+      227,
+      "394.8,378.1,650.4,36"
+     ],
+     [
+      333,
+      "394.8,342.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=option]#827",
+    "prop": "rect",
+    "fromInputMs": 18,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 227,
+    "lastMs": 333,
+    "durationMs": 106,
+    "steps": 2,
+    "to": "394.8,378.1,650.4,36",
+    "values": [
+     [
+      227,
+      "394.8,414.1,650.4,36"
+     ],
+     [
+      333,
+      "394.8,378.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#821",
+    "prop": "rect",
+    "fromInputMs": 18,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 227,
+    "lastMs": 333,
+    "durationMs": 106,
+    "steps": 2,
+    "to": "394.8,342.1,650.4,36",
+    "values": [
+     [
+      227,
+      "394.8,378.1,650.4,36"
+     ],
+     [
+      333,
+      "394.8,342.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#822",
+    "prop": "rect",
+    "fromInputMs": 18,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 227,
+    "lastMs": 333,
+    "durationMs": 106,
+    "steps": 2,
+    "to": "394.8,378.1,650.4,36",
+    "values": [
+     [
+      227,
+      "394.8,414.1,650.4,36"
+     ],
+     [
+      333,
+      "394.8,378.1,650.4,36"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#831",
+    "prop": "opacity",
+    "fromInputMs": 1409,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 1944,
+    "lastMs": 2133,
+    "durationMs": 189,
+    "steps": 35,
+    "to": "0.378058",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.03
+     ],
+     [
+      11,
+      0.059
+     ],
+     [
+      17,
+      0.088
+     ],
+     [
+      22,
+      0.118
+     ],
+     [
+      28,
+      0.147
+     ],
+     [
+      33,
+      0.176
+     ],
+     [
+      39,
+      0.206
+     ],
+     [
+      44,
+      0.235
+     ],
+     [
+      50,
+      0.265
+     ],
+     [
+      56,
+      0.294
+     ],
+     [
+      61,
+      0.323
+     ],
+     [
+      67,
+      0.352
+     ],
+     [
+      72,
+      0.382
+     ],
+     [
+      78,
+      0.411
+     ],
+     [
+      83,
+      0.441
+     ],
+     [
+      89,
+      0.47
+     ],
+     [
+      95,
+      0.5
+     ],
+     [
+      100,
+      0.529
+     ],
+     [
+      106,
+      0.559
+     ],
+     [
+      111,
+      0.588
+     ],
+     [
+      117,
+      0.618
+     ],
+     [
+      122,
+      0.647
+     ],
+     [
+      128,
+      0.676
+     ],
+     [
+      133,
+      0.706
+     ],
+     [
+      139,
+      0.735
+     ],
+     [
+      144,
+      0.764
+     ],
+     [
+      150,
+      0.794
+     ],
+     [
+      156,
+      0.823
+     ],
+     [
+      161,
+      0.852
+     ],
+     [
+      167,
+      0.882
+     ],
+     [
+      172,
+      0.911
+     ],
+     [
+      178,
+      0.941
+     ],
+     [
+      183,
+      0.97
+     ],
+     [
+      189,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 14,
+    "target": "textarea[role=combobox]\"~\"#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 1
+   },
+   {
+    "t": 14,
+    "target": "div#757",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 14,
+    "target": "div#757",
+    "add": [
+     "span\"~\"#800"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 14,
+    "target": "div#654",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 54,
+    "target": "div[role=listbox]#649",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 54,
+    "target": "div[role=listbox]#649",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 54,
+    "target": "div[role=listbox]#649",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 54,
+    "target": "div[role=listbox]#649",
+    "add": [
+     "div[role=group]#801"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 54,
+    "target": "div#650",
+    "add": [
+     "div#802"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 54,
+    "target": "div#761",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 54,
+    "target": "div\"~\"#796",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 19
+   },
+   {
+    "t": 118,
+    "target": "textarea[role=combobox]\"~\"#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 2
+   },
+   {
+    "t": 133,
+    "target": "span#670",
+    "add": [
+     "span[role=status]#812"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 133,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 133,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 133,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 133,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 133,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 133,
+    "target": "span\"~\"#813",
+    "chars": 2
+   },
+   {
+    "t": 133,
+    "target": "span\"~\"#814",
+    "chars": 23
+   },
+   {
+    "t": 133,
+    "target": "span\"~\"#815",
+    "chars": 2
+   },
+   {
+    "t": 133,
+    "target": "span\"~\"#816",
+    "chars": 6
+   },
+   {
+    "t": 133,
+    "target": "span\"~\"#817",
+    "chars": 2
+   },
+   {
+    "t": 133,
+    "target": "span\"~\"#818",
+    "chars": 5
+   },
+   {
+    "t": 219,
+    "target": "textarea[role=combobox]\"~\"#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 3
+   },
+   {
+    "t": 233,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 233,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 233,
+    "target": "span\"~\"#813",
+    "chars": 3
+   },
+   {
+    "t": 233,
+    "target": "span\"~\"#814",
+    "chars": 22
+   },
+   {
+    "t": 233,
+    "target": "div[role=group]#801",
+    "add": [
+     "div[role=presentation]#819"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 233,
+    "target": "div[role=group]#801",
+    "add": [
+     "div[role=presentation]#820"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 233,
+    "target": "div[role=group]#801",
+    "add": [
+     "div[role=presentation]#821"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 233,
+    "target": "div[role=group]#801",
+    "add": [
+     "div[role=presentation]#822"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 233,
+    "target": "div[role=group]#801",
+    "add": [
+     "div[role=presentation]#823"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 287,
+    "target": "span[role=status]#812",
+    "add": [
+     "span#829"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 287,
+    "target": "span[role=status]#812",
+    "add": [
+     "span\"~\"#830"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 325,
+    "target": "textarea[role=combobox]\"~\"#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 4
+   },
+   {
+    "t": 337,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 337,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 337,
+    "target": "span\"~\"#813",
+    "chars": 4
+   },
+   {
+    "t": 337,
+    "target": "span\"~\"#814",
+    "chars": 21
+   },
+   {
+    "t": 429,
+    "target": "textarea[role=combobox]\"~\"#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 5
+   },
+   {
+    "t": 444,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 444,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 444,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 444,
+    "target": "div[role=group]#801",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 444,
+    "target": "span\"~\"#813",
+    "chars": 5
+   },
+   {
+    "t": 444,
+    "target": "span\"~\"#814",
+    "chars": 20
+   },
+   {
+    "t": 545,
+    "target": "textarea[role=combobox]\"~\"#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 6
+   },
+   {
+    "t": 557,
+    "target": "span\"~\"#813",
+    "chars": 6
+   },
+   {
+    "t": 557,
+    "target": "span\"~\"#814",
+    "chars": 19
+   },
+   {
+    "t": 1771,
+    "target": "span#670",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1771,
+    "target": "div#650",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1771,
+    "target": "div\"~\"#796",
+    "add": [],
+    "addN": 0,
+    "rmN": 0,
+    "rm": [],
+    "chars": 18
+   },
+   {
+    "t": 1943,
+    "target": "span#419",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 1943,
+    "target": "span#419",
+    "add": [
+     "span\"~\"#831"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 56,
+  "strip": "strips/type-query.jpg (16 of 215 frames)",
+  "prevFrame": -100
+ },
+ {
+  "label": "hover-results",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[role=presentation]#647"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 162,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/hover-results.jpg (5 of 5 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "arrow-results",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[role=combobox]\"~\"#620"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 269,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/arrow-results.jpg (1 of 1 frames)",
+  "prevFrame": -103
+ },
+ {
+  "label": "close-palette",
+  "anchor": {
+   "type": "keydown",
+   "target": "textarea[role=combobox]\"~\"#620"
+  },
+  "firstChangeMs": 2,
+  "settleMs": 219,
+  "rafFrames": 210,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog]#648",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 2,
+    "lastMs": 2,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,0,0,0",
+    "values": [
+     [
+      2,
+      "0,0,0,0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#648",
+    "prop": "backgroundColor",
+    "fromInputMs": 2,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 2,
+    "lastMs": 2,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgb(255, 255, 255)",
+    "values": [
+     [
+      2,
+      "rgb(255, 255, 255)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#648",
+    "prop": "boxShadow",
+    "fromInputMs": 2,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 2,
+    "lastMs": 2,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      2,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#648",
+    "prop": "borderTopColor",
+    "fromInputMs": 2,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 2,
+    "lastMs": 2,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hsl(none 0% 4.31373% / 0.2)",
+    "values": [
+     [
+      2,
+      "hsl(none 0% 4.31373% / 0.2)"
+     ]
+    ]
+   },
+   {
+    "el": "button[role=option]#849",
+    "prop": "rect",
+    "fromInputMs": 2,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 2,
+    "lastMs": 219,
+    "durationMs": 217,
+    "steps": 14,
+    "to": "401.3,267.8,637.4,35.3",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      45,
+      0.246
+     ],
+     [
+      62,
+      0.5
+     ],
+     [
+      67,
+      0.562
+     ],
+     [
+      73,
+      0.615
+     ],
+     [
+      95,
+      0.769
+     ],
+     [
+      100,
+      0.8
+     ],
+     [
+      128,
+      0.9
+     ],
+     [
+      134,
+      0.915
+     ],
+     [
+      156,
+      0.954
+     ],
+     [
+      162,
+      0.962
+     ],
+     [
+      184,
+      0.985
+     ],
+     [
+      189,
+      0.992
+     ],
+     [
+      217,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#647",
+    "prop": "opacity",
+    "fromInputMs": 2,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 2,
+    "lastMs": 2,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0",
+    "values": [
+     [
+      2,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "div#10",
+    "prop": "opacity",
+    "fromInputMs": 35,
+    "input": "keydown textarea[role=combobox]\"~\"#620",
+    "firstMs": 35,
+    "lastMs": 185,
+    "durationMs": 150,
+    "steps": 11,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      28,
+      0.425
+     ],
+     [
+      34,
+      0.616
+     ],
+     [
+      39,
+      0.749
+     ],
+     [
+      61,
+      0.927
+     ],
+     [
+      67,
+      0.945
+     ],
+     [
+      95,
+      0.988
+     ],
+     [
+      100,
+      0.992
+     ],
+     [
+      123,
+      0.999
+     ],
+     [
+      128,
+      1
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 26,
+    "target": "body#621",
+    "add": [
+     "div#848"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 26,
+    "target": "div[role=dialog]#648",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "body#621",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "div[role=dialog]#648",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "div[role=dialog]#648",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "div[role=presentation]#647",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div[role=dialog]#648",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#626",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "style\"~\"#627",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "link#628",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "link#629",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "link#630",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#631",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#632",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#633",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#634",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "header#377",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#635",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#636",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#396",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#637",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div[role=textbox][tid=chat-input]#423",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#427",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#428",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#638",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#478",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#529",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#639",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#640",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "iframe#641",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#642",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "style\"~\"#643",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#644",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#645",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#646",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div[role=presentation]#623",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div[role=presentation]#647",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div#624",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 30,
+    "target": "body#621",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 30,
+    "target": "div#622",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 30,
+    "target": "div#622",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 247,
+    "target": "body#621",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 42,
+  "strip": "strips/close-palette.jpg (16 of 18 frames)",
+  "prevFrame": -104
+ }
+]

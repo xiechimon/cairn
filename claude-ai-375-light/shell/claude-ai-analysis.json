@@ -1,0 +1,10101 @@
+[
+ {
+  "label": "hover-sidebar-rows",
+  "anchor": {
+   "type": "pointerover",
+   "target": "span\"~\"#13"
+  },
+  "firstChangeMs": -10,
+  "settleMs": 323,
+  "rafFrames": 670,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "rect",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -10,
+    "lastMs": 317,
+    "durationMs": 328,
+    "steps": 54,
+    "to": "0,0,375.2,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.088
+     ],
+     [
+      45,
+      0.17
+     ],
+     [
+      50,
+      0.242
+     ],
+     [
+      56,
+      0.307
+     ],
+     [
+      61,
+      0.366
+     ],
+     [
+      67,
+      0.42
+     ],
+     [
+      72,
+      0.469
+     ],
+     [
+      78,
+      0.513
+     ],
+     [
+      83,
+      0.554
+     ],
+     [
+      89,
+      0.59
+     ],
+     [
+      95,
+      0.625
+     ],
+     [
+      100,
+      0.656
+     ],
+     [
+      106,
+      0.685
+     ],
+     [
+      111,
+      0.711
+     ],
+     [
+      117,
+      0.735
+     ],
+     [
+      122,
+      0.758
+     ],
+     [
+      128,
+      0.778
+     ],
+     [
+      133,
+      0.797
+     ],
+     [
+      139,
+      0.815
+     ],
+     [
+      145,
+      0.831
+     ],
+     [
+      150,
+      0.846
+     ],
+     [
+      156,
+      0.86
+     ],
+     [
+      161,
+      0.873
+     ],
+     [
+      167,
+      0.884
+     ],
+     [
+      172,
+      0.895
+     ],
+     [
+      178,
+      0.905
+     ],
+     [
+      183,
+      0.914
+     ],
+     [
+      189,
+      0.923
+     ],
+     [
+      195,
+      0.931
+     ],
+     [
+      200,
+      0.938
+     ],
+     [
+      206,
+      0.945
+     ],
+     [
+      211,
+      0.951
+     ],
+     [
+      217,
+      0.957
+     ],
+     [
+      222,
+      0.962
+     ],
+     [
+      228,
+      0.966
+     ],
+     [
+      233,
+      0.97
+     ],
+     [
+      239,
+      0.974
+     ],
+     [
+      245,
+      0.978
+     ],
+     [
+      250,
+      0.981
+     ],
+     [
+      256,
+      0.984
+     ],
+     [
+      261,
+      0.986
+     ],
+     [
+      267,
+      0.989
+     ],
+     [
+      272,
+      0.991
+     ],
+     [
+      278,
+      0.993
+     ],
+     [
+      283,
+      0.994
+     ],
+     [
+      289,
+      0.995
+     ],
+     [
+      295,
+      0.997
+     ],
+     [
+      300,
+      0.998
+     ],
+     [
+      306,
+      0.998
+     ],
+     [
+      311,
+      0.999
+     ],
+     [
+      317,
+      0.999
+     ],
+     [
+      322,
+      1
+     ],
+     [
+      328,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "transform",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -10,
+    "lastMs": 323,
+    "durationMs": 333,
+    "steps": 55,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "visibility",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -10,
+    "lastMs": 6,
+    "durationMs": 17,
+    "steps": 2,
+    "to": "visible",
+    "values": [
+     [
+      -10,
+      "hidden"
+     ],
+     [
+      6,
+      "visible"
+     ]
+    ]
+   }
+  ],
+  "scroll": [
+   [
+    -10,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 21,
+    "target": "button[tid=sidebar-compact-trigger]#9",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 967,
+    "target": "div#204",
+    "add": [
+     "button#205"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1161,
+    "target": "body#173",
+    "add": [
+     "div#206"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 1161,
+    "target": "body#173",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 4,
+  "strip": null,
+  "prevFrame": null
+ },
+ {
+  "label": "close-drawer",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=dialog][tid=sidebar]#172"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 309,
+  "rafFrames": 176,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "transform",
+    "fromInputMs": 4,
+    "input": "keydown div[role=dialog][tid=sidebar]#172",
+    "firstMs": 4,
+    "lastMs": 309,
+    "durationMs": 306,
+    "steps": 49,
+    "to": "matrix(1, 0, 0, 1, -375.2, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      44,
+      0.468
+     ],
+     [
+      50,
+      0.513
+     ],
+     [
+      56,
+      0.553
+     ],
+     [
+      61,
+      0.591
+     ],
+     [
+      67,
+      0.625
+     ],
+     [
+      72,
+      0.656
+     ],
+     [
+      78,
+      0.685
+     ],
+     [
+      83,
+      0.711
+     ],
+     [
+      89,
+      0.735
+     ],
+     [
+      94,
+      0.758
+     ],
+     [
+      100,
+      0.778
+     ],
+     [
+      106,
+      0.797
+     ],
+     [
+      111,
+      0.815
+     ],
+     [
+      117,
+      0.831
+     ],
+     [
+      122,
+      0.846
+     ],
+     [
+      128,
+      0.86
+     ],
+     [
+      133,
+      0.873
+     ],
+     [
+      139,
+      0.884
+     ],
+     [
+      144,
+      0.895
+     ],
+     [
+      150,
+      0.905
+     ],
+     [
+      156,
+      0.915
+     ],
+     [
+      161,
+      0.923
+     ],
+     [
+      167,
+      0.931
+     ],
+     [
+      172,
+      0.938
+     ],
+     [
+      178,
+      0.945
+     ],
+     [
+      183,
+      0.951
+     ],
+     [
+      189,
+      0.957
+     ],
+     [
+      194,
+      0.962
+     ],
+     [
+      200,
+      0.966
+     ],
+     [
+      206,
+      0.971
+     ],
+     [
+      211,
+      0.974
+     ],
+     [
+      217,
+      0.978
+     ],
+     [
+      222,
+      0.981
+     ],
+     [
+      228,
+      0.984
+     ],
+     [
+      233,
+      0.987
+     ],
+     [
+      239,
+      0.989
+     ],
+     [
+      244,
+      0.991
+     ],
+     [
+      250,
+      0.993
+     ],
+     [
+      256,
+      0.994
+     ],
+     [
+      261,
+      0.996
+     ],
+     [
+      267,
+      0.997
+     ],
+     [
+      272,
+      0.998
+     ],
+     [
+      278,
+      0.998
+     ],
+     [
+      283,
+      0.999
+     ],
+     [
+      289,
+      0.999
+     ],
+     [
+      295,
+      1
+     ],
+     [
+      300,
+      1
+     ],
+     [
+      306,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 48,
+    "lastMs": 304,
+    "durationMs": 256,
+    "steps": 47,
+    "to": "-375.2,0,375.2,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.085
+     ],
+     [
+      11,
+      0.16
+     ],
+     [
+      17,
+      0.231
+     ],
+     [
+      22,
+      0.294
+     ],
+     [
+      28,
+      0.352
+     ],
+     [
+      33,
+      0.408
+     ],
+     [
+      39,
+      0.457
+     ],
+     [
+      44,
+      0.502
+     ],
+     [
+      50,
+      0.544
+     ],
+     [
+      56,
+      0.583
+     ],
+     [
+      61,
+      0.619
+     ],
+     [
+      67,
+      0.652
+     ],
+     [
+      72,
+      0.682
+     ],
+     [
+      78,
+      0.71
+     ],
+     [
+      83,
+      0.736
+     ],
+     [
+      89,
+      0.76
+     ],
+     [
+      94,
+      0.782
+     ],
+     [
+      100,
+      0.803
+     ],
+     [
+      106,
+      0.822
+     ],
+     [
+      111,
+      0.839
+     ],
+     [
+      117,
+      0.855
+     ],
+     [
+      122,
+      0.87
+     ],
+     [
+      128,
+      0.884
+     ],
+     [
+      133,
+      0.896
+     ],
+     [
+      139,
+      0.908
+     ],
+     [
+      145,
+      0.918
+     ],
+     [
+      150,
+      0.928
+     ],
+     [
+      156,
+      0.937
+     ],
+     [
+      161,
+      0.944
+     ],
+     [
+      167,
+      0.952
+     ],
+     [
+      172,
+      0.958
+     ],
+     [
+      178,
+      0.964
+     ],
+     [
+      183,
+      0.97
+     ],
+     [
+      189,
+      0.974
+     ],
+     [
+      195,
+      0.979
+     ],
+     [
+      200,
+      0.983
+     ],
+     [
+      206,
+      0.986
+     ],
+     [
+      211,
+      0.989
+     ],
+     [
+      217,
+      0.991
+     ],
+     [
+      222,
+      0.993
+     ],
+     [
+      228,
+      0.995
+     ],
+     [
+      234,
+      0.997
+     ],
+     [
+      239,
+      0.998
+     ],
+     [
+      245,
+      0.999
+     ],
+     [
+      250,
+      0.999
+     ],
+     [
+      256,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#427",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 48,
+    "lastMs": 54,
+    "durationMs": 6,
+    "steps": 2,
+    "to": "5,45,144.1,24",
+    "values": [
+     [
+      48,
+      "5.4,44.9,141.2,23.5"
+     ],
+     [
+      54,
+      "5,45,144.1,24"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#427",
+    "prop": "opacity",
+    "fromInputMs": 25,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 48,
+    "lastMs": 54,
+    "durationMs": 6,
+    "steps": 2,
+    "to": "1",
+    "values": [
+     [
+      48,
+      "0"
+     ],
+     [
+      54,
+      "1"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#427",
+    "prop": "scale",
+    "fromInputMs": 25,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 48,
+    "lastMs": 54,
+    "durationMs": 6,
+    "steps": 2,
+    "to": "none",
+    "values": [
+     [
+      48,
+      "0.98"
+     ],
+     [
+      54,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "boxShadow",
+    "fromInputMs": 25,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 48,
+    "lastMs": 48,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      48,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "outlineColor",
+    "fromInputMs": 25,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 48,
+    "lastMs": 48,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      48,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button#205",
+    "prop": "rect",
+    "fromInputMs": 25,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 48,
+    "lastMs": 304,
+    "durationMs": 256,
+    "steps": 47,
+    "to": "-48,158,36,36",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.085
+     ],
+     [
+      11,
+      0.16
+     ],
+     [
+      17,
+      0.231
+     ],
+     [
+      22,
+      0.294
+     ],
+     [
+      28,
+      0.352
+     ],
+     [
+      33,
+      0.408
+     ],
+     [
+      39,
+      0.457
+     ],
+     [
+      44,
+      0.502
+     ],
+     [
+      50,
+      0.544
+     ],
+     [
+      56,
+      0.583
+     ],
+     [
+      61,
+      0.619
+     ],
+     [
+      67,
+      0.652
+     ],
+     [
+      72,
+      0.682
+     ],
+     [
+      78,
+      0.71
+     ],
+     [
+      83,
+      0.736
+     ],
+     [
+      89,
+      0.76
+     ],
+     [
+      94,
+      0.782
+     ],
+     [
+      100,
+      0.803
+     ],
+     [
+      106,
+      0.822
+     ],
+     [
+      111,
+      0.839
+     ],
+     [
+      117,
+      0.855
+     ],
+     [
+      122,
+      0.87
+     ],
+     [
+      128,
+      0.884
+     ],
+     [
+      133,
+      0.896
+     ],
+     [
+      139,
+      0.908
+     ],
+     [
+      145,
+      0.918
+     ],
+     [
+      150,
+      0.928
+     ],
+     [
+      156,
+      0.937
+     ],
+     [
+      161,
+      0.944
+     ],
+     [
+      167,
+      0.952
+     ],
+     [
+      172,
+      0.958
+     ],
+     [
+      178,
+      0.964
+     ],
+     [
+      183,
+      0.97
+     ],
+     [
+      189,
+      0.974
+     ],
+     [
+      195,
+      0.979
+     ],
+     [
+      200,
+      0.983
+     ],
+     [
+      206,
+      0.986
+     ],
+     [
+      211,
+      0.989
+     ],
+     [
+      217,
+      0.991
+     ],
+     [
+      222,
+      0.993
+     ],
+     [
+      228,
+      0.995
+     ],
+     [
+      234,
+      0.997
+     ],
+     [
+      239,
+      0.998
+     ],
+     [
+      245,
+      0.999
+     ],
+     [
+      250,
+      0.999
+     ],
+     [
+      256,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "visibility",
+    "fromInputMs": 261,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 309,
+    "lastMs": 309,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      309,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "button#205",
+    "prop": "visibility",
+    "fromInputMs": 261,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 309,
+    "lastMs": 309,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      309,
+      "hidden"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 4,
+    "target": "button[tid=sidebar-compact-trigger]#9",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 42,
+    "target": "div#424",
+    "add": [
+     "div#425"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 42,
+    "target": "div#425",
+    "add": [
+     "div#426"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 3,
+  "strip": null,
+  "prevFrame": -102
+ },
+ {
+  "label": "hover-composer-plus",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div#35"
+  },
+  "firstChangeMs": 337,
+  "settleMs": 1559,
+  "rafFrames": 315,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=tooltip]#427",
+    "prop": "rect",
+    "fromInputMs": 310,
+    "input": "pointerover span\"~\"#76",
+    "firstMs": 337,
+    "lastMs": 337,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "5.4,44.9,141.2,23.5",
+    "values": [
+     [
+      337,
+      "5.4,44.9,141.2,23.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#427",
+    "prop": "opacity",
+    "fromInputMs": 310,
+    "input": "pointerover span\"~\"#76",
+    "firstMs": 337,
+    "lastMs": 337,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0",
+    "values": [
+     [
+      337,
+      "0"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#427",
+    "prop": "scale",
+    "fromInputMs": 310,
+    "input": "pointerover span\"~\"#76",
+    "firstMs": 337,
+    "lastMs": 337,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0.98",
+    "values": [
+     [
+      337,
+      "0.98"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#438",
+    "prop": "rect",
+    "fromInputMs": 310,
+    "input": "pointerover span\"~\"#76",
+    "firstMs": 337,
+    "lastMs": 1559,
+    "durationMs": 1222,
+    "steps": 26,
+    "to": "5.7,768.9,219.9,23.5",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#438",
+    "prop": "opacity",
+    "fromInputMs": 310,
+    "input": "pointerover span\"~\"#76",
+    "firstMs": 337,
+    "lastMs": 1559,
+    "durationMs": 1222,
+    "steps": 44,
+    "to": "7.30442e-05",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#438",
+    "prop": "scale",
+    "fromInputMs": 310,
+    "input": "pointerover span\"~\"#76",
+    "firstMs": 337,
+    "lastMs": 1559,
+    "durationMs": 1222,
+    "steps": 45,
+    "to": "0.980001",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      2241
+     ],
+     [
+      22,
+      4935
+     ],
+     [
+      28,
+      8296
+     ],
+     [
+      33,
+      12068
+     ],
+     [
+      39,
+      14835
+     ],
+     [
+      44,
+      16429
+     ],
+     [
+      50,
+      17404
+     ],
+     [
+      56,
+      18051
+     ],
+     [
+      61,
+      18525
+     ],
+     [
+      67,
+      18874
+     ],
+     [
+      72,
+      19142
+     ],
+     [
+      78,
+      19359
+     ],
+     [
+      83,
+      19522
+     ],
+     [
+      89,
+      19653
+     ],
+     [
+      94,
+      19754
+     ],
+     [
+      100,
+      19834
+     ],
+     [
+      106,
+      19894
+     ],
+     [
+      111,
+      19939
+     ],
+     [
+      117,
+      19969
+     ],
+     [
+      122,
+      19989
+     ],
+     [
+      128,
+      19999
+     ],
+     [
+      133,
+      null
+     ],
+     [
+      1105,
+      20000
+     ],
+     [
+      1111,
+      17743
+     ],
+     [
+      1117,
+      15045
+     ],
+     [
+      1122,
+      11746
+     ],
+     [
+      1128,
+      7909
+     ],
+     [
+      1133,
+      5151
+     ],
+     [
+      1139,
+      3563
+     ],
+     [
+      1144,
+      2591
+     ],
+     [
+      1150,
+      1945
+     ],
+     [
+      1155,
+      1479
+     ],
+     [
+      1161,
+      1124
+     ],
+     [
+      1167,
+      852
+     ],
+     [
+      1172,
+      644
+     ],
+     [
+      1178,
+      477
+     ],
+     [
+      1183,
+      346
+     ],
+     [
+      1189,
+      245
+     ],
+     [
+      1194,
+      165
+     ],
+     [
+      1200,
+      106
+     ],
+     [
+      1205,
+      62
+     ],
+     [
+      1211,
+      30
+     ],
+     [
+      1217,
+      11
+     ],
+     [
+      1222,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 341,
+    "target": "div[role=tooltip]#427",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 341,
+    "target": "div[role=presentation]#435",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 341,
+    "target": "div#424",
+    "add": [
+     "div#436"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 341,
+    "target": "div#436",
+    "add": [
+     "div#437"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 346,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 346,
+    "target": "div#425",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1440,
+    "target": "div[role=tooltip]#438",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 1440,
+    "target": "div[role=presentation]#439",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 1567,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 1567,
+    "target": "div#436",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 10,
+  "strip": "strips/hover-composer-plus.jpg (16 of 29 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "press-composer-plus",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#76"
+  },
+  "firstChangeMs": -98,
+  "settleMs": 396,
+  "rafFrames": 169,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=tooltip]#438",
+    "prop": "rect",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -98,
+    "lastMs": -98,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "5.7,768.9,219.9,23.5",
+    "values": [
+     [
+      -98,
+      "5.7,768.9,219.9,23.5"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#438",
+    "prop": "opacity",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -98,
+    "lastMs": -98,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "7.30442e-05",
+    "values": [
+     [
+      -98,
+      "7.30442e-05"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#438",
+    "prop": "scale",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -98,
+    "lastMs": -98,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0.980001",
+    "values": [
+     [
+      -98,
+      "0.980001"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=chat-input-attach]#72",
+    "prop": "outlineColor",
+    "fromInputMs": 7,
+    "input": "click span\"~\"#76",
+    "firstMs": 7,
+    "lastMs": 157,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgba(35, 112, 205, 0)",
+    "values": [
+     [
+      7,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      157,
+      "rgba(35, 112, 205, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=chat-input-attach]#72",
+    "prop": "outlineWidth",
+    "fromInputMs": 7,
+    "input": "click span\"~\"#76",
+    "firstMs": 7,
+    "lastMs": 157,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "1.6px",
+    "values": [
+     [
+      7,
+      "2.4px"
+     ],
+     [
+      157,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu]#454",
+    "prop": "rect",
+    "fromInputMs": 13,
+    "input": "click span\"~\"#76",
+    "firstMs": 13,
+    "lastMs": 390,
+    "durationMs": 378,
+    "steps": 53,
+    "to": "0,386,375.2,426",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      89,
+      0.089
+     ],
+     [
+      95,
+      0.17
+     ],
+     [
+      100,
+      0.241
+     ],
+     [
+      106,
+      0.307
+     ],
+     [
+      111,
+      0.366
+     ],
+     [
+      117,
+      0.42
+     ],
+     [
+      122,
+      0.468
+     ],
+     [
+      128,
+      0.513
+     ],
+     [
+      133,
+      0.553
+     ],
+     [
+      139,
+      0.591
+     ],
+     [
+      145,
+      0.625
+     ],
+     [
+      150,
+      0.656
+     ],
+     [
+      156,
+      0.685
+     ],
+     [
+      161,
+      0.711
+     ],
+     [
+      167,
+      0.735
+     ],
+     [
+      172,
+      0.758
+     ],
+     [
+      178,
+      0.778
+     ],
+     [
+      183,
+      0.797
+     ],
+     [
+      189,
+      0.815
+     ],
+     [
+      195,
+      0.831
+     ],
+     [
+      200,
+      0.846
+     ],
+     [
+      206,
+      0.86
+     ],
+     [
+      211,
+      0.873
+     ],
+     [
+      217,
+      0.884
+     ],
+     [
+      222,
+      0.895
+     ],
+     [
+      228,
+      0.905
+     ],
+     [
+      233,
+      0.915
+     ],
+     [
+      239,
+      0.923
+     ],
+     [
+      244,
+      0.931
+     ],
+     [
+      250,
+      0.938
+     ],
+     [
+      256,
+      0.945
+     ],
+     [
+      261,
+      0.951
+     ],
+     [
+      267,
+      0.956
+     ],
+     [
+      272,
+      0.962
+     ],
+     [
+      278,
+      0.966
+     ],
+     [
+      283,
+      0.97
+     ],
+     [
+      289,
+      0.974
+     ],
+     [
+      294,
+      0.978
+     ],
+     [
+      300,
+      0.981
+     ],
+     [
+      306,
+      0.984
+     ],
+     [
+      311,
+      0.986
+     ],
+     [
+      317,
+      0.989
+     ],
+     [
+      322,
+      0.991
+     ],
+     [
+      328,
+      0.993
+     ],
+     [
+      333,
+      0.994
+     ],
+     [
+      339,
+      0.996
+     ],
+     [
+      345,
+      0.997
+     ],
+     [
+      350,
+      0.998
+     ],
+     [
+      356,
+      0.998
+     ],
+     [
+      361,
+      0.999
+     ],
+     [
+      372,
+      1
+     ],
+     [
+      378,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu]#454",
+    "prop": "translate",
+    "fromInputMs": 13,
+    "input": "click span\"~\"#76",
+    "firstMs": 13,
+    "lastMs": 396,
+    "durationMs": 383,
+    "steps": 54,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div[role=menu]#454",
+    "prop": "outlineColor",
+    "fromInputMs": 13,
+    "input": "click span\"~\"#76",
+    "firstMs": 13,
+    "lastMs": 85,
+    "durationMs": 72,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      13,
+      "rgb(35, 112, 205)"
+     ],
+     [
+      85,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": -90,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": -90,
+    "target": "div#436",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 63,
+    "target": "div#71",
+    "add": [
+     "span#441"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 63,
+    "target": "div#71",
+    "add": [
+     "span#442"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 63,
+    "target": "button[tid=chat-input-attach]#72",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 63,
+    "target": "div#424",
+    "add": [
+     "div#443"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 63,
+    "target": "div#443",
+    "add": [
+     "div#444"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 63,
+    "target": "div#71",
+    "add": [
+     "span#445"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 63,
+    "target": "div#71",
+    "add": [
+     "span#446"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 63,
+    "target": "div[role=menuitem][tid=add-menu-skills]#447",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 63,
+    "target": "div[role=menuitem][tid=add-menu-connectors]#448",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 63,
+    "target": "div[role=menuitem]#449",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 63,
+    "target": "div[role=menuitem][tid=add-menu-plugins]#450",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 63,
+    "target": "div[role=menuitem]#451",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 63,
+    "target": "div#71",
+    "add": [
+     "span#452"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 15,
+  "strip": "strips/press-composer-plus.jpg (16 of 36 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "close-plus-menu",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=menu]#454"
+  },
+  "firstChangeMs": 3,
+  "settleMs": 331,
+  "rafFrames": 165,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=menu]#454",
+    "prop": "translate",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#454",
+    "firstMs": 3,
+    "lastMs": 325,
+    "durationMs": 322,
+    "steps": 55,
+    "to": "0px calc(100% + 24px)",
+    "curve": null
+   },
+   {
+    "el": "div[role=menu]#454",
+    "prop": "outlineColor",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#454",
+    "firstMs": 3,
+    "lastMs": 3,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      3,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu]#454",
+    "prop": "outlineWidth",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#454",
+    "firstMs": 3,
+    "lastMs": 3,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1.6px",
+    "values": [
+     [
+      3,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#455",
+    "prop": "opacity",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#454",
+    "firstMs": 3,
+    "lastMs": 325,
+    "durationMs": 322,
+    "steps": 55,
+    "to": "1.3338e-08",
+    "curve": null
+   },
+   {
+    "el": "div[role=menu]#454",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover div[role=presentation]#455",
+    "firstMs": 31,
+    "lastMs": 320,
+    "durationMs": 289,
+    "steps": 53,
+    "to": "0,836,375.2,426",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.089
+     ],
+     [
+      11,
+      0.169
+     ],
+     [
+      16,
+      0.23
+     ],
+     [
+      22,
+      0.305
+     ],
+     [
+      28,
+      0.363
+     ],
+     [
+      33,
+      0.416
+     ],
+     [
+      39,
+      0.466
+     ],
+     [
+      45,
+      0.51
+     ],
+     [
+      50,
+      0.551
+     ],
+     [
+      56,
+      0.588
+     ],
+     [
+      61,
+      0.622
+     ],
+     [
+      67,
+      0.654
+     ],
+     [
+      72,
+      0.683
+     ],
+     [
+      78,
+      0.71
+     ],
+     [
+      83,
+      0.734
+     ],
+     [
+      89,
+      0.757
+     ],
+     [
+      95,
+      0.778
+     ],
+     [
+      100,
+      0.797
+     ],
+     [
+      106,
+      0.815
+     ],
+     [
+      111,
+      0.831
+     ],
+     [
+      117,
+      0.846
+     ],
+     [
+      122,
+      0.86
+     ],
+     [
+      128,
+      0.873
+     ],
+     [
+      133,
+      0.885
+     ],
+     [
+      139,
+      0.896
+     ],
+     [
+      145,
+      0.906
+     ],
+     [
+      150,
+      0.916
+     ],
+     [
+      156,
+      0.924
+     ],
+     [
+      161,
+      0.932
+     ],
+     [
+      167,
+      0.94
+     ],
+     [
+      172,
+      0.946
+     ],
+     [
+      178,
+      0.952
+     ],
+     [
+      183,
+      0.958
+     ],
+     [
+      189,
+      0.963
+     ],
+     [
+      195,
+      0.968
+     ],
+     [
+      200,
+      0.972
+     ],
+     [
+      206,
+      0.976
+     ],
+     [
+      211,
+      0.979
+     ],
+     [
+      217,
+      0.982
+     ],
+     [
+      222,
+      0.985
+     ],
+     [
+      228,
+      0.988
+     ],
+     [
+      233,
+      0.99
+     ],
+     [
+      239,
+      0.992
+     ],
+     [
+      245,
+      0.994
+     ],
+     [
+      250,
+      0.995
+     ],
+     [
+      256,
+      0.996
+     ],
+     [
+      261,
+      0.997
+     ],
+     [
+      267,
+      0.998
+     ],
+     [
+      272,
+      0.999
+     ],
+     [
+      278,
+      0.999
+     ],
+     [
+      283,
+      1
+     ],
+     [
+      289,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=chat-input-attach]#72",
+    "prop": "boxShadow",
+    "fromInputMs": 304,
+    "input": "pointerover div[role=presentation]#455",
+    "firstMs": 331,
+    "lastMs": 331,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      331,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=chat-input-attach]#72",
+    "prop": "outlineColor",
+    "fromInputMs": 304,
+    "input": "pointerover div[role=presentation]#455",
+    "firstMs": 331,
+    "lastMs": 331,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      331,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 26,
+    "target": "div#71",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "div#71",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "div[role=presentation]#455",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div[role=menu]#454",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "div[role=presentation]#456",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 26,
+    "target": "button[tid=chat-input-attach]#72",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 26,
+    "target": "div#71",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "div#71",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 26,
+    "target": "div#71",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 336,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 336,
+    "target": "div#443",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 11,
+  "strip": "strips/close-plus-menu.jpg (16 of 43 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "type-composer",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "p\"~\"#63"
+  },
+  "firstChangeMs": 3,
+  "settleMs": 686,
+  "rafFrames": 681,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=textbox][tid=chat-input]#62",
+    "prop": "outlineColor",
+    "fromInputMs": 3,
+    "input": "click p\"~\"#63",
+    "firstMs": 3,
+    "lastMs": 3,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      3,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "div#58",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#62",
+    "firstMs": 686,
+    "lastMs": 686,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "24,582,327.2,142",
+    "values": [
+     [
+      686,
+      "24,582,327.2,142"
+     ]
+    ]
+   },
+   {
+    "el": "div#59",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#62",
+    "firstMs": 686,
+    "lastMs": 686,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "24,582,327.2,142",
+    "values": [
+     [
+      686,
+      "24,582,327.2,142"
+     ]
+    ]
+   },
+   {
+    "el": "div#60",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#62",
+    "firstMs": 686,
+    "lastMs": 686,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "24,582,327.2,142",
+    "values": [
+     [
+      686,
+      "24,582,327.2,142"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=textbox][tid=chat-input]#62",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#62",
+    "firstMs": 686,
+    "lastMs": 686,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "32,587,319.2,132",
+    "values": [
+     [
+      686,
+      "32,587,319.2,132"
+     ]
+    ]
+   },
+   {
+    "el": "p\"~\"#63",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#62",
+    "firstMs": 686,
+    "lastMs": 686,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "32,587,319.2,110",
+    "values": [
+     [
+      686,
+      "32,587,319.2,110"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 16,
+    "target": "p\"~\"#63",
+    "chars": 158
+   },
+   {
+    "t": 98,
+    "target": "p\"~\"#63",
+    "chars": 159
+   },
+   {
+    "t": 172,
+    "target": "p\"~\"#63",
+    "chars": 160
+   },
+   {
+    "t": 245,
+    "target": "p\"~\"#63",
+    "chars": 161
+   },
+   {
+    "t": 318,
+    "target": "p\"~\"#63",
+    "chars": 162
+   },
+   {
+    "t": 391,
+    "target": "p\"~\"#63",
+    "chars": 163
+   },
+   {
+    "t": 464,
+    "target": "p\"~\"#63",
+    "chars": 164
+   },
+   {
+    "t": 538,
+    "target": "p\"~\"#63",
+    "chars": 165
+   },
+   {
+    "t": 612,
+    "target": "p\"~\"#63",
+    "chars": 166
+   },
+   {
+    "t": 686,
+    "target": "p\"~\"#63",
+    "chars": 167
+   },
+   {
+    "t": 759,
+    "target": "p\"~\"#63",
+    "chars": 168
+   },
+   {
+    "t": 832,
+    "target": "p\"~\"#63",
+    "chars": 169
+   },
+   {
+    "t": 904,
+    "target": "p\"~\"#63",
+    "chars": 170
+   },
+   {
+    "t": 976,
+    "target": "p\"~\"#63",
+    "chars": 171
+   },
+   {
+    "t": 1049,
+    "target": "p\"~\"#63",
+    "chars": 172
+   },
+   {
+    "t": 1122,
+    "target": "p\"~\"#63",
+    "chars": 173
+   },
+   {
+    "t": 1194,
+    "target": "p\"~\"#63",
+    "chars": 174
+   },
+   {
+    "t": 1268,
+    "target": "p\"~\"#63",
+    "chars": 175
+   },
+   {
+    "t": 1343,
+    "target": "p\"~\"#63",
+    "chars": 176
+   },
+   {
+    "t": 1415,
+    "target": "p\"~\"#63",
+    "chars": 177
+   },
+   {
+    "t": 1488,
+    "target": "p\"~\"#63",
+    "chars": 178
+   },
+   {
+    "t": 1561,
+    "target": "p\"~\"#63",
+    "chars": 179
+   },
+   {
+    "t": 1634,
+    "target": "p\"~\"#63",
+    "chars": 180
+   },
+   {
+    "t": 1707,
+    "target": "p\"~\"#63",
+    "chars": 181
+   },
+   {
+    "t": 1781,
+    "target": "p\"~\"#63",
+    "chars": 182
+   },
+   {
+    "t": 1853,
+    "target": "p\"~\"#63",
+    "chars": 183
+   },
+   {
+    "t": 1926,
+    "target": "p\"~\"#63",
+    "chars": 184
+   },
+   {
+    "t": 1998,
+    "target": "p\"~\"#63",
+    "chars": 185
+   },
+   {
+    "t": 2071,
+    "target": "p\"~\"#63",
+    "chars": 186
+   },
+   {
+    "t": 2143,
+    "target": "p\"~\"#63",
+    "chars": 187
+   },
+   {
+    "t": 2217,
+    "target": "p\"~\"#63",
+    "chars": 188
+   },
+   {
+    "t": 2289,
+    "target": "p\"~\"#63",
+    "chars": 189
+   },
+   {
+    "t": 2362,
+    "target": "p\"~\"#63",
+    "chars": 190
+   },
+   {
+    "t": 2434,
+    "target": "p\"~\"#63",
+    "chars": 191
+   },
+   {
+    "t": 2506,
+    "target": "p\"~\"#63",
+    "chars": 192
+   },
+   {
+    "t": 2579,
+    "target": "p\"~\"#63",
+    "chars": 193
+   },
+   {
+    "t": 2652,
+    "target": "p\"~\"#63",
+    "chars": 194
+   },
+   {
+    "t": 2724,
+    "target": "p\"~\"#63",
+    "chars": 195
+   },
+   {
+    "t": 2797,
+    "target": "p\"~\"#63",
+    "chars": 196
+   },
+   {
+    "t": 2870,
+    "target": "p\"~\"#63",
+    "chars": 197
+   },
+   {
+    "t": 2943,
+    "target": "p\"~\"#63",
+    "chars": 198
+   },
+   {
+    "t": 3016,
+    "target": "p\"~\"#63",
+    "chars": 199
+   }
+  ],
+  "mutationCount": 42,
+  "strip": "strips/type-composer.jpg (16 of 20 frames)",
+  "prevFrame": -103
+ },
+ {
+  "label": "clear-composer",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=textbox][tid=chat-input]#62"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 320,
+  "rafFrames": 124,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=textbox][tid=chat-input]#62",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#62",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "32,697,319.2,22",
+    "values": [
+     [
+      4,
+      "32,697,319.2,22"
+     ]
+    ]
+   },
+   {
+    "el": "div#517",
+    "prop": "opacity",
+    "fromInputMs": 1,
+    "input": "keydown div[role=textbox][tid=chat-input]#62",
+    "firstMs": 4,
+    "lastMs": 320,
+    "durationMs": 317,
+    "steps": 51,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      22,
+      0.009
+     ],
+     [
+      28,
+      0.021
+     ],
+     [
+      33,
+      0.036
+     ],
+     [
+      39,
+      0.056
+     ],
+     [
+      44,
+      0.077
+     ],
+     [
+      50,
+      0.102
+     ],
+     [
+      56,
+      0.13
+     ],
+     [
+      61,
+      0.16
+     ],
+     [
+      67,
+      0.192
+     ],
+     [
+      72,
+      0.225
+     ],
+     [
+      83,
+      0.297
+     ],
+     [
+      89,
+      0.333
+     ],
+     [
+      100,
+      0.405
+     ],
+     [
+      106,
+      0.44
+     ],
+     [
+      117,
+      0.508
+     ],
+     [
+      122,
+      0.54
+     ],
+     [
+      133,
+      0.602
+     ],
+     [
+      139,
+      0.631
+     ],
+     [
+      144,
+      0.658
+     ],
+     [
+      150,
+      0.684
+     ],
+     [
+      156,
+      0.709
+     ],
+     [
+      161,
+      0.732
+     ],
+     [
+      167,
+      0.754
+     ],
+     [
+      172,
+      0.776
+     ],
+     [
+      178,
+      0.795
+     ],
+     [
+      183,
+      0.814
+     ],
+     [
+      189,
+      0.831
+     ],
+     [
+      194,
+      0.848
+     ],
+     [
+      200,
+      0.863
+     ],
+     [
+      206,
+      0.877
+     ],
+     [
+      211,
+      0.891
+     ],
+     [
+      217,
+      0.903
+     ],
+     [
+      222,
+      0.915
+     ],
+     [
+      228,
+      0.925
+     ],
+     [
+      233,
+      0.935
+     ],
+     [
+      239,
+      0.944
+     ],
+     [
+      244,
+      0.953
+     ],
+     [
+      250,
+      0.96
+     ],
+     [
+      255,
+      0.967
+     ],
+     [
+      261,
+      0.973
+     ],
+     [
+      267,
+      0.978
+     ],
+     [
+      272,
+      0.983
+     ],
+     [
+      278,
+      0.987
+     ],
+     [
+      283,
+      0.991
+     ],
+     [
+      289,
+      0.994
+     ],
+     [
+      294,
+      0.996
+     ],
+     [
+      300,
+      0.998
+     ],
+     [
+      305,
+      0.999
+     ],
+     [
+      311,
+      1
+     ],
+     [
+      317,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 5,
+    "target": "p#63",
+    "add": [
+     "br#515"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 5,
+    "target": "div[role=textbox][tid=chat-input]#62",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "p"
+    ]
+   },
+   {
+    "t": 18,
+    "target": "div#516",
+    "add": [
+     "div#517"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 27,
+    "target": "div#59",
+    "add": [
+     "span#518"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 4,
+  "strip": "strips/clear-composer.jpg (16 of 32 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "open-model-menu",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span#146"
+  },
+  "firstChangeMs": 7,
+  "settleMs": 380,
+  "rafFrames": 174,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "span#140",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "188.6,780,136.6,24",
+    "values": [
+     [
+      7,
+      "180.6,780,136.6,24"
+     ],
+     [
+      163,
+      "188.6,780,136.6,24"
+     ]
+    ]
+   },
+   {
+    "el": "div#141",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "180.6,772,152.6,40",
+    "values": [
+     [
+      7,
+      "172.6,772,152.6,40"
+     ],
+     [
+      163,
+      "180.6,772,152.6,40"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=model-selector-dropdown]#142",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "188.6,776,136.6,32",
+    "values": [
+     [
+      7,
+      "180.6,776,136.6,32"
+     ],
+     [
+      163,
+      "188.6,776,136.6,32"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=model-selector-dropdown]#142",
+    "prop": "outlineColor",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "rgba(35, 112, 205, 0)",
+    "values": [
+     [
+      7,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      163,
+      "rgba(35, 112, 205, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=model-selector-dropdown]#142",
+    "prop": "outlineWidth",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "1.6px",
+    "values": [
+     [
+      7,
+      "2.4px"
+     ],
+     [
+      163,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "span#145",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "200.6,782.5,112.6,19",
+    "values": [
+     [
+      7,
+      "192.6,782.5,112.6,19"
+     ],
+     [
+      163,
+      "200.6,782.5,112.6,19"
+     ]
+    ]
+   },
+   {
+    "el": "span#146",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "200.6,782.5,112.6,19",
+    "values": [
+     [
+      7,
+      "192.6,782.5,112.6,19"
+     ],
+     [
+      163,
+      "200.6,782.5,112.6,19"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#147",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "200.6,782.5,55.4,19",
+    "values": [
+     [
+      7,
+      "192.6,782.5,55.4,19"
+     ],
+     [
+      163,
+      "200.6,782.5,55.4,19"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#148",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 163,
+    "durationMs": 156,
+    "steps": 2,
+    "to": "260,782.5,53.2,19",
+    "values": [
+     [
+      7,
+      "252,782.5,53.2,19"
+     ],
+     [
+      163,
+      "260,782.5,53.2,19"
+     ]
+    ]
+   },
+   {
+    "el": "div#47",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "8,684,359.2,128",
+    "values": [
+     [
+      7,
+      "8,684,359.2,128"
+     ]
+    ]
+   },
+   {
+    "el": "div#48",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "8,684,359.2,120",
+    "values": [
+     [
+      7,
+      "8,684,359.2,120"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#49",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "8,684,359.2,120",
+    "values": [
+     [
+      7,
+      "8,684,359.2,120"
+     ]
+    ]
+   },
+   {
+    "el": "fieldset#50",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "8,684,359.2,120",
+    "values": [
+     [
+      7,
+      "8,684,359.2,120"
+     ]
+    ]
+   },
+   {
+    "el": "div#51",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "8,684,359.2,120",
+    "values": [
+     [
+      7,
+      "8,684,359.2,120"
+     ]
+    ]
+   },
+   {
+    "el": "div#53",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "8,684,359.2,120",
+    "values": [
+     [
+      7,
+      "8,684,359.2,120"
+     ]
+    ]
+   },
+   {
+    "el": "div#54",
+    "prop": "rect",
+    "fromInputMs": 7,
+    "input": "click span#146",
+    "firstMs": 7,
+    "lastMs": 7,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "8,684,359.2,120",
+    "values": [
+     [
+      7,
+      "8,684,359.2,120"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu]#527",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 368,
+    "durationMs": 328,
+    "steps": 53,
+    "to": "0,81,375.2,731",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.089
+     ],
+     [
+      44,
+      0.169
+     ],
+     [
+      50,
+      0.242
+     ],
+     [
+      56,
+      0.307
+     ],
+     [
+      61,
+      0.366
+     ],
+     [
+      67,
+      0.419
+     ],
+     [
+      72,
+      0.469
+     ],
+     [
+      78,
+      0.513
+     ],
+     [
+      83,
+      0.554
+     ],
+     [
+      89,
+      0.591
+     ],
+     [
+      94,
+      0.625
+     ],
+     [
+      100,
+      0.656
+     ],
+     [
+      106,
+      0.685
+     ],
+     [
+      111,
+      0.711
+     ],
+     [
+      117,
+      0.735
+     ],
+     [
+      122,
+      0.758
+     ],
+     [
+      128,
+      0.778
+     ],
+     [
+      133,
+      0.797
+     ],
+     [
+      139,
+      0.815
+     ],
+     [
+      144,
+      0.831
+     ],
+     [
+      150,
+      0.846
+     ],
+     [
+      156,
+      0.86
+     ],
+     [
+      161,
+      0.873
+     ],
+     [
+      172,
+      0.895
+     ],
+     [
+      178,
+      0.905
+     ],
+     [
+      183,
+      0.914
+     ],
+     [
+      189,
+      0.923
+     ],
+     [
+      194,
+      0.931
+     ],
+     [
+      200,
+      0.938
+     ],
+     [
+      206,
+      0.945
+     ],
+     [
+      211,
+      0.951
+     ],
+     [
+      217,
+      0.956
+     ],
+     [
+      222,
+      0.962
+     ],
+     [
+      228,
+      0.966
+     ],
+     [
+      233,
+      0.97
+     ],
+     [
+      239,
+      0.974
+     ],
+     [
+      245,
+      0.978
+     ],
+     [
+      250,
+      0.981
+     ],
+     [
+      256,
+      0.984
+     ],
+     [
+      261,
+      0.986
+     ],
+     [
+      267,
+      0.989
+     ],
+     [
+      272,
+      0.991
+     ],
+     [
+      278,
+      0.993
+     ],
+     [
+      283,
+      0.994
+     ],
+     [
+      289,
+      0.995
+     ],
+     [
+      295,
+      0.997
+     ],
+     [
+      300,
+      0.998
+     ],
+     [
+      306,
+      0.998
+     ],
+     [
+      311,
+      0.999
+     ],
+     [
+      317,
+      0.999
+     ],
+     [
+      322,
+      1
+     ],
+     [
+      328,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu]#527",
+    "prop": "translate",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 374,
+    "durationMs": 333,
+    "steps": 54,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div[role=menu]#527",
+    "prop": "outlineColor",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 63,
+    "durationMs": 22,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      41,
+      "rgb(35, 112, 205)"
+     ],
+     [
+      63,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "div#529",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "0,280.8,375.2,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#530",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "169.6,294.8,36,4",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#531",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "0,312.8,375.2,691",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#532",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 380,
+    "durationMs": 339,
+    "steps": 17,
+    "to": "0,113,375.2,691",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.089
+     ],
+     [
+      44,
+      0.169
+     ],
+     [
+      50,
+      0.242
+     ],
+     [
+      56,
+      0.307
+     ],
+     [
+      61,
+      0.366
+     ],
+     [
+      67,
+      0.419
+     ],
+     [
+      72,
+      0.469
+     ],
+     [
+      78,
+      0.513
+     ],
+     [
+      83,
+      0.554
+     ],
+     [
+      89,
+      0.591
+     ],
+     [
+      94,
+      0.625
+     ],
+     [
+      100,
+      0.656
+     ],
+     [
+      106,
+      0.685
+     ],
+     [
+      111,
+      0.711
+     ],
+     [
+      117,
+      0.735
+     ],
+     [
+      339,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group]#533",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "4,316.8,367.2,200",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menuitemradio]#534",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "4,316.8,367.2,50",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#535",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "14,322.8,307.2,37",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#536",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "14,322.8,307.2,20",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#537",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "14,322.8,307.2,20",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#538",
+    "prop": "rect",
+    "fromInputMs": 41,
+    "input": "click span#146",
+    "firstMs": 41,
+    "lastMs": 157,
+    "durationMs": 117,
+    "steps": 16,
+    "to": "14,322.8,57.8,20",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      39,
+      0.12
+     ],
+     [
+      44,
+      0.23
+     ],
+     [
+      50,
+      0.329
+     ],
+     [
+      56,
+      0.417
+     ],
+     [
+      61,
+      0.498
+     ],
+     [
+      67,
+      0.57
+     ],
+     [
+      72,
+      0.637
+     ],
+     [
+      78,
+      0.697
+     ],
+     [
+      83,
+      0.753
+     ],
+     [
+      89,
+      0.804
+     ],
+     [
+      94,
+      0.85
+     ],
+     [
+      100,
+      0.892
+     ],
+     [
+      106,
+      0.931
+     ],
+     [
+      111,
+      0.967
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 35,
+    "target": "div#141",
+    "add": [
+     "span#519"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 35,
+    "target": "div#141",
+    "add": [
+     "span#520"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 35,
+    "target": "button[tid=model-selector-dropdown]#142",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 35,
+    "target": "div#424",
+    "add": [
+     "div#521"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 35,
+    "target": "div#521",
+    "add": [
+     "div#522"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 35,
+    "target": "div#141",
+    "add": [
+     "span#523"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 35,
+    "target": "div#141",
+    "add": [
+     "span#524"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 35,
+    "target": "div#141",
+    "add": [
+     "span#525"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 8,
+  "strip": "strips/open-model-menu.jpg (16 of 33 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "hover-model-menu",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[role=menuitemradio]#686"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 1554,
+  "rafFrames": 371,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=menu]#527",
+    "prop": "outlineColor",
+    "fromInputMs": 4,
+    "input": "pointerover div[role=menuitemradio]#686",
+    "firstMs": 4,
+    "lastMs": 1554,
+    "durationMs": 1550,
+    "steps": 2,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      4,
+      "rgb(35, 112, 205)"
+     ],
+     [
+      1554,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "div#531",
+    "prop": "rect",
+    "fromInputMs": 4,
+    "input": "pointerover div[role=menuitemradio]#686",
+    "firstMs": 4,
+    "lastMs": 4,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "0,113,375.2,691",
+    "values": [
+     [
+      4,
+      "0,113,375.2,691"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=group]#533",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover div[role=menuitemradio]#630",
+    "firstMs": 21,
+    "lastMs": 21,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "4,117,367.2,200",
+    "values": [
+     [
+      21,
+      "4,117,367.2,200"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menuitemradio]#534",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover span#537",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "4,117,367.2,50",
+    "values": [
+     [
+      32,
+      "4,117,367.2,50"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menuitemradio]#534",
+    "prop": "backgroundColor",
+    "fromInputMs": 1,
+    "input": "pointerover span#537",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.1)",
+    "values": [
+     [
+      32,
+      "rgba(0, 0, 0, 0.1)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menuitemradio]#534",
+    "prop": "outlineColor",
+    "fromInputMs": 1,
+    "input": "pointerover span#537",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      32,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "span#535",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover span#537",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "14,123,307.2,37",
+    "values": [
+     [
+      32,
+      "14,123,307.2,37"
+     ]
+    ]
+   },
+   {
+    "el": "span#536",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover span#537",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "14,123,307.2,20",
+    "values": [
+     [
+      32,
+      "14,123,307.2,20"
+     ]
+    ]
+   },
+   {
+    "el": "span#537",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover span#537",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "14,123,307.2,20",
+    "values": [
+     [
+      32,
+      "14,123,307.2,20"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#538",
+    "prop": "rect",
+    "fromInputMs": 1,
+    "input": "pointerover span#537",
+    "firstMs": 32,
+    "lastMs": 32,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "14,123,57.8,20",
+    "values": [
+     [
+      32,
+      "14,123,57.8,20"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=tooltip]#730",
+    "prop": "rect",
+    "fromInputMs": 302,
+    "input": "focusin div[role=menuitemradio]#534",
+    "firstMs": 337,
+    "lastMs": 487,
+    "durationMs": 150,
+    "steps": 23,
+    "to": "91,170.9,193.1,64.7",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#730",
+    "prop": "opacity",
+    "fromInputMs": 302,
+    "input": "focusin div[role=menuitemradio]#534",
+    "firstMs": 337,
+    "lastMs": 515,
+    "durationMs": 178,
+    "steps": 31,
+    "to": "3.24903e-05",
+    "curve": null
+   },
+   {
+    "el": "div[role=tooltip]#730",
+    "prop": "scale",
+    "fromInputMs": 302,
+    "input": "focusin div[role=menuitemradio]#534",
+    "firstMs": 337,
+    "lastMs": 515,
+    "durationMs": 178,
+    "steps": 31,
+    "to": "0.980001",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      17,
+      2212
+     ],
+     [
+      22,
+      4900
+     ],
+     [
+      28,
+      8252
+     ],
+     [
+      33,
+      12090
+     ],
+     [
+      39,
+      14848
+     ],
+     [
+      44,
+      16415
+     ],
+     [
+      50,
+      17394
+     ],
+     [
+      56,
+      18054
+     ],
+     [
+      61,
+      18528
+     ],
+     [
+      67,
+      18876
+     ],
+     [
+      72,
+      16646
+     ],
+     [
+      78,
+      13907
+     ],
+     [
+      83,
+      10441
+     ],
+     [
+      89,
+      6754
+     ],
+     [
+      95,
+      4325
+     ],
+     [
+      100,
+      2988
+     ],
+     [
+      106,
+      2172
+     ],
+     [
+      111,
+      1606
+     ],
+     [
+      117,
+      1206
+     ],
+     [
+      122,
+      900
+     ],
+     [
+      128,
+      672
+     ],
+     [
+      133,
+      494
+     ],
+     [
+      139,
+      354
+     ],
+     [
+      145,
+      246
+     ],
+     [
+      150,
+      165
+     ],
+     [
+      156,
+      102
+     ],
+     [
+      161,
+      58
+     ],
+     [
+      167,
+      27
+     ],
+     [
+      172,
+      9
+     ],
+     [
+      178,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 341,
+    "target": "div#521",
+    "add": [
+     "div#728"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 341,
+    "target": "div#728",
+    "add": [
+     "div#729"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 410,
+    "target": "div[role=tooltip]#730",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 410,
+    "target": "div[role=presentation]#731",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 524,
+    "target": "div#521",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 524,
+    "target": "div#728",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/hover-model-menu.jpg (16 of 27 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "close-model-menu",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=menu]#527"
+  },
+  "firstChangeMs": 3,
+  "settleMs": 331,
+  "rafFrames": 172,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=menu]#527",
+    "prop": "translate",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#527",
+    "firstMs": 3,
+    "lastMs": 325,
+    "durationMs": 322,
+    "steps": 44,
+    "to": "0px calc(99.9941% + 23.9986px)",
+    "curve": null
+   },
+   {
+    "el": "div[role=menu]#527",
+    "prop": "outlineColor",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#527",
+    "firstMs": 3,
+    "lastMs": 3,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      3,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=menu]#527",
+    "prop": "outlineWidth",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#527",
+    "firstMs": 3,
+    "lastMs": 3,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1.6px",
+    "values": [
+     [
+      3,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#608",
+    "prop": "opacity",
+    "fromInputMs": 3,
+    "input": "keydown div[role=menu]#527",
+    "firstMs": 3,
+    "lastMs": 325,
+    "durationMs": 322,
+    "steps": 44,
+    "to": "5.92252e-05",
+    "curve": null
+   },
+   {
+    "el": "div[role=menu]#527",
+    "prop": "rect",
+    "fromInputMs": 5,
+    "input": "pointerover div[role=presentation]#608",
+    "firstMs": 36,
+    "lastMs": 325,
+    "durationMs": 289,
+    "steps": 43,
+    "to": "0,836,375.2,731",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.089
+     ],
+     [
+      11,
+      0.167
+     ],
+     [
+      17,
+      0.24
+     ],
+     [
+      22,
+      0.304
+     ],
+     [
+      28,
+      0.363
+     ],
+     [
+      33,
+      0.417
+     ],
+     [
+      39,
+      0.466
+     ],
+     [
+      50,
+      0.551
+     ],
+     [
+      56,
+      0.588
+     ],
+     [
+      67,
+      0.654
+     ],
+     [
+      72,
+      0.683
+     ],
+     [
+      83,
+      0.734
+     ],
+     [
+      89,
+      0.757
+     ],
+     [
+      100,
+      0.797
+     ],
+     [
+      106,
+      0.815
+     ],
+     [
+      117,
+      0.846
+     ],
+     [
+      122,
+      0.86
+     ],
+     [
+      133,
+      0.885
+     ],
+     [
+      139,
+      0.896
+     ],
+     [
+      150,
+      0.915
+     ],
+     [
+      156,
+      0.924
+     ],
+     [
+      167,
+      0.939
+     ],
+     [
+      172,
+      0.946
+     ],
+     [
+      183,
+      0.958
+     ],
+     [
+      189,
+      0.963
+     ],
+     [
+      200,
+      0.972
+     ],
+     [
+      206,
+      0.976
+     ],
+     [
+      211,
+      0.979
+     ],
+     [
+      217,
+      0.982
+     ],
+     [
+      222,
+      0.985
+     ],
+     [
+      228,
+      0.988
+     ],
+     [
+      233,
+      0.99
+     ],
+     [
+      239,
+      0.992
+     ],
+     [
+      244,
+      0.994
+     ],
+     [
+      250,
+      0.995
+     ],
+     [
+      256,
+      0.996
+     ],
+     [
+      261,
+      0.997
+     ],
+     [
+      267,
+      0.998
+     ],
+     [
+      272,
+      0.999
+     ],
+     [
+      278,
+      0.999
+     ],
+     [
+      283,
+      1
+     ],
+     [
+      289,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=model-selector-dropdown]#142",
+    "prop": "rect",
+    "fromInputMs": 299,
+    "input": "pointerover div[role=presentation]#608",
+    "firstMs": 331,
+    "lastMs": 331,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "180.6,776,136.6,32",
+    "values": [
+     [
+      331,
+      "180.6,776,136.6,32"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=model-selector-dropdown]#142",
+    "prop": "boxShadow",
+    "fromInputMs": 299,
+    "input": "pointerover div[role=presentation]#608",
+    "firstMs": 331,
+    "lastMs": 331,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      331,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=model-selector-dropdown]#142",
+    "prop": "outlineColor",
+    "fromInputMs": 299,
+    "input": "pointerover div[role=presentation]#608",
+    "firstMs": 331,
+    "lastMs": 331,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      331,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 29,
+    "target": "div#141",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 29,
+    "target": "div#141",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation]#608",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 29,
+    "target": "div[role=menu]#527",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 29,
+    "target": "div[role=presentation]#526",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 29,
+    "target": "button[tid=model-selector-dropdown]#142",
+    "attr": "aria-expanded",
+    "v": "false"
+   },
+   {
+    "t": 29,
+    "target": "div#141",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 29,
+    "target": "div#141",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 29,
+    "target": "div#141",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 336,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 336,
+    "target": "div#521",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 11,
+  "strip": "strips/close-model-menu.jpg (16 of 37 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "collapse-sidebar",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#13"
+  },
+  "firstChangeMs": 11,
+  "settleMs": 1222,
+  "rafFrames": 235,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "visibility",
+    "fromInputMs": 11,
+    "input": "click span\"~\"#13",
+    "firstMs": 11,
+    "lastMs": 11,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "visible",
+    "values": [
+     [
+      11,
+      "visible"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "boxShadow",
+    "fromInputMs": 11,
+    "input": "click span\"~\"#13",
+    "firstMs": 11,
+    "lastMs": 11,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "none",
+    "values": [
+     [
+      11,
+      "none"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "outlineColor",
+    "fromInputMs": 11,
+    "input": "click span\"~\"#13",
+    "firstMs": 11,
+    "lastMs": 11,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(35, 112, 205, 0)",
+    "values": [
+     [
+      11,
+      "rgba(35, 112, 205, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button#205",
+    "prop": "visibility",
+    "fromInputMs": 11,
+    "input": "click span\"~\"#13",
+    "firstMs": 11,
+    "lastMs": 11,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "visible",
+    "values": [
+     [
+      11,
+      "visible"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "focusin div[role=dialog][tid=sidebar]#172",
+    "firstMs": 33,
+    "lastMs": 317,
+    "durationMs": 283,
+    "steps": 52,
+    "to": "0,0,375.2,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.088
+     ],
+     [
+      11,
+      0.165
+     ],
+     [
+      17,
+      0.237
+     ],
+     [
+      22,
+      0.302
+     ],
+     [
+      28,
+      0.361
+     ],
+     [
+      33,
+      0.414
+     ],
+     [
+      39,
+      0.464
+     ],
+     [
+      45,
+      0.508
+     ],
+     [
+      50,
+      0.549
+     ],
+     [
+      56,
+      0.586
+     ],
+     [
+      61,
+      0.62
+     ],
+     [
+      67,
+      0.652
+     ],
+     [
+      72,
+      0.682
+     ],
+     [
+      78,
+      0.709
+     ],
+     [
+      83,
+      0.734
+     ],
+     [
+      89,
+      0.756
+     ],
+     [
+      95,
+      0.778
+     ],
+     [
+      100,
+      0.797
+     ],
+     [
+      106,
+      0.815
+     ],
+     [
+      111,
+      0.831
+     ],
+     [
+      117,
+      0.847
+     ],
+     [
+      122,
+      0.861
+     ],
+     [
+      128,
+      0.874
+     ],
+     [
+      133,
+      0.886
+     ],
+     [
+      139,
+      0.897
+     ],
+     [
+      145,
+      0.908
+     ],
+     [
+      150,
+      0.917
+     ],
+     [
+      156,
+      0.926
+     ],
+     [
+      161,
+      0.934
+     ],
+     [
+      167,
+      0.941
+     ],
+     [
+      172,
+      0.948
+     ],
+     [
+      178,
+      0.954
+     ],
+     [
+      183,
+      0.959
+     ],
+     [
+      189,
+      0.964
+     ],
+     [
+      195,
+      0.969
+     ],
+     [
+      200,
+      0.973
+     ],
+     [
+      206,
+      0.977
+     ],
+     [
+      211,
+      0.981
+     ],
+     [
+      217,
+      0.984
+     ],
+     [
+      222,
+      0.987
+     ],
+     [
+      228,
+      0.989
+     ],
+     [
+      233,
+      0.991
+     ],
+     [
+      239,
+      0.993
+     ],
+     [
+      245,
+      0.995
+     ],
+     [
+      250,
+      0.996
+     ],
+     [
+      256,
+      0.997
+     ],
+     [
+      261,
+      0.998
+     ],
+     [
+      267,
+      0.999
+     ],
+     [
+      272,
+      0.999
+     ],
+     [
+      278,
+      1
+     ],
+     [
+      283,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "transform",
+    "fromInputMs": 10,
+    "input": "focusin div[role=dialog][tid=sidebar]#172",
+    "firstMs": 33,
+    "lastMs": 322,
+    "durationMs": 289,
+    "steps": 53,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "button#205",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "focusin div[role=dialog][tid=sidebar]#172",
+    "firstMs": 33,
+    "lastMs": 317,
+    "durationMs": 283,
+    "steps": 52,
+    "to": "327.2,158,36,36",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.088
+     ],
+     [
+      11,
+      0.165
+     ],
+     [
+      17,
+      0.237
+     ],
+     [
+      22,
+      0.302
+     ],
+     [
+      28,
+      0.361
+     ],
+     [
+      33,
+      0.414
+     ],
+     [
+      39,
+      0.464
+     ],
+     [
+      45,
+      0.508
+     ],
+     [
+      50,
+      0.549
+     ],
+     [
+      56,
+      0.586
+     ],
+     [
+      61,
+      0.62
+     ],
+     [
+      67,
+      0.652
+     ],
+     [
+      72,
+      0.682
+     ],
+     [
+      78,
+      0.709
+     ],
+     [
+      83,
+      0.734
+     ],
+     [
+      89,
+      0.756
+     ],
+     [
+      95,
+      0.778
+     ],
+     [
+      100,
+      0.797
+     ],
+     [
+      106,
+      0.815
+     ],
+     [
+      111,
+      0.831
+     ],
+     [
+      117,
+      0.847
+     ],
+     [
+      122,
+      0.861
+     ],
+     [
+      128,
+      0.874
+     ],
+     [
+      133,
+      0.886
+     ],
+     [
+      139,
+      0.897
+     ],
+     [
+      145,
+      0.908
+     ],
+     [
+      150,
+      0.917
+     ],
+     [
+      156,
+      0.926
+     ],
+     [
+      161,
+      0.934
+     ],
+     [
+      167,
+      0.941
+     ],
+     [
+      172,
+      0.948
+     ],
+     [
+      178,
+      0.954
+     ],
+     [
+      183,
+      0.959
+     ],
+     [
+      189,
+      0.964
+     ],
+     [
+      195,
+      0.969
+     ],
+     [
+      200,
+      0.973
+     ],
+     [
+      206,
+      0.977
+     ],
+     [
+      211,
+      0.981
+     ],
+     [
+      217,
+      0.984
+     ],
+     [
+      222,
+      0.987
+     ],
+     [
+      228,
+      0.989
+     ],
+     [
+      233,
+      0.991
+     ],
+     [
+      239,
+      0.993
+     ],
+     [
+      245,
+      0.995
+     ],
+     [
+      250,
+      0.996
+     ],
+     [
+      256,
+      0.997
+     ],
+     [
+      261,
+      0.998
+     ],
+     [
+      267,
+      0.999
+     ],
+     [
+      272,
+      0.999
+     ],
+     [
+      278,
+      1
+     ],
+     [
+      283,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#518",
+    "prop": "rect",
+    "fromInputMs": 505,
+    "input": "pointerover div[role=dialog][tid=sidebar]#172",
+    "firstMs": 833,
+    "lastMs": 833,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "24,692,119,32",
+    "values": [
+     [
+      833,
+      "24,692,119,32"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#732",
+    "prop": "opacity",
+    "fromInputMs": 505,
+    "input": "pointerover div[role=dialog][tid=sidebar]#172",
+    "firstMs": 833,
+    "lastMs": 1222,
+    "durationMs": 389,
+    "steps": 70,
+    "to": "0.777646",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.014
+     ],
+     [
+      11,
+      0.029
+     ],
+     [
+      17,
+      0.043
+     ],
+     [
+      22,
+      0.057
+     ],
+     [
+      28,
+      0.072
+     ],
+     [
+      33,
+      0.086
+     ],
+     [
+      39,
+      0.1
+     ],
+     [
+      45,
+      0.114
+     ],
+     [
+      50,
+      0.129
+     ],
+     [
+      56,
+      0.143
+     ],
+     [
+      61,
+      0.157
+     ],
+     [
+      67,
+      0.171
+     ],
+     [
+      78,
+      0.2
+     ],
+     [
+      83,
+      0.214
+     ],
+     [
+      89,
+      0.228
+     ],
+     [
+      95,
+      0.243
+     ],
+     [
+      100,
+      0.257
+     ],
+     [
+      106,
+      0.271
+     ],
+     [
+      111,
+      0.286
+     ],
+     [
+      117,
+      0.3
+     ],
+     [
+      122,
+      0.314
+     ],
+     [
+      128,
+      0.329
+     ],
+     [
+      133,
+      0.343
+     ],
+     [
+      139,
+      0.357
+     ],
+     [
+      145,
+      0.371
+     ],
+     [
+      150,
+      0.386
+     ],
+     [
+      156,
+      0.4
+     ],
+     [
+      161,
+      0.414
+     ],
+     [
+      167,
+      0.429
+     ],
+     [
+      172,
+      0.443
+     ],
+     [
+      178,
+      0.457
+     ],
+     [
+      183,
+      0.471
+     ],
+     [
+      189,
+      0.486
+     ],
+     [
+      195,
+      0.5
+     ],
+     [
+      200,
+      0.514
+     ],
+     [
+      206,
+      0.529
+     ],
+     [
+      211,
+      0.543
+     ],
+     [
+      217,
+      0.557
+     ],
+     [
+      222,
+      0.572
+     ],
+     [
+      228,
+      0.586
+     ],
+     [
+      233,
+      0.6
+     ],
+     [
+      239,
+      0.614
+     ],
+     [
+      245,
+      0.629
+     ],
+     [
+      250,
+      0.643
+     ],
+     [
+      256,
+      0.657
+     ],
+     [
+      261,
+      0.672
+     ],
+     [
+      267,
+      0.686
+     ],
+     [
+      272,
+      0.7
+     ],
+     [
+      278,
+      0.714
+     ],
+     [
+      283,
+      0.729
+     ],
+     [
+      289,
+      0.743
+     ],
+     [
+      295,
+      0.757
+     ],
+     [
+      300,
+      0.771
+     ],
+     [
+      306,
+      0.786
+     ],
+     [
+      311,
+      0.8
+     ],
+     [
+      317,
+      0.814
+     ],
+     [
+      322,
+      0.828
+     ],
+     [
+      328,
+      0.843
+     ],
+     [
+      333,
+      0.857
+     ],
+     [
+      339,
+      0.871
+     ],
+     [
+      345,
+      0.886
+     ],
+     [
+      350,
+      0.9
+     ],
+     [
+      356,
+      0.914
+     ],
+     [
+      361,
+      0.929
+     ],
+     [
+      367,
+      0.943
+     ],
+     [
+      372,
+      0.957
+     ],
+     [
+      378,
+      0.971
+     ],
+     [
+      383,
+      0.986
+     ],
+     [
+      389,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 24,
+    "target": "button[tid=sidebar-compact-trigger]#9",
+    "attr": "aria-expanded",
+    "v": "true"
+   },
+   {
+    "t": 831,
+    "target": "span#518",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 831,
+    "target": "span#518",
+    "add": [
+     "span\"~\"#732"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 3,
+  "strip": "strips/collapse-sidebar.jpg (16 of 132 frames)",
+  "prevFrame": -100
+ },
+ {
+  "label": "expand-sidebar",
+  "anchor": {
+   "type": "pointerdown",
+   "target": "span\"~\"#176"
+  },
+  "firstChangeMs": 7,
+  "settleMs": 323,
+  "rafFrames": 233,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "transform",
+    "fromInputMs": 7,
+    "input": "click span\"~\"#176",
+    "firstMs": 7,
+    "lastMs": 318,
+    "durationMs": 311,
+    "steps": 52,
+    "to": "matrix(1, 0, 0, 1, -375.2, 0)",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      33,
+      0.308
+     ],
+     [
+      39,
+      0.366
+     ],
+     [
+      44,
+      0.419
+     ],
+     [
+      50,
+      0.468
+     ],
+     [
+      56,
+      0.512
+     ],
+     [
+      61,
+      0.554
+     ],
+     [
+      67,
+      0.59
+     ],
+     [
+      72,
+      0.625
+     ],
+     [
+      78,
+      0.656
+     ],
+     [
+      83,
+      0.685
+     ],
+     [
+      89,
+      0.711
+     ],
+     [
+      95,
+      0.736
+     ],
+     [
+      100,
+      0.758
+     ],
+     [
+      106,
+      0.778
+     ],
+     [
+      111,
+      0.797
+     ],
+     [
+      117,
+      0.815
+     ],
+     [
+      122,
+      0.831
+     ],
+     [
+      128,
+      0.846
+     ],
+     [
+      133,
+      0.86
+     ],
+     [
+      139,
+      0.873
+     ],
+     [
+      145,
+      0.885
+     ],
+     [
+      150,
+      0.895
+     ],
+     [
+      156,
+      0.905
+     ],
+     [
+      161,
+      0.915
+     ],
+     [
+      167,
+      0.923
+     ],
+     [
+      172,
+      0.931
+     ],
+     [
+      178,
+      0.938
+     ],
+     [
+      183,
+      0.945
+     ],
+     [
+      189,
+      0.951
+     ],
+     [
+      194,
+      0.956
+     ],
+     [
+      200,
+      0.962
+     ],
+     [
+      206,
+      0.966
+     ],
+     [
+      211,
+      0.971
+     ],
+     [
+      217,
+      0.974
+     ],
+     [
+      222,
+      0.978
+     ],
+     [
+      228,
+      0.981
+     ],
+     [
+      233,
+      0.984
+     ],
+     [
+      239,
+      0.986
+     ],
+     [
+      244,
+      0.989
+     ],
+     [
+      250,
+      0.991
+     ],
+     [
+      256,
+      0.993
+     ],
+     [
+      261,
+      0.994
+     ],
+     [
+      267,
+      0.995
+     ],
+     [
+      272,
+      0.997
+     ],
+     [
+      278,
+      0.998
+     ],
+     [
+      283,
+      0.998
+     ],
+     [
+      289,
+      0.999
+     ],
+     [
+      294,
+      0.999
+     ],
+     [
+      300,
+      1
+     ],
+     [
+      306,
+      1
+     ],
+     [
+      311,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button#179",
+    "prop": "outlineColor",
+    "fromInputMs": 7,
+    "input": "click span\"~\"#176",
+    "firstMs": 7,
+    "lastMs": 157,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "rgba(35, 112, 205, 0)",
+    "values": [
+     [
+      7,
+      "rgba(0, 0, 0, 0.9)"
+     ],
+     [
+      157,
+      "rgba(35, 112, 205, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button#179",
+    "prop": "outlineWidth",
+    "fromInputMs": 7,
+    "input": "click span\"~\"#176",
+    "firstMs": 7,
+    "lastMs": 157,
+    "durationMs": 150,
+    "steps": 2,
+    "to": "1.6px",
+    "values": [
+     [
+      7,
+      "2.4px"
+     ],
+     [
+      157,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 40,
+    "lastMs": 312,
+    "durationMs": 272,
+    "steps": 50,
+    "to": "-375.2,0,375.2,812",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.084
+     ],
+     [
+      11,
+      0.161
+     ],
+     [
+      17,
+      0.232
+     ],
+     [
+      22,
+      0.296
+     ],
+     [
+      28,
+      0.356
+     ],
+     [
+      33,
+      0.408
+     ],
+     [
+      39,
+      0.458
+     ],
+     [
+      44,
+      0.503
+     ],
+     [
+      50,
+      0.545
+     ],
+     [
+      56,
+      0.583
+     ],
+     [
+      61,
+      0.618
+     ],
+     [
+      67,
+      0.65
+     ],
+     [
+      72,
+      0.68
+     ],
+     [
+      78,
+      0.707
+     ],
+     [
+      83,
+      0.733
+     ],
+     [
+      89,
+      0.756
+     ],
+     [
+      94,
+      0.778
+     ],
+     [
+      100,
+      0.798
+     ],
+     [
+      106,
+      0.816
+     ],
+     [
+      111,
+      0.833
+     ],
+     [
+      117,
+      0.849
+     ],
+     [
+      122,
+      0.863
+     ],
+     [
+      128,
+      0.877
+     ],
+     [
+      133,
+      0.889
+     ],
+     [
+      139,
+      0.9
+     ],
+     [
+      144,
+      0.911
+     ],
+     [
+      150,
+      0.92
+     ],
+     [
+      156,
+      0.929
+     ],
+     [
+      161,
+      0.937
+     ],
+     [
+      167,
+      0.945
+     ],
+     [
+      172,
+      0.952
+     ],
+     [
+      178,
+      0.957
+     ],
+     [
+      183,
+      0.963
+     ],
+     [
+      189,
+      0.968
+     ],
+     [
+      194,
+      0.973
+     ],
+     [
+      200,
+      0.977
+     ],
+     [
+      206,
+      0.98
+     ],
+     [
+      211,
+      0.984
+     ],
+     [
+      217,
+      0.987
+     ],
+     [
+      222,
+      0.989
+     ],
+     [
+      228,
+      0.992
+     ],
+     [
+      233,
+      0.993
+     ],
+     [
+      239,
+      0.995
+     ],
+     [
+      244,
+      0.997
+     ],
+     [
+      250,
+      0.998
+     ],
+     [
+      256,
+      0.998
+     ],
+     [
+      261,
+      0.999
+     ],
+     [
+      267,
+      1
+     ],
+     [
+      272,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "outlineColor",
+    "fromInputMs": 10,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 40,
+    "lastMs": 40,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0.9)",
+    "values": [
+     [
+      40,
+      "rgba(0, 0, 0, 0.9)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "outlineWidth",
+    "fromInputMs": 10,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 40,
+    "lastMs": 40,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "2.4px",
+    "values": [
+     [
+      40,
+      "2.4px"
+     ]
+    ]
+   },
+   {
+    "el": "button#205",
+    "prop": "rect",
+    "fromInputMs": 10,
+    "input": "focusin button[tid=sidebar-compact-trigger]#9",
+    "firstMs": 40,
+    "lastMs": 312,
+    "durationMs": 272,
+    "steps": 50,
+    "to": "-48,158,36,36",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.084
+     ],
+     [
+      11,
+      0.161
+     ],
+     [
+      17,
+      0.232
+     ],
+     [
+      22,
+      0.296
+     ],
+     [
+      28,
+      0.356
+     ],
+     [
+      33,
+      0.408
+     ],
+     [
+      39,
+      0.458
+     ],
+     [
+      44,
+      0.503
+     ],
+     [
+      50,
+      0.545
+     ],
+     [
+      56,
+      0.583
+     ],
+     [
+      61,
+      0.618
+     ],
+     [
+      67,
+      0.65
+     ],
+     [
+      72,
+      0.68
+     ],
+     [
+      78,
+      0.707
+     ],
+     [
+      83,
+      0.733
+     ],
+     [
+      89,
+      0.756
+     ],
+     [
+      94,
+      0.778
+     ],
+     [
+      100,
+      0.798
+     ],
+     [
+      106,
+      0.816
+     ],
+     [
+      111,
+      0.833
+     ],
+     [
+      117,
+      0.849
+     ],
+     [
+      122,
+      0.863
+     ],
+     [
+      128,
+      0.877
+     ],
+     [
+      133,
+      0.889
+     ],
+     [
+      139,
+      0.9
+     ],
+     [
+      144,
+      0.911
+     ],
+     [
+      150,
+      0.92
+     ],
+     [
+      156,
+      0.929
+     ],
+     [
+      161,
+      0.937
+     ],
+     [
+      167,
+      0.945
+     ],
+     [
+      172,
+      0.952
+     ],
+     [
+      178,
+      0.957
+     ],
+     [
+      183,
+      0.963
+     ],
+     [
+      189,
+      0.968
+     ],
+     [
+      194,
+      0.973
+     ],
+     [
+      200,
+      0.977
+     ],
+     [
+      206,
+      0.98
+     ],
+     [
+      211,
+      0.984
+     ],
+     [
+      217,
+      0.987
+     ],
+     [
+      222,
+      0.989
+     ],
+     [
+      228,
+      0.992
+     ],
+     [
+      233,
+      0.993
+     ],
+     [
+      239,
+      0.995
+     ],
+     [
+      244,
+      0.997
+     ],
+     [
+      250,
+      0.998
+     ],
+     [
+      256,
+      0.998
+     ],
+     [
+      261,
+      0.999
+     ],
+     [
+      267,
+      1
+     ],
+     [
+      272,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#177",
+    "prop": "rect",
+    "fromInputMs": 115,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 157,
+    "lastMs": 312,
+    "durationMs": 156,
+    "steps": 29,
+    "to": "-367.2,0,359.2,48",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.097
+     ],
+     [
+      11,
+      0.186
+     ],
+     [
+      17,
+      0.267
+     ],
+     [
+      22,
+      0.341
+     ],
+     [
+      28,
+      0.41
+     ],
+     [
+      33,
+      0.473
+     ],
+     [
+      39,
+      0.532
+     ],
+     [
+      44,
+      0.583
+     ],
+     [
+      50,
+      0.634
+     ],
+     [
+      56,
+      0.679
+     ],
+     [
+      61,
+      0.718
+     ],
+     [
+      67,
+      0.756
+     ],
+     [
+      72,
+      0.789
+     ],
+     [
+      78,
+      0.819
+     ],
+     [
+      83,
+      0.847
+     ],
+     [
+      89,
+      0.87
+     ],
+     [
+      94,
+      0.893
+     ],
+     [
+      100,
+      0.911
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.944
+     ],
+     [
+      117,
+      0.957
+     ],
+     [
+      122,
+      0.967
+     ],
+     [
+      128,
+      0.977
+     ],
+     [
+      133,
+      0.985
+     ],
+     [
+      139,
+      0.99
+     ],
+     [
+      144,
+      0.995
+     ],
+     [
+      150,
+      0.997
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#178",
+    "prop": "rect",
+    "fromInputMs": 115,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 157,
+    "lastMs": 312,
+    "durationMs": 156,
+    "steps": 29,
+    "to": "-365.2,8,32,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.097
+     ],
+     [
+      11,
+      0.186
+     ],
+     [
+      17,
+      0.267
+     ],
+     [
+      22,
+      0.341
+     ],
+     [
+      28,
+      0.41
+     ],
+     [
+      33,
+      0.473
+     ],
+     [
+      39,
+      0.532
+     ],
+     [
+      44,
+      0.583
+     ],
+     [
+      50,
+      0.634
+     ],
+     [
+      56,
+      0.679
+     ],
+     [
+      61,
+      0.718
+     ],
+     [
+      67,
+      0.756
+     ],
+     [
+      72,
+      0.789
+     ],
+     [
+      78,
+      0.819
+     ],
+     [
+      83,
+      0.847
+     ],
+     [
+      89,
+      0.87
+     ],
+     [
+      94,
+      0.893
+     ],
+     [
+      100,
+      0.911
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.944
+     ],
+     [
+      117,
+      0.957
+     ],
+     [
+      122,
+      0.967
+     ],
+     [
+      128,
+      0.977
+     ],
+     [
+      133,
+      0.985
+     ],
+     [
+      139,
+      0.99
+     ],
+     [
+      144,
+      0.995
+     ],
+     [
+      150,
+      0.997
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button#179",
+    "prop": "rect",
+    "fromInputMs": 115,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 157,
+    "lastMs": 312,
+    "durationMs": 156,
+    "steps": 29,
+    "to": "-365.2,8,32,32",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.097
+     ],
+     [
+      11,
+      0.186
+     ],
+     [
+      17,
+      0.267
+     ],
+     [
+      22,
+      0.341
+     ],
+     [
+      28,
+      0.41
+     ],
+     [
+      33,
+      0.473
+     ],
+     [
+      39,
+      0.532
+     ],
+     [
+      44,
+      0.583
+     ],
+     [
+      50,
+      0.634
+     ],
+     [
+      56,
+      0.679
+     ],
+     [
+      61,
+      0.718
+     ],
+     [
+      67,
+      0.756
+     ],
+     [
+      72,
+      0.789
+     ],
+     [
+      78,
+      0.819
+     ],
+     [
+      83,
+      0.847
+     ],
+     [
+      89,
+      0.87
+     ],
+     [
+      94,
+      0.893
+     ],
+     [
+      100,
+      0.911
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.944
+     ],
+     [
+      117,
+      0.957
+     ],
+     [
+      122,
+      0.967
+     ],
+     [
+      128,
+      0.977
+     ],
+     [
+      133,
+      0.985
+     ],
+     [
+      139,
+      0.99
+     ],
+     [
+      144,
+      0.995
+     ],
+     [
+      150,
+      0.997
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span#180",
+    "prop": "rect",
+    "fromInputMs": 115,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 157,
+    "lastMs": 312,
+    "durationMs": 156,
+    "steps": 29,
+    "to": "-359.2,14,20,20",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.097
+     ],
+     [
+      11,
+      0.186
+     ],
+     [
+      17,
+      0.267
+     ],
+     [
+      22,
+      0.341
+     ],
+     [
+      28,
+      0.41
+     ],
+     [
+      33,
+      0.473
+     ],
+     [
+      39,
+      0.532
+     ],
+     [
+      44,
+      0.583
+     ],
+     [
+      50,
+      0.634
+     ],
+     [
+      56,
+      0.679
+     ],
+     [
+      61,
+      0.718
+     ],
+     [
+      67,
+      0.756
+     ],
+     [
+      72,
+      0.789
+     ],
+     [
+      78,
+      0.819
+     ],
+     [
+      83,
+      0.847
+     ],
+     [
+      89,
+      0.87
+     ],
+     [
+      94,
+      0.893
+     ],
+     [
+      100,
+      0.911
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.944
+     ],
+     [
+      117,
+      0.957
+     ],
+     [
+      122,
+      0.967
+     ],
+     [
+      128,
+      0.977
+     ],
+     [
+      133,
+      0.985
+     ],
+     [
+      139,
+      0.99
+     ],
+     [
+      144,
+      0.995
+     ],
+     [
+      150,
+      0.997
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#176",
+    "prop": "rect",
+    "fromInputMs": 115,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 157,
+    "lastMs": 312,
+    "durationMs": 156,
+    "steps": 29,
+    "to": "-359.2,14,20,20",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.097
+     ],
+     [
+      11,
+      0.186
+     ],
+     [
+      17,
+      0.267
+     ],
+     [
+      22,
+      0.341
+     ],
+     [
+      28,
+      0.41
+     ],
+     [
+      33,
+      0.473
+     ],
+     [
+      39,
+      0.532
+     ],
+     [
+      44,
+      0.583
+     ],
+     [
+      50,
+      0.634
+     ],
+     [
+      56,
+      0.679
+     ],
+     [
+      61,
+      0.718
+     ],
+     [
+      67,
+      0.756
+     ],
+     [
+      72,
+      0.789
+     ],
+     [
+      78,
+      0.819
+     ],
+     [
+      83,
+      0.847
+     ],
+     [
+      89,
+      0.87
+     ],
+     [
+      94,
+      0.893
+     ],
+     [
+      100,
+      0.911
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.944
+     ],
+     [
+      117,
+      0.957
+     ],
+     [
+      122,
+      0.967
+     ],
+     [
+      128,
+      0.977
+     ],
+     [
+      133,
+      0.985
+     ],
+     [
+      139,
+      0.99
+     ],
+     [
+      144,
+      0.995
+     ],
+     [
+      150,
+      0.997
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog][tid=sidebar]#172",
+    "prop": "visibility",
+    "fromInputMs": 281,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 323,
+    "lastMs": 323,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      323,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "div#177",
+    "prop": "visibility",
+    "fromInputMs": 281,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 323,
+    "lastMs": 323,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      323,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "div#178",
+    "prop": "visibility",
+    "fromInputMs": 281,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 323,
+    "lastMs": 323,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      323,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "button#179",
+    "prop": "visibility",
+    "fromInputMs": 281,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 323,
+    "lastMs": 323,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      323,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "span#180",
+    "prop": "visibility",
+    "fromInputMs": 281,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 323,
+    "lastMs": 323,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      323,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#176",
+    "prop": "visibility",
+    "fromInputMs": 281,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 323,
+    "lastMs": 323,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      323,
+      "hidden"
+     ]
+    ]
+   },
+   {
+    "el": "button#205",
+    "prop": "visibility",
+    "fromInputMs": 281,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 323,
+    "lastMs": 323,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "hidden",
+    "values": [
+     [
+      323,
+      "hidden"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 9,
+    "target": "button[tid=sidebar-compact-trigger]#9",
+    "attr": "aria-expanded",
+    "v": "false"
+   }
+  ],
+  "mutationCount": 1,
+  "strip": "strips/expand-sidebar.jpg (16 of 32 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "open-settings-dialog",
+  "anchor": {
+   "type": "pointerover",
+   "target": "div[role=presentation]#752"
+  },
+  "firstChangeMs": -43,
+  "settleMs": 218,
+  "rafFrames": 252,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog]#757",
+    "prop": "rect",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -43,
+    "lastMs": 218,
+    "durationMs": 261,
+    "steps": 18,
+    "to": "16,16,343.2,780",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      56,
+      0.135
+     ],
+     [
+      61,
+      0.244
+     ],
+     [
+      67,
+      0.34
+     ],
+     [
+      72,
+      0.417
+     ],
+     [
+      78,
+      0.494
+     ],
+     [
+      89,
+      0.609
+     ],
+     [
+      94,
+      0.654
+     ],
+     [
+      100,
+      0.699
+     ],
+     [
+      111,
+      0.769
+     ],
+     [
+      139,
+      0.885
+     ],
+     [
+      145,
+      0.897
+     ],
+     [
+      156,
+      0.929
+     ],
+     [
+      172,
+      0.955
+     ],
+     [
+      178,
+      0.962
+     ],
+     [
+      189,
+      0.974
+     ],
+     [
+      200,
+      0.987
+     ],
+     [
+      261,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#757",
+    "prop": "opacity",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -43,
+    "lastMs": 218,
+    "durationMs": 261,
+    "steps": 18,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      56,
+      0.132
+     ],
+     [
+      61,
+      0.242
+     ],
+     [
+      67,
+      0.338
+     ],
+     [
+      72,
+      0.42
+     ],
+     [
+      78,
+      0.492
+     ],
+     [
+      89,
+      0.609
+     ],
+     [
+      94,
+      0.656
+     ],
+     [
+      100,
+      0.699
+     ],
+     [
+      111,
+      0.768
+     ],
+     [
+      139,
+      0.885
+     ],
+     [
+      145,
+      0.901
+     ],
+     [
+      156,
+      0.927
+     ],
+     [
+      172,
+      0.957
+     ],
+     [
+      178,
+      0.964
+     ],
+     [
+      189,
+      0.976
+     ],
+     [
+      200,
+      0.985
+     ],
+     [
+      261,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#757",
+    "prop": "scale",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -43,
+    "lastMs": 218,
+    "durationMs": 261,
+    "steps": 18,
+    "to": "none",
+    "curve": null
+   },
+   {
+    "el": "div[role=presentation]#752",
+    "prop": "opacity",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -43,
+    "lastMs": 218,
+    "durationMs": 261,
+    "steps": 18,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      56,
+      0.132
+     ],
+     [
+      61,
+      0.242
+     ],
+     [
+      67,
+      0.338
+     ],
+     [
+      72,
+      0.42
+     ],
+     [
+      78,
+      0.492
+     ],
+     [
+      89,
+      0.609
+     ],
+     [
+      94,
+      0.656
+     ],
+     [
+      100,
+      0.699
+     ],
+     [
+      111,
+      0.768
+     ],
+     [
+      139,
+      0.885
+     ],
+     [
+      145,
+      0.901
+     ],
+     [
+      156,
+      0.927
+     ],
+     [
+      172,
+      0.957
+     ],
+     [
+      178,
+      0.964
+     ],
+     [
+      189,
+      0.976
+     ],
+     [
+      200,
+      0.985
+     ],
+     [
+      261,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#759",
+    "prop": "rect",
+    "fromInputMs": 35,
+    "input": "pointerover div[role=presentation]#752",
+    "firstMs": 35,
+    "lastMs": 218,
+    "durationMs": 183,
+    "steps": 13,
+    "to": "16,112,343.2,1204.2",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.01
+     ],
+     [
+      17,
+      0.014
+     ],
+     [
+      22,
+      0.018
+     ],
+     [
+      33,
+      0.403
+     ],
+     [
+      61,
+      0.414
+     ],
+     [
+      67,
+      0.416
+     ],
+     [
+      78,
+      0.992
+     ],
+     [
+      95,
+      0.996
+     ],
+     [
+      100,
+      0.996
+     ],
+     [
+      111,
+      0.997
+     ],
+     [
+      122,
+      0.998
+     ],
+     [
+      183,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "section#761",
+    "prop": "rect",
+    "fromInputMs": 68,
+    "input": "pointerover div[role=presentation]#752",
+    "firstMs": 68,
+    "lastMs": 218,
+    "durationMs": 150,
+    "steps": 9,
+    "to": "32,720,311.2,596.2",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      28,
+      0.007
+     ],
+     [
+      33,
+      0.009
+     ],
+     [
+      45,
+      0.993
+     ],
+     [
+      61,
+      0.996
+     ],
+     [
+      67,
+      0.997
+     ],
+     [
+      78,
+      0.998
+     ],
+     [
+      89,
+      0.999
+     ],
+     [
+      150,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#763",
+    "prop": "rect",
+    "fromInputMs": 146,
+    "input": "pointerover div[role=presentation]#752",
+    "firstMs": 146,
+    "lastMs": 218,
+    "durationMs": 72,
+    "steps": 3,
+    "to": "32.8,812.8,146,225",
+    "values": [
+     [
+      146,
+      "32.9,812.6,145.9,224.9"
+     ],
+     [
+      157,
+      "32.8,812.7,146,224.9"
+     ],
+     [
+      218,
+      "32.8,812.8,146,225"
+     ]
+    ]
+   },
+   {
+    "el": "div#765",
+    "prop": "rect",
+    "fromInputMs": 146,
+    "input": "pointerover div[role=presentation]#752",
+    "firstMs": 146,
+    "lastMs": 218,
+    "durationMs": 72,
+    "steps": 3,
+    "to": "196.4,812.8,146,225",
+    "values": [
+     [
+      146,
+      "196.4,812.6,145.9,224.9"
+     ],
+     [
+      157,
+      "196.4,812.7,146,224.9"
+     ],
+     [
+      218,
+      "196.4,812.8,146,225"
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": -2,
+    "target": "div#733",
+    "add": [
+     "div#734"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -2,
+    "target": "div#424",
+    "add": [
+     "div#735"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -2,
+    "target": "div#424",
+    "add": [
+     "div#736"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -2,
+    "target": "div#736",
+    "add": [
+     "div[role=presentation]#737"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -2,
+    "target": "div#736",
+    "add": [
+     "div#738"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": -2,
+    "target": "div#739",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "style\"~\"#740",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "link#741",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "link#742",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "link#743",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#744",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#745",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#175",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#746",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "header#17",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#747",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#36",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#37",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#748",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div[role=textbox][tid=chat-input]#62",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#67",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#68",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#749",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#118",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#516",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#733",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#750",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "iframe#751",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#735",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div[role=presentation]#737",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div[role=presentation]#752",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "style\"~\"#753",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#754",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#755",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": -2,
+    "target": "div#756",
+    "attr": "aria-hidden",
+    "v": "true"
+   },
+   {
+    "t": 42,
+    "target": "div#758",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 42,
+    "target": "div#758",
+    "add": [
+     "div#759"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 88,
+    "target": "div#760",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 88,
+    "target": "div#760",
+    "add": [
+     "section#761"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 142,
+    "target": "div#762",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 142,
+    "target": "div#762",
+    "add": [
+     "div#763"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 142,
+    "target": "div#764",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 142,
+    "target": "div#764",
+    "add": [
+     "div#765"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 43,
+  "strip": "strips/open-settings-dialog.jpg (16 of 22 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "close-settings-dialog",
+  "anchor": {
+   "type": "keydown",
+   "target": "body#173"
+  },
+  "firstChangeMs": 4,
+  "settleMs": 1210,
+  "rafFrames": 234,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "div[role=dialog]#757",
+    "prop": "scale",
+    "fromInputMs": 4,
+    "input": "keydown body#173",
+    "firstMs": 4,
+    "lastMs": 204,
+    "durationMs": 200,
+    "steps": 35,
+    "to": "0.980003",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.13
+     ],
+     [
+      22,
+      0.339
+     ],
+     [
+      28,
+      0.421
+     ],
+     [
+      33,
+      0.492
+     ],
+     [
+      39,
+      0.554
+     ],
+     [
+      45,
+      0.609
+     ],
+     [
+      50,
+      0.656
+     ],
+     [
+      56,
+      0.699
+     ],
+     [
+      61,
+      0.736
+     ],
+     [
+      67,
+      0.769
+     ],
+     [
+      72,
+      0.798
+     ],
+     [
+      78,
+      0.823
+     ],
+     [
+      83,
+      0.846
+     ],
+     [
+      89,
+      0.867
+     ],
+     [
+      95,
+      0.885
+     ],
+     [
+      100,
+      0.901
+     ],
+     [
+      106,
+      0.915
+     ],
+     [
+      111,
+      0.927
+     ],
+     [
+      117,
+      0.938
+     ],
+     [
+      122,
+      0.948
+     ],
+     [
+      128,
+      0.957
+     ],
+     [
+      133,
+      0.964
+     ],
+     [
+      139,
+      0.971
+     ],
+     [
+      145,
+      0.976
+     ],
+     [
+      150,
+      0.981
+     ],
+     [
+      156,
+      0.985
+     ],
+     [
+      161,
+      0.989
+     ],
+     [
+      167,
+      0.992
+     ],
+     [
+      172,
+      0.994
+     ],
+     [
+      178,
+      0.996
+     ],
+     [
+      183,
+      0.998
+     ],
+     [
+      189,
+      0.999
+     ],
+     [
+      195,
+      1
+     ],
+     [
+      200,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#757",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "keydown body#173",
+    "firstMs": 16,
+    "lastMs": 193,
+    "durationMs": 178,
+    "steps": 30,
+    "to": "19.4,23.8,336.3,764.4",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.243
+     ],
+     [
+      17,
+      0.338
+     ],
+     [
+      22,
+      0.419
+     ],
+     [
+      28,
+      0.485
+     ],
+     [
+      33,
+      0.551
+     ],
+     [
+      39,
+      0.603
+     ],
+     [
+      45,
+      0.654
+     ],
+     [
+      50,
+      0.699
+     ],
+     [
+      56,
+      0.735
+     ],
+     [
+      61,
+      0.765
+     ],
+     [
+      67,
+      0.794
+     ],
+     [
+      72,
+      0.824
+     ],
+     [
+      78,
+      0.846
+     ],
+     [
+      83,
+      0.868
+     ],
+     [
+      89,
+      0.882
+     ],
+     [
+      95,
+      0.904
+     ],
+     [
+      100,
+      0.919
+     ],
+     [
+      106,
+      0.926
+     ],
+     [
+      111,
+      0.941
+     ],
+     [
+      117,
+      0.949
+     ],
+     [
+      122,
+      0.956
+     ],
+     [
+      128,
+      0.963
+     ],
+     [
+      133,
+      0.971
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      144,
+      0.985
+     ],
+     [
+      156,
+      0.993
+     ],
+     [
+      161,
+      0.993
+     ],
+     [
+      172,
+      1
+     ],
+     [
+      178,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=dialog]#757",
+    "prop": "opacity",
+    "fromInputMs": 16,
+    "input": "keydown body#173",
+    "firstMs": 16,
+    "lastMs": 204,
+    "durationMs": 189,
+    "steps": 34,
+    "to": "0.000135957",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.24
+     ],
+     [
+      17,
+      0.335
+     ],
+     [
+      22,
+      0.416
+     ],
+     [
+      28,
+      0.487
+     ],
+     [
+      33,
+      0.55
+     ],
+     [
+      39,
+      0.605
+     ],
+     [
+      45,
+      0.654
+     ],
+     [
+      50,
+      0.697
+     ],
+     [
+      56,
+      0.734
+     ],
+     [
+      61,
+      0.768
+     ],
+     [
+      67,
+      0.797
+     ],
+     [
+      72,
+      0.823
+     ],
+     [
+      78,
+      0.847
+     ],
+     [
+      83,
+      0.867
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      95,
+      0.902
+     ],
+     [
+      100,
+      0.916
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      117,
+      0.95
+     ],
+     [
+      122,
+      0.959
+     ],
+     [
+      128,
+      0.966
+     ],
+     [
+      133,
+      0.973
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      144,
+      0.983
+     ],
+     [
+      150,
+      0.987
+     ],
+     [
+      156,
+      0.991
+     ],
+     [
+      161,
+      0.993
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      172,
+      0.997
+     ],
+     [
+      178,
+      0.999
+     ],
+     [
+      183,
+      1
+     ],
+     [
+      189,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div[role=presentation]#752",
+    "prop": "opacity",
+    "fromInputMs": 16,
+    "input": "keydown body#173",
+    "firstMs": 16,
+    "lastMs": 204,
+    "durationMs": 189,
+    "steps": 34,
+    "to": "0.000135957",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.24
+     ],
+     [
+      17,
+      0.335
+     ],
+     [
+      22,
+      0.416
+     ],
+     [
+      28,
+      0.487
+     ],
+     [
+      33,
+      0.55
+     ],
+     [
+      39,
+      0.605
+     ],
+     [
+      45,
+      0.654
+     ],
+     [
+      50,
+      0.697
+     ],
+     [
+      56,
+      0.734
+     ],
+     [
+      61,
+      0.768
+     ],
+     [
+      67,
+      0.797
+     ],
+     [
+      72,
+      0.823
+     ],
+     [
+      78,
+      0.847
+     ],
+     [
+      83,
+      0.867
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      95,
+      0.902
+     ],
+     [
+      100,
+      0.916
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.94
+     ],
+     [
+      117,
+      0.95
+     ],
+     [
+      122,
+      0.959
+     ],
+     [
+      128,
+      0.966
+     ],
+     [
+      133,
+      0.973
+     ],
+     [
+      139,
+      0.978
+     ],
+     [
+      144,
+      0.983
+     ],
+     [
+      150,
+      0.987
+     ],
+     [
+      156,
+      0.991
+     ],
+     [
+      161,
+      0.993
+     ],
+     [
+      167,
+      0.996
+     ],
+     [
+      172,
+      0.997
+     ],
+     [
+      178,
+      0.999
+     ],
+     [
+      183,
+      1
+     ],
+     [
+      189,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#759",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "keydown body#173",
+    "firstMs": 16,
+    "lastMs": 193,
+    "durationMs": 178,
+    "steps": 30,
+    "to": "19.4,117.9,336.3,1180.1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.243
+     ],
+     [
+      17,
+      0.333
+     ],
+     [
+      22,
+      0.419
+     ],
+     [
+      28,
+      0.486
+     ],
+     [
+      33,
+      0.552
+     ],
+     [
+      39,
+      0.605
+     ],
+     [
+      45,
+      0.652
+     ],
+     [
+      50,
+      0.695
+     ],
+     [
+      56,
+      0.733
+     ],
+     [
+      61,
+      0.767
+     ],
+     [
+      67,
+      0.795
+     ],
+     [
+      72,
+      0.824
+     ],
+     [
+      78,
+      0.848
+     ],
+     [
+      83,
+      0.867
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      95,
+      0.9
+     ],
+     [
+      100,
+      0.914
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.938
+     ],
+     [
+      117,
+      0.948
+     ],
+     [
+      122,
+      0.957
+     ],
+     [
+      128,
+      0.967
+     ],
+     [
+      133,
+      0.971
+     ],
+     [
+      139,
+      0.976
+     ],
+     [
+      144,
+      0.981
+     ],
+     [
+      150,
+      0.986
+     ],
+     [
+      156,
+      0.99
+     ],
+     [
+      167,
+      0.995
+     ],
+     [
+      178,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "section#761",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "keydown body#173",
+    "firstMs": 16,
+    "lastMs": 182,
+    "durationMs": 167,
+    "steps": 28,
+    "to": "35.1,713.7,305,584.3",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.233
+     ],
+     [
+      17,
+      0.33
+     ],
+     [
+      22,
+      0.417
+     ],
+     [
+      28,
+      0.485
+     ],
+     [
+      33,
+      0.553
+     ],
+     [
+      39,
+      0.602
+     ],
+     [
+      45,
+      0.65
+     ],
+     [
+      50,
+      0.699
+     ],
+     [
+      56,
+      0.738
+     ],
+     [
+      61,
+      0.767
+     ],
+     [
+      67,
+      0.796
+     ],
+     [
+      72,
+      0.825
+     ],
+     [
+      78,
+      0.845
+     ],
+     [
+      83,
+      0.864
+     ],
+     [
+      89,
+      0.883
+     ],
+     [
+      95,
+      0.903
+     ],
+     [
+      100,
+      0.922
+     ],
+     [
+      106,
+      0.932
+     ],
+     [
+      111,
+      0.942
+     ],
+     [
+      117,
+      0.951
+     ],
+     [
+      122,
+      0.961
+     ],
+     [
+      128,
+      0.971
+     ],
+     [
+      133,
+      0.971
+     ],
+     [
+      139,
+      0.981
+     ],
+     [
+      150,
+      0.99
+     ],
+     [
+      161,
+      1
+     ],
+     [
+      167,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#763",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "keydown body#173",
+    "firstMs": 16,
+    "lastMs": 171,
+    "durationMs": 156,
+    "steps": 26,
+    "to": "35.9,804.7,143.1,220.5",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.243
+     ],
+     [
+      17,
+      0.329
+     ],
+     [
+      22,
+      0.414
+     ],
+     [
+      28,
+      0.486
+     ],
+     [
+      33,
+      0.557
+     ],
+     [
+      39,
+      0.6
+     ],
+     [
+      45,
+      0.657
+     ],
+     [
+      50,
+      0.7
+     ],
+     [
+      56,
+      0.743
+     ],
+     [
+      61,
+      0.771
+     ],
+     [
+      67,
+      0.8
+     ],
+     [
+      72,
+      0.829
+     ],
+     [
+      78,
+      0.843
+     ],
+     [
+      83,
+      0.871
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      95,
+      0.9
+     ],
+     [
+      100,
+      0.914
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.943
+     ],
+     [
+      117,
+      0.957
+     ],
+     [
+      128,
+      0.971
+     ],
+     [
+      133,
+      0.971
+     ],
+     [
+      139,
+      0.986
+     ],
+     [
+      144,
+      0.986
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "div#765",
+    "prop": "rect",
+    "fromInputMs": 16,
+    "input": "keydown body#173",
+    "firstMs": 16,
+    "lastMs": 171,
+    "durationMs": 156,
+    "steps": 25,
+    "to": "196.2,804.7,143.1,220.5",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      11,
+      0.243
+     ],
+     [
+      17,
+      0.329
+     ],
+     [
+      22,
+      0.414
+     ],
+     [
+      28,
+      0.486
+     ],
+     [
+      33,
+      0.557
+     ],
+     [
+      39,
+      0.6
+     ],
+     [
+      45,
+      0.657
+     ],
+     [
+      50,
+      0.7
+     ],
+     [
+      56,
+      0.743
+     ],
+     [
+      61,
+      0.771
+     ],
+     [
+      67,
+      0.8
+     ],
+     [
+      72,
+      0.829
+     ],
+     [
+      78,
+      0.843
+     ],
+     [
+      83,
+      0.871
+     ],
+     [
+      89,
+      0.886
+     ],
+     [
+      95,
+      0.9
+     ],
+     [
+      100,
+      0.914
+     ],
+     [
+      106,
+      0.929
+     ],
+     [
+      111,
+      0.943
+     ],
+     [
+      117,
+      0.957
+     ],
+     [
+      128,
+      0.971
+     ],
+     [
+      133,
+      0.971
+     ],
+     [
+      139,
+      0.986
+     ],
+     [
+      156,
+      1
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "boxShadow",
+    "fromInputMs": 210,
+    "input": "keydown body#173",
+    "firstMs": 210,
+    "lastMs": 210,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0",
+    "values": [
+     [
+      210,
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "outlineColor",
+    "fromInputMs": 210,
+    "input": "keydown body#173",
+    "firstMs": 210,
+    "lastMs": 210,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "rgba(0, 0, 0, 0)",
+    "values": [
+     [
+      210,
+      "rgba(0, 0, 0, 0)"
+     ]
+    ]
+   },
+   {
+    "el": "button[tid=sidebar-compact-trigger]#9",
+    "prop": "outlineWidth",
+    "fromInputMs": 210,
+    "input": "keydown body#173",
+    "firstMs": 210,
+    "lastMs": 210,
+    "durationMs": 0,
+    "steps": 1,
+    "to": "1.6px",
+    "values": [
+     [
+      210,
+      "1.6px"
+     ]
+    ]
+   },
+   {
+    "el": "span\"~\"#732",
+    "prop": "opacity",
+    "fromInputMs": 620,
+    "input": "pointerover div[role=toolbar]#18",
+    "firstMs": 838,
+    "lastMs": 1210,
+    "durationMs": 372,
+    "steps": 67,
+    "to": "0.2382",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.015
+     ],
+     [
+      15,
+      0.041
+     ],
+     [
+      22,
+      0.06
+     ],
+     [
+      28,
+      0.075
+     ],
+     [
+      33,
+      0.089
+     ],
+     [
+      39,
+      0.105
+     ],
+     [
+      45,
+      0.12
+     ],
+     [
+      50,
+      0.135
+     ],
+     [
+      56,
+      0.149
+     ],
+     [
+      61,
+      0.164
+     ],
+     [
+      67,
+      0.179
+     ],
+     [
+      72,
+      0.194
+     ],
+     [
+      78,
+      0.209
+     ],
+     [
+      83,
+      0.224
+     ],
+     [
+      89,
+      0.239
+     ],
+     [
+      95,
+      0.254
+     ],
+     [
+      100,
+      0.269
+     ],
+     [
+      106,
+      0.284
+     ],
+     [
+      111,
+      0.298
+     ],
+     [
+      117,
+      0.314
+     ],
+     [
+      122,
+      0.328
+     ],
+     [
+      128,
+      0.343
+     ],
+     [
+      133,
+      0.358
+     ],
+     [
+      139,
+      0.373
+     ],
+     [
+      145,
+      0.388
+     ],
+     [
+      150,
+      0.403
+     ],
+     [
+      156,
+      0.418
+     ],
+     [
+      161,
+      0.433
+     ],
+     [
+      167,
+      0.448
+     ],
+     [
+      172,
+      0.463
+     ],
+     [
+      178,
+      0.478
+     ],
+     [
+      183,
+      0.493
+     ],
+     [
+      189,
+      0.508
+     ],
+     [
+      195,
+      0.523
+     ],
+     [
+      200,
+      0.537
+     ],
+     [
+      206,
+      0.552
+     ],
+     [
+      211,
+      0.567
+     ],
+     [
+      217,
+      0.582
+     ],
+     [
+      222,
+      0.597
+     ],
+     [
+      228,
+      0.612
+     ],
+     [
+      233,
+      0.627
+     ],
+     [
+      239,
+      0.642
+     ],
+     [
+      245,
+      0.657
+     ],
+     [
+      250,
+      0.672
+     ],
+     [
+      256,
+      0.687
+     ],
+     [
+      261,
+      0.702
+     ],
+     [
+      267,
+      0.716
+     ],
+     [
+      272,
+      0.731
+     ],
+     [
+      278,
+      0.746
+     ],
+     [
+      283,
+      0.761
+     ],
+     [
+      289,
+      0.776
+     ],
+     [
+      294,
+      0.791
+     ],
+     [
+      300,
+      0.806
+     ],
+     [
+      306,
+      0.821
+     ],
+     [
+      311,
+      0.836
+     ],
+     [
+      317,
+      0.851
+     ],
+     [
+      322,
+      0.866
+     ],
+     [
+      328,
+      0.88
+     ],
+     [
+      333,
+      0.896
+     ],
+     [
+      339,
+      0.911
+     ],
+     [
+      345,
+      0.926
+     ],
+     [
+      350,
+      0.941
+     ],
+     [
+      356,
+      0.955
+     ],
+     [
+      361,
+      0.97
+     ],
+     [
+      367,
+      0.985
+     ],
+     [
+      372,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 7,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#752",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=dialog]#757",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#739",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "style\"~\"#740",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "link#741",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "link#742",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "link#743",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#744",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#745",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#175",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#746",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "header#17",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#747",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#36",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#37",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#748",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=textbox][tid=chat-input]#62",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#67",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#68",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#749",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#118",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#516",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#733",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#750",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "iframe#751",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#735",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#737",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#752",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "style\"~\"#753",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#754",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#755",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div#756",
+    "attr": "aria-hidden",
+    "v": "~"
+   },
+   {
+    "t": 215,
+    "target": "div#424",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 215,
+    "target": "div#736",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 215,
+    "target": "div#736",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 36,
+  "strip": "strips/close-settings-dialog.jpg (16 of 73 frames)",
+  "prevFrame": -101
+ }
+]

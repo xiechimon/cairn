@@ -1,0 +1,797 @@
+[
+ {
+  "label": "tab-1",
+  "anchor": {
+   "type": "keydown",
+   "target": "div[role=textbox][tid=chat-input]#423"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 93,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [
+   [
+    -1,
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "text": [],
+  "mutations": [
+   {
+    "t": 21,
+    "target": "div#620",
+    "add": [
+     "div#621"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 21,
+    "target": "div#621",
+    "add": [
+     "div#622"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/tab-1.jpg (6 of 6 frames)",
+  "prevFrame": null
+ },
+ {
+  "label": "tab-2",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=chat-input-attach]#432"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 110,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 11,
+    "target": "div[role=tooltip]#624",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 11,
+    "target": "div[role=presentation]#623",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 11,
+    "target": "div#620",
+    "add": [
+     "div#628"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 11,
+    "target": "div#628",
+    "add": [
+     "div#629"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 17,
+    "target": "div#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 17,
+    "target": "div#621",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-2.jpg (6 of 6 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "tab-3",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#444"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 110,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 10,
+    "target": "div[role=tooltip]#631",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div[role=presentation]#630",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div#620",
+    "add": [
+     "div#633"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 10,
+    "target": "div#633",
+    "add": [
+     "div#634"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 15,
+    "target": "div#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 15,
+    "target": "div#628",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-3.jpg (8 of 8 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "tab-4",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#450"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 109,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 10,
+    "target": "div[role=tooltip]#636",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div[role=presentation]#635",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 10,
+    "target": "div#620",
+    "add": [
+     "div#638"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 10,
+    "target": "div#638",
+    "add": [
+     "div#639"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 15,
+    "target": "div#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 15,
+    "target": "div#633",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-4.jpg (8 of 8 frames)",
+  "prevFrame": -102
+ },
+ {
+  "label": "tab-5",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#472"
+  },
+  "firstChangeMs": 451,
+  "settleMs": 568,
+  "rafFrames": 99,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "span\"~\"#643",
+    "prop": "opacity",
+    "fromInputMs": 448,
+    "input": "focusin button#486",
+    "firstMs": 451,
+    "lastMs": 568,
+    "durationMs": 117,
+    "steps": 14,
+    "to": "0.233214",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.048
+     ],
+     [
+      11,
+      0.095
+     ],
+     [
+      17,
+      0.142
+     ],
+     [
+      22,
+      0.19
+     ],
+     [
+      28,
+      0.238
+     ],
+     [
+      33,
+      0.286
+     ],
+     [
+      39,
+      0.334
+     ],
+     [
+      44,
+      0.381
+     ],
+     [
+      50,
+      0.429
+     ],
+     [
+      56,
+      0.476
+     ],
+     [
+      61,
+      0.524
+     ],
+     [
+      67,
+      0.571
+     ],
+     [
+      117,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 19,
+    "target": "div[role=tooltip]#641",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 19,
+    "target": "div[role=presentation]#640",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 25,
+    "target": "div#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 25,
+    "target": "div#638",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 450,
+    "target": "span#419",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "span"
+    ]
+   },
+   {
+    "t": 450,
+    "target": "span#419",
+    "add": [
+     "span\"~\"#643"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 6,
+  "strip": "strips/tab-5.jpg (16 of 57 frames)",
+  "prevFrame": -105
+ },
+ {
+  "label": "tab-6",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#486"
+  },
+  "firstChangeMs": -96,
+  "settleMs": 376,
+  "rafFrames": 93,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [
+   {
+    "el": "span\"~\"#643",
+    "prop": "opacity",
+    "fromInputMs": null,
+    "input": null,
+    "firstMs": -96,
+    "lastMs": 376,
+    "durationMs": 472,
+    "steps": 68,
+    "to": "1",
+    "curve": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0.012
+     ],
+     [
+      11,
+      0.024
+     ],
+     [
+      17,
+      0.035
+     ],
+     [
+      22,
+      0.047
+     ],
+     [
+      28,
+      0.059
+     ],
+     [
+      33,
+      0.071
+     ],
+     [
+      39,
+      0.082
+     ],
+     [
+      89,
+      0.188
+     ],
+     [
+      94,
+      0.2
+     ],
+     [
+      111,
+      0.235
+     ],
+     [
+      117,
+      0.247
+     ],
+     [
+      122,
+      0.259
+     ],
+     [
+      128,
+      0.271
+     ],
+     [
+      133,
+      0.283
+     ],
+     [
+      139,
+      0.294
+     ],
+     [
+      189,
+      0.4
+     ],
+     [
+      194,
+      0.412
+     ],
+     [
+      200,
+      0.424
+     ],
+     [
+      206,
+      0.435
+     ],
+     [
+      211,
+      0.447
+     ],
+     [
+      217,
+      0.459
+     ],
+     [
+      222,
+      0.471
+     ],
+     [
+      228,
+      0.482
+     ],
+     [
+      233,
+      0.494
+     ],
+     [
+      239,
+      0.506
+     ],
+     [
+      244,
+      0.518
+     ],
+     [
+      250,
+      0.529
+     ],
+     [
+      256,
+      0.541
+     ],
+     [
+      261,
+      0.553
+     ],
+     [
+      267,
+      0.565
+     ],
+     [
+      272,
+      0.576
+     ],
+     [
+      278,
+      0.588
+     ],
+     [
+      283,
+      0.6
+     ],
+     [
+      289,
+      0.612
+     ],
+     [
+      295,
+      0.624
+     ],
+     [
+      300,
+      0.635
+     ],
+     [
+      306,
+      0.647
+     ],
+     [
+      311,
+      0.659
+     ],
+     [
+      317,
+      0.67
+     ],
+     [
+      322,
+      0.682
+     ],
+     [
+      328,
+      0.694
+     ],
+     [
+      333,
+      0.706
+     ],
+     [
+      339,
+      0.718
+     ],
+     [
+      344,
+      0.729
+     ],
+     [
+      350,
+      0.741
+     ],
+     [
+      356,
+      0.753
+     ],
+     [
+      361,
+      0.765
+     ],
+     [
+      367,
+      0.776
+     ],
+     [
+      372,
+      0.788
+     ],
+     [
+      378,
+      0.8
+     ],
+     [
+      383,
+      0.812
+     ],
+     [
+      389,
+      0.824
+     ],
+     [
+      394,
+      0.835
+     ],
+     [
+      400,
+      0.847
+     ],
+     [
+      406,
+      0.859
+     ],
+     [
+      411,
+      0.871
+     ],
+     [
+      417,
+      0.882
+     ],
+     [
+      422,
+      0.894
+     ],
+     [
+      428,
+      0.906
+     ],
+     [
+      433,
+      0.918
+     ],
+     [
+      439,
+      0.929
+     ],
+     [
+      445,
+      0.941
+     ],
+     [
+      450,
+      0.953
+     ],
+     [
+      456,
+      0.965
+     ],
+     [
+      461,
+      0.977
+     ],
+     [
+      467,
+      0.988
+     ],
+     [
+      472,
+      1
+     ]
+    ]
+   }
+  ],
+  "scroll": [],
+  "text": [],
+  "mutations": [],
+  "mutationCount": 0,
+  "strip": "strips/tab-6.jpg (16 of 41 frames)",
+  "prevFrame": -101
+ },
+ {
+  "label": "tab-7",
+  "anchor": {
+   "type": "keydown",
+   "target": "button[tid=model-selector-dropdown]#502"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 110,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 10,
+    "target": "div#620",
+    "add": [
+     "div#644"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   },
+   {
+    "t": 10,
+    "target": "div#644",
+    "add": [
+     "div#645"
+    ],
+    "addN": 1,
+    "rmN": 0,
+    "rm": []
+   }
+  ],
+  "mutationCount": 2,
+  "strip": "strips/tab-7.jpg (7 of 7 frames)",
+  "prevFrame": -104
+ },
+ {
+  "label": "tab-8",
+  "anchor": {
+   "type": "keydown",
+   "target": "button#524"
+  },
+  "firstChangeMs": null,
+  "settleMs": null,
+  "rafFrames": 108,
+  "rafIntervalMedianMs": 5.6,
+  "changes": [],
+  "scroll": [],
+  "text": [],
+  "mutations": [
+   {
+    "t": 7,
+    "target": "div[role=tooltip]#646",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 7,
+    "target": "div[role=presentation]#647",
+    "attr": "data-open",
+    "v": "~"
+   },
+   {
+    "t": 13,
+    "target": "div#620",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   },
+   {
+    "t": 13,
+    "target": "div#644",
+    "add": [],
+    "addN": 0,
+    "rmN": 1,
+    "rm": [
+     "div"
+    ]
+   }
+  ],
+  "mutationCount": 4,
+  "strip": "strips/tab-8.jpg (16 of 16 frames)",
+  "prevFrame": -102
+ }
+]
