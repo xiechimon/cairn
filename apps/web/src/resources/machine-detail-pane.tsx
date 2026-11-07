@@ -79,13 +79,11 @@ export function TextWithCode({ text }: { text: string }) {
 function RuntimeRow({
   machine,
   runtime,
-  live,
   frozen,
   onToggle,
 }: {
   machine: MachineRow;
   runtime: string;
-  live: boolean;
   frozen: boolean;
   onToggle: (runtime: MachineRuntime, next: boolean) => void;
 }) {
@@ -134,8 +132,8 @@ function RuntimeRow({
         data-testid="provider-toggle"
         aria-label={t('{name} 接任务', { name })}
         checked={enabled}
-        disabled={!toggleable || !live || frozen}
-        title={toggleable && live ? undefined : t('这台机器还不能单独开关 {name}', { name })}
+        disabled={!toggleable || frozen}
+        title={toggleable ? undefined : t('这台机器还不能单独开关 {name}', { name })}
         onCheckedChange={(next) => {
           if (toggleable) onToggle(runtime, next);
         }}
@@ -319,7 +317,6 @@ export function MachineDetailPane({
               key={runtime}
               machine={machine}
               runtime={runtime}
-              live={live}
               frozen={pending || !online}
               onToggle={onToggleRuntime}
             />

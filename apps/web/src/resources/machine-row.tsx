@@ -20,6 +20,7 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { FixtureSet, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
@@ -95,25 +96,31 @@ export function MachineRowView({
   }, [expanded, section]);
 
   const pickedTarget = others.find((m) => m.id === evacuateTarget);
-  const enabled = (machine.enabledRuntimes ?? []).some(isMachineRuntime);
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const shown = draft === null ? machine : { ...machine, enabledRuntimes: draft };
+  const enabled = (shown.enabledRuntimes ?? []).some(isMachineRuntime);
+  const writeRuntimes = (enabledRuntimes: MachineRuntime[]) => {
+    if (!live) {
+      if (blockDemoWrite()) return;
+      setDraft(enabledRuntimes);
+      return;
+    }
+    mutations.patchMachine.mutate(
+      { id: machineId, body: { enabledRuntimes } },
+      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+    );
+  };
   const setAccepting = (next: boolean) => {
     if (next) {
       onOpenSection('runtime');
       return;
     }
-    mutations.patchMachine.mutate(
-      { id: machineId, body: { enabledRuntimes: [] } },
-      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-    );
+    writeRuntimes([]);
   };
   const toggleRuntime = (runtime: MachineRuntime, next: boolean) => {
-    const current = (machine.enabledRuntimes ?? []).filter(isMachineRuntime);
-    const enabledRuntimes = next
-      ? [...new Set([...current, runtime])]
-      : current.filter((r) => r !== runtime);
-    mutations.patchMachine.mutate(
-      { id: machineId, body: { enabledRuntimes } },
-      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+    const current = (shown.enabledRuntimes ?? []).filter(isMachineRuntime);
+    writeRuntimes(
+      next ? [...new Set([...current, runtime])] : current.filter((r) => r !== runtime),
     );
   };
 
@@ -172,7 +179,7 @@ export function MachineRowView({
     machine.online === false && machine.lastSeenAt != null
       ? t('最后在线 {time}', { time: relativeTime(machine.lastSeenAt, now, t) })
       : null;
-  const canMutate = live && machine.id != null && online;
+  const canMutate = machine.id != null && online;
   const bodyId = `machine-body-${machineId}`;
   return (
     <div
@@ -310,7 +317,7 @@ export function MachineRowView({
       {expanded && (
         <div id={bodyId} ref={bodyRef}>
           <MachineDetailPane
-            machine={machine}
+            machine={shown}
             machines={machines}
             chief={chief}
             fixture={fixture}

@@ -137,6 +137,11 @@ test('the runtime link opens the row and an offline row says when it was last on
   const off = await trackOf(pane.getByTestId('provider-toggle').nth(1));
   expect(await trackOf(accept)).toBe(off);
   expect(await trackOf(runtime)).toBe(off);
+  const onlineAccept = items(page).filter({ hasText: 'omarchy' }).getByTestId('machine-accept-toggle');
+  await expect(onlineAccept).toBeEnabled();
+  await expect(onlineAccept).toBeChecked();
+  await expect(accept).toBeChecked();
+  expect(await trackOf(onlineAccept)).not.toBe(await trackOf(accept));
   await expect(pane.getByTestId('machine-recover')).toContainText('重新启动');
   await expect(pane.getByTestId('machine-recover').locator('code')).toContainText('start');
 });
