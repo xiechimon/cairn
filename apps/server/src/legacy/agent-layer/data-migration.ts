@@ -226,11 +226,7 @@ function seedReviewPolicyFrom(
     .from(schema.workPolicy)
     .where(and(eq(schema.workPolicy.teamId, teamId), eq(schema.workPolicy.use, 'review')))
     .get();
-  if (
-    policy !== undefined &&
-    (policy.seededFromAgentId !== null || existingPolicies.has(policy.id))
-  )
-    return;
+  if (policy !== undefined && existingPolicies.has(policy.id)) return;
   const now = nowMs();
   const values = {
     tools: reviewer.tools.filter((tool) => !REVIEWER_DENIED_TOOLS.includes(tool)),

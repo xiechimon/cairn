@@ -171,6 +171,11 @@ export const NAMED_CELLS: Record<string, Cell> = {
     kind: 'persona',
     assigned: 'yes',
     model: 'same-vendor',
+    tools: 'all',
+    secrets: 'some',
+    mcp: 'some',
+    skills: 'some',
+    defaultSkill: 'some',
     secondReviewer: 'independent-custom',
   },
   'assigned custom reviewer with permissions and no default review policy': {

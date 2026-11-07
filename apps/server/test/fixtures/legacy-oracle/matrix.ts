@@ -599,6 +599,15 @@ function compareCell(
       [after.provider, after.modelId],
       [ROLE_MODELS['other-vendor'].provider, ROLE_MODELS['other-vendor'].modelId],
     );
+    const personaRuns =
+      cell.kind === 'persona' && modelsAreIndependent(SESSION_MODEL.modelId, roleModel.modelId);
+    if (!personaRuns) {
+      same(
+        'permissions come from the selected reviewer',
+        [after.tools, after.mcpServers, after.skillsAllowlist, after.defaultSkill, after.secrets],
+        [[], [], null, null, []],
+      );
+    }
     return;
   }
   const executes = cell.assigned === 'yes' || (cell.role === 'review' && cell.kind === 'persona');
