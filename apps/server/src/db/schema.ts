@@ -1,6 +1,5 @@
 import type {
   ActiveRun,
-  Assignment,
   AutonomyGateReason,
   AutonomyKind,
   AutonomySettings,
@@ -23,7 +22,6 @@ import type {
   ModelRef,
   NamedPromptOverrides,
   NotificationType,
-  PersonaRole,
   Phase,
   PrMergeState,
   ProjectColor,
@@ -127,7 +125,6 @@ export const todo = sqliteTable(
     snoozeMode: text('snoozeMode').$type<SnoozeMode>(),
     seqNum: integer('seqNum').notNull(),
     orderIndex: real('orderIndex').notNull().default(0),
-    assignment: json<Assignment | null>('assignment'),
     routeOverride: json<RouteOverride | null>('routeOverride'),
     latestBuildId: text('latestBuildId'),
     lastRunAt: epochMs('lastRunAt'),
@@ -482,38 +479,6 @@ export const notification = sqliteTable(
   (t) => [index('notification_type_readAt_idx').on(t.type, t.readAt)],
 );
 
-export const agent = sqliteTable(
-  'agent',
-  {
-    id: text('id').primaryKey(),
-    teamId: text('teamId')
-      .notNull()
-      .references(() => team.id),
-    displayName: text('displayName').notNull(),
-    description: text('description'),
-    status: text('status').notNull().default('active'),
-    avatarUrl: text('avatarUrl'),
-    provider: text('provider'),
-    modelId: text('modelId'),
-    thinkingLevel: text('thinkingLevel'),
-    persona: text('persona').$type<PersonaRole | null>(),
-    machineId: text('machineId').references(() => machine.id),
-    tools: json<string[]>('tools').notNull().default(sql`'[]'`),
-    secrets: json<string[]>('secrets').notNull().default(sql`'[]'`),
-    defaultSkill: text('defaultSkill'),
-    skillsAllowlist: json<string[]>('skillsAllowlist'),
-    mcpServers: json<string[]>('mcpServers').notNull().default(sql`'[]'`),
-    maxConcurrentTasks: integer('maxConcurrentTasks'),
-    requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
-    fallbackModels: json<ModelRef[] | null>('fallbackModels'),
-  },
-  (t) => [
-    uniqueIndex('agent_team_persona_unique')
-      .on(t.teamId, t.persona)
-      .where(sql`${t.persona} is not null`),
-  ],
-);
-
 export const routingRule = sqliteTable(
   'routing_rule',
   {
@@ -533,7 +498,6 @@ export const routingRule = sqliteTable(
     skillsAllowlist: json<string[] | null>('skillsAllowlist'),
     defaultSkill: text('defaultSkill'),
     secrets: json<string[] | null>('secrets'),
-    adoptedAgentIds: json<string[] | null>('adoptedAgentIds'),
     seededFromAgentId: text('seededFromAgentId'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
@@ -559,6 +523,27 @@ export const workPolicy = sqliteTable(
     updatedAt: epochMs('updatedAt').notNull(),
   },
   (t) => [uniqueIndex('work_policy_team_use_unique').on(t.teamId, t.use)],
+);
+
+export const stepRoute = sqliteTable(
+  'step_route',
+  {
+    stepId: text('stepId').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    kind: text('kind').$type<StepKind>().notNull(),
+    difficulty: text('difficulty').$type<'easy' | 'standard' | 'hard'>().notNull(),
+    harness: text('harness').$type<'claude-code' | 'pi'>(),
+    provider: text('provider'),
+    modelId: text('modelId'),
+    machineId: text('machineId'),
+    reason: text('reason').notNull(),
+    rejected:
+      json<{ modelId: string; machineId: string | null; why: string }[]>('rejected').notNull(),
+    decidedAt: epochMs('decidedAt').notNull(),
+  },
+  (t) => [index('step_route_team_decided_idx').on(t.teamId, t.decidedAt)],
 );
 
 export const featureFlag = sqliteTable(
@@ -600,6 +585,12 @@ export const agentMemory = sqliteTable('agent_memory', {
   lastInjectedAt: epochMs('lastInjectedAt'),
   createdAt: epochMs('createdAt').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const dataMigration = sqliteTable('data_migration', {
+  id: text('id').primaryKey(),
+  doneAt: epochMs('doneAt').notNull(),
+  detail: text('detail').notNull(),
 });
 
 export const memorySaveConflict = sqliteTable('memory_save_conflict', {
@@ -888,6 +879,31 @@ export const chiefTurnUsage = sqliteTable(
   ],
 );
 
+export const coordinatorConversation = sqliteTable('coordinator_conversation', {
+  threadId: text('threadId').primaryKey(),
+  conversationId: text('conversationId').notNull(),
+  lastMirroredEntryId: text('lastMirroredEntryId'),
+  piVersion: text('piVersion').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const coordinatorEntry = sqliteTable(
+  'coordinator_entry',
+  {
+    chiefMessageId: text('chiefMessageId').primaryKey(),
+    threadId: text('threadId').notNull(),
+    conversationId: text('conversationId').notNull(),
+    entryId: text('entryId').notNull(),
+  },
+  (t) => [index('coordinator_entry_thread_idx').on(t.threadId, t.conversationId)],
+);
+
+export const coordinatorLease = sqliteTable('coordinator_lease', {
+  storeKey: text('storeKey').primaryKey(),
+  owner: text('owner'),
+  heartbeatAt: epochMs('heartbeatAt').notNull(),
+});
+
 export const chiefSummary = sqliteTable('chief_summary', {
   threadId: text('threadId').primaryKey(),
   summary: text('summary').notNull(),
@@ -905,7 +921,6 @@ export const chief = sqliteTable('chief', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
-  agentId: text('agentId'),
   charter: text('charter').notNull().default(''),
   watches: json<ChiefWatch[]>('watches').notNull().default(sql`'[]'`),
   wakes: json<Record<string, unknown>[]>('wakes').notNull().default(sql`'[]'`),

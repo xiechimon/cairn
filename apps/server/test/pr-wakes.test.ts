@@ -17,12 +17,11 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
-import { agentForStep } from '../src/services/dispatch-eligibility.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { listNeedsYou, sweepFailedRetries } from '../src/services/needs-you.js';
 import { createPrFeedbackPoller } from '../src/services/pr-feedback.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import { profileForStep } from '../src/services/routing-rules.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { readWorkerQuestion } from '../src/services/worker-question-store.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -31,7 +30,6 @@ import { bootServer, req, type TestServer } from './helpers.js';
 const servers: TestServer[] = [];
 afterEach(() => {
   for (const s of servers.splice(0)) s.dispose();
-  setRoutingRulesEnabled(false);
 });
 
 const HEAD_A = 'a'.repeat(40);
@@ -564,9 +562,8 @@ describe('D109 S3 persistence and poller handoff', () => {
   });
 });
 
-test('a PR session wake is routed by the session rule with no agent assignment', async () => {
+test('a PR session wake is routed by the session rule', async () => {
   const f = fixture();
-  setRoutingRulesEnabled(true);
   f.s.db
     .insert(routingRule)
     .values({
@@ -582,9 +579,8 @@ test('a PR session wake is routed by the session rule with no agent assignment',
   f.fail(1);
   await watchFor(f.s, f.mock).sweep();
   const thread = f.s.db.select().from(todoTable).where(eq(todoTable.id, f.t.todoId)).get();
-  expect(thread?.assignment).toBeNull();
   expect(f.steps()[0]?.kind).toBe('session');
-  expect(agentForStep(f.s.db, thread!, 'session')).toMatchObject({
+  expect(profileForStep(f.s.db, thread!, 'session')).toMatchObject({
     id: 'session-rule',
     modelId: 'session-model',
   });
@@ -744,7 +740,6 @@ test.each(['claimed', 'done'] as const)(
   'a parked question blocks every repair kind with a %s session',
   async (status) => {
     const f = fixture();
-    setRoutingRulesEnabled(true);
     f.s.db.update(todoTable).set({ phase: 'building' }).run();
     f.s.db
       .insert(stepTable)
@@ -852,7 +847,6 @@ test.each(['done', 'building', 'review', 'failed'] as const)(
 
 test('a question opened during GitHub intake prevents dispatch and budget debit', async () => {
   const f = fixture();
-  setRoutingRulesEnabled(true);
   f.s.db
     .insert(stepTable)
     .values({

@@ -16,7 +16,6 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import {
-  agent as agentTable,
   chief as chiefTable,
   machine as machineTable,
   step as stepTable,
@@ -27,13 +26,13 @@ import {
   issueApiKey,
   postProject,
   req,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
   subscriptionClaudeReport,
   type TestServer,
   withVerification,
 } from './helpers.js';
-
-const AGENT_ID = 'agent-home-1';
-const CC_AGENT_ID = 'agent-home-cc';
 
 const temps: string[] = [];
 function temp(prefix: string): string {
@@ -79,26 +78,12 @@ async function claim(app: TestServer['app'], token: string): Promise<ClaimedStep
   return body.step === null ? null : claimedStepSchema.parse(body.step);
 }
 
-function seedAgent(s: TestServer, id: string, provider: string, machineId: string | null) {
-  s.db
-    .insert(agentTable)
-    .values({
-      id,
-      teamId: s.team.id,
-      displayName: id,
-      status: 'active',
-      avatarUrl: null,
-      provider,
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-      machineId,
-    })
-    .run();
+async function rebind(
+  w: World,
+  use: 'session' | 'coordinator',
+  machineId: string,
+): Promise<Response> {
+  return req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/routing-rules/${use}`, { machineId });
 }
 
 interface World {
@@ -125,8 +110,8 @@ async function setupWorld(): Promise<World> {
     .from(machineTable)
     .where(eq(machineTable.name, 'home-other'))
     .get()!.id;
-  seedAgent(s, AGENT_ID, 'stub-gw', machineAId);
-  seedAgent(s, CC_AGENT_ID, 'claude-code', machineAId);
+  s.db.update(machineTable).set({ online: true }).where(eq(machineTable.teamId, s.team.id)).run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: machineAId });
   const projectId = await postProject(s.app, 'home-proj');
   return { s, tokenA, tokenB, machineAId, machineBId, projectId };
 }
@@ -143,15 +128,13 @@ async function createTodo(s: TestServer, projectId: string): Promise<string> {
 async function startBuild(s: TestServer, projectId: string, todoId: string): Promise<string> {
   const res = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: AGENT_ID } },
-    withPlan: false,
   });
   expect(res.status).toBe(201);
   return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id as string;
 }
 
 describe('#1259 worker home-machine gate', () => {
-  test('bound to A -> A claims, B comes up empty; rebound to B -> B claims (reassignment immediate)', async () => {
+  test('pinned to A -> A claims, B comes up empty; re-pinned to B -> B claims (reassignment immediate)', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId);
     await startBuild(w.s, w.projectId, todoId);
@@ -161,30 +144,14 @@ describe('#1259 worker home-machine gate', () => {
     expect(got).not.toBeNull();
     expect(got!.step.machineId).toBe(w.machineAId);
 
-    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
-      machineId: w.machineBId,
-    });
-    expect(rebind.status).toBe(200);
+    const repin = await rebind(w, 'session', w.machineBId);
+    expect(repin.status).toBe(200);
     const todoId2 = await createTodo(w.s, w.projectId);
     await startBuild(w.s, w.projectId, todoId2);
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
     const got2 = await claim(w.s.app, w.tokenB);
     expect(got2).not.toBeNull();
     expect(got2!.step.machineId).toBe(w.machineBId);
-  });
-
-  test('no home machine set -> no machine can claim it (stays pending)', async () => {
-    const w = await setupWorld();
-    seedAgent(w.s, 'agent-homeless', 'stub-gw', null);
-    const todoId = await createTodo(w.s, w.projectId);
-    const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
-      todoIds: [todoId],
-      assignment: { plan: null, build: { agentId: 'agent-homeless' } },
-      withPlan: false,
-    });
-    expect(res.status).toBe(201);
-    expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    expect(await claim(w.s.app, w.tokenB)).toBeNull();
   });
 });
 
@@ -216,12 +183,7 @@ describe('#1312 other-machine mark on a resumed session', () => {
   test('same-machine resume carries no priorMachineId; claim after rebind carries the previous-round machine', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId);
-    const buildRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
-      todoIds: [todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    });
-    expect(buildRes.status).toBe(201);
+    startLegacyBuild(w.s, todoId, { withPlan: true });
     const plan = await claim(w.s.app, w.tokenA);
     expect(plan?.step.kind).toBe('plan');
     await finishPlan(w, plan!.step.id, 'sess-home');
@@ -235,23 +197,26 @@ describe('#1312 other-machine mark on a resumed session', () => {
     expect(sameMachine?.session).toEqual({ action: 'continue', sessionId: 'sess-home' });
 
     const todoId2 = await createTodo(w.s, w.projectId);
-    const buildRes2 = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
-      todoIds: [todoId2],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    });
-    expect(buildRes2.status).toBe(201);
+    startLegacyBuild(w.s, todoId2, { withPlan: true });
     const plan2 = await claim(w.s.app, w.tokenA);
     expect(plan2?.step.kind).toBe('plan');
     await finishPlan(w, plan2!.step.id, 'sess-moved');
-    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
-      machineId: w.machineBId,
-    });
-    expect(rebind.status).toBe(200);
+    const repin = await rebind(w, 'session', w.machineBId);
+    expect(repin.status).toBe(200);
     const confirm2 = await req(w.s.app, 'POST', `/api/builds/${plan2!.step.buildId}/steps`, {
       action: 'confirm',
     });
     expect(confirm2.status).toBe(202);
+    w.s.db
+      .update(machineTable)
+      .set({ enabledRuntimes: [] })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
+    w.s.db
+      .update(stepTable)
+      .set({ createdAt: Date.now() - 6 * 60_000 })
+      .where(eq(stepTable.status, 'pending'))
+      .run();
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
     const moved = await claim(w.s.app, w.tokenB);
     expect(moved).not.toBeNull();
@@ -282,7 +247,7 @@ describe('#682 runtime real gate (semantics unchanged, home-machine version)', (
     expect(got).not.toBeNull();
   });
 
-  test('a claude-code agent step cannot be claimed on a pi-only home machine; rebind to a dual-enabled machine claims', async () => {
+  test('a claude-code step cannot be claimed on a pi-only home machine; re-pin to a dual-enabled machine claims', async () => {
     const w = await setupWorld();
     const dual = await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
       enabledRuntimes: ['pi', 'claude-code'],
@@ -294,17 +259,16 @@ describe('#682 runtime real gate (semantics unchanged, home-machine version)', (
       .where(eq(machineTable.id, w.machineAId))
       .run();
     const todoId = await createTodo(w.s, w.projectId);
+    seedSessionRoute(w.s, {
+      provider: 'claude-code',
+      modelId: 'stub-model',
+      machineId: w.machineAId,
+    });
     const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
       todoIds: [todoId],
-      assignment: { plan: null, build: { agentId: CC_AGENT_ID } },
-      withPlan: false,
     });
     expect(res.status).toBe(201);
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    const denied = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${CC_AGENT_ID}`, {
-      machineId: w.machineBId,
-    });
-    expect(denied.status).toBe(400);
     w.s.db
       .update(machineTable)
       .set({
@@ -316,16 +280,14 @@ describe('#682 runtime real gate (semantics unchanged, home-machine version)', (
       })
       .where(eq(machineTable.id, w.machineBId))
       .run();
-    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${CC_AGENT_ID}`, {
-      machineId: w.machineBId,
-    });
-    expect(rebind.status).toBe(200);
+    const repin = await rebind(w, 'session', w.machineBId);
+    expect(repin.status).toBe(200);
     const got = await claim(w.s.app, w.tokenB);
     expect(got).not.toBeNull();
   });
 });
 
-describe('#1260 chief step delivery = bound Agent home machine', () => {
+describe('#1260 chief step delivery = coordinator rule home machine', () => {
   function bindChief(w: World): void {
     const chiefId = `chief-${w.s.user.id}-${w.s.team.id}`;
     w.s.db
@@ -334,20 +296,22 @@ describe('#1260 chief step delivery = bound Agent home machine', () => {
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        agentId: AGENT_ID,
         charter: '',
         createdAt: Date.now(),
       })
       .run();
+    seedRoute(w.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: w.machineAId,
+    });
   }
 
-  test('Agent bound to B -> only B can claim the chief step; Agent rebound to A -> A claims (reassignment immediate)', async () => {
+  test('Coordinator pinned to B -> only B can claim the chief step; re-pinned to A -> A claims (reassignment immediate)', async () => {
     const w = await setupWorld();
     bindChief(w);
-    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
-      machineId: w.machineBId,
-    });
-    expect(rebind.status).toBe(200);
+    const repin = await rebind(w, 'coordinator', w.machineBId);
+    expect(repin.status).toBe(200);
     const todoId = await createTodo(w.s, w.projectId);
     const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/orchestrate`, {});
     expect(res.status).toBe(201);
@@ -357,9 +321,7 @@ describe('#1260 chief step delivery = bound Agent home machine', () => {
     expect(got!.step.kind).toBe('chief');
     w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, got!.step.id)).run();
 
-    const back = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
-      machineId: w.machineAId,
-    });
+    const back = await rebind(w, 'coordinator', w.machineAId);
     expect(back.status).toBe(200);
     const todoId2 = await createTodo(w.s, w.projectId);
     const res2 = await req(w.s.app, 'POST', `/api/todos/${todoId2}/orchestrate`, {});
@@ -400,8 +362,10 @@ describe('#895 GET /chief orchestration envelope (spec 21 A5; #1260 re-source)',
 
   test('failure mode G: projection -- homeMachineId + running (claimed) / waiting (pending not executable by its home machine) counts', async () => {
     const w = await setupWorld();
-    await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      agent: { agentId: AGENT_ID },
+    seedRoute(w.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: w.machineAId,
     });
     const t1 = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
       content: '回合一',
@@ -426,13 +390,13 @@ describe('#895 GET /chief orchestration envelope (spec 21 A5; #1260 re-source)',
 
   test('failure mode H: waiting criterion -- home machine online but runtime gate off also counts (T3 gap visibility)', async () => {
     const w = await setupWorld();
-    await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      agent: { agentId: AGENT_ID },
+    seedRoute(w.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: w.machineAId,
     });
-    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
-      machineId: w.machineBId,
-    });
-    expect(rebind.status).toBe(200);
+    const repin = await rebind(w, 'coordinator', w.machineBId);
+    expect(repin.status).toBe(200);
     await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
       enabledRuntimes: ['claude-code'],
     });
@@ -451,7 +415,7 @@ describe('#895 GET /chief orchestration envelope (spec 21 A5; #1260 re-source)',
     expect(activityB?.waiting).toBe(1);
   });
 
-  test('regression red line: chief with no Agent bound + no chief step -> homeMachineId null + activity empty', async () => {
+  test('regression red line: chief with no coordinator rule + no chief step -> homeMachineId null + activity empty', async () => {
     const w = await setupWorld();
     const body = await getEnvelope(w);
     expect(body.orchestration.homeMachineId).toBeNull();

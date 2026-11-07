@@ -3,15 +3,18 @@ import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage } from '@earendil-works/pi-ai';
 import { AssistantEntry, type EntryRecord, type Harness } from '@earendil-works/pi-durable';
 import { compactionWindow, estimateTokens, type ModelRef } from './compaction.js';
+import { activeConversation, type Conversation } from './conversations.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
-import type { StepGate } from './tools.js';
+import type { ConversationGate, StepGate } from './tools.js';
+import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
 
 export interface TurnDeps {
   harness: Harness;
+  conversationId?: string | null;
   models: CoordinatorModels;
   api: MachineApi;
   context: Context;
@@ -19,6 +22,9 @@ export interface TurnDeps {
   stopPollMs?: number;
   now: () => number;
   gate?: StepGate;
+  conversationGate?: ConversationGate;
+  volatile?: VolatileContext;
+  volatileText?: string | null;
   onModel?: (ref: ModelRef) => void;
 }
 
@@ -47,7 +53,7 @@ export const SWITCH_FOLD_INSTRUCTIONS =
 
 async function foldBeforeModelSwitch(
   deps: TurnDeps,
-  root: Awaited<ReturnType<Harness['root']>>,
+  root: Conversation,
   next: ModelRef,
 ): Promise<void> {
   const current = (await root.agent(deps.context)).model;
@@ -91,8 +97,16 @@ export async function runCoordinatorTurn(
   deps.gate?.set(stepId);
   deps.onModel?.({ provider, modelId });
   let stopPoll: ReturnType<typeof setInterval> | undefined;
+  let steerPoll: ReturnType<typeof setInterval> | undefined;
+  let rootKey: string | null = null;
   try {
-    const root = await harness.root(context);
+    const root = await activeConversation(harness, deps.conversationId, context);
+    if (root === undefined) {
+      return done({ status: 'failed', errorMessage: 'Coordinator conversation is missing' });
+    }
+    rootKey = String(root.id);
+    deps.conversationGate?.set(rootKey, stepId);
+    deps.volatile?.set(rootKey, deps.volatileText ?? null);
     let stopping: Promise<void> | null = null;
     let polling = false;
     stopPoll = setInterval(() => {
@@ -106,6 +120,32 @@ export async function runCoordinatorTurn(
         .catch(() => {})
         .finally(() => {
           polling = false;
+        });
+    }, deps.stopPollMs ?? STOP_POLL_MS);
+    let inFlight = false;
+    let steering = false;
+    steerPoll = setInterval(() => {
+      if (!inFlight || steering || stopping !== null || api.steer === undefined) return;
+      steering = true;
+      void api
+        .steer(stepId)
+        .then(async (steer) => {
+          if (steer === null) return;
+          await root.submit(
+            {
+              type: 'input',
+              content: steer.content,
+              whenBusy: 'steer',
+              whenIdle: 'reject',
+              requestId: `steer-${stepId}-${steer.key}`,
+            },
+            context,
+          );
+          await api.ackSteer?.(stepId);
+        })
+        .catch(() => {})
+        .finally(() => {
+          steering = false;
         });
     }, deps.stopPollMs ?? STOP_POLL_MS);
     await foldBeforeModelSwitch(deps, root, { provider, modelId });
@@ -127,7 +167,11 @@ export async function runCoordinatorTurn(
       { type: 'input', content: claimed.instruction ?? '', requestId: stepId },
       context,
     );
+    inFlight = true;
     const settled = await submission.wait(context);
+    inFlight = false;
+    clearInterval(steerPoll);
+    if (settled.entry !== undefined) await api.mapUserEntry?.(stepId, String(settled.entry));
     await watch.stop();
     const turnEntries =
       settled.entry === undefined
@@ -164,7 +208,12 @@ export async function runCoordinatorTurn(
     return finished;
   } finally {
     clearInterval(stopPoll);
+    clearInterval(steerPoll);
     deps.gate?.set(null);
+    if (rootKey !== null) {
+      deps.conversationGate?.set(rootKey, null);
+      deps.volatile?.set(rootKey, null);
+    }
     clearInterval(heartbeat);
   }
 }

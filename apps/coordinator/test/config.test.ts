@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readConfig, readMachineToken } from '../src/config.js';
+import { readMachineToken } from '../src/config.js';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -29,17 +29,5 @@ describe('readMachineToken', () => {
 
   it('refuses an empty token file', () => {
     expect(() => readMachineToken(tokenFile(0o600, '\n'))).toThrow(/empty/);
-  });
-});
-
-describe('router tools flag', () => {
-  it('is on unless CAIRN_ROUTING_RULES switches it off', () => {
-    const token = tokenFile(0o600);
-    const base = { CAIRN_COORDINATOR_TOKEN_FILE: token };
-    expect(readConfig(base).routerTools).toBe(true);
-    expect(readConfig({ ...base, CAIRN_ROUTING_RULES: '1' }).routerTools).toBe(true);
-    for (const off of ['0', 'false', 'no', 'off']) {
-      expect(readConfig({ ...base, CAIRN_ROUTING_RULES: off }).routerTools).toBe(false);
-    }
   });
 });

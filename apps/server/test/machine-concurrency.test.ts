@@ -2,7 +2,6 @@ import { machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
@@ -14,14 +13,20 @@ import { listSteps } from '../src/services/builds.js';
 import { listChiefThreads } from '../src/services/chief.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of disposables) d();
 });
-
-const AGENT_ID = 'agent-cap-1';
 
 interface World {
   s: TestServer;
@@ -41,25 +46,13 @@ async function setupWorld(): Promise<World> {
     .from(machineTable)
     .where(eq(machineTable.name, 'cap-mbp'))
     .get()!.id;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'cap-agent',
-      machineId: machineAId,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
+  s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, machineAId)).run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: machineAId });
+  seedRoute(s, 'coordinator', {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: machineAId,
+  });
   const projectId = await postProject(s.app, 'cap-proj');
   return { s, tokenA, machineAId, projectId };
 }
@@ -79,11 +72,11 @@ let seqCounter = 9_000;
 function insertPendingBuildStep(
   s: TestServer,
   world: World,
-  opts: { agentId?: string } = {},
+  opts: { machineId?: string } = {},
 ): { todoId: string; buildId: string; stepId: string } {
   const suffix = Math.random().toString(36).slice(2, 8);
   seqCounter += 1;
-  const now = seqCounter;
+  const now = Date.now() - 60_000 + (seqCounter - 9_000);
   s.db
     .insert(todoTable)
     .values({
@@ -95,7 +88,7 @@ function insertPendingBuildStep(
       spec: '探针',
       phase: 'queued',
       phaseAt: now,
-      assignment: { plan: null, build: { agentId: opts.agentId ?? AGENT_ID } },
+      ...(opts.machineId === undefined ? {} : { routeOverride: { machineId: opts.machineId } }),
     })
     .run();
   s.db
@@ -230,18 +223,8 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
         maxConcurrent: 3,
       })
       .run();
-    w.s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-cap-b',
-        teamId: w.s.team.id,
-        displayName: 'cap-agent-b',
-        modelId: 'stub-model',
-        machineId: machineBId,
-      })
-      .run();
     insertPendingBuildStep(w.s, w);
-    const lateB = insertPendingBuildStep(w.s, w, { agentId: 'agent-cap-b' });
+    const lateB = insertPendingBuildStep(w.s, w, { machineId: machineBId });
     const target = insertPendingBuildStep(w.s, w);
     const projector = stepQueueProjector(w.s.db, w.s.team.id);
     const targetInfo = projector.project({
@@ -292,7 +275,6 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
         id: `chief-${w.s.user.id}-${w.s.team.id}`,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        agentId: AGENT_ID,
         charter: '',
         createdAt: now,
       })

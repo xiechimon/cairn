@@ -51,7 +51,7 @@ function gateSteps() {
   return H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).all();
 }
 
-test('confirm wake embeds the latest persisted plan without the megabyte transcript', () => {
+test('confirm wake prompt stays bounded and carries no build transcript', () => {
   const { deps, record } = seedGate();
   H.s.db
     .insert(message)
@@ -65,28 +65,14 @@ test('confirm wake embeds the latest persisted plan without the megabyte transcr
     .run();
   H.s.db
     .insert(plan)
-    .values([
-      { id: 'new', buildId: 'gate-build', version: 2, content: 'Latest plan text', createdAt: 1 },
-      { id: 'old', buildId: 'gate-build', version: 1, content: 'Obsolete plan', createdAt: 2 },
-    ])
+    .values({ id: 'new', buildId: 'gate-build', version: 1, content: 'Plan body', createdAt: 1 })
     .run();
   triggerChiefWakes(deps, record, 'confirm');
   const prompt = gateSteps().at(-1)!.prompt!;
-  expect(prompt).toContain('Latest plan text');
-  expect(prompt).not.toContain('Obsolete plan');
-  expect(prompt).not.toContain('conversation');
-  expect(prompt.length).toBeLessThan(42000);
-  H.s.db
-    .update(plan)
-    .set({ content: `Plan start\n${'x'.repeat(50000)}END` })
-    .where(eq(plan.id, 'new'))
-    .run();
-  triggerChiefWakes(deps, record, 'confirm');
-  const capped = gateSteps().at(-1)!.prompt!;
-  expect(capped).toContain('Plan start');
-  expect(capped).toContain('truncated');
-  expect(capped).not.toContain('END');
-  expect(capped.length).toBeLessThan(42000);
+  expect(prompt).toContain('Gate todo=gate-todo build=gate-build phase=confirm');
+  expect(prompt).not.toContain('history');
+  expect(prompt).not.toContain('Plan body');
+  expect(prompt.length).toBeLessThan(2000);
 });
 
 test.each(['chief', 'build'] as const)(
@@ -205,12 +191,8 @@ test('conversation summarises tool payloads and makes progress past an oversized
   expect(second.messages.length).toBeGreaterThan(0);
 });
 
-test('failed gate turn retries once with a fresh plan then posts a visible system line', async () => {
+test('failed gate turn retries once with a fresh session then posts a visible system line', async () => {
   const { deps, record } = seedGate();
-  H.s.db
-    .insert(plan)
-    .values({ id: 'p', buildId: 'gate-build', version: 1, content: 'First plan', createdAt: 1 })
-    .run();
   triggerChiefWakes(deps, record, 'confirm');
   const machineId = insertMachine(H.s);
   const finishDeps = {
@@ -227,12 +209,11 @@ test('failed gate turn retries once with a fresh plan then posts a visible syste
       errorMessage: 'context_length_exceeded',
     });
   }
-  H.s.db.update(plan).set({ content: 'Updated plan' }).where(eq(plan.id, 'p')).run();
   await fail(gateSteps()[0]!.id);
   expect(gateSteps()).toHaveLength(2);
   const retry = gateSteps()[1]!;
   expect(retry.status).toBe('pending');
-  expect(retry.prompt).toContain('Updated plan');
+  expect(retry.prompt).toContain('attempt=1');
   expect(retry.freshSession).toBe(true);
   expect(
     H.s.db.select().from(message).where(eq(message.conversationId, 'gate-build')).all(),

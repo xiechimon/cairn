@@ -10,6 +10,7 @@ import {
 } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
@@ -20,7 +21,9 @@ import { useTypeToCompose } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { recordOutsideLocation } from '../settings/settings-href.js';
+import { useAttentionTitle } from './attention-title.js';
 import { fleetStatus } from './fleet-status.js';
+import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
@@ -106,6 +109,8 @@ export function AppSidebar({
     () => todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos),
     [todos, live, todosQ.data, fixture.todos],
   );
+  const chiefRoot = useOptionalChiefRoot();
+  useAttentionTitle(needsYouCount(resolvedTodos, chiefRoot?.pendingQuestions.length ?? 0));
   const fixtureMachines = fixture.resources?.machines;
   const fleet = fleetStatus(live ? (machinesQ.data ?? []) : (fixtureMachines ?? []));
   const machinesOnline =

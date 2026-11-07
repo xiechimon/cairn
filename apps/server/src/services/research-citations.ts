@@ -9,7 +9,7 @@ import { and, asc, eq, isNotNull, isNull, notExists, notInArray, or, sql } from 
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { agent, build, chief, message, todo, tokenUsage } from '../db/schema.js';
+import { build, message, todo, tokenUsage } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, startBuilds } from './builds.js';
 import { modelsAreIndependent } from './merge-gate/model-identity.js';
@@ -18,7 +18,6 @@ import {
   CITATION_PARKED_MARK,
   failureNeedsHuman,
 } from './needs-you.js';
-import { runnableResearchAgentIds } from './research-dispatch.js';
 import { routeForStep } from './routing-rules.js';
 import { createTodo } from './todos.js';
 
@@ -266,34 +265,25 @@ export function openCitationCheck(
   if (source.models.length === 0 || citedUrls(source.content).size === 0) {
     return blocked(deps, source, 'Source report needs observed model usage and cited URLs.');
   }
-  const route = routeForStep(deps.db, { teamId: source.teamId }, 'build');
-  if (route && !independent(source.models, [route.modelId])) {
-    return blocked(deps, source, 'The session route cannot run an independent citation checker.');
-  }
-  const coordinators = new Set(
-    deps.db
-      .select()
-      .from(chief)
-      .where(eq(chief.teamId, source.teamId))
-      .all()
-      .map((row) => row.agentId),
+  const route = routeForStep(
+    deps.db,
+    { teamId: source.teamId, sourceKind: CITATION_CHECK_SOURCE_KIND },
+    'build',
   );
-  const candidates = deps.db
-    .select()
-    .from(agent)
-    .where(and(eq(agent.teamId, source.teamId), eq(agent.status, 'active'), isNull(agent.persona)))
-    .all()
-    .filter(
-      (row) =>
-        !coordinators.has(row.id) &&
-        independent(source.models, [route?.modelId ?? row.modelId ?? '']),
+  if (route === null) {
+    return blocked(
+      deps,
+      source,
+      'No citation_check or session routing rule is available for the citation checker.',
     );
-  const runnable = runnableResearchAgentIds(deps.db, source, candidates, route);
-  const checker = candidates.sort(
-    (a, b) => Number(!runnable.has(a.id)) - Number(!runnable.has(b.id)) || a.id.localeCompare(b.id),
-  )[0];
-  if (!checker)
-    return blocked(deps, source, 'No active independent citation checker is available.');
+  }
+  if (!independent(source.models, [route.modelId])) {
+    return blocked(
+      deps,
+      source,
+      `The ${route.use} route cannot run an independent citation checker.`,
+    );
+  }
   const spec = [
     '# Citation check',
     'Fetch every cited page. Check each factual claim against the page, the fetched date and source quality. Do not trust the report or its claims that a page was fetched.',
@@ -321,8 +311,6 @@ export function openCitationCheck(
   const [started] = startBuilds(deps, {
     projectId: source.projectId,
     todoIds: [row.id],
-    assignment: { plan: null, build: { agentId: checker.id } },
-    withPlan: false,
     triggerSource: 'chief',
   });
   if (!started) return null;

@@ -2,7 +2,6 @@ import { conversationBranch } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import {
-  agent,
   build,
   chief,
   chiefMessage,
@@ -25,7 +24,7 @@ import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from '../src/services
 import { createScheduler } from '../src/services/scheduler.js';
 import { createTodo, setTodoPhase, updateTodo } from '../src/services/todos.js';
 import { githubFake, mergeGithubFake } from './fakes/github.js';
-import { bootServer, req } from './helpers.js';
+import { bootServer, req, seedRoute } from './helpers.js';
 
 const REPO = 'octo/demo';
 const feedback = (id: number, login = 'reviewer', body = `Fix case ${id}`) => ({
@@ -648,23 +647,13 @@ describe('correction loop', () => {
         performed_via_github_app: { slug: 'cairnwright' },
       },
     ]);
-    s.db
-      .insert(agent)
-      .values({
-        id: 'coordinator',
-        teamId: s.team.id,
-        displayName: 'Coordinator',
-        provider: 'stub',
-        modelId: 'stub',
-      })
-      .run();
+    seedRoute(s, 'coordinator', { provider: 'stub', modelId: 'stub' });
     s.db
       .insert(chief)
       .values({
         id: `chief-${s.user.id}-${s.team.id}`,
         userId: s.user.id,
         teamId: s.team.id,
-        agentId: 'coordinator',
         charter: '',
         watches: [],
         wakes: [],

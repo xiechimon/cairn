@@ -5,6 +5,9 @@ export type QuestionDraft =
 export type QuestionDraftRecord = {
   drafts: QuestionDraft[];
   step: number;
+};
+
+export type QuestionSubmitState = {
   submitting: boolean;
   error: string | null;
 };
@@ -17,6 +20,7 @@ export type QuestionPrompt = {
 type Listener = () => void;
 
 const records = new Map<string, QuestionDraftRecord>();
+const submits = new Map<string, QuestionSubmitState>();
 const listeners = new Set<Listener>();
 
 function emit(): void {
@@ -101,16 +105,6 @@ export const questionDraftStore = {
     records.set(key, record);
     emit();
   },
-  patch(key: string, partial: Partial<QuestionDraftRecord>): void {
-    const current = records.get(key) ?? {
-      drafts: [],
-      step: 0,
-      submitting: false,
-      error: null,
-    };
-    records.set(key, { ...current, ...partial });
-    emit();
-  },
   clear(key: string): void {
     if (!records.delete(key)) return;
     emit();
@@ -125,5 +119,24 @@ export const questionDraftStore = {
     return () => {
       listeners.delete(listener);
     };
+  },
+};
+
+export const questionSubmitStore = {
+  get(key: string): QuestionSubmitState {
+    return submits.get(key) ?? { submitting: false, error: null };
+  },
+  patch(key: string, partial: Partial<QuestionSubmitState>): void {
+    submits.set(key, { ...questionSubmitStore.get(key), ...partial });
+    emit();
+  },
+  clear(key: string): void {
+    if (!submits.delete(key)) return;
+    emit();
+  },
+  clearAll(): void {
+    if (submits.size === 0) return;
+    submits.clear();
+    emit();
   },
 };

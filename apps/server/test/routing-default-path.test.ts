@@ -1,20 +1,18 @@
 import { CHIEF_TOOLS_REMOVED_UNDER_D60 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { agent, build, routingRule, step, todo } from '../src/db/schema.js';
-import { agentForStep } from '../src/services/dispatch-eligibility.js';
-import { runRoutingMigration } from '../src/services/routing-migration.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
-import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
+import { beforeEach, describe, expect, test } from 'vitest';
+import { build, routingRule, step, todo, workPolicy } from '../src/db/schema.js';
+import { seedDefaultRouting } from '../src/services/routing-migration.js';
+import { routeForStep } from '../src/services/routing-rules.js';
+import { H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
 
 beforeEach(() => {
-  H.s.db.update(agent).set({ provider: null, modelId: null }).run();
-  runRoutingMigration(H.s.db);
-  setRoutingRulesEnabled(true);
+  H.s.db.delete(routingRule).run();
+  H.s.db.delete(workPolicy).run();
+  seedDefaultRouting(H.s.db);
 });
-afterEach(() => setRoutingRulesEnabled(false));
 
 function seedTodo(id: string) {
   H.s.db
@@ -34,17 +32,6 @@ function seedTodo(id: string) {
 }
 
 describe('the default path after the migration', () => {
-  test('boot creates no persona agents', () => {
-    expect(H.s.db.select().from(agent).where(eq(agent.teamId, H.teamId)).all()).toHaveLength(2);
-    expect(
-      H.s.db
-        .select()
-        .from(agent)
-        .all()
-        .filter((row) => row.persona !== null),
-    ).toEqual([]);
-  });
-
   test('a Coordinator turn opens a thread as one session step on the default rule', async () => {
     const id = seedTodo('open-me');
     const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
@@ -54,7 +41,7 @@ describe('the default path after the migration', () => {
       false,
     );
     const todoRow = H.s.db.select().from(todo).where(eq(todo.id, id)).get()!;
-    expect(agentForStep(H.s.db, todoRow, 'session')).toMatchObject({
+    expect(routeForStep(H.s.db, todoRow, 'session')).toMatchObject({
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
     });
@@ -75,8 +62,7 @@ describe('the default path after the migration', () => {
         relay(name, {
           todoIds: [id],
           todoId: id,
-          assignment: { build: { agentId: AGENT_ID } },
-          subtodos: [{ title: 't', spec: 's', agentId: AGENT_ID }],
+          subtodos: [{ title: 't', spec: 's' }],
         }),
       ).rejects.toMatchObject({
         status: 410,

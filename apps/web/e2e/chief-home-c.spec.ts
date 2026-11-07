@@ -18,8 +18,8 @@ test('the home is one Coordinator conversation: serif greeting, a pinned decisio
   await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 3 in progress');
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(3);
   await expect(needsYou(page)).not.toContainText('relay-186 cannot run glm-5.3-flash');
-  await expect(page.getByTestId('chief-question-count')).toHaveText('1');
-  await expect(page.getByTestId('chief-question-panel')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question-dock')).toBeVisible();
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Coordinator');
@@ -87,7 +87,7 @@ test('the sidebar lists project names only, and the project chat filters the dec
   await expect(needsYou(page)).toContainText('Connect a Claude subscription token');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('chief-stream')).toContainText('Fold finished turns before review');
-  await expect(composer(page)).toHaveAttribute('placeholder', /in cairn/);
+  await expect(composer(page)).toHaveAttribute('placeholder', /in cairn|Type your own answer/);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
 });
 
@@ -206,7 +206,7 @@ test('a project chat links to that project home, files and settings', async ({ p
   await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
 });
 
-test('the home lands at the newest message, with the greeting and the pinned decision above it', async ({
+test('the home lands at the newest message, with the needs-you tray pinned above the composer', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -215,29 +215,18 @@ test('the home lands at the newest message, with the greeting and the pinned dec
   await page.getByTestId('home-c').getByTestId('chief-body').evaluate((node) => {
     node.scrollTop = 0;
   });
-  await expect(page.getByTestId('home-c').getByRole('heading', { level: 2 }).first()).toBeInViewport();
   await expect(needsYou(page).getByRole('heading', { name: 'Needs you' })).toBeInViewport();
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]').first()).toBeInViewport();
 });
 
-test('at phone width the number-key hint of a question is hidden', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(home('home-c'));
-  await page.getByTestId('chief-question-entry').click();
-  const hint = page.getByTestId('chief-question-panel').getByTestId('chief-question-hint');
-  await expect(hint).toBeHidden();
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(hint).toBeVisible();
-});
-
-test('the sidebar Home badge counts the same items as Needs you', async ({ page }) => {
+test('the sidebar Coordinator badge counts the Needs you items plus the pending question', async ({ page }) => {
   await page.goto(home('home-c'));
   const badge = page.getByRole('complementary').getByTestId('attention-badge');
   const needsYouCount = await needsYou(page).getByTestId('needs-you-count').textContent();
   expect(needsYouCount).toBe('3');
-  await expect(badge).toHaveText(needsYouCount ?? '');
+  await expect(badge).toHaveText('4');
   await page.goto('/app/schedules?scenario=home-c');
-  await expect(badge).toHaveText('3');
+  await expect(badge).toHaveText('4');
 });
 
 test('the earlier-messages divider shows only when the conversation reports earlier messages', async ({

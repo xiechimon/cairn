@@ -8,6 +8,7 @@ export const DB_TABLES = [
   'build',
   'step',
   'steer_pending',
+  'step_route',
   'stop_pending',
   'queued_message',
   'message',
@@ -15,7 +16,6 @@ export const DB_TABLES = [
   'schedule',
   'schedule_report',
   'notification',
-  'agent',
   'agent_memory',
   'provider',
   'secret',
@@ -61,6 +61,10 @@ export const DB_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
+  'data_migration',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -69,6 +73,7 @@ export const JOIN_ONLY_TABLES = ['todo_tag'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'steer_pending',
+  'step_route',
   'paired_device',
   'branch_sync',
   'stop_pending',
@@ -108,4 +113,8 @@ export const INTERNAL_ONLY_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
+  'data_migration',
 ] as const;

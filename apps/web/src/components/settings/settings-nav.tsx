@@ -1,10 +1,10 @@
 import { cn } from 'cn';
 import { Search } from 'lucide-react';
-import type { ComponentType, ReactNode, SVGProps } from 'react';
+import type { ComponentType, ReactNode, Ref, SVGProps } from 'react';
 import { Link, type To } from 'react-router';
 import { useI18n } from '../../i18n/provider.js';
-import { FORM_CONTROL_CLS } from '../form-layout.js';
 import { Input } from '../ui/input.js';
+import { Kbd } from '../ui/kbd.js';
 
 export interface SettingsNavItem {
   id: string;
@@ -24,6 +24,7 @@ export function SettingsNav({
   hrefFor,
   query,
   onQuery,
+  searchRef,
   top,
 }: {
   groups: SettingsNavGroup[];
@@ -31,6 +32,7 @@ export function SettingsNav({
   hrefFor: (id: string) => To;
   query: string;
   onQuery: (next: string) => void;
+  searchRef?: Ref<HTMLInputElement>;
   top?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -44,20 +46,25 @@ export function SettingsNav({
     }))
     .filter((group) => group.items.length > 0);
   return (
-    <nav aria-label={t('设置分区')} className="flex h-full min-h-0 flex-col gap-4 px-3 py-4">
+    <nav aria-label={t('设置分区')} className="flex h-full min-h-0 flex-col gap-3 px-2 py-3">
       {top}
-      <div className="relative">
-        <Search
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-content-tertiary"
-        />
+      <div className="flex h-8 flex-none items-center gap-2 rounded-(--radius-control) px-2.5 text-content-tertiary transition-colors duration-(--dur-fast) focus-within:bg-sidebar-hover focus-within:ring-1 focus-within:ring-(--focus-ring) hover:bg-sidebar-hover">
+        <Search aria-hidden className="size-4 flex-none" strokeWidth={1.75} />
         <Input
+          ref={searchRef}
           aria-label={t('搜索设置')}
-          className={cn(FORM_CONTROL_CLS, 'pl-8')}
-          placeholder={t('搜索设置')}
+          aria-keyshortcuts="/"
+          className="h-full flex-auto border-0 bg-transparent px-0 py-0 text-ui text-foreground shadow-none placeholder:text-content-secondary focus-visible:border-0 focus-visible:ring-0 md:text-ui dark:bg-transparent"
+          placeholder={t('搜索')}
           value={query}
           onChange={(event) => onQuery(event.target.value)}
         />
+        <Kbd
+          data-testid="settings-search-hint"
+          className="h-5 flex-none bg-transparent px-1.5 text-caption font-normal text-content-tertiary ring-1 ring-border max-md:hidden"
+        >
+          /
+        </Kbd>
       </div>
       <div className="flex min-h-0 flex-auto flex-col gap-4 overflow-y-auto">
         {visible.length === 0 && (
@@ -66,7 +73,7 @@ export function SettingsNav({
         {visible.map((group) => (
           <div key={group.heading ?? group.items[0]?.id} className="flex flex-col gap-px">
             {group.heading !== null && (
-              <span className="px-2.5 pb-1 text-caption font-medium text-content-tertiary">
+              <span className="px-2.5 pt-1 pb-1 text-caption font-medium text-content-tertiary">
                 {group.heading}
               </span>
             )}

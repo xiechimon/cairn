@@ -9,7 +9,6 @@ import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   apiKey as apiKeyTable,
   build as buildTable,
-  plan as planTable,
   step as stepTable,
   todo as todoTable,
   tokenUsage,
@@ -17,7 +16,6 @@ import {
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -26,16 +24,6 @@ import {
   waitFor,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
-
-const PLAN_MD = [
-  '# 方案',
-  'Kind: fix',
-  '',
-  'Context: 探针任务，README 当前无探针行。',
-  'Changes: 在 README.md 追加一行 m3b probe。',
-  'Edge cases: 无。',
-  'Verification: 读回 README.md 确认探针行在位。',
-].join('\n');
 
 let stub: StubLlm;
 let server: RealServer;
@@ -55,13 +43,6 @@ beforeAll(async () => {
     {
       toolCall: {
         name: 'bash',
-        arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_MD}\nEOF` },
-      },
-    },
-    { content: '方案已就绪：Context / Changes / Edge cases / Verification 四段完整。' },
-    {
-      toolCall: {
-        name: 'bash',
         arguments: { command: 'printf "m3b probe line\\n" >> README.md' },
       },
     },
@@ -71,15 +52,14 @@ beforeAll(async () => {
     {
       toolCall: {
         name: 'bash',
-        arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_MD}\nEOF` },
+        arguments: { command: 'printf "m3b probe line\\n" >> README.md' },
       },
     },
-    { content: '重跑方案已就绪。' },
+    { content: '重跑修改已完成。' },
   ]);
   server = await bootRealServer({
     providerBaseUrl: stub.url,
     claimHoldMs: 1_000,
-    agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
   });
   home = makeTestTempDir('cairn-m3b-home-');
   const config = loadDaemonConfig(
@@ -111,7 +91,7 @@ afterAll(async () => {
 });
 
 describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main sequence)', () => {
-  test('create → plan: worktree contract lands + plan.md v1 persisted + push (r3 §1.4/§3.3)', async () => {
+  test('create → session: worktree contract lands + real bash change → commit/push → review + hasChanges (git ground truth)', async () => {
     world = await seedWorld(
       server.url,
       server.teamId,
@@ -123,33 +103,32 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
 
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
+    try {
+      await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
+    } catch (err) {
+      const b = server.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get();
+      const s = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
+      throw new Error(
+        `${err instanceof Error ? err.message : err} | phase=${server.todoPhase(world.todoId)} buildErr=${b?.errorMessage ?? null} steps=${JSON.stringify(s.map((r) => [r.kind, r.status]))}`,
+      );
+    }
 
-    const convDir = join(paths.workspacesDir, buildId);
-    expect(existsSync(join(convDir, 'plan.md'))).toBe(true);
     const branch = `cairn/conv-${buildId}`;
     const branchSha = await systemGitOps.resolveCommit(bareDir, `refs/heads/${branch}`);
     expect(branchSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(existsSync(join(paths.workspacesDir, buildId))).toBe(true);
     expect(existsSync(join(paths.workspacesDir, world.projectId, 'repo', '.git'))).toBe(true);
 
-    const planOnRemote = await systemGitOps.readFileAt(bareDir, branchSha!, 'plan.md');
-    expect(planOnRemote).not.toBeNull();
-    expect(new TextDecoder().decode(planOnRemote!.content)).toContain('Context:');
+    const readme = await systemGitOps.readFileAt(bareDir, branchSha!, 'README.md');
+    expect(readme).not.toBeNull();
+    expect(new TextDecoder().decode(readme!.content)).toContain('m3b probe line');
 
-    const plans = server.db.select().from(planTable).where(eq(planTable.buildId, buildId)).all();
-    expect(plans).toHaveLength(1);
-    expect(plans[0]!.version).toBe(1);
-    expect(plans[0]!.content).toContain('Changes:');
-    const buildRow = server.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
-    expect(buildRow.planDocId).toBe(plans[0]!.id);
     const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, world.todoId)).get()!;
-    expect(todoRow.hasPlan).toBe(true);
+    expect(todoRow.hasChanges).toBe(true);
 
     const lines = logLines();
     for (const canon of [
@@ -165,8 +144,15 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     }
 
     const stepRows = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
-    expect(stepRows.every((s) => s.status === 'done')).toBe(true);
+    expect(stepRows).toHaveLength(1);
+    expect(stepRows[0]!.kind).toBe('session');
+    expect(stepRows[0]!.status).toBe('done');
     expect(stepRows[0]!.checkpointCommit).toBe(branchSha);
+
+    const msgs = await api(server.url, 'GET', `/api/conversations/${buildId}/messages`);
+    const messages = (msgs.body as { messages: { content: unknown }[] }).messages;
+    expect(JSON.stringify(messages)).toContain('README.md');
+
     const gitKeys = server.db
       .select()
       .from(apiKeyTable)
@@ -181,42 +167,6 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     );
     expect(gitConfig).not.toContain('credential');
     expect(gitConfig).not.toContain('cairn_');
-  }, 150_000);
-
-  test('confirm → build: continue session + real bash change → commit/push → review + hasChanges (git ground truth)', async () => {
-    const confirmed = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
-      action: 'confirm',
-    });
-    expect(confirmed.status).toBe(202);
-    try {
-      await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
-    } catch (err) {
-      const b = server.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get();
-      const s = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
-      throw new Error(
-        `${err instanceof Error ? err.message : err} | phase=${server.todoPhase(world.todoId)} buildErr=${b?.errorMessage ?? null} steps=${JSON.stringify(s.map((r) => [r.kind, r.status]))}`,
-      );
-    }
-
-    expect(logLines().some((l) => l.includes(`continue session ${buildId}`))).toBe(true);
-
-    const branchSha = await systemGitOps.resolveCommit(bareDir, `refs/heads/cairn/conv-${buildId}`);
-    const readme = await systemGitOps.readFileAt(bareDir, branchSha!, 'README.md');
-    expect(readme).not.toBeNull();
-    expect(new TextDecoder().decode(readme!.content)).toContain('m3b probe line');
-
-    const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, world.todoId)).get()!;
-    expect(todoRow.hasChanges).toBe(true);
-    const steps = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
-    const buildStep = steps.find((s) => s.kind === 'build')!;
-    expect(buildStep.checkpointCommit).toMatch(/^[0-9a-f]{40}$/);
-    expect(buildStep.checkpointCommit).not.toBe(
-      steps.find((s) => s.kind === 'plan')!.checkpointCommit,
-    );
-
-    const msgs = await api(server.url, 'GET', `/api/conversations/${buildId}/messages`);
-    const messages = (msgs.body as { messages: { content: unknown }[] }).messages;
-    expect(JSON.stringify(messages)).toContain('README.md');
   }, 150_000);
 
   test('review → merge 202 delegated → merge step → main fast-forward → done (02 §4.2/A6 + r3 §3.6)', async () => {
@@ -258,8 +208,6 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     );
     const started = await api(server.url, 'POST', `/api/projects/${world2.projectId}/builds`, {
       todoIds: [world2.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     const failedBuildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
@@ -288,14 +236,12 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
 
     const rerun = await api(server.url, 'POST', `/api/projects/${world2.projectId}/builds`, {
       todoIds: [world2.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     expect(rerun.status).toBe(201);
     const rerunBuildId = (rerun.body as { builds: { id: string }[] }).builds[0]!.id;
     expect(rerunBuildId).not.toBe(failedBuildId);
-    await waitFor(() => server.todoPhase(world2.todoId) === 'confirm', 120_000);
-    expect(existsSync(join(paths.workspacesDir, rerunBuildId, 'plan.md'))).toBe(true);
+    await waitFor(() => server.todoPhase(world2.todoId) === 'review', 120_000);
+    expect(existsSync(join(paths.workspacesDir, rerunBuildId))).toBe(true);
     const bareDir2 = join(server.reposDir, server.teamId, 'm3b-failure.git');
     const branch2 = await systemGitOps.resolveCommit(
       bareDir2,

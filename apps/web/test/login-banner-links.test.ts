@@ -10,14 +10,14 @@ describe('loginBannerLinks', () => {
 
   it('links only to subscriptions and routing for subscription warnings', () => {
     expect(loginBannerLinks([{ source: 'subscription' }])).toEqual([
-      { id: 'subscriptions', href: '/app/resources/model-routing' },
+      { id: 'subscriptions', href: '/app/resources/providers' },
     ]);
   });
 
   it('gives both links when both kinds are present', () => {
     expect(loginBannerLinks([{ source: 'subscription' }, { source: 'machine' }])).toEqual([
       { id: 'machines', href: '/app/resources/machines' },
-      { id: 'subscriptions', href: '/app/resources/model-routing' },
+      { id: 'subscriptions', href: '/app/resources/providers' },
     ]);
   });
 });

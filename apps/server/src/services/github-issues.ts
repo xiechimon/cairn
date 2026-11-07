@@ -108,7 +108,7 @@ export async function importGithubIssue(
   deps: ImportGithubIssueDeps,
   row: ProjectRow,
   issueNumber: number,
-  opts: { createdBy?: string; pendingIntakeAssignment?: boolean } = {},
+  opts: { createdBy?: string } = {},
 ): Promise<TodoRecord> {
   const { owner, repo } = requireGithubRepo(row);
   const fetchImpl = deps.githubFetch ?? fetch;
@@ -141,9 +141,6 @@ export async function importGithubIssue(
       ownerId: deps.user.id,
       sourceKind: 'github-issue',
       sourceRef: ref,
-      ...(opts.pendingIntakeAssignment
-        ? { assignment: { source: 'intake-label', plan: null, build: null } as const }
-        : {}),
     });
   } finally {
     importsInFlight.delete(claim);

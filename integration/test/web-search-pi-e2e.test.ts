@@ -10,14 +10,14 @@ import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import { agent as agentTable, build as buildTable } from '../../apps/server/src/db/schema.js';
+import { build as buildTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
   type RealServer,
+  updateSessionPolicy,
   waitFor,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
@@ -121,13 +121,9 @@ beforeAll(async () => {
   });
   expect(exaSecret.status).toBe(201);
   expect(otherSecret.status).toBe(201);
-  server.db
-    .update(agentTable)
-    .set({
-      secrets: [(exaSecret.body as { id: string }).id, (otherSecret.body as { id: string }).id],
-    })
-    .where(eq(agentTable.id, AGENT_ID))
-    .run();
+  updateSessionPolicy(server, {
+    secrets: [(exaSecret.body as { id: string }).id, (otherSecret.body as { id: string }).id],
+  });
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
@@ -185,7 +181,6 @@ describe('Phase 1b: a pi info step uses web_search through the daemon tool', () 
     const todoId = (todoRes.body as { id: string }).id;
     const started = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
       todoIds: [todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
       withPlan: false,
     });
     expect(started.status).toBe(201);

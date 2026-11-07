@@ -8,7 +8,7 @@ import {
 import { and, asc, eq, inArray, not, or, type SQL, sql } from 'drizzle-orm';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
-import { agent, build, project, todo, tokenUsage, user } from '../db/schema.js';
+import { build, project, todo, tokenUsage, user } from '../db/schema.js';
 
 export interface SearchDeps {
   db: Db;
@@ -70,11 +70,6 @@ function resolveFilter(
       };
     case 'by': {
       const pattern = `%${escapeLike(cond.name)}%`;
-      const agentIds = deps.db
-        .select({ id: agent.id })
-        .from(agent)
-        .where(and(eq(agent.teamId, teamId), containsLike(agent.displayName, pattern)))
-        .all();
       const userIds = deps.db
         .select({ id: user.id })
         .from(user)
@@ -85,7 +80,7 @@ function resolveFilter(
           ),
         )
         .all();
-      const ids = [...agentIds, ...userIds].map((row) => row.id);
+      const ids = userIds.map((row) => row.id);
       return ids.length === 0
         ? { parsed, condition: null, reason: 'unknown_person' }
         : { parsed, condition: inArray(todo.createdBy, ids), reason: undefined };
@@ -167,7 +162,7 @@ function searchWithSyntax(
     ...(reason === undefined ? {} : { reason }),
   }));
   const conditions = filterConditions(resolved);
-  if (conditions === 'none') return { todos: [], projects: [], agents: [], filters };
+  if (conditions === 'none') return { todos: [], projects: [], filters };
   const wordConditions = parsed.words.map((word) => {
     const like = containsLike(todo.title, `%${escapeLike(word.text)}%`);
     return word.negated ? not(like) : like;
@@ -186,7 +181,7 @@ function searchWithSyntax(
     .where(and(eq(todo.teamId, teamId), ...conditions, ...wordConditions))
     .orderBy(asc(todo.seqNum))
     .all();
-  return { todos, projects: [], agents: [], filters };
+  return { todos, projects: [], filters };
 }
 
 export function search(
@@ -194,7 +189,7 @@ export function search(
   input: { teamId: string; q: string | null; nowMs?: number },
 ): SearchResponse {
   const q = input.q?.trim();
-  if (!q) return { todos: [], projects: [], agents: [] };
+  if (!q) return { todos: [], projects: [] };
   const nowMs = input.nowMs ?? Date.now();
   if (parseSearchQuery(q, nowMs).filters.length > 0) {
     return searchWithSyntax(deps, input.teamId, q, nowMs);
@@ -223,12 +218,5 @@ export function search(
     .orderBy(asc(project.name))
     .all();
 
-  const agents = deps.db
-    .select({ id: agent.id, displayName: agent.displayName })
-    .from(agent)
-    .where(and(eq(agent.teamId, input.teamId), containsLike(agent.displayName, pattern)))
-    .orderBy(asc(agent.displayName))
-    .all();
-
-  return { todos, projects, agents };
+  return { todos, projects };
 }

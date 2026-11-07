@@ -70,12 +70,14 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
   page,
 }) => {
-  await page.goto('/app/resources/machines?scenario=06');
+  await page.goto('/app/settings/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_');
 
-  await expect(page.locator('[data-on]').first()).toBeVisible();
+  await expect(page.getByTestId('machine-accept-toggle').first()).toBeVisible();
 
-  await expect(page.locator('div[data-kind] button')).toHaveCount(2);
-  await expect(page.locator('div[data-kind] button[aria-label^="并发上限"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="machine-item"] > div:first-child button:not([data-testid])')).toHaveCount(0);
+  await expect(
+    page.getByTestId('machine-detail').locator('button[aria-label^="并发上限"]'),
+  ).toHaveCount(1);
 });
 
 test('composer toolbar drops the `语音输入` button, keeps attachment', async ({ page }) => {
@@ -171,18 +173,6 @@ test('mcp page is read-only: no create entry, no per-row more-menu ink, empty st
   await expect(page.getByRole('dialog')).toHaveCount(1);
   await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
-});
-
-test('create-agent dialog drops the avatar `更换` ink (#307)', async ({ page }) => {
-  await page.goto('/app/team?scenario=12');
-  await page.getByRole('button', { name: '创建 Agent' }).click();
-
-  const dialog = page.getByRole('dialog', { name: '创建 agent' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.dlg-agent-swap')).toHaveCount(0);
-
-  await expect(dialog.getByTestId('agent-avatar').locator('img')).toBeVisible();
-  await expect(dialog.getByLabel('名称')).toBeVisible();
 });
 
 test('project settings drops the avatar `更换` ink (#307, supersedes the #177 chrome verdict)', async ({

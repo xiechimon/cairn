@@ -10,7 +10,6 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
 import {
-  agent as agentTable,
   chiefMessage,
   notification as notificationTable,
   step as stepTable,
@@ -23,7 +22,7 @@ import {
   wakeProvenance,
   watchProvenance,
 } from '../src/services/chief.js';
-import { bootServer, issueApiKey, machineIdByName, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -70,20 +69,10 @@ async function setup(): Promise<World> {
     body: { teamId, name: 'quiet-mbp', cliVersion: '0.1.0' },
   });
   const { token } = (await enrollRes.json()) as { token: string };
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-quiet',
-      teamId,
-      displayName: 'quiet-agent',
-      description: '调度',
-      modelId: 'stub-model',
-      provider: 'stub-gw',
-      machineId: machineIdByName(s, 'quiet-mbp'),
-    })
-    .run();
-  await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: 'agent-quiet' } },
+  seedRoute(s, 'coordinator', {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: machineIdByName(s, 'quiet-mbp'),
   });
   const msgRes = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content: '帮我看看' },

@@ -22,7 +22,7 @@ import {
 import { mapCommits, mapDiffFiles, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
-import { relativeTime } from '../board/rel-time.js';
+import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { threadHrefFrom } from '../board/thread-copy.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
@@ -236,7 +236,7 @@ function FilesPane({
                     data-testid="history-meta"
                     className="max-w-full truncate text-meta text-content-tertiary"
                   >
-                    {c.authorName} · {relativeTime(c.at, now, t)} ·{' '}
+                    {joinMeta([c.authorName, relativeTime(c.at, now, t)])} ·{' '}
                     <span className="font-mono">{c.shortSha}</span>
                   </span>
                 </span>
@@ -406,7 +406,7 @@ function CommitDetailView({
             {view.message}
           </span>
           <span className="text-meta text-content-tertiary" data-commit-detail="meta">
-            {view.authorName} · {relativeTime(view.at, now, t)} ·{' '}
+            {joinMeta([view.authorName, relativeTime(view.at, now, t)])} ·{' '}
             <span className="font-mono">{view.shortSha}</span>
           </span>
         </div>
@@ -633,7 +633,7 @@ function TasksPane({
                   {todo.title}
                 </Link>
                 <span data-testid="task-meta" className="truncate text-meta text-content-tertiary">
-                  #{todo.seqNum} · {relativeTime(todo.phaseAt, now, t)}
+                  {joinMeta([`#${todo.seqNum}`, relativeTime(todo.phaseAt, now, t)])}
                 </span>
               </span>
               <TaskStatus phase={todo.phase} />
@@ -669,7 +669,7 @@ function TasksPane({
                 {todo.title}
               </Link>
               <span data-testid="task-meta" className="text-meta text-content-tertiary">
-                #{todo.seqNum} · {relativeTime(todo.phaseAt, now, t)}
+                {joinMeta([`#${todo.seqNum}`, relativeTime(todo.phaseAt, now, t)])}
               </span>
             </Card>
           ))}

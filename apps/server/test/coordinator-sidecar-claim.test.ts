@@ -1,26 +1,24 @@
 import { chiefDigestThreadId } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, afterEach, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
   provider as providerTable,
+  routingRule,
   step as stepTable,
   team as teamTable,
 } from '../src/db/schema.js';
 import { setCoordinatorMachineId } from '../src/services/coordinator-context.js';
 import { claimStep } from '../src/services/machines.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, seedRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of disposables) d();
 });
 afterEach(() => setCoordinatorMachineId(null));
-
-const AGENT_ID = 'agent-coord-sidecar';
 
 interface World {
   s: TestServer;
@@ -48,24 +46,11 @@ async function setupWorld(): Promise<World> {
   disposables.push(() => s.dispose());
   const daemon = await enroll(s, await issueApiKey(s), 'coord-daemon');
   const sidecar = await enroll(s, await issueApiKey(s), 'coord-sidecar');
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'Coordinator',
-      machineId: daemon.id,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
+  seedRoute(s, 'coordinator', {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: daemon.id,
+  });
   const chiefId = `chief-${s.svc.user.id}-${s.team.id}`;
   s.db
     .insert(chiefTable)
@@ -73,11 +58,10 @@ async function setupWorld(): Promise<World> {
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      agentId: AGENT_ID,
       charter: '',
       createdAt: 1,
     })
-    .onConflictDoUpdate({ target: chiefTable.id, set: { agentId: AGENT_ID } })
+    .onConflictDoNothing()
     .run();
   return {
     s,
@@ -158,12 +142,16 @@ function statusOf(w: World, stepId: string) {
   return { status: row.status, machineId: row.machineId };
 }
 
-function bindClaudeCodeCoordinator(w: World): void {
+function setCoordinatorRoute(w: World, set: { provider: string; modelId: string }): void {
   w.s.db
-    .update(agentTable)
-    .set({ provider: 'claude-code', modelId: 'haiku' })
-    .where(eq(agentTable.id, AGENT_ID))
+    .update(routingRule)
+    .set(set)
+    .where(and(eq(routingRule.teamId, w.s.team.id), eq(routingRule.use, 'coordinator')))
     .run();
+}
+
+function bindClaudeCodeCoordinator(w: World): void {
+  setCoordinatorRoute(w, { provider: 'claude-code', modelId: 'haiku' });
   w.s.db
     .update(machineTable)
     .set({
@@ -309,11 +297,7 @@ describe('Coordinator sidecar claim routing (D72)', () => {
   test('flag on: the sidecar does not take a Claude turn the team forbids paying for', async () => {
     const w = await setupWorld();
     setCoordinatorMachineId(w.sidecarId);
-    w.s.db
-      .update(agentTable)
-      .set({ provider: 'anthropic', modelId: 'claude-haiku-5-5' })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    setCoordinatorRoute(w, { provider: 'anthropic', modelId: 'claude-haiku-5-5' });
     w.s.db
       .update(teamTable)
       .set({ claudeUsage: 'subscription-only' })
@@ -332,11 +316,7 @@ describe('Coordinator sidecar claim routing (D72)', () => {
   test('flag on: the sidecar does not take a turn routed to the claude-code runtime', async () => {
     const w = await setupWorld();
     setCoordinatorMachineId(w.sidecarId);
-    w.s.db
-      .update(agentTable)
-      .set({ provider: 'claude-code', modelId: 'haiku' })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    setCoordinatorRoute(w, { provider: 'claude-code', modelId: 'haiku' });
     insertChiefStep(w);
     expect(await claimAsCoordinator(w)).toBeNull();
   });
@@ -350,22 +330,11 @@ describe('Coordinator sidecar claim routing (D72)', () => {
     expect((await claimAsDaemon(w))?.step.id).toBe(stepId);
   });
 
-  test('flag on, keyed provider but paid Claude not allowed: the route falls back and the daemon runs the turn', async () => {
+  test('flag on, a keyed provider route and paid Claude allowed: the sidecar runs the turn and the daemon skips it', async () => {
     const w = await setupWorld();
     setCoordinatorMachineId(w.sidecarId);
-    bindClaudeCodeCoordinator(w);
     addKeyedAnthropicProvider(w);
-    setClaudeUsage(w, 'subscription-only');
-    const stepId = insertChiefStep(w);
-    expect(await claimAsCoordinator(w)).toBeNull();
-    expect((await claimAsDaemon(w))?.step.id).toBe(stepId);
-  });
-
-  test('flag on, keyed provider and paid Claude allowed: the sidecar runs the turn and the daemon skips it', async () => {
-    const w = await setupWorld();
-    setCoordinatorMachineId(w.sidecarId);
-    bindClaudeCodeCoordinator(w);
-    addKeyedAnthropicProvider(w);
+    setCoordinatorRoute(w, { provider: 'anthropic-byok', modelId: 'claude-haiku-5-5' });
     setClaudeUsage(w, 'allow-paid');
     const stepId = insertChiefStep(w);
     expect(await claimAsDaemon(w)).toBeNull();
