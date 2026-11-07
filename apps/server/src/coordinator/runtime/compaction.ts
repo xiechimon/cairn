@@ -2,6 +2,7 @@ import {
   COORDINATOR_SUMMARY_MAX_CHARS,
   COORDINATOR_SUMMARY_PROMPT_HEAD,
   COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
+  shortEvent,
 } from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
 import type { Models } from '@earendil-works/pi-ai/models';
@@ -91,7 +92,9 @@ export function transcriptLines(messages: readonly Message[]): string[] {
   for (const message of messages) {
     if (message.role === 'user') {
       const text = textOf(message.content);
-      if (text !== '') lines.push(`用户：${text}`);
+      const event = shortEvent(text);
+      if (event !== null) lines.push(`事件：${event}`);
+      else if (text !== '') lines.push(`用户：${text}`);
     } else if (message.role === 'assistant') {
       const text = textOf(message.content);
       if (text !== '') lines.push(`总管：${text}`);

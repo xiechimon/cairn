@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { shortEvent } from '@cairn/shared';
 import { BACKGROUND_CONTEXT, type Context } from '@earendil-works/chord/context';
 import type { Message } from '@earendil-works/pi-ai';
 import {
@@ -13,7 +14,6 @@ import { createCoordinatorModels } from './models.js';
 export const SEED_MAX_ROWS = 100;
 export const SEED_ROW_MAX_CHARS = 8_000;
 const TOOL_ARGS_CHARS = 200;
-const WAKE_MARKER_RE = /^\[wake:\w+\]\s*/;
 
 export interface SeedRow {
   id: string;
@@ -60,8 +60,7 @@ export function seedMessageText(row: SeedRow): { role: 'user' | 'assistant'; tex
     if (row.role === 'assistant') role = 'assistant';
     else if (row.role === 'user') {
       role = 'user';
-      const wake = WAKE_MARKER_RE.exec(text);
-      if (wake) text = `[event] ${text.slice(wake[0].length)}`;
+      text = shortEvent(text, row.id) ?? text;
     } else return null;
   }
   if (text.length > SEED_ROW_MAX_CHARS) {

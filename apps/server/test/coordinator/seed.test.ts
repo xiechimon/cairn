@@ -68,7 +68,9 @@ describe('seeding the Coordinator store from the C2 summary', () => {
   it('renders rows like C3: events tagged, tool calls without results, long rows cut with a read_history pointer', () => {
     const messages = seedMessages(readThreadRows(serverDb(tempDir()), 't1', 10));
     expect(messages.map((m) => m.role)).toEqual(['user', 'assistant']);
-    expect(messages[0]?.text).toBe('[event] build 7 failed');
+    expect(messages[0]?.text).toBe(
+      '[event failed] build 7 failed [full text: read_history ids ["u1"]]',
+    );
     expect(messages[1]?.text).toContain('looking\n\n[called todos {"q":1}]');
     expect(messages[1]?.text).not.toContain('HUGE');
     expect(messages[1]?.text).toContain('read_history ids ["a2"]');
@@ -99,5 +101,23 @@ describe('seeding the Coordinator store from the C2 summary', () => {
       seedCoordinator(harness, 'again', rows, { provider: 'stub', modelId: 'm' }, ctx),
     ).rejects.toThrow(/already holds a conversation/);
     await harness.close(ctx);
+  });
+});
+
+describe('seed keeps big events out of the model context', () => {
+  const bigEvent = `[wake:settle] provenance=watch:t9\n${'report line '.repeat(5_000)}`;
+
+  it('turns a 60k-character thread report into a short form with a pointer, and keeps a long user message whole', () => {
+    const user = 'u'.repeat(3_000);
+    const messages = seedMessages([
+      { id: 'ev1', role: 'user', content: JSON.stringify(bigEvent), createdAt: 1 },
+      { id: 'a1', role: 'assistant', content: JSON.stringify('noted'), createdAt: 2 },
+      { id: 'u2', role: 'user', content: JSON.stringify(user), createdAt: 3 },
+    ]);
+    const first = messages[0]?.text ?? '';
+    expect(first.length).toBeLessThan(600);
+    expect(first).toContain('[event settle] report line');
+    expect(first).toContain('read_history ids ["ev1"]');
+    expect(messages.at(-1)?.text).toBe(user);
   });
 });
