@@ -1,4 +1,3 @@
-import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
@@ -25,8 +24,8 @@ import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
-import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
+import { QuestionAnsweredLine } from './question-answered-line.js';
 import { ThreadReportReply } from './thread-report-reply.js';
 
 const MSG_TOOL_BTN_CLS =
@@ -225,8 +224,6 @@ interface ChiefStreamRowProps {
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
-  onAnswerQuestion?: ((input: { requestId: string; answers: AskUserAnswer[] }) => void) | undefined;
-  onCancelQuestion?: ((requestId: string) => void) | undefined;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -276,8 +273,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   toolsOpen,
   onToggleTools,
   onRewindRequest,
-  onAnswerQuestion,
-  onCancelQuestion,
 }: ChiefStreamRowProps) {
   const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
@@ -414,12 +409,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <ChiefQuestionCard
-              item={item}
-              numberKeys={false}
-              {...(onAnswerQuestion ? { onAnswer: onAnswerQuestion } : {})}
-              {...(onCancelQuestion ? { onCancel: onCancelQuestion } : {})}
-            />
+            <QuestionAnsweredLine item={item} />
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -450,6 +440,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               variant="chief"
               label={item.label}
               labelVars={item.labelVars}
+              waiting={item.waiting === true}
               disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
             >
               <div data-testid="chief-turn-tools">

@@ -1330,6 +1330,9 @@ export const EN: Record<string, string> = {
   '提交回答失败，草稿还在，请再试一次。':
     'Could not send your answer. Your draft is still here. Try Submit again.',
   已回答: 'Answered',
+  '已回答：{summary}': 'Answered: {summary}',
+  在等你回答: 'Waiting for your answer',
+  更多操作: 'More actions',
   等待你的回复: 'Waiting for your reply',
   取消提问: 'Dismiss question',
   已取消提问: 'Question dismissed',

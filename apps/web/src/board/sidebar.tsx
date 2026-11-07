@@ -13,7 +13,6 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { useOptionalChiefRoot } from '../chief/chief-root.js';
-import { coordinatorBadgeCount } from '../chief/question-dock-index.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
@@ -222,10 +221,7 @@ export function BoardSidebar({
     [shownTodos, activeProject],
   );
   const chiefRoot = useOptionalChiefRoot();
-  const attention = coordinatorBadgeCount(
-    needsYouCount(shownTodos),
-    chiefRoot?.pendingQuestions.length ?? 0,
-  );
+  const attention = needsYouCount(shownTodos, chiefRoot?.pendingQuestions.length ?? 0);
   const projectNames = useMemo(
     () => new Map([...projectRows, ...archivedRows].map((row) => [row.id, row.name])),
     [projectRows, archivedRows],
