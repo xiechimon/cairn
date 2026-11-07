@@ -352,11 +352,11 @@ export function PiEditor({
       <SettingsCard>
         <SettingsRow
           label={t('服务商')}
-          hint={t('pi 步骤用团队里的服务商，不读这台机器的配置')}
+          hint={t('pi 步骤用所有机器的服务商，不读这台机器的配置')}
           className="flex-wrap gap-y-2 py-2.5"
         >
           <Button variant="outline" size="sm" onClick={onShowTeam}>
-            {t('团队的 {n} 个服务商', { n: providerCount })}
+            {t('所有机器的 {n} 个服务商', { n: providerCount })}
           </Button>
         </SettingsRow>
       </SettingsCard>

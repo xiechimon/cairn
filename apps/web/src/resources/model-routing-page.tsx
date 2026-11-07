@@ -135,7 +135,7 @@ function RoutingContent() {
         <SettingsScopeSentence machines={scopeMachines} scope={scope} onChange={setScope} />
         {scopeMachine !== undefined && (
           <p data-testid="settings-scope-note" className="m-0 px-1 text-meta text-content-tertiary">
-            {t('路由按团队生效，{name} 沿用团队设置。', { name: scopeMachine.name })}
+            {t('路由对所有机器生效，{name} 沿用所有机器的设置。', { name: scopeMachine.name })}
           </p>
         )}
         <SettingsPanel>
