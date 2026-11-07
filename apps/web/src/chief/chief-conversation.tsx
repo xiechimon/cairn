@@ -77,9 +77,10 @@ import type { ChiefEarlier } from './use-chief-surface.js';
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
-const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
-const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
-const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5';
+const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
+const SCROLLER_CONTENT_CLS = 'block min-w-0 max-w-full gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
+const SCROLLER_CONTENT_HOME_CLS =
+  'mx-auto block w-full max-w-190 min-w-0 gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
 
@@ -652,7 +653,7 @@ export function ChiefConversation({
         <div
           ref={heroScrollRef}
           data-testid="chief-home-scroll"
-          className="scroll-fade min-h-0 flex-1 overflow-y-auto pb-6"
+          className="scroll-fade min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
         >
           {hero}
           {intro}
