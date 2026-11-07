@@ -50,6 +50,7 @@ export interface LiveRowProps {
   variant: 'detail' | 'chief';
   label: string;
   labelVars?: TVars;
+  labelDetail?: { label: string; vars: TVars };
   quiet?: boolean;
   disclosure?: { expand: string; collapse: string } | null;
   children?: ReactNode;
@@ -59,6 +60,7 @@ export function LiveRow({
   variant,
   label,
   labelVars,
+  labelDetail,
   quiet = false,
   disclosure = null,
   children,
@@ -68,7 +70,12 @@ export function LiveRow({
   const labelCls = 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
   const body = (
     <>
-      <span className={labelCls}>{t(label, labelVars)}</span>
+      <span
+        className={labelCls}
+        title={labelDetail !== undefined ? t(labelDetail.label, labelDetail.vars) : undefined}
+      >
+        {t(label, labelVars)}
+      </span>
       {disclosure != null && <TraceTriangle open={expanded} />}
     </>
   );

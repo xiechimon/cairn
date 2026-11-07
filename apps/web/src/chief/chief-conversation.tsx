@@ -74,6 +74,7 @@ import {
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
+import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
@@ -478,7 +479,7 @@ export function ChiefConversation({
       )}
     </>
   );
-  const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
+  const streamRow = ({ item, i }: GroupedRow) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
       item={item}
@@ -495,7 +496,9 @@ export function ChiefConversation({
       onCancelQuestion={onCancelQuestion}
     />
   );
-  const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
+  const keepsOwnRow = (item: ChiefStreamItem) =>
+    item.kind === 'thread-report' && outstandingReports.has(item.id);
+  const renderRows = (list: StreamRow[]) => groupThreadEvents(list, keepsOwnRow).map(streamRow);
   const intro = (
     <>
       {!chief.bound && showBindGate && (

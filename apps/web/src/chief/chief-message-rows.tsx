@@ -1,7 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
-import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
@@ -27,6 +26,8 @@ import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
+import type { ThreadActivity } from './thread-activity.js';
+import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
 
 const MSG_TOOL_BTN_CLS =
@@ -70,6 +71,7 @@ const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
 const USER_ROW_CLS = 'mt-6';
+const EVENT_ROW_CLS = 'mt-6';
 const REPLY_ROW_CLS = 'mt-9';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
@@ -197,7 +199,10 @@ function HandoffRow({ todoId }: { todoId: string }) {
   );
 }
 
-export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string | number {
+export function chiefStreamRowKey(
+  item: ChiefStreamItem | ThreadActivity,
+  index: number,
+): string | number {
   switch (item.kind) {
     case 'user':
     case 'robot':
@@ -208,6 +213,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'stopped':
     case 'thread-report':
     case 'thread-message':
+    case 'thread-activity':
       return item.id ?? index;
     default:
       return index;
@@ -215,7 +221,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
 }
 
 interface ChiefStreamRowProps {
-  item: ChiefStreamItem;
+  item: ChiefStreamItem | ThreadActivity;
   index: number;
   latest: boolean;
   replyable?: boolean;
@@ -260,10 +266,10 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
 const messageToolsReveal = (latest: boolean) =>
   latest
     ? 'opacity-100'
-    : 'opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+    : 'opacity-0 transition-opacity duration-(--dur-reveal) ease-(--ease-drawer) group-hover/message:opacity-100 group-hover/message:delay-100 focus-within:opacity-100';
 
-const messageToolsPlace = (latest: boolean, side: 'left' | 'right', flowGap: string) =>
-  latest ? flowGap : `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
+const messageToolsPlace = (side: 'left' | 'right') =>
+  `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
 
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
@@ -282,44 +288,27 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
-  if (item.kind === 'thread-report')
+  if (item.kind === 'thread-report' || item.kind === 'thread-message')
     return (
-      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Marker
-          variant="separator"
-          className={MARKER_NOTE_CLS}
-          data-testid="thread-report-marker"
-          data-phase={item.phase}
-        >
-          <MarkerContent className={MARKER_CONTENT_CLS}>
-            <ThreadLink todoId={item.todoId} className="hover:underline">
-              {t('任务 #{n} {title}：{status}', {
-                n: item.seqNum,
-                title: item.title,
-                status: t(reportStatusWord(item)),
-              })}
-            </ThreadLink>
-            {item.line !== undefined && <span className="ml-1.5">{item.line}</span>}
-          </MarkerContent>
-        </Marker>
-        {item.phase === 'needs-you' && replyable && <ThreadReportReply todoId={item.todoId} />}
+      <MessageScrollerItem
+        messageId={item.id}
+        style={SCROLLER_ITEM_STYLE}
+        className={EVENT_ROW_CLS}
+      >
+        <ThreadEventLine item={item} />
+        {item.kind === 'thread-report' && item.phase === 'needs-you' && replyable && (
+          <ThreadReportReply todoId={item.todoId} />
+        )}
       </MessageScrollerItem>
     );
-  if (item.kind === 'thread-message')
+  if (item.kind === 'thread-activity')
     return (
-      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-message-marker">
-          <MarkerContent className={MARKER_CONTENT_CLS}>
-            <ThreadLink todoId={item.todoId} className="hover:underline">
-              {t(
-                item.by === 'coordinator'
-                  ? 'Coordinator 直接对 #{n} 说：{excerpt}'
-                  : '你直接对 #{n} 说：{excerpt}',
-                { n: item.seqNum, excerpt: item.excerpt },
-              )}
-            </ThreadLink>
-          </MarkerContent>
-        </Marker>
+      <MessageScrollerItem
+        messageId={item.id}
+        style={SCROLLER_ITEM_STYLE}
+        className={EVENT_ROW_CLS}
+      >
+        <ThreadActivityRow activity={item} />
       </MessageScrollerItem>
     );
   if (item.kind === 'error')
@@ -364,10 +353,14 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               data-md={item.markdown != null ? '' : undefined}
               className={`${BUBBLE_USER_CLS} ${item.markdown != null ? BUBBLE_MD_CLS : ''}`}
             >
-              {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
+              {item.markdown != null ? (
+                <ChatMarkdown text={item.markdown} conversational />
+              ) : (
+                item.text
+              )}
             </div>
             <div
-              className={`${messageToolsPlace(latest, 'right', 'mt-1')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-tools"
             >
               <MessageStamp createdAt={item.createdAt} fallback={item.at} />
@@ -450,6 +443,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               variant="chief"
               label={item.label}
               labelVars={item.labelVars}
+              labelDetail={item.labelDetail}
               disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
             >
               <div data-testid="chief-turn-tools">
@@ -487,7 +481,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
             <BubbleContent className={BUBBLE_ROBOT_CLS}>
               {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} />
+                <ChatMarkdown text={item.markdown} conversational />
               ) : (
                 <>
                   {(item.paragraphs ?? []).map((p, j) => (
@@ -510,7 +504,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
           {item.typing !== true && (
             <div
-              className={`${messageToolsPlace(latest, 'left', 'mt-2')} flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace('left')} flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-foot"
             >
               <Button
