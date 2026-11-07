@@ -616,7 +616,7 @@ function skillsSelection(
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  const agentRow = profileForStep(deps, todoRow, row.kind);
+  const agentRow = profileForStep(deps, todoRow, row.kind, row.id);
   const allowlist = agentRow?.skillsAllowlist ?? null;
   if (allowlist === null) return { isChief: false, unrestricted: true, wanted: scanned };
   const whitelist = new Set(allowlist);

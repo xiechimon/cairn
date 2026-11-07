@@ -264,7 +264,9 @@ export async function evaluateMergeGate(
     .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt));
   const authorStep = buildSteps.at(-1);
   const authorAgent =
-    authorStep !== undefined ? profileForStep(deps.db, todoRow, authorStep.kind) : null;
+    authorStep !== undefined
+      ? profileForStep(deps.db, todoRow, authorStep.kind, authorStep.id)
+      : null;
   const verifier = routeForStep(deps.db, todoRow, 'session') !== null;
   const policy = autonomousMergePolicy(
     deps.db,

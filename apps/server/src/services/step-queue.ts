@@ -58,7 +58,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .all();
   const workerQueue = workerRows.map((r) => ({
     ...r,
-    home: profileForStep(db, r.todoRow, r.kind)?.machineId ?? null,
+    home: profileForStep(db, r.todoRow, r.kind, r.id)?.machineId ?? null,
   }));
   const chiefRows = db
     .select({
@@ -108,7 +108,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
 
   const teamMachines = db.select().from(machine).where(eq(machine.teamId, teamId)).all();
   function agentForRow(row: (typeof queue)[number]): RouteProfile | null {
-    if ('todoRow' in row) return profileForStep(db, row.todoRow, row.kind);
+    if ('todoRow' in row) return profileForStep(db, row.todoRow, row.kind, row.id);
     return coordinatorProfile(db, teamId);
   }
 

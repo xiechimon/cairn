@@ -53,8 +53,9 @@ export function profileForStep(
   deps: MachineDeps,
   todoRow: typeof todo.$inferSelect,
   kind: StepRecord['kind'],
+  stepId: string | null = null,
 ) {
-  return profileForStepRoute(deps.db, todoRow, kind);
+  return profileForStepRoute(deps.db, todoRow, kind, stepId);
 }
 
 export function ownedStep(deps: MachineDeps, machineId: string | null, stepId: string) {
