@@ -31,6 +31,7 @@ import type { Db } from './db/client.js';
 import { build, chiefMessage, machine, schedule, step, todo } from './db/schema.js';
 import { parseChiefTrigger } from './services/chief.js';
 import { stepRuntimeFor } from './services/dispatch-eligibility.js';
+import { storedStepRoute } from './services/step-route.js';
 
 const SCOPE = 'cairn.server';
 const COORDINATOR_TURN_SPAN = 'coordinator turn';
@@ -121,6 +122,7 @@ export function emitRuntimeStepSpan(
           kind: row.kind,
           checkpointCommit: row.checkpointCommit,
           errorMessage,
+          route: storedStepRoute(db, row.id),
           ...(isTurn
             ? {}
             : {

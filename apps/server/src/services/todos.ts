@@ -201,7 +201,7 @@ function waitingOnOf(
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
   for (const s of pendingSteps) {
-    const agentRow = profileForStep(deps.db, row, s.kind);
+    const agentRow = profileForStep(deps.db, row, s.kind, s.id);
     if (agentRow === null) continue;
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
     const runnable = online.some(

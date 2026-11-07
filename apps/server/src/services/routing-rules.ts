@@ -1,6 +1,7 @@
 import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_ROUTER_TOOLS,
+  CODEX_MODEL,
   filterAgentTools,
   isSessionStepKind,
   type PatchRoutingRuleBody,
@@ -21,6 +22,7 @@ import type { Db } from '../db/client.js';
 import { machine, routingRule, workPolicy } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { decideStepRoute } from './step-route.js';
 
 type RoutingRuleRow = typeof routingRule.$inferSelect;
 type WorkPolicyRow = typeof workPolicy.$inferSelect;
@@ -41,6 +43,7 @@ export interface RouteProfile {
   mcpServers: string[];
   requiredCapabilities: RequiredCapabilities | null;
   fallbackModels: RoutingRuleRow['fallbackModels'];
+  routed: boolean;
 }
 
 export interface RoutedTodo {
@@ -151,10 +154,11 @@ export function routeProfile(
       ? withOverride(route.requiredCapabilities, override?.requiredCapabilities)
       : route.requiredCapabilities,
     fallbackModels: route.fallbackModels,
+    routed: false,
   };
 }
 
-export function profileForStep(
+export function ruleProfileForStep(
   db: Pick<Db, 'select'>,
   todoRow: RoutedTodo,
   kind: StepKind,
@@ -162,6 +166,32 @@ export function profileForStep(
   const route = routeForStep(db, todoRow, kind);
   if (route === null) return null;
   return routeProfile(route, policyForStep(db, todoRow, kind), todoRow.routeOverride ?? null);
+}
+
+const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
+
+export function profileForStep(
+  db: Pick<Db, 'select'>,
+  todoRow: RoutedTodo,
+  kind: StepKind,
+  stepId: string | null = null,
+): RouteProfile | null {
+  const base = ruleProfileForStep(db, todoRow, kind);
+  if (base === null) return null;
+  const route = routeForStep(db, todoRow, kind);
+  if (route?.use !== 'session' || todoRow.sourceKind === 'research-citation-check') return base;
+  if (base.provider === null || !ROUTED_PROVIDERS.includes(base.provider)) return base;
+  const decision = decideStepRoute(db, todoRow, kind, stepId, {
+    machineId: base.machineId,
+    required: base.requiredCapabilities,
+  });
+  if (decision.chosen === null) return base;
+  return {
+    ...base,
+    provider: decision.chosen.provider,
+    modelId: decision.chosen.modelId,
+    routed: true,
+  };
 }
 
 export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): RouteProfile | null {
