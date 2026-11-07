@@ -1,7 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { serve } from '@hono/node-server';
-import pino from 'pino';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
 import {
@@ -22,6 +21,7 @@ import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
+import { createServerLogger } from './lib/logger.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
@@ -50,7 +50,8 @@ import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { startupMessage } from './startup-log.js';
 
 const loadedConfig = loadConfig();
-const logger = pino({
+const logSecrets = [loadedConfig.authToken ?? ''];
+const logger = createServerLogger(logSecrets, {
   level: process.env.LOG_LEVEL ?? 'info',
   // pino-pretty cannot load its transport worker from a single-file bundle.
   ...(process.env.NODE_ENV === 'production' || BUNDLED_FORM
@@ -64,6 +65,7 @@ if (refusal !== null) {
   process.exit(1);
 }
 const config = ensureAccessToken(loadedConfig);
+logSecrets.push(config.authToken ?? '');
 
 const opened = (() => {
   try {
