@@ -86,7 +86,7 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date, files = {}
   return git(work, 'rev-parse', 'HEAD');
 }
 
-function fixture({ claimed = 0, heartbeatAgeMs = null, seedFiles = {} } = {}) {
+function fixture({ claimed = 0, digestClaimed = 0, heartbeatAgeMs = null, seedFiles = {} } = {}) {
   const dir = makeTestTempDir('deploy-self-');
   const origin = join(dir, 'origin.git');
   const work = join(dir, 'work');
@@ -108,7 +108,7 @@ function fixture({ claimed = 0, heartbeatAgeMs = null, seedFiles = {} } = {}) {
   const db = join(data, 'server.db');
   sqlite(
     db,
-    `create table step(id text primary key, status text, lastHeartbeatAt integer);
+    `create table step(id text primary key, buildId text, status text, lastHeartbeatAt integer);
      create table machine(id text primary key, name text, lastSeenAt integer, maxConcurrent integer default 1);
      create table __drizzle_migrations(id integer primary key, hash text);
      insert into machine values ('m1', 'omarchy', 0, 1);
@@ -118,7 +118,12 @@ function fixture({ claimed = 0, heartbeatAgeMs = null, seedFiles = {} } = {}) {
   for (let i = 0; i < claimed; i++)
     sqlite(
       db,
-      `insert into step(id, status, lastHeartbeatAt) values ('s${i}', 'claimed', ${heartbeat})`,
+      `insert into step(id, buildId, status, lastHeartbeatAt) values ('s${i}', 'build-${i}', 'claimed', ${heartbeat})`,
+    );
+  for (let i = 0; i < digestClaimed; i++)
+    sqlite(
+      db,
+      `insert into step(id, buildId, status, lastHeartbeatAt) values ('d${i}', 'chief-digest-chief-x', 'claimed', ${heartbeat})`,
     );
 
   fakeTool(
@@ -361,6 +366,22 @@ test('waits while a step is running or a deploy hold is set', () => {
   const heldResult = held.run(DEPLOY, [heldTarget]);
   assert.equal(heldResult.status, 75);
   assert.match(heldResult.stderr, /hold: orb trial-one/);
+});
+
+test('a claimed Coordinator digest step does not hold the deploy back', () => {
+  const f = fixture({ digestClaimed: 1, heartbeatAgeMs: 1_000 });
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /step running/);
+});
+
+test('a digest step does not hide a real running step', () => {
+  const f = fixture({ claimed: 1, digestClaimed: 1, heartbeatAgeMs: 1_000 });
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 75, result.stderr);
+  assert.match(result.stderr, /1 step running/);
 });
 
 test('forces the deploy past claimed steps with no heartbeat once the wait bound passes', () => {
