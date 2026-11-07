@@ -3,7 +3,12 @@ import { expect, type Page, test } from '@playwright/test';
 const PANES = [
   { section: 'machines', endpoint: 'machines', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'providers', endpoint: 'providers', empty: '[data-testid="providers-empty"]', ok: { providers: [] } },
-  { section: 'routing', endpoint: 'claude-subscriptions', empty: '[data-testid="vendor-section"]', ok: [] },
+  {
+    section: 'routing',
+    endpoint: 'model-routing',
+    empty: '[data-testid="routing-section"]',
+    ok: { edges: [], connections: [], quota: [], settings: { claudeUsage: 'subscription-only' } },
+  },
   { section: 'mcp', endpoint: 'mcp-servers', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'secrets', endpoint: 'secrets', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'api-keys', endpoint: 'api-keys', empty: '[data-testid="keys-empty"]', ok: [] },
@@ -35,6 +40,11 @@ for (const pane of PANES) {
   }) => {
     const state = { fail: true, ok: pane.ok as unknown };
     await stub(page, pane.endpoint, state);
+    if (pane.section === 'providers') {
+      await page.route('**/api/teams/team-1/claude-subscriptions', (route) =>
+        route.fulfill({ json: [] }),
+      );
+    }
     await page.goto(`/app/settings/${pane.section}`);
     const settings = page.getByRole('dialog', { name: '设置' });
     await expect(settings.getByTestId('query-error')).toBeVisible();
@@ -62,7 +72,7 @@ test('machines: a slow list fetch shows a skeleton, not the empty state', async 
   await expect(settings.getByTestId('resource-empty')).toBeVisible();
 });
 
-test('routing: a failed Claude subscriptions fetch still lets the Codex tab show its own accounts', async ({
+test('providers: a failed Claude subscriptions fetch still lists the API providers', async ({
   page,
 }) => {
   const state = { fail: true, ok: [] as unknown };
@@ -85,13 +95,56 @@ test('routing: a failed Claude subscriptions fetch still lets the Codex tab show
       },
     }),
   );
-  await page.goto('/app/settings/routing');
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({ json: { sources: [] } }),
+  );
+  await page.goto('/app/settings/providers');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('provider-instance')).toContainText('Codex main');
+  await expect(settings.getByTestId('provider-instance')).toContainText('订阅');
+  await expect(settings.getByTestId('providers-partial-error')).toContainText('订阅账户没能加载');
+  state.fail = false;
+  await settings.getByTestId('providers-partial-error').getByRole('button', { name: '重试' }).click();
+  await expect(settings.getByTestId('providers-partial-error')).toHaveCount(0);
+});
+
+test('providers: a failed API providers fetch next to a loaded subscription still shows an error and retries', async ({
+  page,
+}) => {
+  const state = { fail: true, ok: { providers: [] } as unknown };
+  await stub(page, 'providers', state);
+  await page.route('**/api/teams/team-1/claude-subscriptions', (route) =>
+    route.fulfill({
+      json: [{ id: 's1', label: 'Fresh', expiresAt: null, createdAt: 0, plan: null }],
+    }),
+  );
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({ json: { sources: [] } }),
+  );
+  await page.goto('/app/settings/providers');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('provider-instance')).toContainText('Fresh');
+  await expect(settings.getByTestId('providers-partial-error')).toContainText('模型服务没能加载');
+  state.fail = false;
+  await settings.getByTestId('providers-partial-error').getByRole('button', { name: '重试' }).click();
+  await expect(settings.getByTestId('providers-partial-error')).toHaveCount(0);
+});
+
+test('providers: a team whose only data is a failed subscriptions fetch sees an error, not the empty state', async ({
+  page,
+}) => {
+  const state = { fail: true, ok: [] as unknown };
+  await stub(page, 'claude-subscriptions', state);
+  await page.route('**/api/teams/team-1/providers', (route) =>
+    route.fulfill({ json: { providers: [] } }),
+  );
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({ json: { sources: [] } }),
+  );
+  await page.goto('/app/settings/providers');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('query-error')).toBeVisible();
-  await expect(settings.getByTestId('vendor-list').getByRole('button', { name: /Codex/ })).toBeVisible();
-  await settings.getByTestId('vendor-list').getByRole('button', { name: /Codex/ }).click();
-  await expect(settings.getByTestId('query-error')).toHaveCount(0);
-  await expect(settings.getByTestId('account-row')).toContainText('Codex main');
+  await expect(settings.getByTestId('providers-empty')).toHaveCount(0);
 });
 
 test('providers: a failed team providers fetch does not hide the machine scope editors', async ({

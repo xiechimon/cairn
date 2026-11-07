@@ -95,7 +95,7 @@ const GROUPS: Group[] = [
     heading: '模型与账户',
     sections: [
       { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
-      { id: 'routing', label: '订阅与路由', Icon: Route, element: () => <ModelRoutingPage /> },
+      { id: 'routing', label: '模型路由', Icon: Route, element: () => <ModelRoutingPage /> },
       {
         id: 'work-routing',
         label: '工作路由',

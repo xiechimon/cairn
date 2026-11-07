@@ -61,7 +61,7 @@ test('OAuth providers show no API key row; key providers show a write-only key r
   page,
 }) => {
   await page.goto(`${FLEET}&item=provider%3Aprov-copilot`);
-  await expect(editor(page)).toContainText('OAuth 登录');
+  await expect(editor(page)).toContainText('OAuth');
   await expect(editor(page).getByRole('button', { name: '更换 API key' })).toHaveCount(0);
   await page.goto(`${FLEET}&item=provider%3Aprov-anthropic`);
   await expect(editor(page)).toContainText('Anthropic Messages');

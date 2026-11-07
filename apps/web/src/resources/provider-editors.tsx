@@ -34,11 +34,14 @@ const PROTOCOL_LABELS: Record<ProviderApi, string> = {
   'openai-responses': 'OpenAI Responses',
 };
 
+const SUBSCRIPTION_PRESET_IDS: readonly string[] = ['openai-codex'];
+
 const isOAuthPreset = (providerId: string) =>
   (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(providerId);
 
 export function providerKind(record: ProviderRecord): string {
-  if (isOAuthPreset(record.providerId)) return 'OAuth 登录';
+  if (SUBSCRIPTION_PRESET_IDS.includes(record.providerId)) return '订阅';
+  if (isOAuthPreset(record.providerId)) return 'OAuth';
   if ((PROVIDER_PRESET_IDS as readonly string[]).includes(record.providerId)) return 'API key';
   return '自定义端点';
 }
@@ -51,7 +54,7 @@ export function providerMark(record: ProviderRecord): ProviderMark {
   return Server;
 }
 
-function CommitInput({
+export function CommitInput({
   label,
   value,
   onCommit,

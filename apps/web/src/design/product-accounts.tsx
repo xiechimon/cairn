@@ -1,17 +1,14 @@
 import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
+import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
   type MachineWithProviders,
   type SubscriptionAccount,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import { toRoutingGraph } from '../api/model-routing.js';
-import {
-  AccountRow,
-  MachineProvidersCard,
-  QuotaSection,
-} from '../components/accounts/account-parts.js';
+import { MachineProvidersCard, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import { CheckedButton } from '../components/checked-button.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -37,8 +34,12 @@ import {
 } from '../fixtures/accounts.js';
 import { r7 } from '../fixtures/core.js';
 import { useI18n } from '../i18n/provider.js';
-import { SubscriptionAccounts } from '../resources/accounts-view.js';
 import { OnlineStatus } from '../resources/parts.js';
+import {
+  SubscriptionDetail,
+  subscriptionStatusView,
+  subscriptionSummary,
+} from '../resources/subscription-detail.js';
 import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
@@ -63,18 +64,131 @@ const QUERY_PHASES = [
   { phase: 'empty', query: settledQuery },
 ] as const;
 
-function useAccounts() {
-  const [accounts, setAccounts] = useState<SubscriptionAccount[]>(() => [
-    ...ACCOUNT_SUBSCRIPTIONS.map((wire) => toClaudeAccount(wire, NOW)),
-    ...OTHER_ACCOUNTS,
-  ]);
-  const actionsFor = (account: SubscriptionAccount) => ({
-    onRename: (label: string) =>
-      setAccounts((rows) => rows.map((row) => (row.id === account.id ? { ...row, label } : row))),
-    onVerify: () => undefined,
-    onRemove: () => setAccounts((rows) => rows.filter((row) => row.id !== account.id)),
-  });
-  return { accounts, actionsFor };
+const ROUTING_ACCOUNTS: SubscriptionAccount[] = [
+  ...ACCOUNT_SUBSCRIPTIONS.map((wire) => toClaudeAccount(wire, NOW)),
+  ...OTHER_ACCOUNTS,
+];
+
+function fixtureAccount(label: string): SubscriptionAccount {
+  const wire = ACCOUNT_SUBSCRIPTIONS.find((candidate) => candidate.label === label);
+  if (wire === undefined) throw new Error(`no fixture subscription named ${label}`);
+  return toClaudeAccount(wire, NOW);
+}
+
+const FRESH_SUBSCRIPTION: SubscriptionAccount = {
+  id: 'fresh',
+  vendor: 'claude',
+  label: 'Spare laptop',
+  expiresAt: null,
+  createdAt: NOW - 60_000,
+  plan: null,
+  state: 'ok',
+  cooldownUntil: null,
+  windows: [],
+  lastUsedAt: null,
+  stepsLast24h: null,
+};
+
+function subscriptionStates(): {
+  account: SubscriptionAccount;
+  verification?: Verification;
+}[] {
+  const personal = fixtureAccount('Personal');
+  const work = fixtureAccount('Work');
+  const legacy = fixtureAccount('Old laptop');
+  return [
+    { account: personal },
+    {
+      account: { ...personal, id: 'verifying', label: 'Verifying' },
+      verification: { phase: 'verifying' },
+    },
+    {
+      account: { ...personal, id: 'network', label: 'After restart' },
+      verification: { phase: 'failed', reason: 'network' },
+    },
+    { account: work },
+    { account: { ...legacy, state: 'expired' } },
+    { account: FRESH_SUBSCRIPTION },
+  ];
+}
+
+function SubscriptionPanelSpecimen() {
+  const { t } = useI18n();
+  const clock = useClock();
+  const states = subscriptionStates();
+  const [selected, setSelected] = useState('network');
+  const views = states.map(({ account, verification }) => ({
+    account,
+    verification,
+    view: subscriptionStatusView(account, accountStatusOf(account, verification), NOW, t, clock),
+  }));
+  const items: ProviderItem[] = [
+    ...views.map(({ account, view }) => ({
+      id: account.id,
+      name: account.label,
+      Mark: ClaudeMark,
+      status: subscriptionSummary(account, view, NOW, t),
+      tone: view.tone,
+    })),
+    {
+      id: 'anthropic',
+      name: 'Anthropic',
+      Mark: ClaudeMark,
+      status: 'API key · 3 models',
+      tone: 'ok',
+    },
+  ];
+  const current = views.find(({ account }) => account.id === selected) ?? views[0];
+  return (
+    <ProviderPanel
+      items={items}
+      selectedId={selected}
+      onSelect={setSelected}
+      header={<h2 className="m-0 text-card-title font-semibold text-foreground">{t('服务商')}</h2>}
+    >
+      {current !== undefined && (
+        <SubscriptionDetail
+          account={current.account}
+          now={NOW}
+          view={current.view}
+          verifying={current.verification?.phase === 'verifying'}
+          steps={ACCOUNT_STEPS[current.account.id]}
+          sticky={ACCOUNT_STICKINESS.filter(
+            (thread) => thread.subscriptionId === current.account.id,
+          )}
+          actions={{
+            onVerify: () => undefined,
+            onRename: () => undefined,
+            onRemove: () => undefined,
+          }}
+        />
+      )}
+    </ProviderPanel>
+  );
+}
+
+function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
+  const { t } = useI18n();
+  const clock = useClock();
+  const account = fixtureAccount('Personal');
+  const view = subscriptionStatusView(account, accountStatusOf(account, undefined), NOW, t, clock);
+  return (
+    <div data-state={state} className="flex flex-col gap-6">
+      <SubscriptionDetail
+        account={account}
+        now={NOW}
+        view={view}
+        verifying={false}
+        steps={ACCOUNT_STEPS[account.id]}
+        sticky={ACCOUNT_STICKINESS.filter((thread) => thread.subscriptionId === account.id)}
+        actions={{
+          onVerify: () => undefined,
+          onRename: () => undefined,
+          onRemove: () => undefined,
+        }}
+      />
+    </div>
+  );
 }
 
 function ProviderPanelSpecimen() {
@@ -165,13 +279,11 @@ function SettingsNavSpecimen() {
 
 export function AccountsSection() {
   const { t } = useI18n();
-  const { accounts, actionsFor } = useAccounts();
   const [machine, setMachine] = useState<MachineWithProviders | undefined>(PROVIDER_MACHINES[0]);
   const [scopeValue, setScopeValue] = useState(TEAM_SCOPE);
   const [scopeCheckedAt] = useState(() => Date.now());
-  const claude = accounts.filter((a) => a.vendor === 'claude');
   const graph = toRoutingGraph(ACCOUNT_ROUTING, {
-    accounts,
+    accounts: ROUTING_ACCOUNTS,
     providers: ACCOUNTS.providers,
     machineNames: new Map(ACCOUNT_MACHINES.map((m) => [m.id, m.name])),
     t,
@@ -180,54 +292,28 @@ export function AccountsSection() {
     <Section
       id="accounts"
       title="Accounts"
-      lede="Subscription accounts per vendor, pooled the way T3 Code's Usage → Limits does: one flat row per quota window with a combined bar, one sub-row per account with what is left. They sit on top of the model routing page, above the graph."
+      lede="Subscriptions live in the Providers list next to API keys, the way T3 Code's Providers page lists Codex and Claude: one row per account with kind and one status, the account's quota and usage in its detail. The routing page keeps only the graph."
     >
       <Specimen
-        id="pooled-window"
-        title="Quota section"
-        note="5-hour window over three Claude accounts: one over its limit, one never reported (dashed)"
+        id="subscription-provider-list"
+        title="Subscriptions in the provider list"
+        note="a subscription is one provider row beside API keys: kind, plan, one status, last use. States: available, verifying, failed with its reason, cooling, expired, never used. The detail shows status with Retry, quota, last use, 24 hour steps, steps and Remove"
         stage="sheet"
-        code={`<QuotaSection windows={['five_hour']} accounts={claudeAccounts} now={now} />`}
+        code={`<ProviderPanel items={subscriptionItems} selectedId={id} onSelect={select}><SubscriptionDetail account={account} view={view} /></ProviderPanel>`}
       >
         <div className="w-full">
-          <QuotaSection windows={['five_hour']} accounts={claude} now={NOW} />
+          <SubscriptionPanelSpecimen />
         </div>
       </Specimen>
       <Specimen
-        id="account-row"
-        title="Account row"
-        note="ok, cooling, expired; the meta line shows plan, priority and recent use; ⋯ opens Rename R, Verify V, Remove D"
+        id="subscription-detail-quota"
+        title="Subscription detail with quota"
+        note="status, last use and 24 hour steps, then one bar per quota window, the steps this account ran and its sticky threads"
         stage="sheet"
-        code={`<AccountRow account={account} index={0} now={now} actions={{ onRename, onVerify, onRemove }} />`}
+        code={`<SubscriptionDetail account={account} now={now} view={view} verifying={false} steps={steps} sticky={sticky} actions={actions} />`}
       >
-        <div className="w-full">
-          <SettingsCard>
-            {claude.map((account, index) => (
-              <AccountRow
-                key={account.id}
-                account={account}
-                index={index}
-                now={NOW}
-                actions={actionsFor(account)}
-              />
-            ))}
-          </SettingsCard>
-        </div>
-      </Specimen>
-      <Specimen
-        id="subscription-accounts"
-        title="Subscription accounts"
-        note="one vendor at a time through SegmentedTabs (icon + count); Add account follows the selected vendor; a Claude row opens to its steps and sticky threads"
-        stage="sheet"
-      >
-        <div className="w-full">
-          <SubscriptionAccounts
-            accounts={accounts}
-            stepsByAccount={ACCOUNT_STEPS}
-            stickiness={ACCOUNT_STICKINESS}
-            now={NOW}
-            actionsFor={actionsFor}
-          />
+        <div className="flex w-full max-w-160 flex-col gap-6">
+          <SubscriptionDetailSpecimen state="ok" />
         </div>
       </Specimen>
       <Specimen

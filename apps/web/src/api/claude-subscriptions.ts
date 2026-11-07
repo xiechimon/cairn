@@ -1,5 +1,11 @@
-import type { ClaudeSubscription, CreateClaudeSubscription } from '@cairn/shared';
+import type {
+  ClaudeSubscription,
+  ClaudeSubscriptionVerifyResult,
+  CreateClaudeSubscription,
+} from '@cairn/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
+import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
 import type { AccountStepsPage, ClaudeSubscriptionWire, StickyThread } from './claude-accounts.js';
 import { ApiError, api } from './client.js';
 
@@ -79,4 +85,26 @@ export function useClaudeSubscriptionStickiness(teamId: string | undefined, live
       ),
     enabled: live && teamId !== undefined,
   });
+}
+
+export function useSubscriptionVerification(teamId: string | undefined) {
+  const [states, setStates] = useState<Record<string, Verification>>({});
+  const inFlight = useRef(new Set<string>());
+  const verify = async (id: string): Promise<VerifyOutcome | null> => {
+    if (inFlight.current.has(id)) return null;
+    inFlight.current.add(id);
+    setStates((current) => ({ ...current, [id]: { phase: 'verifying' } }));
+    const outcome = await runVerification(() =>
+      api.post<ClaudeSubscriptionVerifyResult>(
+        `/api/teams/${teamId}/claude-subscriptions/${id}/verify`,
+      ),
+    );
+    inFlight.current.delete(id);
+    setStates((current) => {
+      const { [id]: _settled, ...rest } = current;
+      return outcome.ok ? rest : { ...rest, [id]: { phase: 'failed', reason: outcome.reason } };
+    });
+    return outcome;
+  };
+  return { states, verify };
 }

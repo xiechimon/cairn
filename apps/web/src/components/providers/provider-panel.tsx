@@ -9,7 +9,7 @@ import { Button } from '../ui/button.js';
 
 export type ProviderMark = ComponentType<SVGProps<SVGSVGElement>>;
 
-export type ProviderTone = 'ok' | 'warn' | 'off';
+export type ProviderTone = 'ok' | 'warn' | 'fail' | 'off';
 
 export interface ProviderSwitch {
   checked: boolean;
@@ -29,9 +29,10 @@ export interface ProviderItem {
 
 const MONO_MARK_CLS = '[&_path]:fill-current';
 
-const TONE_DOT: Record<ProviderTone, string> = {
+export const TONE_DOT: Record<ProviderTone, string> = {
   ok: 'bg-running',
   warn: 'bg-(--waiting-ink)',
+  fail: 'bg-destructive',
   off: 'bg-content-dim',
 };
 

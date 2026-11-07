@@ -16,7 +16,7 @@ test('model services open with a scope sentence and keep the scope in the URL', 
   await expect(settings(page).getByTestId('settings-checked')).toContainText('已检查');
 });
 
-test('subscriptions and routing carry the same sentence and say machines follow the team', async ({
+test('routing carries the same sentence and say machines follow the team', async ({
   page,
 }) => {
   await page.goto('/app/settings/routing?scenario=providers-fleet');
@@ -25,7 +25,7 @@ test('subscriptions and routing carry the same sentence and say machines follow 
   await scope(page).click();
   await page.getByRole('option', { name: /build-box/ }).first().click();
   await expect(page).toHaveURL(/scope=/);
-  await expect(settings(page).getByTestId('settings-scope-note')).toContainText('沿用团队设置');
+  await expect(settings(page).getByTestId('settings-scope-note')).toContainText('按团队生效');
 });
 
 test('device and personal pages show no scope sentence', async ({ page }) => {

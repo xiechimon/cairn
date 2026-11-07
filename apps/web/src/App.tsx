@@ -25,7 +25,7 @@ import { TodoRedirect } from './routes/todo-redirect.js';
 import { ACTIVITY_PATH } from './search/activity-href.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { SettingsPage } from './settings/settings-page.js';
-import { SettingsRedirect } from './settings/settings-redirect.js';
+import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 
 export const router = createBrowserRouter([
   {
@@ -55,7 +55,7 @@ export const router = createBrowserRouter([
               { path: `${MACHINES_HREF}/:id`, element: <MachineDetailRedirect /> },
               { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
               { path: PROVIDERS_HREF, element: <SettingsRedirect section="providers" /> },
-              { path: MODEL_ROUTING_HREF, element: <SettingsRedirect section="routing" /> },
+              { path: MODEL_ROUTING_HREF, element: <LegacyModelRoutingRedirect /> },
               {
                 path: ROUTING_SETTINGS_HREF,
                 element: <SettingsRedirect section="work-routing" />,
