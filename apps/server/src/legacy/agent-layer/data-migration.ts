@@ -1,3 +1,10 @@
+import {
+  AGENT_TOOL_MERGE,
+  AGENT_TOOL_PUSH,
+  AGENT_TOOL_SKILL_CREATE,
+  AGENT_TOOL_SKILL_UPDATE,
+  AGENT_TOOL_TAG,
+} from '@cairn/shared';
 import type Database from 'better-sqlite3';
 import { and, eq, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -13,6 +20,13 @@ export const AGENT_LAYER_MIGRATION_ID = 'drop-agents';
 const DEFAULT_SESSION_MODEL = 'claude-sonnet-5-5';
 const REVIEWER_PERSONAS = ['code_reviewer', 'security_auditor', 'test_engineer'];
 const CITATION_SOURCE_KIND = 'research-citation-check';
+const REVIEWER_DENIED_TOOLS: readonly string[] = [
+  AGENT_TOOL_MERGE,
+  AGENT_TOOL_PUSH,
+  AGENT_TOOL_TAG,
+  AGENT_TOOL_SKILL_CREATE,
+  AGENT_TOOL_SKILL_UPDATE,
+];
 
 type AgentRow = typeof schema.agent.$inferSelect;
 type RuleUse = typeof schema.routingRule.$inferInsert.use;
@@ -133,11 +147,21 @@ function preseedRules(db: Db, teamId: string): void {
   if (chiefAgent !== undefined && usable(chiefAgent)) {
     const existing = ruleOf(db, teamId, 'coordinator');
     if (existing === undefined) insertRule(db, 'coordinator', chiefAgent, chiefAgent.id);
-    else if (existing.mcpServers === null) {
+    else {
       db.update(schema.routingRule)
-        .set({ mcpServers: chiefAgent.mcpServers })
+        .set({
+          mcpServers: existing.mcpServers ?? chiefAgent.mcpServers,
+          requiredCapabilities:
+            existing.requiredCapabilities ?? executorRequirement(db, chiefAgent),
+        })
         .where(eq(schema.routingRule.id, existing.id))
         .run();
+      if (existing.id !== chiefAgent.id) {
+        db.update(schema.todo)
+          .set({ createdBy: existing.id })
+          .where(and(eq(schema.todo.teamId, teamId), eq(schema.todo.createdBy, chiefAgent.id)))
+          .run();
+      }
     }
   }
 
@@ -148,14 +172,12 @@ function preseedRules(db: Db, teamId: string): void {
       const id = row.assignment?.build?.agentId;
       if (id != null) counts.set(id, (counts.get(id) ?? 0) + 1);
     }
-    const assigned = mostAssigned(counts, nonChief);
-    const independent = nonChief
-      .filter(
-        (row) =>
-          row.status === 'active' &&
-          row.persona === null &&
-          modelsAreIndependent(sessionModel, row.modelId ?? ''),
-      )
+    const independentOfSession = nonChief.filter((row) =>
+      modelsAreIndependent(sessionModel, row.modelId ?? ''),
+    );
+    const assigned = mostAssigned(counts, independentOfSession);
+    const independent = independentOfSession
+      .filter((row) => row.status === 'active' && row.persona === null)
       .sort(
         (a, b) =>
           Number(b.displayName === 'eval-harbor') - Number(a.displayName === 'eval-harbor') ||
@@ -167,14 +189,9 @@ function preseedRules(db: Db, teamId: string): void {
   }
 }
 
-function createAssignedReviewRule(db: Db, teamId: string): void {
+function createAssignedReviewRule(db: Db, teamId: string, existingPolicies: Set<string>): void {
+  if (ruleOf(db, teamId, 'review') !== undefined) return;
   const agents = db.select().from(schema.agent).where(eq(schema.agent.teamId, teamId)).all();
-  if (
-    ruleOf(db, teamId, 'review') !== undefined ||
-    agents.some((row) => row.persona === 'code_reviewer')
-  ) {
-    return;
-  }
   const todos = db.select().from(schema.todo).where(eq(schema.todo.teamId, teamId)).all();
   const chiefAgentId =
     db.select().from(schema.chief).where(eq(schema.chief.teamId, teamId)).get()?.agentId ?? null;
@@ -183,14 +200,55 @@ function createAssignedReviewRule(db: Db, teamId: string): void {
     const id = row.assignment?.review?.agentId;
     if (id != null) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
+  const sessionModel = ruleOf(db, teamId, 'session')?.modelId ?? DEFAULT_SESSION_MODEL;
   const reviewer = mostAssigned(
     counts,
-    agents.filter((row) => row.id !== chiefAgentId && usable(row)),
+    agents.filter(
+      (row) =>
+        row.id !== chiefAgentId &&
+        usable(row) &&
+        modelsAreIndependent(sessionModel, row.modelId ?? ''),
+    ),
   );
-  const sessionModel = ruleOf(db, teamId, 'session')?.modelId ?? DEFAULT_SESSION_MODEL;
-  if (reviewer !== undefined && modelsAreIndependent(sessionModel, reviewer.modelId ?? '')) {
-    insertRule(db, 'review', reviewer);
+  if (reviewer === undefined) return;
+  insertRule(db, 'review', reviewer);
+  seedReviewPolicyFrom(db, teamId, reviewer, existingPolicies);
+}
+
+function seedReviewPolicyFrom(
+  db: Db,
+  teamId: string,
+  reviewer: AgentRow,
+  existingPolicies: Set<string>,
+): void {
+  const policy = db
+    .select()
+    .from(schema.workPolicy)
+    .where(and(eq(schema.workPolicy.teamId, teamId), eq(schema.workPolicy.use, 'review')))
+    .get();
+  if (
+    policy !== undefined &&
+    (policy.seededFromAgentId !== null || existingPolicies.has(policy.id))
+  )
+    return;
+  const now = nowMs();
+  const values = {
+    tools: reviewer.tools.filter((tool) => !REVIEWER_DENIED_TOOLS.includes(tool)),
+    mcpServers: reviewer.mcpServers,
+    skillsAllowlist: reviewer.skillsAllowlist,
+    defaultSkill: reviewer.defaultSkill,
+    secrets: [],
+    seededFromAgentId: reviewer.id,
+    updatedAt: now,
+  };
+  if (policy === undefined) {
+    db.insert(schema.workPolicy)
+      .values({ id: newRecordId(), teamId, use: 'review', createdAt: now, ...values })
+      .onConflictDoNothing()
+      .run();
+    return;
   }
+  db.update(schema.workPolicy).set(values).where(eq(schema.workPolicy.id, policy.id)).run();
 }
 
 function fillMachineFallbacks(db: Db, teamId: string): number {
@@ -299,10 +357,17 @@ export function runAgentLayerDataMigration(sqlite: Database.Database): AgentLaye
         preseedRules(db, teamId);
       }
       currentTeam = null;
+      const existingPolicies = new Set(
+        db
+          .select({ id: schema.workPolicy.id })
+          .from(schema.workPolicy)
+          .all()
+          .map((row) => row.id),
+      );
       runRoutingMigration(db);
       for (const teamId of teamIds) {
         currentTeam = teamId;
-        createAssignedReviewRule(db, teamId);
+        createAssignedReviewRule(db, teamId, existingPolicies);
       }
       currentTeam = null;
       seedRoutingRules(db);
