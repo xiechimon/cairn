@@ -5,12 +5,7 @@ import { describe, expect, test } from 'vitest';
 import * as schema from '../src/db/schema.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const SOURCE_DIRS = [
-  'apps/server/src',
-  'apps/daemon/src',
-  'apps/coordinator/src',
-  'packages/shared/src',
-];
+const SOURCE_DIRS = ['apps/server/src', 'apps/daemon/src', 'packages/shared/src'];
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {

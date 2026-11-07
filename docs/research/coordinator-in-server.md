@@ -101,9 +101,9 @@ This departs from t3code's single SQLite. Rakazo's rule keeps the cost small: th
 
 - `openProviderKey` (secret-box) runs inside pi-ai's `auth.apiKey.resolve` on each request, replacing `InMemoryCredentialStore.setApiKey`. No cache, so rotation needs no restart.
 - No key in `step`, `chief_message`, Pi entries, `onReport` or telemetry. Error text passes `redactSecrets`. The resolver lives only in `apps/server/src/coordinator/credentials.ts` (credentials surface, §6). A test asserts a known key appears in no row or captured log after a failing turn.
-- D113 models:
-  - Router: `use='coordinator'`, provider `vani`, model `deepseek/deepseek-v4.1-flash`, `openai-completions` (supported by `runtime/provider.ts`, measured).
-  - Summary: `use='compaction'`, `anthropic/claude-haiku-5-5`. `start.ts` today reuses the router's provider for summaries, so the summary `ModelRef` gets its own.
+- D113 models, changed by ian on 2026-11-07 (the vani account had no prepaid balance, HTTP 402):
+  - Router: `use='coordinator'`, provider `openai-codex`, model `gpt-6.1-sol`, thinking `low`, because it only routes. The provider row is keyless (machine OAuth). The runtime maps it onto pi-ai's `openai-codex-responses` API at `https://chatgpt.com/backend-api` (`runtime/provider.ts`) and reads the access token from the host's Codex login, `$CODEX_HOME/auth.json` (default `~/.codex/auth.json`), on every request (`coordinator/codex-login.ts`). An expired or missing login makes the route unavailable, so daemons claim as before. The runtime never refreshes the token, because rotating the refresh token would race the Codex CLI.
+  - Summary: `use='compaction'`, `anthropic/claude-haiku-5-5`. With no Anthropic API connection the summary falls back to the router route, `openai-codex/gpt-6.1-sol`.
 
 ## 6. Seam and rule edits (owner route)
 
