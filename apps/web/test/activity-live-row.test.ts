@@ -423,7 +423,7 @@ describe('mapChief queue projection (#1108 Q6)', () => {
     });
   }
 
-  test('Q6: turnQueue with machine → presence-row queue label; when it disappears → `处理中`', () => {
+  test('Q6: turnQueue with machine → one connecting verb, counts in the detail; when it disappears → `处理中`', () => {
     expect(
       chiefOfThread({
         ...THREAD_Q,
@@ -434,20 +434,40 @@ describe('mapChief queue projection (#1108 Q6)', () => {
       }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
-      label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
-      labelVars: { machine: 'xmonsMac', running: 2, cap: 2, ahead: 2 },
+      label: '正在连接 {machine}...',
+      labelVars: { machine: 'xmonsMac' },
+      labelDetail: {
+        label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
+        vars: { machine: 'xmonsMac', running: 2, cap: 2, ahead: 2 },
+      },
     });
     expect(
       chiefOfThread({ ...THREAD_Q, turnQueue: { position: 1, waitingFor: null } }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
-      label: '排队中：等空闲机器（前面 {ahead} 个）',
-      labelVars: { ahead: 0 },
+      label: '处理中...',
+      labelDetail: { label: '排队中：等空闲机器（前面 {ahead} 个）', vars: { ahead: 0 } },
     });
 
     expect(chiefOfThread({ ...THREAD_Q }).stream?.at(-1)).toMatchObject({
       kind: 'streaming',
       label: '处理中...',
+    });
+  });
+
+  test('Q7: a blocked turn queue keeps its actionable reason as the label', () => {
+    expect(
+      chiefOfThread({
+        ...THREAD_Q,
+        turnQueue: {
+          position: 1,
+          waitingFor: { machineId: 'm1', name: 'xmonsMac', running: 0, capacity: 2 },
+          blocked: { kind: 'machine-offline', missing: [] },
+        },
+      }).stream?.at(-1),
+    ).toMatchObject({
+      kind: 'streaming',
+      label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
     });
   });
 });
