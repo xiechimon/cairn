@@ -190,7 +190,7 @@ export function MachineRowView({
             aria-expanded={expanded}
             aria-controls={bodyId}
             onClick={onToggle}
-            className="h-auto min-w-0 justify-start gap-1.5 rounded-sm p-0 text-left text-ui font-medium text-foreground hover:bg-transparent"
+            className="h-auto min-w-0 justify-start gap-1.5 rounded-sm p-0 text-left text-ui font-medium text-foreground hover:bg-transparent aria-expanded:bg-transparent"
           >
             <ChevronRight
               aria-hidden

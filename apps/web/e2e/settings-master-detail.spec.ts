@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const MACHINES = '/app/settings/machines?scenario=machines-master-detail';
 
@@ -127,8 +127,16 @@ test('the runtime link opens the row and an offline row says when it was last on
   await expect(old).toHaveAttribute('data-expanded', 'true');
   const pane = detail(page);
   await expect(pane.getByTestId('machine-offline-hint')).toContainText('重新连接 old-laptop');
-  await expect(old.getByTestId('machine-accept-toggle')).toBeDisabled();
-  await expect(pane.getByTestId('provider-toggle').first()).toBeDisabled();
+  const accept = old.getByTestId('machine-accept-toggle');
+  const runtime = pane.getByTestId('provider-toggle').first();
+  for (const control of [accept, runtime]) {
+    await expect(control).toBeDisabled();
+    await expect(control).toHaveAttribute('aria-disabled', 'true');
+  }
+  const trackOf = (el: Locator) => el.evaluate((node) => getComputedStyle(node).backgroundColor);
+  const off = await trackOf(pane.getByTestId('provider-toggle').nth(1));
+  expect(await trackOf(accept)).toBe(off);
+  expect(await trackOf(runtime)).toBe(off);
   await expect(pane.getByTestId('machine-recover')).toContainText('重新启动');
   await expect(pane.getByTestId('machine-recover').locator('code')).toContainText('start');
 });
