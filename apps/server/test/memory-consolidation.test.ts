@@ -1,8 +1,15 @@
 import { chiefDigestThreadId, ISSUE_FENCE_OPEN } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agentMemory, chiefMessage, chief as chiefTable, step } from '../src/db/schema.js';
+import {
+  agentMemory,
+  chiefMessage,
+  chief as chiefTable,
+  chiefThread,
+  step,
+} from '../src/db/schema.js';
 import { finishChiefDigest, queueDigestStep } from '../src/services/chief-digest.js';
+import { chiefTurnContext } from '../src/services/coordinator-steps.js';
 import { listMemoryEntries } from '../src/services/memory.js';
 import {
   applyMemoryPass,
@@ -210,6 +217,39 @@ describe('the weekly pass rides on the digest step', () => {
         .map((m) => m.id)
         .sort(),
     ).toEqual(['b', 'c', 'd']);
+  });
+});
+
+describe('a digest turn is not a use', () => {
+  test('the digest step reads memories without refreshing lastInjectedAt', () => {
+    for (const id of ['a', 'b', 'c', 'd']) put(id, id);
+    const chiefRow = H.s.db.select().from(chiefTable).where(eq(chiefTable.id, H.chiefId)).get()!;
+    const stepId = queueDigestStep(
+      H.s.svc,
+      chiefRow,
+      `base\nDigest thread=t until=1 last=x reason=daily`,
+      NOW,
+    );
+    const stepRow = H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
+    const threadRow = H.s.db
+      .select()
+      .from(chiefThread)
+      .where(eq(chiefThread.id, stepRow.buildId))
+      .get()!;
+    const context = chiefTurnContext(
+      {
+        ...H.s.svc,
+        box: H.s.secretBox,
+        reposDir: H.s.reposDir,
+        attachmentsDir: H.s.attachmentsDir,
+        skillsDir: H.s.skillsDir,
+      },
+      stepRow,
+      threadRow,
+      agent(),
+    );
+    expect(context.memories).toHaveLength(4);
+    expect(valid().every((m) => m.lastInjectedAt === null)).toBe(true);
   });
 });
 

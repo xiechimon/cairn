@@ -116,6 +116,7 @@ interface InjectScope {
   agentId: string;
   projectId?: string | null;
   projectOnly?: boolean;
+  recordUse?: boolean;
   teamId?: string;
   threadId?: string;
 }
@@ -178,7 +179,7 @@ export function injectMemoriesCapped(
       .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
       .all();
     const { shown, omitted } = capMemories(rows, capTokens);
-    if (shown.length > 0) {
+    if (shown.length > 0 && scope.recordUse !== false) {
       tx.update(agentMemory)
         .set({ lastInjectedAt: nowMs() })
         .where(

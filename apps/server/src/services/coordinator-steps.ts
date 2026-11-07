@@ -80,7 +80,13 @@ export function chiefTurnContext(
   }
   const memories = injectMemoriesCapped(
     deps.db,
-    { agentId, teamId: threadRow.teamId, threadId: threadRow.id, projectId: null },
+    {
+      agentId,
+      teamId: threadRow.teamId,
+      threadId: threadRow.id,
+      projectId: null,
+      recordUse: !digest,
+    },
     MEMORY_INJECT_TOKEN_CAP,
   ).memories.map(({ title, content }) => ({ title, content }));
   const project = digest
