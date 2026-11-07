@@ -42,7 +42,6 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
-import { finishChiefSummary, isChiefSummaryStep } from './chief-summary.js';
 import { releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
@@ -455,8 +454,7 @@ async function finishStepReport(
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
   }
   if (stepRow.kind === 'chief' && isChiefDigestStep(stepRow)) {
-    if (isChiefSummaryStep(stepRow)) finishChiefSummary(deps, stepRow, outcome, nowMs());
-    else finishChiefDigest(deps, stepRow, outcome, nowMs());
+    finishChiefDigest(deps, stepRow, outcome, nowMs());
     publishStepStatus(deps, stepId);
     emitRuntimeStepSpan(deps.db, stepId);
     return;
