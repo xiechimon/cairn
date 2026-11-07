@@ -1,9 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { parseFlushOutput } from '../../src/coordinator/memory-flush.js';
 import {
   compactionWindow,
@@ -64,7 +63,7 @@ afterEach(() => {
   setFailureSink(null);
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs.splice(0)) releaseTestTempDir(d);
 });
 
 const failureLogs = () => logs.filter((l) => l.message === COMPACTION_FAILURE_LOG);
@@ -97,7 +96,7 @@ describe('compaction failures are never silent', () => {
       ),
     );
     const coordinatorModels = createCoordinatorModels([faux.provider]);
-    const dir = mkdtempSync(join(tmpdir(), 'coord-fail-'));
+    const dir = makeTestTempDir('coord-fail-');
     dirs.push(dir);
     const api = fakeMachineApi();
     api.relayTool = async () => 'row '.repeat(6000);
@@ -186,7 +185,7 @@ describe('compaction failures are never silent', () => {
       ),
     );
     const coordinatorModels = createCoordinatorModels([faux.provider]);
-    const dir = mkdtempSync(join(tmpdir(), 'coord-fail-'));
+    const dir = makeTestTempDir('coord-fail-');
     dirs.push(dir);
     const api = fakeMachineApi();
     api.relayTool = async () => 'row '.repeat(6000);
@@ -249,7 +248,7 @@ describe('compaction failures are never silent', () => {
       ),
     );
     const coordinatorModels = createCoordinatorModels([faux.provider]);
-    const dir = mkdtempSync(join(tmpdir(), 'coord-fail-'));
+    const dir = makeTestTempDir('coord-fail-');
     dirs.push(dir);
     const harness = await openCoordinatorHarness(
       join(dir, 'c.sqlite'),
