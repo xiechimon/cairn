@@ -94,6 +94,7 @@ export function applyFlush(
         sourceTodoId: null,
         sourceBuildId: scope.threadId,
         source: FLUSH_SOURCE,
+        force: true,
       });
       if ('status' in saved) result.skipped += 1;
       else result.saved += 1;
