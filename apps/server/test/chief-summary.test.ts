@@ -7,7 +7,9 @@ import {
   finishChiefSummary,
   isChiefSummaryStep,
   planChiefSummaries,
+  SUMMARY_BATCH_MAX_MESSAGES,
   SUMMARY_MAX_CHARS,
+  SUMMARY_WINDOW_MESSAGES,
   uncompactedCount,
 } from '../src/services/chief-summary.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
@@ -120,6 +122,70 @@ describe('rolling Coordinator summary (D70 C2)', () => {
     expect(summarySteps()).toHaveLength(2);
     expect(finishLast('success', '   ').status).toBe('failed');
     expect(summaryRow()).toBeUndefined();
+  });
+
+  test('no new messages since the last summary queue nothing, however often the planner ticks', () => {
+    seed(100);
+    planChiefSummaries(H.s.svc, NOW);
+    finishLast('success', 'Covered the first 50.');
+    for (let tick = 1; tick <= 20; tick++) planChiefSummaries(H.s.svc, NOW + tick * 150_000);
+    expect(summarySteps()).toHaveLength(1);
+  });
+
+  test('a summary and its own digest-thread output do not count as new messages', () => {
+    seed(100);
+    planChiefSummaries(H.s.svc, NOW);
+    finishLast('success', 'Covered the first 50.');
+    const before = uncompactedCount(H.s.db, H.threadId);
+    reply('another assistant line on the digest thread');
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'chief-digest-own-output',
+        threadId: H.threadId,
+        role: 'system',
+        content: '{}',
+        createdAt: NOW + 5,
+      })
+      .run();
+    expect(uncompactedCount(H.s.db, H.threadId)).toBe(before);
+    planChiefSummaries(H.s.svc, NOW + 10 * 60_000);
+    expect(summarySteps()).toHaveLength(1);
+  });
+
+  test('a failed summary stays backed off across every tick inside the retry delay', () => {
+    seed(100);
+    planChiefSummaries(H.s.svc, NOW);
+    finishLast('failed');
+    for (let tick = 1; tick <= 5; tick++) planChiefSummaries(H.s.svc, NOW + tick * 150_000);
+    expect(summarySteps()).toHaveLength(1);
+  });
+
+  test('at most one summary is in flight while a large backlog waits', () => {
+    seed(1000);
+    for (let tick = 0; tick < 10; tick++) planChiefSummaries(H.s.svc, NOW + tick * 150_000);
+    expect(summarySteps()).toHaveLength(1);
+  });
+
+  test('a large backlog is drained in batches of up to the batch cap, always leaving the live window', () => {
+    seed(1000);
+    planChiefSummaries(H.s.svc, NOW);
+    const [first] = summarySteps();
+    expect(first?.prompt?.endsWith(`count=${SUMMARY_BATCH_MAX_MESSAGES}`)).toBe(true);
+    finishLast('success', 'Covered the first batch.');
+    expect(uncompactedCount(H.s.db, H.threadId)).toBe(1000 - SUMMARY_BATCH_MAX_MESSAGES);
+    let remaining = uncompactedCount(H.s.db, H.threadId);
+    let tick = 1;
+    while (remaining >= SUMMARY_WINDOW_MESSAGES * 2) {
+      planChiefSummaries(H.s.svc, NOW + tick * 2);
+      finishLast('success', `Covered batch ${tick}.`);
+      remaining = uncompactedCount(H.s.db, H.threadId);
+      tick += 1;
+    }
+    expect(remaining).toBe(SUMMARY_WINDOW_MESSAGES);
+    expect(tick).toBeLessThanOrEqual(4);
+    planChiefSummaries(H.s.svc, NOW + 100);
+    expect(summarySteps()).toHaveLength(tick);
   });
 
   test('a batch over the transcript budget stops early and the cursor covers only what was sent', () => {
