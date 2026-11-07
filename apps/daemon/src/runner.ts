@@ -93,7 +93,7 @@ import {
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { buildExecutorRecord } from './executor-record.js';
-import { GitPushHookError, withGitCredentialFallback } from './git.js';
+import { GitPushHookError, gitCredentialEnv, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
@@ -370,9 +370,12 @@ export async function runStep(
   }, deps.heartbeatIntervalMs ?? 30_000);
   if (heartbeat.unref) heartbeat.unref();
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
+  const credentialCleanups: (() => void)[] = [];
   try {
-    await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance);
+    await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, credentialCleanups);
   } finally {
+    for (const cleanup of credentialCleanups.reverse()) cleanup();
+    deps.sessionHandles?.delete(stepId);
     clearInterval(heartbeat);
     deps.stepImageSupport?.delete(stepId);
     deps.stepSteeringSupport?.delete(stepId);
@@ -388,6 +391,7 @@ async function runClaimedStep(
   heartbeat: ReturnType<typeof setInterval>,
   stop: RunStop,
   provenance: MachineHeartbeatBody,
+  credentialCleanups: (() => void)[],
 ): Promise<void> {
   let { client, journal, logger } = deps;
   const now = deps.now ?? (() => Date.now());
@@ -544,7 +548,8 @@ async function runClaimedStep(
 
   const tokenRes = await client.token(stepId);
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
-  const redact = credentialRedactor(creds.claudeSubscriptionToken);
+  credentialCleanups.push(() => clearCredentials(creds));
+  const redact = credentialRedactor(creds.claudeSubscriptionToken, creds.git?.password);
   client = guardCredentialOutputs(client, redact);
   journal = guardCredentialOutputs(journal, redact);
   logger = guardCredentialOutputs(logger, redact);
@@ -860,7 +865,29 @@ async function runClaimedStep(
     }
   };
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
-  const stepEnv = { ...opts.env, ...(readonlyWorkspace ? READONLY_GIT_ENV : {}) };
+  const stepGitEnv: Record<string, string> =
+    repo?.kind === 'github' && creds.git !== null
+      ? {
+          ...Object.fromEntries(
+            Object.entries(gitCredentialEnv(creds.git)).filter(
+              (entry): entry is [string, string] => entry[1] !== undefined,
+            ),
+          ),
+          GH_TOKEN: creds.git.password,
+          GITHUB_TOKEN: creds.git.password,
+        }
+      : {};
+  const stepEnv: Record<string, string> = {
+    ...opts.env,
+    ...stepGitEnv,
+    ...(readonlyWorkspace ? READONLY_GIT_ENV : {}),
+  };
+  credentialCleanups.push(() => {
+    for (const key of Object.keys(stepGitEnv)) {
+      delete stepEnv[key];
+      delete stepGitEnv[key];
+    }
+  });
   delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
   if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
     stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
@@ -1465,7 +1492,10 @@ async function runClaimedStep(
     armBodyTimeout();
     if (pass === 0) armDurationCap();
     try {
-      for await (const ev of credentialSafeEvents(handle.events, creds.claudeSubscriptionToken)) {
+      for await (const ev of credentialSafeEvents(
+        credentialSafeEvents(handle.events, creds.git?.password),
+        creds.claudeSubscriptionToken,
+      )) {
         if (ev.type === 'toolcall_end') {
           if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
           else runningToolCalls.delete(ev.call.id);
@@ -2084,7 +2114,12 @@ async function runClaimedStep(
   };
   const redactedSessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
   const sessionFileForUpload = prepareCredentialSessionUpload(
-    handle?.sessionFile,
+    prepareCredentialSessionUpload(
+      handle?.sessionFile,
+      creds.git?.password,
+      redactedSessionFile,
+      (message) => logger.step(message),
+    ),
     creds.claudeSubscriptionToken,
     redactedSessionFile,
     (message) => logger.step(message),

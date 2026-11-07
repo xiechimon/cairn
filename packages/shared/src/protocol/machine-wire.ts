@@ -337,6 +337,7 @@ export const machineTokenResponseSchema = z.object({
     .object({
       username: z.string(),
       password: z.string(),
+      kind: z.enum(['app', 'unattributed']).optional(),
     })
     .nullable(),
 });

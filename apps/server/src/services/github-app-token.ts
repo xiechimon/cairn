@@ -3,12 +3,14 @@ import { z } from 'zod';
 import type { ServerConfig } from '../config.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubApiBaseUrl, isGithubApiUrl } from '../lib/github-api-base.js';
-import { type AppToken, tokenValue } from '../lib/github-token.js';
+import {
+  type AppToken,
+  type AppTokenReason,
+  registerAppToken,
+  tokenValue,
+} from '../lib/github-token.js';
 
-export type AppTokenReason =
-  | 'app-token-unconfigured'
-  | 'app-token-unavailable'
-  | 'repo-not-installed';
+export type { AppTokenReason } from '../lib/github-token.js';
 
 type Repository = { owner: string; repo: string };
 
@@ -98,6 +100,11 @@ async function loadInstallation(deps: GithubAppTokenDeps, path: string, force: b
   const fetchImpl = deps.fetchImpl ?? fetch;
   for (let attempt = 0; attempt < 2; attempt++) {
     const minted = await mintToken(path, force || attempt > 0);
+    registerAppToken(minted.token, minted.expiresAt, (inner, target) => async (input, init) => {
+      const response = await appGithubFetch({ ...deps, fetchImpl: inner }, target, input, init);
+      if (response === null) throw new Error('GitHub App token refresh unavailable');
+      return response;
+    });
     const repositories = new Set<string>();
     let retry = false;
     for (let page = 1; ; page++) {
@@ -140,7 +147,9 @@ async function repoToken(deps: GithubAppTokenDeps, repo: Repository, force: bool
   else {
     try {
       const value = await installation(deps, force);
-      if (value?.repositories.has(`${repo.owner}/${repo.repo}`.toLowerCase())) return value.token;
+      if (value?.repositories.has(`${repo.owner}/${repo.repo}`.toLowerCase())) {
+        return value.token;
+      }
       reason = value ? 'repo-not-installed' : 'app-token-unavailable';
     } catch {
       reason = 'app-token-unavailable';

@@ -42,7 +42,7 @@ import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loo
 import { sweepIdleComposerDrafts } from './composer-drafts.js';
 import { createDueRunner, type DueClock } from './due-events.js';
 import { projectOfTodo } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { autonomousToken } from './github-autonomous-token.js';
 import {
   createIssueIntake,
   ISSUE_INTAKE_INTERVAL_MS,
@@ -589,7 +589,7 @@ export function createScheduler(
             {
               db: deps.db,
               githubFetch: deps.githubFetch as FetchLike,
-              tokenForTeam: (teamId) => githubTokenOrNull(deps, teamId),
+              tokenForTeam: (teamId, repo) => autonomousToken(deps, teamId, repo),
               logger: reflectCurate.logger,
             },
             guards,

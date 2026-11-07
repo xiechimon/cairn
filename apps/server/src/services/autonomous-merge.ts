@@ -15,7 +15,7 @@ import { type FetchLike, githubPull } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { userTokenOrNull } from './github-connection.js';
 import { projectMergeConfigOf } from './projects.js';
 
 type Store = Pick<Db, 'select' | 'insert' | 'update' | 'delete'>;
@@ -272,7 +272,7 @@ export async function recoverAutonomousMerges(
       if (!context) continue;
       const target = githubRepoOfProject(context.project);
       if (target && context.build.prNumber !== null) {
-        const token = await githubTokenOrNull(deps, admission.teamId);
+        const token = await userTokenOrNull(deps, admission.teamId);
         const page = await githubPull(
           githubFetch,
           token,

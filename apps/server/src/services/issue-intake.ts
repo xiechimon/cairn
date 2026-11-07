@@ -39,6 +39,7 @@ import {
   githubOpenIssuesWithLabel,
 } from '../lib/github.js';
 import { isCairnIdentity } from '../lib/github-feedback.js';
+import type { AutonomousToken } from '../lib/github-token.js';
 import { nowMs } from '../lib/ids.js';
 import {
   type AutonomyGateResult,
@@ -55,7 +56,8 @@ import type { BuildDeps } from './builds.js';
 import { chiefBinding } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
 import { githubRepoOfProject } from './git.js';
-import { teamGithubToken } from './github-connection.js';
+import { autonomousToken, githubReadToken } from './github-autonomous-token.js';
+import { teamUserToken } from './github-connection.js';
 import { importGithubIssue, importsInFlightFor } from './github-issues.js';
 import { orchestrateTodo } from './orchestrate.js';
 
@@ -152,7 +154,7 @@ interface IssueTaskRow extends ReconcileRow {
 }
 
 interface TeamAccess {
-  token: string;
+  token: AutonomousToken;
   box: SecretBox;
   createdBy: string;
 }
@@ -845,7 +847,6 @@ export function createIssueIntake(
 
   async function reconcileClosed(
     teamId: string,
-    token: string,
     rows: ReconcileRow[],
     now: number,
     tally: IssueIntakeTally,
@@ -854,6 +855,8 @@ export function createIssueIntake(
     for (const t of rows) {
       const ref = parseGithubIssueSourceRef(t.sourceRef);
       if (ref === null) continue;
+      const token = await githubReadToken({ ...deps, githubFetch: run.githubFetch }, teamId, ref);
+      if (token === null) continue;
       const key = refKey(teamId, t.sourceRef);
       keep.add(key);
       try {
@@ -924,10 +927,14 @@ export function createIssueIntake(
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
-    const got = await teamGithubToken(deps, teamId);
-    if ('reason' in got) {
+    const got = await teamUserToken(deps, teamId);
+    const box = 'token' in got ? got.box : deps.box;
+    if (box === undefined) {
       tally.skipped += projects.length;
-      log({ teamId, reason: got.reason }, 'issue intake team skipped');
+      log(
+        { teamId, reason: 'reason' in got ? got.reason : 'no-secret-box' },
+        'issue intake team skipped',
+      );
       return;
     }
     const agentId = chiefBinding(deps, teamId).agentId;
@@ -937,7 +944,7 @@ export function createIssueIntake(
       }
     } else {
       const taken = issueTasks.filter((t) => t.createdBy === agentId);
-      await reconcileClosed(teamId, got.token, taken, now, tally);
+      await reconcileClosed(teamId, taken, now, tally);
     }
     if (projects.length === 0) return;
     const binding = chiefBinding(deps, teamId);
@@ -965,7 +972,27 @@ export function createIssueIntake(
       seenRepos.add(githubRepo.toLowerCase());
       tally.projects += 1;
       try {
-        await intakeProject(row, repoRef.owner, repoRef.repo, { ...got, createdBy }, now, tally);
+        const token = await autonomousToken(
+          { ...deps, githubFetch: run.githubFetch },
+          teamId,
+          repoRef,
+        );
+        if (token === null) {
+          tally.skipped += 1;
+          log(
+            { teamId, reason: 'reason' in got ? got.reason : 'no-github-connection' },
+            'issue intake team skipped',
+          );
+          continue;
+        }
+        await intakeProject(
+          row,
+          repoRef.owner,
+          repoRef.repo,
+          { token, box, createdBy },
+          now,
+          tally,
+        );
       } catch (err) {
         if (err instanceof GithubRateLimitedError) throw err;
         tally.errors += 1;

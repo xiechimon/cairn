@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HttpError } from '../src/lib/errors.js';
 import { githubCreateIssue } from '../src/lib/github.js';
+import type { AutonomousToken } from '../src/lib/github-token.js';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -27,8 +28,14 @@ test('parallel creates share slots and an explicit secondary limit retries succe
   });
   try {
     const results = await Promise.all([
-      githubCreateIssue(upstream, 'token', 'owner', 'repo', { title: 'first', body: '' }),
-      githubCreateIssue(upstream, 'token', 'owner', 'repo', { title: 'second', body: '' }),
+      githubCreateIssue(upstream, 'token' as AutonomousToken, 'owner', 'repo', {
+        title: 'first',
+        body: '',
+      }),
+      githubCreateIssue(upstream, 'token' as AutonomousToken, 'owner', 'repo', {
+        title: 'second',
+        body: '',
+      }),
     ]);
     expect(results).toHaveLength(2);
     expect(upstream).toHaveBeenCalledTimes(3);
@@ -53,7 +60,7 @@ test('an unwritable gate directory surfaces as HttpError 503 naming the director
     text: async () => '',
   }));
   try {
-    const failure = await githubCreateIssue(upstream, 'token', 'owner', 'repo', {
+    const failure = await githubCreateIssue(upstream, 'token' as AutonomousToken, 'owner', 'repo', {
       title: 'blocked by permissions',
       body: '',
     }).then(

@@ -22,6 +22,7 @@ import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
 import { pauseTeamGithubRepos } from './services/github-autonomy-brake.js';
+import { userTokenOrNull } from './services/github-connection.js';
 import { getModelRouting } from './services/model-routing.js';
 import {
   listUnreadEntityIds,
@@ -124,6 +125,16 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
           box: ctx.secretBox,
           githubFetch: ctx.githubFetch,
           oauthClient: ctx.oauthClient,
+          githubWriteTokenForRepo: (teamId) =>
+            userTokenOrNull(
+              {
+                db: ctx.db,
+                box: ctx.secretBox,
+                githubFetch: ctx.githubFetch,
+                oauthClient: ctx.oauthClient,
+              },
+              teamId,
+            ),
         },
         id,
       );

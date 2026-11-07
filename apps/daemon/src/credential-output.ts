@@ -2,10 +2,12 @@ import type { StepEvent } from '@cairn/shared';
 import { writePrivateFile } from './private-fs.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
 
-export function credentialRedactor(token: string | undefined): <T>(value: T) => T {
+export function credentialRedactor(...values: (string | undefined)[]): <T>(value: T) => T {
+  const tokens = values.filter((value): value is string => Boolean(value));
   const visit = (value: unknown): unknown => {
-    if (!token) return value;
-    if (typeof value === 'string') return value.split(token).join('[REDACTED]');
+    if (tokens.length === 0) return value;
+    if (typeof value === 'string')
+      return tokens.reduce((text, token) => text.split(token).join('[REDACTED]'), value);
     if (Array.isArray(value)) return value.map(visit);
     if (
       value !== null &&

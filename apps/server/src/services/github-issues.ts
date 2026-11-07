@@ -16,7 +16,8 @@ import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubRepoIssue, githubRepoIssues, githubRepoLabels } from '../lib/github.js';
 import { githubRepoOfProject } from './git.js';
-import { teamGithubToken } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
+import { teamUserToken } from './github-connection.js';
 import { CORRECTION_PROMPT } from './merge-gate/correction.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { normalizeGithubLabelColor, resolveProjectTagIds, syncGithubLabels } from './tags.js';
@@ -37,8 +38,14 @@ function requireGithubRepo(row: ProjectRow): GithubRepoRef {
   return ref;
 }
 
-async function requireToken(deps: GithubIssueFaceDeps, teamId: string): Promise<string> {
-  const access = await teamGithubToken(deps, teamId);
+async function requireToken(
+  deps: GithubIssueFaceDeps,
+  teamId: string,
+  repo: GithubRepoRef,
+): Promise<string> {
+  const preferred = await githubReadToken(deps, teamId, repo);
+  if (preferred !== null) return preferred;
+  const access = await teamUserToken(deps, teamId);
   if (!('token' in access)) throw notFound('github connection');
   return access.token;
 }
@@ -69,7 +76,7 @@ export async function listProjectGithubIssues(
   opts: { state: GithubIssueState; page: number },
 ): Promise<GithubIssuesResponse> {
   const { owner, repo } = requireGithubRepo(row);
-  const token = await requireToken(deps, row.teamId);
+  const token = await requireToken(deps, row.teamId, { owner, repo });
   const fetchImpl = deps.githubFetch ?? fetch;
   const { issues, hasMore } = await githubRepoIssues(fetchImpl, token, owner, repo, opts);
   const claimed = claimedSourceRefs(
@@ -122,7 +129,7 @@ export async function importGithubIssue(
   }
   importsInFlight.set(claim, row.id);
   try {
-    const token = await requireToken(deps, row.teamId);
+    const token = await requireToken(deps, row.teamId, { owner, repo });
     const detail = await githubRepoIssue(fetchImpl, token, owner, repo, issueNumber);
     const repoLabels = await githubRepoLabels(fetchImpl, token, owner, repo);
     syncGithubLabels(deps.db, row.id, [...repoLabels, ...detail.labels]);
@@ -165,7 +172,7 @@ export async function readSourceIssueEcho(
   }
   const parsed = parseGithubIssueSourceRef(row.sourceRef);
   if (!parsed) throw notFound('source issue');
-  const token = await requireToken(deps, row.teamId);
+  const token = await requireToken(deps, row.teamId, parsed);
   const detail = await githubRepoIssue(
     deps.githubFetch ?? fetch,
     token,

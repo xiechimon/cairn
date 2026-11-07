@@ -12,11 +12,14 @@ import {
   machine as machineTable,
   message as messageTable,
   plan as planTable,
+  project as projectTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { MERGE_NOT_LANDED_NOTE } from '../src/services/machines.js';
+import { stubGithubApp } from './github-identity-fixture.js';
 import {
   bootServer,
   dropQueuedVerify,
@@ -500,3 +503,51 @@ describe('hosted repo provision seed commit (M3b [design]: empty repo cannot wor
     expect(await systemGitOps.isAncestor(dir, sha, sha)).toBe(true);
   });
 });
+
+test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
+  'GitHub step credential uses the autonomous identity with App reason %s',
+  async (reason) => {
+    const w = await setupGitWorld();
+    w.startBuild();
+    const claimed = await w.claim();
+    w.s.db
+      .update(projectTable)
+      .set({ repoKind: 'github', githubRepo: 'owner/repo' })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.s.team.id,
+        login: 'human',
+        accessToken: 'identity-test-user',
+        scope: 'repo',
+      },
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const app = stubGithubApp(reason);
+    try {
+      const response = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
+        cred: w.token,
+      });
+      expect(response.status).toBe(200);
+      const result = machineTokenResponseSchema.parse(await response.json());
+      expect(result.git?.password === (reason === null ? app : 'identity-test-user')).toBe(true);
+      expect(result.git?.kind).toBe(reason === null ? 'app' : 'unattributed');
+      expect(info).toHaveBeenCalledWith(
+        'github step credential',
+        expect.objectContaining({ kind: reason === null ? 'app' : 'unattributed' }),
+      );
+      if (reason !== null) {
+        expect(warn).toHaveBeenCalledWith(
+          'github write unattributed',
+          expect.objectContaining({ reason, owner: 'owner', repo: 'repo' }),
+        );
+        expect(JSON.stringify(warn.mock.calls).includes('identity-test-user')).toBe(false);
+      }
+    } finally {
+      vi.restoreAllMocks();
+    }
+  },
+);

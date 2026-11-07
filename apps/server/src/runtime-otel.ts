@@ -34,6 +34,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { Db } from './db/client.js';
 import { build, chiefMessage, machine, schedule, step, todo } from './db/schema.js';
+import { githubUnattributedCounts } from './lib/github-token.js';
 import { parseChiefTrigger } from './services/chief.js';
 import { stepRuntimeFor } from './services/dispatch-eligibility.js';
 import { storedStepRoute } from './services/step-route.js';
@@ -93,6 +94,12 @@ export function emitRuntimeStepSpan(
   const row = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row || row.claimedAt == null) return;
   const environment = otelEnvironment(env);
+  const attribution = Object.fromEntries(
+    [...githubUnattributedCounts()].map(([reason, count]) => [
+      `cairn.github.write_unattributed.${reason}`,
+      count,
+    ]),
+  );
   const start = row.claimedAt;
   const end = Math.max(start, row.finishedAt ?? Date.now());
   const isTurn = row.kind === 'chief';
@@ -122,6 +129,7 @@ export function emitRuntimeStepSpan(
       startTimeUnixNano: otlpNanos(start),
       endTimeUnixNano: otlpNanos(end),
       attributes: otlpAttributes({
+        ...attribution,
         ...stepAttributes({
           stepId: row.id,
           kind: row.kind,

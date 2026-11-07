@@ -208,28 +208,6 @@
     {
       "includes": [
         "apps/server/src/**",
-        "!apps/server/src/routes-resources.ts",
-        "!apps/server/src/services/autonomous-merge.ts",
-        "!apps/server/src/services/blocker-handoff.ts",
-        "!apps/server/src/services/builds.ts",
-        "!apps/server/src/services/ci-corrections.ts",
-        "!apps/server/src/services/ci-loop.ts",
-        "!apps/server/src/services/git.ts",
-        "!apps/server/src/services/github-autonomy-brake.ts",
-        "!apps/server/src/services/github-issues.ts",
-        "!apps/server/src/services/github-reads.ts",
-        "!apps/server/src/services/github-recovery.ts",
-        "!apps/server/src/services/issue-intake.ts",
-        "!apps/server/src/services/machine-finish-step.ts",
-        "!apps/server/src/services/machine-step-token.ts",
-        "!apps/server/src/services/merge-gate-run.ts",
-        "!apps/server/src/services/pr-feedback.ts",
-        "!apps/server/src/services/pr-watch.ts",
-        "!apps/server/src/services/projects.ts",
-        "!apps/server/src/services/scheduler.ts",
-        "!apps/server/src/services/scheduling/sweep.ts",
-        "!apps/server/src/services/ship-gate.ts",
-        "!apps/server/src/services/todos.ts",
         "!apps/server/src/coordinator/runtime/**",
         "!apps/server/src/db/client.ts",
         "!apps/server/src/legacy/**",
@@ -292,7 +270,7 @@
                       "**/github-connection.ts"
                     ],
                     "importNamePattern": "(githubTokenOrNull|teamGithubToken|openGithubToken|\\*)",
-                    "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are frozen to existing importers until segment 2."
+                    "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are private to github-connection.ts."
                   }
                 ],
                 "paths": {
@@ -329,7 +307,7 @@
                       "**/github-connection.ts"
                     ],
                     "importNamePattern": "(githubTokenOrNull|teamGithubToken|openGithubToken|\\*)",
-                    "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are frozen to existing importers until segment 2."
+                    "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are private to github-connection.ts."
                   }
                 ],
                 "paths": {}

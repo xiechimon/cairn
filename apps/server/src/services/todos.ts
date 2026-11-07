@@ -38,13 +38,15 @@ import {
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
+import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import { assertCorrectionDone } from './correction.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { hasGithubConnection, teamGithubToken } from './github-connection.js';
+import { autonomousToken } from './github-autonomous-token.js';
+import { hasGithubConnection } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -61,6 +63,10 @@ import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 type TodoRow = typeof todo.$inferSelect;
 
 export interface TodoDeps {
+  githubWriteTokenForRepo?: (
+    teamId: string,
+    repo: GithubRepoRef,
+  ) => Promise<GithubWriteToken | null>;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -514,12 +520,15 @@ function planProjectMove(
 function scheduleMovedIssueClose(deps: TodoDeps, teamId: string, move: ProjectMove): void {
   const parsed = move.closeIssueRef === null ? null : parseGithubIssueSourceRef(move.closeIssueRef);
   if (parsed === null || deps.box === undefined) return;
-  void teamGithubToken(deps, teamId)
-    .then((access) =>
-      'token' in access
+  void (deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo)))(
+    teamId,
+    parsed,
+  )
+    .then((token) =>
+      token !== null
         ? githubCloseIssue(
             deps.githubFetch ?? fetch,
-            access.token,
+            token,
             parsed.owner,
             parsed.repo,
             parsed.issueNumber,
@@ -756,10 +765,12 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   if (row.sourceRef !== null && !replacesOtherRepo) return null;
   if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
-  const access = await teamGithubToken(deps, row.teamId);
-  if (!('token' in access)) throw new HttpError(404, 'github connection not found');
+  const token = await (
+    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
+  )(row.teamId, repoRef);
+  if (token === null) throw new HttpError(404, 'github connection not found');
   const { owner, repo } = repoRef;
-  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, access.token, owner, repo, {
+  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, token, owner, repo, {
     title: row.title,
     body: row.spec,
   });
@@ -773,11 +784,13 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   const record = getTodo(deps, todoId);
   if (record) hub.publishTodoDoc(record.teamId, record);
   if (replaced !== null) {
-    const closeAccess = await teamGithubToken(deps, row.teamId);
-    if ('token' in closeAccess) {
+    const closeToken = await (
+      deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
+    )(row.teamId, replaced);
+    if (closeToken !== null) {
       await githubCloseIssue(
         deps.githubFetch ?? fetch,
-        closeAccess.token,
+        closeToken,
         replaced.owner,
         replaced.repo,
         replaced.issueNumber,
@@ -824,11 +837,13 @@ export async function writebackSelfIssueTitle(
   if (row?.sourceKind !== 'github-issue-self' || row.sourceRef === null) return;
   const parsed = parseGithubIssueSourceRef(row.sourceRef);
   if (parsed === null) return;
-  const access = await teamGithubToken(deps, row.teamId);
-  if (!('token' in access)) return;
+  const token = await (
+    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
+  )(row.teamId, parsed);
+  if (token === null) return;
   await githubUpdateIssueTitle(
     deps.githubFetch ?? fetch,
-    access.token,
+    token,
     parsed.owner,
     parsed.repo,
     parsed.issueNumber,

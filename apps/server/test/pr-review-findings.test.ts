@@ -12,6 +12,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, project, step, threadPr, todo } from '../src/db/schema.js';
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
 import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
+import type { AutonomousToken } from '../src/lib/github-token.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
 import { createPrWakes } from '../src/services/pr-wakes.js';
@@ -20,10 +21,12 @@ import {
   answerPendingWorkerQuestions,
   writeWorkerQuestion,
 } from '../src/services/worker-question-store.js';
+import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const s of servers.splice(0)) s.dispose();
 });
 
@@ -209,7 +212,14 @@ function fixture() {
   });
   const deps = { ...s.svc, box: s.secretBox };
   const row = () => s.db.select().from(threadPr).get()!;
-  const input = () => ({ row: row(), fetch, token: 'fake', owner: 'o', repo: 'r', now: 1000 });
+  const input = () => ({
+    row: row(),
+    fetch,
+    token: 'fake' as AutonomousToken,
+    owner: 'o',
+    repo: 'r',
+    now: 1000,
+  });
   const reconcile = () => reconcilePrReviewFindings(deps, input());
   const wake = () =>
     createPrWakes(deps)({
@@ -842,5 +852,41 @@ test.each([429, 403])(
     });
     await expect(f.wake()).rejects.toBeInstanceOf(GithubRateLimitedError);
     expect(f.s.db.select().from(step).all()).toEqual([]);
+  },
+);
+
+test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
+  'PR watch G14 writes use the trigger identity when App reason is %s',
+  async (reason) => {
+    const f = fixture();
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const app = stubGithubApp(reason);
+    upsertGithubConnection(
+      { db: f.s.db, box: f.s.secretBox },
+      {
+        teamId: f.s.team.id,
+        login: 'human',
+        accessToken: 'identity-test-user',
+        scope: 'repo',
+      },
+    );
+    const watcher = createPrWatch({ ...f.s.svc, box: f.s.secretBox }, { githubFetch: f.fetch });
+    await watcher.sweep();
+    await watcher.sweep();
+    const writes = f.fetch.mock.calls.filter(([, init]) => init?.body?.includes('mutation'));
+    expect(writes.length).toBeGreaterThan(0);
+    expect(
+      writes.every(
+        ([, init]) =>
+          init?.headers?.authorization === `Bearer ${reason === null ? app : 'identity-test-user'}`,
+      ),
+    ).toBe(true);
+    if (reason !== null) {
+      expect(log).toHaveBeenCalledWith(
+        'github write unattributed',
+        expect.objectContaining({ reason, owner: 'o', repo: 'r' }),
+      );
+      expect(JSON.stringify(log.mock.calls).includes('identity-test-user')).toBe(false);
+    }
   },
 );

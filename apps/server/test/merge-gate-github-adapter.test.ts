@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import type { FetchLike } from '../src/lib/github.js';
+import type { AutonomousToken } from '../src/lib/github-token.js';
 import { newGateReadCache, readGateGithubFacts } from '../src/services/merge-gate/github-facts.js';
 import { githubGatePort } from '../src/services/merge-gate-github.js';
 
-const TOKEN = 'gho_adapterTestToken0123';
+const TOKEN = 'gho_adapterTestToken0123' as AutonomousToken;
 const API = 'https://api.github.com/repos/Some-Org/some.repo';
 const SHA = 'c'.repeat(40);
 const SHA2 = 'd'.repeat(40);

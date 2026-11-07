@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -7,6 +7,7 @@ import type {
   GitCredentials,
   MachineDoneBody,
   MachineStreamEvent,
+  SessionOpts,
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
@@ -215,14 +216,18 @@ function fakeWorkspace(opts: {
   return { ws, calls, pushes };
 }
 
-function completingBackend(): AgentBackend {
+function completingBackend(onSession?: (opts: SessionOpts) => void, echo?: string): AgentBackend {
   return {
     capabilities: PI_CAPABILITIES,
-    async createSession(): Promise<AgentSessionHandle> {
+    async createSession(opts): Promise<AgentSessionHandle> {
+      onSession?.(opts);
       return {
         sessionId: 'pi-sess-cred',
         events: (async function* () {
-          yield { type: 'text_delta', text: 'ok' } as never;
+          if (echo) {
+            yield { type: 'text_delta', text: echo.slice(0, 5) } as never;
+            yield { type: 'text_delta', text: echo.slice(5) } as never;
+          } else yield { type: 'text_delta', text: 'ok' } as never;
           yield { type: 'done', usage: [] } as never;
         })(),
         async steer() {},
@@ -241,6 +246,8 @@ async function setup(
   opts: {
     git?: GitCredentials | null;
     workspace: ReturnType<typeof fakeWorkspace>;
+    onSession?: (opts: SessionOpts) => void;
+    echo?: string;
   },
 ) {
   probeMock.mockReset();
@@ -256,7 +263,7 @@ async function setup(
     {
       client,
       journal,
-      backendFor: () => completingBackend(),
+      backendFor: () => completingBackend(opts.onSession, opts.echo),
       logger,
       paths,
       workspace: opts.workspace.ws,
@@ -410,4 +417,77 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('machine');
   }, 20_000);
+});
+
+test.each(['github', 'hosted'] as const)(
+  'step shell GitHub credentials are scoped and erased for %s',
+  async (kind) => {
+    let held: SessionOpts['env'];
+    let applied = false;
+    const previous = process.env.GH_TOKEN;
+    const { client, lines, paths } = await setup(
+      claimedStep('build', {
+        kind,
+        cloneUrl: kind === 'github' ? 'https://github.com/o/r.git' : 'http://server/git/t/r',
+      }),
+      {
+        git: GITHUB_TOKEN,
+        workspace: fakeWorkspace({}),
+        echo: GITHUB_TOKEN.password,
+        onSession: (opts) => {
+          held = opts.env;
+          applied =
+            kind === 'github'
+              ? opts.env?.GH_TOKEN === GITHUB_TOKEN.password &&
+                opts.env.GITHUB_TOKEN === GITHUB_TOKEN.password &&
+                opts.env.CAIRN_GIT_CRED_PASSWORD === GITHUB_TOKEN.password
+              : opts.env?.GH_TOKEN === undefined && opts.env?.CAIRN_GIT_CRED_PASSWORD === undefined;
+        },
+      },
+    );
+    expect(applied).toBe(true);
+    expect(held?.GH_TOKEN === undefined).toBe(true);
+    expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
+    expect(process.env.GH_TOKEN === previous).toBe(true);
+    expect(JSON.stringify(transcriptRows(client)).includes(GITHUB_TOKEN.password)).toBe(false);
+    expect(lines.join('\n').includes(GITHUB_TOKEN.password)).toBe(false);
+    for (const file of readdirSync(paths.outboxDir)) {
+      expect(
+        readFileSync(join(paths.outboxDir, file), 'utf8').includes(GITHUB_TOKEN.password),
+      ).toBe(false);
+    }
+  },
+);
+
+test('App git authentication failure never retries with machine user credentials', async () => {
+  const workspace = fakeWorkspace({
+    pushWithToken: async () => {
+      throw new Error(MEA_AUTH_FAILURE);
+    },
+  });
+  const { client } = await setup(
+    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+    { git: { ...GITHUB_TOKEN, kind: 'app' }, workspace },
+  );
+  expect(workspace.pushes).toHaveLength(1);
+  expect(client.doneBodies[0]?.body.status).toBe('failed');
+});
+
+test('step shell credentials are erased when backend session creation fails', async () => {
+  let held: SessionOpts['env'];
+  const { client } = await setup(
+    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+    {
+      git: GITHUB_TOKEN,
+      workspace: fakeWorkspace({}),
+      onSession: (opts) => {
+        held = opts.env;
+        throw new Error('backend unavailable');
+      },
+    },
+  );
+  expect(client.doneBodies[0]?.body.status).toBe('failed');
+  expect(held?.GH_TOKEN === undefined).toBe(true);
+  expect(held?.GITHUB_TOKEN === undefined).toBe(true);
+  expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
 });

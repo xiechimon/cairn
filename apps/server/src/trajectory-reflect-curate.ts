@@ -12,6 +12,7 @@ import type { Db } from './db/client.js';
 import { project } from './db/schema.js';
 import type { FetchLike } from './lib/github.js';
 import { githubCreateIssue } from './lib/github.js';
+import type { AutonomousToken } from './lib/github-token.js';
 import { githubRepoOfProject } from './services/git.js';
 import { curateCandidates, GUARD_CANDIDATES_FILE } from './trajectory-curate.js';
 import { exportTrajectories } from './trajectory-export.js';
@@ -59,7 +60,10 @@ export async function openGuardCandidateIssues(
   deps: {
     db: Db;
     githubFetch: FetchLike;
-    tokenForTeam: (teamId: string) => Promise<string | null>;
+    tokenForTeam: (
+      teamId: string,
+      repo: { owner: string; repo: string },
+    ) => Promise<AutonomousToken | null>;
     logger: ReflectCurateLogger;
   },
   guards: GuardCandidate[],
@@ -68,7 +72,7 @@ export async function openGuardCandidateIssues(
   for (const guard of guards) {
     const projectRow = deps.db.select().from(project).where(eq(project.id, guard.project)).get();
     const ref = githubRepoOfProject(projectRow);
-    const token = await deps.tokenForTeam(guard.teamId);
+    const token = ref === null ? null : await deps.tokenForTeam(guard.teamId, ref);
     if (ref === null || token === null) {
       deps.logger.info(
         { guardId: guard.id, project: guard.project },

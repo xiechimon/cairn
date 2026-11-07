@@ -7,7 +7,7 @@ import { eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { githubConnection } from '../db/schema.js';
 import { type FetchLike, refreshOAuthAccessToken } from '../lib/github.js';
-import type { UserToken } from '../lib/github-token.js';
+import { isAppToken, type UserToken } from '../lib/github-token.js';
 import { nowMs } from '../lib/ids.js';
 import { SecretBoxError } from '../lib/secret-box.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -21,6 +21,7 @@ export interface GithubConnectionDeps {
 
 export interface GithubTokenDeps {
   db: Db;
+  githubAppTokenSocket?: string | null;
   box?: SecretBox | undefined;
   githubFetch?: FetchLike | undefined;
   oauthClient?: OAuthClientConfig | null | undefined;
@@ -199,8 +200,9 @@ function refreshConnectionToken(
 
 export function refreshingGithubFetch(deps: GithubTokenDeps, inner: FetchLike): FetchLike {
   return async (input, init) => {
-    const res = await inner(input, init);
     const header = init?.headers?.authorization;
+    if (header?.startsWith('Bearer ') && isAppToken(header.slice(7))) return inner(input, init);
+    const res = await inner(input, init);
     if (res.status !== 401 || deps.box === undefined || !header?.startsWith('Bearer ')) return res;
     const box = deps.box;
     const rejected = header.slice('Bearer '.length);

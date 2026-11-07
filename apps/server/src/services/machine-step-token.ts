@@ -2,14 +2,15 @@ import type { GitCredentials, MachineTokenResponse, ProviderConfig } from '@cair
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, chiefThread, step, todo } from '../db/schema.js';
+import { isAppToken } from '../lib/github-token.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
   resolveChiefStepCredentials,
   resolveStepCredentials,
 } from './credentials.js';
-import { projectOfTodo } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { githubRepoOfProject, projectOfTodo } from './git.js';
+import { autonomousToken } from './github-autonomous-token.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -41,10 +42,19 @@ export async function stepToken(
   if (projectRow?.repoKind === 'hosted' && todoRow) {
     git = issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId });
   } else if (projectRow?.repoKind === 'github' && todoRow) {
-    const githubToken = await githubTokenOrNull(deps, todoRow.teamId);
+    const ref = githubRepoOfProject(projectRow);
+    const githubToken = ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref);
+    console.info('github step credential', {
+      stepId,
+      kind: githubToken === null ? 'none' : isAppToken(githubToken) ? 'app' : 'unattributed',
+    });
     git =
       githubToken !== null
-        ? { username: GITHUB_ACCESS_TOKEN_USERNAME, password: githubToken }
+        ? {
+            username: GITHUB_ACCESS_TOKEN_USERNAME,
+            password: githubToken,
+            kind: isAppToken(githubToken) ? 'app' : 'unattributed',
+          }
         : null;
   }
   return {

@@ -5,16 +5,17 @@ import { and, desc, eq } from 'drizzle-orm';
 import { autonomousMergeAdmission, build, project, team, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
 import { type FetchLike, githubPull, isFullSha } from '../lib/github.js';
+import type { AutonomousToken } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
+import { autonomousToken } from './github-autonomous-token.js';
 import { brakeRequest, pauseGithubRepo } from './github-autonomy-brake.js';
-import { githubTokenOrNull } from './github-connection.js';
 
 export async function prepareRecoveryBranch(
   url: string,
   base: string,
   reverted: string,
-  token: string,
+  token: AutonomousToken,
 ): Promise<string> {
   if (!isFullSha(base) || !isFullSha(reverted)) throw new Error('Recovery requires full SHAs');
   const dir = await mkdtemp(join(tmpdir(), 'cairn-recovery-'));
@@ -117,7 +118,11 @@ export async function recoverRedAutonomousMain(
     const repo = `${target.owner}/${target.repo}`;
     if (seen.has(repo)) continue;
     seen.add(repo);
-    const token = await githubTokenOrNull(deps, row.admission.teamId);
+    const token = await autonomousToken(
+      { ...deps, githubFetch: fetchImpl },
+      row.admission.teamId,
+      target,
+    );
     if (token === null) continue;
     const mainResponse = await brakeRequest(fetchImpl, token, repo, 'branches/main');
     if (!mainResponse.ok) continue;

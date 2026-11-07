@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -45,4 +45,30 @@ test('current importers and new branded providers remain importable without disa
   expect(lint('apps/server/src/services/schedules.ts').status).toBe(0);
   expect(lintFixture("import { userTokenOrNull } from './github-connection.js';").status).toBe(0);
   expect(lintFixture("import x from 'simple-git';").status).toBe(1);
+});
+
+test('former migration allowlist no longer exempts any legacy getter importer', () => {
+  const config = JSON.parse(readFileSync(join(root, 'biome.json'), 'utf8')) as {
+    overrides: { includes: string[] }[];
+  };
+  for (const path of [
+    'routes-resources',
+    'services/builds',
+    'services/pr-watch',
+    'services/ci-loop',
+    'services/issue-intake',
+    'services/machine-step-token',
+    'services/merge-gate-run',
+    'services/todos',
+    'services/scheduler',
+  ]) {
+    expect(
+      config.overrides.some((rule) => rule.includes.includes(`!apps/server/src/${path}.ts`)),
+    ).toBe(false);
+    const result = lintFixture(
+      "import { githubTokenOrNull as legacy } from './github-connection.js';",
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr.includes('noRestrictedImports')).toBe(true);
+  }
 });

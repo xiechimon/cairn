@@ -5,8 +5,14 @@ import {
   reviewFindingBadge,
 } from '@cairn/shared';
 import { z } from 'zod';
-import { type FetchLike, GithubRateLimitedError, githubGraphql } from './github.js';
+import {
+  type FetchLike,
+  GithubRateLimitedError,
+  githubGraphql,
+  githubGraphqlRead,
+} from './github.js';
 import { githubApiBaseUrl } from './github-api-base.js';
+import { type AutonomousToken, githubTokenFetch } from './github-token.js';
 
 const pageInfo = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 const pullSchema = z.object({
@@ -72,7 +78,7 @@ export async function githubPrReviewFindings(
         }),
       })
       .parse(
-        await githubGraphql(fetch, token, query, {
+        await githubGraphqlRead(fetch, token, query, {
           owner,
           name: repo,
           number,
@@ -125,7 +131,7 @@ export async function githubPrReviewFindings(
 
 export async function githubSetPullDraft(
   fetch: FetchLike,
-  token: string,
+  token: AutonomousToken,
   id: string,
   draft: boolean,
 ): Promise<void> {
@@ -143,7 +149,7 @@ export async function githubSetPullDraft(
 
 export async function githubSetReviewHoldLabel(
   fetch: FetchLike,
-  token: string,
+  token: AutonomousToken,
   id: string,
   labelId: string,
   add: boolean,
@@ -160,12 +166,12 @@ export async function githubSetReviewHoldLabel(
 
 export async function githubCreateReviewHoldLabel(
   fetch: FetchLike,
-  token: string,
+  token: AutonomousToken,
   owner: string,
   repo: string,
 ): Promise<void> {
   const url = `${githubApiBaseUrl()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/labels`;
-  const response = await fetch(url, {
+  const response = await githubTokenFetch(fetch, token)(url, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${token}`,

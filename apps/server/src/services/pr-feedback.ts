@@ -7,7 +7,7 @@ import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import { githubRepoOfProject } from './git.js';
-import { teamGithubToken } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import { publishStepRow } from './quota-wait.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -69,11 +69,11 @@ export function createPrFeedbackPoller(
               continue;
             const ref = githubRepoOfProject(target.project);
             if (ref === null || target.build.prNumber === null) continue;
-            const access = await teamGithubToken(deps, target.todo.teamId);
-            if (!('token' in access)) continue;
+            const token = await githubReadToken(deps, target.todo.teamId, ref);
+            if (token === null) continue;
             const page = await githubPull(
               cachedFetch,
-              access.token,
+              token,
               ref.owner,
               ref.repo,
               target.build.prNumber,
@@ -82,7 +82,7 @@ export function createPrFeedbackPoller(
             if (pull?.state !== 'open' || pull.merged) continue;
             const snapshot = await githubPrFeedback(
               cachedFetch,
-              access.token,
+              token,
               ref.owner,
               ref.repo,
               target.build.prNumber,
@@ -127,13 +127,13 @@ export function createPrFeedbackPoller(
                   .get()
               )
                 continue;
-              const permissionKey = `${access.token}:${`${ref.owner}/${ref.repo}:${comment.author}`.toLowerCase()}`;
+              const permissionKey = `${token}:${`${ref.owner}/${ref.repo}:${comment.author}`.toLowerCase()}`;
               const cached = permissions.get(permissionKey);
               let allowed = cached && cached.expiresAt > nowMs() ? cached.allowed : undefined;
               if (allowed === undefined) {
                 const permission = await githubCollaboratorPermission(
                   run.githubFetch,
-                  access.token,
+                  token,
                   ref.owner,
                   ref.repo,
                   comment.author,

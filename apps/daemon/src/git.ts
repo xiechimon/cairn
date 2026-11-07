@@ -173,7 +173,12 @@ export async function withGitCredentialFallback(
     return 'integration';
   } catch (err) {
     const first = err instanceof Error ? err.message : String(err);
-    if (err instanceof GitPushHookError || !opts.allowMachineFallback || !isGitAuthFailure(first))
+    if (
+      cred.kind === 'app' ||
+      err instanceof GitPushHookError ||
+      !opts.allowMachineFallback ||
+      !isGitAuthFailure(first)
+    )
       throw err;
     opts.onFallback?.(first);
     try {

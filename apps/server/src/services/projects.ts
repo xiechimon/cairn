@@ -33,7 +33,7 @@ import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
-import { teamGithubToken } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -253,14 +253,9 @@ export async function updateProject(
     const slash = ref.indexOf('/');
     const owner = ref.slice(0, slash);
     const repo = ref.slice(slash + 1);
-    const access = await teamGithubToken(deps, row.teamId);
+    const token = await githubReadToken(deps, row.teamId, { owner, repo });
     const fetchImpl = deps.githubFetch ?? fetch;
-    const probe = await githubRepoReachable(
-      fetchImpl,
-      'token' in access ? access.token : null,
-      owner,
-      repo,
-    );
+    const probe = await githubRepoReachable(fetchImpl, token, owner, repo);
     if (!probe.reachable) {
       throw new HttpError(400, `invalid body at githubRepo: repository not reachable: ${ref}`);
     }

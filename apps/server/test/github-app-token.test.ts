@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterEach, expect, expectTypeOf, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../src/config.js';
+import { type FetchLike, githubCreateCommitStatus } from '../src/lib/github.js';
 import { type AppToken, tokenValue, type UserToken } from '../src/lib/github-token.js';
 import { appGithubFetch, appTokenOrNull } from '../src/services/github-app-token.js';
 import * as connection from '../src/services/github-connection.js';
@@ -279,4 +280,64 @@ test('injected fetch handles listing and App requests with redirects disabled', 
   expect(fetchImpl).toHaveBeenCalledTimes(2);
   for (const call of fetchImpl.mock.calls) expect(call[1]).toMatchObject({ redirect: 'error' });
   expect(globalFetch).not.toHaveBeenCalled();
+});
+
+test('typed status transport re-mints once on App 401 and never uses a user credential', async () => {
+  const { deps, refreshes } = await mint();
+  const identities: boolean[] = [];
+  const upstream = vi.fn<FetchLike>(async (input, init) => {
+    if (String(input).includes('/installation/repositories')) return installed();
+    identities.push(/^Bearer app-[12]$/.test(init?.headers?.authorization ?? ''));
+    return Response.json({ message: 'Bad credentials' }, { status: 401 });
+  });
+  const token = await appTokenOrNull({ ...deps, fetchImpl: upstream }, repo);
+  expect(token !== null).toBe(true);
+  if (token === null) throw new Error('fixture App unavailable');
+  const result = await githubCreateCommitStatus(
+    upstream,
+    token,
+    repo.owner,
+    repo.repo,
+    'a'.repeat(40),
+    { state: 'success', context: 'test', description: '' },
+    { timeoutMs: 1000 },
+  );
+  expect(result).toMatchObject({ kind: 'failed', failure: { kind: 'status', status: 401 } });
+  expect(identities).toEqual([true, true]);
+  expect(refreshes).toEqual([false, true]);
+});
+
+test('shared installation token retains the requested repository on refresh after another repo resolves', async () => {
+  const { deps } = await mint();
+  let listing = 0;
+  let writes = 0;
+  const upstream: FetchLike = async (input) => {
+    if (String(input).includes('/installation/repositories')) {
+      listing++;
+      return Response.json({
+        total_count: listing === 1 ? 2 : 1,
+        repositories: [
+          ...(listing === 1 ? [{ full_name: 'octo/alpha' }] : []),
+          { full_name: 'octo/beta' },
+        ],
+      });
+    }
+    writes++;
+    return new Response(null, { status: 401 });
+  };
+  const injected = { ...deps, fetchImpl: upstream };
+  const token = await appTokenOrNull(injected, repo);
+  await appTokenOrNull(injected, { owner: 'octo', repo: 'beta' });
+  if (token === null) throw new Error('fixture App unavailable');
+  await githubCreateCommitStatus(
+    upstream,
+    token,
+    repo.owner,
+    repo.repo,
+    'a'.repeat(40),
+    { state: 'success', context: 'test', description: '' },
+    { timeoutMs: 1000 },
+  );
+  expect(listing).toBe(2);
+  expect(writes).toBe(1);
 });

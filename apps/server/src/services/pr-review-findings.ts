@@ -9,6 +9,7 @@ import {
   githubSetPullDraft,
   githubSetReviewHoldLabel,
 } from '../lib/github-review-findings.js';
+import { type AutonomousToken, githubTokenFetch } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
 
@@ -44,13 +45,14 @@ export async function reconcilePrReviewFindings(
   input: {
     row: typeof threadPr.$inferSelect;
     fetch: FetchLike;
-    token: string;
+    token: AutonomousToken;
     owner: string;
     repo: string;
     now: number;
   },
 ): Promise<PrReviewFinding[]> {
-  const { row, fetch, token, owner, repo, now } = input;
+  const { row, fetch: inner, token, owner, repo, now } = input;
+  const fetch = githubTokenFetch(inner, token, { owner, repo });
   if (row.dismissed) return [];
   const pull = await githubPrReviewFindings(fetch, token, owner, repo, row.number);
   if (pull.state !== 'OPEN') return [];

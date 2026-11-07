@@ -28,6 +28,7 @@ import {
   stopActiveStepsAfterExit,
   stopActiveStepsForArchive,
 } from './services/builds.js';
+import { userTokenOrNull } from './services/github-connection.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
 import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
@@ -47,7 +48,11 @@ import {
 } from './services/todos.js';
 
 export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
-  const svc = svcOf(ctx);
+  const base = svcOf(ctx);
+  const svc = {
+    ...base,
+    githubWriteTokenForRepo: (teamId: string) => userTokenOrNull(base, teamId),
+  };
 
   app.get('/api/todos/:id/github-issue', async (c) => {
     const echo = await readSourceIssueEcho(githubIssueDepsOf(ctx), c.req.param('id'));
