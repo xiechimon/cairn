@@ -5,6 +5,7 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
+  chiefMessage,
   chief as chiefTable,
   chiefThread,
   notification as notificationTable,
@@ -169,6 +170,29 @@ describe('chief unread badge (#1303)', () => {
     );
     const wake = await w.claim();
     await w.done(wake.step.id, '关口汇报：方案已停住。');
+    expect(chiefNotif(w.s, w.threadId)?.readAt).toBeNull();
+    expect(await unreadChief(w.s, w.teamId)).toContain(w.threadId);
+  });
+
+  test('a wake turn that consumed a composer message notifies its answer', async () => {
+    const w = await setupTurn('回头提醒');
+    w.s.db
+      .update(stepTable)
+      .set({ prompt: '[wake:wake] 回头核实任务状态并向用户汇报。' })
+      .where(eq(stepTable.buildId, w.threadId))
+      .run();
+    const claimed = await w.claim();
+    w.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'steered-user-1',
+        threadId: w.threadId,
+        role: 'user',
+        content: '顺便看下空列',
+        createdAt: Date.now() + 1,
+      })
+      .run();
+    await w.done(claimed.step.id, '空列没问题。');
     expect(chiefNotif(w.s, w.threadId)?.readAt).toBeNull();
     expect(await unreadChief(w.s, w.teamId)).toContain(w.threadId);
   });

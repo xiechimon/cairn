@@ -17,7 +17,7 @@ import {
 } from './chief.js';
 import { CHIEF_DIGEST_SYSTEM_PROMPT, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
-import { recordChiefStop } from './chief-turns.js';
+import { recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from './machine-deps.js';
 import { injectMemories } from './memory.js';
 import { stepScopeProjectId } from './picked-project.js';
@@ -118,7 +118,13 @@ export function finishCoordinatorTurn(
     '回合已结束',
   );
   finishChiefTurn(deps, stepRow.buildId, outcome);
-  if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId, stepRow.prompt);
+  if (outcome.status === 'success')
+    notifyChiefTurn(
+      deps,
+      stepRow.buildId,
+      stepRow.prompt,
+      steeredMessageScopes(deps.db, stepRow).length > 0,
+    );
   if (outcome.status === 'failed') recoverGateWake(deps, stepRow);
   if (outcome.status === 'failed' && outcome.errorMessage) {
     upsertChiefRow(deps, {

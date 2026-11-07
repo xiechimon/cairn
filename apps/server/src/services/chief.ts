@@ -1637,8 +1637,9 @@ export function notifyChiefTurn(
   deps: ChiefDeps,
   threadId: string,
   stepPrompt?: string | null,
+  consumedUserMessage = false,
 ): void {
-  if (parseChiefTrigger(stepPrompt ?? null) !== 'user') return;
+  if (parseChiefTrigger(stepPrompt ?? null) !== 'user' && !consumedUserMessage) return;
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) return;
   const last = deps.db
