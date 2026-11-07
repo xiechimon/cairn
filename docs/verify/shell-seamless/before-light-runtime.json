@@ -14,8 +14,11 @@
     },
     "background": "rgb(230, 231, 225)",
     "shadow": "none",
-    "overflowX": "hidden",
-    "padding": "12px 12px 10px"
+    "padding": "12px 12px 10px",
+    "borderWidth": "0px",
+    "borderColor": "rgb(29, 35, 31)",
+    "borderStyle": "solid",
+    "radius": "0px"
   },
   "sheet": {
     "rect": {
@@ -30,40 +33,49 @@
     },
     "background": "rgb(246, 246, 242)",
     "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(29, 35, 31, 0.06) 0px 1px 2px 0px, rgba(29, 35, 31, 0.06) 0px 2px 8px 0px, rgb(220, 223, 215) 0px 0px 0px 1px",
-    "overflowX": "hidden",
-    "padding": "0px"
+    "padding": "0px",
+    "borderWidth": "0px",
+    "borderColor": "rgb(29, 35, 31)",
+    "borderStyle": "solid",
+    "radius": "14px"
   },
   "tray": {
     "rect": {
       "x": 266,
-      "y": 624.015625,
+      "y": 668.015625,
       "width": 728,
-      "height": 149.984375,
-      "top": 624.015625,
+      "height": 105.984375,
+      "top": 668.015625,
       "right": 994,
       "bottom": 774,
       "left": 266
     },
     "background": "rgba(0, 0, 0, 0)",
     "shadow": "none",
-    "overflowX": "auto",
-    "padding": "0px"
+    "padding": "0px",
+    "borderWidth": "0px",
+    "borderColor": "rgb(29, 35, 31)",
+    "borderStyle": "solid",
+    "radius": "0px"
   },
   "row": {
     "rect": {
       "x": 266,
-      "y": 648,
+      "y": 692,
       "width": 728,
       "height": 38,
-      "top": 648,
+      "top": 692,
       "right": 994,
-      "bottom": 686,
+      "bottom": 730,
       "left": 266
     },
     "background": "rgb(253, 253, 251)",
     "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(29, 35, 31, 0.06) 0px 1px 2px 0px, rgba(29, 35, 31, 0.06) 0px 2px 8px 0px, rgb(220, 223, 215) 0px 0px 0px 1px",
-    "overflowX": "visible",
-    "padding": "6px 12px"
+    "padding": "6px 12px",
+    "borderWidth": "0px",
+    "borderColor": "rgb(220, 223, 215)",
+    "borderStyle": "solid",
+    "radius": "14px"
   },
   "panel": {
     "rect": {
@@ -78,7 +90,10 @@
     },
     "background": "rgb(246, 246, 242)",
     "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(220, 223, 215) 1px 0px 0px 0px inset",
-    "overflowX": "visible",
-    "padding": "0px"
+    "padding": "0px",
+    "borderWidth": "0px",
+    "borderColor": "rgb(29, 35, 31)",
+    "borderStyle": "solid",
+    "radius": "0px"
   }
 }

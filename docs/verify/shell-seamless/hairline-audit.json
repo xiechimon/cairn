@@ -1,0 +1,23 @@
+{
+  "base": "aa9eb3f40a29ce3b1c42df7429a32d2d45f4e15c",
+  "reviewedHead": "a4740d0a60ce6d75903ea2873a098e4ed3898d83",
+  "removedHairlineCarriers": [
+    "        className=\"side-panel relative flex w-(--side-panel-w) min-w-0 flex-none flex-col bg-background shadow-[inset_1px_0_0_var(--border)] max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-(--z-panel-low) max-[1100px]:w-[min(420px,100%)] max-[1100px]:shadow-(--floating-shadow) max-[640px]:w-full\"",
+    "  'relative isolate my-2 mr-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) bg-background shadow-(--e1) max-[640px]:m-0 max-[640px]:rounded-none max-[640px]:shadow-none';"
+  ],
+  "decisions": [
+    {
+      "element": "SHEET_PANEL",
+      "removed": "shadow-(--e1)",
+      "restore": "border border-border; retain rounded-(--radius-card)",
+      "omit": "shadow pool that painted the gutter; mobile stays borderless like main"
+    },
+    {
+      "element": "SidePanel",
+      "removed": "shadow-[inset_1px_0_0_var(--border)]",
+      "restore": "border-l border-border on desktop",
+      "omit": "no added shadow; overlay keeps existing floating skin"
+    }
+  ],
+  "otherRemovedBorderDivideRingClasses": []
+}

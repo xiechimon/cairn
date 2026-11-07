@@ -1,51 +1,62 @@
-# Shell continuity verification
+# Shell continuity and hairline verification
 
-Base: `749f36b74e21db2872e3c5c07992137171bf2519` plus the uncommitted shell-seamless changes. No commit, push, dependency installation or lockfile change was made.
+Follow-up to #3341. Changes remain uncommitted in `web/shell-seamless`; no push, PR operation, dependency installation or lockfile change was made.
 
-## Runtime evidence
+## Live comparison
 
-The main evidence comes from a real isolated server with scratch SQLite records for confirm, failed and review threads. The browser loads `/app?thread=shell-3`, with no scenario query or API interception. The model source is not configured and no provider is called. The Coordinator shows a seeded user turn and assistant reply; the decision tray, right thread, action card and both composers are real app components backed by the seeded server. Separate fixture captures exercise a populated conversation and a pending question.
+The full-page captures show the running app at 1440×900, with the thread panel open, a seeded Coordinator exchange, two decision rows, a review action and both composers. The isolated server uses scratch SQLite with auth off; no scenario URL, API interception or provider call is used. The failed seed was automatically requeued by the real server and is visible under in-progress. The two remaining decision rows exercise the same tray as the fixture's three rows.
 
-| State | Before | After | Observed result |
+| State | Main | Line-free PR head | Restored hairlines |
 |---|---|---|---|
-| 1440 light, review thread open | ![Before light](before-light.png) | ![After light](after-light.png) | Canvas gutter is continuous; sheet starts at x=256 instead of 248. |
-| 1440 dark, review thread open | ![Before dark](before-dark.png) | ![After dark](after-dark.png) | No outer sheet ring/shadow or desktop panel separator. |
-| Decision edges, light | ![Before edge](before-light-edge.png) | ![After edge](after-light-edge.png) | Rounded left ring and shadow are fully visible. |
-| Decision edges, dark | ![Before edge](before-dark-edge.png) | ![After edge](after-dark-edge.png) | The first and last row edges have room inside the scrollport. |
+| Light | ![Main light](before-light.png) | ![PR light](before-lines-light.png) | ![Fixed light](after-light.png) |
+| Dark | ![Main dark](before-dark.png) | ![PR dark](before-lines-dark.png) | ![Fixed dark](after-dark.png) |
 
-The left-edge crops are captured at device scale 2 for inspection. Before screenshots use a separately compiled copy of the original three components; after screenshots use the working changes.
+Before uses the three original components read from `origin/main`; before-lines uses their committed PR versions. Each source swap is restored in a `finally` block. A browser condition requires the expected border/shadow/inset for each stage before capturing. After uses this worktree's final components. The browser waits for the seeded assistant reply and fonts before taking a full-page screenshot. Each stage's `*-runtime.json` records actual computed styles and bounds.
 
-The `before-*-runtime.json` and `after-*-runtime.json` files record live computed styles and bounding boxes. The sidebar colors are `rgb(230, 231, 225)` in light and `rgb(20, 23, 21)` in dark. The sheet has 8px margins on all sides after accounting for the sidebar. The tray's padding changes from 0px to 8px; its row width remains aligned with the composer. The panel and sheet now both report `box-shadow: none` on desktop.
+The final sheet is at x=256, y=8, 1176×884, with a 14px radius and 1px solid border. Its desktop panel is 420×882 inside that border and has a 1px solid left divider. Both lines resolve to `rgb(220, 223, 215)` in light and `rgb(53, 59, 54)` in dark, the same `--border` token used by main. Both desktop shadows are `none`. The 8px gutter remains canvas-colored; the tray retains 8px symmetric row clearance. A real border consumes 1px on each edge, so tests measure composer spacing from the inner sheet floor and page-column width excludes the two border pixels.
 
-## Fixture coverage and references
+## Separator audit
 
-| State | Evidence | Review |
+The complete source diff against main changes only the tray, sheet and SidePanel. `hairline-audit.json` preserves the audited head/base and removed line carriers.
+
+| Element / removed carrier | Decision | Reason |
 |---|---|---|
-| Populated conversation and pending question, 1440 light | [Before](before-light-fixture.png), [after](after-light-fixture.png) | Full decision rings, composer and question card remain aligned. |
-| Populated conversation and pending question, 1440 dark | [Before](before-dark-fixture.png), [after](after-dark-fixture.png) | Same rounded edges on the dark sheet. |
-| 390 light, thread closed / open | [Home](after-390-light-fixture.png), [thread](after-390-light-thread-fixture.png) | No horizontal overflow; complete row, action and composer borders. |
-| 390 dark, thread closed / open | [Home](after-390-dark-fixture.png), [thread](after-390-dark-thread-fixture.png) | Same full-width phone behavior and visible borders. |
-| Claude.ai reference | [Reference](../../design/references/coordinator-chat/claude-ai-empty-composer.jpg), [ours light](after-light.png), [ours dark](after-dark.png) | Quiet canvas and contained composer; Cairn retains the owner's inset sheet and denser decision tray. |
-| t3code thread reference | [Reference](../../design/references/thread-review/t3code-done-changed-file-card.png), [ours](after-390-light-thread-fixture.png) | Thread cards and composer fit their column; Cairn retains its own action card. |
+| Sheet `shadow-(--e1)` | Restore its 1px ring as `border border-border`; keep `rounded-(--radius-card)` | The token contains both a shadow pool and the structural ring. Only the pool painted the gutter band; restore the line without that pool. |
+| SidePanel `shadow-[inset_1px_0_0_var(--border)]` | Restore as desktop `border-l border-border` | It was the conversation/thread divider. Keep existing floating overlay skin below 1100px, where main also replaced the inset shadow. |
+| Mobile sheet `max-[640px]:shadow-none` | Replace with `max-[640px]:border-0` | Main's edge-to-edge mobile sheet had no ring; retain that behavior. |
+| Other removed `border`, `border-l`, `border-r`, `divide-*`, `ring-1` | None found | Header, row, action-card and composer separators remain untouched. |
+| Tray scrollport | Retain `p-2` and expanded scrollport width | Reserves room for external row rings and prevents left clipping. |
 
-Rules checked: P1, P3, P5, V1, V4, V7, V8, R1. All screenshots above were opened for visual review. The two updated SidePanel gallery baselines were each inspected before and after acceptance. Only the intended desktop left edge is removed; dimensions and content stay the same.
+## References and states
 
-## Tests and limits
+| State / reference | Ours | Verdict |
+|---|---|---|
+| Coordinator / Claude.ai, light | ![Reference and ours light](reference-light.png) | Quiet canvas and contained composer; Cairn retains the owner's bordered sheet and denser tray. The populated conversation is less sparse than the empty reference. |
+| Coordinator / Claude.ai, dark | ![Reference and ours dark](reference-dark.png) | Hairlines preserve the two columns without elevation; the reference has no equivalent decision tray. |
+
+Rules checked: P1/P3/P5, V1/V4/V7/V8, R1. Reference shots for Coordinator and thread review were reopened. The four main before/after shots, line-free comparison, reference montages, refreshed fixture shots and both old/new SidePanel baselines were visually inspected. Original before-fixture captures and fixture edge crops from the first pass remain as historical evidence; refreshed final fixture captures are labelled fixture and supplement the live shots. Main live edge crops were regenerated from the new full-page screenshots.
+
+## Validation
 
 | Command | Result |
 |---|---|
-| `E2E_PORT=8399 pnpm --filter @cairn/web e2e chief-home-shell-seamless.spec.ts --workers=1` before fixing | 8 failed: gutter color/inset, sheet/panel elevation, and clipped row rings. |
-| Same regression after fixing | 8 passed. |
+| New 1440 light/dark hairline assertions, before implementation | 2 failed: both card and divider were 0px. |
+| Focused shell, page shell and Coordinator panel e2e | 27 passed. |
 | `pnpm exec vitest run --changed` | 3 files, 15 tests passed. |
 | `pnpm lint` | Passed. |
-| `pnpm typecheck` | All workspace packages passed. |
-| `pnpm spec:parse` | 1497 web tests in 212 specs and 70 integration files parsed. |
-| `E2E_PORT=8499 pnpm --filter @cairn/web e2e:affected` | Shared SidePanel triggered full fallback: 1474 passed, 20 skipped, 3 failed. |
-| `E2E_PORT=8499 pnpm --filter @cairn/web e2e chief-panel.spec.ts chief-home-shell-seamless.spec.ts paper-board-sheet.spec.ts --workers=2` | 25 passed after updating the old one-sided sheet-width expectation. |
-| Focused SidePanel gallery screenshot comparison using the existing gallery capture algorithm | 2 passed against the updated light/dark baselines. |
+| `pnpm typecheck` | Passed in all workspace packages. |
+| `pnpm spec:parse` | 1502 web tests / 212 specs and 70 integration files parsed. |
+| `E2E_PORT=8499 pnpm --filter @cairn/web e2e:affected` | Interrupted with SIGTERM / exit 143 before its summary; rerun sequentially as four affected shards. |
+| Affected `--shard=1/4` | 333 passed, 20 skipped, 2 gallery aggregates failed; both SidePanel comparisons passed. |
+| Affected `--shard=2/4` | 413 passed, including the initially failing long-reply case. |
+| Affected `--shard=3/4` | 382 passed. |
+| Affected `--shard=4/4` | 352 passed, including all four inner-floor composer-gap cases. |
+| All affected shards | 1480 passed, 20 skipped, 2 gallery aggregates failed; all 1502 selected tests completed. |
 
-The remaining two failures are the light/dark gallery aggregate comparisons, which include unrelated text raster differences. The original three components were compiled from HEAD into a separate cache output directory, restoring the working files in a `finally` block. In both themes, the original-code `sizes-2` control screenshot is pixel-identical to the failed post-change screenshot (`compare -metric AE`: 0). Both differ from the repository baseline. This establishes pre-existing drift for that unchanged specimen, without accepting unrelated snapshots. The `gallery-original-code-{light,dark}.png` and `gallery-current-code-{light,dark}.png` pairs preserve this control evidence. Other gallery differences still need the orchestrator's CI comparison.
+Live: isolated server on 8791, web on 5273, seeded SQLite and Coordinator exchange; full-page 1440 light/dark with thread panel open.
+Mocked: fixture e2e, pending question and 390px captures; no real providers were called by the screenshot run.
+Not covered: production data, real providers, CI rendering, dedicated loading/error screenshots; gallery aggregates remain red; production/CI verification is still outstanding.
 
-Live: isolated server, seeded decision tray, review thread, action card and composers, light/dark at 1440.
-Mocked: populated conversation, pending question, 390px and regression e2e use fixtures; no model invocation.
-Not covered: production data, provider execution, CI rendering, dedicated empty/loading/error screenshot matrix.
+The initially failing Activity clock and long-reply cases passed in the completed shards without changes to those tests or their implementation. The two remaining gallery aggregates include 111 light and 101 dark unaccepted specimen differences; neither includes SidePanel. `gallery-drift.json` records their names. No broader baseline refresh was accepted. Earlier original-code/control images remain historical evidence; this follow-up does not claim a new original-code control for every gallery specimen. `validation.json` records all four completion summaries and limits.
+
+The handoff body passes local section, coverage-line, baseline-verdict, English-only and task checks, with 236 prose characters. Image HTTP reachability is deferred until the orchestrator publishes the uncommitted images and SHA-pins their links; it is not claimed as passing.

@@ -18,3 +18,10 @@ Failure modes: sheet shadow paints a band over canvas; missing left margin break
 Plan: establish failing geometric e2e, capture before, remove shell elevation and provide even inset, reserve scroll padding for row elevation, check pane/composers, run affected checks, capture and inspect after, prepare handoff files.
 
 Acceptance: gutter effective computed background equals sidebar in both themes; 8px sheet inset on desktop; rows have symmetric 8px clearance inside scrollport; card/composer edges fit every clipping ancestor; pane shares sheet top/bottom without another shadow; 390px has no horizontal overflow.
+
+## Hairline restoration follow-up (#3341)
+
+Goal: retain the continuous canvas gutter and unclipped decision rows while restoring main's structural hairlines, without shadows.
+Reference: origin/main's `--e1` ends in a 1px `--border` ring; SidePanel used an inset 1px `--border` divider. Keep the 14px card radius and use real borders instead of their shadow implementations. The existing reference shots were reopened for this follow-up; no new surface or draft is needed.
+Failure modes: removing elevation also removes its embedded ring; missing divider merges the two columns; a transparent or background-colored border passes a width-only check; real borders reduce inner geometry by 2px; an overlay border changes phone layout; restoring the old elevation repaints the gutter; changing tray padding reintroduces clipping.
+Acceptance: main card four sides and desktop panel left side compute to 1px solid `--border` in 1440 light/dark; no desktop shadows; existing gutter, tray clearance, 390px overflow and composer clipping assertions stay green. Full-page live captures show the open thread in both themes, compared with main and the line-free PR head.

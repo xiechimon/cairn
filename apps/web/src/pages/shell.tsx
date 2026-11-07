@@ -8,7 +8,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
 
 export const SHEET_PANEL =
-  'relative isolate m-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) bg-background max-[640px]:m-0 max-[640px]:rounded-none';
+  'relative isolate m-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) border border-border bg-background max-[640px]:m-0 max-[640px]:rounded-none max-[640px]:border-0';
 
 export const EmbeddedShell = createContext(false);
 

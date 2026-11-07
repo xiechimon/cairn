@@ -8,6 +8,53 @@ for (const theme of ['light', 'dark'] as const) {
       reducedMotion: 'reduce',
     });
 
+    test('sheet border and conversation divider remain visible at one CSS pixel', async ({ page }) => {
+      await page.goto('/app?scenario=home-c&thread=home-c-review');
+      await expect(page.getByTestId('side-chat')).toBeVisible();
+      const lines = await page.evaluate(() => {
+        const sheet = document.querySelector('.board-sheet');
+        const panel = document.querySelector('.side-panel');
+        if (!sheet || !panel) throw new Error('Missing shell');
+        const card = sheet.getBoundingClientRect();
+        const pane = panel.getBoundingClientRect();
+        const token = document.createElement('div');
+        token.style.borderColor = 'var(--border)';
+        document.body.append(token);
+        const color = getComputedStyle(token).borderColor;
+        token.remove();
+        const border = getComputedStyle(sheet);
+        const divider = getComputedStyle(panel);
+        return {
+          color,
+          cardBackground: border.backgroundColor,
+          panelBackground: divider.backgroundColor,
+          widths: [border.borderTopWidth, border.borderRightWidth, border.borderBottomWidth, border.borderLeftWidth],
+          colors: [border.borderTopColor, border.borderRightColor, border.borderBottomColor, border.borderLeftColor],
+          styles: [border.borderTopStyle, border.borderRightStyle, border.borderBottomStyle, border.borderLeftStyle],
+          radius: border.borderRadius,
+          dividerWidth: divider.borderLeftWidth,
+          dividerColor: divider.borderLeftColor,
+          dividerStyle: divider.borderLeftStyle,
+          dividerHeight: pane.height,
+          dividerInsideSheet: pane.left > card.left && pane.right <= card.right,
+          visible: divider.visibility === 'visible' && divider.display !== 'none' && divider.opacity === '1',
+        };
+      });
+      expect.soft(lines.widths).toEqual(['1px', '1px', '1px', '1px']);
+      expect.soft(lines.colors).toEqual(Array(4).fill(lines.color));
+      expect.soft(lines.styles).toEqual(Array(4).fill('solid'));
+      expect.soft(lines.color).not.toMatch(/transparent|rgba\([^)]*, 0\)/);
+      expect.soft(lines.color).not.toBe(lines.cardBackground);
+      expect.soft(lines.color).not.toBe(lines.panelBackground);
+      expect.soft(lines.radius).toBe('14px');
+      expect.soft(lines.dividerWidth).toBe('1px');
+      expect.soft(lines.dividerColor).toBe(lines.color);
+      expect.soft(lines.dividerStyle).toBe('solid');
+      expect.soft(lines.dividerHeight).toBeGreaterThan(800);
+      expect.soft(lines.dividerInsideSheet).toBe(true);
+      expect(lines.visible).toBe(true);
+    });
+
     test('sidebar and inset sheet share one unpainted canvas gutter', async ({ page }) => {
       await page.goto('/app?scenario=home-c&thread=home-c-review');
       await expect(page.getByTestId('side-chat')).toBeVisible();
@@ -42,7 +89,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect.soft([canvas.top, canvas.bottom, canvas.right]).toEqual([8, 8, 8]);
       expect.soft(canvas.shadow).toBe('none');
       expect.soft(canvas.panelShadow).toBe('none');
-      expect([canvas.panelTop, canvas.panelBottom]).toEqual([8, 0]);
+      expect([canvas.panelTop, canvas.panelBottom]).toEqual([9, -1]);
     });
 
     test('needs-you borders have symmetric room inside their scrollport', async ({ page }) => {

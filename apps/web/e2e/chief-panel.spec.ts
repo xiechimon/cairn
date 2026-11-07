@@ -10,7 +10,7 @@ async function settled(page: Page) {
 
 const WIN_BOX = { x: 1440 - 8 - 380, y: 732 - 8 - 600, width: 380, height: 600 };
 
-const SHEET_W = 1440 - 248 - 16;
+const SHEET_W = 1440 - 248 - 16 - 2;
 
 test.describe('chief panel floating form (ADR 0013)', () => {
   test('Esc never closes the panel on a page route (D3)', async ({ page }) => {

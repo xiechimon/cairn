@@ -1,0 +1,76 @@
+{
+  "lint": "passed",
+  "typecheck": "passed",
+  "specParse": "passed: 1502 web tests in 212 specs; 70 integration files",
+  "changedUnitTests": {
+    "files": 3,
+    "passed": 15
+  },
+  "focusedShellE2e": {
+    "passed": 27
+  },
+  "negativeControl": {
+    "newHairlineTestsFailedBeforeFix": 2
+  },
+  "affected": {
+    "initialRunExitCode": 143,
+    "initialRunComplete": false,
+    "shards": [
+      {
+        "command": "E2E_PORT=8499 pnpm --filter @cairn/web e2e:affected --shard=1/4",
+        "counts": {
+          "passed": 333,
+          "failed": 2,
+          "skipped": 20
+        },
+        "exitCode": 1,
+        "log": "/tmp/shell-lines-affected-1.log"
+      },
+      {
+        "command": "E2E_PORT=8499 pnpm --filter @cairn/web e2e:affected --shard=2/4",
+        "counts": {
+          "passed": 413,
+          "failed": 0,
+          "skipped": 0
+        },
+        "exitCode": 0,
+        "log": "/tmp/shell-lines-affected-2.log"
+      },
+      {
+        "command": "E2E_PORT=8499 pnpm --filter @cairn/web e2e:affected --shard=3/4",
+        "counts": {
+          "passed": 382,
+          "failed": 0,
+          "skipped": 0
+        },
+        "exitCode": 0,
+        "log": "/tmp/shell-lines-affected-3.log"
+      },
+      {
+        "command": "E2E_PORT=8499 pnpm --filter @cairn/web e2e:affected --shard=4/4",
+        "counts": {
+          "passed": 352,
+          "failed": 0,
+          "skipped": 0
+        },
+        "exitCode": 0,
+        "log": "/tmp/shell-lines-affected-4.log"
+      }
+    ],
+    "totals": {
+      "passed": 1480,
+      "failed": 2,
+      "skipped": 20
+    },
+    "remainingFailures": [
+      "gallery-snapshots: light aggregate",
+      "gallery-snapshots: dark aggregate"
+    ],
+    "sidePanelBaselineComparisons": "light and dark pass within the gallery aggregate"
+  },
+  "limits": [
+    "Gallery aggregates remain red; no unrelated baselines accepted.",
+    "No CI or real provider verification.",
+    "Image asset publishing and SHA pinning belong to the orchestrator."
+  ]
+}
