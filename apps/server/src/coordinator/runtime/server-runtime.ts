@@ -6,6 +6,8 @@ import {
   coordinatorCompactionExtension,
   coordinatorCompactionSettings,
   type ModelRef,
+  type Summarize,
+  summarizerFor,
 } from './compaction.js';
 import type { MachineApi } from './machine-api.js';
 import { type CoordinatorModels, createCoordinatorModels } from './models.js';
@@ -87,11 +89,18 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       volatileContextExtension(volatile),
       coordinatorCompactionExtension(() => summary.ref),
     ];
+    const summarize = (): Summarize | null => {
+      try {
+        return summarizerFor(models.models, summary.ref);
+      } catch {
+        return null;
+      }
+    };
     const harness = openReconciledHarness(
       threadStorePath(config.storageDir, threadId),
       models.models,
       context,
-      { extensions, settings: settings(models) },
+      { extensions, settings: settings(models), summarize },
       forceReseed ? { ...facts, forceReseed: true, hasClaimedStep: false } : facts,
     ).then((result) => {
       config.onReconciled?.(threadId, result.outcome, result.stale);
