@@ -16,6 +16,7 @@ import {
   warnIgnoredTailscaleUsers,
   warnInsecureBind,
 } from './config.js';
+import { migrateSidecarState } from './coordinator/boot-migration.js';
 import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
@@ -24,7 +25,6 @@ import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
   setCoordinatorInServer,
-  setCoordinatorMachineId,
   setCoordinatorServerContextEnabled,
   setCoordinatorWake,
 } from './services/coordinator-context.js';
@@ -90,7 +90,6 @@ seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
 setCoordinatorInServer(config.coordinatorInServer);
-setCoordinatorMachineId(config.coordinatorMachineId);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
@@ -187,6 +186,15 @@ const scheduler = createScheduler(
   }),
   schedulingRunOf(config, { githubFetch, logger }),
 );
+if (config.coordinatorInServer) {
+  migrateSidecarState({
+    machine: { db, hub, machineHub },
+    homeDir: config.homeDir,
+    storageDir: coordinatorStoreDir(config.dataDir),
+    sidecarMachineId: config.coordinatorMachineId,
+    logger,
+  });
+}
 const coordinator = config.coordinatorInServer
   ? startCoordinator({
       machine: {

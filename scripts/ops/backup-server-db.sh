@@ -5,7 +5,8 @@ umask 077
 usage() {
   cat >&2 <<'EOF'
 usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
-         [--attachments <dir> --attachments-out <dir>] [--remote <rsync destination>]
+         [--attachments <dir> --attachments-out <dir>] [--coordinator <dir> --coordinator-out <dir>]
+         [--remote <rsync destination>]
 
   --db               live server DB, copied with sqlite3 .backup and checked with integrity_check
   --out              local directory for server-db-<UTC timestamp>.db.gz, keeping the newest --keep (default 48)
@@ -13,6 +14,10 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
                      DB copy, with the size it records, are copied into --attachments-out, and nothing
                      is ever deleted there; step-sessions/<step>.jsonl is copied as
                      step-sessions/<step>.<mtime>-<sha256 prefix>.jsonl, one file per content
+  --coordinator      in-server Coordinator store directory; each <thread>.sqlite is copied after the server
+                     DB with sqlite3 .backup, checked with integrity_check and written gzipped into
+                     --coordinator-out/coordinator-<UTC timestamp>/, keeping the newest --keep runs. A store
+                     newer than the DB copy is a reconcile case at the next boot, never a restore failure
   --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
                      with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
 
@@ -26,18 +31,22 @@ DB=""
 OUT=""
 ATTACHMENTS=""
 ATTACHMENTS_OUT=""
+COORDINATOR=""
+COORDINATOR_OUT=""
 REMOTE=""
 KEEP=48
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --db | --out | --attachments | --attachments-out | --remote | --keep)
+    --db | --out | --attachments | --attachments-out | --coordinator | --coordinator-out | --remote | --keep)
       [ $# -ge 2 ] && [[ "$2" != -* ]] || { echo "$1 requires a value" >&2; usage; }
       case "$1" in
         --db) DB="$2" ;;
         --out) OUT="$2" ;;
         --attachments) ATTACHMENTS="$2" ;;
         --attachments-out) ATTACHMENTS_OUT="$2" ;;
+        --coordinator) COORDINATOR="$2" ;;
+        --coordinator-out) COORDINATOR_OUT="$2" ;;
         --remote) REMOTE="$2" ;;
         --keep) KEEP="$2" ;;
       esac
@@ -52,6 +61,11 @@ done
 [[ "$KEEP" =~ ^[1-9][0-9]*$ ]] || { echo "--keep must be a positive integer: $KEEP" >&2; usage; }
 if [[ -n "$ATTACHMENTS" && -z "$ATTACHMENTS_OUT" || -z "$ATTACHMENTS" && -n "$ATTACHMENTS_OUT" ]]; then
   echo "--attachments and --attachments-out go together" >&2
+  usage
+fi
+
+if [[ -n "$COORDINATOR" && -z "$COORDINATOR_OUT" || -z "$COORDINATOR" && -n "$COORDINATOR_OUT" ]]; then
+  echo "--coordinator and --coordinator-out go together" >&2
   usage
 fi
 
@@ -94,6 +108,28 @@ echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
     { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) |
     while IFS= read -r f; do rm -f -- "$f" "$f.attachments.sha256" || exit 1; done
 ) || fail "rotate $OUT"
+
+if [ -n "$COORDINATOR" ]; then
+  [ -d "$COORDINATOR" ] || fail "coordinator stores not found: $COORDINATOR"
+  mkdir -p "$COORDINATOR_OUT/coordinator-$ts" || fail "create $COORDINATOR_OUT/coordinator-$ts"
+  stores=0
+  for src in "$COORDINATOR"/*.sqlite; do
+    [ -f "$src" ] || continue
+    base="$(basename "$src")"
+    sqlite3 "$src" ".backup $tmp/$base" || fail "sqlite3 .backup of coordinator store $base"
+    store_check="$(sqlite3 "$tmp/$base" 'PRAGMA integrity_check;')" || fail "integrity_check of coordinator store $base"
+    [ "$store_check" = "ok" ] || fail "integrity_check of coordinator store $base: $store_check"
+    gzip -c "$tmp/$base" > "$COORDINATOR_OUT/coordinator-$ts/$base.gz" || fail "gzip coordinator store $base"
+    rm -f "$tmp/$base"
+    stores=$((stores + 1))
+  done
+  (
+    cd "$COORDINATOR_OUT" &&
+      { ls -1d coordinator-*/ 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) |
+      while IFS= read -r d; do rm -rf -- "$d" || exit 1; done
+  ) || fail "rotate $COORDINATOR_OUT"
+  echo "[$ts] coordinator stores copied: $stores"
+fi
 
 if [ -n "$ATTACHMENTS" ]; then
   mkdir -p "$ATTACHMENTS_OUT" || fail "create $ATTACHMENTS_OUT"

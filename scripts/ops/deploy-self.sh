@@ -76,9 +76,7 @@ HOST_TOOLS_ALARM_TITLE="Host tools differ from main"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
-COORDINATOR_UNIT=cairn-coordinator.service
 ORB_ALARM_TITLE="Orb daemon needs attention"
-COORDINATOR_ALARM_TITLE="Coordinator sidecar needs attention"
 DB="$DATA_DIR/server.db"
 
 EXIT_REFUSED=2
@@ -436,7 +434,6 @@ start_optional_unit() {
 
 stop_services() {
   stop_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  stop_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
 
@@ -449,7 +446,6 @@ start_and_check() {
   systemctl --user start "$DAEMON_UNIT"
   daemon_healthy "$started_ms" || return 1
   start_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  start_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   return 0
 }
 

@@ -422,3 +422,47 @@ test('an orphan manifest does not prevent publishing a new empty backup', () => 
   const [copy] = dbCopies(out);
   assert.equal(readFileSync(join(out, `${copy}.attachments.sha256`), 'utf8'), '');
 });
+
+test('coordinator stores are copied after the db, verified, gzipped and rotated by --keep', () => {
+  const f = fixture();
+  const stores = join(f.server, 'coordinator');
+  mkdirSync(stores, { recursive: true });
+  for (const name of ['chief-a', 'chief-b']) {
+    sqlite(
+      join(stores, `${name}.sqlite`),
+      `create table t(v text); insert into t values ('${name}');`,
+    );
+  }
+  write(join(stores, 'chief-a.sqlite-wal'), 'ignored');
+  const out = join(f.backups, 'coordinator');
+  write(join(out, 'coordinator-20200101T000000Z', 'old.sqlite.gz'), 'old');
+  const result = f.run([
+    '--db',
+    f.db,
+    '--out',
+    join(f.backups, 'db'),
+    '--coordinator',
+    stores,
+    '--coordinator-out',
+    out,
+    '--keep',
+    '1',
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /coordinator stores copied: 2/);
+  const runs = readdirSync(out);
+  assert.equal(runs.length, 1);
+  assert.deepEqual(readdirSync(join(out, runs[0])).sort(), [
+    'chief-a.sqlite.gz',
+    'chief-b.sqlite.gz',
+  ]);
+  const restored = join(f.root, 'restored-store.sqlite');
+  writeFileSync(restored, gunzipSync(readFileSync(join(out, runs[0], 'chief-b.sqlite.gz'))));
+  assert.equal(sqlite(restored, 'select v from t;').trim(), 'chief-b');
+});
+
+test('--coordinator and --coordinator-out go together', () => {
+  const f = fixture();
+  const result = f.run(['--db', f.db, '--out', join(f.backups, 'db'), '--coordinator', f.server]);
+  assert.equal(result.status, 2);
+});

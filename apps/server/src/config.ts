@@ -97,6 +97,12 @@ function envStr(name: string): string | null {
   return raw !== undefined && raw !== '' ? raw : null;
 }
 
+function envFlagDefaultOn(name: string): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) return true;
+  return !['0', 'false', 'no', 'off'].includes(raw.toLowerCase());
+}
+
 function envFlag(name: string): boolean {
   const raw = process.env[name];
   if (raw === undefined) return false;
@@ -206,7 +212,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     scheduling: envFlag(ENV_VARS.scheduling),
     coordinatorServerContext: envFlag(ENV_VARS.coordinatorServerContext),
     coordinatorMachineId: envStr(ENV_VARS.coordinatorMachineId),
-    coordinatorInServer: envFlag(ENV_VARS.coordinatorInServer),
+    coordinatorInServer: envFlagDefaultOn(ENV_VARS.coordinatorInServer),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
     trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),

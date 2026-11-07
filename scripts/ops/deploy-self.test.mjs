@@ -169,14 +169,12 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
     `if [ "$2" = is-enabled ]; then
   case "$4" in
     cairn-daemon-orb.service) [ -f "${fake}/orb-enabled" ]; exit $? ;;
-    cairn-coordinator.service) [ -f "${fake}/coordinator-enabled" ]; exit $? ;;
     *) exit 1 ;;
   esac
 fi
 echo "systemctl $*" >> "${fake}/systemctl.log"
 if [ "$2" = show ]; then
   case "$3" in
-    cairn-coordinator.service) slug=coordinator ;;
     cairn-daemon-orb.service) slug=orb ;;
     *) exit 1 ;;
   esac
@@ -195,7 +193,6 @@ if [ "$2" = show ]; then
   exit 0
 fi
 [ ! -f "${fake}/orb-$2-fail" ] || [ "$3" != cairn-daemon-orb.service ] || exit 1
-[ ! -f "${fake}/coordinator-$2-fail" ] || [ "$3" != cairn-coordinator.service ] || exit 1
 [ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
@@ -869,109 +866,6 @@ for (const action of ['start', 'stop']) {
     assert.doesNotMatch(result.stdout, /rolling back|restarting/);
   });
 }
-
-test('the enabled Coordinator sidecar stops with the daemon and starts after it', () => {
-  const f = fixture();
-  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
-  const result = f.run(DEPLOY, [pushTarget(f)]);
-  assert.equal(result.status, 0, result.stderr);
-  const calls = f.log('systemctl.log').trim().split('\n');
-  const stop = calls.indexOf('systemctl --user stop cairn-coordinator.service');
-  const start = calls.indexOf('systemctl --user start cairn-coordinator.service');
-  assert.ok(stop >= 0 && stop < calls.indexOf('systemctl --user stop cairn-server.service'));
-  assert.ok(start > calls.indexOf('systemctl --user start cairn-daemon.service'));
-});
-
-test('a Coordinator sidecar that is not enabled is never touched', () => {
-  const f = fixture();
-  const result = f.run(DEPLOY, [pushTarget(f)]);
-  assert.equal(result.status, 0, result.stderr);
-  assert.doesNotMatch(f.log('systemctl.log'), /cairn-coordinator/);
-});
-
-test('a failing Coordinator start does not fail the deploy', () => {
-  const f = fixture();
-  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
-  writeFileSync(join(f.fake, 'coordinator-start-fail'), '');
-  const result = f.run(DEPLOY, [pushTarget(f)]);
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /coordinator-unit-start-failed/);
-  assert.equal(existsSync(join(f.state, 'alarms', 'coordinator-unit-start-failed')), true);
-});
-
-for (const mode of ['inactive', 'restarts', 'pid', 'one-active']) {
-  test(`a Coordinator ${mode} startup preserves its alarm after a successful start command`, () => {
-    const f = fixture();
-    writeFileSync(join(f.fake, 'coordinator-enabled'), '');
-    writeFileSync(join(f.fake, 'coordinator-health-mode'), mode);
-    mkdirSync(join(f.state, 'alarms'), { recursive: true });
-    const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
-    writeFileSync(alarm, '');
-    const result = f.run(DEPLOY, [pushTarget(f)]);
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(existsSync(alarm), true);
-    assert.match(result.stderr, /coordinator-unit-start-failed/);
-  });
-}
-
-test('a Coordinator restart that returns success without staying active preserves both alarms', () => {
-  const f = fixture();
-  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
-  writeFileSync(join(f.fake, 'coordinator-stop-fail'), '');
-  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'inactive');
-  mkdirSync(join(f.state, 'alarms'), { recursive: true });
-  writeFileSync(join(f.state, 'alarms', 'coordinator-unit-start-failed'), '');
-  const result = f.run(DEPLOY, [pushTarget(f)]);
-  assert.equal(result.status, 0, result.stderr);
-  for (const action of ['start', 'stop'])
-    assert.equal(existsSync(join(f.state, 'alarms', `coordinator-unit-${action}-failed`)), true);
-});
-
-test('rollback preserves the Coordinator alarm when the old sidecar also crash-loops', () => {
-  const f = fixture();
-  const target = pushTarget(f);
-  writeFileSync(join(f.fake, 'broken-sha'), target);
-  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
-  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'restarts');
-  const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 1, result.stderr);
-  assert.equal(existsSync(join(f.state, 'alarms', 'coordinator-unit-start-failed')), true);
-});
-
-test('interrupted deployment recovery does not clear a crash-looping Coordinator alarm', () => {
-  const f = fixture();
-  const target = pushTarget(f);
-  git(f.checkout, 'fetch', '-q', 'origin', 'main');
-  git(f.checkout, 'checkout', '-q', '--detach', target);
-  mkdirSync(f.state, { recursive: true });
-  mkdirSync(f.backups, { recursive: true });
-  const snapshot = join(f.backups, 'stopped-interrupted.db');
-  sqlite(f.db, `vacuum into '${snapshot}'`);
-  writeFileSync(
-    join(f.state, 'in-progress'),
-    `phase=switching\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\n`,
-  );
-  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
-  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'inactive');
-  mkdirSync(join(f.state, 'alarms'), { recursive: true });
-  const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
-  writeFileSync(alarm, '');
-  const result = f.run(DEPLOY, ['--recover']);
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(existsSync(alarm), true);
-});
-
-test('a stable Coordinator clears its start alarm only after three matching active observations', () => {
-  const f = fixture();
-  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
-  mkdirSync(join(f.state, 'alarms'), { recursive: true });
-  const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
-  writeFileSync(alarm, '');
-  const result = f.run(DEPLOY, [pushTarget(f)]);
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(existsSync(alarm), false);
-  assert.equal(readFileSync(join(f.fake, 'coordinator-health-count'), 'utf8').trim(), '3');
-});
 
 for (const script of [DEPLOY, WATCH]) {
   test(`${script.endsWith('deploy-self.sh') ? 'deployment' : 'watch'} scopes App credentials to individual gh calls`, () => {
