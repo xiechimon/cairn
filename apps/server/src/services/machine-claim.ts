@@ -44,7 +44,12 @@ import {
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import { coordinatorMachineId, coordinatorSidecarEnabled } from './coordinator-context.js';
+import {
+  coordinatorInServerEnabled,
+  coordinatorMachineId,
+  coordinatorSidecarEnabled,
+} from './coordinator-context.js';
+import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import {
   capabilityGatePasses,
@@ -155,7 +160,24 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .orderBy(asc(step.createdAt))
     .all()
     .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
-    .filter((row) => !sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
+    .filter(
+      (row) =>
+        !sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow) &&
+        !serverTakesTurn(deps.db, teamId, row.stepRow),
+    );
+}
+
+export function serverTakesTurn(
+  db: MachineDeps['db'],
+  teamId: string,
+  stepRow: typeof step.$inferSelect,
+): boolean {
+  return (
+    coordinatorInServerEnabled() &&
+    stepRow.kind === 'chief' &&
+    !isChiefDigestStep(stepRow) &&
+    coordinatorRoute(db, teamId) !== null
+  );
 }
 
 function sidecarTakesTurn(

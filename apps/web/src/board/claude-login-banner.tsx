@@ -112,25 +112,17 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
       className="mt-4"
       title={title}
       body={<span data-testid="claude-login-summary">{body}</span>}
-      actions={
-        <>
-          {links.map((link) => (
-            <Button
-              key={link.id}
-              variant="outline"
-              size="sm"
-              className="px-3"
-              render={<Link to={link.href} />}
-            >
-              {links.length === 1
-                ? t('查看')
-                : link.id === 'machines'
-                  ? t('查看机器')
-                  : t('查看订阅')}
-            </Button>
-          ))}
-        </>
-      }
+      actions={links.map((link) => (
+        <Button
+          key={link.id}
+          variant="outline"
+          size="sm"
+          className="px-3"
+          render={<Link to={link.href} />}
+        >
+          {links.length === 1 ? t('查看') : link.id === 'machines' ? t('查看机器') : t('查看订阅')}
+        </Button>
+      ))}
     />
   );
 }

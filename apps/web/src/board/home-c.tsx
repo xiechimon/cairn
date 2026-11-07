@@ -359,7 +359,10 @@ export function HomeC({
   if (load !== 'ready') {
     return (
       <div className="relative flex min-h-0 min-w-0 flex-1">
-        <section data-testid="home-c" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <section
+          data-testid="home-c"
+          className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
+        >
           {paneButtons}
           {load === 'loading' ? (
             <>
@@ -401,7 +404,7 @@ export function HomeC({
       <section
         data-testid="home-c"
         aria-label={t('与 Coordinator 的对话')}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+        className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
       >
         {paneButtons}
         {banner != null && (

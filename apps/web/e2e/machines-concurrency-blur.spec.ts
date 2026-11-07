@@ -108,7 +108,7 @@ const manual5 = () =>
 
 test('edit then click `恢复推荐`: sends exactly one PATCH (null), does not save a manual value first', async ({ page }) => {
   const { bodies } = await stubStack(page, [manual5()]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
   await trigger(page, 'm-1').click();
   await input(page).fill('7');
   await page.getByTestId('machine-concurrency-reset').click();
@@ -119,7 +119,7 @@ test('edit then click `恢复推荐`: sends exactly one PATCH (null), does not s
 
 test('edit then click +: sends exactly one PATCH (draft + 1)', async ({ page }) => {
   const { bodies } = await stubStack(page, [manual5()]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
   await trigger(page, 'm-1').click();
   await input(page).fill('7');
   await page.getByTestId('machine-concurrency-inc').click();
@@ -139,7 +139,7 @@ test('out-of-range value left unedited: focus then blur sends no PATCH, does not
       capabilities: { mcpServers: [], skills: [] },
     }),
   ]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
   await trigger(page, 'm-1').click();
   await expect(page.getByTestId('machine-concurrency-out-of-range')).toBeVisible();
   await input(page).focus();
@@ -152,7 +152,7 @@ test('out-of-range value left unedited: focus then blur sends no PATCH, does not
 
 test('two consecutive writes: the second waits for the first receipt (ordered, final = last intent)', async ({ page }) => {
   const { bodies, pending, state } = await stubStack(page, [manual5()], { hold: true });
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
   await trigger(page, 'm-1').click();
   await input(page).fill('6');
   await input(page).press('Enter');
@@ -174,7 +174,7 @@ test('three + clicks while a PATCH is in flight: 3 → 6, draft does not bounce 
     [machine({ id: 'm-1', maxConcurrent: 3, maxConcurrentOverridden: true, concurrencySource: 'manual' })],
     { hold: true },
   );
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
   await trigger(page, 'm-1').click();
   const inc = page.getByTestId('machine-concurrency-inc');
   await inc.click();

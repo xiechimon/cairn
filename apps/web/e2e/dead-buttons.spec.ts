@@ -70,12 +70,14 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
   page,
 }) => {
-  await page.goto('/app/resources/machines?scenario=06');
+  await page.goto('/app/settings/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_');
 
-  await expect(page.locator('[data-on]').first()).toBeVisible();
+  await expect(page.getByTestId('machine-accept-toggle').first()).toBeVisible();
 
-  await expect(page.locator('div[data-kind] button')).toHaveCount(2);
-  await expect(page.locator('div[data-kind] button[aria-label^="并发上限"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="machine-item"] > div:first-child button:not([data-testid])')).toHaveCount(0);
+  await expect(
+    page.getByTestId('machine-detail').locator('button[aria-label^="并发上限"]'),
+  ).toHaveCount(1);
 });
 
 test('composer toolbar drops the `语音输入` button, keeps attachment', async ({ page }) => {

@@ -185,6 +185,14 @@ export function installCells(cells: readonly Cell[], dir: string): string {
     `INSERT INTO todo (id, teamId, projectId, title, phase, phaseAt, seqNum, assignment, sourceKind)
      VALUES (?, ?, ?, 'Task', 'queued', 1, ?, ?, ?)`,
   );
+  const todoBy = sqlite.prepare(
+    `INSERT INTO todo (id, teamId, projectId, title, phase, phaseAt, seqNum, createdBy)
+     VALUES (?, ?, ?, 'Imported', 'queued', 1, 3, ?)`,
+  );
+  const coordinatorRule = sqlite.prepare(
+    `INSERT INTO routing_rule (id, teamId, use, provider, modelId, thinkingLevel, fallbackModels, machineId, seededFromAgentId, createdAt, updatedAt)
+     VALUES (?, ?, 'coordinator', ?, ?, ?, ?, ?, ?, 1, 1)`,
+  );
   const rule = sqlite.prepare(
     `INSERT INTO routing_rule (id, teamId, use, provider, modelId, machineId, seededFromAgentId, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)`,
@@ -246,12 +254,21 @@ export function installCells(cells: readonly Cell[], dir: string): string {
       }
       const mate = `mate-${t}`;
       agent.run(plainValues(cell, mate, 'Mate', null, t, SESSION_MODEL));
+      const alternate = `alt-${t}`;
+      const secondReviewer = role === 'review' && cell.secondReviewer === 'independent-custom';
+      if (secondReviewer) {
+        agent.run(
+          plainValues(cell, alternate, 'Alternate reviewer', null, t, ROLE_MODELS['other-vendor']),
+        );
+      }
       const independent = role === 'review' || role === 'verify' ? 1 : 0;
       memory.run(`mr-${t}`, roleAgent, t, 'mem-role', 'role fact', independent);
       memory.run(`mm-${t}`, mate, t, 'mem-mate', 'mate fact', 0);
       const slot = SLOT_OF[role];
       const assignment: Record<string, unknown> = { plan: null, build: { agentId: impl } };
-      if (slot !== undefined && cell.assigned === 'yes') assignment[slot] = { agentId: roleAgent };
+      if (slot !== undefined && cell.assigned === 'yes') {
+        assignment[slot] = { agentId: secondReviewer ? alternate : roleAgent };
+      }
       if (role === 'implement' && cell.assigned === 'no') assignment.build = null;
       todo.run(`todo-${t}`, t, `p-${t}`, 1, JSON.stringify(assignment), null);
       if (role === 'citation') {
@@ -265,6 +282,23 @@ export function installCells(cells: readonly Cell[], dir: string): string {
             : null,
           'research-citation-check',
         );
+      }
+      if (role === 'coordinator') {
+        todoBy.run(`todo-chief-${t}`, t, `p-${t}`, chiefAgent);
+        if (cell.existing !== 'none') {
+          coordinatorRule.run(
+            `rule-${t}`,
+            t,
+            roleModel.provider,
+            roleModel.modelId,
+            cell.thinking === 'high' ? 'high' : null,
+            cell.fallback === 'some'
+              ? JSON.stringify([{ provider: 'claude-code', modelId: 'claude-sonnet-5-5' }])
+              : null,
+            cell.machine !== 'none' && cell.ruleMachine === 'pinned' ? `pin-${t}` : null,
+            chiefAgent,
+          );
+        }
       }
       if (cell.existing !== 'none' && role !== 'coordinator' && role !== 'citation') {
         const use = role === 'review' ? 'review' : 'session';
@@ -350,6 +384,8 @@ export const INTENTIONAL_DIFFERENCES = {
     'citation checks run under a citation_check rule seeded from the assigned or independent checker; legacy ran them under the session route and blocked non-independent checks at runtime',
   unassignedMachineFallback:
     'a rule with no machine takes the seed agent machine for every step; legacy applied that fallback only to a step with an assigned agent',
+  customReviewerPermissions:
+    'an assigned custom reviewer promoted to a review rule keeps its MCP servers, skills and default skill in a review policy seeded from it (reviewer-denied tools and secrets dropped); legacy left the default empty review policy over it',
   unexecutedAgent:
     'an agent that never ran the step has no legacy profile or memory owner to compare against',
 } as const;
@@ -497,6 +533,17 @@ function compareCell(
     same('coordinator machine', profile.machineId, cell.machine === 'none' ? null : `pin-${t}`);
     const expected = orbMachine(cell) ? { ...(agentCaps ?? {}), executor: 'orb' } : agentCaps;
     same('coordinator caps', profile.requiredCapabilities, expected);
+    const coordinatorRule = db
+      .select()
+      .from(schema.routingRule)
+      .where(and(eq(schema.routingRule.teamId, t), eq(schema.routingRule.use, 'coordinator')))
+      .get();
+    const imported = db
+      .select()
+      .from(schema.todo)
+      .where(eq(schema.todo.id, `todo-chief-${t}`))
+      .get();
+    same('imported task owner', imported?.createdBy, coordinatorRule?.id);
     return;
   }
   const todoRow = db
@@ -521,7 +568,7 @@ function compareCell(
       SESSION_MODEL.modelId,
       ROLE_MODELS[cell.model].modelId,
     );
-    const expectCheckerRule = cell.assigned === 'yes' || (cell.kind === 'custom' && independent);
+    const expectCheckerRule = independent && (cell.assigned === 'yes' || cell.kind === 'custom');
     if (expectCheckerRule) {
       same(
         'citation model',
@@ -539,6 +586,30 @@ function compareCell(
   }
   const kind = STEP_OF[cell.role];
   const after = profileForStep(db, todoRow, kind);
+  if (
+    cell.role === 'review' &&
+    cell.assigned === 'yes' &&
+    cell.existing === 'none' &&
+    cell.secondReviewer === 'independent-custom'
+  ) {
+    check(after !== null, 'no review profile although an independent reviewer is assigned');
+    if (after === null) return;
+    same(
+      'assigned independent reviewer model',
+      [after.provider, after.modelId],
+      [ROLE_MODELS['other-vendor'].provider, ROLE_MODELS['other-vendor'].modelId],
+    );
+    const personaRuns =
+      cell.kind === 'persona' && modelsAreIndependent(SESSION_MODEL.modelId, roleModel.modelId);
+    if (!personaRuns) {
+      same(
+        'permissions come from the selected reviewer',
+        [after.tools, after.mcpServers, after.skillsAllowlist, after.defaultSkill, after.secrets],
+        [[], [], null, null, []],
+      );
+    }
+    return;
+  }
   const executes = cell.assigned === 'yes' || (cell.role === 'review' && cell.kind === 'persona');
   if (before === null) {
     check(INTENTIONAL_DIFFERENCES.unexecutedAgent.length > 0, 'unreachable');
@@ -560,6 +631,20 @@ function compareCell(
       tools: expected.tools.filter((tool) => !REVIEWER_DENIED_ALL.includes(tool)),
       secrets: [],
       requiredCapabilities: expectedCaps(cell),
+    };
+  }
+  if (
+    cell.role === 'review' &&
+    cell.kind === 'custom' &&
+    cell.assigned === 'yes' &&
+    cell.existing === 'none'
+  ) {
+    check(INTENTIONAL_DIFFERENCES.customReviewerPermissions.length > 0, 'unreachable');
+    expected = {
+      ...expected,
+      mcpServers: cell.mcp === 'some' ? ['codegraph', 'playwright'] : [],
+      skillsAllowlist: cell.skills === 'null' ? null : cell.skills === 'some' ? ['skill-a'] : [],
+      defaultSkill: cell.defaultSkill === 'some' ? 'skill-a' : null,
     };
   }
   const ruleUse = cell.role === 'review' ? 'review' : 'session';

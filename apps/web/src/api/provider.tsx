@@ -97,7 +97,7 @@ export function LiveDataBridge() {
 function FixtureModeChip({ id }: { id: string }) {
   const { t } = useI18n();
   return (
-    <div className="fixture-mode-chip pointer-events-none fixed top-2 right-3 z-40 rounded-full bg-popover px-3 py-1 text-xs text-muted-foreground ring-1 ring-foreground/10">
+    <div className="fixture-mode-chip pointer-events-none fixed hidden md:block top-2 right-3 z-40 rounded-full bg-popover px-3 py-1 text-xs text-muted-foreground ring-1 ring-foreground/10">
       {t('示例数据（scenario {id}）', { id })}
     </div>
   );
