@@ -9,6 +9,7 @@ import type { HarnessEvalAttempt } from '../harness-eval-coordinator.js';
 import { compareFilesFromResponse } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import type { GateGithubPort, GateRaw, GateRawFailure } from './github-port.js';
+import { RULESETS_NOT_ON_PLAN } from './github-rules.js';
 import { harnessNeedFromInputs } from './harness-eval-judge.js';
 import {
   type HarnessEvalCoordinatorPort,
@@ -218,6 +219,7 @@ async function readRules(
   r: Reader,
   req: Pick<GateReadRequest, 'owner' | 'repo'>,
   branch: string,
+  allowUnsupportedRulesets = false,
 ): Promise<Binding[] | null> {
   const out: Binding[] = [];
   for (let page = 1; page <= RULE_PAGES; page += 1) {
@@ -227,7 +229,20 @@ async function readRules(
       (b) => Array.isArray(b) && b.length < PER_PAGE,
       (etag) => r.port.branchRules(branch, { page, perPage: PER_PAGE, etag }),
     );
-    if (!got.ok || !Array.isArray(got.body)) return null;
+    if (!got.ok) {
+      const failure = r.failure;
+      if (
+        allowUnsupportedRulesets &&
+        page === 1 &&
+        failure?.kind === 'status' &&
+        (failure.status === 404 ||
+          (failure.status === 403 && RULESETS_NOT_ON_PLAN.test(failure.message ?? '')))
+      ) {
+        return [];
+      }
+      return null;
+    }
+    if (!Array.isArray(got.body)) return null;
     for (const rule of got.body as unknown[]) {
       if (!isObj(rule) || typeof rule.type !== 'string') return null;
       if (rule.type !== 'required_status_checks') continue;
@@ -552,7 +567,7 @@ export async function readRequiredChecksAt(
   if (!isSha(head)) return null;
   const branch = await readBody(r, null, always, () => port.branch(branchName, { etag: null }));
   const classic = branch.ok ? projectBranch(branch.body).classic : null;
-  const rules = classic === null ? null : await readRules(r, req, branchName);
+  const rules = classic === null ? null : await readRules(r, req, branchName, true);
   const bindings = [...(classic ?? []), ...(rules ?? [])];
   const required =
     classic === null || rules === null ? null : [...new Set(bindings.map((b) => b.context))];

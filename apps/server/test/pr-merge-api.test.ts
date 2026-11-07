@@ -284,6 +284,76 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     },
   );
 
+  test('human merge succeeds with no classic required checks and no rulesets', async () => {
+    const w = makeWorld();
+    w.fake.checkAnswers['/branches/main'] = { status: 200, body: { protected: false } };
+    w.fake.checkAnswers['/check-runs'] = {
+      status: 200,
+      body: { total_count: 0, check_runs: [] },
+    };
+    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+    expect(response.status).toBe(202);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('done');
+  });
+
+  test.each([
+    [404, 'Not Found', 'success'],
+    [404, 'Not Found', 'failure'],
+    [
+      403,
+      'Upgrade to GitHub Pro or make this repository public to enable this feature.',
+      'success',
+    ],
+  ] as const)(
+    'rules endpoint %s (%s) defers to classic required checks with %s',
+    async (status, message, conclusion) => {
+      const w = makeWorld();
+      w.fake.checkAnswers['/rules/branches/main'] = { status, body: { message } };
+      w.fake.checkAnswers['/check-runs'] = {
+        status: 200,
+        body: {
+          total_count: 1,
+          check_runs: [
+            { id: 1, name: 'check', head_sha: CP, status: 'completed', conclusion, app: null },
+          ],
+        },
+      };
+      const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+      expect(response.status).toBe(conclusion === 'success' ? 202 : 409);
+      expect(w.fake.puts()).toHaveLength(conclusion === 'success' ? 1 : 0);
+      if (conclusion !== 'success') {
+        expect(await response.json()).toEqual({ error: expect.stringContaining('"check"') });
+        expectUntouched(w);
+      } else {
+        expect(w.phase()).toBe('done');
+      }
+    },
+  );
+
+  test.each<Answer>([
+    { status: 403, body: { message: 'Resource not accessible by integration' } },
+    { status: 401, body: { message: 'Upgrade to GitHub Pro' } },
+    {
+      status: 403,
+      body: { message: 'Upgrade to GitHub Pro' },
+      headers: { 'x-ratelimit-remaining': '0' },
+    },
+    { status: 429, body: { message: 'Too many requests' } },
+    'network',
+    'timeout',
+  ])('unreadable rules endpoint %j refuses human merge without a PUT', async (answer) => {
+    const w = makeWorld();
+    w.fake.checkAnswers['/rules/branches/main'] = answer;
+    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: expect.stringContaining('required-checks-unreadable'),
+    });
+    expect(w.fake.puts()).toHaveLength(0);
+    expectUntouched(w);
+  });
+
   test.each(['/branches/main', '/rules/branches/main'])(
     'unreadable required checks at %s return HTTP 409 without a merge PUT',
     async (path) => {

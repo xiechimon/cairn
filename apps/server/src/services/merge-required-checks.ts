@@ -16,6 +16,7 @@ export async function assertMergeRequiredChecks(
   const checks = await readRequiredChecksAt(port, repo, branch, head);
   const blockers: string[] = [];
   requiredChecksReadiness(head, checks, (code, ...detail) => {
+    if (code === 'required-checks-none') return;
     blockers.push(`${code}${detail.length === 0 ? '' : `: ${detail.join(', ')}`}`);
   });
   if (blockers.length > 0) {
