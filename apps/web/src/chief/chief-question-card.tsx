@@ -415,7 +415,7 @@ export function ChiefQuestionCard({
       className={ATTACHED_CARD_CLS}
     >
       <div
-        className={`flex flex-none items-center gap-1 px-3.5 pt-2 pb-1${collapsed ? '' : ' @max-md:absolute @max-md:top-0.5 @max-md:right-1 @max-md:z-10 @max-md:p-0'}`}
+        className={`flex flex-none items-center gap-1 px-3.5 pt-2 pb-1${collapsed ? '' : ' max-[640px]:absolute max-[640px]:top-0.5 max-[640px]:right-1 max-[640px]:z-10 max-[640px]:p-0'}`}
       >
         <QuestionStatus status={item.status} quiet={!collapsed} />
         <Button
@@ -423,7 +423,7 @@ export function ChiefQuestionCard({
           data-testid="chief-question-collapse"
           aria-expanded={!collapsed}
           title={collapsed ? t('展开提问') : t('收起提问')}
-          className={`h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent aria-expanded:bg-transparent${collapsed ? '' : ' @max-md:hidden'}`}
+          className={`h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent aria-expanded:bg-transparent${collapsed ? '' : ' max-[640px]:hidden'}`}
           onClick={toggleCollapsed}
         >
           <span className={collapsed ? 'max-w-1/2 truncate' : 'truncate'}>
@@ -438,7 +438,7 @@ export function ChiefQuestionCard({
         </Button>
         {shownPager !== undefined && (
           <div
-            className="flex flex-none items-center @max-md:hidden"
+            className="flex flex-none items-center max-[640px]:hidden"
             title={blockedByUpload ? t('附件上传中') : undefined}
           >
             <Button
@@ -478,7 +478,7 @@ export function ChiefQuestionCard({
                   size="icon-xs"
                   data-testid="chief-question-more"
                   aria-label={t('更多操作')}
-                  className="hidden @max-md:inline-flex"
+                  className="hidden max-[640px]:inline-flex"
                 />
               }
             >
@@ -521,7 +521,7 @@ export function ChiefQuestionCard({
           variant="ghost"
           size="icon-xs"
           aria-label={collapsed ? t('展开提问') : t('收起提问')}
-          className={collapsed ? undefined : '@max-md:hidden'}
+          className={collapsed ? undefined : 'max-[640px]:hidden'}
           onClick={toggleCollapsed}
         >
           {collapsed ? (
@@ -536,7 +536,7 @@ export function ChiefQuestionCard({
           data-testid="chief-question-dismiss"
           aria-label={t('取消提问')}
           title={t('取消提问')}
-          className="@max-md:hidden"
+          className="max-[640px]:hidden"
           disabled={!pending || onCancel === undefined}
           onClick={dismiss}
         >
@@ -548,7 +548,7 @@ export function ChiefQuestionCard({
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <div
               data-testid="chief-question-text"
-              className="flex-none px-3.5 pb-1.5 text-ui break-words text-foreground @max-md:pt-2.5 @max-md:pr-10"
+              className="flex-none px-3.5 pb-1.5 text-ui break-words text-foreground max-[640px]:pt-2.5 max-[640px]:pr-10"
             >
               {question.question}
             </div>
@@ -631,7 +631,7 @@ export function ChiefQuestionCard({
 
 function Keycap({ children }: { children: ReactNode }) {
   return (
-    <span className="grid h-5 min-w-5 flex-none place-items-center rounded-(--cds-radius-sm) bg-(--hover-1) px-1 @max-md:hidden pointer-coarse:hidden text-caption tabular-nums text-content-tertiary">
+    <span className="grid h-5 min-w-5 flex-none place-items-center rounded-(--cds-radius-sm) bg-(--hover-1) px-1 max-[640px]:hidden pointer-coarse:hidden text-caption tabular-nums text-content-tertiary">
       {children}
     </span>
   );
