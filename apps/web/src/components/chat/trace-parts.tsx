@@ -26,10 +26,10 @@ export const EMPTY_TRACE_COUNTS: TraceCounts = {
 };
 
 const SUMMARY_BTN =
-  "chat-interaction h-auto min-h-0 w-fit max-w-full cursor-pointer justify-start gap-1 rounded-md border-0 bg-transparent px-0 py-0.5 text-left font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
+  "h-auto min-h-0 w-fit max-w-full cursor-pointer justify-start gap-1 rounded-md border-0 bg-transparent px-0 py-0.5 text-left font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
 const ROW_BTN =
-  "chat-interaction flex h-9 min-h-9 w-full min-w-0 cursor-pointer justify-start gap-1.5 rounded-(--cds-radius-xs) border-0 bg-transparent px-3 text-left font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
+  "flex h-9 min-h-9 w-full min-w-0 cursor-pointer justify-start gap-1.5 rounded-(--cds-radius-xs) border-0 bg-transparent px-3 text-left font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
 
 export const RUNNING_VERB =
   'data-running:[&_[data-trace-verb]]:shimmer motion-reduce:data-running:[&_[data-trace-verb]]:shimmer-none';
