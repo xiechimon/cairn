@@ -198,6 +198,21 @@ describe('chief streaming handoff (#857 F-H1..H6)', () => {
     expect(liveTextStore.get(CONV)).toBe('');
   });
 
+  test('F-H9 a terminal step drops text streamed after the pending handoff and keeps the settled prefix', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'text_delta', text: '第一段' });
+    es.push({ type: 'message', message: textRow('m1', '第一段') });
+    es.push({ type: 'text_delta', text: '未落库的后半' });
+    es.push(stepEvent('failed'));
+
+    expect(visible([USER])).toContain('第一段');
+    expect(liveTextStore.get(CONV)).toBe('第一段');
+
+    const knownIds = new Set([USER.id, 'm1']);
+    liveTextStore.prune(CONV, knownIds);
+    expect(liveTextStore.get(CONV)).toBe('');
+  });
+
   test('F-H8 a failed or stopped step refetches the Coordinator record so the outage banner appears', () => {
     const qc = freshClient();
     const spy = vi.spyOn(qc, 'invalidateQueries');
