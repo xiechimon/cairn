@@ -29,7 +29,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { settingsHref } from '../settings/settings-href.js';
-import { opensLegacyAccounts } from '../settings/settings-redirect.js';
+import { legacyAccountsSearch, opensLegacyAccounts } from '../settings/settings-redirect.js';
 import { MODEL_ROUTING_HREF } from './hrefs.js';
 
 const VENDOR_PRESETS: Record<'codex' | 'grok', string> = {
@@ -207,13 +207,12 @@ function RoutingContent() {
 export function ModelRoutingPage() {
   const [searchParams] = useSearchParams();
   if (!opensLegacyAccounts(searchParams)) return <RoutingContent />;
-  const params = new URLSearchParams(searchParams);
-  params.delete('tab');
-  params.delete('vendor');
-  const rest = params.toString();
   return (
     <Navigate
-      to={{ pathname: settingsHref('providers'), search: rest === '' ? '' : `?${rest}` }}
+      to={{
+        pathname: settingsHref('providers'),
+        search: legacyAccountsSearch(searchParams.toString()),
+      }}
       replace
     />
   );

@@ -87,7 +87,6 @@ test('sections switch in place, keep their own params, and close goes back to wh
 test('old resource URLs land on their settings section with the query intact', async ({ page }) => {
   const cases = [
     ['/app/resources/providers', 'providers'],
-    ['/app/resources/model-routing', 'providers'],
     ['/app/resources/routing-settings', 'work-routing'],
     ['/app/resources/machines', 'machines'],
     ['/app/resources/skills', 'skills'],

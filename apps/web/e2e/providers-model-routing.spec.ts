@@ -43,6 +43,10 @@ test('old subscription links land on the provider list, old routing links on the
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/settings/routing?scenario=model-routing&vendor=codex');
   await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await page.goto('/app/resources/model-routing?scenario=model-routing&scope=m1&vendor=claude');
+  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await page.goto('/app/settings/routing?scenario=model-routing&scope=m1&vendor=claude');
+  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
   await page.goto('/app/settings/routing?scenario=model-routing&tab=routing&vendor=codex');
   await expect(page).toHaveURL(/\/app\/settings\/routing\?/);
   await expect(page.getByTestId('routing-section')).toBeVisible();

@@ -40,6 +40,11 @@ for (const pane of PANES) {
   }) => {
     const state = { fail: true, ok: pane.ok as unknown };
     await stub(page, pane.endpoint, state);
+    if (pane.section === 'providers') {
+      await page.route('**/api/teams/team-1/claude-subscriptions', (route) =>
+        route.fulfill({ json: [] }),
+      );
+    }
     await page.goto(`/app/settings/${pane.section}`);
     const settings = page.getByRole('dialog', { name: '设置' });
     await expect(settings.getByTestId('query-error')).toBeVisible();

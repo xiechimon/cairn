@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { opensLegacyAccounts } from '../src/settings/settings-redirect.js';
+import { legacyAccountsSearch, opensLegacyAccounts } from '../src/settings/settings-redirect.js';
 
 const params = (query: string) => new URLSearchParams(query);
 
@@ -17,5 +17,12 @@ describe('opensLegacyAccounts', () => {
   it('leaves a plain visit on the routing page', () => {
     expect(opensLegacyAccounts(params(''))).toBe(false);
     expect(opensLegacyAccounts(params('scope=x'))).toBe(false);
+  });
+});
+
+describe('legacyAccountsSearch', () => {
+  it('drops the old view params and any machine scope so the team subscriptions show', () => {
+    expect(legacyAccountsSearch('?scope=m1&vendor=claude&scenario=x')).toBe('?scenario=x');
+    expect(legacyAccountsSearch('?tab=accounts')).toBe('');
   });
 });
