@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  estimateTokens,
   ISSUE_FENCE_OPEN,
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_QUOTA_PER_TEAM,
@@ -103,21 +104,60 @@ export function listMemoryEntries(
     .all();
 }
 
-export function injectMemories(
+export const MEMORY_INJECT_TOKEN_CAP = 3_000;
+
+export interface InjectedMemory {
+  id: string;
+  title: string;
+  content: string;
+}
+
+interface InjectScope {
+  agentId: string;
+  projectId?: string | null;
+  projectOnly?: boolean;
+  teamId?: string;
+  threadId?: string;
+}
+
+export function capMemories<T extends InjectedMemory & { updatedAt: number }>(
+  rows: readonly T[],
+  capTokens: number,
+): { shown: T[]; omitted: number } {
+  const byRecency = [...rows].sort((a, b) => b.updatedAt - a.updatedAt);
+  const keep = new Set<string>();
+  let used = 0;
+  for (const row of byRecency) {
+    const cost = estimateTokens(`- ${row.title}: ${row.content}`);
+    if (used + cost > capTokens) continue;
+    used += cost;
+    keep.add(row.id);
+  }
+  const shown = rows.filter((row) => keep.has(row.id));
+  const newest = byRecency[0];
+  if (shown.length === 0 && newest !== undefined && Number.isFinite(capTokens)) {
+    const room = Math.max(1, Math.floor(capTokens / 1.25) - newest.title.length);
+    const content = `${newest.content.slice(0, room)} …`;
+    return { shown: [{ ...newest, content }], omitted: rows.length - 1 };
+  }
+  return { shown, omitted: rows.length - shown.length };
+}
+
+export function injectMemoriesCapped(
   db: Db,
-  scope: {
-    agentId: string;
-    projectId?: string | null;
-    projectOnly?: boolean;
-    teamId?: string;
-    threadId?: string;
-  },
-) {
+  scope: InjectScope,
+  capTokens: number,
+): { memories: InjectedMemory[]; omitted: number } {
   return db.transaction((tx) => {
     const teamId = scope.teamId;
     const teamScoped = teamId !== undefined;
     const rows = tx
-      .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
+      .select({
+        id: agentMemory.id,
+        title: agentMemory.title,
+        content: agentMemory.content,
+        updatedAt: agentMemory.updatedAt,
+      })
       .from(agentMemory)
       .where(
         and(
@@ -137,19 +177,45 @@ export function injectMemories(
       )
       .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
       .all();
-    if (rows.length > 0) {
+    const { shown, omitted } = capMemories(rows, capTokens);
+    if (shown.length > 0) {
       tx.update(agentMemory)
         .set({ lastInjectedAt: nowMs() })
         .where(
           inArray(
             agentMemory.id,
-            rows.map((row) => row.id),
+            shown.map((row) => row.id),
           ),
         )
         .run();
     }
-    return rows.map(({ title, content }) => ({ title, content }));
+    return {
+      memories: shown.map(({ id, title, content }) => ({ id, title, content })),
+      omitted,
+    };
   });
+}
+
+export function searchMemoryEntries<T extends { title: string; content: string }>(
+  entries: readonly T[],
+  query: string,
+): T[] {
+  const fold = (text: string) => text.normalize('NFKC').toLowerCase();
+  const terms = query
+    .split(/\s+/)
+    .filter((term) => term !== '')
+    .map(fold);
+  if (terms.length === 0) return [...entries];
+  return entries.filter((entry) => {
+    const text = fold(`${entry.title}\n${entry.content}`);
+    return terms.every((term) => text.includes(term));
+  });
+}
+
+export function injectMemories(db: Db, scope: InjectScope) {
+  return injectMemoriesCapped(db, scope, Number.POSITIVE_INFINITY).memories.map(
+    ({ title, content }) => ({ title, content }),
+  );
 }
 
 export function memoriesInScope(

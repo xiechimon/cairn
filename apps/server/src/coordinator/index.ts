@@ -24,6 +24,7 @@ import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
+import { stepScopeProjectId } from '../services/picked-project.js';
 import { chiefRemoteTools } from '../services/routing-rules.js';
 import {
   type CoordinatorProviders,
@@ -80,11 +81,6 @@ type StepRow = typeof step.$inferSelect;
 function thinkingLevelOf(value: string | null): ThinkingLevel | null {
   const parsed = thinkingLevelSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
-}
-
-function memoriesSection(memories: readonly { title: string; content: string }[]): string | null {
-  if (memories.length === 0) return null;
-  return `Memories:\n${memories.map((m) => `- ${m.title}: ${m.content}`).join('\n')}`;
 }
 
 export function startCoordinator(options: CoordinatorOptions): Coordinator {
@@ -317,8 +313,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         createdAt: nowMs(),
       });
     }
-    const volatileParts = [...context.sections, memoriesSection(context.memories)].filter(
-      (part): part is string => part !== null,
+    const volatileParts = context.sections;
+    logger.info(
+      {
+        threadId: row.buildId,
+        stepId: row.id,
+        projectId: stepScopeProjectId(row),
+        ...context.memoryTrace,
+      },
+      'coordinator memory injected',
     );
     return {
       claimed: {
