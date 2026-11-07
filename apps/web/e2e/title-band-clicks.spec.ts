@@ -38,8 +38,10 @@ for (const [route, scenario] of [
 ] as const) {
   test(`sidebar destination renders no back arrow — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);
-    await expect(page.getByTestId('page-topbar')).toBeVisible();
-    await expect(page.locator('[aria-label="返回"]')).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="page-topbar"], [data-testid="settings-breadcrumb"]').first(),
+    ).toBeVisible();
+    await expect(page.locator('[data-testid="page-topbar"] [aria-label="返回"]')).toHaveCount(0);
   });
 }
 
@@ -65,7 +67,6 @@ for (const [route, scenario] of [
 }
 
 for (const [route, backTo] of [
-  ['/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06', '/app/settings/machines'],
   [
     '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
     /\/app\?scenario=r2-24c&project=ZAQczKCu0MOAzC1ZqcFlX$/,

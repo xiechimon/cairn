@@ -211,10 +211,10 @@ test('with the drawer closed, N stays retired — neither drawer nor dialog open
 test.describe('#1141 suppression retired', () => {
   test('machine detail: ⌘J wakes the drawer in place', async ({ page }) => {
     await page.goto(MACHINE_DETAIL);
-    await expect(page.getByTestId('machine-detail-online')).toBeVisible();
+    await expect(page.getByTestId('machine-detail')).toBeVisible();
     await pressAndExpect(page, 'Meta+j', drawer(page));
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
-    await expect(page).toHaveURL(/\/app\/resources\/machines\/Kd8fG2hJ4mN9pQ1rStUvWx3/);
+    await expect(page).toHaveURL(/machine=Kd8fG2hJ4mN9pQ1rStUvWx3/);
     await pressAndExpect(page, 'Meta+j', drawer(page), 'hidden');
     await expect(drawer(page)).toBeHidden();
   });

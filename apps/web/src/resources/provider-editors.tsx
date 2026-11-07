@@ -16,7 +16,13 @@ import {
   ProviderModelRow,
   ProviderSection,
 } from '../components/providers/provider-panel.js';
-import { SETTINGS_HINT_CLS, SettingsCard, SettingsRow } from '../components/settings-list.js';
+import {
+  SETTINGS_HINT_CLS,
+  SettingsCard,
+  SettingsDangerZone,
+  SettingsRow,
+  SettingsSection,
+} from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
@@ -207,7 +213,7 @@ export function TeamProviderEditor({
               onRemove={() => saveModels(models.filter((m) => m.id !== model.id))}
             />
           ))}
-          <div className="flex min-h-11 items-center gap-2 px-4 py-1.5">
+          <div className="settings-flat-block flex min-h-11 items-center gap-2 px-4 py-1.5">
             <Input
               aria-label={t('添加模型')}
               placeholder={t('添加模型 ID，回车保存')}
@@ -223,11 +229,14 @@ export function TeamProviderEditor({
           </div>
         </SettingsCard>
       </ProviderSection>
-      <div className="flex justify-end">
-        <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
-          {t('移除服务商')}
-        </Button>
-      </div>
+      <SettingsSection title={t('管理')}>
+        <SettingsDangerZone
+          label={t('移除服务商')}
+          description={t('移除后，使用它的模型不再可选。')}
+          actionLabel={t('移除')}
+          onAction={() => setConfirming(true)}
+        />
+      </SettingsSection>
       <AlertDialogShell
         title={t('移除「{name}」？', { name: record.label })}
         ariaLabel={t('移除服务商')}
