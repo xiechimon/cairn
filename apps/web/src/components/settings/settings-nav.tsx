@@ -48,16 +48,25 @@ export function SettingsNav({
   return (
     <nav aria-label={t('设置分区')} className="flex h-full min-h-0 flex-col gap-3 px-2 py-3">
       {top}
-      <div className="flex h-8 flex-none items-center gap-2 rounded-(--radius-control) px-2.5 text-content-tertiary transition-colors duration-(--dur-fast) focus-within:bg-sidebar-hover focus-within:ring-1 focus-within:ring-(--focus-ring) hover:bg-sidebar-hover">
+      <div
+        data-testid="settings-search"
+        className="flex h-8 flex-none items-center gap-2 rounded-(--radius-control) px-2.5 text-content-tertiary transition-colors duration-(--dur-fast) focus-within:bg-sidebar-hover focus-within:ring-1 focus-within:ring-(--focus-ring) hover:bg-sidebar-hover"
+      >
         <Search aria-hidden className="size-4 flex-none" strokeWidth={1.75} />
         <Input
           ref={searchRef}
           aria-label={t('搜索设置')}
           aria-keyshortcuts="/"
-          className="h-full flex-auto border-0 bg-transparent px-0 py-0 text-ui text-foreground shadow-none placeholder:text-content-secondary focus-visible:border-0 focus-visible:ring-0 md:text-ui dark:bg-transparent"
+          className="h-full flex-auto border-0 bg-transparent px-0 py-0 text-ui outline-hidden text-foreground shadow-none placeholder:text-content-secondary focus-visible:border-0 focus-visible:ring-0 md:text-ui dark:bg-transparent"
           placeholder={t('搜索')}
           value={query}
           onChange={(event) => onQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.stopPropagation();
+            onQuery('');
+            event.currentTarget.blur();
+          }}
         />
         <Kbd
           data-testid="settings-search-hint"
