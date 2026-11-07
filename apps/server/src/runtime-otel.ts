@@ -1,6 +1,9 @@
+import { randomBytes } from 'node:crypto';
 import {
+  chatAttributes,
   chiefTurnErrorContentSchema,
   coordinatorTurnAttributes,
+  executeToolAttributes,
   GENAI_OPERATION,
   LANGFUSE_ATTR,
   langfuseEnvironmentAttributes,
@@ -8,8 +11,10 @@ import {
   otelEnvironment,
   otelErrorMessage,
   otelResourceAttributes,
+  redactSecrets,
   runtimeBuildAttributes,
   stepAttributes,
+  type TokenCounts,
 } from '@cairn/shared';
 import {
   createOtlpSender,
@@ -207,4 +212,106 @@ export function emitRuntimeBuildSpan(
         : { status: { code: OTLP_STATUS_ERROR, message: errorMessage ?? outcome } }),
     },
   ]);
+}
+
+export type CoordinatorTurnSpanRecord =
+  | {
+      kind: 'chat';
+      at: number;
+      provider: string;
+      model: string;
+      responseModel?: string;
+      finishReason?: string;
+      rawFinishReason?: string;
+      usage: TokenCounts;
+      costUsd?: number;
+      errorMessage?: string;
+    }
+  | {
+      kind: 'tool';
+      id: string;
+      name: string;
+      arguments: unknown;
+      result: unknown;
+      isError: boolean;
+      startAt: number;
+      endAt: number;
+    };
+
+function jsonText(value: unknown): string {
+  return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
+}
+
+export function emitCoordinatorTurnSpans(
+  turn: { threadId: string; stepId: string; provider: string; model: string },
+  records: readonly CoordinatorTurnSpanRecord[],
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  const target = runtimeTarget(env);
+  if (target === null || records.length === 0) return;
+  const environment = otelEnvironment(env);
+  const traceId = otlpTraceIdOfStep({ kind: 'chief', buildId: turn.threadId, stepId: turn.stepId });
+  const parentSpanId = otlpStepSpanIdOfBuild(turn.threadId, turn.stepId);
+  const spans: OtlpSpan[] = records.map((record) => {
+    if (record.kind === 'chat') {
+      return {
+        traceId,
+        spanId: randomBytes(8).toString('hex'),
+        parentSpanId,
+        name: `chat ${record.model}`.trim(),
+        kind: OTLP_SPAN_KIND.client,
+        startTimeUnixNano: otlpNanos(record.at),
+        endTimeUnixNano: otlpNanos(record.at),
+        attributes: otlpAttributes({
+          ...chatAttributes(
+            {
+              provider: record.provider,
+              model: record.model,
+              ...(record.responseModel !== undefined
+                ? { responseModel: record.responseModel }
+                : {}),
+              ...(record.finishReason !== undefined ? { finishReason: record.finishReason } : {}),
+              ...(record.rawFinishReason !== undefined
+                ? { rawFinishReason: record.rawFinishReason }
+                : {}),
+              usage: record.usage,
+              ...(record.costUsd !== undefined ? { costUsd: record.costUsd } : {}),
+            },
+            { provider: turn.provider, model: turn.model },
+          ),
+          ...langfuseEnvironmentAttributes(environment),
+        }),
+        ...(record.finishReason === 'error'
+          ? {
+              status: {
+                code: OTLP_STATUS_ERROR,
+                message: otelErrorMessage(record.errorMessage) ?? 'error',
+              },
+            }
+          : {}),
+      };
+    }
+    return {
+      traceId,
+      spanId: randomBytes(8).toString('hex'),
+      parentSpanId,
+      name: `execute_tool ${record.name}`,
+      kind: OTLP_SPAN_KIND.internal,
+      startTimeUnixNano: otlpNanos(record.startAt),
+      endTimeUnixNano: otlpNanos(Math.max(record.startAt, record.endAt)),
+      attributes: otlpAttributes({
+        ...executeToolAttributes({
+          name: record.name,
+          callId: record.id,
+          arguments: jsonText(record.arguments),
+          result: jsonText(record.result),
+        }),
+        ...langfuseEnvironmentAttributes(environment),
+      }),
+      ...(record.isError ? { status: { code: OTLP_STATUS_ERROR, message: 'tool error' } } : {}),
+    };
+  });
+  const request = otlpTracesRequest(otelResourceAttributes(environment), SCOPE, spans);
+  const redacted = redactSecrets(request).value as typeof request;
+  sender.send(target, redacted);
 }
