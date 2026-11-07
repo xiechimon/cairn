@@ -36,6 +36,30 @@ describe('coordinatorLoad', () => {
     ).toBe('ready');
   });
 
+  it('a thread created by the first send from home does not bring the skeleton back', () => {
+    expect(
+      coordinatorLoad({
+        chief: ok(),
+        coordinator: ok(),
+        messages: pending,
+        hasThread: true,
+        wasReady: true,
+      }),
+    ).toBe('ready');
+  });
+
+  it('an error still wins over a previously ready surface', () => {
+    expect(
+      coordinatorLoad({
+        chief: ok(),
+        coordinator: ok(),
+        messages: failed,
+        hasThread: true,
+        wasReady: true,
+      }),
+    ).toBe('error');
+  });
+
   it('still loading while the lookup or the messages are pending', () => {
     expect(coordinatorLoad({ chief: ok(), coordinator: pending, messages: pending, hasThread: false })).toBe('loading');
     expect(coordinatorLoad({ chief: ok(), coordinator: ok(), messages: pending, hasThread: true })).toBe('loading');

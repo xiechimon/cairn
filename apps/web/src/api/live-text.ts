@@ -18,6 +18,18 @@ export const liveTextStore = {
     const hadHandoff = handoffs.delete(conversationId);
     if (hadBuffer || hadHandoff) emit();
   },
+  clearUnlessSettling(conversationId: string): void {
+    const handoff = handoffs.get(conversationId);
+    if (handoff === undefined) {
+      liveTextStore.clear(conversationId);
+      return;
+    }
+    const buf = buffers.get(conversationId) ?? '';
+    if (buf.length > handoff.prefixLen) {
+      buffers.set(conversationId, buf.slice(0, handoff.prefixLen));
+      emit();
+    }
+  },
   noteSettled(conversationId: string, messageId: string): void {
     const buf = buffers.get(conversationId) ?? '';
     if (buf === '') return;
