@@ -64,7 +64,7 @@ const hist = (dump) => {
   const h = {};
   for (const p of histProps) h[p] = new Map();
   for (const e of dump.els) {
-    const textual = e.text && e.text.length > 0;
+    const textual = (e.text && e.text.length > 0) || /"[^"]*"#\d/.test(e.key);
     for (const p of histProps) {
       if (
         ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'color'].includes(

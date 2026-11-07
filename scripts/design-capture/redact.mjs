@@ -152,7 +152,7 @@ for (const entry of readdirSync(runDir, { withFileTypes: true })) {
     specs.push({
       name: 'palette-recents',
       box: [0, 0, vw0, vh0],
-      from: mark('start:open-palette') + 150,
+      from: mark('start:open-palette') - 100,
       to: mark('end:type-query'),
     });
   const composer = (dumps.initial?.els ?? []).find((e) => (e.roles ?? []).includes('composer.box'));
@@ -264,8 +264,8 @@ for (const entry of readdirSync(runDir, { withFileTypes: true })) {
       box: [sp.box[0] / vw0, sp.box[1] / vh0, sp.box[2] / vw0, sp.box[3] / vh0],
       ...(sp.from || sp.to
         ? {
-            from: secs(sp.from ?? t0) + 0.25,
-            to: Math.max(0, secs(sp.to ?? sorted.at(-1).ts) - 0.25),
+            from: secs(sp.from ?? t0) + 0.05,
+            to: Math.max(0, secs(sp.to ?? sorted.at(-1).ts) - 0.05),
           }
         : {}),
     }));
