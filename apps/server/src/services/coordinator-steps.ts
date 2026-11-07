@@ -1,11 +1,11 @@
-import type { MachineDoneBody } from '@cairn/shared';
+import type { MachineDoneBody, ModelUsage } from '@cairn/shared';
 import {
   CHIEF_TURN_ERROR_KIND,
   formatSkillRouteSection,
   suggestSkillsForMessage,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
-import { type chiefThread, step } from '../db/schema.js';
+import { and, eq, sql } from 'drizzle-orm';
+import { type chiefThread, chiefTurnUsage, step, tokenUsage } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
 import {
@@ -18,11 +18,19 @@ import {
 import { CHIEF_DIGEST_SYSTEM_PROMPT, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
 import { recordChiefStop } from './chief-turns.js';
-import { type MachineDeps, publishStepStatus, upsertChiefRow } from './machine-deps.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
+import {
+  isChiefConversation,
+  type MachineDeps,
+  publishStepStatus,
+  stepTeamId,
+  upsertChiefRow,
+} from './machine-deps.js';
 import { injectMemories } from './memory.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { scanLocalSkills } from './skills.js';
+import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
 type StepRow = typeof step.$inferSelect;
 type ThreadRow = typeof chiefThread.$inferSelect;
@@ -84,11 +92,12 @@ export function chiefTurnContext(
         projectId: stepScopeProjectId(stepRow),
         threadId: threadRow.id,
       });
+  const sections = [projectSection, routeSection].filter((part): part is string => !!part);
   const instruction =
     stepRow.prompt === null
       ? null
-      : [stepRow.prompt, projectSection, routeSection].filter((part) => part).join('\n\n');
-  return { digest, trigger, systemPrompt, memories, instruction };
+      : [stepRow.prompt, ...sections].filter((part) => part).join('\n\n');
+  return { digest, trigger, systemPrompt, memories, instruction, sections };
 }
 
 export function finishCoordinatorTurn(
@@ -130,4 +139,92 @@ export function finishCoordinatorTurn(
     });
   }
   emitRuntimeStepSpan(deps.db, stepRow.id);
+}
+
+export function recordStepUsage(
+  deps: MachineDeps,
+  stepRow: StepRow,
+  usage: readonly ModelUsage[],
+): void {
+  const { db } = deps;
+  const usageTeamId = stepTeamId(deps, stepRow);
+  for (const u of usage) {
+    const prior = db
+      .select()
+      .from(tokenUsage)
+      .where(and(eq(tokenUsage.buildId, stepRow.buildId), eq(tokenUsage.model, u.model)))
+      .get();
+    const tokens = {
+      input: (prior?.input ?? 0) + u.input,
+      output: (prior?.output ?? 0) + u.output,
+      cacheRead: (prior?.cacheRead ?? 0) + u.cacheRead,
+      cacheWrite: (prior?.cacheWrite ?? 0) + u.cacheWrite,
+    };
+    const rates = ratesForModel(db, usageTeamId, u.model);
+    const reported = u.cost;
+    const cost = rates
+      ? costFromRates(tokens, rates)
+      : reported !== undefined &&
+          (reported.input !== 0 ||
+            reported.output !== 0 ||
+            reported.cacheRead !== 0 ||
+            reported.cacheWrite !== 0 ||
+            reported.total !== 0)
+        ? {
+            costInput: (prior?.costInput ?? 0) + reported.input,
+            costOutput: (prior?.costOutput ?? 0) + reported.output,
+            costCacheRead: (prior?.costCacheRead ?? 0) + reported.cacheRead,
+            costCacheWrite: (prior?.costCacheWrite ?? 0) + reported.cacheWrite,
+            costTotal: (prior?.costTotal ?? 0) + reported.total,
+          }
+        : null;
+    db.insert(tokenUsage)
+      .values({
+        buildId: stepRow.buildId,
+        model: u.model,
+        ...tokens,
+        costInput: cost?.costInput ?? null,
+        costOutput: cost?.costOutput ?? null,
+        costCacheRead: cost?.costCacheRead ?? null,
+        costCacheWrite: cost?.costCacheWrite ?? null,
+        costTotal: cost?.costTotal ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [tokenUsage.buildId, tokenUsage.model],
+        set: cost === null ? tokens : { ...tokens, ...cost },
+      })
+      .run();
+    if (
+      coordinatorRunsOnPi() &&
+      stepRow.kind === 'chief' &&
+      isChiefConversation(stepRow.buildId) &&
+      !isChiefDigestStep(stepRow)
+    ) {
+      db.insert(chiefTurnUsage)
+        .values({
+          stepId: stepRow.id,
+          threadId: stepRow.buildId,
+          model: u.model,
+          input: u.input,
+          output: u.output,
+          cacheRead: u.cacheRead,
+          cacheWrite: u.cacheWrite,
+          ttftMs: u.ttftMs ?? null,
+          contextTokens: u.contextTokens ?? null,
+          createdAt: nowMs(),
+        })
+        .onConflictDoUpdate({
+          target: [chiefTurnUsage.stepId, chiefTurnUsage.model],
+          set: {
+            input: sql`${chiefTurnUsage.input} + ${u.input}`,
+            output: sql`${chiefTurnUsage.output} + ${u.output}`,
+            cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
+            cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
+            ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
+            contextTokens: sql`coalesce(${u.contextTokens ?? null}, ${chiefTurnUsage.contextTokens})`,
+          },
+        })
+        .run();
+    }
+  }
 }
