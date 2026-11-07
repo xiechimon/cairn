@@ -61,10 +61,7 @@ export function ThreadCard({
             size="sm"
             variant="outline"
             onClick={onView}
-            className={cn(
-              'h-6.5 px-2.25 text-meta text-content-secondary',
-              primaryLabel != null && '@max-lg:hidden',
-            )}
+            className="h-6.5 px-2.25 text-meta text-content-secondary"
           >
             {viewLabel}
           </Button>

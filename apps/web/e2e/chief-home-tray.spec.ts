@@ -210,3 +210,15 @@ test('an answered card fades out over 200ms and leaves a one-line summary in the
   expect(seen).toEqual([{ animation: 'question-fade-out', duration: '0.2s' }]);
   await expect(page).toHaveTitle('Cairn');
 });
+
+test('on a phone every tray row still has a button that opens its thread', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: FIVE });
+  await page.goto('/app');
+  const tray = page.getByTestId('chief-composer-block').getByTestId('needs-you');
+  const rows = tray.locator('[data-slot="needs-you-item"]');
+  await expect(rows).toHaveCount(3);
+  for (let i = 0; i < 3; i++) {
+    await expect(rows.nth(i).getByRole('button', { name: 'View thread' })).toBeVisible();
+  }
+});
