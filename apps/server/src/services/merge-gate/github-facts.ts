@@ -216,7 +216,7 @@ function projectBranch(body: unknown): { tip: string | null; classic: Binding[] 
 
 async function readRules(
   r: Reader,
-  req: GateReadRequest,
+  req: Pick<GateReadRequest, 'owner' | 'repo'>,
   branch: string,
 ): Promise<Binding[] | null> {
   const out: Binding[] = [];
@@ -493,6 +493,74 @@ async function probeEvidence(
   return out;
 }
 
+async function readCheckState(
+  r: Reader,
+  repoKey: string,
+  head: string,
+  bindings: Binding[],
+  required: string[] | null,
+): Promise<Pick<GateGithubFacts, 'checks' | 'ownStatus'>> {
+  let checks: GateInputs['checks'] = null;
+  let ownStatus: GateGithubFacts['ownStatus'] = 'unreadable';
+  const runs = await readPaged(
+    r,
+    `runs:${repoKey}@${head}`,
+    RUN_PAGES,
+    'check_runs',
+    runOf,
+    (page, etag) => r.port.checkRuns(head, { filter: 'latest', page, perPage: PER_PAGE, etag }),
+    () => true,
+  );
+  const statuses = await readPaged(
+    r,
+    `status:${repoKey}@${head}`,
+    STATUS_PAGES,
+    'statuses',
+    statusOf,
+    (page, etag) => r.port.combinedStatus(head, { page, perPage: PER_PAGE, etag }),
+    (first, page) => typeof page.sha === 'string' && page.sha === first.sha,
+  );
+  if (statuses !== null) {
+    const picked = pickStatuses(statuses.rows);
+    const own = picked.find((s) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT);
+    ownStatus = !statuses.complete
+      ? 'unreadable'
+      : own === undefined
+        ? null
+        : { state: own.state, description: own.description };
+    if (runs !== null) {
+      checks = {
+        headSha: head,
+        statusSha: statuses.first.sha as string,
+        required,
+        runs: pickRuns(runs.rows, bindings),
+        statuses: picked.map((s) => ({ context: s.context, state: s.state })),
+        complete: runs.complete && statuses.complete,
+      };
+    }
+  }
+  return { checks, ownStatus };
+}
+
+export async function readRequiredChecksAt(
+  port: GateGithubPort,
+  req: Pick<GateReadRequest, 'owner' | 'repo'>,
+  branchName: string,
+  head: string,
+): Promise<GateInputs['checks']> {
+  const r: Reader = { port, cache: newGateReadCache(), now: 0, limited: null, failure: null };
+  if (!isSha(head)) return null;
+  const branch = await readBody(r, null, always, () => port.branch(branchName, { etag: null }));
+  const classic = branch.ok ? projectBranch(branch.body).classic : null;
+  const rules = classic === null ? null : await readRules(r, req, branchName);
+  const bindings = [...(classic ?? []), ...(rules ?? [])];
+  const required =
+    classic === null || rules === null ? null : [...new Set(bindings.map((b) => b.context))];
+  return (
+    await readCheckState(r, `${req.owner}/${req.repo}`.toLowerCase(), head, bindings, required)
+  ).checks;
+}
+
 export async function readGateGithubFacts(
   port: GateGithubPort,
   req: GateReadRequest,
@@ -560,43 +628,7 @@ export async function readGateGithubFacts(
     pr.baseBehindBy = c.behindBy;
   }
 
-  const runs = await readPaged(
-    r,
-    `runs:${repoKey}@${head}`,
-    RUN_PAGES,
-    'check_runs',
-    runOf,
-    (page, etag) => port.checkRuns(head, { filter: 'latest', page, perPage: PER_PAGE, etag }),
-    () => true,
-  );
-  const statuses = await readPaged(
-    r,
-    `status:${repoKey}@${head}`,
-    STATUS_PAGES,
-    'statuses',
-    statusOf,
-    (page, etag) => port.combinedStatus(head, { page, perPage: PER_PAGE, etag }),
-    (first, page) => typeof page.sha === 'string' && page.sha === first.sha,
-  );
-  if (statuses !== null) {
-    const picked = pickStatuses(statuses.rows);
-    const own = picked.find((s) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT);
-    facts.ownStatus = !statuses.complete
-      ? 'unreadable'
-      : own === undefined
-        ? null
-        : { state: own.state, description: own.description };
-    if (runs !== null) {
-      facts.checks = {
-        headSha: head,
-        statusSha: statuses.first.sha as string,
-        required,
-        runs: pickRuns(runs.rows, bindings),
-        statuses: picked.map((s) => ({ context: s.context, state: s.state })),
-        complete: runs.complete && statuses.complete,
-      };
-    }
-  }
+  Object.assign(facts, await readCheckState(r, repoKey, head, bindings, required));
   if (facts.checks === null) facts.notes.push('checks unreadable');
 
   if (typeof facts.compare !== 'string') {
