@@ -69,7 +69,7 @@ export function SettingsScopeSentence({
                 <SelectItem
                   key={m.id}
                   value={m.id}
-                  className="[&>span:first-child]:min-w-0 [&>span:first-child]:shrink [&>span:first-child]:whitespace-normal [&>span:first-child]:[overflow-wrap:anywhere]"
+                  className="h-auto! min-h-8 py-1! [&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:whitespace-normal [&>:first-child]:[overflow-wrap:anywhere]"
                 >
                   <Monitor aria-hidden />
                   <MachineName machine={m} all={machines} />

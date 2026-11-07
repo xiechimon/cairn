@@ -158,9 +158,9 @@ test('the accept switch is derived: off clears runtimes, on only opens the runti
   expect(patches[1]).toEqual({ enabledRuntimes: ['pi'] });
 });
 
-test('scope menu keeps long machine names and the selection indicator inside a phone viewport', async ({
+test('scope menu wraps long machine names without clipping or overlapping adjacent options inside a phone viewport', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const machineName = 'm'.repeat(60);
   await mockLive(
@@ -168,7 +168,10 @@ test('scope menu keeps long machine names and the selection indicator inside a p
     {
       threads: [],
       messages: [],
-      machines: [{ id: 'm-long', name: machineName, online: false }],
+      machines: [
+        { id: 'm-long', name: machineName, online: false },
+        { id: 'm-next', name: 'next-machine', online: true },
+      ],
     },
     (path, _route, json) => {
       if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
@@ -186,10 +189,48 @@ test('scope menu keeps long machine names and the selection indicator inside a p
   await page.getByRole('option', { name: new RegExp(machineName) }).click();
   await scope(page).click();
   const selected = page.getByRole('option', { name: new RegExp(machineName), selected: true });
+  const itemBox = await selected.boundingBox();
+  const textBox = await selected.locator('> :first-child').boundingBox();
+  const previousBox = await page.getByRole('option', { name: '所有机器', exact: true }).boundingBox();
+  const nextBox = await page.getByRole('option', { name: 'next-machine', exact: true }).boundingBox();
+  expect(itemBox).not.toBeNull();
+  expect(textBox).not.toBeNull();
+  expect(previousBox).not.toBeNull();
+  expect(nextBox).not.toBeNull();
+  expect(previousBox!.y + previousBox!.height).toBeLessThanOrEqual(itemBox!.y);
+  expect(itemBox!.y + itemBox!.height).toBeLessThanOrEqual(nextBox!.y);
+  expect(textBox!.x).toBeGreaterThanOrEqual(itemBox!.x);
+  expect(textBox!.x + textBox!.width).toBeLessThanOrEqual(itemBox!.x + itemBox!.width);
+  expect(textBox!.y).toBeGreaterThanOrEqual(itemBox!.y);
+  expect(textBox!.y + textBox!.height).toBeLessThanOrEqual(itemBox!.y + itemBox!.height);
+  const dimensions = await selected.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      height: style.height,
+      minHeight: style.minHeight,
+      paddingTop: style.paddingTop,
+      paddingBottom: style.paddingBottom,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    };
+  });
+  await testInfo.attach('machine-option-computed-style', {
+    body: JSON.stringify({ dimensions, itemBox, textBox, previousBox, nextBox }, null, 2),
+    contentType: 'application/json',
+  });
+  expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.clientHeight);
+  expect(dimensions.minHeight).toBe('32px');
+  expect(Number.parseFloat(dimensions.height)).toBeGreaterThan(32);
+  expect(Number.parseFloat(dimensions.paddingTop)).toBeGreaterThan(0);
+  expect(Number.parseFloat(dimensions.paddingBottom)).toBeGreaterThan(0);
   const indicator = selected.locator('svg.lucide-check');
   await expect(indicator).toBeVisible();
   await expect(indicator).toBeInViewport({ ratio: 1 });
   await expect
     .poll(() => menu.evaluate((element) => element.getBoundingClientRect().right))
     .toBeLessThanOrEqual(390);
+  await testInfo.attach('wrapped-machine-option', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
 });
