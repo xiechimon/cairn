@@ -116,14 +116,14 @@ export function createPrWakes(deps: BuildDeps) {
     now: number;
   }): Promise<void> => {
     const { row, pull, runs, token, owner, repo, now } = input;
-    if (pull.state !== 'open' || pull.merged) return;
+    if (pull.state !== 'open' || pull.merged || row.dismissed) return;
     let findings: PrReviewFinding[] | null = null;
     try {
       findings = await reconcilePrReviewFindings(deps, input);
     } catch (error) {
       if (error instanceof GithubRateLimitedError) throw error;
     }
-    if (!row.autoFix || row.dismissed) return;
+    if (!row.autoFix) return;
     const ledgerId = `pr-wakes:${row.teamId}:${row.repo}#${row.number}`;
     const stored = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
     const ledger = ledgerSchema.parse(stored?.content ?? {});

@@ -15,6 +15,10 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
 import { createPrWakes } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
+import {
+  answerPendingWorkerQuestions,
+  writeWorkerQuestion,
+} from '../src/services/worker-question-store.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
@@ -202,6 +206,45 @@ test.each(['P2', 'P3'])(
   },
 );
 
+test.each([true, false])(
+  'dismissed ready PR with findings stays ready without notices or wakes (autoFix=%s)',
+  async (autoFix) => {
+    const f = fixture();
+    f.s.db.update(threadPr).set({ dismissed: true, autoFix }).where(eq(threadPr.id, 'pr')).run();
+    await f.wake();
+    expect(
+      f.queries.some(
+        (q) =>
+          q.includes('convertPullRequestToDraft') || q.includes('markPullRequestReadyForReview'),
+      ),
+    ).toBe(false);
+    expect(f.fetch).not.toHaveBeenCalled();
+    expect(f.state.draft).toBe(false);
+    expect(f.s.db.select().from(message).all()).toEqual([]);
+    expect(f.s.db.select().from(step).all()).toEqual([]);
+  },
+);
+
+test('dismissed cairn-held draft with zero findings stays draft', async () => {
+  const f = fixture();
+  await f.reconcile();
+  f.state.resolved = true;
+  f.s.db.update(threadPr).set({ dismissed: true }).where(eq(threadPr.id, 'pr')).run();
+  f.fetch.mockClear();
+  f.queries.length = 0;
+  await f.wake();
+  expect(
+    f.queries.some(
+      (q) => q.includes('convertPullRequestToDraft') || q.includes('markPullRequestReadyForReview'),
+    ),
+  ).toBe(false);
+  expect(f.fetch).not.toHaveBeenCalled();
+  expect(f.state.draft).toBe(true);
+  expect(f.hold()).toMatchObject({ head: 'abc' });
+  expect(f.s.db.select().from(message).all()).toHaveLength(1);
+  expect(f.s.db.select().from(step).all()).toEqual([]);
+});
+
 test.each(['http', 'graphql', 'cursor'])('unreadable threads fail closed: %s', async (error) => {
   const f = fixture();
   f.state.error = error;
@@ -290,13 +333,88 @@ test('autoFix off still holds, notifies and later releases', async () => {
   expect(f.state.draft).toBe(false);
 });
 
-test('unverified draft mutation does not record a hold and retries', async () => {
+test('unverified draft mutation retains hold intent and retries', async () => {
   const f = fixture();
   f.state.apply = false;
   await expect(f.reconcile()).rejects.toThrow();
-  expect(f.hold()).toBeUndefined();
+  expect(f.hold()).toMatchObject({ head: 'abc' });
   await expect(f.reconcile()).rejects.toThrow();
   expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(2);
+});
+
+test('successful draft mutation with failed read-back retains ownership and later releases', async () => {
+  const f = fixture();
+  const implementation = f.fetch.getMockImplementation()!;
+  f.fetch.mockImplementation(async (url, init) => {
+    if (init?.body && JSON.parse(init.body).query.includes('node(id:'))
+      throw new Error('read-back failed');
+    return implementation(url, init);
+  });
+  await expect(f.reconcile()).rejects.toThrow('GitHub GraphQL unavailable');
+  expect(f.state.draft).toBe(true);
+  expect(f.hold()).toMatchObject({ head: 'abc' });
+  f.fetch.mockImplementation(implementation);
+  f.state.resolved = true;
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+  expect(f.hold()).toBeUndefined();
+  expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);
+});
+
+test('failed draft mutation retains intent and retries without duplicate holds', async () => {
+  const f = fixture();
+  let holdAtMutation: unknown;
+  const implementation = f.fetch.getMockImplementation()!;
+  f.fetch.mockImplementation(async (url, init) => {
+    if (init?.body && JSON.parse(init.body).query.includes('convertPullRequestToDraft')) {
+      holdAtMutation = f.hold();
+      throw new Error('mutation failed');
+    }
+    return implementation(url, init);
+  });
+  await expect(f.reconcile()).rejects.toThrow('GitHub GraphQL unavailable');
+  expect(f.state.draft).toBe(false);
+  expect(holdAtMutation).toMatchObject({ head: 'abc' });
+  expect(f.hold()).toMatchObject({ head: 'abc' });
+  f.fetch.mockImplementation(implementation);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.s.db.select().from(message).all()).toHaveLength(1);
+  expect(f.hold()).toMatchObject({ head: 'abc' });
+  expect(
+    f.fetch.mock.calls.filter(
+      ([, init]) => init?.body && JSON.parse(init.body).query.includes('convertPullRequestToDraft'),
+    ),
+  ).toHaveLength(2);
+});
+
+test('pending blocking worker question prevents release until answered', async () => {
+  const f = fixture();
+  await f.reconcile();
+  f.state.resolved = true;
+  writeWorkerQuestion(
+    { db: f.s.db },
+    'b',
+    'question',
+    {
+      kind: 'ask_user_question',
+      requestId: 'question',
+      status: 'pending',
+      questions: [{ header: 'Decision', question: 'Proceed?', options: [] }],
+      answers: null,
+    },
+    1,
+  );
+  expect(f.s.db.select().from(step).all()).toEqual([]);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.hold()).toMatchObject({ head: 'abc' });
+  expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(false);
+  expect(answerPendingWorkerQuestions({ db: f.s.db }, 'b', 'Proceed')).toBe(true);
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+  expect(f.hold()).toBeUndefined();
+  expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);
 });
 
 test('unverified ready mutation retains the hold and retries', async () => {

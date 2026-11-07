@@ -5,6 +5,7 @@ import { message, step, type threadPr } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubPrReviewFindings, githubSetPullDraft } from '../lib/github-review-findings.js';
 import type { BuildDeps } from './builds.js';
+import { blockingWorkerQuestions } from './worker-question-store.js';
 
 const holdSchema = z.object({ head: z.string() });
 
@@ -27,7 +28,6 @@ export async function reconcilePrReviewFindings(
   const hold = stored ? holdSchema.parse(stored.content) : null;
   if (pull.findings.length > 0) {
     if (!pull.isDraft) {
-      await githubSetPullDraft(fetch, token, pull.id, true);
       deps.db
         .insert(message)
         .values({
@@ -39,6 +39,7 @@ export async function reconcilePrReviewFindings(
         })
         .onConflictDoUpdate({ target: message.id, set: { content: { head: pull.head } } })
         .run();
+      await githubSetPullDraft(fetch, token, pull.id, true);
     }
     if (!row.autoFix) {
       const wakeLedger = deps.db
@@ -70,6 +71,7 @@ export async function reconcilePrReviewFindings(
     pull.isDraft &&
     hold &&
     !pull.labels.some((label) => ['coordinator-hold', 'needs-decision'].includes(label)) &&
+    blockingWorkerQuestions(deps.db, row.buildId).length === 0 &&
     !deps.db
       .select({ id: step.id })
       .from(step)
