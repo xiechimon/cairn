@@ -57,11 +57,13 @@ function DockQuestion({
   numberKeys,
   pager,
   bound,
+  ownFooter,
 }: {
   request: OriginChiefQuestion;
   numberKeys: boolean;
   pager: QuestionPager | undefined;
   bound: boolean;
+  ownFooter: boolean;
 }) {
   const root = useOptionalChiefRoot();
   const key = draftKeyOf(request);
@@ -87,6 +89,7 @@ function DockQuestion({
         numberKeys={numberKeys}
         {...(pager !== undefined ? { pager } : {})}
         bound={bound}
+        ownFooter={ownFooter}
         onAnswer={(input) =>
           root?.surface.onAnswerQuestion?.({ ...input, threadId: request.conversationId })
         }
@@ -144,7 +147,15 @@ function useLeavingQuestion(shownId: string | undefined): ChiefQuestionItem | nu
   return leaving;
 }
 
-export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boolean }) {
+export function ChiefQuestionDock({
+  home,
+  bound,
+  ownFooter,
+}: {
+  home: boolean;
+  bound: boolean;
+  ownFooter: boolean;
+}) {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const numberKeys = bound && searchParams.get(THREAD_PARAM) === null;
@@ -222,6 +233,7 @@ export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boole
         numberKeys={numberKeys}
         pager={pager}
         bound={bound}
+        ownFooter={ownFooter}
       />
     </section>
   );
