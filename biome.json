@@ -24,10 +24,6 @@
       "apps/server/drizzle.config.ts",
       "apps/server/build.mjs",
       "apps/server/scripts/stage-web.mjs",
-      "apps/coordinator/src/**",
-      "apps/coordinator/test/**/*.ts",
-      "apps/coordinator/package.json",
-      "apps/coordinator/tsconfig.json",
       "apps/daemon/src/**",
       "apps/daemon/test/**/*.ts",
       "apps/daemon/build.mjs",
@@ -71,7 +67,7 @@
             "patterns": [
               {
                 "group": ["@earendil-works/*", "@earendil-works/*/*"],
-                "message": "Seam discipline (01 §5/§7.3): pi packages are consumed only in apps/daemon/src/backend/ (behind the AgentBackend seam) and apps/coordinator/src/runtime/ (the Coordinator sidecar, D72); other modules import the seam interface from @cairn/shared."
+                "message": "Seam discipline (01 §5/§7.3): pi packages are consumed only in apps/daemon/src/backend/ (behind the AgentBackend seam) and apps/server/src/coordinator/runtime/ (the in-server Coordinator, D114); other modules import the seam interface from @cairn/shared."
               },
               {
                 "group": [
@@ -104,6 +100,10 @@
                 "message": "Seam discipline (ACP): ACP SDK and adapters may only be consumed through apps/daemon/src/backend/."
               },
               {
+                "group": ["**/legacy/agent-layer/*"],
+                "message": "Seam discipline (D60): the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
+              },
+              {
                 "group": ["@opentelemetry/*", "@opentelemetry/*/*"],
                 "message": "Seam discipline (observability-4): OpenTelemetry packages may only be consumed through the thin bridge module apps/daemon/src/backend/otel.ts, and only when CAIRN_OTEL_ENDPOINT is configured."
               }
@@ -123,8 +123,10 @@
     {
       "includes": [
         "apps/daemon/src/backend/**",
-        "apps/coordinator/src/runtime/**",
-        "apps/coordinator/test/**"
+        "apps/server/src/coordinator/runtime/**",
+        "apps/server/src/db/client.ts",
+        "apps/server/src/legacy/**",
+        "apps/server/test/**"
       ],
       "linter": {
         "rules": {

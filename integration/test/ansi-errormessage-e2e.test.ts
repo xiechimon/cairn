@@ -9,7 +9,7 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { build as buildTable, step as stepTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { AGENT_ID, api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
+import { api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const BIOME_FIXTURE = fileURLToPath(new URL('./fixtures/biome-ansi-coloured.txt', import.meta.url));
@@ -90,8 +90,6 @@ describe('#1262 E2E: lint-failed commit → errorMessage persisted as plain text
 
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;

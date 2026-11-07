@@ -14,7 +14,7 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { ASK_PARK_MS } from '../../apps/server/src/services/chief-questions.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
+import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const ASK_ARGS = {
@@ -152,8 +152,10 @@ afterAll(async () => {
 
 describe('#1049 chief ask_user blocking Q&A full chain (pi backend)', () => {
   test('question → card (row + notification) → answer card → same turn continues (D2/D3/D4)', async () => {
-    const patch = await teamApi('PATCH', `/api/teams/${server.teamId}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: null },
+    const patch = await teamApi('PATCH', `/api/teams/${server.teamId}/routing-rules/coordinator`, {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      thinkingLevel: null,
     });
     expect(patch.status).toBe(200);
     const sent = await teamApi('POST', `/api/teams/${server.teamId}/chief/threads`, {

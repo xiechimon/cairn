@@ -1,7 +1,7 @@
 import { todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
-import { agent, build, message, plan, project, schedule, step, todo } from '../src/db/schema.js';
+import { build, message, plan, project, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
@@ -10,24 +10,14 @@ import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { PhaseTransitionError } from '../src/services/phase.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule, workerScheduleRunHistory } from '../src/services/schedules.js';
-import { bootServer, insertMachine, postProject, req } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 
 afterEach(() => vi.restoreAllMocks());
 
 async function world(kind: 'once' | 'cron' = 'cron') {
   const s = bootServer();
   const machineId = insertMachine(s);
-  s.db
-    .insert(agent)
-    .values({
-      id: 'scheduled-agent',
-      teamId: s.team.id,
-      displayName: 'Worker',
-      provider: 'p',
-      modelId: 'm',
-      machineId,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'p', modelId: 'm', machineId });
   const projectId = await postProject(s.app, 'Scheduled continuation');
   const response = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: 'Check changes',
@@ -37,8 +27,6 @@ async function world(kind: 'once' | 'cron' = 'cron') {
   const [started] = builds.startBuilds(s.svc, {
     projectId,
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: 'scheduled-agent' } },
-    withPlan: false,
   });
   const buildId = started!.id;
   const first = s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
@@ -429,7 +417,10 @@ test('an owner schedule at confirm cancels the old build and starts a build with
   const fresh = s.db.select().from(build).all().at(-1)!;
   expect(fresh).toMatchObject({ withPlan: false, triggerSource: 'schedule', prevPhase: 'confirm' });
   expect(fresh.id).not.toBe(s.buildId);
-  expect(s.db.select().from(step).all().at(-1)).toMatchObject({ buildId: fresh.id, kind: 'build' });
+  expect(s.db.select().from(step).all().at(-1)).toMatchObject({
+    buildId: fresh.id,
+    kind: 'session',
+  });
 });
 
 test.each(['queued', 'todo', 'closed'] as const)(

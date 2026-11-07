@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   notification as notificationTable,
@@ -11,7 +10,6 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { OVERFLOW_AFTER_MS } from '../src/services/machine-routing.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { NO_MACHINE_ALERT_MS, sweepUnplaceableSteps } from '../src/services/unplaceable-steps.js';
 import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
 
@@ -19,8 +17,6 @@ const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of disposables) d();
 });
-beforeEach(() => setRoutingRulesEnabled(true));
-afterEach(() => setRoutingRulesEnabled(false));
 
 let seq = 20_000;
 
@@ -70,33 +66,11 @@ async function machineOf(
   return machineId;
 }
 
-function agentOf(
+function routeOf(
   w: World,
-  id: string,
   preferred: string | null,
   requiredCapabilities: { executor?: 'orb'; mcpServers?: string[] } | null = null,
 ): void {
-  w.s.db
-    .insert(agentTable)
-    .values({
-      id,
-      teamId: w.s.team.id,
-      displayName: id,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-      maxConcurrentTasks: null,
-      requiredCapabilities: null,
-      machineId: null,
-    })
-    .run();
   w.s.db.delete(routingRule).where(eq(routingRule.teamId, w.s.team.id)).run();
   w.s.db
     .insert(routingRule)
@@ -117,7 +91,6 @@ function agentOf(
 
 function pendingStep(
   w: World,
-  agentId: string,
   opts: { ageMs?: number; priorSession?: { machineId: string; sessionId: string } } = {},
 ): string {
   seq += 1;
@@ -135,7 +108,6 @@ function pendingStep(
       spec: 'probe',
       phase: 'queued',
       phaseAt: createdAt,
-      assignment: { plan: null, build: { agentId } },
     })
     .run();
   w.s.db
@@ -194,8 +166,8 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     const w = await world();
     const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
     await machineOf(w, 'mac');
-    agentOf(w, 'implementer', orb, { executor: 'orb' });
-    pendingStep(w, 'implementer', { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    routeOf(w, orb, { executor: 'orb' });
+    pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
     sweepUnplaceableSteps(w.s.svc, Date.now());
     const [item] = alerts(w);
     expect(item?.snippet).toContain('omarchy-orb');
@@ -205,8 +177,8 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     const w = await world();
     const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
     await machineOf(w, 'mac');
-    agentOf(w, 'implementer', orb, { executor: 'orb' });
-    pendingStep(w, 'implementer', { ageMs: NO_MACHINE_ALERT_MS - 60_000 });
+    routeOf(w, orb, { executor: 'orb' });
+    pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS - 60_000 });
     sweepUnplaceableSteps(w.s.svc, Date.now());
     expect(alerts(w)).toHaveLength(0);
   });
@@ -215,8 +187,8 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     await machineOf(w, 'mac');
-    agentOf(w, 'reviewer', omarchy);
-    pendingStep(w, 'reviewer', { ageMs: OVERFLOW_AFTER_MS * 3 });
+    routeOf(w, omarchy);
+    pendingStep(w, { ageMs: OVERFLOW_AFTER_MS * 3 });
     sweepUnplaceableSteps(w.s.svc, Date.now());
     expect(alerts(w)).toHaveLength(0);
   });
@@ -224,8 +196,8 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
   test('a missing capability on the online machines is named', async () => {
     const w = await world();
     const mac = await machineOf(w, 'mac');
-    agentOf(w, 'designer', mac, { mcpServers: ['figma'] });
-    pendingStep(w, 'designer', { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    routeOf(w, mac, { mcpServers: ['figma'] });
+    pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
     sweepUnplaceableSteps(w.s.svc, Date.now());
     expect(alerts(w)[0]?.snippet).toContain('MCP server "figma"');
   });
@@ -233,24 +205,12 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
   test('a read alert is not raised again for the same wait', async () => {
     const w = await world();
     const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
-    agentOf(w, 'implementer', orb, { executor: 'orb' });
-    pendingStep(w, 'implementer', { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    routeOf(w, orb, { executor: 'orb' });
+    pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
     sweepUnplaceableSteps(w.s.svc, Date.now());
     w.s.db.update(notificationTable).set({ readAt: Date.now() }).run();
     sweepUnplaceableSteps(w.s.svc, Date.now() + 60_000);
     expect(alerts(w)).toHaveLength(1);
     expect(alerts(w)[0]?.readAt).not.toBeNull();
-  });
-
-  test('routing rules off: a pinned step whose machine is offline alerts and names that machine', async () => {
-    const w = await world();
-    setRoutingRulesEnabled(false);
-    const omarchy = await machineOf(w, 'omarchy', { online: false });
-    await machineOf(w, 'mac');
-    agentOf(w, 'pinned', null);
-    w.s.db.update(agentTable).set({ machineId: omarchy }).where(eq(agentTable.id, 'pinned')).run();
-    pendingStep(w, 'pinned', { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
-    sweepUnplaceableSteps(w.s.svc, Date.now());
-    expect(alerts(w)[0]?.snippet).toContain('omarchy');
   });
 });

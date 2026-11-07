@@ -1,6 +1,5 @@
-import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
-import { relativeTime } from '../board/rel-time.js';
+import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -25,9 +24,8 @@ import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
-import { ChiefIdentity } from './chief-identity.js';
-import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
+import { QuestionAnsweredLine } from './question-answered-line.js';
 import { ThreadReportReply } from './thread-report-reply.js';
 
 const MSG_TOOL_BTN_CLS =
@@ -38,6 +36,7 @@ const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: string }) {
   const { t, locale } = useI18n();
   const now = useMinuteClock();
+  if (createdAt != null && !isUsableTimestamp(createdAt, now)) return null;
   if (createdAt == null) {
     return fallback == null ? null : (
       <span className={STAMP_CLS} data-testid="chief-msg-stamp">
@@ -64,18 +63,19 @@ function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: 
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
 const MSG_COL_CLS =
-  'min-w-0 flex-1 text-card-title text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
+  'relative min-w-0 flex-1 text-card-title text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const MSG_ROW_CLS = 'mt-3.5';
+const USER_ROW_CLS = 'mt-6';
+const REPLY_ROW_CLS = 'mt-9';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
 const BUBBLE_USER_CLS =
-  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title break-words text-(--foreground)';
+  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title [overflow-wrap:anywhere] text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
 const MARKER_CONTENT_CLS = 'max-w-[85%]';
@@ -218,16 +218,12 @@ interface ChiefStreamRowProps {
   index: number;
   latest: boolean;
   replyable?: boolean;
-  bound: ChiefContent['bound'];
-  agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
   copiedKey: string | null;
   onCopy: (key: string, text: string) => void;
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
-  onAnswerQuestion?: ((input: { requestId: string; answers: AskUserAnswer[] }) => void) | undefined;
-  onCancelQuestion?: ((requestId: string) => void) | undefined;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -261,23 +257,22 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
 const messageToolsReveal = (latest: boolean) =>
   latest
     ? 'opacity-100'
-    : 'opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+    : 'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+
+const messageToolsPlace = (latest: boolean, side: 'left' | 'right', flowGap: string) =>
+  latest ? flowGap : `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
 
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   latest,
   replyable = false,
-  bound,
-  agent,
   runningTool,
   copiedKey,
   onCopy,
   toolsOpen,
   onToggleTools,
   onRewindRequest,
-  onAnswerQuestion,
-  onCancelQuestion,
 }: ChiefStreamRowProps) {
   const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
@@ -354,9 +349,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'user')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`${MSG_ROW_CLS} justify-end`} data-testid="chief-msg">
+        <Message className={`${USER_ROW_CLS} justify-end`} data-testid="chief-msg">
           <MessageContent
-            className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
+            className="relative max-w-[min(85%,42rem)] flex-none items-end gap-0"
             data-testid="chief-msg-col"
           >
             <div
@@ -367,7 +362,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </div>
             <div
-              className={`mt-1 flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace(latest, 'right', 'mt-1')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-tools"
             >
               <MessageStamp createdAt={item.createdAt} fallback={item.at} />
@@ -401,24 +396,20 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'thinking')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${MSG_ROW_CLS}`}>
+        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ThinkingRow text={item.text} />
           </MessageContent>
         </Message>
       </MessageScrollerItem>
     );
+  if (item.kind === 'question' && item.status === 'pending') return null;
   if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${MSG_ROW_CLS}`}>
+        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <ChiefQuestionCard
-              item={item}
-              numberKeys={false}
-              {...(onAnswerQuestion ? { onAnswer: onAnswerQuestion } : {})}
-              {...(onCancelQuestion ? { onCancel: onCancelQuestion } : {})}
-            />
+            <QuestionAnsweredLine item={item} />
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -443,12 +434,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     ];
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-        <Message className={MSG_ROW_CLS} data-testid="chief-msg">
+        <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
           <MessageContent className={MSG_COL_LIVE_CLS}>
             <LiveRow
               variant="chief"
               label={item.label}
               labelVars={item.labelVars}
+              waiting={item.waiting === true}
               disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
             >
               <div data-testid="chief-turn-tools">
@@ -468,17 +460,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   }
-  const identity =
-    bound && agent ? <ChiefIdentity agent={agent} busy={item.typing === true} /> : null;
   const tools = turnToolSteps(item.tools);
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-      <Message className={MSG_ROW_CLS} data-testid="chief-msg">
-        <MessageContent
-          className={identity != null ? `${MSG_COL_MID_CLS} gap-1.5` : MSG_COL_MID_CLS}
-          data-testid="chief-msg-col"
-        >
-          {identity}
+      <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
+        <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
           {tools.length > 0 && (
             <TraceGroup
               density="compact"
@@ -515,7 +501,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
           {item.typing !== true && (
             <div
-              className={`mt-2 flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace(latest, 'left', 'mt-2')} flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-foot"
             >
               <Button

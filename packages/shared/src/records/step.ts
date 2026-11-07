@@ -96,7 +96,6 @@ export const buildStepActionBodySchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('confirm') }),
   z.object({
     action: z.literal('review'),
-    agentId: z.string().optional(),
     focus: z.string().optional(),
   }),
   z.object({

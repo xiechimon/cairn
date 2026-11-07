@@ -5,11 +5,13 @@ import {
   questionActionThread,
   questionDraftKey,
   questionDraftStore,
+  questionSubmitStore,
 } from '../src/chief/question-drafts.js';
 import { originChiefQuestions } from '../src/chief/question-origin.js';
 
 afterEach(() => {
   questionDraftStore.clearAll();
+  questionSubmitStore.clearAll();
 });
 
 const questions = [
@@ -41,7 +43,7 @@ describe('Coordinator question drafts stay on their own request', () => {
   test('another team or request cannot read a filled draft', () => {
     const key = questionDraftKey({ teamId: 't1', conversationId: 'c1', requestId: 'q1' });
     const drafts = applyQuestionPick(emptyQuestionDrafts(questions), 0, questions[0]!, 0);
-    questionDraftStore.set(key, { drafts, step: 1, submitting: false, error: null });
+    questionDraftStore.set(key, { drafts, step: 1 });
     expect(
       questionDraftStore.get(
         questionDraftKey({ teamId: 't2', conversationId: 'c1', requestId: 'q1' }),
@@ -65,16 +67,25 @@ describe('Coordinator question drafts stay on their own request', () => {
     const key = questionDraftKey({ teamId: 't1', conversationId: 'c1', requestId: 'q1' });
     const drafts = emptyQuestionDrafts(questions);
     drafts[2] = { kind: 'text', value: 'also the changelog' };
-    questionDraftStore.set(key, { drafts, step: 2, submitting: true, error: null });
-    questionDraftStore.patch(key, {
+    questionDraftStore.set(key, { drafts, step: 2 });
+    questionSubmitStore.patch(key, { submitting: true });
+    questionSubmitStore.patch(key, {
       submitting: false,
       error: 'Could not send your answer. Your draft is still here. Try Submit again.',
     });
     const stored = questionDraftStore.get(key);
-    expect(stored?.submitting).toBe(false);
+    expect(questionSubmitStore.get(key).submitting).toBe(false);
     expect(stored?.step).toBe(2);
     expect(stored?.drafts[2]).toEqual({ kind: 'text', value: 'also the changelog' });
-    expect(stored?.error).toContain('draft is still here');
+    expect(questionSubmitStore.get(key).error).toContain('draft is still here');
+  });
+
+  test('submission state exists without any draft record', () => {
+    const key = questionDraftKey({ teamId: 't1', conversationId: 'c1', requestId: 'q9' });
+    expect(questionDraftStore.get(key)).toBeUndefined();
+    questionSubmitStore.patch(key, { submitting: true });
+    expect(questionSubmitStore.get(key).submitting).toBe(true);
+    expect(questionDraftStore.get(key)).toBeUndefined();
   });
 
   test('clearing one request leaves the other', () => {
@@ -83,14 +94,10 @@ describe('Coordinator question drafts stay on their own request', () => {
     questionDraftStore.set(first, {
       drafts: emptyQuestionDrafts(questions),
       step: 1,
-      submitting: false,
-      error: null,
     });
     questionDraftStore.set(second, {
       drafts: emptyQuestionDrafts(questions.slice(0, 1)),
       step: 0,
-      submitting: false,
-      error: null,
     });
     questionDraftStore.clear(first);
     expect(questionDraftStore.get(first)).toBeUndefined();

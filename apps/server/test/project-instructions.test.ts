@@ -1,16 +1,16 @@
 import { BRIEF_MARKER_END, claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { agent, chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
+import { chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { saveMemoryEntry } from '../src/services/memory.js';
 import {
-  bindAgentHome,
-  bindAllAgents,
   bootServer,
   issueApiKey,
   machineIdByName,
   req,
+  seedRoute,
+  seedSessionRoute,
   type TestServer,
 } from './helpers.js';
 
@@ -94,16 +94,7 @@ describe('instructions cannot break the worker brief (D74 P1)', () => {
 describe('threads in the project receive the instructions (D74 P1)', () => {
   test('a claimed build carries its project instructions through the wire schema', async () => {
     const token = await enroll('rules-builder');
-    s.db
-      .insert(agent)
-      .values({
-        id: 'rules-agent',
-        teamId: s.team.id,
-        displayName: 'Builder',
-        modelId: 'stub-model',
-      })
-      .run();
-    bindAllAgents(s);
+    seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
     const id = await createProject('rules', { kind: 'github', githubRepo: 'octo/demo' });
     await req(s.app, 'PATCH', `/api/projects/${id}`, { instructions: RULES });
     const task = (await (
@@ -112,7 +103,6 @@ describe('threads in the project receive the instructions (D74 P1)', () => {
     const started = await req(s.app, 'POST', `/api/projects/${id}/builds`, {
       todoIds: [task.id],
       withPlan: false,
-      assignment: { plan: null, build: { agentId: 'rules-agent' } },
     });
     expect(started.status).toBe(201);
     expect((await claim(token)).project?.instructions).toBe(RULES);
@@ -123,23 +113,13 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
   const CHIEF_AGENT = 'agent-rules-chief';
 
   beforeEach(() => {
-    s.db
-      .insert(agent)
-      .values({
-        id: CHIEF_AGENT,
-        teamId: s.team.id,
-        displayName: CHIEF_AGENT,
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      })
-      .run();
+    seedRoute(s, 'coordinator', { id: CHIEF_AGENT, provider: 'stub-gw', modelId: 'stub-model' });
     s.db
       .insert(chiefTable)
       .values({
         id: `chief-${s.user.id}-${s.team.id}`,
         userId: s.user.id,
         teamId: s.team.id,
-        agentId: CHIEF_AGENT,
         charter: '',
         watches: [],
         wakes: [],
@@ -155,7 +135,11 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
     });
     expect(sent.status).toBe(201);
     const token = await enroll('rules-chief');
-    bindAgentHome(s, CHIEF_AGENT, machineIdByName(s, 'rules-chief'));
+    seedRoute(s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: machineIdByName(s, 'rules-chief'),
+    });
     const claimed = await claim(token);
     expect(claimed.step.kind).toBe('chief');
     return (claimed as { instruction?: string }).instruction ?? '';
@@ -218,7 +202,11 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
     });
     expect(sent.status).toBe(201);
     const token = await enroll('rules-chief');
-    bindAgentHome(s, CHIEF_AGENT, machineIdByName(s, 'rules-chief'));
+    seedRoute(s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: machineIdByName(s, 'rules-chief'),
+    });
     const claimed = await claim(token);
     expect(claimed.agent?.memories?.map((m) => m.title)).toEqual(['team rule']);
   });

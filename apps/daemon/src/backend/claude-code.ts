@@ -40,7 +40,10 @@ import type {
 } from '@cairn/shared';
 import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@cairn/shared';
 import { z } from 'zod';
-import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
+import {
+  claudeCodeAuthFailureMessage,
+  claudeCodeTeamSubscriptionAuthFailureMessage,
+} from '../claude-code-auth.js';
 import { credentialRedactor } from '../credential-output.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
@@ -100,11 +103,13 @@ export interface ClaudeMapState {
   modelId?: string;
   authFailed?: boolean;
   machineName?: string;
+  teamSubscriptionToken: boolean;
 }
 
 export function createClaudeMapState(opts?: {
   modelId?: string;
   machineName?: string;
+  teamSubscriptionToken?: boolean;
 }): ClaudeMapState {
   return {
     calls: new Map(),
@@ -113,6 +118,7 @@ export function createClaudeMapState(opts?: {
     usage: [],
     sessionId: null,
     rateLimits: [],
+    teamSubscriptionToken: opts?.teamSubscriptionToken ?? false,
     ...(opts?.modelId !== undefined ? { modelId: opts.modelId } : {}),
     ...(opts?.machineName !== undefined ? { machineName: opts.machineName } : {}),
   };
@@ -310,7 +316,9 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             ? resultText
             : (subtype ?? 'unknown error');
       const message = state.authFailed
-        ? claudeCodeAuthFailureMessage(state.machineName ?? hostname())
+        ? state.teamSubscriptionToken
+          ? claudeCodeTeamSubscriptionAuthFailureMessage(cliMessage)
+          : claudeCodeAuthFailureMessage(state.machineName ?? hostname(), cliMessage)
         : cliMessage;
       if (state.interrupted) {
         return [
@@ -320,7 +328,12 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           },
         ];
       }
-      return [{ type: 'error', error: { message, retryable: isRetryableError(message) } }];
+      return [
+        {
+          type: 'error',
+          error: { message, retryable: !state.authFailed && isRetryableError(message) },
+        },
+      ];
     }
     case 'rate_limit_event': {
       const info = (
@@ -1106,6 +1119,7 @@ export class ClaudeCodeBackend implements AgentBackend {
     const state = createClaudeMapState({
       modelId: opts.modelId,
       machineName: this.opts.machineName ?? hostname(),
+      teamSubscriptionToken: sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN !== undefined,
     });
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined) input.push(buildUserMessage(opts.prompt, opts.promptImages));

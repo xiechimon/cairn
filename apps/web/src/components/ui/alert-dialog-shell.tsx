@@ -87,13 +87,7 @@ export function AlertDialogShell({
           </div>
           <DialogFootRow hint={hint}>{footer}</DialogFootRow>
           <AlertDialogPrimitive.Close
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn('delete-confirm-close', DIALOG_CLOSE_CLS)}
-              />
-            }
+            render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
             aria-label={t('关闭')}
             onClick={onClose}
           >

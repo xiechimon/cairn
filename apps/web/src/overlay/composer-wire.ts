@@ -57,6 +57,7 @@ export interface ComposerWireOptions {
   editable?: boolean;
   draft?: string;
   onDraftChange?: (next: string) => void;
+  readDraft?: () => string;
   onSend?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
   onStopAndSend?: (text: string) => void | Promise<void>;
@@ -70,6 +71,7 @@ export interface ComposerWireOptions {
     onStop?: () => void;
   };
   growCap?: number;
+  active?: boolean;
   onPickProject?: (project: { id: string; label: string }) => void;
 }
 
@@ -128,6 +130,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     editable = false,
     draft: draftProp,
     onDraftChange,
+    readDraft,
     onSend,
     onQueue,
     onStopAndSend,
@@ -136,6 +139,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     mentionFiles,
     slash: slashOptions,
     growCap,
+    active = true,
     onPickProject,
   } = options;
   const { t } = useI18n();
@@ -362,7 +366,14 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     void Promise.resolve(onAttachment(files))
       .then((tokens) => {
         if (tokens.length === 0) return;
-        writeFull(joinDraft([...tokensRef.current, ...tokens], draftRef.current));
+        const base =
+          readDraft === undefined ? undefined : splitDraft(toDisplay(readDraft(), registry));
+        writeFull(
+          joinDraft(
+            [...(base?.tokens ?? tokensRef.current), ...tokens],
+            base?.text ?? draftRef.current,
+          ),
+        );
       })
       .catch((err) => {
         console.error('attachment delegate failed', err);
@@ -407,7 +418,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   }, [draft]);
 
   useLayoutEffect(() => {
-    if (growCap == null) return;
+    if (growCap == null || !active) return;
     const ta = textareaRef.current;
     if (ta == null) return;
     const grow = () => {
@@ -424,7 +435,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     });
     observer.observe(ta);
     return () => observer.disconnect();
-  }, [draft, growCap]);
+  }, [draft, growCap, active]);
 
   const applyTextInsert = (
     produce: (

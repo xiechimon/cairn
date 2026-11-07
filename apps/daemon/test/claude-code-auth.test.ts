@@ -1,12 +1,14 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { CLAUDE_CODE_AUTH_FAILURE_MARKER, isProviderAuthFailure } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   claudeCodeAuthFailureMessage,
+  claudeCodeTeamSubscriptionAuthFailureMessage,
   parseClaudeCodeAuthStatus,
   probeClaudeCodeAuth,
 } from '../src/claude-code-auth.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function statusJson(fields: Record<string, unknown>): string {
   return JSON.stringify({
@@ -79,7 +81,7 @@ describe('probeClaudeCodeAuth', () => {
   });
 
   test('failure mode 6b: real subprocess rc=1 + JSON stdout → verdict as usual (not folded into unknown by the exit code)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-auth-'));
+    const dir = testTempDir('cairn-cc-auth-');
     const stub = join(dir, 'claude');
     writeFileSync(
       stub,
@@ -106,13 +108,38 @@ describe('probeClaudeCodeAuth', () => {
 });
 
 describe('claudeCodeAuthFailureMessage', () => {
+  test('keeps the CLI reason for machine login failures', () => {
+    const msg = claudeCodeAuthFailureMessage('daemon-mea', 'OAuth token revoked');
+    expect(msg).toContain('claude auth status');
+    expect(msg).toContain('OAuth token revoked');
+  });
+
   test('failure mode 7: names the machine + credential kind + remedy', () => {
     const msg = claudeCodeAuthFailureMessage('daemon-mea');
+    expect(msg).toContain(CLAUDE_CODE_AUTH_FAILURE_MARKER);
+    expect(isProviderAuthFailure(msg)).toBe(true);
     expect(msg).toContain('daemon-mea');
     expect(msg).toContain('claude-code');
     expect(msg).toContain('ANTHROPIC_API_KEY');
     expect(msg).toContain('ANTHROPIC_AUTH_TOKEN');
     expect(msg).toContain('/login');
     expect(msg).toContain('不跨机');
+  });
+});
+
+describe('claudeCodeTeamSubscriptionAuthFailureMessage', () => {
+  test('names the rejected team subscription, CLI reason and token replacement remedy', () => {
+    const msg = claudeCodeTeamSubscriptionAuthFailureMessage('OAuth token revoked');
+    expect(msg).toContain(CLAUDE_CODE_AUTH_FAILURE_MARKER);
+    expect(isProviderAuthFailure(msg)).toBe(true);
+    expect(msg).toContain('cairn');
+    expect(msg).toContain('团队 Claude 订阅');
+    expect(msg).toContain('拒绝');
+    expect(msg).toContain('OAuth token revoked');
+    expect(msg).toContain('设置 → 订阅');
+    expect(msg).toContain('claude setup-token');
+    expect(msg).toContain('验证');
+    expect(msg).not.toContain('claude auth status');
+    expect(msg).not.toContain('/login');
   });
 });

@@ -7,7 +7,6 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
-  agent,
   build,
   buildFeedback,
   machine,
@@ -25,7 +24,14 @@ import {
   workerScheduleRunHistory,
 } from '../src/services/schedules.js';
 import { setTodoArchived, setTodoPhase } from '../src/services/todos.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  seedRoute,
+  seedSessionRoute,
+} from './helpers.js';
 
 const toolNames = [
   'schedule_create',
@@ -37,7 +43,7 @@ const toolNames = [
 
 afterEach(() => vi.restoreAllMocks());
 
-async function world(kind: 'plan' | 'build' = 'build') {
+async function world() {
   const s = bootServer();
   const key = await issueApiKey(s);
   async function machineCall(path: string, body: unknown, token: string) {
@@ -54,17 +60,7 @@ async function world(kind: 'plan' | 'build' = 'build') {
   );
   expect(enrolled.status).toBe(200);
   const { token } = (await enrolled.json()) as { token: string };
-  s.db
-    .insert(agent)
-    .values({
-      id: 'schedule-agent',
-      teamId: s.team.id,
-      displayName: 'Worker',
-      provider: 'p',
-      modelId: 'm',
-    })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { provider: 'p', modelId: 'm' });
   const projectId = await postProject(s.app, 'Thread schedules');
   const response = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: 'Inspect changes',
@@ -73,11 +69,6 @@ async function world(kind: 'plan' | 'build' = 'build') {
   const { id: todoId } = (await response.json()) as { id: string };
   await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
-    assignment: {
-      plan: kind === 'plan' ? { agentId: 'schedule-agent' } : null,
-      build: { agentId: 'schedule-agent' },
-    },
-    withPlan: kind === 'plan',
   });
   async function claim() {
     const response = await machineCall('/api/machine/tasks/claim', {}, token);
@@ -376,7 +367,7 @@ describe('worker schedule security', () => {
     ['confirm', '*/15 * * * *'],
     ['review', '*/15 * * * *'],
   ] as const)('%s gate survives a due worker %s schedule', async (phase, cadence) => {
-    const s = await world(phase === 'confirm' ? 'plan' : 'build');
+    const s = await world();
     await s.run('schedule_create', { cadence, prompt: 'Follow up' });
     const due = s.stored().nextRunAt!;
     s.db.update(step).set({ status: 'done' }).where(eq(step.id, s.claimed.step.id)).run();
@@ -646,6 +637,7 @@ test.each(['review', 'verify', 'merge'] as const)(
   '%s claims do not advertise schedule tools',
   async (kind) => {
     const s = await world();
+    seedRoute(s, 'review', { provider: 'p', modelId: 'm' });
     s.db
       .update(step)
       .set({
@@ -655,7 +647,7 @@ test.each(['review', 'verify', 'merge'] as const)(
         prompt:
           kind === 'review'
             ? buildReviewStepPrompt({
-                agentId: 'schedule-agent',
+                agentId: 'review-route',
                 gate: 'review',
                 planText: '',
                 changes: [],
@@ -665,19 +657,7 @@ test.each(['review', 'verify', 'merge'] as const)(
       })
       .where(eq(step.id, s.claimed.step.id))
       .run();
-    s.db
-      .update(todo)
-      .set({
-        phase: 'review',
-        assignment: {
-          plan: null,
-          build: { agentId: 'schedule-agent' },
-          review: { agentId: 'schedule-agent' },
-          verify: { agentId: 'schedule-agent' },
-        },
-      })
-      .where(eq(todo.id, s.todoId))
-      .run();
+    s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, s.todoId)).run();
     const claimed = await s.claim();
     expect(claimed.step.kind).toBe(kind);
     expect(

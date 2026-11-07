@@ -1,13 +1,9 @@
-import {
-  type ClaimedStep,
-  MEMORY_QUOTA_PER_AGENT,
-  memoryRecordSchema,
-  WORKER_REMOTE_TOOLS,
-} from '@cairn/shared';
+import { type ClaimedStep, MEMORY_QUOTA_PER_TEAM, memoryRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { agentMemory, agent as agentTable, build as buildTable } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
+import { agentMemory, build as buildTable } from '../src/db/schema.js';
+import { workerRemoteTools } from '../src/services/machine-claim.js';
+import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -27,7 +23,7 @@ async function call(
   );
 }
 
-const AGENT_ID = 'agent-m4b-mem';
+const OWNER_ID = 'route-m4b-mem';
 
 async function world() {
   const s = bootServer({ claimHoldMs: 250 });
@@ -37,17 +33,7 @@ async function world() {
     body: { teamId: s.team.id, name: 'm4b-mem', cliVersion: '0.1.0' },
   });
   const { token } = (await enroll.json()) as { token: string };
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'scribe',
-      provider: 'p',
-      modelId: 'm',
-    })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { id: OWNER_ID, provider: 'p', modelId: 'm' });
 
   const projectId = await postProject(s.app);
   const spec = '完成后请用你的记忆工具保存一条与本项目相关的一句话经验';
@@ -56,11 +42,7 @@ async function world() {
   });
   const { id: todoId } = (await todoRes.json()) as { id: string };
   await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    body: {
-      todoIds: [todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
-    },
+    body: { todoIds: [todoId] },
   });
   const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
   const { step } = (await claimRes.json()) as { step: ClaimedStep | null };
@@ -81,7 +63,9 @@ async function relay(
 describe('worker step memory relay (r5 section 6 write path = agent tool -> server executes)', () => {
   test('claim payload = memory trio + attachment read remoteTools (02 section 4.4 + #310/r9 section 3.1 worker-side attachment tools = spec `attachment:` token parse path)', async () => {
     const { s, step } = await world();
-    expect(step.remoteTools?.map((t) => t.name)).toEqual(WORKER_REMOTE_TOOLS.map((t) => t.name));
+    expect(step.remoteTools?.map((t) => t.name)).toEqual(
+      workerRemoteTools('session', false).map((t) => t.name),
+    );
     s.dispose();
   });
 
@@ -95,13 +79,13 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     const { text } = (await res.json()) as { text: string };
     const saved = memoryRecordSchema.parse(JSON.parse(text));
     expect(saved).toMatchObject({
-      agentId: AGENT_ID,
+      agentId: OWNER_ID,
       teamId: s.team.id,
       projectId,
       sourceTodoId: todoId,
       sourceBuildId: step.step.buildId,
     });
-    const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories`);
+    const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/memories`);
     const rows = (await list.json()) as unknown[];
     expect(rows).toHaveLength(1);
     expect(memoryRecordSchema.parse(rows[0]).id).toBe(saved.id);
@@ -131,15 +115,11 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
         content: params.content,
       });
       expect(update.status).toBe(200);
-      const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories`);
+      const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/memories`);
       expect(await list.json()).toMatchObject([
         { content: '本仓使用 pnpm', history: [{ content: '本仓使用 npm' }] },
       ]);
-      const all = await call(
-        s.app,
-        'GET',
-        `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories?includeInvalid=true`,
-      );
+      const all = await call(s.app, 'GET', `/api/teams/${s.team.id}/memories?includeInvalid=true`);
       expect(await all.json()).toMatchObject([
         { id, content: '本仓使用 npm', supersededBy: expect.any(String) },
         { content: '本仓使用 pnpm' },
@@ -159,11 +139,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
       const { id } = JSON.parse(((await first.json()) as { text: string }).text) as { id: string };
       const params = { title: '包管理器', content: '本仓使用 pnpm' };
       await relay(s.app, token, step.step.id, 'save_memory', params);
-      const removed = await call(
-        s.app,
-        'DELETE',
-        `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories/${id}`,
-      );
+      const removed = await call(s.app, 'DELETE', `/api/teams/${s.team.id}/memories/${id}`);
       expect(removed.status).toBe(204);
       const retry = await relay(s.app, token, step.step.id, 'save_memory', params);
       expect(retry.status).toBe(200);
@@ -196,7 +172,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     s.dispose();
   });
 
-  test('memories / delete_memory: only this Agent entries (out-of-scope defense)', async () => {
+  test('memories / delete_memory: only this team entries (out-of-scope defense)', async () => {
     const { s, token, step } = await world();
     await relay(s.app, token, step.step.id, 'save_memory', { title: 't', content: 'c' });
     const listRes = await relay(s.app, token, step.step.id, 'memories', {});
@@ -220,15 +196,15 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     s.dispose();
   });
 
-  test(`quota ${MEMORY_QUOTA_PER_AGENT}/Agent: over = 409 (UI "memory n/100" same source)`, async () => {
+  test(`quota ${MEMORY_QUOTA_PER_TEAM}/team: over = 409 (UI "memory n/100" same source)`, async () => {
     const { s, token, step } = await world();
     const now = Date.now();
-    for (let i = 0; i < MEMORY_QUOTA_PER_AGENT; i++) {
+    for (let i = 0; i < MEMORY_QUOTA_PER_TEAM; i++) {
       s.db
         .insert(agentMemory)
         .values({
           id: `mem-${i}`,
-          agentId: AGENT_ID,
+          agentId: OWNER_ID,
           teamId: s.team.id,
           title: `t${i}`,
           content: 'c',
@@ -290,7 +266,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
       .insert(agentMemory)
       .values({
         id: 'mem-global',
-        agentId: AGENT_ID,
+        agentId: OWNER_ID,
         teamId: s.team.id,
         title: '全局',
         content: 'g',
@@ -314,7 +290,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
       body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
     });
     const now = Date.now();
-    const base = { agentId: AGENT_ID, teamId: s.team.id, createdAt: now, updatedAt: now };
+    const base = { agentId: OWNER_ID, teamId: s.team.id, createdAt: now, updatedAt: now };
     s.db
       .insert(agentMemory)
       .values([
@@ -359,11 +335,7 @@ async function claimNextTask(
   });
   const { id: todoId } = (await t.json()) as { id: string };
   await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    body: {
-      todoIds: [todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
-    },
+    body: { todoIds: [todoId] },
   });
   const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
   const { step } = (await claimRes.json()) as { step: ClaimedStep | null };

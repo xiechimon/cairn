@@ -1,5 +1,4 @@
 import type {
-  Assignment,
   GithubRepoRef,
   Phase,
   RouteOverride,
@@ -23,7 +22,6 @@ import {
 import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  agent,
   build,
   machine,
   message,
@@ -43,11 +41,7 @@ import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import { assertCorrectionDone } from './correction.js';
-import {
-  agentForStep as agentForStepEligibility,
-  capabilityGatePasses,
-  runtimeGatePasses,
-} from './dispatch-eligibility.js';
+import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { hasGithubConnection, teamGithubToken } from './github-connection.js';
@@ -56,7 +50,7 @@ import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
-import { routeForStep } from './routing-rules.js';
+import { profileForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
 import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
@@ -101,10 +95,6 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     .where(eq(build.todoId, row.id))
     .orderBy(asc(build.createdAt))
     .all();
-  const buildAgentId = row.assignment?.build?.agentId ?? null;
-  const agentRow = buildAgentId
-    ? db.select().from(agent).where(eq(agent.id, buildAgentId)).get()
-    : undefined;
   let quotaWait: TodoRecord['quotaWait'] = null;
   if (row.latestBuildId !== null) {
     const waiting = db
@@ -154,8 +144,6 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
-    assignment: row.assignment ?? null,
-    agent: agentRow ? { id: agentRow.id, displayName: agentRow.displayName } : null,
     latestBuildId: row.latestBuildId,
     lastRunAt: row.lastRunAt,
     hasChanges: row.hasChanges,
@@ -213,15 +201,11 @@ function waitingOnOf(
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
   for (const s of pendingSteps) {
-    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
+    const agentRow = profileForStep(deps.db, row, s.kind, s.id);
     if (agentRow === null) continue;
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
-    const pooled = routeForStep(deps.db, row, s.kind) !== null;
     const runnable = online.some(
-      (m) =>
-        (pooled || m.id === agentRow.machineId) &&
-        runtimeGatePasses(m, provider) &&
-        capabilityGatePasses(m, agentRow),
+      (m) => runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
     );
     if (!runnable) return { on: 'machine', retryAt: null };
   }
@@ -303,7 +287,6 @@ export function createTodo(
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
-    assignment?: Assignment;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -337,7 +320,6 @@ export function createTodo(
       phaseAt: now,
       seqNum,
       orderIndex: (orderRow?.n ?? -1) + 1,
-      assignment: input.assignment ?? null,
       latestBuildId: null,
       awaitingReply: false,
       lastRunAt: null,
@@ -386,13 +368,6 @@ export function updateTodo(
     tagIds?: string[];
     orderIndex?: number;
     projectId?: string;
-    assignment?: {
-      source?: Assignment['source'];
-      plan?: NonNullable<Assignment['plan']>;
-      build?: NonNullable<Assignment['build']>;
-      review?: NonNullable<Assignment['review']>;
-      verify?: NonNullable<Assignment['verify']>;
-    };
     routeOverride?: RouteOverride | null;
   },
   opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
@@ -424,33 +399,6 @@ export function updateTodo(
       if (owned === undefined) throw notFound(`machine ${machineId}`);
     }
     sets.routeOverride = patch.routeOverride;
-  }
-  if (patch.assignment !== undefined) {
-    const merged: NonNullable<TodoRow['assignment']> = {
-      plan:
-        patch.assignment.plan !== undefined
-          ? patch.assignment.plan
-          : (row.assignment?.plan ?? null),
-      build:
-        patch.assignment.build !== undefined
-          ? patch.assignment.build
-          : (row.assignment?.build ?? null),
-    };
-    if (patch.assignment.review !== undefined || row.assignment?.review != null) {
-      merged.review =
-        patch.assignment.review !== undefined
-          ? patch.assignment.review
-          : (row.assignment?.review ?? null);
-    }
-    if (patch.assignment.verify !== undefined || row.assignment?.verify != null) {
-      merged.verify =
-        patch.assignment.verify !== undefined
-          ? patch.assignment.verify
-          : (row.assignment?.verify ?? null);
-    }
-    const source = patch.assignment.source ?? row.assignment?.source;
-    if (source !== undefined) merged.source = source;
-    sets.assignment = merged;
   }
   let manualPhaseApplied = false;
   if (patch.phase !== undefined && patch.phase !== row.phase) {
@@ -591,13 +539,7 @@ export function setTodoPhase(
   extra: Partial<
     Pick<
       TodoRow,
-      | 'hasChanges'
-      | 'hasPlan'
-      | 'latestBuildId'
-      | 'lastRunAt'
-      | 'assignment'
-      | 'routeOverride'
-      | 'awaitingReply'
+      'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'routeOverride' | 'awaitingReply'
     >
   > = {},
   options: { landedMerge?: true } = {},

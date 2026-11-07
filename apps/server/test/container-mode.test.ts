@@ -122,6 +122,44 @@ describe('container mode: CAIRN_REQUIRE_TOKEN', () => {
     expect(booted.output()).not.toContain(TOKEN);
   });
 
+  test('local startup with a known token logs only guidance and CLI stdout provides a working link', async () => {
+    const booted = await boot({ CAIRN_TOKEN: TOKEN });
+    await untilOnline(booted);
+    const output = await new Promise<string>((done, fail) => {
+      const cli = spawn(process.execPath, ['--import', 'tsx', 'src/cli.ts', 'token'], {
+        cwd: resolve(serverDir, '../daemon'),
+        env: {
+          ...process.env,
+          CAIRN_HOME: booted.home,
+          CAIRN_TOKEN: TOKEN,
+          HOST: '127.0.0.1',
+          PORT: String(booted.port),
+        },
+      });
+      children.push(cli);
+      let stdout = '';
+      cli.stdout.on('data', (chunk) => {
+        stdout += chunk;
+      });
+      cli.on('error', fail);
+      cli.on('close', (code) => (code === 0 ? done(stdout) : fail(new Error('token CLI failed'))));
+    });
+    const link = output.match(/http:\/\/[^\s]+\/app#token=[^\s]+/)?.[0];
+    expect(link !== undefined).toBe(true);
+    const url = new URL(link ?? 'http://invalid');
+    const token = new URLSearchParams(url.hash.slice(1)).get('token');
+    expect(token === TOKEN).toBe(true);
+    expect(
+      (await fetch(`${url.origin}/api/user/me`, { headers: { authorization: `Bearer ${token}` } }))
+        .status,
+    ).toBe(200);
+    expect(booted.output().includes(TOKEN)).toBe(false);
+    expect(booted.output().includes('#token=')).toBe(false);
+    expect(booted.output()).toContain(
+      'token auth enabled — run `cairn token` on this machine to print a login link',
+    );
+  });
+
   test('flag off and no token on loopback: the server generates a token instead of serving open', async () => {
     const booted = await boot({});
     await untilOnline(booted);
@@ -160,7 +198,8 @@ describe('#2057 safe bare-server defaults on a real process', () => {
         .status,
     ).toBe(200);
     expect(booted.output()).toContain('"host":"127.0.0.1"');
-    expect(booted.output()).toContain(`#token=${token}`);
+    expect(booted.output().includes(token)).toBe(false);
+    expect(booted.output().includes('#token=')).toBe(false);
     const lan = lanAddress();
     if (lan !== null) {
       await expect(

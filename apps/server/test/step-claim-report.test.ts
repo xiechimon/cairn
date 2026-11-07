@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   apiKey as apiKeyTable,
   build as buildTable,
   machine as machineTable,
@@ -16,7 +15,7 @@ import { nowMs } from '../src/lib/ids.js';
 import { BUILD_ABANDONED_STEP_MS, sweepAbandonedBuildSteps } from '../src/services/builds.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
 import { claimStep, finishStep, type MachineDeps } from '../src/services/machines.js';
-import { bootServer } from './helpers.js';
+import { bootServer, seedSessionRoute } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -53,16 +52,7 @@ function makeWorld(opts: WorldOpts = {}) {
     .insert(machineTable)
     .values({ id: MACHINE, teamId, name: 'm1', online: true, enabledRuntimes: ['pi'] })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-1473',
-      teamId,
-      displayName: 'p1473',
-      modelId: 'stub-model',
-      machineId: MACHINE,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: MACHINE });
   s.db
     .insert(todoTable)
     .values({
@@ -73,7 +63,6 @@ function makeWorld(opts: WorldOpts = {}) {
       phase: 'building',
       phaseAt: base,
       seqNum: 1,
-      assignment: { plan: null, build: { agentId: 'agent-1473' } },
     })
     .run();
   if (opts.priorPr) {

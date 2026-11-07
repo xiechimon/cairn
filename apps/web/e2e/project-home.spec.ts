@@ -60,7 +60,7 @@ test('the ask link opens the project chat scoped to this project', async ({ page
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}.*chat=1`));
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveAttribute(
     'placeholder',
-    /cairn/,
+    /cairn|Type your own answer/,
   );
   await page.getByTestId('home-c-project-links').getByRole('link', { name: 'Project home' }).click();
   await expect(home(page)).toBeVisible();

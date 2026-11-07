@@ -180,7 +180,7 @@ const PROBE_MERGE_ROUND: TranscriptItem[] = [
     ],
     footer: { seconds: 17 },
   },
-  { kind: 'note', text: '🎉 任务已完成' },
+  { kind: 'note', text: '已完成，未验证' },
 ];
 
 const LEGACY_REVIEW_TRANSCRIPT: TranscriptItem[] = [

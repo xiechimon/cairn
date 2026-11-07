@@ -43,7 +43,7 @@ import { compactionCeilingFetch } from './compaction-ceiling.js';
 import { SessionNotResumableError } from './errors.js';
 import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { connectFailedLine } from './mcp-config.js';
-import { PiStepSpanSink } from './otel.js';
+import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
 import {
   enrichProviderError,
@@ -554,7 +554,14 @@ function toMessageRecord(msg: PiMessageLike): {
 }
 
 function isRetryableError(message: string): boolean {
-  return /rate.?limit|overloaded|timeout|temporarily|5\d\d/i.test(message);
+  if (
+    /\b404\b|\bmodel(?:[\s_-]+[^\n]*?)?not[\s_-]+found\b|\bnot[\s_-]+supported\b/i.test(message)
+  ) {
+    return false;
+  }
+  return /^5\d\d:|rate.?limit|overloaded|timeout|temporarily|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status)\s*:?\s*5\d\d\b|\b5\d\d\s+(?:Internal Server Error|Not Implemented|Bad Gateway|Service Unavailable|Gateway Timeout|HTTP Version Not Supported|Variant Also Negotiates|Insufficient Storage|Loop Detected|Not Extended|Network Authentication Required)\b/i.test(
+    message,
+  );
 }
 
 export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState): StepEvent[] {
@@ -1045,14 +1052,11 @@ export class PiBackend implements AgentBackend {
     if (deniedSkills.length > 0) {
       this.opts.onSkillsLog?.(`deny: ${deniedSkills.length} skill dir(s) hard-blocked`);
     }
-    const envBash =
-      opts.env !== undefined
-        ? defineTool(
-            createBashToolDefinition(opts.cwd, {
-              spawnHook: (ctx) => ({ ...ctx, env: { ...ctx.env, ...opts.env } }),
-            }),
-          )
-        : null;
+    const envBash = defineTool(
+      createBashToolDefinition(opts.cwd, {
+        spawnHook: (ctx) => ({ ...ctx, env: runtimeChildEnv({ ...ctx.env, ...opts.env }) }),
+      }),
+    );
     const { session } = await createAgentSession({
       cwd: opts.cwd,
       agentDir: this.opts.agentDir,
@@ -1085,16 +1089,7 @@ export class PiBackend implements AgentBackend {
           ? [...MCP_TOOL_ALLOWLIST]
           : []),
       ],
-      ...(gatedRead || envBash !== null || customTools.length > 0 || localTools.length > 0
-        ? {
-            customTools: [
-              ...(gatedRead ? [gatedRead] : []),
-              ...(envBash !== null ? [envBash] : []),
-              ...customTools,
-              ...localTools,
-            ],
-          }
-        : {}),
+      customTools: [...(gatedRead ? [gatedRead] : []), envBash, ...customTools, ...localTools],
     });
     await session.bindExtensions(
       mcpEndpoints.length > 0 || askRelay !== undefined ? { uiContext: mcpCaptureUi } : {},

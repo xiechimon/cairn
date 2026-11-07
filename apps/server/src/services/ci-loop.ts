@@ -845,6 +845,15 @@ export function createCiPoller(
       return;
     }
     grindPullCache.set(key, { etag: pullPage.etag, pull });
+    if (pull.state !== 'open') {
+      if (freshGrindRow(cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
+        tally.skipped += 1;
+        return;
+      }
+      setTodoPhase(deps, cand.todoId, 'review');
+      tally.advanced += 1;
+      return;
+    }
     const branch = conversationBranch(cand.buildId);
     const baseBranch = target.baseBranch ?? pull.defaultBranch;
     const own =

@@ -1,7 +1,7 @@
 import { claudeLoginBlocksClaim, claudeRateBlock, isBuildStepKind } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { type agent, type build, type machine, step } from '../db/schema.js';
+import { type build, type machine, step } from '../db/schema.js';
 import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
@@ -9,6 +9,7 @@ import {
   machineEligibility,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
+import type { RouteProfile } from './routing-rules.js';
 
 export const SESSION_GRACE_MS = 5 * 60_000;
 export const OVERFLOW_AFTER_MS = 10 * 60_000;
@@ -16,11 +17,10 @@ export const OVERFLOW_AFTER_MS = 10 * 60_000;
 type MachineRow = typeof machine.$inferSelect;
 
 export interface WorkerStepFacts {
-  agentRow: Pick<typeof agent.$inferSelect, 'machineId' | 'requiredCapabilities'>;
-  model: Pick<typeof agent.$inferSelect, 'provider' | 'modelId'>;
+  agentRow: Pick<RouteProfile, 'machineId' | 'requiredCapabilities'>;
+  model: Pick<RouteProfile, 'provider' | 'modelId'>;
   localProject: boolean;
   localMerge: boolean;
-  routed: boolean;
 }
 
 export function workerIneligibility(
@@ -31,13 +31,12 @@ export function workerIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const claudeCode = stepRuntimeFor(facts.model.provider) === 'claude-code';
-  const pinGatesOnly = { ...facts.agentRow, machineId: machineRow.id };
   return machineEligibility({
     machine: machineRow,
-    agent: facts.routed ? facts.agentRow : pinGatesOnly,
+    agent: facts.agentRow,
     model: facts.model,
     catalog,
-    localProject: facts.routed && facts.localProject,
+    localProject: facts.localProject,
     claudeRateBlocked: claudeRateBlock(machineRow.claudeRateLimits ?? [], now) !== null,
     claudeLoginBlocked:
       claudeCode &&
@@ -105,21 +104,6 @@ export function priorSessionOf(
       stepRow.kind === 'verify' ||
       stepRow.freshSession,
   };
-}
-
-export function pinAllows(input: {
-  machineId: string;
-  pinnedId: string | null;
-  pinned: MachineRow | undefined;
-  model: Pick<typeof agent.$inferSelect, 'provider'>;
-  now: number;
-}): boolean {
-  if (input.pinnedId === input.machineId) return true;
-  return (
-    stepRuntimeFor(input.model.provider) === 'claude-code' &&
-    input.pinned !== undefined &&
-    claudeRateBlock(input.pinned.claudeRateLimits ?? [], input.now) !== null
-  );
 }
 
 export interface RouteTarget {

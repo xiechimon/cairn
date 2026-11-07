@@ -9,12 +9,14 @@ const COMPONENTS = join(SRC, 'components');
 const NOT_IN_GALLERY: Record<string, string> = {
   'ui/alert-dialog.tsx':
     'Registry copy with no consumer; confirm surfaces use alert-dialog-shell.tsx, shown in the Dialog section.',
+  'model-select-core.tsx':
+    'Gap: rendered only through src/routes/agent-model-select.tsx on the routing settings page; no specimen yet.',
   'conversation-skeleton.tsx':
     'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
-  'query-state.tsx':
-    'Gap: wraps live queries on settings, panels and the team page; the gallery has no live queries, so no specimen yet.',
   'queued-capsules.tsx':
     'Rendered inside the Queued messages specimen through src/detail/composer.tsx.',
+  'shortcut-hint.tsx':
+    'Rendered inside the Question card specimen (the Ctrl and return keycaps) and the search panel.',
 };
 
 function walk(dir: string): string[] {

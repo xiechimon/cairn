@@ -1,5 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -24,6 +23,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -195,7 +195,7 @@ function handle(sessionId: string, events: StepEvent[]): AgentSessionHandle {
 const DONE_EVENT: StepEvent = { type: 'done', usage: [] };
 
 async function setup(claimed: ClaimedStep, backend: AgentBackend) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-artifact-'));
+  const home = testTempDir('cairn-runner-artifact-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();

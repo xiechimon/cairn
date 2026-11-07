@@ -78,6 +78,28 @@ describe('cairn token (print)', () => {
     expect(out).not.toContain('file-token-0123456789abcdef');
   });
 
+  test.each([
+    ['127.0.0.1', '127.0.0.1'],
+    ['0.0.0.0', 'localhost'],
+    ['::', 'localhost'],
+    ['::1', '[::1]'],
+  ])('prints a login link for bind host %s', (host, display) => {
+    const home = scratchHome();
+    const token = 'synthetic-token+with/reserved=';
+    writeTokenFile(home, token);
+    const { code, out } = run(
+      { rotate: false },
+      { [ENV_VARS.home]: home, HOST: host, PORT: '9876' },
+    );
+    expect(code).toBe(0);
+    const link = out.match(/Login link: (.+)/)?.[1];
+    expect(link !== undefined).toBe(true);
+    const url = new URL(link ?? 'http://invalid');
+    expect(url.origin).toBe(`http://${display}:9876`);
+    expect(url.pathname).toBe('/app');
+    expect(new URLSearchParams(url.hash.slice(1)).get('token') === token).toBe(true);
+  });
+
   test('failure mode 4: neither -> guidance, exit 0', () => {
     const home = scratchHome();
     const { code, out } = run({ rotate: false }, { [ENV_VARS.home]: home });

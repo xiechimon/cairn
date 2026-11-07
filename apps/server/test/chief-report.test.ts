@@ -11,7 +11,6 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   agentMemory,
-  agent as agentTable,
   build as buildTable,
   chiefMessage,
   chiefReport,
@@ -35,6 +34,7 @@ import {
   issueApiKey,
   machineIdByName,
   postProject,
+  seedRoute,
   type TestServer,
 } from './helpers.js';
 
@@ -100,21 +100,7 @@ async function setup(opts: { chat?: boolean; tz?: string } = {}): Promise<World>
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'report-mbp');
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-report',
-      teamId,
-      displayName: 'report-agent',
-      description: '调度',
-      modelId: 'stub-model',
-      provider: 'stub-gw',
-      machineId,
-    })
-    .run();
-  await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: 'agent-report' } },
-  });
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model', machineId });
   const projectId = await postProject(s.app, 'cairn');
   const msgRes = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content: '看板拖完卡片计数不对，修一下' },

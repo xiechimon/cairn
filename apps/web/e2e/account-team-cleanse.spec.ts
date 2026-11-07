@@ -56,28 +56,3 @@ test('team: `设置` routes to the account surface', async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/settings\/account/);
   await expect(page.locator('.account-card')).toBeVisible();
 });
-
-test('team: chart tab swaps to the org chart, persists, and returns', async ({ page }) => {
-  await page.goto('/app/team?scenario=12');
-  const gridTab = page.getByRole('tab', { name: 'grid' });
-  const chartTab = page.getByRole('tab', { name: 'chart' });
-  await expect(page.getByTestId('team-agent-card').first()).toBeVisible();
-
-  await chartTab.click();
-  await expect(page.getByTestId('team-chart-node')).toHaveCount(1);
-  await expect(page.getByText('暂无成员')).toHaveCount(0);
-  await expect(page.getByTestId('team-agent-card')).toHaveCount(0);
-  await expect(page.getByTestId('team-agent-grid')).toHaveCount(0);
-  await expect(page.getByText(/个成员/)).toHaveCount(0);
-  await expect(chartTab).toHaveAttribute('aria-selected', 'true');
-  await expect(gridTab).toHaveAttribute('aria-selected', 'false');
-
-  // the choice survives a reload (cairn.teamMembersLayout)
-  await page.reload();
-  await expect(page.getByTestId('team-chart-node')).toBeVisible();
-
-  // and the tablist is the way back — no trap in chart layout
-  await page.getByRole('tab', { name: 'grid' }).click();
-  await expect(page.getByTestId('team-agent-card').first()).toBeVisible();
-  await expect(page.getByText(/个成员/)).toBeVisible();
-});

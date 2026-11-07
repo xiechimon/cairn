@@ -6,7 +6,6 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -32,8 +31,7 @@ beforeAll(async () => {
       toolCall: {
         name: 'bash',
         arguments: {
-          command:
-            "printf '# 方案\nKind: fix\n\nContext: steer 探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n' > plan.md",
+          command: "printf 'steer probe\\n' >> README.md",
         },
       },
       delayMs: 8_000,
@@ -82,8 +80,6 @@ describe('W3 steer E2E: message while building → pending → signal → pull-c
     });
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     expect(started.status).toBe(201);
     const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -103,7 +99,7 @@ describe('W3 steer E2E: message while building → pending → signal → pull-c
       true,
     );
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
 
     const late = await api(server.url, 'POST', `/api/conversations/${buildId}/messages`, {
       content: '晚到的一条',

@@ -472,11 +472,42 @@ class MergeState {
   onPut: (() => Promise<void> | void) | null = null;
   onMarker: (() => Promise<void> | void) | null = null;
   markerAnswer: Answer = { status: 200, body: [] };
+  checkAnswers: Record<string, Answer> = {};
   compareStatus = 'identical';
   constructor(
     readonly pulls: Record<number, PullFake>,
     readonly branchOf: (n: number) => string,
   ) {}
+
+  setGreenRequiredChecks(head: string): void {
+    this.checkAnswers = {
+      '/branches/main': {
+        status: 200,
+        body: { protected: true, protection: { required_status_checks: { contexts: ['check'] } } },
+      },
+      '/rules/branches/main': { status: 200, body: [] },
+      '/check-runs': {
+        status: 200,
+        body: {
+          total_count: 1,
+          check_runs: [
+            {
+              id: 1,
+              name: 'check',
+              head_sha: head,
+              status: 'completed',
+              conclusion: 'success',
+              app: null,
+            },
+          ],
+        },
+      },
+      '/status': {
+        status: 200,
+        body: { sha: head, total_count: 0, statuses: [] },
+      },
+    };
+  }
 
   gets = () => this.requests.filter((r) => r.method === 'GET' && /\/pulls\/\d+$/.test(r.url));
   puts = () => this.requests.filter((r) => r.method === 'PUT');
@@ -510,6 +541,13 @@ class MergeState {
       return answer(200, JSON.stringify({ status: this.compareStatus }));
     }
     if (/\/pulls\?/.test(url)) return answer(200, '[]');
+    for (const [path, a] of Object.entries(this.checkAnswers).sort(
+      ([a], [b]) => b.length - a.length,
+    )) {
+      if (!input.pathname.endsWith(path)) continue;
+      throwIfFault(a);
+      return answer(a.status, a.raw ?? JSON.stringify(a.body ?? {}), a.headers);
+    }
     if (url.includes('/check-runs')) return answer(404, '{}');
     const m = url.match(/\/pulls\/(\d+)$/);
     if (m === null || method !== 'GET') return answer(404, '{}');

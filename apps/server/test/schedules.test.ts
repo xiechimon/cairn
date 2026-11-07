@@ -12,7 +12,7 @@ import { completeStep, listSteps } from '../src/services/builds.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { pauseSchedule, serverTimezone, wallClockParts } from '../src/services/schedules.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, postProject, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const TZ = 'Asia/Shanghai';
 
@@ -35,6 +35,7 @@ async function withTodo(title = '每天巡检 r3-lifecycle') {
       await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title, spec: '巡检 README' })
     ).json(),
   );
+  seedSessionRoute(s);
   const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
   return { ...s, projectId, todoDoc, scheduler };
 }
@@ -53,8 +54,6 @@ async function runToReview(s: TestServer, projectId: string, todoId: string): Pr
   const started = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       todoIds: [todoId],
-      assignment: { plan: null, build: null },
-      withPlan: false,
     })
   ).json()) as { builds: BuildRecord[] };
   const buildId = started.builds[0]?.id as string;
@@ -296,7 +295,7 @@ describe('scheduled thread continuation', () => {
     expect(list).toHaveLength(1);
     const steps = listSteps(s.svc, builds[0]?.id as string);
     expect(steps).toHaveLength(1);
-    expect(steps[0]?.kind).toBe('build');
+    expect(steps[0]?.kind).toBe('session');
     setTodoPhase(s.svc, s.todoDoc.id, 'building');
     completeStep(s.svc, steps[0]!.id);
     expect(await (await req(s.app, 'GET', '/api/schedules')).json()).toEqual([]);
@@ -370,8 +369,6 @@ describe('scheduled thread continuation', () => {
     const s = await withTodo();
     await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, {
       todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: false,
     });
     s.db
       .insert(machineTable)

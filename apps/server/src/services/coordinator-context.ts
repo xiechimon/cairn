@@ -5,7 +5,24 @@ import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
 let serverContextOn = false;
-let sidecarMachineId: string | null = null;
+let inServer = false;
+let wakeThread: (threadId: string) => void = () => {};
+
+export function setCoordinatorInServer(on: boolean): void {
+  inServer = on;
+}
+
+export function coordinatorInServerEnabled(): boolean {
+  return inServer;
+}
+
+export function setCoordinatorWake(wake: (threadId: string) => void): void {
+  wakeThread = wake;
+}
+
+export function wakeCoordinator(threadId: string): void {
+  wakeThread(threadId);
+}
 
 export function setCoordinatorServerContextEnabled(on: boolean): void {
   serverContextOn = on;
@@ -15,20 +32,8 @@ export function coordinatorServerContextEnabled(): boolean {
   return serverContextOn;
 }
 
-export function setCoordinatorMachineId(machineId: string | null): void {
-  sidecarMachineId = machineId;
-}
-
-export function coordinatorMachineId(): string | null {
-  return sidecarMachineId;
-}
-
-export function coordinatorSidecarEnabled(): boolean {
-  return sidecarMachineId !== null;
-}
-
 export function coordinatorRunsOnPi(): boolean {
-  return serverContextOn || coordinatorSidecarEnabled();
+  return serverContextOn || inServer;
 }
 
 function contextWindowOf(db: Db, teamId: string, usageModel: string): number {

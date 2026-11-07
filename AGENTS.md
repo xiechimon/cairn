@@ -8,14 +8,14 @@
 - Confirm lockfile changes with ian before committing `pnpm-lock.yaml`; authorized changes require `CAIRN_ALLOW_LOCKFILE_CHANGE=1`.
 - Do not run postinstall scripts without explicit user authorization; install dependencies with scripts disabled unless authorized.
 - Seam discipline: read the comments in `biome.json` before changing locked imports (`@earendil-works/*`, `@modelcontextprotocol/sdk`, `simple-git`, `isomorphic-git`, `cron-parser`); consume them through thin bridges.
-- Keep GitOps, MCP and LLM provider access behind `apps/daemon/src/backend/`; check the seam before moving files or adding dependencies.
+- Keep GitOps, MCP and LLM provider access behind `apps/daemon/src/backend/`; the one exception is the in-server Coordinator runtime, `apps/server/src/coordinator/runtime/` (D114). Check the seam before moving files or adding dependencies.
 - Never kill another lane's processes; inspect the PID, command and working directory before stopping a process you started.
 - Do not set `TMPDIR` without `CAIRN_HEAVY_SLOTS_DIR`; all lanes must share the heavy-work slot directory.
 - Codex security review is no longer part of the merge route (ian, 2026-11-06): `review-gate` requires the code review only. The security-surface lists below still mark protected paths for routing and ownership.
 
 Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`, the one source for protected and auto-merge paths; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
-- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`
+- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
 - MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers}.ts`
 

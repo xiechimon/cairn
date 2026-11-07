@@ -11,24 +11,9 @@ interface Control {
 
 const CONTROLS: Control[] = [
   {
-    name: 'agent tabs',
-    url: '/app/resources/agents/r3-builder?scenario=agent-detail',
-    track: (page) => page.getByRole('tablist', { name: 'Agent' }),
-  },
-  {
-    name: 'team switch',
-    url: '/app/team?scenario=12',
-    track: (page) => page.getByTestId('page-topbar').getByRole('tablist'),
-  },
-  {
     name: 'project tabs',
     url: `${PROJ}?scenario=r2-24b`,
     track: (page) => page.getByRole('banner').getByRole('tablist'),
-  },
-  {
-    name: 'providers runtime',
-    url: '/app/resources/providers?scenario=10',
-    track: (page) => page.getByRole('tablist', { name: '范围' }),
   },
   {
     name: 'settings appearance',
@@ -143,7 +128,7 @@ function hexToRgb(hex: string) {
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
 }
 
-for (const control of [CONTROLS[1], CONTROLS[3]]) {
+for (const control of [CONTROLS[1]]) {
   test(`${control.name}: keyboard focus draws the ring inside the option`, async ({ page }) => {
     await themed(page, 'light', control.url);
     const option = control.track(page).locator('[data-segmented="option"][data-active]');
@@ -167,12 +152,6 @@ test('pointer click leaves no focus ring', async ({ page }) => {
   const info = await ring(weekly);
   expect(info.focusVisible).toBe(false);
   expect(info.style).toBe('none');
-
-  await themed(page, 'light', '/app/resources/agents/r3-builder?scenario=agent-detail');
-  const memory = page.getByRole('tab', { name: '记忆' });
-  await memory.click();
-  await expect(memory).toHaveAttribute('aria-selected', 'true');
-  expect((await ring(memory)).style).toBe('none');
 });
 
 test('radio group: arrow keys move focus and select, roving tabindex follows', async ({ page }) => {

@@ -1,11 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import {
-  chiefMessage,
-  chief as chiefTable,
-  chiefThread,
-  step as stepTable,
-} from '../src/db/schema.js';
+import { chiefMessage, chiefThread, routingRule, step as stepTable } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { sendChiefMessage } from '../src/services/chief.js';
 import { H, registerChiefHarness } from './chief-harness.js';
@@ -52,8 +47,8 @@ describe('chief thread surface persistence (02 section 4.3 / r5 section 3.6)', (
     expect(body.messages.some((m) => m.role === 'user' && m.content === '第一条')).toBe(true);
   });
 
-  test('no Agent bound -> sending a message 409 (gate clause canon server half, r5 section 2)', async () => {
-    H.s.db.update(chiefTable).set({ agentId: null }).where(eq(chiefTable.id, H.chiefId)).run();
+  test('no coordinator routing rule -> sending a message 409 (gate clause canon server half, r5 section 2)', async () => {
+    H.s.db.delete(routingRule).where(eq(routingRule.use, 'coordinator')).run();
     expect(() =>
       sendChiefMessage(
         { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },

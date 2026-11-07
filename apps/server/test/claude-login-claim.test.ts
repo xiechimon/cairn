@@ -3,7 +3,6 @@ import type { ClaudeAuthStateWire, ClaudeCodeReport } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
@@ -20,6 +19,7 @@ import {
   issueApiKey,
   postProject,
   req,
+  seedRoute,
   type TestServer,
 } from './helpers.js';
 
@@ -53,7 +53,7 @@ function report(login?: {
   return {
     installed: true,
     hostname: 'omarchy',
-    models: [],
+    models: [{ id: 'stub-model', name: 'stub-model' }],
     auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
     ...(login !== undefined ? { login } : {}),
   } as ClaudeCodeReport;
@@ -66,25 +66,16 @@ async function world(): Promise<{ s: TestServer; projectId: string }> {
   return { s, projectId };
 }
 
-function insertAgent(
-  s: TestServer,
-  opts: { id: string; machineId: string; provider: string },
-): void {
-  s.db
-    .insert(agentTable)
-    .values({
-      id: opts.id,
-      teamId: s.team.id,
-      displayName: opts.id,
-      provider: opts.provider,
-      modelId: 'stub-model',
-      thinkingLevel: 'off',
-      machineId: opts.machineId,
-    })
-    .run();
+function routeSession(s: TestServer, opts: { machineId: string; provider: string }): void {
+  seedRoute(s, 'session', {
+    provider: opts.provider,
+    modelId: 'stub-model',
+    thinkingLevel: 'off',
+    machineId: opts.machineId,
+  });
 }
 
-function insertBuildStep(s: TestServer, projectId: string, agentId: string): string {
+function insertBuildStep(s: TestServer, projectId: string): string {
   seq += 1;
   const suffix = `${seq}`;
   const todoId = `todo-login-${suffix}`;
@@ -101,7 +92,6 @@ function insertBuildStep(s: TestServer, projectId: string, agentId: string): str
       spec: '',
       phase: 'queued',
       phaseAt: seq,
-      assignment: { plan: null, build: { agentId } },
     })
     .run();
   s.db
@@ -136,8 +126,7 @@ function stepStatus(s: TestServer, stepId: string): string {
 }
 
 function insertChief(s: TestServer, machineId: string, provider: string): string {
-  const agentId = `agent-chief-${provider}-${machineId}`;
-  insertAgent(s, { id: agentId, machineId, provider });
+  seedRoute(s, 'coordinator', { provider, modelId: 'stub-model', thinkingLevel: 'off', machineId });
   const chiefId = `chief-login-${machineId}`;
   s.db
     .insert(chiefTable)
@@ -145,7 +134,6 @@ function insertChief(s: TestServer, machineId: string, provider: string): string
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      agentId,
       charter: '',
       createdAt: 1,
     })
@@ -269,11 +257,15 @@ describe.each(['subscription-only', 'allow-paid'] as const)('%s machine auth', (
           kind === 'chief'
             ? insertChief(s, ownerId, 'claude-code')
             : (() => {
-                insertAgent(s, { id: 'auth-builder', machineId: ownerId, provider: 'claude-code' });
-                return insertBuildStep(s, projectId, 'auth-builder');
+                routeSession(s, { machineId: ownerId, provider: 'claude-code' });
+                return insertBuildStep(s, projectId);
               })();
         const claimed = await claimAs(s, claimantId);
-        if (claudeUsage === 'allow-paid' || subscription) {
+        const modelUnverifiable = kind === 'build' && role === 'spare' && noReport;
+        if (modelUnverifiable && claudeUsage === 'allow-paid') {
+          expect(claimed).toBeNull();
+          expect(stepStatus(s, stepId)).toBe('pending');
+        } else if (claudeUsage === 'allow-paid' || subscription) {
           expect(claimed?.step).toMatchObject({ id: stepId, machineId: claimantId });
         } else {
           expect(claimed).toBeNull();
@@ -303,8 +295,8 @@ describe('claimStep and Claude Code login expiry', () => {
       name: 'expired-host',
       claudeCodeReport: report({ state: 'expired', expiresAt: Date.now() - 3_600_000 }),
     });
-    insertAgent(s, { id: 'agent-expired', machineId: expiredId, provider: 'claude-code' });
-    const stepId = insertBuildStep(s, projectId, 'agent-expired');
+    routeSession(s, { machineId: expiredId, provider: 'claude-code' });
+    const stepId = insertBuildStep(s, projectId);
     expect(await claimAs(s, expiredId)).toBeNull();
     expect(stepStatus(s, stepId)).toBe('pending');
   });
@@ -319,8 +311,8 @@ describe('claimStep and Claude Code login expiry', () => {
       name: 'healthy-host',
       claudeCodeReport: report({ state: 'ok', expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 }),
     });
-    insertAgent(s, { id: 'agent-healthy', machineId: healthyId, provider: 'claude-code' });
-    const stepId = insertBuildStep(s, projectId, 'agent-healthy');
+    routeSession(s, { machineId: healthyId, provider: 'claude-code' });
+    const stepId = insertBuildStep(s, projectId);
     const claimed = await claimAs(s, healthyId);
     expect(claimed?.step.id).toBe(stepId);
   });
@@ -334,9 +326,8 @@ describe('claimStep and Claude Code login expiry', () => {
     for (const [index, claudeCodeReport] of cases.entries()) {
       const { s, projectId } = await world();
       const machineId = insertMachine(s, { name: `open-${index}`, claudeCodeReport });
-      const agentId = `agent-open-${index}`;
-      insertAgent(s, { id: agentId, machineId, provider: 'claude-code' });
-      const stepId = insertBuildStep(s, projectId, agentId);
+      routeSession(s, { machineId, provider: 'claude-code' });
+      const stepId = insertBuildStep(s, projectId);
       const claimed = await claimAs(s, machineId);
       expect(claimed?.step.id).toBe(stepId);
     }
@@ -348,8 +339,8 @@ describe('claimStep and Claude Code login expiry', () => {
       name: 'stale-expiring',
       claudeCodeReport: report({ state: 'expiring', expiresAt: Date.now() - 1 }),
     });
-    insertAgent(s, { id: 'agent-stale', machineId, provider: 'claude-code' });
-    const stepId = insertBuildStep(s, projectId, 'agent-stale');
+    routeSession(s, { machineId, provider: 'claude-code' });
+    const stepId = insertBuildStep(s, projectId);
     expect(await claimAs(s, machineId)).toBeNull();
     expect(stepStatus(s, stepId)).toBe('pending');
   });
@@ -360,8 +351,8 @@ describe('claimStep and Claude Code login expiry', () => {
       name: 'expired-pi',
       claudeCodeReport: report({ state: 'expired', expiresAt: Date.now() - 3_600_000 }),
     });
-    insertAgent(s, { id: 'agent-pi', machineId, provider: 'stub-gw' });
-    const stepId = insertBuildStep(s, projectId, 'agent-pi');
+    routeSession(s, { machineId, provider: 'stub-gw' });
+    const stepId = insertBuildStep(s, projectId);
     const claimed = await claimAs(s, machineId);
     expect(claimed?.step.id).toBe(stepId);
   });
@@ -472,8 +463,8 @@ describe('subscription login takes precedence over expired machine login', () =>
         kind === 'chief'
           ? insertChief(s, machineId, 'claude-code')
           : (() => {
-              insertAgent(s, { id: 'subscription-builder', machineId, provider: 'claude-code' });
-              return insertBuildStep(s, projectId, 'subscription-builder');
+              routeSession(s, { machineId, provider: 'claude-code' });
+              return insertBuildStep(s, projectId);
             })();
       const token =
         'sk-ant-oat01-private-subscription-claim-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
@@ -551,8 +542,8 @@ describe('subscription login takes precedence over expired machine login', () =>
       name: 'expired-both',
       claudeCodeReport: report({ state: 'expired', expiresAt: 1 }),
     });
-    insertAgent(s, { id: 'expired-subscription-builder', machineId, provider: 'claude-code' });
-    insertBuildStep(s, projectId, 'expired-subscription-builder');
+    routeSession(s, { machineId, provider: 'claude-code' });
+    insertBuildStep(s, projectId);
     await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
       label: 'Expired',
       token:
@@ -569,13 +560,13 @@ test('team-scoped revocation removes future credentials and restores the machine
     name: 'revoked-subscription',
     claudeCodeReport: report({ state: 'expired', expiresAt: 1 }),
   });
-  insertAgent(s, { id: 'revocation-builder', machineId, provider: 'claude-code' });
+  routeSession(s, { machineId, provider: 'claude-code' });
   const token = `sk-ant-oat01-${'r'.repeat(64)}`;
   const path = `/api/teams/${s.team.id}/claude-subscriptions`;
   const response = await req(s.app, 'POST', path, { label: 'Revocable', token });
   expect(response.status).toBe(201);
   const { id } = (await response.json()) as { id: string };
-  const firstStep = insertBuildStep(s, projectId, 'revocation-builder');
+  const firstStep = insertBuildStep(s, projectId);
   expect((await claimAs(s, machineId))?.step.id).toBe(firstStep);
   const machineToken = 'revocation-machine-auth';
   s.db
@@ -595,7 +586,7 @@ test('team-scoped revocation removes future credentials and restores the machine
   expect((await req(s.app, 'DELETE', `${path}/${id}`)).status).toBe(204);
   expect((await req(s.app, 'DELETE', `${path}/${id}`)).status).toBe(404);
   expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(false);
-  const nextStep = insertBuildStep(s, projectId, 'revocation-builder');
+  const nextStep = insertBuildStep(s, projectId);
   expect(await claimAs(s, machineId)).toBeNull();
   s.db
     .update(stepTable)

@@ -2,6 +2,10 @@ import { DEFAULT_AUTONOMY_SETTINGS, needsYouQuerySchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
+  claudeCodeAuthFailureMessage,
+  claudeCodeTeamSubscriptionAuthFailureMessage,
+} from '../../daemon/src/claude-code-auth.js';
+import {
   build as buildTable,
   project as projectTable,
   step as stepTable,
@@ -9,10 +13,15 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { applyStepFailure, type BuildDeps, completeStep } from '../src/services/builds.js';
-import { listNeedsYou, NEEDS_YOU_STALE_MS, sweepFailedRetries } from '../src/services/needs-you.js';
+import {
+  failureNeedsHuman,
+  listNeedsYou,
+  NEEDS_YOU_STALE_MS,
+  sweepFailedRetries,
+} from '../src/services/needs-you.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -31,6 +40,7 @@ interface World {
 function openWorld(phase: 'building' | 'confirm' | 'review' = 'building'): World {
   const s = bootServer();
   disposables.push(() => s.dispose());
+  seedSessionRoute(s);
   const suffix = newRecordId(8);
   const projectId = `proj-${suffix}`;
   const todoId = `todo-${suffix}`;
@@ -70,7 +80,7 @@ function openWorld(phase: 'building' | 'confirm' | 'review' = 'building'): World
     .values({
       id: stepId,
       buildId,
-      kind: 'build',
+      kind: 'session',
       status: 'claimed',
       createdAt: nowMs() - 30_000,
     })
@@ -117,7 +127,7 @@ describe('needs you (#1800)', () => {
       .from(stepTable)
       .where(eq(stepTable.status, 'pending'))
       .all()
-      .find((row) => row.kind === 'build');
+      .find((row) => row.kind === 'session');
     if (retried === undefined) throw new Error('missing retry step');
     expect(retried.byPerson).toBe(false);
     setTodoPhase(w.deps, w.todoId, 'building');
@@ -168,6 +178,30 @@ describe('needs you (#1800)', () => {
     expect(phaseOf(w)).toBe('failed');
     expect(buildCount(w)).toBe(builds);
     expect(groups(w).current.map((entry) => entry.reason)).toEqual(['failed']);
+  });
+
+  test.each([
+    ['machine login', claudeCodeAuthFailureMessage('daemon-test')],
+    ['team subscription', claudeCodeTeamSubscriptionAuthFailureMessage('credential rejected')],
+    ['raw CLI', 'Failed to authenticate: OAuth token revoked'],
+    ['ordinary failure', 'build failed: test assertion failed'],
+  ])('the retry sweep only restarts ordinary failures: %s', async (kind, errorMessage) => {
+    const w = openWorld();
+    const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
+    if (step === undefined) throw new Error('missing step');
+    applyStepFailure(w.deps, step, errorMessage);
+    expect(phaseOf(w)).toBe('failed');
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
+    ).toBe(errorMessage);
+    const needsHuman = kind !== 'ordinary failure';
+
+    await sweepFailedRetries(w.deps);
+
+    expect(phaseOf(w)).toBe(needsHuman ? 'failed' : 'queued');
+    expect(buildCount(w)).toBe(needsHuman ? 1 : 2);
+    expect(failureNeedsHuman(errorMessage)).toBe(needsHuman);
+    expect(groups(w).current.map((entry) => entry.reason)).toEqual(needsHuman ? ['failed'] : []);
   });
 
   test('plan confirmations and human reviews enter needs you; an autonomous review does not', () => {

@@ -141,23 +141,6 @@ function tableExists(dbPath: string, table: string): boolean {
   }
 }
 
-function agentColumn(
-  dbPath: string,
-  agentId: string,
-  column: 'defaultSkill' | 'skillsAllowlist' | 'mcpServers',
-): string | null {
-  const sqlite = new Database(dbPath, { readonly: true });
-  try {
-    const row = sqlite.prepare(`SELECT ${column} FROM agent WHERE id = ?`).get(agentId) as Record<
-      string,
-      string | null
-    >;
-    return row[column] ?? null;
-  } finally {
-    sqlite.close();
-  }
-}
-
 function exportFiles(homeDir: string): string[] {
   return readdirSync(homeDir)
     .filter((f) => /^legacy-export-.+\.json$/.test(f))
@@ -165,16 +148,14 @@ function exportFiles(homeDir: string): string[] {
 }
 
 describe('legacy-export migration guardrail (skill + mcp_server table retirement)', () => {
-  test('L1/L5: legacy db two tables with rows -> export content complete on disk, mcpServers cleared + skills column migration retired, both tables gone', () => {
+  test('L1/L5: legacy db two tables with rows -> export content complete on disk, retired tables gone and the agent table kept for one start', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 2, mcpRows: 1 });
     const home = temp('cairn-legacy-home-');
     const { db, close } = openDbWithHandle(dbPath, { legacyExportDir: home });
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
       expect(tableExists(dbPath, 'mcp_server')).toBe(false);
-      expect(agentColumn(dbPath, 'ag-1', 'skillsAllowlist')).toBeNull();
-      expect(agentColumn(dbPath, 'ag-1', 'defaultSkill')).toBeNull();
-      expect(agentColumn(dbPath, 'ag-1', 'mcpServers')).toBe('[]');
+      expect(tableExists(dbPath, 'agent')).toBe(true);
       const files = exportFiles(home);
       expect(files).toHaveLength(1);
       expect(files[0]).toMatch(/^legacy-export-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/);
@@ -239,9 +220,7 @@ describe('legacy-export migration guardrail (skill + mcp_server table retirement
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
       expect(tableExists(dbPath, 'mcp_server')).toBe(false);
-      expect(agentColumn(dbPath, 'ag-1', 'skillsAllowlist')).toBeNull();
-      expect(agentColumn(dbPath, 'ag-1', 'defaultSkill')).toBeNull();
-      expect(agentColumn(dbPath, 'ag-1', 'mcpServers')).toBe('[]');
+      expect(tableExists(dbPath, 'agent')).toBe(true);
     } finally {
       close();
     }

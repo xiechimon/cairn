@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
   agentMemory,
-  agent as agentTable,
   build as buildTable,
   chiefMessage,
   chiefThread,
@@ -149,10 +148,6 @@ function nextQuarter(): number {
   return Math.ceil((nowMs() + 3_600_000) / 900_000) * 900_000;
 }
 
-function buildsOf(todoId: string): number {
-  return H.s.db.select().from(buildTable).where(eq(buildTable.todoId, todoId)).all().length;
-}
-
 function schedulesOf(todoId: string): number {
   return H.s.db.select().from(scheduleTable).where(eq(scheduleTable.todoId, todoId)).all().length;
 }
@@ -161,44 +156,7 @@ function memoryCount(): number {
   return H.s.db.select().from(agentMemory).all().length;
 }
 
-describe('#1470 MCP run_builds / schedule_todo: the project a todo points at is team-checked too', () => {
-  const assignment = { build: { agentId: AGENT_ID } };
-
-  test('U1 run_builds: an own-team todo pointing at another team project -> 404 project, not one build created', async () => {
-    const err = await rejection(mcp('run_builds', { todoIds: [CROSS], assignment }));
-    expect(err.status).toBe(404);
-    expect(err.message).toBe(`project ${PROJ_B}`);
-    expect(buildsOf(CROSS)).toBe(0);
-  });
-
-  test('U1 run_builds mixed list: the own-team todo at the front is not dispatched first either', async () => {
-    const own = H.s.db.select().from(todoTable).where(eq(todoTable.id, OWN_TASK)).get();
-    const before = buildsOf(OWN_TASK);
-    const err = await rejection(mcp('run_builds', { todoIds: [OWN_TASK, CROSS], assignment }));
-    expect(err.status).toBe(404);
-    expect(buildsOf(OWN_TASK)).toBe(before);
-    expect(H.s.db.select().from(todoTable).where(eq(todoTable.id, OWN_TASK)).get()?.phase).toBe(
-      own?.phase,
-    );
-  });
-
-  test('U8 run_builds: assigning another team agent -> 404 agent, not one build created', async () => {
-    H.s.db
-      .insert(agentTable)
-      .values({ id: 'agent-b-1470', teamId: TEAM_B, displayName: 'b', provider: 'p', modelId: 'm' })
-      .run();
-    const before = buildsOf(OWN_TASK);
-    const err = await rejection(
-      mcp('run_builds', {
-        todoIds: [OWN_TASK],
-        assignment: { build: { agentId: 'agent-b-1470' } },
-      }),
-    );
-    expect(err.status).toBe(404);
-    expect(err.message).toBe('agent agent-b-1470');
-    expect(buildsOf(OWN_TASK)).toBe(before);
-  });
-
+describe('#1470 MCP schedule_todo: the project a todo points at is team-checked too', () => {
   test('U2 schedule_todo: an own-team todo pointing at another team project -> 404 project, no schedule created', async () => {
     const err = await rejection(
       mcp('schedule_todo', { todoId: CROSS, kind: 'once', at: nextQuarter() }),
@@ -208,11 +166,7 @@ describe('#1470 MCP run_builds / schedule_todo: the project a todo points at is 
     expect(schedulesOf(CROSS)).toBe(0);
   });
 
-  test('U7 same-team paths unchanged: run_builds and schedule_todo work as usual', async () => {
-    const res = (await mcp('run_builds', { todoIds: [OWN_TASK], assignment })) as {
-      builds: unknown[];
-    };
-    expect(res.builds.length).toBe(1);
+  test('U7 same-team paths unchanged: schedule_todo works as usual', async () => {
     await mcp('schedule_todo', { todoId: OWN_TASK, kind: 'once', at: nextQuarter() });
     expect(schedulesOf(OWN_TASK)).toBe(1);
   });
@@ -280,6 +234,7 @@ describe('#1470 save_memory: projectId / sourceTodoId are team-checked', () => {
   const workerCtx = () => ({
     teamId: H.teamId,
     agentId: AGENT_ID,
+    sourceName: null,
     todoId: OWN_TASK,
     projectId: H.projectId,
     buildId: OWN_BUILD,

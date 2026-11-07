@@ -1,9 +1,8 @@
 import { type ClaimedStep, FIXED_TAGS, todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { agent as agentTable } from '../src/db/schema.js';
 import { backfillFixedTags, seedFixedTags } from '../src/services/tags.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
+import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -82,8 +81,6 @@ describe('fixed-vocabulary seeding (ADR 0002 D4)', () => {
 });
 
 describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the todoId)', () => {
-  const AGENT_ID = 'agent-task-meta';
-
   async function world() {
     const s = bootServer({ claimHoldMs: 250 });
     const plain = await issueApiKey(s);
@@ -92,11 +89,7 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
       body: { teamId: s.team.id, name: 'task-meta', cliVersion: '0.1.0' },
     });
     const { token } = (await enroll.json()) as { token: string };
-    s.db
-      .insert(agentTable)
-      .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'meta', provider: 'p', modelId: 'm' })
-      .run();
-    bindAllAgents(s);
+    seedSessionRoute(s, { provider: 'p', modelId: 'm' });
 
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -104,11 +97,7 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
     });
     const { id: todoId } = (await todoRes.json()) as { id: string };
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: null, build: { agentId: AGENT_ID } },
-        withPlan: false,
-      },
+      body: { todoIds: [todoId] },
     });
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
