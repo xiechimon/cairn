@@ -1,5 +1,5 @@
 import { chiefDigestThreadId, ISSUE_FENCE_OPEN } from '@cairn/shared';
-import { and, eq, inArray, like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agentMemory, step } from '../db/schema.js';
@@ -12,6 +12,7 @@ export const MEMORY_PASS_STALE_MS = 30 * 24 * 60 * 60_000;
 export const MEMORY_PASS_MIN_ENTRIES = 4;
 const LIST_MAX_ENTRIES = 80;
 const LIST_MAX_CHARS = 16_000;
+const LINE_MAX_CHARS = 600;
 const MERGES_MAX = 5;
 const EXPIRES_MAX = 10;
 const CONTENT_MAX = 500;
@@ -62,13 +63,38 @@ export function memoryPassDue(
   return !done.some((row) => now - (row.finishedAt ?? row.createdAt) < MEMORY_PASS_INTERVAL_MS);
 }
 
-export function memoryPassSection(db: Db, teamId: string, agentId: string): string {
+function unvisitedFirst(db: Db, chiefId: string, rows: ReturnType<typeof validCore>) {
+  const prompts = db
+    .select({ prompt: step.prompt })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, chiefDigestThreadId(chiefId)),
+        eq(step.status, 'done'),
+        like(step.prompt, `%${MEMORY_PASS_MARK}%`),
+      ),
+    )
+    .all();
+  const visited = (id: string) => prompts.some((p) => p.prompt?.includes(`\n${id} | `));
+  const fresh = rows.filter((m) => !visited(m.id));
+  return fresh.length > 0 ? fresh : rows;
+}
+
+export function memoryPassSection(
+  db: Db,
+  chiefId: string,
+  teamId: string,
+  agentId: string,
+): string {
   const lines: string[] = [];
   let used = 0;
-  for (const m of validCore(db, teamId, agentId).slice(0, LIST_MAX_ENTRIES)) {
+  for (const m of unvisitedFirst(db, chiefId, validCore(db, teamId, agentId)).slice(
+    0,
+    LIST_MAX_ENTRIES,
+  )) {
     const line = `${m.id} | ${m.projectId ?? 'team'} | 更新 ${DAY(m.updatedAt)} | 最近注入 ${
       m.lastInjectedAt === null ? '从未' : DAY(m.lastInjectedAt)
-    } | ${m.title}：${m.content}`;
+    } | ${m.title}：${m.content}`.slice(0, LINE_MAX_CHARS);
     if (used + line.length > LIST_MAX_CHARS) break;
     lines.push(line);
     used += line.length + 1;
@@ -116,16 +142,13 @@ export function applyMemoryPass(
       continue;
     }
     try {
-      const successor = updateMemoryEntry(db, {
+      updateMemoryEntry(db, {
         memoryId: keep.id,
         agentId: scope.agentId,
         teamId: scope.teamId,
         content,
+        absorb: { ids: merge.drop, at: now },
       });
-      db.update(agentMemory)
-        .set({ invalidAt: now, supersededBy: successor.id })
-        .where(inArray(agentMemory.id, merge.drop))
-        .run();
       result.merged += 1;
     } catch (error) {
       if (!(error instanceof HttpError)) throw error;

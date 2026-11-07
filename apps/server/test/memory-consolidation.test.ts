@@ -66,6 +66,21 @@ describe('applyMemoryPass', () => {
     expect(H.s.db.select().from(agentMemory).all()).toHaveLength(3);
   });
 
+  test('a merge may keep the wording of an entry it drops', () => {
+    put('a', 'Squash merges only.');
+    put('b', 'Only squash merges.');
+    const out = applyMemoryPass(
+      H.s.db,
+      scope(),
+      { merge: [{ keep: 'a', drop: ['b'], content: 'Only squash merges.' }] },
+      NOW,
+    );
+    expect(out).toEqual({ merged: 1, expired: 0, skipped: 0 });
+    expect(valid().map((m) => m.content)).toEqual(['Only squash merges.']);
+    expect(row('b')?.invalidAt).toBe(NOW);
+    expect(row('b')?.supersededBy).toBe(valid()[0]?.id);
+  });
+
   test('refuses to merge across projects, with unknown ids, with itself, or with fenced text', () => {
     put('a', 'one');
     put('b', 'two', { projectId: H.projectId });
@@ -198,6 +213,42 @@ describe('the weekly pass rides on the digest step', () => {
   });
 });
 
+describe('the listing rotates', () => {
+  const chiefRow = () =>
+    H.s.db.select().from(chiefTable).where(eq(chiefTable.id, H.chiefId)).get()!;
+  const base = 'base prompt\nDigest thread=t until=1 last=x reason=daily';
+  const listed = (prompt: string) =>
+    prompt
+      .split('\n')
+      .filter((line) => / \| (team|\w+) \| 更新 /.test(line))
+      .map((line) => line.split(' | ')[0] as string);
+
+  test('every entry is visited over successive passes, within the bound', () => {
+    const ids = Array.from({ length: 200 }, (_, i) => `m${String(i).padStart(3, '0')}`);
+    for (const id of ids) put(id, id);
+    const seen = new Set<string>();
+    let at = NOW;
+    for (let pass = 0; pass < 3; pass += 1) {
+      const stepId = queueDigestStep(H.s.svc, chiefRow(), base, at);
+      const prompt = H.s.db.select().from(step).where(eq(step.id, stepId)).get()?.prompt ?? '';
+      const batch = listed(prompt);
+      expect(batch.length).toBeGreaterThan(0);
+      expect(batch.length).toBeLessThanOrEqual(80);
+      for (const id of batch) seen.add(id);
+      H.s.db.update(step).set({ status: 'done', finishedAt: at }).where(eq(step.id, stepId)).run();
+      at += MEMORY_PASS_INTERVAL_MS + 1;
+    }
+    expect(seen.size).toBe(200);
+  });
+
+  test('an oversized entry is cut and does not empty the list', () => {
+    put('big', 'x'.repeat(40_000));
+    for (const id of ['b', 'c', 'd']) put(id, id);
+    const section = memoryPassSection(H.s.db, H.chiefId, H.teamId, agent());
+    expect(listed(section)).toEqual(['big', 'b', 'c', 'd']);
+  });
+});
+
 describe('prompt helpers', () => {
   test('withMemoryPass keeps the digest meta line last', () => {
     const out = withMemoryPass('body\nDigest thread=t until=1 last=x reason=daily', 'SECTION');
@@ -208,7 +259,7 @@ describe('prompt helpers', () => {
     put('live', 'still true');
     put('dead', 'gone');
     H.s.db.update(agentMemory).set({ invalidAt: NOW }).where(eq(agentMemory.id, 'dead')).run();
-    const section = memoryPassSection(H.s.db, H.teamId, agent());
+    const section = memoryPassSection(H.s.db, H.chiefId, H.teamId, agent());
     expect(section).toContain('live | team');
     expect(section).not.toContain('gone');
   });

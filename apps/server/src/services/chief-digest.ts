@@ -283,7 +283,7 @@ export function queueDigestStep(
   const agentId = coordinatorProfile(db, chiefRow.teamId)?.id;
   const prompt =
     agentId !== undefined && memoryPassDue(db, chiefRow.id, chiefRow.teamId, agentId, now)
-      ? withMemoryPass(basePrompt, memoryPassSection(db, chiefRow.teamId, agentId))
+      ? withMemoryPass(basePrompt, memoryPassSection(db, chiefRow.id, chiefRow.teamId, agentId))
       : basePrompt;
   db.insert(chiefThread)
     .values({
