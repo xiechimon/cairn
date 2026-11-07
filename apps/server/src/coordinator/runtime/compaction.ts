@@ -13,6 +13,7 @@ import {
   defineExtension,
   hook,
 } from '@earendil-works/pi-durable';
+import { reportCompactionFailure } from './failure-report.js';
 
 export const BACKGROUND_COMPACTION_AT = 70_000;
 export const COMPACTION_RESERVE_TOKENS = 16_384;
@@ -187,26 +188,35 @@ export function summarizerFor(
 export function coordinatorCompactionExtension(
   summaryModel: () => ModelRef | null,
   flush: () => MemoryFlush | null = () => null,
+  threadId?: string,
 ) {
+  const scope = threadId === undefined ? {} : { threadId };
   return defineExtension({
     name: 'cairn-coordinator-compaction',
     hooks: [
       hook(CompactionTask, {
         beforeCompact: async (compaction, api, context) => {
-          const cached = await api.memo<string>(SUMMARY_MEMO, context);
-          if (cached !== undefined) return { summary: cached };
-          const summarize = summarizerFor(api.models, summaryModel());
-          const { previous, rest } = splitPreviousSummary(compaction.messages);
-          const lines = transcriptLines(rest);
-          const flusher = flush();
-          if (flusher !== null && (await api.memo<boolean>(FLUSH_MEMO, context)) === undefined) {
-            try {
-              await flusher.run(flushTranscript(lines), summarize);
-            } catch {}
-            await api.memo(FLUSH_MEMO, true, context);
+          try {
+            const cached = await api.memo<string>(SUMMARY_MEMO, context);
+            if (cached !== undefined) return { summary: cached };
+            const summarize = summarizerFor(api.models, summaryModel());
+            const { previous, rest } = splitPreviousSummary(compaction.messages);
+            const lines = transcriptLines(rest);
+            const flusher = flush();
+            if (flusher !== null && (await api.memo<boolean>(FLUSH_MEMO, context)) === undefined) {
+              try {
+                await flusher.run(flushTranscript(lines), summarize);
+              } catch (error) {
+                reportCompactionFailure(scope, 'memory-flush', error);
+              }
+              await api.memo(FLUSH_MEMO, true, context);
+            }
+            const summary = await foldSummary(previous, summaryBatches(lines), summarize);
+            return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
+          } catch (error) {
+            reportCompactionFailure(scope, 'summary-fold', error);
+            throw error;
           }
-          const summary = await foldSummary(previous, summaryBatches(lines), summarize);
-          return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
         },
       }),
     ],

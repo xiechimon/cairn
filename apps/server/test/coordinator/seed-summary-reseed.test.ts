@@ -38,7 +38,7 @@ describe('Coordinator reseed builds its summary on demand', () => {
     coordinator.wake(w.threadId);
     await coordinator.idle();
 
-    expect(lines.join('\n')).toContain('seed summary failed');
+    expect(lines.join('\n')).toContain('coordinator compaction step failed');
     expect(lines.join('\n')).not.toContain(KEY);
     expect(
       w.s.db

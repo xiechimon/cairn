@@ -9,6 +9,11 @@ import type { AssistantMessage, ModelThinkingLevel } from '@earendil-works/pi-ai
 import { AssistantEntry, type EntryRecord, type Harness } from '@earendil-works/pi-durable';
 import { compactionWindow, type ModelRef } from './compaction.js';
 import { activeConversation, type Conversation } from './conversations.js';
+import {
+  reportCompactionFailure,
+  reportLiveCompactionFailure,
+  taskFailure,
+} from './failure-report.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
@@ -61,6 +66,7 @@ async function foldBeforeModelSwitch(
   deps: TurnDeps,
   root: Conversation,
   next: ModelRef,
+  scope: { threadId: string; stepId: string },
 ): Promise<void> {
   const current = (await root.agent(deps.context)).model;
   if (current === undefined) return;
@@ -71,9 +77,14 @@ async function foldBeforeModelSwitch(
   if (estimateTokens(JSON.stringify(view.messages)) < compactionWindow(window).backgroundAt) return;
   try {
     const task = await root.compact(SWITCH_FOLD_INSTRUCTIONS, deps.context);
-    await deps.harness.waitForTask(task, deps.context);
-  } catch {
-    return;
+    const settled = await deps.harness.waitForTask(task, deps.context);
+    const { outcome } = settled.state;
+    if (outcome.status !== 'completed') {
+      const reason = outcome.error?.message ?? outcome.reason ?? outcome.status;
+      reportCompactionFailure(scope, 'model-switch-fold', taskFailure(reason));
+    }
+  } catch (error) {
+    reportCompactionFailure(scope, 'model-switch-fold', error);
   }
 }
 
@@ -155,7 +166,12 @@ export async function runCoordinatorTurn(
           steering = false;
         });
     }, deps.stopPollMs ?? STOP_POLL_MS);
-    await foldBeforeModelSwitch(deps, root, { provider, modelId });
+    await foldBeforeModelSwitch(
+      deps,
+      root,
+      { provider, modelId },
+      { threadId: claimed.chief.threadId, stepId },
+    );
     await root.configure(
       {
         model: { provider, modelId },
@@ -165,10 +181,13 @@ export async function runCoordinatorTurn(
       context,
     );
     const newest = (await root.entries({}, 1, undefined, context)).items[0]?.id;
+    const threadId = claimed.chief.threadId;
     const mirror = createTurnMirror(api, stepId, newest);
     const watch = await root.watch(context);
     watch.start(async (call) => {
-      if (call.kind === 'value') await mirror.onView(call.value);
+      if (call.kind !== 'value') return;
+      reportLiveCompactionFailure({ threadId, stepId }, call.value.docs['pi.live']);
+      await mirror.onView(call.value);
     });
     if (stopping !== null) {
       await stopping;

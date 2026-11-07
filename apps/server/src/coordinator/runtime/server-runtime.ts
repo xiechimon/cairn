@@ -10,6 +10,7 @@ import {
   type Summarize,
   summarizerFor,
 } from './compaction.js';
+import { reportCompactionFailure } from './failure-report.js';
 import type { MachineApi } from './machine-api.js';
 import { type CoordinatorModels, createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
@@ -92,12 +93,14 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       coordinatorCompactionExtension(
         () => summary.ref,
         () => config.memoryFlush?.(threadId) ?? null,
+        threadId,
       ),
     ];
     const summarize = (): Summarize | null => {
       try {
         return summarizerFor(models.models, summary.ref);
-      } catch {
+      } catch (error) {
+        reportCompactionFailure({ threadId }, 'summary-model', error);
         return null;
       }
     };

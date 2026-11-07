@@ -34,6 +34,7 @@ import {
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { createMemoryFlush } from './memory-flush.js';
+import { reportCompactionFailure, setFailureSink } from './runtime/failure-report.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
 import type { SeedRow } from './runtime/seed.js';
@@ -191,7 +192,9 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
               ids,
               String(error),
             );
-            logger.warn({ threadId, error: message }, 'seed summary failed');
+            const scrubbed = new Error(message);
+            scrubbed.name = error instanceof Error ? error.name : 'Error';
+            reportCompactionFailure({ threadId }, 'seed-summary', scrubbed);
           },
           nowMs(),
         );
@@ -273,6 +276,20 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     config: route.config,
     modelId: route.modelId,
     resolveKey: () => coordinatorApiKey({ db, box: machine.box }, teamId, route.provider),
+  });
+
+  setFailureSink({
+    log: (fields, message) => logger.error(fields, message),
+    stepOf: (threadId) => liveSteps(threadId)[0]?.id ?? null,
+    scrub: (threadId, message) => {
+      const teamId = threadTeam(threadId);
+      if (teamId === null) return message;
+      const providers = coordinatorProviders({ db, box: machine.box }, teamId);
+      const keyed = [providers?.router.provider, providers?.summary.provider].filter(
+        (id): id is string => id !== undefined,
+      );
+      return scrubProviderError({ db, box: machine.box }, teamId, keyed, message);
+    },
   });
 
   const heldLease = (threadId: string): Lease | null => {

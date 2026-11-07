@@ -33,10 +33,10 @@ export function parseFlushOutput(raw: string) {
   try {
     json = JSON.parse((fenced?.[1] ?? raw).trim());
   } catch {
-    return [];
+    throw new Error('memory flush output is not JSON');
   }
   const outer = outputSchema.safeParse(json);
-  if (!outer.success) return [];
+  if (!outer.success) throw new Error('memory flush output has no memories array');
   return outer.data.memories
     .flatMap((entry) => {
       const parsed = candidateSchema.safeParse(entry);
