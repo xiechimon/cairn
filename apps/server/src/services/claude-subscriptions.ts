@@ -97,11 +97,14 @@ export function openClaudeSubscription(
   return row ? deps.box.open(row.tokenCipher) : undefined;
 }
 
-export function hasActiveClaudeSubscription(deps: { db: Db }, teamId: string): boolean {
+export function hasActiveClaudeSubscription(
+  deps: { db: Pick<Db, 'select'> },
+  teamId: string,
+): boolean {
   return activeSubscriptionRow(deps, teamId) !== undefined;
 }
 
-function activeSubscriptionRow(deps: { db: Db }, teamId: string): Row | undefined {
+function activeSubscriptionRow(deps: { db: Pick<Db, 'select'> }, teamId: string): Row | undefined {
   return deps.db
     .select()
     .from(claudeSubscription)
