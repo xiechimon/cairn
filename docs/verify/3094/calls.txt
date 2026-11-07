@@ -1,0 +1,16 @@
+$ curl -s -X POST 'http://127.0.0.1:8941/api/teams/BuK_TWaV1lcs565X2opYe/providers/doA4TZAdDk2oTirWe8jaV/test' -H 'content-type: application/json' -d '{}'
+HTTP 404
+{"error":"Not found"}
+
+$ curl -s -X POST 'http://127.0.0.1:8931/api/teams/MRxJJPnnbdi_KGf47ZWlz/providers/doA4TZAdDk2oTirWe8jaV/test' -H 'content-type: application/json' -d '{}'
+HTTP 200
+{"status":"ok","probe":{"requestedModel":"glm-5.3","echoedModel":"glm-5.3-0612","httpStatus":200,"latencyMs":423,"error":null}}
+
+$ curl -s -X POST 'http://127.0.0.1:8931/api/teams/MRxJJPnnbdi_KGf47ZWlz/providers/iw6SKvhORdcWAyJEkajbU/test' -H 'content-type: application/json' -d '{}'
+HTTP 200
+{"status":"failed","probe":{"requestedModel":"glm-5.3","echoedModel":null,"httpStatus":401,"latencyMs":8,"error":{"type":"auth","message":"401: {\"message\":\"Incorrect API key provided: [REDACTED]\"}"}}}
+
+$ curl -s -X POST 'http://127.0.0.1:8931/api/teams/MRxJJPnnbdi_KGf47ZWlz/providers/nope/test' -H 'content-type: application/json' -d '{}'
+HTTP 404
+{"error":"provider nope not found"}
+
