@@ -252,7 +252,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     expect((await w.claim())?.instruction).toBe('第二句');
   });
 
-  test('a message typed during a wake turn waits for its own turn', async () => {
+  test('a message typed during a wake turn goes into that turn too', async () => {
     const w = await setupWorld();
     await w.send('第一句');
     const first = await w.claim();
@@ -261,9 +261,9 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
       .set({ prompt: '[wake:settle] 任务 #9 已合并完成' })
       .where(eq(stepTable.id, first!.step.id))
       .run();
-    const second = await w.send('第二句');
-    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'queued' }]);
-    expect(await w.fetchSteer(first!.step.id)).toBeNull();
+    await w.send('第二句');
+    expect((await w.thread()).pending).toEqual([]);
+    expect(await w.fetchSteer(first!.step.id)).toBe('第二句');
   });
 
   test('a message queued behind a running turn does not make the thread look queued for a machine', async () => {
