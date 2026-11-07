@@ -315,3 +315,47 @@ export function emitCoordinatorTurnSpans(
   const redacted = redactSecrets(request).value as typeof request;
   sender.send(target, redacted);
 }
+
+export function emitCompactionFailureSpan(
+  failure: {
+    stage: string;
+    errorClass: string;
+    message: string;
+    count: number;
+    threadId?: string | undefined;
+    stepId?: string | undefined;
+  },
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  const target = runtimeTarget(env);
+  if (target === null) return;
+  const environment = otelEnvironment(env);
+  const now = Date.now();
+  const inTurn = failure.threadId !== undefined && failure.stepId !== undefined;
+  const span: OtlpSpan = {
+    traceId: inTurn
+      ? otlpTraceIdOfStep({
+          kind: 'chief',
+          buildId: failure.threadId ?? '',
+          stepId: failure.stepId ?? '',
+        })
+      : otlpTraceIdOfBuild(failure.threadId ?? 'coordinator'),
+    spanId: randomBytes(8).toString('hex'),
+    ...(inTurn
+      ? { parentSpanId: otlpStepSpanIdOfBuild(failure.threadId ?? '', failure.stepId ?? '') }
+      : {}),
+    name: `compaction ${failure.stage}`,
+    kind: OTLP_SPAN_KIND.internal,
+    startTimeUnixNano: otlpNanos(now),
+    endTimeUnixNano: otlpNanos(now),
+    attributes: otlpAttributes({
+      'cairn.compaction.stage': failure.stage,
+      'cairn.compaction.failure_count': failure.count,
+      'error.type': failure.errorClass,
+      ...langfuseEnvironmentAttributes(environment),
+    }),
+    status: { code: OTLP_STATUS_ERROR, message: failure.message },
+  };
+  const request = otlpTracesRequest(otelResourceAttributes(environment), SCOPE, [span]);
+  sender.send(target, redactSecrets(request).value as typeof request);
+}
