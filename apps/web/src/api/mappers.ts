@@ -1125,7 +1125,7 @@ export function mapRunHistory(
     const b = byId.get(entry.buildId);
     const isCurrent = todo.latestBuildId === entry.buildId;
     const failed = b?.errorMessage != null && b.errorMessage !== '';
-    const parts = [relativeTime(entry.createdAt, now)];
+    const parts = [relativeTime(entry.createdAt, now)].filter((part) => part !== '');
     const tokens = tokensByBuild?.get(entry.buildId);
     if (tokens !== undefined) parts.push(`${formatTokens(tokens)} tokens`);
     if (failed && b) parts.push(stripAnsiEscapes(b.errorMessage ?? ''));

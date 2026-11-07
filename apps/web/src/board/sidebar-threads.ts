@@ -51,7 +51,11 @@ export function groupThreads(todos: readonly TodoRecord[], projectId: string | n
   return groups;
 }
 
-export function elapsedSince(since: number, now: number): { n: number; unit: ElapsedUnit } | null {
+export function elapsedSince(
+  since: number | null | undefined,
+  now: number,
+): { n: number; unit: ElapsedUnit } | null {
+  if (since == null || since <= 0) return null;
   const diff = now - since;
   if (diff < MINUTE) return null;
   if (diff < HOUR) return { n: Math.floor(diff / MINUTE), unit: 'm' };
