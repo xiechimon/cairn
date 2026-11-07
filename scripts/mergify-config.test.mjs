@@ -123,7 +123,9 @@ test('the review-gate bot may run dequeue, and writers keep the default', () => 
   assert.match(config, / {10}- sender-permission >= write\n/);
 });
 
-test('only the bot queue requires resolved review threads immediately after draft', () => {
-  assert.match(rules.bot, /- -draft\n {6}- '#review-threads-unresolved = 0'\n/);
-  assert.doesNotMatch(rules.default, /#review-threads-unresolved/);
+test('both queues require zero unresolved review threads immediately after draft', () => {
+  for (const name of ['default', 'bot']) {
+    const [queue] = rules[name].split('    merge_conditions:\n');
+    assert.match(queue, /- -draft\n {6}- '#review-threads-unresolved = 0'\n/, name);
+  }
 });
