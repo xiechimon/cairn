@@ -1403,6 +1403,7 @@ function collectChiefStream(
       }
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
+    if (m.role === 'user' && pendingState === undefined) eventTurn = false;
     if (pendingState !== undefined) {
       const text = textOfContent(m.content).trim();
       pendingById.set(m.id, {
