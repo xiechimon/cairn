@@ -45,7 +45,7 @@ export const TASK = {
   title: '修复看板拖拽后计数不刷新',
   spec: '',
   phase: 'building',
-  phaseAt: 0,
+  phaseAt: Date.now() - 12 * 60_000,
   seqNum: 9,
   orderIndex: 0,
   tagIds: [],

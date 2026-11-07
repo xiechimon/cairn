@@ -172,6 +172,39 @@ describe('emitRuntimeStepSpan', () => {
     expect(attrs['cairn.checkpoint_commit']).toEqual({ stringValue: 'sha-checkpoint' });
   });
 
+  test.each(['plan', 'build', 'verify', 'review', 'merge', 'session'] as const)(
+    'exports the todo session on a %s step before the build root is emitted',
+    (kind) => {
+      const { s, stepId, todoId } = makeWorld({
+        status: 'done',
+        claimedAt: 1000,
+        finishedAt: 2000,
+      });
+      s.db.update(stepTable).set({ kind }).where(eq(stepTable.id, stepId)).run();
+      const captured = captureFetch();
+      emitRuntimeStepSpan(s.db, stepId, env);
+      expect(captured).toHaveLength(1);
+      const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+      const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+      expect(attrs['langfuse.session.id']).toEqual({ stringValue: todoId });
+      expect(attrs['session.id']).toEqual({ stringValue: todoId });
+      expect(attrs['langfuse.trace.name']).toBeUndefined();
+      expect(attrs['langfuse.trace.tags']).toBeUndefined();
+    },
+  );
+
+  test('does not invent a session when the step has no build row', () => {
+    const { s, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
+    s.db.update(stepTable).set({ buildId: 'missing-build' }).where(eq(stepTable.id, stepId)).run();
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    expect(captured).toHaveLength(1);
+    const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+    expect(attrs['langfuse.session.id']).toBeUndefined();
+    expect(attrs['session.id']).toBeUndefined();
+  });
+
   test('marks failed steps as error and re-reads finishedAt after the terminal update', () => {
     const { s, buildId, stepId } = makeWorld({
       status: 'failed',
@@ -547,6 +580,8 @@ describe('Coordinator turn export', () => {
     expect(root['langfuse.session.id']).toEqual({ stringValue: expect.stringMatching(/^todo-/) });
     expect(root['langfuse.environment']).toEqual({ stringValue: 'prod' });
     const stepAttrs = attrsOf(captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
+    expect(stepAttrs['langfuse.session.id']).toEqual(root['langfuse.session.id']);
+    expect(stepAttrs['session.id']).toEqual(root['session.id']);
     expect(stepAttrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
     expect(stepAttrs['langfuse.trace.name']).toBeUndefined();
   });

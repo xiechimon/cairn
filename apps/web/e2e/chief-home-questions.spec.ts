@@ -505,7 +505,9 @@ for (const locale of ['zh', 'en'] as const) {
       });
       expect(defects).toEqual([]);
       const dock = drawer.getByTestId('chief-question-dock');
-      await expect(dock.getByTestId('chief-question-dismiss')).toBeInViewport({ ratio: 1 });
+      await expect(
+        dock.getByTestId(size.width <= 640 ? 'chief-question-more' : 'chief-question-dismiss'),
+      ).toBeInViewport({ ratio: 1 });
       await expect(drawer.getByTestId('chief-question-primary')).toBeInViewport({ ratio: 1 });
     });
   }
@@ -619,7 +621,7 @@ for (const size of [
     await expect.poll(async () => (await card.boundingBox())!.height).toBeLessThanOrEqual(size.height * 0.4 + 1);
     await drawer.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
     await drawer.getByTestId('chief-question-option-0-0').click();
-    const dismiss = card.getByTestId('chief-question-dismiss');
+    const dismiss = card.getByTestId(size.width <= 640 ? 'chief-question-more' : 'chief-question-dismiss');
     const submit = drawer.getByTestId('chief-question-primary');
     await expect(dismiss).toBeInViewport({ ratio: 1 });
     await expect(submit).toBeInViewport({ ratio: 1 });

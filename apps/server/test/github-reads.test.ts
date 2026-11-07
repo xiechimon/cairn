@@ -1300,7 +1300,7 @@ describe('github_overlap Coordinator read', () => {
     const fetchImpl: FetchLike = async (input, init) => {
       const path = new URL(String(input)).pathname;
       const delayed =
-        lookup === 'openIssues' ||
+        (lookup === 'openIssues' && path === '/search/issues') ||
         (lookup === 'filePulls open PRs' && path === PULLS_PATH) ||
         (lookup === 'filePulls files for PR #1' && path === `${PULLS_PATH}/1/files`);
       if (delayed) {

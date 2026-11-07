@@ -1,8 +1,4 @@
-import {
-  type AskUserAnswer,
-  CHIEF_INPUT_PLACEHOLDER,
-  CHIEF_INPUT_PLACEHOLDER_STEERING,
-} from '@cairn/shared';
+import { CHIEF_INPUT_PLACEHOLDER, CHIEF_INPUT_PLACEHOLDER_STEERING } from '@cairn/shared';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
   type ReactNode,
@@ -74,6 +70,7 @@ import {
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
+import { awaitingStream } from './question-lifecycle.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
@@ -133,8 +130,6 @@ export interface ChiefConversationProps {
   onClose?: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
-  onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancelQuestion?: (requestId: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
@@ -153,6 +148,7 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
+  tray?: ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -165,8 +161,6 @@ export function ChiefConversation({
   onClose,
   onSend,
   onRewind,
-  onAnswerQuestion,
-  onCancelQuestion,
   onWithdraw,
   onSteer,
   onStop,
@@ -185,6 +179,7 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
+  tray,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
@@ -389,8 +384,9 @@ export function ChiefConversation({
       : undefined;
   const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
-  const turnElapsed =
-    turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
+  const turnElapsed = questionAttached
+    ? null
+    : (turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null);
   const withdraw =
     onWithdraw == null
       ? undefined
@@ -409,7 +405,10 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const allRows = awaitingStream(chief.stream ?? [], questionAttached).map((item, i) => ({
+    item,
+    i,
+  }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
   const latestMessage = rows.findLast(
     ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
@@ -502,16 +501,12 @@ export function ChiefConversation({
       index={i}
       latest={i === latestMessage?.i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
-      bound={chief.bound}
-      agent={chief.agent}
       runningTool={chief.runningTool}
       copiedKey={copiedKey}
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
-      onAnswerQuestion={onAnswerQuestion}
-      onCancelQuestion={onCancelQuestion}
     />
   );
   const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
@@ -714,6 +709,7 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
+        {tray}
         <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
         {composerReplacement ?? (
           <>

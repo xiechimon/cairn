@@ -314,10 +314,7 @@ export function AccountRow({
         <AccountStateChip account={account} now={now} />
       </span>
       <span className="grid grid-cols-2 gap-x-6">
-        <Stat
-          value={account.lastUsedAt === null ? '—' : relativeTime(account.lastUsedAt, now, t)}
-          label={t('最近使用')}
-        />
+        <Stat value={relativeTime(account.lastUsedAt, now, t) || '—'} label={t('最近使用')} />
         <Stat
           value={account.stepsLast24h === null ? '—' : String(account.stepsLast24h)}
           label={t('24 小时步骤')}
@@ -504,7 +501,11 @@ export function StickyThreadRow({ thread, now }: { thread: StickyThread; now: nu
     <ListRow
       className="hover:bg-transparent"
       title={thread.title}
-      trailing={t('固定于 {ago}', { ago: relativeTime(thread.since, now, t) })}
+      trailing={
+        relativeTime(thread.since, now, t) === ''
+          ? undefined
+          : t('固定于 {ago}', { ago: relativeTime(thread.since, now, t) })
+      }
     />
   );
 }

@@ -33,6 +33,7 @@ import {
   classifyStepFailure,
   classifyUserText,
   conversationBranch,
+  DONE_ROW,
   GATE_ANNOUNCEMENTS,
   infoReportMessageSchema,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -50,6 +51,7 @@ import {
   verifyVerdictSchema,
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
+import { STATUS_WORDS } from '../board/status-words.js';
 import type {
   BranchInfoContent,
   ChiefContent,
@@ -721,6 +723,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (isJsonPlumbing(text)) continue;
+      if (text === DONE_ROW) {
+        entries.push({
+          at: m.createdAt,
+          item: {
+            kind: 'note',
+            text: todo.verified === true ? STATUS_WORDS.verified : STATUS_WORDS.doneUnverified,
+            id: m.id,
+          },
+        });
+        continue;
+      }
       if (text !== '') entries.push({ at: m.createdAt, item: { kind: 'note', text, id: m.id } });
       continue;
     }
@@ -1112,7 +1125,7 @@ export function mapRunHistory(
     const b = byId.get(entry.buildId);
     const isCurrent = todo.latestBuildId === entry.buildId;
     const failed = b?.errorMessage != null && b.errorMessage !== '';
-    const parts = [relativeTime(entry.createdAt, now)];
+    const parts = [relativeTime(entry.createdAt, now)].filter((part) => part !== '');
     const tokens = tokensByBuild?.get(entry.buildId);
     if (tokens !== undefined) parts.push(`${formatTokens(tokens)} tokens`);
     if (failed && b) parts.push(stripAnsiEscapes(b.errorMessage ?? ''));
