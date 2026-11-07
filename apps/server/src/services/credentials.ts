@@ -75,7 +75,7 @@ export function resolveStepCredentials(
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
 
-  const agentRow = profileForStep(deps.db, todoRow, stepRow.kind);
+  const agentRow = profileForStep(deps.db, todoRow, stepRow.kind, stepRow.id);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;

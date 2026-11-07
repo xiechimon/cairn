@@ -25,7 +25,8 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     if (waited < NO_MACHINE_ALERT_MS) continue;
     const projector = projectors.get(todoRow.teamId) ?? stepQueueProjector(deps.db, todoRow.teamId);
     projectors.set(todoRow.teamId, projector);
-    const homeMachineId = profileForStep(deps.db, todoRow, stepRow.kind)?.machineId ?? null;
+    const homeMachineId =
+      profileForStep(deps.db, todoRow, stepRow.kind, stepRow.id)?.machineId ?? null;
     const queue = projector.project({
       id: stepRow.id,
       createdAt: stepRow.createdAt,
