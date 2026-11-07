@@ -1452,7 +1452,6 @@ export const EN: Record<string, string> = {
     'When subscriptions run out, Claude may fall back to a paid-per-token API key.',
   只用订阅: 'Subscriptions only',
   允许按量付费: 'Allow pay as you go',
-  路由: 'Routing',
   '每种用途用哪个模型、走哪个连接': 'Which model and connection each use runs on',
   '正在读取路由…': 'Loading routing…',
   '移除「{name}」？': 'Remove {name}?',

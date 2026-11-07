@@ -127,7 +127,7 @@ function RoutingContent() {
   return (
     <PageShell
       route={MODEL_ROUTING_HREF}
-      title={t('路由')}
+      title={t('模型路由')}
       selected={MODEL_ROUTING_HREF}
       fixture={fixture}
     >
