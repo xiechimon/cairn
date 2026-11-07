@@ -559,7 +559,7 @@ function isRetryableError(message: string): boolean {
   ) {
     return false;
   }
-  return /rate.?limit|overloaded|timeout|temporarily|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status)\s*:?\s*5\d\d\b|\b5\d\d\s+(?:Internal Server Error|Not Implemented|Bad Gateway|Service Unavailable|Gateway Timeout|HTTP Version Not Supported|Variant Also Negotiates|Insufficient Storage|Loop Detected|Not Extended|Network Authentication Required)\b/i.test(
+  return /^5\d\d:|rate.?limit|overloaded|timeout|temporarily|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status)\s*:?\s*5\d\d\b|\b5\d\d\s+(?:Internal Server Error|Not Implemented|Bad Gateway|Service Unavailable|Gateway Timeout|HTTP Version Not Supported|Variant Also Negotiates|Insufficient Storage|Loop Detected|Not Extended|Network Authentication Required)\b/i.test(
     message,
   );
 }

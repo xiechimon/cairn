@@ -344,6 +344,18 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
 
   test.each([
     ['status 503', true],
+    ['503: {"message":"All available accounts exhausted","type":"server_error"}', true],
+    ['502:{"message":"relay failure"}', true],
+    ['500: relay failure', true],
+    ['599:relay failure', true],
+    ['404: model not found', false],
+    ['503: model not found', false],
+    ['502:model is not supported', false],
+    ['503: upstream returned 404', false],
+    ['request id 503: relay failure', false],
+    ['1503: relay failure', false],
+    ['5030: relay failure', false],
+    ['503 relay failure', false],
     ['503 Service Unavailable', true],
     ['HTTP 502', true],
     ['HTTP/1.1 500 Internal Server Error', true],
