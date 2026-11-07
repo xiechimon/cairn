@@ -50,6 +50,7 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
       lede="Pieces of the project and schedules pages that are more than a settings row."
     >
       <Specimen
+        id="background-tasks"
         title="Background tasks"
         note="ProjectAutonomyCard; saving needs the server and reports an error here"
         stage="canvas"
@@ -59,6 +60,7 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
         </div>
       </Specimen>
       <Specimen
+        id="folder-and-branch-pickers"
         title="Folder and branch pickers"
         note={picked ?? 'DirBrowser in its popover; ProjectBaseBranchSelect'}
         stage="canvas"
@@ -84,6 +86,7 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
         </Cell>
       </Specimen>
       <Specimen
+        id="import-from-github"
         title="Import from GitHub"
         note={picked ?? 'GithubIssuesDialog: filter by state, page, click an issue to import'}
         stage="canvas"
@@ -103,6 +106,7 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
         />
       </Specimen>
       <Specimen
+        id="schedule-rows"
         title="Schedule rows"
         note="Iframe of scenario r3-93; ScheduleCard is private to the schedules page"
         stage="canvas"

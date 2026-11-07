@@ -1,56 +1,21 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { type ClaimedStep, derivePresetDefaults, type PresetCatalogModel } from '@cairn/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
-import {
-  agent as agentTable,
-  machine as machineTable,
-  routingRule,
-  team as teamTable,
-} from '../src/db/schema.js';
+import { afterAll, describe, expect, test } from 'vitest';
+import { coordinatorProviders } from '../src/coordinator/credentials.js';
+import { machine as machineTable, routingRule, team as teamTable } from '../src/db/schema.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
-import {
-  type CoordinatorRouteFallback,
-  setCoordinatorRouteLog,
-} from '../src/services/coordinator-route.js';
+import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { resolveChiefStepCredentials } from '../src/services/credentials.js';
 import { createProvider } from '../src/services/providers.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, seedRoute, type TestServer } from './helpers.js';
 
-const ANTHROPIC_CATALOG = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../daemon/node_modules/@earendil-works/pi-ai/dist/providers/data/anthropic.json',
-);
-
-function anthropicPreset() {
-  const raw = JSON.parse(readFileSync(ANTHROPIC_CATALOG, 'utf8')) as Record<
-    string,
-    Record<string, PresetCatalogModel>
-  >;
-  const models = Object.values(raw).flatMap((group) => Object.values(group));
-  const preset = derivePresetDefaults([{ provider: 'anthropic', models }]).anthropic;
-  if (preset === undefined) throw new Error('the Anthropic preset has no defaults');
-  return preset;
-}
-
-const AGENT_ID = 'agent-chief-route';
 const BYOK_KEY = 'sk-ant-api-test-byok';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of disposables) d();
 });
-
-let fallbacks: [string, CoordinatorRouteFallback][] = [];
-beforeEach(() => {
-  fallbacks = [];
-  setCoordinatorRouteLog((teamId, reason) => fallbacks.push([teamId, reason]));
-  setCoordinatorServerContextEnabled(true);
-});
-afterEach(() => setCoordinatorServerContextEnabled(false));
 
 function call(
   app: Hono,
@@ -75,27 +40,13 @@ interface World {
   teamId: string;
   threadId: string;
   token: string;
+  machineId: string;
 }
 
-async function world(): Promise<World> {
-  const s = bootServer();
+async function world(opts: { rule?: boolean } = {}): Promise<World> {
+  const s = bootServer({ claimHoldMs: 100 });
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: 'chief',
-      description: 'coordinator',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
-  const patched = await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-  });
-  expect(patched.status).toBe(200);
   const key = await issueApiKey(s);
   const enrolled = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
@@ -108,15 +59,19 @@ async function world(): Promise<World> {
     .set({ enabledRuntimes: ['pi', 'claude-code'] })
     .where(eq(machineTable.id, machineId))
     .run();
-  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
+  if (opts.rule !== false) {
+    seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+  }
   const sent = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content: 'hello' },
   });
+  if (opts.rule === false) {
+    expect(sent.status).toBe(409);
+    return { s, teamId, threadId: '', token, machineId };
+  }
   expect(sent.status).toBe(201);
   const { thread } = (await sent.json()) as { thread: { id: string } };
-  fallbacks = [];
-  setCoordinatorRouteLog((team, reason) => fallbacks.push([team, reason]));
-  return { s, teamId, threadId: thread.id, token };
+  return { s, teamId, threadId: thread.id, token, machineId };
 }
 
 function allowPaidClaude(w: World) {
@@ -148,96 +103,68 @@ function addAnthropicKey(w: World, providerId = 'anthropic', apiKey: string | nu
   );
 }
 
-async function claim(w: World): Promise<ClaimedStep> {
+async function claim(w: World): Promise<ClaimedStep | null> {
   const res = await call(w.s.app, 'POST', '/api/machine/tasks/claim', { cred: w.token, body: {} });
   const body = (await res.json()) as { step: ClaimedStep | null };
-  if (body.step === null) throw new Error('no step claimed');
   return body.step;
 }
 
-describe('the coordinator route (D70 C5)', () => {
-  test('with a keyed Anthropic provider, the chief claim runs on it through Pi and a rule is seeded', async () => {
+describe('the coordinator route (D70 C5, now read from the coordinator routing rule)', () => {
+  test('a coordinator rule onto a keyed Anthropic provider: the chief claim and its credentials follow the rule', async () => {
     const w = await world();
     addAnthropicKey(w);
     allowPaidClaude(w);
+    seedRoute(w.s, 'coordinator', {
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+      machineId: w.machineId,
+    });
     const claimed = await claim(w);
-    expect(claimed.agent).toMatchObject({ provider: 'anthropic', modelId: 'claude-haiku-5-5' });
-    expect(w.s.db.select().from(routingRule).all()).toMatchObject([
-      { teamId: w.teamId, use: 'coordinator', provider: 'anthropic', modelId: 'claude-haiku-5-5' },
-    ]);
+    expect(claimed?.agent).toMatchObject({ provider: 'anthropic', modelId: 'claude-haiku-5-5' });
     const bundle = resolveChiefStepCredentials({ db: w.s.db, box: w.s.secretBox }, w.threadId);
     expect(bundle.provider).toMatchObject({
       providerId: 'anthropic',
       apiKey: BYOK_KEY,
       modelId: 'claude-haiku-5-5',
     });
-    expect(fallbacks).toEqual([]);
   });
 
-  test('without an API-key provider the chief claim falls back to the bound agent and logs why once', async () => {
-    const w = await world();
-    const claimed = await claim(w);
-    expect(claimed.agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
-    resolveChiefStepCredentials({ db: w.s.db, box: w.s.secretBox }, w.threadId);
-    expect(fallbacks).toEqual([[w.teamId, 'no-api-key-provider']]);
+  test('the rule is the only source: without a coordinator rule the chat is refused and a keyed Anthropic provider seeds nothing', async () => {
+    const w = await world({ rule: false });
+    addAnthropicKey(w);
     expect(w.s.db.select().from(routingRule).all()).toEqual([]);
+    expect(await claim(w)).toBeNull();
   });
 
-  test('an Anthropic provider without a key does not count, and a rule whose provider lost its key falls back', async () => {
+  test('a rule whose provider has no key claims on the rule model but carries no API key', async () => {
     const w = await world();
     addAnthropicKey(w, 'anthropic', null);
-    expect((await claim(w)).agent?.provider).toBe('stub-gw');
-    expect(fallbacks).toEqual([[w.teamId, 'no-api-key-provider']]);
-    w.s.db
-      .insert(routingRule)
-      .values({
-        id: 'rule-coord',
-        teamId: w.teamId,
-        use: 'coordinator',
-        provider: 'anthropic',
-        modelId: 'claude-sonnet-5-5',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
+    allowPaidClaude(w);
+    seedRoute(w.s, 'coordinator', {
+      provider: 'anthropic',
+      modelId: 'claude-sonnet-5-5',
+      machineId: w.machineId,
+    });
+    expect((await claim(w))?.agent).toMatchObject({
+      provider: 'anthropic',
+      modelId: 'claude-sonnet-5-5',
+    });
     const bundle = resolveChiefStepCredentials({ db: w.s.db, box: w.s.secretBox }, w.threadId);
-    expect(bundle.provider).toBeNull();
-    expect(fallbacks).toContainEqual([w.teamId, 'rule-provider-has-no-key']);
+    expect(bundle.provider).toMatchObject({ providerId: 'anthropic', apiKey: null });
   });
 
-  test('flag off: a keyed provider and a rule change nothing', async () => {
+  test('a rule onto a keyed Anthropic provider is not claimed while the team is subscription-only', async () => {
     const w = await world();
     addAnthropicKey(w);
-    setCoordinatorServerContextEnabled(false);
-    expect((await claim(w)).agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
-    expect(w.s.db.select().from(routingRule).all()).toEqual([]);
-    expect(fallbacks).toEqual([]);
+    seedRoute(w.s, 'coordinator', {
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+      machineId: w.machineId,
+    });
+    expect(await claim(w)).toBeNull();
   });
 
-  test('a keyed relay speaking the Anthropic API is never seeded as the Coordinator', async () => {
-    const w = await world();
-    createProvider(
-      { db: w.s.db, box: w.s.secretBox },
-      {
-        teamId: w.teamId,
-        body: {
-          providerId: 'relay-186',
-          label: 'Relay',
-          baseUrl: 'https://relay.example.com/v1',
-          api: 'anthropic-messages',
-          apiKey: 'relay-key',
-          models: [{ id: 'glm-5.3', name: 'GLM' }],
-        },
-        createdBy: w.s.user.id,
-      },
-    );
-    allowPaidClaude(w);
-    expect((await claim(w)).agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
-    expect(w.s.db.select().from(routingRule).all()).toEqual([]);
-    expect(fallbacks).toEqual([[w.teamId, 'no-api-key-provider']]);
-  });
-
-  test('a hand-written rule to a gateway with non-Claude model names still needs allow-paid', async () => {
+  test('a rule onto a gateway with non-Claude model names is claimed as written', async () => {
     const w = await world();
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
@@ -254,78 +181,148 @@ describe('the coordinator route (D70 C5)', () => {
         createdBy: w.s.user.id,
       },
     );
-    w.s.db
-      .insert(routingRule)
-      .values({
-        id: 'rule-gw',
-        teamId: w.teamId,
-        use: 'coordinator',
-        provider: 'company-gateway',
-        modelId: 'sonnet',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    expect((await claim(w)).agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
-    expect(fallbacks).toEqual([[w.teamId, 'paid-claude-not-allowed']]);
+    seedRoute(w.s, 'coordinator', {
+      provider: 'company-gateway',
+      modelId: 'sonnet',
+      machineId: w.machineId,
+    });
+    expect((await claim(w))?.agent).toMatchObject({
+      provider: 'company-gateway',
+      modelId: 'sonnet',
+    });
+    const bundle = resolveChiefStepCredentials({ db: w.s.db, box: w.s.secretBox }, w.threadId);
+    expect(bundle.provider).toMatchObject({ providerId: 'company-gateway', modelId: 'sonnet' });
   });
 
-  test('a keyed Anthropic provider with no models does not shadow one that has them', async () => {
+  test('a rule pinned to another machine is not claimed by this one', async () => {
     const w = await world();
+    const key = await issueApiKey(w.s);
+    const enrolled = await call(w.s.app, 'POST', '/api/machine/enroll', {
+      cred: key,
+      body: { teamId: w.teamId, name: 'other-mbp', cliVersion: '9.9.9' },
+    });
+    const other = (await enrolled.json()) as { token: string; machineId: string };
+    seedRoute(w.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: other.machineId,
+    });
+    expect(await claim(w)).toBeNull();
+    const res = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+      cred: other.token,
+      body: {},
+    });
+    const body = (await res.json()) as { step: ClaimedStep | null };
+    expect(body.step?.agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
+  });
+
+  test('coordinatorRoute: a keyed non-Anthropic provider is the route without allow-paid', async () => {
+    const w = await world();
+    setCoordinatorServerContextEnabled(true);
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
       {
         teamId: w.teamId,
         body: {
-          providerId: 'anthropic-empty',
-          label: 'Empty',
-          baseUrl: 'https://api.anthropic.com',
-          api: 'anthropic-messages',
-          apiKey: 'empty-key',
-          models: [],
+          providerId: 'vani',
+          label: 'Vani',
+          baseUrl: 'https://vani.example.com/v1',
+          api: 'openai-completions',
+          apiKey: 'vani-key',
+          models: [{ id: 'deepseek/deepseek-v4.1-flash', name: 'flash' }],
         },
         createdBy: w.s.user.id,
       },
     );
-    addAnthropicKey(w);
-    allowPaidClaude(w);
-    expect((await claim(w)).agent).toMatchObject({
-      provider: 'anthropic',
-      modelId: 'claude-haiku-5-5',
+    seedRoute(w.s, 'coordinator', {
+      provider: 'vani',
+      modelId: 'deepseek/deepseek-v4.1-flash',
+      machineId: w.machineId,
     });
+    expect(coordinatorRoute(w.s.db, w.teamId)).toMatchObject({
+      provider: 'vani',
+      modelId: 'deepseek/deepseek-v4.1-flash',
+    });
+    setCoordinatorServerContextEnabled(false);
   });
 
-  test('a provider added from the Anthropic preset as filled in is the keyed Coordinator route', async () => {
+  test('coordinatorRoute: a keyed Anthropic provider needs allow-paid', async () => {
     const w = await world();
-    const preset = anthropicPreset();
+    setCoordinatorServerContextEnabled(true);
+    addAnthropicKey(w);
+    seedRoute(w.s, 'coordinator', {
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+      machineId: w.machineId,
+    });
+    expect(coordinatorRoute(w.s.db, w.teamId)).toBeNull();
+    allowPaidClaude(w);
+    expect(coordinatorRoute(w.s.db, w.teamId)).not.toBeNull();
+    setCoordinatorServerContextEnabled(false);
+  });
+
+  test('coordinatorRoute: a Claude model behind an OpenAI-compatible gateway needs allow-paid', async () => {
+    const w = await world();
+    setCoordinatorServerContextEnabled(true);
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
       {
         teamId: w.teamId,
         body: {
-          providerId: 'anthropic',
-          label: 'Anthropic',
-          baseUrl: preset.baseUrl,
-          api: preset.api,
-          authHeader: preset.authHeader,
-          models: preset.models.filter((model) => preset.picks.includes(model.id)),
-          apiKey: BYOK_KEY,
+          providerId: 'claude-gateway',
+          label: 'Gateway',
+          baseUrl: 'https://gw.example.com/v1',
+          api: 'openai-completions',
+          apiKey: 'gw-key',
+          models: [{ id: 'claude-sonnet-5-5', name: 'sonnet' }],
         },
         createdBy: w.s.user.id,
       },
     );
-    allowPaidClaude(w);
-    expect((await claim(w)).agent).toMatchObject({
-      provider: 'anthropic',
-      modelId: 'claude-haiku-5-5',
+    seedRoute(w.s, 'coordinator', {
+      provider: 'claude-gateway',
+      modelId: 'claude-sonnet-5-5',
+      machineId: w.machineId,
     });
-    expect(fallbacks).toEqual([]);
+    expect(coordinatorRoute(w.s.db, w.teamId)).toBeNull();
+    allowPaidClaude(w);
+    expect(coordinatorRoute(w.s.db, w.teamId)).not.toBeNull();
+    setCoordinatorServerContextEnabled(false);
   });
 
-  test('a keyed provider while the team is subscription-only falls back instead of spending', async () => {
+  test('coordinatorProviders: a paid Claude compaction rule falls back to the router without allow-paid', async () => {
     const w = await world();
+    setCoordinatorServerContextEnabled(true);
     addAnthropicKey(w);
-    expect((await claim(w)).agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
-    expect(fallbacks).toEqual([[w.teamId, 'paid-claude-not-allowed']]);
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId: 'vani',
+          label: 'Vani',
+          baseUrl: 'https://vani.example.com/v1',
+          api: 'openai-completions',
+          apiKey: 'vani-key',
+          models: [{ id: 'deepseek/deepseek-v4.1-flash', name: 'flash' }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+    seedRoute(w.s, 'coordinator', {
+      provider: 'vani',
+      modelId: 'deepseek/deepseek-v4.1-flash',
+      machineId: w.machineId,
+    });
+    seedRoute(w.s, 'compaction', {
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+      machineId: w.machineId,
+    });
+    const deps = { db: w.s.db, box: w.s.secretBox };
+    expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('vani');
+    allowPaidClaude(w);
+    expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('anthropic');
+    setCoordinatorServerContextEnabled(false);
   });
 });

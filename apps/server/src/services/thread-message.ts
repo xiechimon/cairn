@@ -75,15 +75,6 @@ export function startThreadBuild(
   const [started] = startBuilds(deps, {
     projectId: row.projectId,
     todoIds: [row.id],
-    assignment:
-      row.assignment?.source === 'intake-label'
-        ? {
-            source: row.assignment.source,
-            plan: row.assignment.plan,
-            build: row.assignment.build,
-          }
-        : { plan: null, build: null },
-    withPlan: false,
     triggerSource: origin.origin === 'user' ? 'user' : 'chief',
     prompt,
   });

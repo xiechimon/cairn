@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -12,7 +11,6 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -20,6 +18,7 @@ import { orbDistRelease } from '../src/orb/dist.js';
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -27,7 +26,7 @@ afterEach(() => {
 });
 
 function fixture(wrap?: (runner: OrbCommandRunner) => OrbCommandRunner) {
-  const root = mkdtempSync(join(tmpdir(), 'orb-dist-'));
+  const root = testTempDir('orb-dist-');
   roots.push(root);
   const host = createOrbCheckout(root);
   const distRoot = join(root, 'dist');

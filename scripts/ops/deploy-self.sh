@@ -70,13 +70,13 @@ STEP_STALE_SECONDS="${CAIRN_DEPLOY_STEP_STALE_SECONDS:-600}"
 STEPS_ALARM_TITLE="Deploy forced past a claimed step with no heartbeat"
 HOST_TOOLS_ROOT="${CAIRN_HOST_TOOLS_ROOT:-$HOME/.cairn/tools}"
 HOST_LANES_ROOT="${CAIRN_HOST_LANES_ROOT:-$HOME/lanes}"
+HOST_BIN_ROOT="${CAIRN_HOST_BIN_ROOT:-$HOME/.local/bin}"
+HOST_UNITS_ROOT="${CAIRN_HOST_UNITS_ROOT:-$HOME/.config/systemd/user}"
 HOST_TOOLS_ALARM_TITLE="Host tools differ from main"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
-COORDINATOR_UNIT=cairn-coordinator.service
 ORB_ALARM_TITLE="Orb daemon needs attention"
-COORDINATOR_ALARM_TITLE="Coordinator sidecar needs attention"
 DB="$DATA_DIR/server.db"
 
 EXIT_REFUSED=2
@@ -158,13 +158,15 @@ mark_failed() {
 }
 
 install_host_tools() {
-  local target="$1" previous="${2:-}" rel dest source kept=""
-  mkdir -p "$HOST_TOOLS_ROOT" "$HOST_LANES_ROOT" || { log "host tools: cannot create the host roots"; return 0; }
+  local target="$1" previous="${2:-}" rel dest source kept="" units_changed="" new_timers="" was_missing timer
+  mkdir -p "$HOST_TOOLS_ROOT" "$HOST_LANES_ROOT" "$HOST_BIN_ROOT" "$HOST_UNITS_ROOT" || { log "host tools: cannot create the host roots"; return 0; }
   while IFS= read -r rel; do
     [ -n "$rel" ] || continue
     case "$rel" in
       scripts/ops/host/tools/*) dest="$HOST_TOOLS_ROOT/${rel#scripts/ops/host/tools/}" ;;
       scripts/ops/host/lanes/*) dest="$HOST_LANES_ROOT/${rel#scripts/ops/host/lanes/}" ;;
+      scripts/ops/host/bin/*) dest="$HOST_BIN_ROOT/${rel#scripts/ops/host/bin/}" ;;
+      scripts/ops/host/units/*) dest="$HOST_UNITS_ROOT/${rel#scripts/ops/host/units/}" ;;
       *) continue ;;
     esac
     source="$CHECKOUT/$rel"
@@ -179,16 +181,31 @@ install_host_tools() {
       continue
     fi
     mkdir -p "$(dirname "$dest")" || continue
+    was_missing=0
+    [ -e "$dest" ] || was_missing=1
     if cp "$source" "$dest.tmp.$$" && mv "$dest.tmp.$$" "$dest"; then
       case "$rel" in
-        *.sh) chmod 755 "$dest" ;;
+        scripts/ops/host/bin/* | *.sh) chmod 755 "$dest" ;;
         *) if [ -x "$source" ]; then chmod 755 "$dest"; else chmod 644 "$dest"; fi ;;
       esac
     else
       rm -f "$dest.tmp.$$"
       log "host tools: cannot write $dest"
+      continue
     fi
-  done < <(git -C "$CHECKOUT" ls-tree -r --name-only "$target" -- scripts/ops/host/tools scripts/ops/host/lanes)
+    case "$rel" in
+      scripts/ops/host/units/*.timer)
+        units_changed=1
+        [ "$was_missing" = 0 ] || new_timers="$new_timers $(basename "$rel")" ;;
+      scripts/ops/host/units/*) units_changed=1 ;;
+    esac
+  done < <(git -C "$CHECKOUT" ls-tree -r --name-only "$target" -- scripts/ops/host/tools scripts/ops/host/lanes scripts/ops/host/bin scripts/ops/host/units)
+  if [ -n "$units_changed" ]; then
+    systemctl --user daemon-reload || log "host tools: daemon-reload failed"
+    for timer in $new_timers; do
+      systemctl --user enable --now "$timer" || log "host tools: cannot enable $timer"
+    done
+  fi
   printf '%s\n' "$target" >"$HOST_TOOLS_ROOT/.installed-sha" 2>/dev/null || true
   printf '%s\n' "$target" >"$STATE/host-tools-sha" 2>/dev/null || true
   if [ -n "$kept" ]; then
@@ -216,7 +233,7 @@ host_tools_alarm() {
 step_counts() {
   local cutoff=$(( ($(date +%s) - STEP_STALE_SECONDS) * 1000 ))
   sqlite3 -readonly -separator ' ' "$DB" \
-    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed'"
+    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed' and coalesce(buildId, '') not like 'chief-digest-%'"
 }
 
 step_wait_alarm() {
@@ -261,9 +278,18 @@ allow_builds_block() {
     awk '/^allowBuilds:/{inside=1; print; next} inside && /^[^[:space:]#]/{inside=0} inside{print}'
 }
 
+hook_lines() {
+  { git -C "$CHECKOUT" show "$1:$2" 2>/dev/null || true; } |
+    { grep -E '"(pre|post)?(install|prepare)"[[:space:]]*:' || true; } |
+    sed -E 's/^[[:space:]]*//; s/,[[:space:]]*$//'
+}
+
 install_hooks_changed() {
-  git -C "$CHECKOUT" diff "$PREVIOUS" "$TARGET" -- '*package.json' |
-    grep -E '^[+-][^+-].*"(pre|post)?(install|prepare)"[[:space:]]*:' || true
+  local manifest
+  while IFS= read -r manifest; do
+    [ "$(hook_lines "$PREVIOUS" "$manifest")" = "$(hook_lines "$TARGET" "$manifest")" ] ||
+      echo "$manifest"
+  done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- '*package.json')
   git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc'
 }
 
@@ -417,7 +443,6 @@ start_optional_unit() {
 
 stop_services() {
   stop_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  stop_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
 
@@ -430,7 +455,6 @@ start_and_check() {
   systemctl --user start "$DAEMON_UNIT"
   daemon_healthy "$started_ms" || return 1
   start_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  start_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   return 0
 }
 

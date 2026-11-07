@@ -84,16 +84,10 @@ test('receipt works without a stored token and refuses external receipt URLs', a
   assert.equal(w.requests.length, 1);
 });
 
-test('ops tests run in prepush and the backup CI job and journal ends with a newline', async () => {
+test('ops tests run in prepush and the backup CI job', async () => {
   const ci = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
   for (const path of ['scripts/ops/push-test.test.mjs', 'scripts/ops/push-worker.test.mjs']) {
     assert.ok(selfTests.includes(path));
     assert.ok(ci.slice(ci.indexOf('  ops-backup-test:')).includes(path));
   }
-  assert.ok(
-    readFileSync(
-      new URL('../../apps/server/drizzle/meta/_journal.json', import.meta.url),
-      'utf8',
-    ).endsWith('\n'),
-  );
 });

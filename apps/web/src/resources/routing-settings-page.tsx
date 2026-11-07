@@ -10,13 +10,15 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Route } from 'lucide-react';
-import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 import { useMachines, useModelSources } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { EmptyState } from '../components/empty-state.js';
+import { MachineName, machineLabel } from '../components/machine-label.js';
+import { QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -37,8 +39,13 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
+import { settingsHref } from '../settings/settings-href.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
+export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
+export const COORDINATOR_ROUTING_HREF = `${settingsHref('work-routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
+
+const CREATABLE_USES: readonly RouteUse[] = ['coordinator', 'review', 'citation_check'];
 
 const USE_LABELS: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
@@ -46,6 +53,7 @@ const USE_LABELS: Record<RouteUse, string> = {
   review: '评审',
   digest: '摘要',
   compaction: '压缩',
+  citation_check: '引文检查',
 };
 
 const POLICY_LABELS: Record<PolicyUse, string> = {
@@ -59,13 +67,15 @@ function fixtureSettings(search: URLSearchParams): TeamRoutingSettings | null {
 }
 
 function RuleEditor({
+  use,
   rule,
   machines,
   options,
   live,
   onSave,
 }: {
-  rule: RoutingRuleRecord;
+  use: RouteUse;
+  rule: RoutingRuleRecord | null;
   machines: { id: string; name: string }[];
   options: ModelOption[];
   live: boolean;
@@ -77,22 +87,27 @@ function RuleEditor({
   }) => void;
 }) {
   const { t } = useI18n();
-  const [provider, setProvider] = useState<string | null>(rule.provider);
-  const [modelId, setModelId] = useState<string | null>(rule.modelId);
+  const [provider, setProvider] = useState<string | null>(rule?.provider ?? null);
+  const [modelId, setModelId] = useState<string | null>(rule?.modelId ?? null);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
-    (rule.thinkingLevel as ThinkingLevel | null) ?? 'off',
+    (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off',
   );
-  const [machineId, setMachineId] = useState(rule.machineId);
+  const [machineId, setMachineId] = useState(rule?.machineId ?? null);
+  const pickedMachine = machines.find((m) => m.id === machineId);
   const dirty =
+    rule === null ||
     provider !== rule.provider ||
     modelId !== rule.modelId ||
     (thinkingLevel === 'off' ? null : thinkingLevel) !== rule.thinkingLevel ||
     machineId !== rule.machineId;
   return (
-    <div data-testid={`routing-rule-${rule.use}`}>
+    <div
+      id={`route-${use}`}
+      data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
+    >
       <SettingsCard>
-        <SettingsRow label={t(USE_LABELS[rule.use])} hint={t('模型与首选机器')}>
-          <span className="font-mono text-meta text-content-tertiary">{rule.use}</span>
+        <SettingsRow label={t(USE_LABELS[use])} hint={t('模型与首选机器')}>
+          <span className="font-mono text-meta text-content-tertiary">{use}</span>
         </SettingsRow>
         <SettingsRow label={t('运行时')}>
           <AgentRuntimeSelect
@@ -146,21 +161,32 @@ function RuleEditor({
               <SelectValue>
                 {machineId === null
                   ? t('不固定')
-                  : (machines.find((m) => m.id === machineId)?.name ?? machineId)}
+                  : pickedMachine === undefined
+                    ? undefined
+                    : (machineLabel(pickedMachine, machines) ?? machineId)}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={null}>{t('不固定')}</SelectItem>
               {machines.map((machine) => (
                 <SelectItem key={machine.id} value={machine.id}>
-                  {machine.name}
+                  <MachineName machine={machine} all={machines} />
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </SettingsRow>
         {live && onSave !== undefined && (
-          <SettingsRow label={t('保存')} hint={dirty ? t('有未保存的改动') : t('已与服务器一致')}>
+          <SettingsRow
+            label={rule === null ? t('创建') : t('保存')}
+            hint={
+              rule === null
+                ? t('这条路由还没有规则，选好运行时与模型后创建。')
+                : dirty
+                  ? t('有未保存的改动')
+                  : t('已与服务器一致')
+            }
+          >
             <Button
               disabled={!dirty || provider == null || modelId == null}
               onClick={() => {
@@ -173,7 +199,7 @@ function RuleEditor({
                 });
               }}
             >
-              {t('保存')}
+              {rule === null ? t('创建') : t('保存')}
             </Button>
           </SettingsRow>
         )}
@@ -255,8 +281,8 @@ export function RoutingSettingsPage() {
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
   const settings: TeamRoutingSettings = live
-    ? (settingsQ.data ?? { enabled: false, rules: [], policies: [] })
-    : (fixtureSettings(searchParams) ?? { enabled: false, rules: [], policies: [] });
+    ? (settingsQ.data ?? { rules: [], policies: [] })
+    : (fixtureSettings(searchParams) ?? { rules: [], policies: [] });
   const machines = live
     ? (machinesQ.data ?? []).map((machine) => ({ id: machine.id, name: machine.name }))
     : (fixture.resources?.machines ?? [])
@@ -266,66 +292,47 @@ export function RoutingSettingsPage() {
     ? toModelOptions(modelSourcesQ.data?.sources ?? [])
     : toModelOptions(fixture.resources?.providerSources ?? []);
   const empty = settings.rules.length === 0 && settings.policies.length === 0;
+  const { hash } = useLocation();
+  const loaded = !live || settingsQ.data !== undefined;
+  const missingUses = loaded
+    ? CREATABLE_USES.filter((use) => !settings.rules.some((rule) => rule.use === use))
+    : [];
+  useEffect(() => {
+    if (!loaded || hash === '') return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [loaded, hash]);
+  const saveRule = (
+    use: RouteUse,
+    body: Parameters<typeof mutations.patchRule.mutate>[0]['body'],
+  ) =>
+    mutations.patchRule.mutate(
+      { use, body },
+      {
+        onSuccess: () => toastSuccess(t('规则已保存')),
+        onError: (error) => toastError(t('保存失败，请重试。'), error),
+      },
+    );
   return (
-    <PageShell
-      route={ROUTING_SETTINGS_HREF}
-      title={t('工作路由')}
-      fixture={fixture}
-      actions={
-        live && empty ? (
-          <Button
-            data-testid="routing-settings-seed"
-            onClick={() =>
-              mutations.seed.mutate(undefined, {
-                onSuccess: () => toastSuccess(t('已从 Agent 生成规则与策略')),
-                onError: (error) => toastError(t('生成失败，请重试。'), error),
-              })
-            }
-          >
-            {t('从 Agent 生成')}
-          </Button>
-        ) : undefined
-      }
-    >
-      <div className="flex flex-col gap-6">
-        <SettingsCard>
-          <SettingsRow
-            label={t('路由规则开关')}
-            hint={
-              settings.enabled
-                ? t('CAIRN_ROUTING_RULES 已开启；调度走规则与策略。')
-                : t('CAIRN_ROUTING_RULES 仍关闭；可先编辑，切流在 PR9。')
-            }
-          >
-            <span data-testid="routing-rules-enabled" className="text-ui text-content-secondary">
-              {settings.enabled ? t('规则已启用') : t('规则未启用')}
-            </span>
-          </SettingsRow>
-        </SettingsCard>
-        {empty ? (
-          <EmptyState
-            testId="routing-settings-empty"
-            className="mt-2"
-            icon={Route}
-            title={t('还没有路由规则。')}
-            description={t(
-              '从现有 Agent 生成 session / review 规则与工作策略，或等 CAIRN_ROUTING_RULES 开启后由服务器种子写入。',
-            )}
-            action={
-              live
-                ? {
-                    label: t('从 Agent 生成'),
-                    onClick: () =>
-                      mutations.seed.mutate(undefined, {
-                        onSuccess: () => toastSuccess(t('已从 Agent 生成规则与策略')),
-                        onError: (error) => toastError(t('生成失败，请重试。'), error),
-                      }),
-                  }
-                : undefined
-            }
-          />
-        ) : (
-          <>
+    <PageShell route={ROUTING_SETTINGS_HREF} title={t('工作路由')} fixture={fixture}>
+      <QueryBoundary
+        query={live ? settingsQ : undefined}
+        isEmpty={live && settingsQ.data === undefined}
+        loadingLabel={t('正在加载工作路由')}
+        errorTitle={t('工作路由没能加载')}
+        className="mt-6"
+        empty={null}
+      >
+        <div className="flex flex-col gap-6">
+          {empty && (
+            <EmptyState
+              testId="routing-settings-empty"
+              className="mt-2"
+              icon={Route}
+              title={t('还没有路由规则。')}
+              description={t('先创建 Coordinator 规则，它才能回答你的消息。')}
+            />
+          )}
+          {(settings.rules.length > 0 || missingUses.length > 0) && (
             <div className="flex flex-col gap-4">
               <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
                 {t('路由规则')}
@@ -333,25 +340,28 @@ export function RoutingSettingsPage() {
               {settings.rules.map((rule) => (
                 <RuleEditor
                   key={rule.id}
+                  use={rule.use}
                   rule={rule}
                   machines={machines}
                   options={modelOptions}
                   live={live}
-                  onSave={
-                    live
-                      ? (body) =>
-                          mutations.patchRule.mutate(
-                            { use: rule.use, body },
-                            {
-                              onSuccess: () => toastSuccess(t('规则已保存')),
-                              onError: (error) => toastError(t('保存失败，请重试。'), error),
-                            },
-                          )
-                      : undefined
-                  }
+                  onSave={live ? (body) => saveRule(rule.use, body) : undefined}
+                />
+              ))}
+              {missingUses.map((use) => (
+                <RuleEditor
+                  key={`new-${use}`}
+                  use={use}
+                  rule={null}
+                  machines={machines}
+                  options={modelOptions}
+                  live={live}
+                  onSave={live ? (body) => saveRule(use, body) : undefined}
                 />
               ))}
             </div>
+          )}
+          {settings.policies.length > 0 && (
             <div className="flex flex-col gap-4">
               <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
                 {t('工作策略')}
@@ -376,9 +386,9 @@ export function RoutingSettingsPage() {
                 />
               ))}
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      </QueryBoundary>
     </PageShell>
   );
 }

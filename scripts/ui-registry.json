@@ -1,14 +1,14 @@
 {
   "frozenFrom": {
-    "sha": "49b100079e0e943e9efc7204cb9aff888000acf0",
-    "date": "2026-11-05"
+    "sha": "749f36b74e21db2872e3c5c07992137171bf2519",
+    "date": "2026-11-07"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer).",
-      "hash": "f03f25b0488dfd888b2bc4dc44e89327c741e2afb75057b8763c20881b47b747"
+      "hash": "e8317e0495455920e2e493b5a94ceebb8056c1d8a3550072a69208db0702cf96"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
@@ -45,8 +45,8 @@
       "kind": "registry",
       "upstreamItem": "button",
       "status": "deviated",
-      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries.",
-      "hash": "15a939b54f1e0c65f6650e72a40bcfb00fd15892badafb0db6d05b43cb8912d6"
+      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries. Owner hover policy: pressed buttons stay flat and color transitions exclude box-shadow.",
+      "hash": "8b64311a7995b43251cfba06ccab90751422146af2fd5477396aef965802fb7c"
     },
     "card.tsx": {
       "kind": "registry",
@@ -182,8 +182,8 @@
     },
     "status-chip.tsx": {
       "kind": "adapter",
-      "reason": "#942 canon table §5.2 / #983 verdict (kept as zero-skin adapter): five-state task chip = registry Badge skeleton + data-tone state carrier + five --chip-* token utility pairs (spec/22 §1.7/1.8 1:1 values; plan/confirm have no registry variant semantics). The sm geometry tier is retired per #983 — all faces converge on the registry Badge h-5 default (#1006).",
-      "hash": "6ca04a9311f473be2072a4de9154114a0690555cd3c771ed705351a6558ea00e"
+      "reason": "#942 canon table §5.2 / #983 verdict (kept as zero-skin adapter): five-state task chip = registry Badge skeleton + data-tone state carrier + one neutral bg-secondary fill with the state in the text colour (confirm: --waiting-ink, failed: text-destructive; the five --chip-* fill pairs were retired by #3186, anti-slop palette roles). The sm geometry tier is retired per #983 — all faces converge on the registry Badge h-5 default (#1006).",
+      "hash": "c995f7b9e463bec1b24ec1482d4fc13fa8fad84d22d19b61b65e0cd8f10c8e1a"
     },
     "switch.tsx": {
       "kind": "registry",

@@ -21,7 +21,7 @@ Apply this checklist before reporting verification or handing off a delivery. Fo
 - Stub-only runs cannot establish real-provider behavior. Keep deterministic stub regressions, including real-daemon protocol and orchestration checks; name the stubbed boundary and limit the claim to the exercised layers. A real-provider claim requires a real-provider run with recorded provider mode and runtime evidence; if credentials or access are unavailable, report that claim as unverified.
 - Make supporting evidence readable to reviewers. Committing artifacts under `docs/verify/<issue>/` is optional. Preserve ordinary reference links as references; embed image links and check that they are reachable.
 - Mechanism claims require compiled or runtime evidence of the claimed effect, such as compiled CSS, observed animation state, actual wire payloads, runtime logs or schema snapshots. Source, configuration and installed dependencies alone do not establish that the mechanism took effect. Record the artifact and the assertion it supports.
-- Separate automated checks from review. `scripts/pr-evidence-gate.py` (required by the merge gate via `pr-evidence-not-green`) rejects missing or empty What/Proof/Review/Risk sections (legacy Verified aliases Proof; Upstream is optional), non-embedded image links, unreachable image URLs, fixture URLs whose query carries `scenario` (#1982), and screenshot embeds outside this repository's associated `docs/verify/<issue>/` archive (#1983). Negative controls live in `scripts/pr-evidence-gate.test.py` and `scripts/pr-evidence-archive.test.py`. The gate still does not judge evidence sufficiency, live-app origin, or real-provider execution. Stub-only runs stay a reviewer check until evidence carries machine-readable provider provenance; do not claim the gate detects them from a screenshot or a passing HTTP request.
+- Separate automated checks from review. `scripts/pr-evidence-gate.py` (required by the merge gate via `pr-evidence-not-green`) rejects missing or empty What/Proof/Review/Risk sections (legacy Verified aliases Proof; Upstream is optional), non-embedded image links, unreachable image URLs, fixture URLs whose query carries `scenario` (#1982), a diff touching `apps/server/src/routes*.ts` without the evidence card (`### Requirement` and `### Requests`, D117), and a diff changing more than docs without `Live:`, `Mocked:` and `Not covered:` lines. The screenshot-archive origin check (#1983) was removed in #2201: images may live on any reachable https host. Negative controls live in `scripts/pr-evidence-gate.test.py`. The gate still does not judge evidence sufficiency, live-app origin, or real-provider execution. Stub-only runs stay a reviewer check until evidence carries machine-readable provider provenance; do not claim the gate detects them from a screenshot or a passing HTTP request. `vp.mjs drive api-evidence-card card` generates the card's table, transcript and screenshots from a live stack.
 
 The implementer templates incorporate the same checklist in `docs/agent-dispatch-prompts.md#evidence-limits-checklist`. Apply it to every workflow below, including the stub LLM custom probes and fixture regressions.
 
@@ -35,6 +35,18 @@ The implementer templates incorporate the same checklist in `docs/agent-dispatch
 | Observe | screenshots (1440x732, same convention as e2e); HTTP JSON (`GET /api/auth/session`, `/api/todos`, `/api/teams`...); SQLite rows (`<CAIRN_HOME>/server/server.db`, better-sqlite3 read-only); server logs (`cairn-server online` line). |
 | Isolate | three axes: `VERIFY_PORT` (server, default 8791) / `VERIFY_WEB_PORT` (vite, default 5273) / `CAIRN_HOME` (scratch). vite dev does not write `dist/`, no collision with e2e's dist. |
 
+## UI reference comparison
+
+A UI change is verified against the reference shots, not only against its own before picture (D120). Surface to shots: `docs/design/references/README.md`; rules: `apps/web/DESIGN-RULES.md`; brief and coverage table: `.claude/skills/design-cairn/SKILL.md`.
+
+1. List the states from the brief's component x state table. Produce each on the live stack; seed what the stack cannot reach (pending question, offline machine, quota, error, long content) with a fixture or seed data and label it fixture.
+2. Capture each state: `node .claude/skills/verify-cairn/scripts/vp.mjs capture </app/route> --name <state>` writes a 1440x732 dark screenshot into the evidence directory. Light theme and 390px come from the CI screenshot job or a Playwright context with `viewport` and `colorScheme`; the D117 matrix is 1440 and 390, light and dark.
+3. Put the reference beside ours, one image per state: `magick montage <reference> <ours> -tile 2x1 -geometry 1000x+8+8 <state>-compare.png`.
+4. Write one sentence per pair: what matches, what is still worse than the reference. A pair with no sentence does not count.
+5. Run the `M` rules that apply (spacing, tooltips, placeholders, raw errors, fonts) and report the numbers; the CI look-and-feel job runs the same rules next to axe, non-blocking for 2 weeks and then blocking.
+
+The self-review of the pairs is done by the session that built the screen. Evidence limits above still apply: fixture pairs say so, and a real-stack pair is required for the main state.
+
 ## Port and lane discipline (read first)
 
 The in-repo port fleet: **8787** server / **5173** vite / **8399** e2e. Occupants are live processes of another lane (often including the user's own dev stack), **must not be killed**. This skill defaults to 8791 + 5273; if launch finds them taken, change ports (env override `VERIFY_PORT` / `VERIFY_WEB_PORT`), never touch anyone else's port. Check occupancy: `lsof -iTCP:8791 -sTCP:LISTEN`.
@@ -42,6 +54,10 @@ The in-repo port fleet: **8787** server / **5173** vite / **8399** e2e. Occupant
 **worktree lane**: since 2026-09-28 `.claude/skills/verify-cairn/` is committed in the repo (a .gitignore nested exception), **a worktree checkout carries this skill's full copy**. Run method: `VERIFY_REPO_ROOT=<worktree absolute path>` to start the stack (the worktree must already have `pnpm install`), and **must run the scripts themselves from the worktree path** (`node <worktree>/.claude/skills/verify-cairn/scripts/...`) - running from the main-checkout path uses the main checkout's old probe scripts to verify the lane's new code, the symptom is extremely confusing (the old script times out 30s at fill, not a parse error; #386 real case burned 5 rounds to locate). **Must re-launch after changing code**: the worktree is under `.claude/worktrees/`, and vite's `**/.claude/**` watch-ignore covers the whole worktree, so changing code while the stack is running does not take effect (measured, in project memory), and what gets driven is the old code.
 
 **Lane wrap-up**: `VERIFY_REPO_ROOT` controls the stack and runtime state. Evidence defaults to the main checkout so it survives worktree cleanup. Share the relevant results; archive into `docs/verify/<ticket>/` only when useful.
+
+## GitHub emulator
+
+For GitHub-facing PR evidence, follow [GitHub emulator evidence](features/github-emulator.md): pinned npx startup, `CAIRN_GITHUB_API_BASE_URL`, and `vp.mjs drive github-emulator pr-watch`. This runs the real D109 poller over HTTP without GitHub credentials. E2B and Langfuse remain follow-ups.
 
 ## Launch
 

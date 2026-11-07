@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router';
 
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent } from '../fixtures/records.js';
-import { AGENTS_HREF } from '../routes/agent-detail-page.js';
+import { ROUTING_SETTINGS_HREF } from '../resources/routing-settings-page.js';
 import { AVATAR_IMG_CLS } from './recipes.js';
 
 const IDENTITY_CLS = 'inline-flex items-center gap-1.5 self-start text-inherit no-underline';
@@ -34,7 +34,7 @@ export function ChiefIdentity({ agent, busy = false }: ChiefIdentityProps) {
   return (
     <Link
       className={`${IDENTITY_CLS} cursor-pointer`}
-      to={{ pathname: `${AGENTS_HREF}/${agent.id}`, search }}
+      to={{ pathname: ROUTING_SETTINGS_HREF, search }}
     >
       {face}
     </Link>

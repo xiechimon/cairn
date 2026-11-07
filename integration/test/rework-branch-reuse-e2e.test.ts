@@ -1,14 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  appendPlanLocationNote,
   buildRestartPrompt,
-  buildReviewRejectPrompt,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   conversationBranch,
-  PLAN_FILE_NAME,
+  SESSION_REWORK_BRIEF,
 } from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -19,13 +16,12 @@ import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   build as buildTable,
   message as messageTable,
-  plan as planTable,
   step as stepTable,
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
 import { runGit, systemGitOps } from '../../apps/server/src/lib/git.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -42,18 +38,6 @@ const FEEDBACK = '我要的是svg样式的';
 const REJECT_FEEDBACK = '图标行改小一号';
 const PR_NUMBER = 888;
 const PR_URL = `https://github.com/demo-owner/demo-repo/pull/${PR_NUMBER}`;
-
-const PLAN_V1 = [
-  '# 方案 v1',
-  'Kind: fix',
-  '',
-  'Context: 图标探针任务。',
-  'Changes: README.md 追加一行。',
-  'Edge cases: 无。',
-  'Verification: 读回 README.md。',
-].join('\n');
-const PLAN_V2 = PLAN_V1.replace('# 方案 v1', '# 方案 v2');
-const PLAN_V3 = PLAN_V1.replace('# 方案 v1', '# 方案 v3');
 
 function userWireText(m: { role: string; content?: unknown }): string | null {
   if (typeof m.content === 'string') return m.content;
@@ -98,10 +82,6 @@ function evidenceJson(name: string, data: unknown): void {
 beforeAll(async () => {
   stub = await startStubLlm([
     {
-      toolCall: { name: 'bash', arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_V1}\nEOF` } },
-    },
-    { content: '方案 v1 就绪。' },
-    {
       toolCall: {
         name: 'bash',
         arguments: { command: 'printf "rework probe line\\n" >> README.md' },
@@ -110,10 +90,6 @@ beforeAll(async () => {
     { content: '改动完成。' },
     { status: 400 },
     {
-      toolCall: { name: 'bash', arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_V2}\nEOF` } },
-    },
-    { content: '按反馈调整为 v2。' },
-    {
       toolCall: {
         name: 'bash',
         arguments: { command: 'printf "rework probe line v2\\n" >> README.md' },
@@ -121,16 +97,19 @@ beforeAll(async () => {
     },
     { content: '返工改动完成。' },
     {
-      toolCall: { name: 'bash', arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_V3}\nEOF` } },
+      toolCall: {
+        name: 'bash',
+        arguments: { command: 'printf "rework probe line v3\\n" >> README.md' },
+      },
     },
-    { content: '按打回意见调整为 v3。' },
+    { content: '按打回意见返工完成。' },
   ]);
   server = await bootRealServer({
     providerBaseUrl: stub.url,
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'cairn-rework-reuse-home-'));
+  home = makeTestTempDir('cairn-rework-reuse-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
@@ -186,18 +165,11 @@ describe('#931 both rework paths return to the original branch (E2E)', () => {
     const bareDir = join(server.reposDir, server.teamId, 'rework-lifecycle.git');
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     expect(started.status).toBe(201);
     const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
     const branch = conversationBranch(buildId);
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 150_000);
-    const confirmedRound1 = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
-      action: 'confirm',
-    });
-    expect(confirmedRound1.status).toBe(202);
     await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
     server.db
       .update(buildTable)
@@ -208,9 +180,15 @@ describe('#931 both rework paths return to the original branch (E2E)', () => {
     const commitsAfterRound1 = await branchCommitCount(bareDir, branch);
     expect(commitsAfterRound1).toBeGreaterThanOrEqual(2);
 
+    const reviewRule = await api(
+      server.url,
+      'PATCH',
+      `/api/teams/${server.teamId}/routing-rules/review`,
+      { provider: 'stub-gw', modelId: 'stub-model' },
+    );
+    expect(reviewRule.status).toBe(200);
     const reviewed = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
       action: 'review',
-      agentId: AGENT_ID,
     });
     expect(reviewed.status).toBe(202);
     await waitFor(() => server.todoPhase(world.todoId) === 'failed', 150_000);
@@ -248,32 +226,24 @@ describe('#931 both rework paths return to the original branch (E2E)', () => {
       rows.some((m) => m.role === 'system' && String(m.content).includes(`PR #${PR_NUMBER}`)),
     ).toBe(true);
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 150_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
     expect(countLog('返工新会话：工作区回退到分支头')).toBeGreaterThanOrEqual(1);
     expect(countLog(`new session ${buildId}`)).toBe(newSessionCountBefore + 1);
 
-    const expectedReworkPrompt = appendPlanLocationNote(
-      composeTaskPromptWithInstruction(TASK_TEXT, buildRestartPrompt(FEEDBACK)),
-      join(paths.plansDir, buildId, PLAN_FILE_NAME),
+    const expectedReworkPrompt = composeTaskPromptWithInstruction(
+      TASK_TEXT,
+      buildRestartPrompt(FEEDBACK),
     );
     expect(
       stub.requests.some((r) =>
-        r.messages.some((m) => m.role === 'user' && userWireText(m) === expectedReworkPrompt),
+        r.messages.some(
+          (m) => m.role === 'user' && userWireText(m)?.startsWith(expectedReworkPrompt) === true,
+        ),
       ),
     ).toBe(true);
 
-    const commitsAfterReworkPlan = await branchCommitCount(bareDir, branch);
-    expect(commitsAfterReworkPlan).toBeGreaterThan(commitsAfterRound1);
-    const plans = server.db.select().from(planTable).where(eq(planTable.buildId, buildId)).all();
-    expect(plans.map((p) => p.version).sort()).toEqual([1, 2]);
-
-    const confirmed = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
-      action: 'confirm',
-    });
-    expect(confirmed.status).toBe(202);
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
-    const commitsAfterReworkBuild = await branchCommitCount(bareDir, branch);
-    expect(commitsAfterReworkBuild).toBeGreaterThan(commitsAfterReworkPlan);
+    const commitsAfterRework = await branchCommitCount(bareDir, branch);
+    expect(commitsAfterRework).toBeGreaterThan(commitsAfterRound1);
 
     const continueCountBefore = countLog(`continue session ${buildId}`);
     const rejected = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
@@ -287,26 +257,20 @@ describe('#931 both rework paths return to the original branch (E2E)', () => {
       server.db.select().from(buildTable).where(eq(buildTable.todoId, world.todoId)).all(),
     ).toHaveLength(1);
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 150_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
     expect(countLog(`continue session ${buildId}`)).toBeGreaterThan(continueCountBefore);
-    const plansFinal = server.db
-      .select()
-      .from(planTable)
-      .where(eq(planTable.buildId, buildId))
-      .all();
-    expect(plansFinal.map((p) => p.version).sort()).toEqual([1, 2, 3]);
-    const replanStep = server.db
+    const reworkStep = server.db
       .select()
       .from(stepTable)
       .where(eq(stepTable.buildId, buildId))
       .orderBy(asc(stepTable.createdAt))
       .all()
-      .filter((st) => st.kind === 'plan')
+      .filter((st) => st.kind === 'session')
       .at(-1)!;
-    expect(replanStep.prompt).toBe(buildReviewRejectPrompt(REJECT_FEEDBACK));
+    expect(reworkStep.prompt).toBe(`${SESSION_REWORK_BRIEF}\n\n${REJECT_FEEDBACK}`);
 
     const commitsFinal = await branchCommitCount(bareDir, branch);
-    expect(commitsFinal).toBeGreaterThan(commitsAfterRound1);
+    expect(commitsFinal).toBeGreaterThan(commitsAfterRework);
     expect(countLog('Worktree reused')).toBeGreaterThanOrEqual(2);
 
     if (EVIDENCE_ROOT !== null) {
@@ -339,15 +303,6 @@ describe('#931 both rework paths return to the original branch (E2E)', () => {
           .where(eq(messageTable.conversationId, buildId))
           .all()
           .map((m) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt })),
-      );
-      evidenceJson(
-        'plans.json',
-        server.db
-          .select()
-          .from(planTable)
-          .where(eq(planTable.buildId, buildId))
-          .orderBy(asc(planTable.version))
-          .all(),
       );
       evidenceText(
         'git-conv-branch.txt',

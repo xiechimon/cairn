@@ -1,0 +1,163 @@
+import { createHash } from 'node:crypto';
+import {
+  CHIEF_REMOTE_TOOLS,
+  CHIEF_ROUTER_TOOLS,
+  type MachineAskBody,
+  type RemoteToolDef,
+} from '@cairn/shared';
+import { defineExtension, defineTool, type ToolRegistration } from '@earendil-works/pi-durable';
+import type { MachineApi } from './machine-api.js';
+
+export class ShutdownInterrupt extends Error {
+  constructor() {
+    super('Coordinator is shutting down');
+    this.name = 'ShutdownInterrupt';
+  }
+}
+
+export const COORDINATOR_TOOL_OUTPUT_MAX_BYTES = 32_768;
+
+export type ToolChannel = Pick<MachineApi, 'relayTool' | 'askUser'>;
+
+export function askRequestId(stepId: string, callId: string): string {
+  return `ask-${createHash('sha256').update(`${stepId}\0${callId}`).digest('hex').slice(0, 32)}`;
+}
+
+async function askThroughChannel(
+  channel: ToolChannel,
+  stepId: string,
+  callId: string,
+  args: Record<string, unknown>,
+  signal: AbortSignal | undefined,
+  shuttingDown: () => boolean,
+): Promise<string> {
+  const requestId = askRequestId(stepId, callId);
+  try {
+    const body: MachineAskBody = {
+      requestId,
+      questions: (args.questions ?? []) as MachineAskBody['questions'],
+      ...(typeof args.provenance === 'string'
+        ? { provenance: args.provenance as MachineAskBody['provenance'] }
+        : {}),
+    };
+    const settled = await channel.askUser(stepId, body, signal);
+    if (shuttingDown()) throw new ShutdownInterrupt();
+    return JSON.stringify(settled);
+  } catch (error) {
+    if (shuttingDown()) throw new ShutdownInterrupt();
+    const message = error instanceof Error ? error.message : String(error);
+    return JSON.stringify({
+      status: 'cancelled',
+      requestId,
+      answers: null,
+      reason: `ask channel aborted: ${message}`,
+    });
+  }
+}
+
+export interface StepResolver {
+  stepFor(conversationId: string): Promise<string>;
+}
+
+export interface StepGate extends StepResolver {
+  current(): Promise<string>;
+  set(stepId: string | null): void;
+}
+
+export interface ConversationGate extends StepResolver {
+  set(conversationId: string, stepId: string | null): void;
+}
+
+export function createConversationGate(): ConversationGate {
+  const steps = new Map<string, string>();
+  return {
+    stepFor: async (conversationId) => {
+      const stepId = steps.get(conversationId);
+      if (stepId === undefined) {
+        throw new Error(
+          `Coordinator tool call for conversation ${conversationId} has no live step`,
+        );
+      }
+      return stepId;
+    },
+    set: (conversationId, stepId) => {
+      if (stepId === null) steps.delete(conversationId);
+      else steps.set(conversationId, stepId);
+    },
+  };
+}
+
+export function createStepGate(): StepGate {
+  let stepId: string | null = null;
+  let waiters: ((id: string) => void)[] = [];
+  const current = () =>
+    stepId !== null
+      ? Promise.resolve(stepId)
+      : new Promise<string>((resolve) => waiters.push(resolve));
+  return {
+    current,
+    stepFor: current,
+    set: (next) => {
+      stepId = next;
+      if (next === null) return;
+      const ready = waiters;
+      waiters = [];
+      for (const resolve of ready) resolve(next);
+    },
+  };
+}
+
+const EMPTY_PARAMETERS = { type: 'object', properties: {} };
+
+export function coordinatorTool(
+  def: RemoteToolDef,
+  channel: ToolChannel,
+  gate: StepResolver,
+  shuttingDown: () => boolean = () => false,
+): ToolRegistration {
+  return defineTool({
+    name: def.name,
+    description: def.description,
+    parameters: (def.parameters ?? EMPTY_PARAMETERS) as object,
+    replay: def.replaySafe === true || def.name === 'ask_user' ? 'safe' : 'unsafe',
+    outputLimits: { maxBytes: COORDINATOR_TOOL_OUTPUT_MAX_BYTES, retain: 'head' },
+    execute: async (args, api, context) => {
+      const stepId = await gate.stepFor(String(api.conversationId));
+      const params = args as Record<string, unknown>;
+      if (def.name === 'ask_user') {
+        const text = await askThroughChannel(
+          channel,
+          stepId,
+          api.callId,
+          params,
+          context.abortSignal,
+          shuttingDown,
+        );
+        return { output: [{ type: 'text', text }] };
+      }
+      try {
+        const text = await channel.relayTool(stepId, def.name, params);
+        return { output: [{ type: 'text', text }] };
+      } catch (error) {
+        if (error instanceof ShutdownInterrupt) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        return { output: [{ type: 'text', text: message }], isError: true };
+      }
+    },
+  });
+}
+
+export function coordinatorToolsExtension(
+  channel: ToolChannel,
+  gate: StepResolver,
+  options: { routerTools?: boolean; shuttingDown?: () => boolean } = {},
+) {
+  const defs =
+    options.routerTools === false
+      ? CHIEF_REMOTE_TOOLS
+      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
+  return defineExtension({
+    name: 'cairn-coordinator-tools',
+    tools: defs.map((def) => coordinatorTool(def, channel, gate, options.shuttingDown)),
+  });
+}

@@ -2,7 +2,6 @@ import type { ConversationStepEvent, TranscriptRow } from '@cairn/shared';
 import { conversationStreamEventSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { agent as agentTable } from '../src/db/schema.js';
 import { rewindChiefThread } from '../src/services/chief.js';
 import {
   CONV_TEXT_BUFFER_MAX_BYTES,
@@ -10,7 +9,7 @@ import {
   ConversationStreamHub,
   type TeamStreamConnection,
 } from '../src/services/events.js';
-import { bootServer, issueApiKey, machineIdByName, openConvStream } from './helpers.js';
+import { bootServer, issueApiKey, machineIdByName, openConvStream, seedRoute } from './helpers.js';
 
 class FakeConn implements TeamStreamConnection {
   readonly frames: object[] = [];
@@ -269,8 +268,6 @@ async function call(
   );
 }
 
-const AGENT_ID = 'agent-740';
-
 async function setupChief(opts: { pingIntervalMs?: number } = {}) {
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: opts.pingIntervalMs ?? 3_600_000 });
   const key = await issueApiKey(s);
@@ -280,21 +277,7 @@ async function setupChief(opts: { pingIntervalMs?: number } = {}) {
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'm740');
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'agent-740',
-      modelId: 'stub-model',
-      provider: 'stub-gw',
-      machineId,
-    })
-    .run();
-  const patchRes = await call(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, {
-    body: { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-  });
-  expect(patchRes.status).toBe(200);
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model', machineId });
   const msgRes = await call(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, {
     body: { content: '写一份 catch-up 测试稿。' },
   });

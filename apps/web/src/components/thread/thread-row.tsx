@@ -1,17 +1,18 @@
 import { cn } from 'cn';
 import { AlarmClockOff, GitPullRequest } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useI18n } from '../../i18n/provider.js';
 import type { StoneTone } from '../stone/tone.js';
 import { Button } from '../ui/button.js';
 import { Checkbox } from '../ui/checkbox.js';
 
 const TONE_LABEL: Record<StoneTone, string> = {
-  waiting: 'Waiting on you',
-  failed: 'Failed',
-  review: 'Ready for review',
-  working: 'Working',
-  idle: 'Idle',
-  resolved: 'Resolved',
+  waiting: '等你处理',
+  failed: '失败',
+  review: '等你审阅',
+  working: '进行中',
+  idle: '空闲',
+  resolved: '已完成',
 };
 
 export interface ThreadRowProps {
@@ -39,6 +40,7 @@ export function ThreadRow({
   onOpen,
   menu,
 }: ThreadRowProps) {
+  const { t } = useI18n();
   const quietTitle = tone === 'idle' || tone === 'resolved';
   return (
     <div
@@ -58,7 +60,7 @@ export function ThreadRow({
       >
         <Checkbox
           checked={selected}
-          aria-label={`Select ${title}`}
+          aria-label={t('选择 {title}', { title })}
           onCheckedChange={(next) => onSelectedChange?.(next)}
         />
       </span>
@@ -78,12 +80,12 @@ export function ThreadRow({
           </span>
           {pr != null && (
             <span className="inline-flex flex-none items-center gap-0.5 text-meta text-content-tertiary tabular-nums">
-              <GitPullRequest className="size-3" />#{pr}
+              <GitPullRequest className="size-3.5" />#{pr}
             </span>
           )}
         </span>
         <span className="truncate text-meta text-content-tertiary">{reason}</span>
-        <span className="sr-only">{TONE_LABEL[tone]}</span>
+        <span className="sr-only">{t(TONE_LABEL[tone])}</span>
       </Button>
       <span
         className={cn(
@@ -92,7 +94,7 @@ export function ThreadRow({
           menu != null && 'group-focus-within/row:invisible group-hover/row:invisible',
         )}
       >
-        {snoozed ? <AlarmClockOff className="size-3.5" aria-label="Snoozed" /> : age}
+        {snoozed ? <AlarmClockOff className="size-3.5" aria-label={t('已暂停')} /> : age}
       </span>
       {menu != null && (
         <span className="absolute top-1.5 right-1.5 hidden items-center group-focus-within/row:flex group-hover/row:flex">

@@ -36,6 +36,7 @@ import { build, type machine as machineTable, step, todo } from './db/schema.js'
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
+import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { isLoopbackPeer, matchesAuthToken } from './lib/token-auth.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
@@ -162,12 +163,15 @@ function enrollOrigin(c: Context): string {
 }
 
 function originOf(c: Context): string {
-  return forwardedOrigin({
-    url: c.req.url,
-    loopbackPeer: isLoopbackPeer(c),
-    proto: c.req.header('x-forwarded-proto'),
-    host: c.req.header('x-forwarded-host'),
-  });
+  return (
+    tailnetOriginOf(c) ??
+    forwardedOrigin({
+      url: c.req.url,
+      loopbackPeer: isLoopbackPeer(c),
+      proto: c.req.header('x-forwarded-proto'),
+      host: c.req.header('x-forwarded-host'),
+    })
+  );
 }
 
 export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
@@ -181,7 +185,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     reposDir: ctx.reposDir,
     attachmentsDir: ctx.attachmentsDir,
     mcpConfigPath: ctx.mcpConfigPath,
-    intakeAgentAllowlist: ctx.intakeAgentAllowlist,
     skillsDir: ctx.skillsDir,
     convHub: ctx.convHub,
     oauthClient: ctx.oauthClient,

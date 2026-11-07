@@ -9,20 +9,24 @@ import {
   releaseComputerControl,
   renewComputerControl,
 } from '../api/computer-screen.js';
+import { useConnected } from '../api/connection-state.js';
 import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
 import { ListCard } from '../components/list-card.js';
+import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { X } from '../icons/index.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
+import { machineStateLabel } from './fleet-status.js';
 import { desktopControlInstalled, desktopControlOnline } from './machine-capabilities.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
@@ -32,15 +36,6 @@ export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow 
     machines[0] ??
     null
   );
-}
-
-function runningLabel(machine: MachineRow, t: ReturnType<typeof useI18n>['t']): string {
-  if (machine.online !== true) return t('离线');
-  const running = machine.runningSteps ?? 0;
-  if (running === 0) return t('空闲');
-  return machine.maxConcurrent != null
-    ? t('{n}/{max} 在跑', { n: running, max: machine.maxConcurrent })
-    : t('{n} 在跑', { n: running });
 }
 
 function OnlineDot({ online }: { online: boolean }) {
@@ -56,14 +51,18 @@ export function MachineChip({
   machines,
   open,
   onToggle,
+  loading = false,
 }: {
   machines: readonly MachineRow[];
   open: boolean;
   onToggle: () => void;
+  loading?: boolean;
 }) {
   const { t } = useI18n();
+  const connected = useConnected();
   const host = coordinatorMachine(machines);
-  const running = machines.reduce((sum, machine) => sum + (machine.runningSteps ?? 0), 0);
+  const hostOnline = connected && host?.online === true;
+  const running = hostOnline ? (host?.runningSteps ?? 0) : 0;
   return (
     <Button
       variant="ghost"
@@ -71,19 +70,27 @@ export function MachineChip({
       aria-pressed={open}
       onClick={onToggle}
       data-testid="machines-button"
-      className="mr-1 h-7 gap-1.5 rounded-full px-2.5 text-meta font-normal text-content-secondary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      title={
+        host === null
+          ? undefined
+          : `${host.name} · ${connected ? machineStateLabel(host, t) : t('连接断开，正在重连…')}`
+      }
+      data-connected={connected}
+      className="mr-1 h-7 gap-1.5 rounded-full px-2.5 text-meta font-normal text-content-secondary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
     >
       <Laptop aria-hidden="true" className="size-3.5" />
       <span className="max-w-32 truncate max-[640px]:sr-only">{host?.name ?? t('电脑')}</span>
-      <OnlineDot online={host?.online === true} />
+      {loading ? (
+        <Skeleton className="size-1.5 animate-none rounded-full" />
+      ) : (
+        <OnlineDot online={hostOnline} />
+      )}
+      {!loading && host != null && connected && !hostOnline && (
+        <span className="text-content-tertiary max-[640px]:hidden">{t('离线')}</span>
+      )}
       {running > 0 && (
         <span className="text-content-tertiary tabular-nums max-[640px]:hidden">
           {t('{n} 在跑', { n: running })}
-        </span>
-      )}
-      {machines.length > 1 && (
-        <span className="text-content-tertiary tabular-nums max-[640px]:hidden">
-          +{machines.length - 1}
         </span>
       )}
     </Button>
@@ -137,8 +144,6 @@ function MachineScreen({
   interactive: boolean;
   onExpand?: () => void;
 }) {
-  const { t } = useI18n();
-  const online = machine.online === true;
   if (computer !== null && teamId !== undefined && desktopControlOnline(machine, computer)) {
     return (
       <MachineScreenSurface
@@ -150,11 +155,7 @@ function MachineScreen({
       />
     );
   }
-  if (!online) return <ScreenPlaceholder online={false} label={t('电脑离线')} />;
-  if (desktopControlOnline(machine, computer)) {
-    return <ScreenPlaceholder online label={t('桌面控制已上线，屏幕显示在这里')} />;
-  }
-  return <ScreenPlaceholder online label={t('屏幕随桌面控制一起上线，到时显示在这里')} />;
+  return null;
 }
 
 function MachineCard({
@@ -358,10 +359,19 @@ function MachineCard({
           </span>
           <span className="flex items-center gap-1.5 text-meta text-content-tertiary">
             <OnlineDot online={online} />
-            {runningLabel(machine, t)}
+            {machineStateLabel(machine, t)}
           </span>
         </span>
       </div>
+      {online && !screenLive && (
+        <p
+          data-testid="machine-screen-hint"
+          className="m-0 flex items-center gap-2 px-3.5 pb-1 text-meta text-content-tertiary"
+        >
+          <MonitorSmartphone aria-hidden="true" className="size-3.5 flex-none" />
+          {t('未开启桌面控制，开启后这里显示屏幕')}
+        </p>
+      )}
       <CapabilityRow
         icon={<MonitorSmartphone aria-hidden="true" className="size-4" />}
         label={t('桌面控制')}
@@ -384,9 +394,11 @@ function MachineCard({
 export function MachinesPanel({
   machines,
   onClose,
+  query,
 }: {
   machines: readonly MachineRow[];
   onClose: () => void;
+  query?: QueryLike;
 }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -395,6 +407,7 @@ export function MachinesPanel({
   const computers = computersQ.data ?? [];
   const host = coordinatorMachine(machines);
   const ordered = host === null ? machines : [host, ...machines.filter((m) => m !== host)];
+  const machinesPhase = queryPhase(query, machines.length === 0);
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
   return (
@@ -403,21 +416,29 @@ export function MachinesPanel({
         <SidePanelTitle>{t('电脑')}</SidePanelTitle>
       </SidePanelHead>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pt-3 pb-4">
-        {ordered.length <= 1 && (
+        {ordered.length <= 1 && machinesPhase !== 'loading' && machinesPhase !== 'error' && (
           <p className="m-0 px-1 text-meta text-content-tertiary">
             {t('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。')}
           </p>
         )}
         <CoordinatorComputer />
-        {ordered.map((machine) => (
-          <MachineCard
-            key={machine.id ?? machine.name}
-            machine={machine}
-            coordinator={machine === host}
-            computer={computerFor(machine)}
-            teamId={teamId}
-          />
-        ))}
+        <QueryBoundary
+          query={query}
+          isEmpty={machines.length === 0}
+          loadingLabel={t('正在加载电脑')}
+          errorTitle={t('电脑没能加载')}
+          empty={null}
+        >
+          {ordered.map((machine) => (
+            <MachineCard
+              key={machine.id ?? machine.name}
+              machine={machine}
+              coordinator={machine === host}
+              computer={computerFor(machine)}
+              teamId={teamId}
+            />
+          ))}
+        </QueryBoundary>
         <Button
           variant="ghost"
           size="sm"

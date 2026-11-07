@@ -62,7 +62,7 @@ export function ProvidersPattern() {
       title="Empty to filled"
       lede="A resource page from its first visit: an empty state, a two-step dialog with a grouped picker, a toast, then the list."
     >
-      <Specimen title="Providers page" stage="canvas" className="block">
+      <Specimen id="providers-page" title="Providers page" stage="canvas" className="block">
         <div className="mx-auto flex max-w-160 flex-col gap-4">
           <div className="flex items-center justify-between">
             <span className="text-page font-medium">Providers</span>
@@ -168,7 +168,7 @@ export function ProvidersPattern() {
                     variant="ghost"
                     aria-pressed={picked === p.id}
                     className={cn(
-                      'h-10 justify-start gap-3 rounded-(--radius-menu-item) px-2 text-ui font-normal text-foreground hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border dark:hover:bg-card',
+                      'h-10 justify-start gap-3 rounded-(--radius-menu-item) px-2 text-ui font-normal text-foreground hover:bg-card dark:hover:bg-card',
                       picked === p.id && PICKER_ROW_SELECTED,
                     )}
                     onClick={() => setPicked(p.id)}

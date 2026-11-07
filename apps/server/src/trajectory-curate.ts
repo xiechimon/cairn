@@ -209,7 +209,7 @@ export function curateCandidates(
       }
       const memoryScope = {
         ...scope,
-        agentId: memoryOwnerOf(tx, scope.teamId, scope.agentId, 'build'),
+        agentId: memoryOwnerOf(tx, scope.teamId, 'build'),
         projectId: placement.projectId,
       };
       const memories = memoriesInScope(tx, memoryScope);

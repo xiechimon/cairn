@@ -4,7 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations, useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { relativeTime } from '../board/rel-time.js';
+import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { useThreadHref } from '../board/thread-link.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -268,7 +268,10 @@ export function ScheduleDetailDialog({
               <dd className="m-0 mt-1 text-foreground">
                 {schedule.lastRunAt === null
                   ? t('Not run yet')
-                  : `${relativeTime(schedule.lastRunAt, now, t)} · ${schedule.lastRunStatus ?? '—'}`}
+                  : joinMeta([
+                      relativeTime(schedule.lastRunAt, now, t),
+                      schedule.lastRunStatus ?? '—',
+                    ])}
               </dd>
             </div>
           </dl>

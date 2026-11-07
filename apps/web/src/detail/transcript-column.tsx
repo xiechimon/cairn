@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import {
@@ -10,12 +10,14 @@ import {
 import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
+import { openingAnchor } from './scroll-anchor.js';
 import { SpecBlock } from './spec-block.js';
 import { type LiveStep, Transcript } from './transcript.js';
 
-const ROOT_CLS = 'h-auto min-h-0 flex-1';
+const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const VIEWPORT_CLS = 'chat-col pt-5 pr-4 pb-(--chat-extra-space) pl-5';
-const CONTENT_CLS = 'mx-auto block w-full max-w-(--chat-max-w) gap-0';
+const CONTENT_CLS =
+  'mx-auto block w-full max-w-(--chat-max-w) min-w-0 gap-0 [overflow-wrap:anywhere]';
 
 export interface TranscriptColumnHandle {
   scrollToEnd: () => void;
@@ -28,6 +30,9 @@ interface TranscriptColumnProps {
   onOpenPlan?: () => void;
   spec?: string;
   autoScroll: boolean;
+  running?: boolean;
+  settled?: boolean;
+  threadKey?: string;
 }
 
 export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptColumnProps>(
@@ -50,6 +55,9 @@ function TranscriptColumnInner({
   agent,
   onOpenPlan,
   spec,
+  running,
+  settled = true,
+  threadKey,
   handleRef,
 }: Omit<TranscriptColumnProps, 'autoScroll'> & {
   handleRef: React.ForwardedRef<TranscriptColumnHandle>;
@@ -57,9 +65,27 @@ function TranscriptColumnInner({
   const { t } = useI18n();
   const { scrollToEnd } = useMessageScroller();
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const anchoredKey = useRef<string | undefined>(undefined);
+  const anchor = running === undefined || !settled ? null : openingAnchor(running, transcript);
+  useEffect(() => {
+    if (anchor === null || anchoredKey.current === threadKey) return;
+    anchoredKey.current = threadKey;
+    if (anchor === 'end') {
+      void scrollToEnd();
+      return;
+    }
+    const bubbles = viewportRef.current?.querySelectorAll('[data-testid="user-bubble"]');
+    bubbles?.item(bubbles.length - 1)?.scrollIntoView({ block: 'start' });
+  }, [anchor, threadKey, scrollToEnd]);
   return (
     <MessageScroller className={ROOT_CLS}>
-      <FadeScrollerViewport data-testid="transcript-col" className={VIEWPORT_CLS}>
+      <FadeScrollerViewport
+        ref={viewportRef}
+        reserveEnd={false}
+        data-testid="transcript-col"
+        className={VIEWPORT_CLS}
+      >
         <MessageScrollerContent className={CONTENT_CLS}>
           {spec != null && <SpecBlock spec={spec} />}
           <Transcript

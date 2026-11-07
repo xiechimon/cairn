@@ -7,14 +7,13 @@ import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
-import { AGENTS_HREF } from '../routes/agent-detail-page.js';
 
 const CODE_SKIN: Record<string, string> = {
   'chat-code':
-    'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code leading-3',
+    'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code leading-3 [overflow-wrap:anywhere]',
   'doc-code': 'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code',
 };
-const CODE_LINK_SKIN = 'bg-(--chip-plan-bg) text-(--chip-plan-fg)';
+const CODE_LINK_SKIN = 'bg-secondary text-content-secondary';
 
 interface SegmentsProps {
   segments: DocSegment[];
@@ -24,7 +23,6 @@ interface SegmentsProps {
 function mentionHref(seg: DocSegment, threadHref: (id: string) => string): string | null {
   if (seg.mentionId == null) return null;
   if (seg.mentionKind === 'todo') return threadHref(seg.mentionId);
-  if (seg.mentionKind === 'agent') return `${AGENTS_HREF}/${seg.mentionId}`;
   return null;
 }
 

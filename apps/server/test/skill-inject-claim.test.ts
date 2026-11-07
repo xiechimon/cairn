@@ -1,31 +1,25 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { chief as chiefTable, skillAudit, step as stepTable } from '../src/db/schema.js';
 import {
-  agent as agentTable,
-  chief as chiefTable,
-  skillAudit,
-  step as stepTable,
-} from '../src/db/schema.js';
-import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
   req,
+  seedPolicy,
+  seedRoute,
+  seedSessionRoute,
   type TestServer,
 } from './helpers.js';
 
-const AGENT_ID = 'agent-si-1';
-const CHIEF_AGENT_ID = 'agent-si-chief';
-
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-si-skills-'));
+  const root = makeTestTempDir('cairn-si-skills-');
   roots.push(root);
   return root;
 }
@@ -86,6 +80,7 @@ interface World {
   s: TestServer;
   token: string;
   projectId: string;
+  sessionRouteId: string;
 }
 
 async function setupWorld(): Promise<World> {
@@ -100,29 +95,14 @@ async function setupWorld(): Promise<World> {
   });
   expect(res.status).toBe(200);
   const token = ((await res.json()) as { token: string }).token;
-  for (const id of [AGENT_ID, CHIEF_AGENT_ID]) {
-    s.db
-      .insert(agentTable)
-      .values({
-        id,
-        teamId: s.team.id,
-        displayName: id,
-        status: 'active',
-        avatarUrl: null,
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        thinkingLevel: null,
-        tools: [],
-        secrets: [],
-        defaultSkill: null,
-        skillsAllowlist: id === AGENT_ID ? [...GRANTED] : null,
-        mcpServers: [],
-      })
-      .run();
-    bindAllAgents(s);
-  }
+  const sessionRouteId = seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    skillsAllowlist: [...GRANTED],
+  });
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model' });
   const projectId = await postProject(s.app, 'si-proj');
-  return { s, token, projectId };
+  return { s, token, projectId, sessionRouteId };
 }
 
 async function claim(app: TestServer['app'], token: string): Promise<ClaimedStep | null> {
@@ -144,7 +124,6 @@ async function createTodo(s: TestServer, projectId: string, spec: string): Promi
 async function startBuild(s: TestServer, projectId: string, todoId: string): Promise<string> {
   const res = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: AGENT_ID } },
     withPlan: false,
   });
   expect(res.status).toBe(201);
@@ -173,7 +152,7 @@ describe('#1106 dispatch skill injection (worker claim selection)', () => {
     const buildId = await startBuild(w.s, w.projectId, todoId);
     const got = await claim(w.s.app, w.token);
     expect(got).not.toBeNull();
-    expect(got?.step.kind).toBe('build');
+    expect(got?.step.kind).toBe('session');
     expect(got?.agent?.skillsAllowlist).toEqual(GRANTED);
     const injected = got?.agent?.injectedSkills ?? [];
     expect(injected.length).toBeGreaterThan(0);
@@ -197,7 +176,7 @@ describe('#1106 dispatch skill injection (worker claim selection)', () => {
     const buildId = await startBuild(w.s, w.projectId, todoId);
     expect(buildId).toBeTruthy();
     const got = await claim(w.s.app, w.token);
-    expect(got?.step.kind).toBe('build');
+    expect(got?.step.kind).toBe('session');
     expect(got?.agent?.injectedSkills).toEqual([]);
     expect(got?.agent?.skillsAllowlist).toEqual(GRANTED);
     expect(stepRow(w.s, got!.step.id).skillInjection).toEqual({ hits: [] });
@@ -205,11 +184,7 @@ describe('#1106 dispatch skill injection (worker claim selection)', () => {
 
   test('failure mode 3: the task text names an ungranted skill -> not selected (grants bound the candidates, nothing invented)', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(agentTable)
-      .set({ skillsAllowlist: GRANTED.filter((id) => id !== 'tdd') })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    seedPolicy(w.s, 'session', { skillsAllowlist: GRANTED.filter((id) => id !== 'tdd') });
     const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
     await startBuild(w.s, w.projectId, todoId);
     const got = await claim(w.s.app, w.token);
@@ -219,11 +194,7 @@ describe('#1106 dispatch skill injection (worker claim selection)', () => {
 
   test('failure mode 8 (#1169): skillsAllowlist=null (unrestricted) -> the candidate base = the full scan (no longer zero candidates)', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(agentTable)
-      .set({ skillsAllowlist: null })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    seedPolicy(w.s, 'session', { skillsAllowlist: null });
     const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
     await startBuild(w.s, w.projectId, todoId);
     const got = await claim(w.s.app, w.token);
@@ -235,11 +206,7 @@ describe('#1106 dispatch skill injection (worker claim selection)', () => {
 
   test('failure mode 7: granted but not scanned by the server (a daemon-local skill) -> still selected by name (candidate base = the granted set)', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(agentTable)
-      .set({ skillsAllowlist: [...GRANTED, 'local-one'] })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    seedPolicy(w.s, 'session', { skillsAllowlist: [...GRANTED, 'local-one'] });
     const todoId = await createTodo(w.s, w.projectId, '用 local-one 处理本地构建');
     const buildId = await startBuild(w.s, w.projectId, todoId);
     expect(buildId).toBeTruthy();
@@ -261,7 +228,6 @@ describe('#1106 chief steps bypass the selection surface (a live claim)', () => 
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        agentId: CHIEF_AGENT_ID,
         charter: '',
         createdAt: Date.now(),
       })
@@ -331,7 +297,7 @@ describe('#1971 worker claim skill_audit inject rows', () => {
     for (const hit of hits) {
       const audit = audits.find((a) => a.skillId === hit.id)!;
       expect(audit.actorType).toBe('agent');
-      expect(audit.actorId).toBe(AGENT_ID);
+      expect(audit.actorId).toBe(w.sessionRouteId);
       expect(audit.createdAt).toBe(row.claimedAt);
       expect(audit.bytes).toBe(Buffer.byteLength(hit.reason, 'utf8'));
       expect(audit.bytes).toBeGreaterThan(hit.reason.length);
@@ -356,7 +322,6 @@ describe('#1971 worker claim skill_audit inject rows', () => {
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        agentId: CHIEF_AGENT_ID,
         charter: '',
         createdAt: Date.now(),
       })
@@ -371,11 +336,7 @@ describe('#1971 worker claim skill_audit inject rows', () => {
 
   test('ungranted skill names produce no inject audit rows', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(agentTable)
-      .set({ skillsAllowlist: GRANTED.filter((id) => id !== 'tdd') })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    seedPolicy(w.s, 'session', { skillsAllowlist: GRANTED.filter((id) => id !== 'tdd') });
     const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
     await startBuild(w.s, w.projectId, todoId);
     const got = await claim(w.s.app, w.token);
@@ -393,7 +354,6 @@ describe('#1971 worker claim skill_audit inject rows', () => {
     });
     expect(enroll2.status).toBe(200);
     const token2 = ((await enroll2.json()) as { token: string }).token;
-    bindAllAgents(w.s);
     const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
     await startBuild(w.s, w.projectId, todoId);
     const winner = await claim(w.s.app, w.token);
@@ -418,7 +378,7 @@ describe('#1971 worker claim skill_audit inject rows', () => {
       .from(stepTable)
       .where(eq(stepTable.buildId, buildId))
       .all()
-      .find((r) => r.kind === 'build')!;
+      .find((r) => r.kind === 'session')!;
     expect(pending.status).toBe('pending');
     w.s.db.run(
       sql`CREATE TRIGGER skill_audit_inject_fail BEFORE INSERT ON skill_audit BEGIN SELECT RAISE(ABORT, 'forced audit failure'); END`,

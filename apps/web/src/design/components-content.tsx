@@ -1,7 +1,9 @@
+import { GitBranch, Terminal } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
+import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
@@ -30,6 +32,16 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from '../components/ui/trace.js';
+import {
   Copy,
   FileText,
   Key,
@@ -43,7 +55,7 @@ import {
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import { splitQuery } from '../search/search-query.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
-import { Cell, Section, Specimen } from './specimen.js';
+import { Cell, Labeled, Section, Specimen } from './specimen.js';
 
 const LANGS = [
   { value: 'en', label: 'English' },
@@ -60,6 +72,7 @@ export function EmptySection() {
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Specimen
+          id="empty-state"
           title="Empty state"
           code={`<EmptyState icon={Key} title="No API keys yet" description="…" action={{ label: 'Create key' }} />`}
         >
@@ -71,7 +84,11 @@ export function EmptySection() {
             action={{ label: 'Create key' }}
           />
         </Specimen>
-        <Specimen title="Read-only empty state" note="A hint explains why there is no action">
+        <Specimen
+          id="read-only-empty-state"
+          title="Read-only empty state"
+          note="A hint explains why there is no action"
+        >
           <EmptyState
             className="w-full"
             icon={Server}
@@ -81,7 +98,7 @@ export function EmptySection() {
           />
         </Specimen>
       </div>
-      <Specimen title="Skeleton" note="Card-shaped, two per column">
+      <Specimen id="skeleton" title="Skeleton" note="Card-shaped, two per column">
         <div className="flex w-full flex-col gap-3">
           <div className="mb-1">
             <Button
@@ -118,7 +135,11 @@ export function EmptySection() {
         </div>
       </Specimen>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <Specimen title="Project not found" note="An unknown project link, with close names">
+        <Specimen
+          id="project-not-found"
+          title="Project not found"
+          note="An unknown project link, with close names"
+        >
           <MemoryRouter>
             <ProjectNotFound
               unknownId="cairn-old"
@@ -130,7 +151,11 @@ export function EmptySection() {
             />
           </MemoryRouter>
         </Specimen>
-        <Specimen title="Project not found, recent" note="Nothing is close, so the latest projects">
+        <Specimen
+          id="project-not-found-recent"
+          title="Project not found, recent"
+          note="Nothing is close, so the latest projects"
+        >
           <MemoryRouter>
             <ProjectNotFound
               unknownId="zzzzzzzz"
@@ -146,7 +171,11 @@ export function EmptySection() {
             />
           </MemoryRouter>
         </Specimen>
-        <Specimen title="Projects failed to load" note="Retry, or leave for the Coordinator">
+        <Specimen
+          id="projects-failed-to-load"
+          title="Projects failed to load"
+          note="Retry, or leave for the Coordinator"
+        >
           <MemoryRouter>
             <ProjectsFailed onRetry={() => undefined} />
           </MemoryRouter>
@@ -165,7 +194,7 @@ export function SettingsSection() {
       title="Settings list"
       lede="A header above one card of equal-height rows. Label left, control right, danger zone in its own card at the end."
     >
-      <Specimen title="Account settings" stage="canvas" className="block">
+      <Specimen id="account-settings" title="Account settings" stage="canvas" className="block">
         <div className="mx-auto flex max-w-160 flex-col gap-4">
           <SettingsHeader
             avatar={<SeededAvatar name="ian" fallback="/avatar-user.png" className="size-14" />}
@@ -220,7 +249,7 @@ export function AvatarSection() {
       title="Avatar"
       lede="Avatars are seeded from the name, so the same person always looks the same. A busy agent's avatar draws its spiral over a faint copy, so the face never changes."
     >
-      <Specimen title="Seeded avatar">
+      <Specimen id="seeded-avatar" title="Seeded avatar">
         {[
           { size: 'size-6', label: '24' },
           { size: 'size-8', label: '32' },
@@ -262,8 +291,9 @@ export function ConversationSection() {
       lede="Message is the row, Bubble is the surface, Marker is a note between turns. Attachments ride in the composer and the stream."
     >
       <Specimen
+        id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="bubble-gradient rounded-(--cds-radius-xl) px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -271,7 +301,7 @@ export function ConversationSection() {
               className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
               data-testid="turn-user"
             >
-              <div className="bubble-gradient w-fit max-w-full rounded-(--cds-radius-xl) px-3 py-2 text-card-title text-foreground">
+              <div className="w-fit max-w-full rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title text-foreground">
                 Why does pnpm install fail in CI?
               </div>
               <div className="mt-1 flex items-center gap-1 text-content-tertiary">
@@ -341,7 +371,7 @@ export function ConversationSection() {
           </Marker>
         </div>
       </Specimen>
-      <Specimen title="Attachments" note="done, uploading and error states">
+      <Specimen id="attachments" title="Attachments" note="done, uploading and error states">
         {files.map((f) => (
           <Attachment key={f.name} state={f.state}>
             <AttachmentMedia>
@@ -375,7 +405,16 @@ const TRACE_DONE: { id: string; step: TraceStep }[] = [
 ];
 
 const TRACE_RUNNING: { id: string; step: TraceStep }[] = [
-  { id: 'a', step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } },
+  {
+    id: 'a',
+    step: {
+      kind: 'run',
+      command: `git diff -- ${'long-command'.repeat(30)}`,
+      exit: null,
+      output: [],
+      secs: 0,
+    },
+  },
 ];
 
 const TRACE_FAILED: { id: string; step: TraceStep }[] = [
@@ -405,6 +444,17 @@ const TRACE_TOOLS: { id: string; step: TraceStep }[] = [
   { id: 'c', step: { kind: 'tool', name: 'open_pr', status: 'failed', secs: 3 } },
 ];
 
+const THINKING_SHORT = 'The lockfile and package.json disagree, so the frozen install fails.';
+
+const THINKING_LONG =
+  'The frozen install fails because the last commit bumped vitest in package.json while pnpm-lock.yaml kept the old specifier, so the resolution step cannot be skipped and CI stops before any test runs.\nCheck the commit first.';
+
+const THINKING_MULTILINE = `The frozen install fails at the lockfile check.
+
+1. The last commit touched package.json only.
+2. Running pnpm install locally rewrites pnpm-lock.yaml.
+3. Push the lockfile on the same branch and wait for CI.`;
+
 export function TraceSection() {
   return (
     <Section
@@ -413,6 +463,7 @@ export function TraceSection() {
       lede="The agent's narration stays body text. Tool activity folds into one grey summary line ending in a triangle; open it for a hairline card with one 36px row per action: a quiet verb, the target in medium weight, and the result at the end. A row opens to its command and output. Never hand-write tool rows."
     >
       <Specimen
+        id="trace-states"
         title="Trace states"
         note="done, running (present tense, shimmer on the verb), failed (red count and exit code), pending"
         code={`<TraceSteps defaultOpen steps={[{ id, step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } }]} />`}
@@ -433,6 +484,7 @@ export function TraceSection() {
         </div>
       </Specimen>
       <Specimen
+        id="step-kinds"
         title="Step kinds"
         note="think, search, read, say, run (opens to command and output), edit, push, check"
       >
@@ -443,10 +495,124 @@ export function TraceSection() {
         />
       </Specimen>
       <Specimen
+        id="coordinator-turn-tools"
         title="Coordinator turn tools"
-        note="the same group at compact density under a Coordinator reply"
+        note="compact rows respond immediately without shadows; summary has no copy action"
       >
-        <TraceGroup steps={TRACE_TOOLS} density="compact" defaultOpen className="w-120" />
+        <TraceGroup
+          steps={TRACE_TOOLS}
+          density="compact"
+          defaultOpen
+          className="w-120 max-w-full"
+        />
+      </Specimen>
+      <Specimen
+        id="thinking-rows"
+        title="Thinking rows"
+        note="collapsed to a one-line preview, a long first line cut at 150 characters, then opened to the full reasoning"
+      >
+        <div className="flex w-full max-w-160 flex-col gap-5">
+          <Labeled label="Collapsed: first line as the preview">
+            <ThinkingRow text={THINKING_SHORT} />
+          </Labeled>
+          <Labeled label="Collapsed: a long first line is cut with an ellipsis">
+            <ThinkingRow text={THINKING_LONG} />
+          </Labeled>
+          <Labeled label="Collapsed at 320px, a narrow panel">
+            <div className="w-80 max-w-full">
+              <ThinkingRow text={THINKING_LONG} />
+            </div>
+          </Labeled>
+          <Labeled label="Open: the title becomes Thinking, the full text follows">
+            <ThinkingRow text={THINKING_MULTILINE} defaultOpen />
+          </Labeled>
+        </div>
+      </Specimen>
+      <Specimen
+        id="trace-lines"
+        title="Trace lines"
+        note="the primitives behind every trace row: default, running with shimmer, error, pending, and a collapsible with a detail panel"
+      >
+        <div className="flex w-full max-w-160 flex-col gap-5">
+          <Cell label="Default, with icon and trailing description">
+            <Trace>
+              <TraceLine>
+                <TraceIcon>
+                  <FileText />
+                </TraceIcon>
+                <TraceTitle>Read apps/server/src/routes-machine.ts</TraceTitle>
+                <TraceDescription>214 lines</TraceDescription>
+              </TraceLine>
+            </Trace>
+          </Cell>
+          <Cell label="Running: shimmer on the title">
+            <Trace>
+              <TraceLine status="running">
+                <TraceIcon>
+                  <Terminal />
+                </TraceIcon>
+                <TraceTitle>Running pnpm exec vitest run --changed</TraceTitle>
+                <TraceDescription>8s</TraceDescription>
+              </TraceLine>
+            </Trace>
+          </Cell>
+          <Cell label="Error">
+            <Trace>
+              <TraceLine status="error">
+                <TraceIcon>
+                  <Terminal />
+                </TraceIcon>
+                <TraceTitle>pnpm install --frozen-lockfile</TraceTitle>
+                <TraceDescription>exit 1</TraceDescription>
+              </TraceLine>
+            </Trace>
+          </Cell>
+          <Cell label="Pending">
+            <Trace>
+              <TraceLine status="pending">
+                <TraceIcon>
+                  <GitBranch />
+                </TraceIcon>
+                <TraceTitle>Push fix/lockfile</TraceTitle>
+              </TraceLine>
+            </Trace>
+          </Cell>
+          <Cell label="Collapsed at 320px: a long title truncates, the description stays">
+            <div className="w-80 max-w-full">
+              <Trace>
+                <TraceLine>
+                  <TraceIcon>
+                    <FileText />
+                  </TraceIcon>
+                  <TraceTitle>
+                    Read apps/server/src/services/merge-gate/model-identity.ts
+                  </TraceTitle>
+                  <TraceDescription>1,204 lines</TraceDescription>
+                </TraceLine>
+              </Trace>
+            </div>
+          </Cell>
+          <Cell label="Collapsible: open, with the detail panel">
+            <Trace>
+              <TraceCollapsible defaultOpen>
+                <TraceCollapsibleTrigger>
+                  <TraceLine>
+                    <TraceIcon>
+                      <Terminal />
+                    </TraceIcon>
+                    <TraceTitle>pnpm install</TraceTitle>
+                    <TraceDescription>12s</TraceDescription>
+                  </TraceLine>
+                </TraceCollapsibleTrigger>
+                <TraceCollapsibleContent>
+                  <pre className="m-0 font-mono text-code whitespace-pre-wrap">
+                    {'Lockfile is up to date, resolution step is skipped\nDone in 11.2s'}
+                  </pre>
+                </TraceCollapsibleContent>
+              </TraceCollapsible>
+            </Trace>
+          </Cell>
+        </div>
       </Specimen>
     </Section>
   );
@@ -462,7 +628,7 @@ export function SearchSyntaxSection() {
       lede="Typed filters become chips in the field. A value that cannot match is flagged on its chip with a reason, and the footer opens the syntax list."
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Specimen title="Chips" note="Valid, then flagged with its reason">
+        <Specimen id="chips" title="Chips" note="Valid, then flagged with its reason">
           <div className="flex w-full flex-col gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               {GALLERY_CHIPS.map((chip, index) => (
@@ -477,7 +643,11 @@ export function SearchSyntaxSection() {
             <ChipProblems chips={GALLERY_CHIPS} problems={[null, null, 'bad_cost']} />
           </div>
         </Specimen>
-        <Specimen title="Syntax help" note="Opened from the palette footer or the Activity field">
+        <Specimen
+          id="syntax-help"
+          title="Syntax help"
+          note="Opened from the palette footer or the Activity field"
+        >
           <SyntaxHelp className="w-full" />
         </Specimen>
       </div>

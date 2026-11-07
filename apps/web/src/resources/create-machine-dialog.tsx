@@ -96,7 +96,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
         </ol>
         <Button
           variant="ghost"
-          className={`${INLINE_ACTION_CLS} px-0 text-content-secondary hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary dark:hover:bg-transparent font-normal active:not-aria-[haspopup]:translate-y-0`}
+          className={`${INLINE_ACTION_CLS} px-0 text-content-secondary hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary dark:hover:bg-transparent font-normal`}
           aria-expanded={apiKeyOpen}
           onClick={() => setApiKeyOpen((value) => !value)}
         >

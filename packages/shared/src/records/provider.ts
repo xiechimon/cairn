@@ -94,12 +94,6 @@ export type ProviderTestError = z.infer<typeof providerTestErrorSchema>;
 
 export const providerTestResultSchema = z.object({
   status: z.enum(['ok', 'failed']),
-  listing: z.object({
-    httpStatus: z.number().int().nullable(),
-    modelCount: z.number().int().nullable(),
-    latencyMs: z.number().int().nullable(),
-    error: providerTestErrorSchema.nullable(),
-  }),
   probe: z.object({
     requestedModel: z.string().nullable(),
     echoedModel: z.string().nullable(),

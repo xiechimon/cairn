@@ -1,17 +1,4 @@
-export {
-  AGENT_LONG_ROLE,
-  agentDelete,
-  agentDetail,
-  agentDetailActive,
-  agentDetailLongModels,
-  agentDetailMemory,
-  agentDetailSecrets,
-  agentLongRole,
-  agentLongRoleTeam,
-  chiefAgentChip,
-  chiefFabAvatar,
-  chiefFabAvatarOverride,
-} from './agents.js';
+export { chiefAgentChip, chiefFabAvatar, chiefFabAvatarOverride, secretsList } from './agents.js';
 export { apiKeysCreated } from './api-keys.js';
 export {
   boardChiefProbes,
@@ -127,6 +114,8 @@ export {
 export {
   machinesChiefState,
   machinesClaudeLogin,
+  machinesDuplicateNames,
+  machinesMasterDetail,
   providersEmpty,
   providersFleet,
   resourcesCcBinGone,
@@ -143,12 +132,4 @@ export {
   schedulesFormOnce,
   schedulesList,
 } from './schedules.js';
-export {
-  TEAM_R7,
-  teamGrid,
-  teamOrgChart,
-  teamOrgChartEmpty,
-  teamOrgChartPair,
-  teamOrgChartSingle,
-  teamRoster,
-} from './team.js';
+export { TEAM_R7, teamGrid } from './team.js';

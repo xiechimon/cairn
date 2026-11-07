@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink } from '../icons/index.js';
 import type { GalleryTheme } from './design-doc.js';
-import { Section } from './specimen.js';
+import { Section, useOnlySpecimen } from './specimen.js';
 
 const FRAME_W = 1200;
 const FRAME_H = 760;
@@ -38,13 +38,8 @@ const SCREENS = [
     parts: 'Schedule cards, frequency, next run',
   },
   {
-    title: 'Team',
-    url: '/app/team?scenario=12',
-    parts: 'Agent cards, team switch',
-  },
-  {
-    title: 'Agent settings',
-    url: '/app/resources/agents/r3-builder?scenario=agent-detail',
+    title: 'Work routing',
+    url: '/app/settings/work-routing?scenario=routing-settings',
     parts: 'Settings list, runtime and model pickers',
   },
   {
@@ -134,6 +129,7 @@ function Screen({
 }
 
 export function ScreensSection({ theme }: { theme: GalleryTheme }) {
+  if (useOnlySpecimen() != null) return null;
   return (
     <Section
       id="screens"

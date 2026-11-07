@@ -2,7 +2,6 @@ import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   gateState as gateStateTable,
   gateVerdict as gateVerdictTable,
@@ -13,7 +12,7 @@ import {
 import { systemGitOps } from '../src/lib/git.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
 import { computePatchDigest } from '../src/services/merge-gate/digest.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
 
 const BASE = 'b'.repeat(40);
 const HEAD = 'a'.repeat(40);
@@ -86,19 +85,7 @@ function world(seed: Seed = {}): World {
       },
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent',
-      teamId: s.team.id,
-      displayName: 'Local agent',
-      description: '',
-      provider: 'anthropic',
-      modelId: 'claude-x',
-      tools: ['merge', 'push'],
-      machineId: null,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'anthropic', modelId: 'claude-x', tools: ['merge', 'push'] });
   s.db
     .insert(todoTable)
     .values({
@@ -112,7 +99,6 @@ function world(seed: Seed = {}): World {
       seqNum: 1,
       latestBuildId: seed.latestBuild ?? 'build',
       sourceRef: seed.sourceRef ?? null,
-      assignment: { plan: null, build: { agentId: 'agent' } },
     })
     .run();
   s.db

@@ -8,7 +8,7 @@ TLA_SHA256="936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
 TLA_URL="https://github.com/tlaplus/tlaplus/releases/download/v${TLA_VERSION}/tla2tools.jar"
 JAR="${CAIRN_TLA_JAR:-$HOME/.cache/cairn/tla2tools-${TLA_VERSION}.jar}"
 JAVA="${JAVA:-java}"
-TRACE_VARS="head base dgst landed lastEval verdicts patch judged decided commitReady commitBase"
+TRACE_VARS="head base dgst used carriers updates landed lastEval verdicts patch judged decided commitReady commitBase commitPatch rejudges rebuilds"
 
 if [ ! -f "$JAR" ]; then
   echo "tla2tools.jar not found at $JAR" >&2
@@ -63,7 +63,7 @@ summarize_trace() {
         v = vars[i]
         if (!(v in cur)) continue
         if (n == 1) {
-          if (v ~ /^(head|base|dgst|landed|patch|judged|decided|commitReady|commitBase)$/) printf "       %s = %s\n", v, cur[v]
+          if (v ~ /^(head|base|dgst|used|carriers|updates|landed|patch|judged|decided|commitReady|commitBase|commitPatch|rejudges|rebuilds)$/) printf "       %s = %s\n", v, cur[v]
         } else if (!(v in prev) || prev[v] != cur[v]) {
           printf "       %s = %s\n", v, cur[v]
         }

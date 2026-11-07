@@ -75,7 +75,7 @@ function eligibility(number, expectedHead) {
     reasons.push('head-changed-or-invalid');
   if (pr.draft) reasons.push('draft');
   if (pr.base.ref !== 'main') reasons.push('base-not-main');
-  for (const label of ['needs-decision', 'cairn-recovery'])
+  for (const label of ['coordinator-hold', 'cairn-recovery'])
     if (pr.labels.some((item) => item.name === label)) reasons.push(label);
   const runs = pages(
     `repos/${repo}/commits/${pr.head.sha}/check-runs?filter=latest&per_page=100`,

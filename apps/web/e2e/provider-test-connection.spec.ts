@@ -18,7 +18,6 @@ const RECORD = {
 
 const OK = {
   status: 'ok',
-  listing: { httpStatus: 200, modelCount: 4, latencyMs: 80, error: null },
   probe: {
     requestedModel: 'glm-5.3',
     echoedModel: 'glm-5.3',
@@ -30,7 +29,6 @@ const OK = {
 
 const FAILED = {
   status: 'failed',
-  listing: { httpStatus: 401, modelCount: null, latencyMs: 60, error: { type: 'auth', message: 'bad key' } },
   probe: {
     requestedModel: 'glm-5.3',
     echoedModel: null,

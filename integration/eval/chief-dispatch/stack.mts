@@ -11,15 +11,16 @@ import { type MachineHandle, runMachine } from '../../../apps/daemon/src/machine
 import { statePaths } from '../../../apps/daemon/src/state.js';
 import {
   agentMemory as agentMemoryTable,
-  agent as agentTable,
   build as buildTable,
   chiefMessage,
   chiefThread,
   machine as machineTable,
   project as projectTable,
+  routingRule as routingRuleTable,
   step as stepTable,
   todo as todoTable,
   tokenUsage,
+  workPolicy as workPolicyTable,
 } from '../../../apps/server/src/db/schema.js';
 import { cancelPendingQuestions } from '../../../apps/server/src/services/chief-questions.js';
 import { repoDirFor } from '../../../apps/server/src/services/git.js';
@@ -27,7 +28,6 @@ import {
   api,
   bootRealServer,
   daemonLogLines,
-  AGENT_ID as HELPER_BOOTSTRAP_AGENT_ID,
   type RealServer,
   waitFor,
 } from '../../../integration/test/helpers.js';
@@ -352,35 +352,59 @@ export async function seedWorld(
   if (prov.status !== 201)
     throw new Error(`建 provider 失败: ${prov.status} ${JSON.stringify(prov.body)}`);
 
-  server.db.delete(agentTable).where(eq(agentTable.id, HELPER_BOOTSTRAP_AGENT_ID)).run();
-
   const machineRow = server.db.select().from(machineTable).all()[0];
   if (machineRow === undefined) throw new Error('daemon 未注册机器，无法给 Agent 绑归属机');
 
   const agentIds: Record<string, string> = {};
-  for (const a of opts.roster) {
-    const res = await api(server.url, 'POST', `/api/teams/${server.teamId}/agents`, {
-      displayName: a.displayName,
-      description: a.description,
-      provider: 'relay-186',
-      modelId: a.modelId,
-      machineId: machineRow.id,
-    });
-    if (res.status !== 201)
-      throw new Error(`建 agent ${a.key} 失败: ${res.status} ${JSON.stringify(res.body)}`);
-    agentIds[a.key] = (res.body as { id: string }).id;
-  }
+  for (const a of opts.roster) agentIds[a.key] = `agent-${a.key}`;
 
   const chiefKey =
     opts.roster.find((a) => a.modelId === opts.chiefModelId)?.key ?? opts.roster[0]?.key;
   if (chiefKey === undefined) throw new Error('roster 为空，无法确定总管 agent');
   const chiefAgentId = agentIds[chiefKey];
   if (chiefAgentId === undefined) throw new Error(`总管绑定的 agent 未建出: ${chiefKey}`);
-  const bound = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
-    agent: { agentId: chiefAgentId, thinkingLevel: chiefThinkingLevel() },
-    charter: '',
-  });
-  if (bound.status !== 200) throw new Error(`绑定总管失败: ${bound.status}`);
+  const now = Date.now();
+  const routeBase = {
+    teamId: server.teamId,
+    provider: 'relay-186',
+    thinkingLevel: null,
+    machineId: machineRow.id,
+    createdAt: now,
+    updatedAt: now,
+  };
+  server.db.delete(routingRuleTable).where(eq(routingRuleTable.teamId, server.teamId)).run();
+  server.db.delete(workPolicyTable).where(eq(workPolicyTable.teamId, server.teamId)).run();
+  server.db
+    .insert(routingRuleTable)
+    .values([
+      {
+        ...routeBase,
+        id: randomUUID(),
+        use: 'coordinator',
+        modelId: opts.chiefModelId,
+        thinkingLevel: chiefThinkingLevel(),
+      },
+      {
+        ...routeBase,
+        id: randomUUID(),
+        use: 'session',
+        modelId: opts.roster[0]?.modelId ?? opts.chiefModelId,
+      },
+    ])
+    .run();
+  server.db
+    .insert(workPolicyTable)
+    .values({
+      id: randomUUID(),
+      teamId: server.teamId,
+      use: 'session',
+      tools: [],
+      mcpServers: [],
+      secrets: [],
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
 
   const proj = await api(server.url, 'POST', '/api/projects', {
     name: 'eval-project',
@@ -597,13 +621,6 @@ function driveTurnEvidence(
   const rawModel = usageRows.find((r) => r.model !== '')?.model ?? null;
   const model = rawModel !== null ? (rawModel.split('/').at(-1) ?? rawModel) : null;
 
-  const assignmentOf = (
-    t: (typeof todos)[number],
-  ): { build: string | null; plan: string | null } => {
-    const a = t.assignment as { build?: { agentId?: string }; plan?: { agentId?: string } } | null;
-    return { build: a?.build?.agentId ?? null, plan: a?.plan?.agentId ?? null };
-  };
-
   return {
     threadId,
     stepStatus,
@@ -616,8 +633,8 @@ function driveTurnEvidence(
       title: t.title,
       spec: t.spec ?? '',
       projectId: t.projectId,
-      buildAgentId: assignmentOf(t).build,
-      planAgentId: assignmentOf(t).plan,
+      buildAgentId: null,
+      planAgentId: null,
       phase: t.phase,
     })),
     buildRows: builds.map((b) => ({

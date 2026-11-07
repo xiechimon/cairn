@@ -62,12 +62,37 @@ Fenced code blocks do not exempt image links: agents list evidence in
 code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
-Schema evidence: with `--schema-glance <file>` (the output of
+Schema evidence: only the first contiguous block of table lines (or the
+No schema changes line) directly under the heading is compared; later prose
+and tables are ignored. `node scripts/pr-schema-sync.mjs <pr-number>` rewrites
+the section in a body file. With `--schema-glance <file>` (the output of
 scripts/schema-glance.mjs from the merge base of base and head to head,
 passed by the workflow only when base...head touches apps/server/drizzle/**,
 so migrations merged into main after the PR branched never count), the body
 must carry a
 `### Schema changes` section whose table rows equal that file's rows.
+
+Evidence card (D117): with `--changed-files <file>` (one changed path per line,
+passed by the workflow), a PR that changes `apps/server/src/routes*.ts` must
+carry, outside code fences and comments, a `### Requirement` section and a
+`### Requests` section. Requirement is an internal source (an issue, PR or
+plan decision link plus a quoted excerpt) or an embedded screenshot of the
+official doc; a third-party API (a `Third-party:` line or any link outside
+this repository) always needs the screenshot. Requests holds an embedded
+screenshot of the real call, and a table with a Before row and at least one
+row naming an HTTP status code. Every PR that changes more than docs must
+also carry non-empty `Live:`, `Mocked:` and `Not covered:` lines (`Not
+verified:` was merged into `Not covered:`; a label with only markup after it
+counts as empty). The gate checks the card's shape;
+whether it matches the requirement stays a reviewer judgment.
+
+Baseline evidence: with `--changed-baselines <file>` (one path per line,
+passed by the workflow only when merge base...head adds or modifies a
+`*-snapshots/*.png` file), the body must show each changed baseline: a table
+row naming the file with at least two embedded images (old baseline and new
+render), or a `<file>: <verdict>` line naming it. The file is matched by its
+name with or without `.png`; a pair inside a code fence does not render and
+does not count. Each baseline without either is named.
 
 Usage:
   python3 scripts/pr-evidence-gate.py body.md                # CI entry point
@@ -115,6 +140,18 @@ PROSE_LIMIT = 600
 SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
 ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
 NO_SCHEMA_CHANGES = 'No schema changes'
+ROUTES_FILE = re.compile(r'^apps/server/src/routes[^/]*\.ts$')
+DOCS_FILE = re.compile(r'^docs/|\.md$')
+COVERAGE_LABELS = ('Live', 'Mocked', 'Not covered')
+CARD_HEADING = re.compile(r'^###[ \t]+(.+?)[ \t]*$', re.M)
+STOP_HEADING = re.compile(r'^#{1,3}[ \t]+', re.M)
+HTTP_STATUS = re.compile(r'(?<![\w.])[1-5]\d\d(?![\w.])')
+INTERNAL_LINK = re.compile(r'https://(?:github\.com|raw\.githubusercontent\.com)/xiechimon/cairn(?:/|$)')
+INTERNAL_REF = re.compile(r'https://github\.com/xiechimon/cairn/(?:issues|pull|blob)/|\bD\d{1,4}\b')
+THIRD_PARTY_LINE = re.compile(r'^[ \t]*(?:[-*]\s+)?(?:\*\*)?Third-party:', re.M | re.I)
+QUOTE_LINE = re.compile(r'^[ \t]*>[ \t]?(.*)$', re.M)
+UNESCAPED_PIPE = re.compile(r'(?<!\\)\|')
+MARKUP = re.compile(r'[*_`~\s]+')
 
 
 
@@ -281,11 +318,15 @@ def schema_rows(markdown):
     heading = SCHEMA_HEADING.search(text)
     if heading is None:
         return None
-    rest = text[heading.end():]
-    following = ANY_HEADING.search(rest)
-    section = rest[:following.start()] if following else rest
-    return [' '.join(line.split()) for line in section.splitlines()
-            if line.strip().startswith('|') or line.strip() == NO_SCHEMA_CHANGES]
+    rows = []
+    for line in text[heading.end():].splitlines():
+        stripped = line.strip()
+        is_row = stripped.startswith('|') or stripped == NO_SCHEMA_CHANGES
+        if is_row:
+            rows.append(' '.join(stripped.split()))
+        elif stripped or rows:
+            break
+    return rows
 
 
 def schema_verdict(body, expected_markdown):
@@ -294,6 +335,113 @@ def schema_verdict(body, expected_markdown):
     if actual is None:
         return 'missing'
     return 'matches' if actual == expected else 'stale'
+
+
+def card_section(text, title):
+    for heading in CARD_HEADING.finditer(text):
+        if heading.group(1).strip().lower() == title.lower():
+            rest = text[heading.end():]
+            following = STOP_HEADING.search(rest)
+            return rest[:following.start()] if following else rest
+    return None
+
+
+def has_content(text):
+    return bool(MARKUP.sub('', text))
+
+
+def table_rows(section):
+    rows = []
+    for line in section.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith('|'):
+            continue
+        inner = stripped[1:-1] if stripped.endswith('|') and not stripped.endswith('\\|') else stripped[1:]
+        cells = [cell.replace('\\|', '|').strip() for cell in UNESCAPED_PIPE.split(inner)]
+        if all(re.fullmatch(r':?-+:?', cell) for cell in cells):
+            continue
+        rows.append(cells)
+    return (rows[0], rows[1:]) if rows else ([], [])
+
+
+def embedded_images(section):
+    return [link for link in find_links(section) if link['embedded']]
+
+
+def card_problems(body):
+    text = visible_markdown(body)
+    problems = []
+    requirement = card_section(text, 'Requirement')
+    requests = card_section(text, 'Requests')
+    if requirement is None:
+        problems.append("missing '### Requirement' section: link the requirement and quote it, or screenshot the official doc")
+    else:
+        urls = URL.findall(requirement)
+        outside = [url for url in urls if not INTERNAL_LINK.match(url)
+                   and not IMG_EXT.search(urlsplit(url).path) and not is_media_host_image(url)]
+        third_party = bool(THIRD_PARTY_LINE.search(requirement)) or bool(outside)
+        shots = embedded_images(requirement)
+        if third_party:
+            if not shots:
+                problems.append('third-party Requirement needs an embedded screenshot of the official doc')
+        elif not shots:
+            if not INTERNAL_REF.search(requirement):
+                problems.append('Requirement has no internal link (issue, PR or plan decision Dxxx); add one, or screenshot the doc')
+            if not has_content(' '.join(QUOTE_LINE.findall(requirement))):
+                problems.append('Requirement has no quoted excerpt: quote the requirement under the link with > lines, or screenshot the doc')
+    if requests is None:
+        problems.append("missing '### Requests' section: screenshot the real call and add the Requests table")
+    else:
+        if not embedded_images(requests):
+            problems.append('Requests section has no embedded screenshot of the running product or API tool')
+        header, rows = table_rows(requests)
+        if not any(row and re.sub(r'[*`_ ]', '', row[0]).lower().startswith('before') for row in rows):
+            problems.append('Requests table has no Before row: one 404 or the old response is enough')
+        response = next((i for i, cell in enumerate(header) if 'response' in cell.lower()), None)
+        if response is None:
+            problems.append("Requests table has no 'Response' column")
+        elif not any(len(row) > response and HTTP_STATUS.search(row[response]) for row in rows):
+            problems.append('Requests table has no row with an HTTP status code in the Response column')
+    return problems
+
+
+def coverage_problems(body):
+    text = visible_markdown(body, blank_fences=False)
+    problems = []
+    for label in COVERAGE_LABELS:
+        pattern = re.compile(rf'^[ \t]*(?:[-*+][ \t]+)?[*_`]{{0,2}}{label}:[*_`]{{0,2}}(?P<rest>.*)$', re.M)
+        if not any(has_content(match['rest']) for match in pattern.finditer(text)):
+            problems.append(f'missing {label}:')
+    if 'missing Not covered:' in problems and re.search(r'^[ \t]*(?:[-*+]\s+)?(?:\*\*)?Not verified:', text, re.M):
+        problems.append('Not verified: was merged into Not covered: (name what ran live, what was mocked, and what no check reached)')
+    return problems
+
+
+def baseline_token(path):
+    stem = re.escape(path.rsplit('/', 1)[-1].removesuffix('.png'))
+    return rf'(?<![\w-]){stem}(?:\.png)?(?![\w-])'
+
+
+def baseline_shown(rendered, with_fences, path):
+    token = baseline_token(path)
+    for line in rendered.splitlines():
+        if line.strip().startswith('|') and re.search(token, line) and len(embedded_images(line)) >= 2:
+            return True
+    verdict = re.compile(token + r'[*_`]*[ \t]*:(?P<rest>.*)$', re.M)
+    return any(has_content(match['rest']) for match in verdict.finditer(with_fences))
+
+
+def baseline_problems(body, baselines):
+    rendered = visible_markdown(body)
+    with_fences = visible_markdown(body, blank_fences=False)
+    return [path for path in baselines if not baseline_shown(rendered, with_fences, path)]
+
+
+def split_option(args, name):
+    if name not in args:
+        return args, None
+    at = args.index(name)
+    return args[:at] + args[at + 2:], args[at + 1]
 
 
 def split_schema_glance(argv):
@@ -307,7 +455,9 @@ def split_schema_glance(argv):
 
 
 def main():
-    args, schema_glance = split_schema_glance(sys.argv[1:])
+    args, changed_file = split_option(sys.argv[1:], '--changed-files')
+    args, schema_glance = split_schema_glance(args)
+    args, baseline_file = split_option(args, '--changed-baselines')
     if args:
         with open(args[0], encoding='utf-8') as f:
             body = f.read()
@@ -324,7 +474,39 @@ def main():
             print("pr-evidence: schema-changes: matches the schema-glance output")
         else:
             failures.append('schema-changes')
-            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
+            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes', or run: node scripts/pr-schema-sync.mjs <pr-number> and apply the printed file with gh pr edit --body-file")
+
+    if baseline_file is not None:
+        with open(baseline_file, encoding='utf-8') as f:
+            baselines = [line.strip() for line in f if line.strip()]
+        missing = baseline_problems(body, baselines)
+        for path in missing:
+            failures.append('baseline-evidence')
+            print(f"FAIL baseline-evidence: {path}")
+        if missing:
+            print("pr-evidence: show each changed snapshot baseline as an old baseline | new render image pair, or a '<file>: <verdict>' line; see .claude/skills/pr-cairn/SKILL.md, 'Snapshot baselines'")
+        else:
+            print(f"pr-evidence: baseline-evidence: {len(baselines)} changed baseline(s) shown")
+
+    if changed_file is not None:
+        with open(changed_file, encoding='utf-8') as f:
+            changed = [line.strip() for line in f if line.strip()]
+        if any(ROUTES_FILE.match(path) for path in changed):
+            problems = card_problems(body)
+            for problem in problems:
+                failures.append('api-card')
+                print(f"FAIL api-card: {problem}")
+            if problems:
+                print("pr-evidence: a PR that changes apps/server/src/routes*.ts carries the evidence card; see .claude/skills/pr-cairn/SKILL.md, 'Evidence card'")
+            else:
+                print("pr-evidence: api-card: complete")
+        if any(not DOCS_FILE.search(path) for path in changed):
+            problems = coverage_problems(body)
+            for problem in problems:
+                failures.append('coverage-lines')
+                print(f"FAIL coverage-lines: {problem}")
+            if not problems:
+                print("pr-evidence: coverage-lines: Live / Mocked / Not covered present")
 
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')

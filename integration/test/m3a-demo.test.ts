@@ -1,19 +1,17 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { step as stepTable, tokenUsage } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
   type RealServer,
   seedWorld,
+  startLegacyBuild,
   waitFor,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
@@ -43,7 +41,7 @@ beforeAll(async () => {
     { content: '修改已完成并验证通过。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  const home = mkdtempSync(join(tmpdir(), 'cairn-it-home-'));
+  const home = makeTestTempDir('cairn-it-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'it-mbp' },
     {},
@@ -80,13 +78,7 @@ describe('M3a demo: server dispatches step → daemon executes for real → tran
       spec: '在 README 写一行探针。',
     });
     todoId = world.todoId;
-    const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
-      todoIds: [todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    });
-    expect(started.status).toBe(201);
-    buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
+    buildId = startLegacyBuild(server, todoId, { withPlan: true });
 
     const t0 = Date.now();
     await waitFor(() => server.todoPhase(todoId) === 'confirm', 120_000);
@@ -131,7 +123,6 @@ describe('M3a demo: server dispatches step → daemon executes for real → tran
 
     const first = stub.requests[0]!;
     const flat = JSON.stringify(first.messages);
-    expect(flat).toContain('集成测试执行 Agent');
     expect(flat).toContain('探针任务');
     expect(flat).toContain('在 README 写一行探针。');
   }, 150_000);

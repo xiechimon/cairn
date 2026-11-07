@@ -144,11 +144,17 @@ export function isProviderOutage(rawError: string): boolean {
   return PROVIDER_5XX_PATTERNS.some((re) => re.test(lower));
 }
 
+export const CLAUDE_CODE_AUTH_FAILURE_MARKER = '[claude-code-auth-failure]';
+
 export function isProviderAuthFailure(rawError: string): boolean {
   const lower = rawError.trim().toLowerCase();
   if (lower === '') return false;
   if (
     containsAny(lower, [
+      CLAUDE_CODE_AUTH_FAILURE_MARKER,
+      'failed to authenticate',
+      'oauth token revoked',
+      'authentication_failed',
       'authentication_error',
       'invalid api key',
       'invalid_api_key',

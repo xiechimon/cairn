@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
   claimedStepSchema,
@@ -13,8 +12,8 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent as agentTable,
   build as buildTable,
   message as messageTable,
   plan as planTable,
@@ -26,17 +25,17 @@ import {
 import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
-  req,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
   withVerification,
 } from './helpers.js';
 
-const AGENT_ID = 'agent-review-1';
-const REVIEW_AGENT_ID = 'agent-reviewer-1';
-const CROSS_VENDOR_AGENT_ID = 'agent-rival-1';
+const SESSION_ROUTE_ID = 'route-session-1';
+const REVIEW_ROUTE_ID = 'route-reviewer-1';
 const PLAN_FILE_NAME = 'plan.md';
 
 const GIT_ENV = {
@@ -76,12 +75,12 @@ interface World {
   projectId: string;
   seedConvChanges(buildId: string, files: Record<string, string>): Promise<void>;
   machineToken: string;
-  startBuild(withPlan?: boolean): Promise<string>;
+  startBuild(withPlan?: boolean): string;
   claim(): Promise<{ stepId: string; kind: string }>;
   done(stepId: string, body: Record<string, unknown>): Promise<void>;
   uploadPlan(stepId: string, content: string): Promise<void>;
   confirm(buildId: string): Promise<void>;
-  startReview(buildId: string, body?: { agentId: string; focus?: string }): Promise<Response>;
+  startReview(buildId: string, body?: { focus?: string }): Promise<Response>;
   todoRow(): ReturnType<typeof loadTodoRow>;
   buildRow(buildId: string): ReturnType<typeof loadBuildRow>;
   stepsOf(buildId: string): ReturnType<typeof loadStepsOf>;
@@ -126,33 +125,17 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
-
-  s.db
-    .insert(agentTable)
-    .values({
-      id: REVIEW_AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-reviewer',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
+  seedSessionRoute(s, { id: SESSION_ROUTE_ID, provider: 'stub-gw', modelId: 'stub-model' });
+  seedRoute(s, 'review', {
+    id: REVIEW_ROUTE_ID,
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+  });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'review-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string; machineId: string };
   const projectId = await postProject(
@@ -165,16 +148,8 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
   });
   const { id: todoId } = (await todoRes.json()) as { id: string };
 
-  async function startBuild(withPlan = true): Promise<string> {
-    const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        withPlan,
-      },
-    });
-    expect(res.status).toBe(201);
-    return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
+  function startBuild(withPlan = true): string {
+    return startLegacyBuild(s, todoId, { withPlan });
   }
   async function claim() {
     const res = await call(s.app, 'POST', '/api/machine/tasks/claim', {
@@ -213,10 +188,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     });
     expect(res.status).toBe(202);
   }
-  async function startReview(
-    buildId: string,
-    body: { agentId: string; focus?: string } = { agentId: REVIEW_AGENT_ID },
-  ): Promise<Response> {
+  async function startReview(buildId: string, body: { focus?: string } = {}): Promise<Response> {
     return call(s.app, 'POST', `/api/builds/${buildId}/steps`, {
       body: { action: 'review', ...body },
     });
@@ -226,7 +198,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     const projRow = s.db.select().from(projectTable).where(eq(projectTable.id, projectId)).get();
     expect(projRow?.repoName).toBeTruthy();
     const bareDir = join(s.reposDir, s.team.id, `${projRow?.repoName}.git`);
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-review-511-'));
+    const dir = makeTestTempDir('cairn-review-511-');
     dirs.push(dir);
     const repoDir = join(dir, 'repo');
     const git = async (args: string[]) => {
@@ -281,61 +253,6 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     expect(w.stepsOf(buildId).find((s) => s.kind === 'review')).toBeUndefined();
   });
 
-  test('failure mode 2: missing agentId -> 400 (zod body schema)', async () => {
-    const buildId = await w.startBuild(true);
-    const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
-    await w.done(planClaimed.stepId, { status: 'success' });
-    expect(w.todoRow().phase).toBe('confirm');
-    const res = await req(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review', focus: '看看安全' },
-    });
-    expect(res.status).toBe(400);
-  });
-
-  test('agent selection stays out of the server: an explicitly named same-vendor agentId is accepted as usual (no regression to 409)', async () => {
-    const buildId = await w.startBuild(true);
-    const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
-    await w.done(planClaimed.stepId, { status: 'success' });
-    expect(w.todoRow().phase).toBe('confirm');
-    expect(w.todoRow().assignment?.build?.agentId).toBe(AGENT_ID);
-
-    const sameVendor = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID, focus: '' });
-    expect(sameVendor.status).toBe(202);
-    const sameMeta = parseReviewPromptMeta(
-      w.stepsOf(buildId).find((s) => s.kind === 'review')?.prompt ?? null,
-    );
-    expect(sameMeta?.agentId).toBe(REVIEW_AGENT_ID);
-  });
-
-  test('agent selection stays out of the server: a cross-vendor agentId is accepted as usual too (no vendor criterion)', async () => {
-    const buildId = await w.startBuild(true);
-    const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
-    await w.done(planClaimed.stepId, { status: 'success' });
-    expect(w.todoRow().phase).toBe('confirm');
-
-    w.s.db
-      .insert(agentTable)
-      .values({
-        id: CROSS_VENDOR_AGENT_ID,
-        teamId: w.s.team.id,
-        displayName: 'stub-rival',
-        provider: 'rival-gw',
-        modelId: 'rival-model',
-      })
-      .run();
-    bindAllAgents(w.s);
-
-    const res = await w.startReview(buildId, { agentId: CROSS_VENDOR_AGENT_ID, focus: '' });
-    expect(res.status).toBe(202);
-    const meta = parseReviewPromptMeta(
-      w.stepsOf(buildId).find((s) => s.kind === 'review')?.prompt ?? null,
-    );
-    expect(meta?.agentId).toBe(CROSS_VENDOR_AGENT_ID);
-  });
-
   test('happy path: initiating review from confirm -> the review step queued + REVIEW_ANNOUNCEMENT + the phase stays confirm', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
@@ -344,7 +261,6 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     expect(w.todoRow().phase).toBe('confirm');
 
     const res = await w.startReview(buildId, {
-      agentId: REVIEW_AGENT_ID,
       focus: '关注边界情况',
     });
     expect(res.status).toBe(202);
@@ -356,7 +272,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     const meta = parseReviewPromptMeta(reviewStep?.prompt ?? null);
     expect(meta).not.toBeNull();
     expect(meta?.kind).toBe('review');
-    expect(meta?.agentId).toBe(REVIEW_AGENT_ID);
+    expect(meta?.agentId).toBe(REVIEW_ROUTE_ID);
     expect(reviewStep?.prompt ?? '').toContain('关注边界情况');
 
     const messages = w.messagesOf(buildId);
@@ -369,14 +285,14 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     expect(w.todoRow().hasChanges).toBe(false);
   });
 
-  test('happy path: claiming the review step -> the claim payload agent = the reviewer chosen in the dialog (not through the assignment slot)', async () => {
+  test('happy path: claiming the review step -> the claim payload agent = the review routing rule (not the session rule)', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
 
-    const startRes = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    const startRes = await w.startReview(buildId);
     expect(startRes.status).toBe(202);
 
     const claimRes = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
@@ -386,8 +302,8 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     const claimBody = (await claimRes.json()) as { step: unknown };
     const parsed = claimedStepSchema.parse(claimBody.step);
     expect(parsed.step.kind).toBe('review');
-    expect(parsed.agent?.id).toBe(REVIEW_AGENT_ID);
-    expect(parsed.agent?.id).not.toBe(AGENT_ID);
+    expect(parsed.agent?.id).toBe(REVIEW_ROUTE_ID);
+    expect(parsed.agent?.id).not.toBe(SESSION_ROUTE_ID);
   });
 
   test('happy path: empty focus allowed (the optional textarea may be empty)', async () => {
@@ -396,7 +312,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
-    const res = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID, focus: '' });
+    const res = await w.startReview(buildId, { focus: '' });
     expect(res.status).toBe(202);
     expect(w.stepsOf(buildId).find((s) => s.kind === 'review')).toBeDefined();
   });
@@ -412,7 +328,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     expect(buildClaimed.kind).toBe('build');
     await w.done(buildClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('review');
-    const res = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    const res = await w.startReview(buildId);
     expect(res.status).toBe(202);
     expect(w.stepsOf(buildId).filter((s) => s.kind === 'review')).toHaveLength(1);
   });
@@ -423,7 +339,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
-    await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    await w.startReview(buildId);
     expect(w.todoRow().phase).toBe('confirm');
 
     const reviewClaimed = await w.claim();
@@ -468,7 +384,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
-    await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    await w.startReview(buildId);
     expect(w.todoRow().phase).toBe('confirm');
 
     const reviewClaimed = await w.claim();
@@ -543,7 +459,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     const planClaimed = await w.claim();
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
-    await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    await w.startReview(buildId);
 
     const reviewClaimed = await w.claim();
     await w.done(reviewClaimed.stepId, { status: 'success' });
@@ -577,7 +493,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     const planClaimed = await w.claim();
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
-    await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    await w.startReview(buildId);
 
     const reviewClaimed = await w.claim();
     await w.done(reviewClaimed.stepId, {
@@ -649,7 +565,7 @@ describe('review step material forks by gate (#511)', () => {
     await w.done(planClaimed.stepId, { status: 'success', sessionId: 'sess-plan' });
     expect(w.todoRow().phase).toBe('confirm');
 
-    const res = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    const res = await w.startReview(buildId);
     expect(res.status).toBe(202);
     const prompt = reviewPromptOf(w, buildId);
     expect(prompt).toContain(PLAN_V1);
@@ -661,7 +577,7 @@ describe('review step material forks by gate (#511)', () => {
     const buildId = await advanceToReviewGate(w);
     await w.seedConvChanges(buildId, { [CONV_CHANGE_FILE]: CONV_CHANGE_BODY });
 
-    const res = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    const res = await w.startReview(buildId);
     expect(res.status).toBe(202);
     const prompt = reviewPromptOf(w, buildId);
     expect(prompt).toContain(PLAN_V1);
@@ -672,7 +588,7 @@ describe('review step material forks by gate (#511)', () => {
 
   test('failure mode 3: an empty change surface at the review gate -> initiation still works, the material honestly says no changes', async () => {
     const buildId = await advanceToReviewGate(w);
-    const res = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    const res = await w.startReview(buildId);
     expect(res.status).toBe(202);
     const prompt = reviewPromptOf(w, buildId);
     expect(prompt).toContain(PLAN_V1);
@@ -693,7 +609,7 @@ describe('review step material forks by gate (#511)', () => {
     const { files } = (await changesRes.json()) as { files: { path: string }[] };
     expect(files.length).toBeGreaterThan(0);
 
-    await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    await w.startReview(buildId);
     const prompt = reviewPromptOf(w, buildId);
     for (const file of files) expect(prompt).toContain(file.path);
     expect(prompt).toContain(`本轮共 ${files.length} 个文件改动`);
@@ -701,7 +617,7 @@ describe('review step material forks by gate (#511)', () => {
 
   test('failure mode 6: the review step claim payload session = new (the prompt goes to a new session, not continuing the main conv)', async () => {
     const buildId = await advanceToReviewGate(w);
-    await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
+    await w.startReview(buildId);
     const claimRes = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
       cred: w.machineToken,
       body: {},

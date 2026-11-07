@@ -1,6 +1,4 @@
 import {
-  type AgentRecord,
-  type AgentTask,
   type AgentTodoItem,
   type ChiefDigestItem,
   type ChiefReportContent,
@@ -243,7 +241,6 @@ export interface FixtureSet {
   project?: ProjectContent;
   projectTab?: 'tasks' | 'files';
   team?: TeamContent;
-  agents?: AgentRecord[];
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;
   projectNames?: Record<string, string>;
@@ -251,7 +248,6 @@ export interface FixtureSet {
   chief?: ChiefContent;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
-  agentTasks?: AgentTask[];
 }
 
 export interface GithubFixture {
@@ -278,6 +274,7 @@ export interface MachineRow {
   kind?: 'local' | 'remote';
   name: string;
   online?: boolean;
+  lastSeenAt?: number | null;
   pill?: string;
   enabledRuntimes?: string[];
   chiefHost?: boolean;
@@ -595,6 +592,7 @@ export type ChiefStreamItem =
       tools?: ChiefToolRow[];
       labelVars?: Record<string, string | number>;
       signalAt?: number;
+      waiting?: boolean;
     };
 
 export interface ChiefToolRow {

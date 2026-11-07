@@ -45,7 +45,7 @@ export const TASK = {
   title: '修复看板拖拽后计数不刷新',
   spec: '',
   phase: 'building',
-  phaseAt: 0,
+  phaseAt: Date.now() - 12 * 60_000,
   seqNum: 9,
   orderIndex: 0,
   tagIds: [],
@@ -68,6 +68,9 @@ export const PROJECT = {
   githubRepo: null,
   localPath: null,
 };
+
+export const READY_MACHINE = { id: 'm-ready', name: 'omarchy', online: true };
+export const READY_PROVIDER = { id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' };
 
 export const toolRow = (id: string, name: string, args: unknown, at: number) => ({
   id,
@@ -190,10 +193,10 @@ export async function mockLive(
       return json({ thread: THREAD }, 201);
     }
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
-    if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json(state.todos ?? [TASK]);
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
-    if (p === '/api/teams/t1/machines') return json(state.machines ?? []);
+    if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);
+    if (p === '/api/teams/t1/providers') return json({ presets: [], providers: [READY_PROVIDER] });
     if (p === '/api/server/backup') return json(state.backup ?? { state: 'none' });
     if (p === '/api/flags') return json({ flags: [] });
     if (p === '/api/teams/t1/members' || p === '/api/skills') return json([]);

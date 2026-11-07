@@ -1,20 +1,15 @@
 import {
-  type Assignment,
-  CHIEF_DIGEST_THREAD_ID_PREFIX,
   type ClaudeCodeReport,
   capabilityMissingLabels,
   isBackendRuntimeId,
-  isPlanFirstRoundWithLessons,
   type MachineCapabilities,
   type MachineHardware,
-  parseReviewPromptMeta,
   type RequiredCapabilities,
   type StepKind,
 } from '@cairn/shared';
-import { and, eq, like, ne, not } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
-import { applyRoute, policyForStep, routeForStep, ruleAgent } from './routing-rules.js';
+import { build, step, todo } from '../db/schema.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -80,79 +75,9 @@ export function declaredMcpGaps(
     .filter((slug) => !installed.includes(slug));
 }
 
-export function agentIdForStep(
-  todoRow: typeof todo.$inferSelect,
-  kind: StepKind,
-  prompt: string | null = null,
-): string | null {
-  if (kind === 'review') {
-    return parseReviewPromptMeta(prompt)?.agentId ?? null;
-  }
-  if (kind === 'verify') {
-    return todoRow.assignment?.verify?.agentId ?? null;
-  }
-  return planSlotFor(todoRow, kind, prompt)?.agentId ?? null;
-}
-
-export function agentForStep(
-  db: Db,
-  todoRow: typeof todo.$inferSelect,
-  kind: StepKind,
-  prompt: string | null = null,
-): typeof agent.$inferSelect | null {
-  const agentId = agentIdForStep(todoRow, kind, prompt);
-  const route = routeForStep(db, todoRow, kind);
-  const agentRow =
-    agentId === null ? undefined : db.select().from(agent).where(eq(agent.id, agentId)).get();
-  const policy = policyForStep(db, todoRow, kind);
-  const base = agentRow ?? (route === null ? null : ruleAgent(route, policy));
-  if (base === null) return null;
-  return applyRoute(base, route, todoRow.routeOverride, policy);
-}
-
-function planSlotFor(
-  todoRow: typeof todo.$inferSelect,
-  kind: StepKind,
-  prompt: string | null,
-): Assignment['plan'] | Assignment['build'] {
-  if (kind !== 'plan') return todoRow.assignment?.build ?? null;
-  if (todoRow.assignment?.plan != null) return todoRow.assignment.plan;
-  return isReworkPlanPrompt(prompt) ? (todoRow.assignment?.build ?? null) : null;
-}
-
-function isReworkPlanPrompt(prompt: string | null): boolean {
-  return prompt !== null && !isPlanFirstRoundWithLessons(prompt);
-}
-
-export function unassignedStepReason(
-  todoRow: typeof todo.$inferSelect,
-  kind: StepKind,
-  prompt: string | null,
-): string {
-  if (kind === 'review') {
-    return 'review 步无 Agent：审核 prompt meta 未携带 agentId，无人可领。';
-  }
-  if (kind === 'verify') {
-    const slot = todoRow.assignment?.verify;
-    if (slot?.agentId == null) {
-      return 'verify 步无指派 Agent：assignment 的 verify 槽为空，无人可领。指派 Verifier（assignment.verify 槽）后重新运行任务。';
-    }
-    return `verify 步指派的 Agent 不存在（agentId ${slot.agentId} 已删除或不在本团队），无人可领。改派 Verifier 后重新运行任务。`;
-  }
-  if (kind !== 'plan') {
-    const slot = todoRow.assignment?.build;
-    if (slot?.agentId == null) {
-      return `build 步无指派 Agent：assignment 的 build 槽为空，无人可领。指派 Agent 后重新运行任务。`;
-    }
-    return `build 步指派的 Agent 不存在（agentId ${slot.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
-  }
-  if (todoRow.assignment?.plan?.agentId != null) {
-    return `plan 步指派的 Agent 不存在（agentId ${todoRow.assignment.plan.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
-  }
-  if (isReworkPlanPrompt(prompt)) {
-    return `plan 步无指派 Agent：assignment 的 plan 槽与 build 槽均为空（返工步已尝试回落 build 槽），无人可领。指派 Agent 后重新运行任务。`;
-  }
-  return `plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。指派 Agent 后重新运行任务。`;
+export function unassignedStepReason(kind: StepKind): string {
+  const use = kind === 'review' ? 'review' : 'session';
+  return `${kind} step has no ${use} routing rule: add a \`${use}\` routing rule in routing settings, then rerun the task.`;
 }
 
 export function machineRunningCount(db: Db, machineId: string): number {
@@ -171,34 +96,6 @@ export function projectRunningCount(db: Pick<Db, 'select'>, projectId: string): 
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief'), eq(todo.projectId, projectId)))
     .all().length;
-}
-
-export function agentRunningCount(db: Db, agentId: string): number {
-  const rows = db
-    .select({ kind: step.kind, prompt: step.prompt, todoRow: todo })
-    .from(step)
-    .innerJoin(build, eq(step.buildId, build.id))
-    .innerJoin(todo, eq(build.todoId, todo.id))
-    .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief')))
-    .all();
-  const workerCount = rows.filter(
-    (r) => agentIdForStep(r.todoRow, r.kind, r.prompt) === agentId,
-  ).length;
-  const chiefCount = db
-    .select({ id: step.id })
-    .from(step)
-    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-    .where(
-      and(
-        eq(step.status, 'claimed'),
-        eq(step.kind, 'chief'),
-        eq(chief.agentId, agentId),
-        not(like(step.buildId, `${CHIEF_DIGEST_THREAD_ID_PREFIX}%`)),
-      ),
-    )
-    .all().length;
-  return workerCount + chiefCount;
 }
 
 export function homeMachineRejectReason(
@@ -227,7 +124,7 @@ export function homeMachineRejectReason(
       return `机器 ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
     }
     if (!report.installed || !report.models.some((m) => m.id === agentRow.modelId)) {
-      return `机器 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。`;
+      return `机器 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该机 ~/.claude/settings.json 配上，或在路由规则里换模型）。`;
     }
   }
   return null;

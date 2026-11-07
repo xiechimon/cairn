@@ -1,13 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -16,14 +7,15 @@ import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import { agent as agentTable, message as messageTable } from '../../apps/server/src/db/schema.js';
+import { message as messageTable } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
   type RealServer,
   seedWorld,
+  updateSessionPolicy,
   waitFor,
 } from './helpers.js';
 import { type StubLlm, type StubResponse, startStubLlm } from './stub-llm.js';
@@ -93,7 +85,6 @@ beforeAll(async () => {
   server = await bootRealServer({
     providerBaseUrl: stub.url,
     claimHoldMs: 1_000,
-    agentDescription: '你是集成测试 Agent：按指令使用工具，然后简短汇报。',
   });
   writeSkill(
     join(server.skillsDir, 'alpha-skill'),
@@ -113,13 +104,9 @@ beforeAll(async () => {
     '团队分发技能丙（目录末位——截顶先吃掉的就是尾部）。',
     'gamma body.',
   );
-  server.db
-    .update(agentTable)
-    .set({ skillsAllowlist: ALLOWLIST })
-    .where(eq(agentTable.id, AGENT_ID))
-    .run();
+  updateSessionPolicy(server, { skillsAllowlist: ALLOWLIST });
 
-  localSkillsDir = mkdtempSync(join(tmpdir(), 'cairn-it-routing-local-'));
+  localSkillsDir = makeTestTempDir('cairn-it-routing-local-');
   localOneFile = writeSkill(
     join(localSkillsDir, 'local-one'),
     'local-one',
@@ -134,7 +121,7 @@ beforeAll(async () => {
   );
   stubRounds[0] = { toolCall: { name: 'read', arguments: { path: localBlockedFile } } };
 
-  home = mkdtempSync(join(tmpdir(), 'cairn-it-routing-home-'));
+  home = makeTestTempDir('cairn-it-routing-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
@@ -190,8 +177,6 @@ describe('spec 14 skill routing behavior acceptance E2E (#919)', () => {
     );
     const started = await api(server.url, 'POST', `/api/projects/${world1.projectId}/builds`, {
       todoIds: [world1.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     build1Id = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -253,11 +238,7 @@ describe('spec 14 skill routing behavior acceptance E2E (#919)', () => {
 
   test('empty allowlist: empty manifest spoken aloud (F6), session unaffected (F7)', async () => {
     await waitFor(() => stub.requests.length === 5, 30_000);
-    server.db
-      .update(agentTable)
-      .set({ skillsAllowlist: [] })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    updateSessionPolicy(server, { skillsAllowlist: [] });
     stubRounds.push(
       {
         toolCall: {
@@ -275,8 +256,6 @@ describe('spec 14 skill routing behavior acceptance E2E (#919)', () => {
     );
     const started = await api(server.url, 'POST', `/api/projects/${world2.projectId}/builds`, {
       todoIds: [world2.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     const build2Id = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -295,7 +274,6 @@ describe('spec 14 skill routing behavior acceptance E2E (#919)', () => {
     const req2 = stub.requests[5]!;
     const flat2 = JSON.stringify(req2.messages);
     expect(flat2).not.toContain('<available_skills>');
-    expect(flat2).toContain('你是集成测试 Agent');
     const msgs2 = server.db
       .select()
       .from(messageTable)

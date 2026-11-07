@@ -31,8 +31,7 @@ for (const [name, url] of [
 for (const [name, url, rows] of [
   ['skills', '/app/resources/skills?scenario=06', 1],
   ['mcp', '/app/resources/mcp-servers?scenario=07', 1],
-  ['secrets', '/app/resources/secrets?scenario=agent-detail-secrets', 2],
-  ['machines', '/app/resources/machines?scenario=06', 2],
+  ['secrets', '/app/resources/secrets?scenario=secrets-list', 2],
 ] as const) {
   test(`${name} list: one settings card of 52px rows, 14px corner`, async ({ page }) => {
     await light(page, url);
@@ -46,25 +45,14 @@ for (const [name, url, rows] of [
   });
 }
 
-test('machines: `添加机器` sits in the top bar, no dashed full-width bar', async ({ page }) => {
-  await light(page, '/app/resources/machines?scenario=06');
-  const add = page.getByTestId('page-topbar').getByRole('button', { name: '添加机器' });
+test('machines: `添加机器` is the plus beside the list heading, no dashed full-width bar', async ({ page }) => {
+  await light(page, '/app/resources/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_');
+  const add = page.getByTestId('settings-content').getByRole('button', { name: '添加机器' });
   await expect(add).toBeVisible();
-  await expect(page.locator('[data-testid="page-col"] button.border-dashed')).toHaveCount(0);
-  const local = page.locator('div[data-kind="local"]');
-  await expect(local).toContainText('在线');
-  await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(95, 143, 79)');
-});
-
-test('providers scope tabs: canvas track, chosen tab white with a 1px ring', async ({ page }) => {
-  await light(page, '/app/resources/providers?scenario=06');
-  const list = page.getByRole('tablist', { name: '范围' });
-  await expect(list).toHaveCSS('background-color', 'rgb(230, 231, 225)');
-  const chosen = list.getByRole('tab', { selected: true });
-  await expect(chosen).toHaveCSS('background-color', 'rgb(253, 253, 251)');
-  const ring = await chosen.evaluate((el) => getComputedStyle(el).boxShadow);
-  expect(ring).toContain('0px 0px 0px 1px');
-  await expect(chosen).toHaveCSS('height', '28px');
+  await expect(page.locator('button.border-dashed')).toHaveCount(0);
+  const local = page.getByTestId('machine-item').first();
+  await expect(local.getByTestId('machine-item-status')).toHaveText('在线');
+  await expect(local.getByTestId('machine-accept-toggle')).toBeVisible();
 });
 
 for (const [name, url, open, submit] of [
@@ -74,7 +62,7 @@ for (const [name, url, open, submit] of [
 ] as const) {
   test(`${name} dialog: FormActions footer, primary is not a full-width bar`, async ({ page }) => {
     await light(page, url);
-    await page.getByTestId('page-topbar').getByRole('button', { name: open, exact: true }).click();
+    await page.getByTestId('page-toolbar').getByRole('button', { name: open, exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     const foot = dialog.getByTestId('dialog-foot');

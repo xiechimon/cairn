@@ -1,0 +1,18 @@
+#!/bin/bash
+set -u
+[ $# -gt 0 ] || { echo "usage: cairn-heavy <command...>" >&2; exit 2; }
+export CAIRN_TEST_TEMP_ROOT="${CAIRN_TEST_TEMP_ROOT-$HOME/.cache/cairn-test-tmp}"
+mkdir -p -- "$CAIRN_TEST_TEMP_ROOT" || exit 1
+slots=(/tmp/cairn-heavy-check.lock /tmp/cairn-heavy-check-2.lock /tmp/cairn-heavy-check-3.lock /tmp/cairn-heavy-check-4.lock /tmp/cairn-heavy-check-5.lock /tmp/cairn-heavy-check-6.lock)
+mem_kib=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+usable=$(( mem_kib / 3145728 ))
+(( usable < 1 )) && usable=1
+(( usable > 6 )) && usable=6
+for (( n = 0; n < usable; n++ )); do
+  exec {fd}>"${slots[$n]}"
+  if flock -n "$fd"; then "$@"; rc=$?; exit $rc; fi
+  exec {fd}>&-
+done
+i=$(( RANDOM % usable )); exec {fd}>"${slots[$i]}"
+flock -w 3600 "$fd" || { echo "cairn-heavy: timed out waiting for a slot" >&2; exit 75; }
+"$@"

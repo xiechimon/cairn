@@ -1,17 +1,21 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   project as projectTable,
+  routingRule as routingRuleTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { BUILD_ABANDONED_STEP_MS, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import {
+  ABANDONED_CLAIM_QUARANTINE_LIMIT,
+  BUILD_ABANDONED_STEP_MS,
+  sweepAbandonedBuildSteps,
+} from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedRoute, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -25,7 +29,7 @@ interface BuildWorld {
   buildId: string;
   stepId: string;
   machineId: string;
-  agentId: string | null;
+  routeId: string | null;
   base: number;
 }
 
@@ -35,8 +39,8 @@ function makeWorld(step: {
   createdAgo: number;
   heartbeatAgo?: number | null;
   machineOnline?: boolean;
-  withAgent?: boolean;
-  agentProvider?: string;
+  withRoute?: boolean;
+  routeProvider?: string;
   machineRuntimes?: string[];
   pin?: 'self' | 'ghost' | (string & {});
 }): BuildWorld {
@@ -48,8 +52,7 @@ function makeWorld(step: {
   const buildId = `build-${Math.random().toString(36).slice(2)}`;
   const stepId = `step-${Math.random().toString(36).slice(2)}`;
   const machineId = `machine-${Math.random().toString(36).slice(2)}`;
-  const withAgent = step.withAgent === true || step.pin !== undefined;
-  const agentId = withAgent ? `agent-${Math.random().toString(36).slice(2)}` : null;
+  const withRoute = step.withRoute === true || step.pin !== undefined;
   s.db.insert(projectTable).values({ id: 'proj-sweep', name: 'sweep', teamId }).run();
   s.db
     .insert(machineTable)
@@ -60,18 +63,14 @@ function makeWorld(step: {
       online: step.machineOnline ?? false,
       ...(step.machineRuntimes !== undefined
         ? { enabledRuntimes: step.machineRuntimes }
-        : step.withAgent
+        : step.withRoute
           ? { enabledRuntimes: ['pi'] }
           : {}),
     })
     .run();
-  if (agentId !== null) {
-    s.db
-      .insert(agentTable)
-      .values({
-        id: agentId,
-        teamId,
-        displayName: 'sweep-agent',
+  const routeId = withRoute
+    ? seedSessionRoute(s, {
+        provider: step.routeProvider ?? 'pi',
         modelId: 'stub-model',
         machineId:
           step.pin === undefined || step.pin === 'self'
@@ -79,10 +78,8 @@ function makeWorld(step: {
             : step.pin === 'ghost'
               ? 'machine-gone'
               : step.pin,
-        ...(step.agentProvider !== undefined ? { provider: step.agentProvider } : {}),
       })
-      .run();
-  }
+    : null;
   s.db
     .insert(todoTable)
     .values({
@@ -93,7 +90,6 @@ function makeWorld(step: {
       phase: 'building',
       phaseAt: base - step.createdAgo,
       seqNum: 1,
-      ...(agentId !== null ? { assignment: { plan: null, build: { agentId } } } : {}),
     })
     .run();
   s.db
@@ -127,7 +123,7 @@ function makeWorld(step: {
       lastHeartbeatAt: step.status === 'claimed' ? heartbeat : null,
     })
     .run();
-  return { s, teamId, todoId, buildId, stepId, machineId, agentId, base };
+  return { s, teamId, todoId, buildId, stepId, machineId, routeId, base };
 }
 
 function stepRowOf(w: BuildWorld) {
@@ -138,9 +134,9 @@ function todoRowOf(w: BuildWorld) {
   return w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
 }
 
-function agentRowOf(w: BuildWorld) {
-  if (w.agentId === null) throw new Error('world has no agent');
-  return w.s.db.select().from(agentTable).where(eq(agentTable.id, w.agentId)).get()!;
+function routeRowOf(w: BuildWorld) {
+  if (w.routeId === null) throw new Error('world has no route');
+  return w.s.db.select().from(routingRuleTable).where(eq(routingRuleTable.id, w.routeId)).get()!;
 }
 function buildRowOf(w: BuildWorld) {
   return w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
@@ -214,12 +210,12 @@ describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildStep
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('after release the home machine can reclaim: another machine comes up empty (#1259 home-machine gate), the home machine claims the same step once online', async () => {
+  test('after release the preferred machine can reclaim: while it is online another machine comes up empty (#1259 overflow wait), the preferred machine claims the same step', async () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 300_000,
       heartbeatAgo: 300_000,
-      withAgent: true,
+      withRoute: true,
     });
     const meaId = `machine-mea-${Math.random().toString(36).slice(2)}`;
     w.s.db
@@ -230,9 +226,9 @@ describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildStep
     sweepAbandonedBuildSteps(w.s.svc, w.base);
     expect(stepRowOf(w).status).toBe('pending');
 
+    w.s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, w.machineId)).run();
     const other = await claimStep(machineDepsOf(w), meaId, w.teamId, 10, 'http://localhost');
     expect(other).toBeNull();
-    w.s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, w.machineId)).run();
     const claimed = await claimStep(
       machineDepsOf(w),
       w.machineId,
@@ -251,7 +247,7 @@ describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildStep
       status: 'claimed',
       createdAgo: 300_000,
       heartbeatAgo: 300_000,
-      withAgent: true,
+      withRoute: true,
     });
     w.s.db
       .insert(stepTable)
@@ -435,7 +431,7 @@ describe('#1257 unclaimed suspension when the home machine is offline (home-mach
     expect(stepRowOf(w).status).toBe('pending');
     expect(buildRowOf(w).errorMessage).toBeNull();
     expect(todoRowOf(w).phase).toBe('building');
-    expect(agentRowOf(w).machineId).toBe(w.machineId);
+    expect(routeRowOf(w).machineId).toBe(w.machineId);
     sweepAbandonedBuildSteps(w.s.svc, w.base + 60_000);
     expect(stepRowOf(w).status).toBe('pending');
     expect(otherId).not.toBe(w.machineId);
@@ -458,10 +454,14 @@ describe('#1257 unclaimed suspension when the home machine is offline (home-mach
     const w = makeWorld({
       status: 'pending',
       createdAgo: 600_000 + 1_000,
-      withAgent: true,
+      withRoute: true,
       machineOnline: true,
     });
-    w.s.db.update(agentTable).set({ machineId: null }).where(eq(agentTable.id, w.agentId!)).run();
+    w.s.db
+      .update(routingRuleTable)
+      .set({ machineId: null })
+      .where(eq(routingRuleTable.id, w.routeId!))
+      .run();
     addOnlineMachine(w);
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -475,10 +475,14 @@ describe('#1257 unclaimed suspension when the home machine is offline (home-mach
     const w = makeWorld({
       status: 'pending',
       createdAgo: 90_000,
-      withAgent: true,
+      withRoute: true,
       machineOnline: true,
     });
-    w.s.db.update(agentTable).set({ machineId: null }).where(eq(agentTable.id, w.agentId!)).run();
+    w.s.db
+      .update(routingRuleTable)
+      .set({ machineId: null })
+      .where(eq(routingRuleTable.id, w.routeId!))
+      .run();
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
@@ -504,14 +508,14 @@ describe('#1257 unclaimed suspension when the home machine is offline (home-mach
     const w = makeWorld({
       status: 'pending',
       createdAgo: 1_800_000,
-      withAgent: true,
+      withRoute: true,
       machineOnline: true,
     });
     const otherId = addOnlineMachine(w);
     w.s.db
-      .update(agentTable)
+      .update(routingRuleTable)
       .set({ machineId: otherId })
-      .where(eq(agentTable.id, w.agentId!))
+      .where(eq(routingRuleTable.id, w.routeId!))
       .run();
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -560,8 +564,8 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
       status: 'pending',
       createdAgo: 601_000,
       machineOnline: true,
-      withAgent: true,
-      agentProvider: 'claude-code',
+      withRoute: true,
+      routeProvider: 'claude-code',
       machineRuntimes: ['pi'],
       pin: 'self',
     });
@@ -577,7 +581,7 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
     expect(stepRowOf(w).status).toBe('pending');
     expect(buildRowOf(w).errorMessage).toBeNull();
     expect(todoRowOf(w).phase).toBe('building');
-    expect(agentRowOf(w).machineId).toBe(w.machineId);
+    expect(routeRowOf(w).machineId).toBe(w.machineId);
     sweepAbandonedBuildSteps(w.s.svc, w.base + 60_000);
     expect(stepRowOf(w).status).toBe('pending');
   });
@@ -587,8 +591,8 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
       status: 'pending',
       createdAgo: 90_000,
       machineOnline: true,
-      withAgent: true,
-      agentProvider: 'claude-code',
+      withRoute: true,
+      routeProvider: 'claude-code',
       machineRuntimes: ['pi'],
       pin: 'self',
     });
@@ -606,8 +610,8 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
       status: 'pending',
       createdAgo: 1_800_000,
       machineOnline: true,
-      withAgent: true,
-      agentProvider: 'claude-code',
+      withRoute: true,
+      routeProvider: 'claude-code',
       machineRuntimes: ['pi', 'claude-code'],
       pin: 'self',
     });
@@ -634,27 +638,18 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('review step judged the same (agentId from the prompt meta header line, provider recomputed from the same source): gate blocked also suspends', () => {
+  test('review step judged the same (provider read from the review routing rule): gate blocked also suspends', () => {
     const w = makeWorld({
       status: 'pending',
       kind: 'review',
       createdAgo: 601_000,
       machineOnline: true,
-      withAgent: true,
-      agentProvider: 'claude-code',
+      withRoute: true,
+      routeProvider: 'claude-code',
       machineRuntimes: ['pi'],
       pin: 'self',
     });
-    w.s.db
-      .update(stepTable)
-      .set({ prompt: `{"kind":"review","agentId":"${w.agentId}","gate":"review"}\n审核任务` })
-      .where(eq(stepTable.id, w.stepId))
-      .run();
-    w.s.db
-      .update(todoTable)
-      .set({ assignment: { plan: null, build: null } })
-      .where(eq(todoTable.id, w.todoId))
-      .run();
+    seedRoute(w.s, 'review', { provider: 'claude-code', machineId: w.machineId });
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
@@ -662,7 +657,7 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('steps with no Agent assigned do not enter this check (unassigned = another seam family nobody can claim, not a gate block)', () => {
+  test('steps with no session route do not enter this check (unrouted = another seam family nobody can claim, not a gate block)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 1_200_000,
@@ -769,5 +764,52 @@ describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind
 
     expect(stepRowOf(w).status).toBe('pending');
     expect(buildRowOf(w).errorMessage).toBeNull();
+  });
+});
+
+describe('#2582 crash-loop quarantine (releaseClaimedStep counts abandoned claims)', () => {
+  test('one abandoned claim releases back to pending and counts it', () => {
+    const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).claimCount).toBe(1);
+    expect(buildRowOf(w).errorMessage).toBeNull();
+    expect(todoRowOf(w).phase).toBe('building');
+  });
+
+  test('the Nth abandoned claim quarantines the step instead of releasing it', () => {
+    const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
+    w.s.db
+      .update(stepTable)
+      .set({ claimCount: ABANDONED_CLAIM_QUARANTINE_LIMIT - 1 })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('failed');
+    expect(buildRowOf(w).errorMessage).toMatch(
+      new RegExp(`crashed ${ABANDONED_CLAIM_QUARANTINE_LIMIT} times`),
+    );
+  });
+
+  test('a claim that made progress before the machine went offline does not count toward quarantine', () => {
+    const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 130_000 });
+    w.s.db
+      .update(stepTable)
+      .set({ claimCount: ABANDONED_CLAIM_QUARANTINE_LIMIT - 1 })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).claimCount).toBe(ABANDONED_CLAIM_QUARANTINE_LIMIT - 1);
+  });
+
+  test('quarantine limit is a small fixed number, not a sweeping timeout', () => {
+    expect(ABANDONED_CLAIM_QUARANTINE_LIMIT).toBe(3);
   });
 });

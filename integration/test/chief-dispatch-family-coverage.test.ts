@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 const SCRIPT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -22,7 +22,7 @@ function writeFlow(
   results: Record<string, unknown>[],
   errors: Record<string, unknown>[],
 ): string {
-  const home = mkdtempSync(join(tmpdir(), `cairn-coverage-${name}-`));
+  const home = makeTestTempDir(`cairn-coverage-${name}-`);
   homes.push(home);
   writeFileSync(
     join(home, 'cases.json'),

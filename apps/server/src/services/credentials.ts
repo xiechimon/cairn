@@ -7,14 +7,12 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, apiKey, build, chief, chiefThread, step, todo } from '../db/schema.js';
+import { apiKey, build, chief, chiefThread, step, todo } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
-import { routedChiefAgent } from './coordinator-route.js';
-import { agentForStep } from './dispatch-eligibility.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
-import { applyRoute, policyForStep, routeForStep, ruleAgent } from './routing-rules.js';
+import { coordinatorProfile, profileForStep } from './routing-rules.js';
 import { openSecretValues, type SecretDeps } from './secrets.js';
 
 export interface CredentialsDeps {
@@ -77,14 +75,7 @@ export function resolveStepCredentials(
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
 
-  const agentId = todoRow.assignment?.build?.agentId ?? todoRow.assignment?.plan?.agentId ?? null;
-  const assignedAgent = agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
-    : undefined;
-  const route = routeForStep(deps.db, todoRow, stepRow.kind);
-  const policy = policyForStep(deps.db, todoRow, stepRow.kind);
-  const base = assignedAgent ?? (route === null ? null : ruleAgent(route, policy));
-  const agentRow = base === null ? null : applyRoute(base, route, null, policy);
+  const agentRow = profileForStep(deps.db, todoRow, stepRow.kind, stepRow.id);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;
@@ -108,7 +99,7 @@ export function resolveStepCredentials(
   }
 
   const secrets =
-    todoRow.assignment?.source !== 'intake-label' && agentRow && stepTakesSecrets(stepRow.kind)
+    agentRow && stepTakesSecrets(stepRow.kind)
       ? openSecretValues(boxDeps, todoRow.teamId, agentRow.secrets, todoRow.projectId)
       : {};
 
@@ -119,8 +110,7 @@ export function resolveStepCredentials(
     claudeSubscriptionToken: openClaudeSubscription(
       deps,
       todoRow.teamId,
-      stepRow.fallback?.model?.provider ??
-        agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt)?.provider,
+      stepRow.fallback?.model?.provider ?? agentRow?.provider,
     ),
   };
 }
@@ -133,10 +123,9 @@ export function resolveChiefStepCredentials(
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
-  if (!chiefRow?.agentId) throw notFound(`chief agent binding for ${threadId}`);
-  const boundAgent = deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get();
-  if (!boundAgent) throw notFound(`agent ${chiefRow.agentId}`);
-  const agentRow = routedChiefAgent(deps.db, threadRow.teamId, boundAgent);
+  if (!chiefRow) throw notFound(`chief ${threadRow.chiefId}`);
+  const agentRow = coordinatorProfile(deps.db, threadRow.teamId);
+  if (!agentRow) throw notFound(`coordinator routing rule for ${threadId}`);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;

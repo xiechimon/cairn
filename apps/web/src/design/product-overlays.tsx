@@ -1,7 +1,6 @@
 import { Play } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
-import { AgentPickerPanel } from '../components/agent-picker.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { useI18n } from '../i18n/provider.js';
@@ -17,13 +16,7 @@ import { type SearchContext, SearchPanel, useSearchState } from '../overlay/sear
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
 import { StatusMenu } from '../overlay/status-menu.js';
-import {
-  BOARD_FIXTURE,
-  CARD_FACES,
-  GALLERY_AGENTS,
-  MENTION_GROUPS,
-  PROJECT_TITLE,
-} from './product-fixtures.js';
+import { BOARD_FIXTURE, CARD_FACES, MENTION_GROUPS, PROJECT_TITLE } from './product-fixtures.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const SLASH_SECTIONS: { title: string; rows: SlashRow[] }[] = [
@@ -88,6 +81,7 @@ function SearchSpecimen() {
   const [withContext, setWithContext] = useState(false);
   return (
     <Specimen
+      id="search"
       title="Search"
       note="SearchPanel: on a task page the task rides along as a chip and its commands come first"
       stage="canvas"
@@ -141,6 +135,7 @@ function PickersSpecimen() {
   const inlineId = useId();
   return (
     <Specimen
+      id="slash-menu-and-mentions"
       title="Slash menu and mentions"
       note={picked ?? 'SlashMenu and MentionInline as they float over the composer'}
       stage="canvas"
@@ -202,6 +197,7 @@ function AttachmentsSpecimen() {
   const onPreview = (name: string, src: string) => setPreview({ name, src });
   return (
     <Specimen
+      id="attachments-2"
       title="Attachments"
       note="AttachmentCard states; click a done card for AttachmentPreview"
       stage="canvas"
@@ -260,6 +256,7 @@ function MenusSpecimen() {
   const moreRef = useRef<HTMLButtonElement>(null);
   return (
     <Specimen
+      id="menus-and-popovers"
       title="Menus and popovers"
       note={last ?? 'MoreMenu, PaneTitle, PaneViewButtons, the status menu and the agent picker'}
       stage="canvas"
@@ -312,30 +309,6 @@ function MenusSpecimen() {
           />
         </div>
       </Cell>
-      <Cell label="Agent picker">
-        <div className={MENU_STAGE}>
-          <AgentPickerPanel
-            agents={GALLERY_AGENTS}
-            selectedId="builder"
-            onSelect={(id) => setLast(`Assign ${id}`)}
-            onDone={() => {}}
-            footnote="Switching agents restarts this step."
-            rebindCopy="更换执行 Agent？后续运行将改由 <agent> 执行。"
-          />
-        </div>
-      </Cell>
-      <Cell label="Agent picker, rebind confirmation">
-        <div className={MENU_STAGE}>
-          <AgentPickerPanel
-            agents={GALLERY_AGENTS}
-            selectedId="builder"
-            onSelect={(id) => setLast(`Assign ${id}`)}
-            onDone={() => {}}
-            rebindCopy="更换执行 Agent？后续运行将改由 <agent> 执行。"
-            startConfirming="reviewer"
-          />
-        </div>
-      </Cell>
     </Specimen>
   );
 }
@@ -356,6 +329,7 @@ function ConfirmsSpecimen() {
   ] as const;
   return (
     <Specimen
+      id="confirmations"
       title="Confirmations"
       note={last ?? 'Each button opens the real confirmation'}
       stage="canvas"

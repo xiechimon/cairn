@@ -1,7 +1,7 @@
 name: pr-evidence
 
-# The decision guard: a PR carrying the `needs-decision` label is red here
-# until a person removes the label, and while the label is on, a run also
+# The hold guard: a PR carrying the `coordinator-hold` label is red here
+# until the label is removed, and while the label is on, a run also
 # disarms GitHub auto-merge on the PR. An unchecked task only turns the
 # pr-tasks step red and never adds the label. This keeps a merge from landing
 # while a human decision is pending, which happened on 2026-10-21 (#1435: auto-merge was armed, the
@@ -107,21 +107,17 @@ jobs:
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
         id: pr
 
-      - name: Refuse while a person has a decision pending (needs-decision label)
+      - name: Refuse while a hold is on (coordinator-hold label)
         env:
           LABELS: ${{ steps.pr.outputs.labels }}
         run: |
           case ",$LABELS," in
-            *,needs-decision,*)
-              touch needs-decision.flag
-              echo "FAIL needs-decision: a person has to remove the needs-decision label before this PR can merge"
-              exit 1 ;;
             *,coordinator-hold,*)
-              touch needs-decision.flag
-              echo "FAIL coordinator-hold: the coordinator asked for changes; this PR merges only after the author pushes them and the label is removed"
+              touch hold.flag
+              echo "FAIL coordinator-hold: the coordinator asked for changes or a person's decision is pending; this PR merges only after the label is removed"
               exit 1 ;;
           esac
-          echo "pr-decision: GREEN (no needs-decision or coordinator-hold label)"
+          echo "pr-decision: GREEN (no coordinator-hold label)"
 
       - name: Check the autonomy brake
         if: ${{ !cancelled() }}
@@ -138,7 +134,7 @@ jobs:
       # !cancelled() so every gate's findings show in one run even when an
       # earlier step reds (#1240): a lane fixing a link problem should not
       # have to push again to discover a tasks problem.
-      - name: Check PR body evidence (sections + links embedded + reachable + schema table)
+      - name: Check PR body evidence (sections + links embedded + reachable + schema table + evidence card + coverage lines + baseline pairs)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: |
           BASE_SHA="$(jq -r '.base.sha' "$RUNNER_TEMP/pr.json")"
@@ -150,7 +146,13 @@ jobs:
             node "$RUNNER_TEMP/schema-glance.mjs" --base "$MERGE_BASE" --head "$HEAD_SHA" > "$RUNNER_TEMP/schema-glance.md"
             schema_args=(--schema-glance "$RUNNER_TEMP/schema-glance.md")
           fi
-          python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "${schema_args[@]}"
+          baseline_args=()
+          git diff --name-only --diff-filter=AMR "$MERGE_BASE" "$HEAD_SHA" -- '*-snapshots/*.png' > "$RUNNER_TEMP/changed-baselines.txt"
+          if [ -s "$RUNNER_TEMP/changed-baselines.txt" ]; then
+            baseline_args=(--changed-baselines "$RUNNER_TEMP/changed-baselines.txt")
+          fi
+          git diff --name-only "$MERGE_BASE" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" --changed-files "$RUNNER_TEMP/changed-files.txt" "${schema_args[@]}" "${baseline_args[@]}"
 
       - name: Check PR body tasks (no unchecked task anywhere)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
@@ -165,7 +167,7 @@ jobs:
         run: node scripts/english-only-gate.mjs --text "$RUNNER_TEMP/pr-body.md"
 
       # A pending decision must not be racing an armed auto-merge: whenever
-      # the needs-decision label is on, auto-merge is disarmed. An unchecked
+      # the coordinator-hold label is on, auto-merge is disarmed. An unchecked
       # task only turns the pr-tasks step red and never adds the
       # label, so checking the item turns the PR green with no manual label
       # removal. Disabling an unarmed auto-merge is a no-op and uses the
@@ -173,7 +175,7 @@ jobs:
       - name: Mark the decision pending and disarm auto-merge
         if: ${{ failure() }}
         run: |
-          if [ ! -f needs-decision.flag ] && [ ! -f autonomy-paused.flag ]; then
+          if [ ! -f hold.flag ] && [ ! -f autonomy-paused.flag ]; then
             echo "pr-decision: red without a pending decision; auto-merge left as it is"
             exit 0
           fi

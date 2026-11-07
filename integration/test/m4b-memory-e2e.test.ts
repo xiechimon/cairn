@@ -1,6 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -12,6 +10,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -62,7 +61,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求完成改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'cairn-m4b-mem-home-'));
+  home = makeTestTempDir('cairn-m4b-mem-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
@@ -112,8 +111,6 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     );
     const started = await api(server.url, 'POST', `/api/projects/${world1.projectId}/builds`, {
       todoIds: [world1.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     build1 = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -156,8 +153,6 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     world2 = { projectId: world1.projectId, todoId: (todo2Res.body as { id: string }).id };
     const started = await api(server.url, 'POST', `/api/projects/${world2.projectId}/builds`, {
       todoIds: [world2.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
 

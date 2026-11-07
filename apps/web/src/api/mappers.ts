@@ -11,7 +11,6 @@ import type {
   SecretRecord,
   SkillRecord,
   StepActivity,
-  TeamMember,
   TokenUsage,
   ToolCallRecord,
   UsageCost,
@@ -33,6 +32,7 @@ import {
   classifyStepFailure,
   classifyUserText,
   conversationBranch,
+  DONE_ROW,
   GATE_ANNOUNCEMENTS,
   infoReportMessageSchema,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -50,6 +50,7 @@ import {
   verifyVerdictSchema,
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
+import { STATUS_WORDS } from '../board/status-words.js';
 import type {
   BranchInfoContent,
   ChiefContent,
@@ -71,8 +72,6 @@ import type {
   ReviewFinding,
   RunHistoryRow,
   SkillRow,
-  TeamAgentCard,
-  TeamContent,
   TokenUsageContent,
   TranscriptItem,
   UsageCostContent,
@@ -162,7 +161,6 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
 }
 
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
-  const agentId = w.assignment?.build?.agentId ?? w.assignment?.plan?.agentId ?? null;
   return {
     id: w.id,
     teamId: w.teamId,
@@ -177,8 +175,8 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     seqNum: w.seqNum,
     orderIndex: w.orderIndex,
     tagIds: w.tagIds,
-    assignment: agentId !== null ? { agentId } : null,
-    agent: w.agent,
+    assignment: null,
+    agent: null,
     latestBuildId: w.latestBuildId,
     lastRunAt: w.lastRunAt,
     hasChanges: w.hasChanges,
@@ -721,6 +719,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (isJsonPlumbing(text)) continue;
+      if (text === DONE_ROW) {
+        entries.push({
+          at: m.createdAt,
+          item: {
+            kind: 'note',
+            text: todo.verified === true ? STATUS_WORDS.verified : STATUS_WORDS.doneUnverified,
+            id: m.id,
+          },
+        });
+        continue;
+      }
       if (text !== '') entries.push({ at: m.createdAt, item: { kind: 'note', text, id: m.id } });
       continue;
     }
@@ -909,7 +918,7 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
     case 'capacity':
       return '请求被限流，请稍后重试。';
     default:
-      return '运行失败，请查看原始错误排查原因后重试。';
+      return '';
   }
 }
 
@@ -1112,7 +1121,7 @@ export function mapRunHistory(
     const b = byId.get(entry.buildId);
     const isCurrent = todo.latestBuildId === entry.buildId;
     const failed = b?.errorMessage != null && b.errorMessage !== '';
-    const parts = [relativeTime(entry.createdAt, now)];
+    const parts = [relativeTime(entry.createdAt, now)].filter((part) => part !== '');
     const tokens = tokensByBuild?.get(entry.buildId);
     if (tokens !== undefined) parts.push(`${formatTokens(tokens)} tokens`);
     if (failed && b) parts.push(stripAnsiEscapes(b.errorMessage ?? ''));
@@ -1142,31 +1151,6 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
   }));
 }
 
-export function mapTeam(members: TeamMember[]): TeamContent {
-  const agents = members.filter((m) => m.memberType === 'agent');
-  const cards: TeamAgentCard[] = agents.map((m) => {
-    const a = m.actor as {
-      displayName?: string;
-      avatarUrl?: string | null;
-      modelId?: string | null;
-      description?: string | null;
-      provider?: string | null;
-      machineId?: string | null;
-    };
-    return {
-      id: m.actorId,
-      displayName: a.displayName ?? '',
-      avatarUrl: a.avatarUrl ?? null,
-      model: a.modelId ?? '',
-      isDefault: Boolean(a.modelId),
-      role: a.description ?? null,
-      provider: a.provider ?? null,
-      machineId: a.machineId ?? null,
-    };
-  });
-  return { members: members.length, agents: cards };
-}
-
 export function mapApiKeys(rows: ApiKeyRow[]): DisplayApiKey[] {
   return rows.map((r) => ({
     id: r.id,
@@ -1188,6 +1172,7 @@ export function mapMachines(
     kind: m.kind,
     name: m.name,
     online: m.online,
+    ...(m.lastSeenAt !== undefined ? { lastSeenAt: m.lastSeenAt } : {}),
     enabledRuntimes: m.enabledRuntimes,
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
@@ -1512,9 +1497,17 @@ function collectChiefStream(
               id: m.id,
               markdown: text,
               at: clockTime(m.createdAt),
+              createdAt: m.createdAt,
               ...rowProject(m),
             }
-          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt), ...rowProject(m) },
+          : {
+              kind: 'user',
+              text: head,
+              id: m.id,
+              at: clockTime(m.createdAt),
+              createdAt: m.createdAt,
+              ...rowProject(m),
+            },
       );
       continue;
     }
@@ -1524,6 +1517,7 @@ function collectChiefStream(
       markdown: rawText,
       seconds: '',
       id: m.id,
+      createdAt: m.createdAt,
       ...(pendingTools.length > 0
         ? { tools: pendingTools.map(({ running: _settled, ...tool }) => tool) }
         : {}),

@@ -1,4 +1,4 @@
-import type { MachineAskBody, MachineAskResponse, StepKind } from '@cairn/shared';
+import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
@@ -9,7 +9,7 @@ import {
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.js';
+import { build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { attachWorkerFile } from './agent-attachments.js';
 import { NotFoundError } from './builds.js';
@@ -23,15 +23,15 @@ import {
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
-import { agentForStep } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
 import {
+  coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
-  routeForStep,
-  routingRulesEnabled,
+  profileForStep,
+  type RouteProfile,
 } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
@@ -41,13 +41,13 @@ import { askWorkerQuestion, recordThreadReportLine } from './worker-questions.js
 
 export async function machineAsk(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   body: MachineAskBody,
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
-  if (row.kind === 'session' && routingRulesEnabled()) {
+  if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
   if (row.kind !== 'chief' || !isChiefConversation(row.buildId)) {
@@ -87,7 +87,7 @@ export async function machineAsk(
 
 export async function executeRelayToolCall(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   name: string,
   params: Record<string, unknown>,
@@ -127,7 +127,6 @@ export async function executeRelayToolCall(
       reposDir: deps.reposDir,
       attachmentsDir: deps.attachmentsDir,
       skillsDir: deps.skillsDir,
-      intakeAgentAllowlist: deps.intakeAgentAllowlist,
       ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
       ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
       ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
@@ -137,7 +136,7 @@ export async function executeRelayToolCall(
       userId: threadRow.userId,
       chiefId: chiefRow.id,
       threadId,
-      chiefAgentId: chiefRow.agentId,
+      chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
       conversationId: threadId,
       turnPrompt: row.prompt,
       turnScopeProjectId: stepScopeProjectId(row),
@@ -166,7 +165,7 @@ async function executeWorkerMemoryToolCall(
   if (isThreadScheduleTool(name)) {
     return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
   }
-  if (name === 'thread_report' && row.kind === 'session' && routingRulesEnabled()) {
+  if (name === 'thread_report' && row.kind === 'session') {
     if (row.status !== 'claimed') {
       throw new HttpError(409, 'thread_report requires a currently claimed step');
     }
@@ -174,19 +173,18 @@ async function executeWorkerMemoryToolCall(
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);
-  const slot = row.kind === 'plan' ? todoRow.assignment?.plan : todoRow.assignment?.build;
-  const agentId = slot?.agentId ?? routeForStep(deps.db, todoRow, row.kind)?.id;
+  const profile = profileForStep(deps.db, todoRow, row.kind, row.id);
   if (name === 'create_skill' || name === 'update_skill') {
-    if (!agentId) throw new HttpError(409, 'step has no assigned agent — skill write has no actor');
-    return executeWorkerSkillTool(deps, todoRow, row, agentId, name, params);
+    if (!profile) throw new HttpError(409, 'step has no routing rule — skill write has no actor');
+    return executeWorkerSkillTool(deps, todoRow, profile, name, params);
   }
-  if (!agentId) throw new HttpError(409, 'step has no assigned agent — memory has no store');
+  if (!profile) throw new HttpError(409, 'step has no routing rule — memory has no store');
   return executeWorkerMemoryTool(
     deps.db,
     {
       teamId: todoRow.teamId,
-      agentId: memoryOwnerOf(deps.db, todoRow.teamId, agentId, row.kind),
-      sourceAgentId: agentForStep(deps.db, todoRow, row.kind, row.prompt)?.id ?? agentId,
+      agentId: memoryOwnerOf(deps.db, todoRow.teamId, row.kind),
+      sourceName: profile.displayName,
       teamScoped: memoryOpsAreTeamScoped(row.kind),
       todoId: todoRow.id,
       projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
@@ -201,20 +199,16 @@ async function executeWorkerMemoryToolCall(
 async function executeWorkerSkillTool(
   deps: MachineDeps,
   todoRow: typeof todo.$inferSelect,
-  stepRow: { kind: StepKind; prompt: string | null },
-  agentId: string,
+  agentRow: RouteProfile,
   name: 'create_skill' | 'update_skill',
   params: Record<string, unknown>,
 ): Promise<string> {
-  const agentRow =
-    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt) ??
-    deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
-  if (!agentRow) throw new NotFoundError(`agent ${agentId}`);
+  const agentId = agentRow.id;
   const want = name === 'create_skill' ? AGENT_TOOL_SKILL_CREATE : AGENT_TOOL_SKILL_UPDATE;
   if (!agentRow.tools.includes(want)) {
     throw new HttpError(
       403,
-      `Agent ${agentRow.displayName} 未获「${want}」授权（Agent 详情页权限 tab），无法${name === 'create_skill' ? '创建' : '更新'}技能`,
+      `${agentRow.displayName} 未获「${want}」授权（工作策略 tools），无法${name === 'create_skill' ? '创建' : '更新'}技能`,
     );
   }
   const opts = {

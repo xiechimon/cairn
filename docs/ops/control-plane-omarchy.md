@@ -117,3 +117,15 @@ Rename the Mac server, web and deploy launch agents to `*.disabled-<date>` so a 
 2. If omarchy took writes worth keeping, copy its state back to the Mac as a set: `server.db` through `sqlite3 .backup`, plus `attachments/`, `repos/` and `trajectory-exports/` with `rs`. Attachment bytes live in files beside the database, so a database alone leaves rows whose files exist only on omarchy. Otherwise the Mac's own copy is the state at the freeze.
 3. Restore the Mac launch agents and its `tailscale serve`, and start them. Run the environment check on the Mac before pointing anything at it.
 4. Point both daemons back at `https://<mac>`.
+
+## The Coordinator runs inside the server (D114)
+
+The Coordinator is part of `cairn-server.service`. There is no sidecar unit, token or machine.
+
+- Switch: `CAIRN_COORDINATOR_IN_SERVER` is on unless set to `0`, `false`, `no` or `off`. When it is off, or no keyed Coordinator route resolves, daemons claim chief turns as before.
+- Route: the team's `coordinator` routing rule (D113 as changed on 2026-11-07: provider `openai-codex`, model `gpt-6.1-sol`, thinking `low`, authenticated by the host's Codex login in `$CODEX_HOME/auth.json`) and the `compaction` summary route. Provider keys are read from the encrypted `provider` rows on each request; no key lives in `step`, `chief_message` or a store.
+- State: one SQLite store per thread at `$CAIRN_HOME/server/coordinator/<threadId>.sqlite`, owned by one process through the `coordinator_lease` row. `chief_message` stays the truth; a store that disagrees with it is re-seeded and the old file is kept beside it as `*.stale-<ms>`.
+- Boot migration: a set `CAIRN_COORDINATOR_MACHINE_ID` is logged and that machine's token is revoked. Stores under `$CAIRN_HOME/coordinator/threads/` are moved into the server store directory when no store of the same name exists.
+- Backup: `backup-server-db.sh --coordinator <dir> --coordinator-out <dir>` copies each store after the server DB with `sqlite3 .backup` and `integrity_check`. A store newer than the DB copy is a reconcile case at the next boot.
+- Restore: restore `server.db` and, optionally, the matching store files; a missing or divergent store is re-seeded from `chief_message`.
+- Roll back: set `CAIRN_COORDINATOR_IN_SERVER=0` in `~/.config/cairn/server.env` and restart `cairn-server.service`.

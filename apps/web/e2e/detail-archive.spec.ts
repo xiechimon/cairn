@@ -82,6 +82,8 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
     }
     if (path.endsWith('/stream'))
       return route.fulfill({ contentType: 'text/event-stream', body: '' });
+    if (path.startsWith('/api/teams/team-archive/drafts/'))
+      return route.fulfill({ json: { content: '', updatedAt: null } });
     const responses: Record<string, unknown> = {
       '/api/user/me': { id: 'user-archive', displayName: 'Owner', avatarUrl: null },
       '/api/teams': [
@@ -147,6 +149,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/teams/team-archive/notifications': { unreadThreadIds: [] },
       '/api/teams/team-archive/model-sources': { sources: [] },
       '/api/teams/team-archive/providers': { presets: [], providers: [] },
+      '/api/teams/team-archive/model-routing': { edges: [], connections: [], quota: [] },
       '/api/server/backup': { status: 'healthy' },
       '/api/schedules': [],
       '/api/teams/team-archive/claude-subscriptions': [],

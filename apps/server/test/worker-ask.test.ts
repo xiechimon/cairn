@@ -1,6 +1,6 @@
 import { threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { build, chiefMessage, message, project, step, todo } from '../src/db/schema.js';
 import {
   applyStoppedStep,
@@ -10,15 +10,12 @@ import {
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
-import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
+import { H, registerChiefHarness } from './chief-harness.js';
 
 registerChiefHarness();
-beforeEach(() => setRoutingRulesEnabled(true));
-afterEach(() => setRoutingRulesEnabled(false));
 
 const REQUEST = 'ask-11111111-2222-3333-4444-555555555555';
 const QUESTIONS = [
@@ -56,13 +53,11 @@ function seedTodo(id = 'session-todo') {
   return id;
 }
 
-function startSession(withPlan = true) {
+function startSession() {
   const todoId = seedTodo();
   const [started] = startBuilds(deps(), {
     projectId: H.projectId,
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: AGENT_ID } },
-    withPlan,
   });
   const stepRow = H.s.db.select().from(step).where(eq(step.buildId, started!.id)).get()!;
   return { todoId, buildId: started!.id, stepRow };
@@ -84,7 +79,7 @@ describe('worker ask_user on a session step', () => {
   }
 
   test('the question parks the thread: awaitingReply is set and a needs-you report is written', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     const settled = await askWorkerQuestion(
@@ -108,7 +103,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('the needs-you report row carries the question own words, collapsed and capped', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     const long = `Which   export\nformat ${'and encoding '.repeat(30)}should it use?`;
@@ -127,7 +122,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('invisible format characters in the question never reach the report line', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     await askWorkerQuestion(
       deps(),
@@ -144,7 +139,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('a short question is the report line verbatim', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     await askWorkerQuestion(
       deps(),
@@ -156,7 +151,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('the answer delivered through the thread message clears awaitingReply and settles the held ask', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     const held = askWorkerQuestion(
@@ -177,7 +172,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('a parked step keeps awaitingReply through the move to review and clears it when the thread moves on', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     await askWorkerQuestion(
@@ -197,7 +192,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('a request id owned by another build is rejected and its message untouched', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     H.s.db
       .insert(message)
@@ -225,7 +220,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('a retried ask keeps the stored creation time', async () => {
-    const { todoId, buildId, stepRow } = startSession(false);
+    const { todoId, buildId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     await askWorkerQuestion(
@@ -250,7 +245,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('a delivery that throws leaves the question pending and awaitingReply set', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     await askWorkerQuestion(
@@ -278,7 +273,7 @@ describe('worker ask_user on a session step', () => {
   });
 
   test('a non-session worker step still cannot ask', async () => {
-    const { stepRow } = startSession(false);
+    const { stepRow } = startSession();
     H.s.db
       .update(step)
       .set({ kind: 'verify', status: 'claimed' })
@@ -304,7 +299,7 @@ describe('session steps share the build-step paths', () => {
   }
 
   test('a session turn that parked on an unanswered ask with no changes parks instead of failing', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     await askWorkerQuestion(
@@ -323,16 +318,9 @@ describe('session steps share the build-step paths', () => {
     expect(content.status).toBe('pending');
   });
 
-  test('a parked session with a verifier assigned does not dispatch verification', async () => {
-    const { todoId, buildId, stepRow } = startSession(false);
-    H.s.db
-      .update(todo)
-      .set({
-        phase: 'building',
-        assignment: { plan: null, build: { agentId: AGENT_ID }, verify: { agentId: AGENT_ID } },
-      })
-      .where(eq(todo.id, todoId))
-      .run();
+  test('a parked session does not dispatch further steps', async () => {
+    const { todoId, buildId, stepRow } = startSession();
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     await askWorkerQuestion(
       deps(),
@@ -351,7 +339,7 @@ describe('session steps share the build-step paths', () => {
   });
 
   test('a session turn with no changes and no question still fails the artifact gate', () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     claim(stepRow.id);
     completeStep(deps(), stepRow.id, { hasChanges: false });
@@ -359,7 +347,7 @@ describe('session steps share the build-step paths', () => {
   });
 
   test('a reply that moves a review thread on marks the parked question answered', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
     await askWorkerQuestion(
@@ -392,7 +380,7 @@ describe('session steps share the build-step paths', () => {
 
 describe('a parked worker question holds the gates', () => {
   async function parked(withPr: boolean) {
-    const { todoId, buildId, stepRow } = startSession(false);
+    const { todoId, buildId, stepRow } = startSession();
     H.s.db
       .update(project)
       .set({ repoKind: 'github', githubRepo: 'owner/repo' })
@@ -447,7 +435,7 @@ describe('a parked worker question holds the gates', () => {
 
 describe('stopping a session with a pending question', () => {
   test('clears awaitingReply and cancels the question', async () => {
-    const { todoId, buildId, stepRow } = startSession(false);
+    const { todoId, buildId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
@@ -468,7 +456,7 @@ describe('stopping a session with a pending question', () => {
 
 describe('worker question hardening', () => {
   test('a request id owned by a non-question message in the same build is a 409 and stays intact', async () => {
-    const { buildId, stepRow } = startSession(false);
+    const { buildId, stepRow } = startSession();
     H.s.db
       .insert(message)
       .values({
@@ -495,7 +483,7 @@ describe('worker question hardening', () => {
   });
 
   test('the push and notification body is capped and scrubbed', async () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
@@ -525,56 +513,18 @@ describe('worker question hardening', () => {
     expect(bodies[0]!.length).toBeLessThanOrEqual(120);
     expect(bodies[0]).not.toContain(secret);
   });
-
-  test('flag off: a stale pending question row does not block the CI poller', async () => {
-    const { todoId, buildId } = await (async () => {
-      const s = startSession(false);
-      H.s.db
-        .update(project)
-        .set({ repoKind: 'github', githubRepo: 'owner/repo' })
-        .where(eq(project.id, H.projectId))
-        .run();
-      H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, s.todoId)).run();
-      H.s.db.update(build).set({ prNumber: 7 }).where(eq(build.id, s.buildId)).run();
-      H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, s.stepRow.id)).run();
-      const claimed = H.s.db.select().from(step).where(eq(step.id, s.stepRow.id)).get()!;
-      await askWorkerQuestion(
-        deps(),
-        claimed,
-        { requestId: REQUEST, questions: QUESTIONS },
-        { holdMs: 0 },
-      );
-      return s;
-    })();
-    setRoutingRulesEnabled(false);
-    const { blockingWorkerQuestions } = await import('../src/services/worker-question-store.js');
-    expect(blockingWorkerQuestions(H.s.db, buildId)).toHaveLength(0);
-    H.s.db.update(step).set({ status: 'done' }).where(eq(step.kind, 'session')).run();
-    const fetched: string[] = [];
-    const poller = createCiPoller(deps(), {
-      githubFetch: async (url) => {
-        fetched.push(String(url));
-        return new Response('{}', { status: 404 });
-      },
-    });
-    await poller.sweep();
-    expect(todoId).toBeTruthy();
-    expect(fetched.some((url) => url.includes('/pulls/7'))).toBe(true);
-  });
 });
 
 describe('worker ask_user tool dispatch and parked replies', () => {
-  test('session steps get ask_user for both repo types, build steps never, flag off unchanged', () => {
+  test('session steps get ask_user for both repo types, build steps never', () => {
     for (const github of [false, true]) {
       expect(workerRemoteTools('session', github).map((t) => t.name)).toContain('ask_user');
       expect(workerRemoteTools('build', github).map((t) => t.name)).not.toContain('ask_user');
     }
-    setRoutingRulesEnabled(false);
-    expect(workerRemoteTools('session', false).map((t) => t.name)).not.toContain('ask_user');
   });
 
   test('a reply to a parked session with no claimed step is delivered, answers the question and continues', async () => {
-    const { todoId, buildId, stepRow } = startSession(false);
+    const { todoId, buildId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     H.s.db.update(build).set({ prNumber: 7 }).where(eq(build.id, buildId)).run();
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();

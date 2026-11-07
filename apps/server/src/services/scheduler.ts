@@ -37,9 +37,9 @@ import {
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { planChiefDigests } from './chief-digest.js';
-import { planChiefSummaries } from './chief-summary.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
+import { sweepIdleComposerDrafts } from './composer-drafts.js';
 import { createDueRunner, type DueClock } from './due-events.js';
 import { projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
@@ -52,7 +52,7 @@ import { sweepStaleMachines } from './machines.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
-import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from './pr-feedback.js';
+import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
@@ -91,13 +91,12 @@ export interface CiPollRun {
 }
 
 export interface IssueIntakeRun {
-  intakeAgentAllowlist?: readonly string[];
   githubFetch: FetchLike;
   logger: IssueIntakeLogger;
 }
 
 export function issueIntakeRunOf(
-  config: { issueIntake: boolean; intakeAgentAllowlist?: readonly string[] },
+  config: { issueIntake: boolean },
   run: IssueIntakeRun,
 ): IssueIntakeRun | null {
   run.logger.info(
@@ -106,9 +105,7 @@ export function issueIntakeRunOf(
       ? `github issue intake on (${ENV_VARS.issueIntake})`
       : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
   );
-  return config.issueIntake
-    ? { ...run, intakeAgentAllowlist: config.intakeAgentAllowlist ?? [] }
-    : null;
+  return config.issueIntake ? run : null;
 }
 
 export function schedulingRunOf(
@@ -227,9 +224,13 @@ export function createScheduler(
   let alertsSweeping = false;
   const ciPoller =
     ci !== undefined && ci !== null
-      ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
+      ? createCiPoller(deps, {
+          githubFetch: ci.githubFetch,
+          logger: ci.logger,
+          threadPrWakes: true,
+        })
       : null;
-  const feedbackPoller = ci ? createPrFeedbackPoller(deps, ci) : null;
+  const prWatch = ci ? createPrWatch(deps, ci) : null;
   const correctionIntake = intake
     ? createIssueIntake(deps, { ...intake, label: 'correction' })
     : null;
@@ -242,6 +243,16 @@ export function createScheduler(
           logger: scheduling.logger,
         })
       : null;
+  let prSweep: Promise<void> | null = null;
+  let prSweepAt = Number.NEGATIVE_INFINITY;
+  function watchPrs() {
+    const now = clock.now();
+    if (prSweep === null || now - prSweepAt >= PR_WATCH_INTERVAL_MS) {
+      prSweepAt = now;
+      prSweep = prWatch?.sweep(now).then(() => undefined) ?? Promise.resolve();
+    }
+    return prSweep;
+  }
   let lastGcAt = 0;
   let gcImmediate: NodeJS.Immediate | null = null;
   let gcBatches: ReturnType<typeof sweepAttachmentBatches> | null = null;
@@ -369,8 +380,6 @@ export function createScheduler(
       const [started] = startBuilds(deps, {
         projectId: row.projectId,
         todoIds: [row.todoId],
-        assignment: todoRow.assignment ?? { plan: null, build: null },
-        withPlan: false,
         triggerSource: 'schedule',
         scheduledBy: row.createdBy,
         prompt: workerCreated ? prompt : row.prompt || undefined,
@@ -497,7 +506,6 @@ export function createScheduler(
       }
     }
     planChiefDigests(deps, now);
-    planChiefSummaries(deps, now);
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);
@@ -536,6 +544,7 @@ export function createScheduler(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
           now,
         );
+        sweepIdleComposerDrafts(deps.db, now);
         advanceGc();
         sweepStepSessions(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
@@ -674,8 +683,16 @@ export function createScheduler(
         fireDueChiefWakes(deps, now);
         return { rescheduleAt: null };
       },
-      ci: () => ciPoller?.sweep(),
-      feedback: () => feedbackPoller?.sweep(),
+      ci: async () => {
+        await watchPrs();
+        await ciPoller?.sweep();
+      },
+      feedback: async () => {
+        await watchPrs();
+      },
+      'pr-watch': async () => {
+        await watchPrs();
+      },
       intake: async () => {
         await issueIntake?.sweep();
         await correctionIntake?.sweep();
@@ -752,7 +769,7 @@ export function createScheduler(
       setScheduleClockListener(() => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       if (ciPoller !== null) ensureDue('poll:ci', 'ci', CI_POLL_INTERVAL_MS);
-      if (feedbackPoller !== null) ensureDue('poll:feedback', 'feedback', PR_FEEDBACK_INTERVAL_MS);
+      if (prWatch !== null) ensureDue('poll:pr-watch', 'pr-watch', PR_WATCH_INTERVAL_MS);
       if (issueIntake !== null) ensureDue('poll:intake', 'intake', ISSUE_INTAKE_INTERVAL_MS);
       if (schedulingSweep !== null) {
         ensureDue('poll:scheduling', 'scheduling', SCHEDULE_INTERVAL_MS);

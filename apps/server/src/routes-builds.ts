@@ -1,19 +1,24 @@
 import {
   type BuildRecord,
+  buildMergePermissionSchema,
   buildStepActionBodySchema,
   buildStopBodySchema,
   conversationMessagesQuerySchema,
   createBranchSyncBodySchema,
-  planRowSchema,
+  planResponseSchema,
+  prPanelListSchema,
+  prPanelQuerySchema,
   startBuildsBodySchema,
   tokenUsageSchema,
 } from '@cairn/shared';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
 import { message, plan as planTable, todo, tokenUsage } from './db/schema.js';
+import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requestOrigin, requireProject, svcOf } from './routes-helpers.js';
 import {
   createBranchSync,
@@ -22,8 +27,10 @@ import {
 } from './services/branch-sync.js';
 import {
   applyBuildStepAction,
+  buildMergePermission,
   getBuild,
   listSteps,
+  planAutoApproveAt,
   readSteerPending,
   requestMerge,
   requestStop,
@@ -40,9 +47,11 @@ import {
 } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { readMergeGateState } from './services/merge-gate-run.js';
+import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { holdSecondRejectionRework } from './services/research-stuck.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
+import { listThreadPrs } from './services/thread-pr.js';
 
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -52,6 +61,18 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     const record = getBuild(svc, id);
     if (!record) throw notFound(`build ${id}`);
     return c.json(record);
+  });
+
+  app.get('/api/prs', (c) => {
+    const { threadId } = parseWith(prPanelQuerySchema, c.req.query(), 'query');
+    return c.json(
+      prPanelListSchema.parse(
+        listThreadPrs(ctx.db, {
+          teamId: ctx.team.id,
+          ...(threadId !== undefined ? { threadId } : {}),
+        }),
+      ),
+    );
   });
 
   app.get('/api/builds/:id/gate', (c) => {
@@ -116,16 +137,23 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         stream.writeSSE({ data: JSON.stringify(payload) }),
       );
       const unsubscribe = ctx.convHub?.subscribe(conversationId, conn) ?? (() => {});
+      const deviceId = pairedDeviceIdOf(c);
       const timer = setInterval(() => {
+        if (deviceId !== null && !pairedDeviceExists(ctx.db, deviceId)) {
+          stream.abort();
+          return;
+        }
         void conn.send({ type: 'ping', seq: conn.nextSeq() });
       }, ctx.pingIntervalMs);
       let release: () => void = () => {};
       const held = new Promise<void>((resolve) => {
         release = resolve;
       });
+      const unbindDevice = deviceStreams.bind(deviceId, () => stream.abort());
       stream.onAbort(() => {
         clearInterval(timer);
         unsubscribe();
+        unbindDevice();
         release();
       });
       await conn.send({ type: 'ping', seq: conn.nextSeq() });
@@ -136,13 +164,12 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/projects/:id/builds', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
     const body = parseWith(startBuildsBodySchema, await jsonBody(c), 'body');
+    if (body.assignment != null) throw new HttpError(410, AGENTS_REMOVED_MESSAGE);
     let builds: BuildRecord[];
     try {
       builds = startBuilds(svc, {
         projectId: row.id,
         todoIds: body.todoIds,
-        assignment: body.assignment,
-        withPlan: body.withPlan,
         ...(body.routeOverride !== undefined ? { routeOverride: body.routeOverride } : {}),
       });
     } catch (err) {
@@ -151,6 +178,10 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     }
     return c.json({ builds }, 201);
   });
+
+  app.get('/api/builds/:id/merge-permission', (c) =>
+    c.json(buildMergePermissionSchema.parse(buildMergePermission(svc, c.req.param('id')))),
+  );
 
   app.post('/api/builds/:id/merge', async (c) => {
     try {
@@ -240,15 +271,48 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       .all();
     return c.json(
       rows.map((r) =>
-        planRowSchema.parse({
+        planResponseSchema.parse({
           id: r.id,
           buildId: r.buildId,
           version: r.version,
           createdAt: r.createdAt,
           content: r.content,
+          autoApproveAt: planAutoApproveAt(svc, r.id),
+          autoApprovePausedAt: r.autoApprovePausedAt,
         }),
       ),
     );
+  });
+
+  app.post('/api/builds/:id/plans/:planId/pause-auto-approve', (c) => {
+    const buildId = c.req.param('id');
+    const buildRow = getBuild(svc, buildId);
+    if (!buildRow) throw notFound(`build ${buildId}`);
+    const planId = c.req.param('planId');
+    const row = ctx.db
+      .select()
+      .from(planTable)
+      .where(and(eq(planTable.id, planId), eq(planTable.buildId, buildId)))
+      .get();
+    if (!row) throw notFound(`plan ${planId}`);
+    const task = ctx.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+    const latest = ctx.db
+      .select({ id: planTable.id })
+      .from(planTable)
+      .where(eq(planTable.buildId, buildId))
+      .orderBy(desc(planTable.version))
+      .get();
+    if (
+      task?.phase !== 'confirm' ||
+      task.latestBuildId !== buildId ||
+      task.archivedAt !== null ||
+      latest?.id !== planId
+    ) {
+      throw conflict('Only the current plan awaiting confirmation can pause auto-approve');
+    }
+    const autoApprovePausedAt = row.autoApprovePausedAt ?? Date.now();
+    ctx.db.update(planTable).set({ autoApprovePausedAt }).where(eq(planTable.id, planId)).run();
+    return c.json(planResponseSchema.parse({ ...row, autoApproveAt: null, autoApprovePausedAt }));
   });
 
   app.get('/api/builds/:id/changes', async (c) =>

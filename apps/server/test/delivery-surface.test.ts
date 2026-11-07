@@ -3,10 +3,12 @@ import { CHANGES_DIFF_MAX_BYTES, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent as agentTable, build as buildTable, todo as todoTable } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
-
-const AGENT_ID = 'agent-704-1';
+import {
+  build as buildTable,
+  machine as machineTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
+import { bootServer, issueApiKey, seedSessionRoute, type TestServer } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -50,11 +52,11 @@ async function setupWorld(): Promise<World> {
     body: { teamId: s.team.id, name: 'm704', cliVersion: '0.1.0' },
   });
   const machineJson = (await enrollRes.json()) as { token: string };
-  s.db
-    .insert(agentTable)
-    .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'b704', modelId: 'm' })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'm',
+    machineId: s.db.select().from(machineTable).get()!.id,
+  });
 
   const ghRes = await call(s.app, 'POST', '/api/projects', {
     body: { name: 'probe-704', kind: 'github', githubRepo: 'octocat/Hello-World' },
@@ -79,11 +81,7 @@ async function setupWorld(): Promise<World> {
     async startBuild(projectId) {
       const todoId = projectId === ghProject.id ? todoBody.id : plainTodo.id;
       const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        body: {
-          todoIds: [todoId],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-          withPlan: false,
-        },
+        body: { todoIds: [todoId] },
       });
       expect(res.status).toBe(201);
       const body = (await res.json()) as { builds: { id: string }[] };
@@ -240,11 +238,7 @@ describe('hosted form source-of-truth does not drift (#704: the bare repo is sti
     });
     const todoRow = (await todoRes.json()) as { id: string };
     await call(w.s.app, 'POST', `/api/projects/${project.id}/builds`, {
-      body: {
-        todoIds: [todoRow.id],
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        withPlan: false,
-      },
+      body: { todoIds: [todoRow.id] },
     });
     const claimed = await w.claim();
     await w.done(claimed.step.id, { status: 'success', changesDiff: SAMPLE_DIFF });

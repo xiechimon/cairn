@@ -55,6 +55,8 @@ Upstream is optional and belongs only on PRs that add a mechanism. Closing keywo
 
 Commit messages follow `area(issue): summary`, for example `server(1570): skip already-pushed traces`.
 
+Cairn is Apache-2.0 and has no CLA. Pull requests from external contributors need a DCO sign-off on each commit (`Signed-off-by: Name <email>`); add it with `git commit -s`.
+
 A maintainer reviews every pull request, and an AI reviewer may also comment. A pull request merges once CI is green and the review approves it.
 
 ## Releases

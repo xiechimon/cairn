@@ -20,13 +20,14 @@ import {
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { agent, machine, provider, routingRule, todo } from './db/schema.js';
-import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
+import { machine, provider, routingRule, todo } from './db/schema.js';
+import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import {
   createApiKeyBodySchema,
   jsonBody,
   patchSecretBodySchema,
+  requestOrigin,
   requireTeam,
   svcOf,
 } from './routes-helpers.js';
@@ -187,18 +188,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
-    const holders = ctx.db
-      .select({ id: agent.id, displayName: agent.displayName })
-      .from(agent)
-      .where(eq(agent.machineId, id))
-      .all();
-    if (holders.length > 0) {
-      throw conflict(
-        `机器「${row.name}」上有 ${holders.length} 个 agent 的归属机是它（${holders
-          .map((h) => h.displayName)
-          .join('、')}）——先换绑或整机迁移，再删除。`,
-      );
-    }
     ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
@@ -231,17 +220,21 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       .where(and(eq(machine.id, body.targetMachineId), eq(machine.teamId, src.teamId)))
       .get();
     if (!dst) throw notFound(`machine ${body.targetMachineId}`);
-    const holders = ctx.db.select().from(agent).where(eq(agent.machineId, id)).all();
+    const holders = ctx.db.select().from(routingRule).where(eq(routingRule.machineId, id)).all();
     const moved: string[] = [];
     const rejected: { agentId: string; reason: string }[] = [];
-    for (const a of holders) {
-      const reject = homeMachineRejectReason(dst, a, mergedCatalogModels());
+    for (const rule of holders) {
+      const reject = homeMachineRejectReason(dst, rule, mergedCatalogModels());
       if (reject !== null) {
-        rejected.push({ agentId: a.id, reason: reject });
+        rejected.push({ agentId: rule.id, reason: reject });
         continue;
       }
-      ctx.db.update(agent).set({ machineId: dst.id }).where(eq(agent.id, a.id)).run();
-      moved.push(a.id);
+      ctx.db
+        .update(routingRule)
+        .set({ machineId: dst.id })
+        .where(eq(routingRule.id, rule.id))
+        .run();
+      moved.push(rule.id);
     }
     return c.json({ moved, rejected });
   });
@@ -460,7 +453,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/providers/oauth/:preset/authorize', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const origin = c.req.header('origin') ?? new URL(c.req.url).origin;
+    const origin = c.req.header('origin') ?? requestOrigin(c);
     try {
       const { authorizationUrl } = startOAuthAuthorize(oauthDeps(), {
         teamId,
@@ -530,7 +523,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/github/oauth/authorize', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const origin = c.req.header('origin') ?? new URL(c.req.url).origin;
+    const origin = c.req.header('origin') ?? requestOrigin(c);
     try {
       const { authorizationUrl } = startGithubConnectionAuthorize(oauthDeps(), {
         teamId,

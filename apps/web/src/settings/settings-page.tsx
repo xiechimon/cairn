@@ -10,6 +10,7 @@ import {
   Route,
   Server,
   ShieldEllipsis,
+  Smartphone,
   User,
   Users,
   Waypoints,
@@ -34,6 +35,7 @@ import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
+import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { TeamPage } from '../routes/team-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
@@ -93,7 +95,7 @@ const GROUPS: Group[] = [
     heading: '模型与账户',
     sections: [
       { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
-      { id: 'routing', label: '订阅与路由', Icon: Route, element: () => <ModelRoutingPage /> },
+      { id: 'routing', label: '模型路由', Icon: Route, element: () => <ModelRoutingPage /> },
       {
         id: 'work-routing',
         label: '工作路由',
@@ -116,6 +118,12 @@ const GROUPS: Group[] = [
     sections: [
       { id: 'team', label: '团队', Icon: Users, element: () => <TeamPage /> },
       { id: 'api-keys', label: 'API 密钥', Icon: KeyRound, element: () => <ApiKeysPage /> },
+      {
+        id: 'remote',
+        label: '远程访问',
+        Icon: Smartphone,
+        element: () => <RemoteAccessPage />,
+      },
     ],
   },
 ];
@@ -148,6 +156,7 @@ export function SettingsPage() {
   });
   const close = () => navigate(returnTo);
   const windowRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
   useEffect(() => {
@@ -167,8 +176,26 @@ export function SettingsPage() {
       }
       closeRef.current();
     };
+    const onSlash = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest('input, textarea, select') !== null)
+      ) {
+        return;
+      }
+      const search = searchRef.current;
+      if (search === null || search.offsetParent === null) return;
+      event.preventDefault();
+      search.focus();
+    };
     document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
+    document.addEventListener('keydown', onSlash);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('keydown', onSlash);
+    };
   }, []);
   const hrefFor = (id: string): To => ({ pathname: `${SETTINGS_HREF}/${id}`, search });
   const groups: SettingsNavGroup[] = GROUPS.map((group) => ({
@@ -209,6 +236,7 @@ export function SettingsPage() {
             hrefFor={hrefFor}
             query={query}
             onQuery={setQuery}
+            searchRef={searchRef}
             top={
               <div className="flex items-center justify-between px-1 md:hidden">
                 <span className="text-card-title font-medium text-foreground">{t('设置')}</span>
@@ -223,7 +251,10 @@ export function SettingsPage() {
           data-testid="settings-content"
           className={cn('flex min-w-0 flex-auto flex-col', section === null && 'max-md:hidden')}
         >
-          <div className="flex h-11 flex-none items-center gap-2 border-b border-border px-4 text-meta text-content-tertiary">
+          <div
+            data-testid="settings-breadcrumb"
+            className="flex h-11 flex-none items-center gap-2 border-b border-border px-4 text-meta text-content-tertiary"
+          >
             <Button
               variant="ghost"
               size="icon-sm"
@@ -237,7 +268,7 @@ export function SettingsPage() {
             {shown !== undefined && (
               <>
                 <span aria-hidden>/</span>
-                <span className="text-foreground">{t(shown.label)}</span>
+                <h1 className="m-0 text-meta font-medium text-foreground">{t(shown.label)}</h1>
               </>
             )}
             <Button
@@ -250,7 +281,7 @@ export function SettingsPage() {
               <X />
             </Button>
           </div>
-          <div className="flex min-h-0 flex-auto">
+          <div data-testid="settings-body" className="flex min-h-0 flex-auto">
             {shown !== undefined && (
               <EmbeddedShell.Provider value>{shown.element()}</EmbeddedShell.Provider>
             )}

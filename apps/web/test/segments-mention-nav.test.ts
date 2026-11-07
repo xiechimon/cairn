@@ -26,10 +26,10 @@ function mention(
 }
 
 describe('segments mention navigation seam (#741)', () => {
-  test('F-U1: agent segment with mentionId → anchor, href = /app/resources/agents/<id>', () => {
+  test('F-U1: agent segment with mentionId → lazy span, no anchor', () => {
     const markup = render([mention('agent', 'a1')]);
-    expect(markup).toMatch(/<a [^>]*href="\/app\/resources\/agents\/a1"/);
-    expect(markup).toContain('scribe</a>');
+    expect(markup).not.toContain('<a ');
+    expect(markup).toMatch(/<span [^>]*class="[^"]*mention-chip--agent/);
   });
 
   test('F-U2: agent segment without mentionId → lazy span, no anchor', () => {
@@ -51,12 +51,11 @@ describe('segments mention navigation seam (#741)', () => {
     }
   });
 
-  test('F-U5: after linking, chip class family keeps accent (mention-chip mention-chip--agent)', () => {
+  test('F-U5: chip class family keeps accent (mention-chip mention-chip--agent)', () => {
     const markup = render([mention('agent', 'a1')]);
 
     expect(markup).toMatch(/class="[^"]*\bmention-chip\b[^"]*"/);
     expect(markup).toMatch(/class="[^"]*\bmention-chip--agent\b[^"]*"/);
-    expect(markup).toContain('text-(--chip-done-fg)');
-    expect(markup).toContain('cursor-pointer');
+    expect(markup).toContain('text-content-secondary');
   });
 });

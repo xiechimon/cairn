@@ -1,5 +1,4 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { eq } from 'drizzle-orm';
@@ -9,7 +8,8 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { build as buildTable, step as stepTable } from '../../apps/server/src/db/schema.js';
-import { AGENT_ID, api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
+import { api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const BIOME_FIXTURE = fileURLToPath(new URL('./fixtures/biome-ansi-coloured.txt', import.meta.url));
@@ -51,7 +51,7 @@ describe('#1262 E2E: lint-failed commit → errorMessage persisted as plain text
       { content: '修改完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-    home = mkdtempSync(join(tmpdir(), 'cairn-1262-home-'));
+    home = makeTestTempDir('cairn-1262-home-');
     const config = loadDaemonConfig(
       {
         serverUrl: server.url,
@@ -90,8 +90,6 @@ describe('#1262 E2E: lint-failed commit → errorMessage persisted as plain text
 
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;

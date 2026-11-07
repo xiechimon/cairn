@@ -7,30 +7,68 @@ import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { and, eq, isNull } from 'drizzle-orm';
-import { onTestFinished } from 'vitest';
+import { afterAll, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
 import {
-  agent as agentTable,
+  build as buildTable,
   provider as providerTable,
+  routingRule as routingRuleTable,
   todo as todoTable,
+  workPolicy as workPolicyTable,
 } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
+import { newUuidv7 } from '../../apps/server/src/lib/ids.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
+import { type BuildDeps, enqueueStep } from '../../apps/server/src/services/builds.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
+import { setTodoPhase } from '../../apps/server/src/services/todos.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
+
+const liveServers = new Set<() => Promise<void>>();
+
+const pendingReleases = new Set<() => void>();
+
+function releasePending(): void {
+  for (const release of [...pendingReleases]) release();
+}
+
+process.once('exit', releasePending);
+
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    releasePending();
+    process.kill(process.pid, signal);
+  });
+}
+
+let sweepRegistered = false;
+
+function registerSweep(): void {
+  if (sweepRegistered) return;
+  sweepRegistered = true;
+  try {
+    afterAll(async () => {
+      sweepRegistered = false;
+      await Promise.allSettled([...liveServers].map((close) => close()));
+    });
+  } catch {
+    sweepRegistered = false;
+  }
+}
 
 export interface RealServer {
   url: string;
   teamId: string;
   apiKey: string;
   db: ReturnType<typeof openMemoryDb>;
+  svc: BuildDeps;
   reposDir: string;
   attachmentsDir: string;
   skillsDir: string;
@@ -73,8 +111,10 @@ export async function bootRealServer(opts: {
   if (ownMcpConfig) writeFileSync(mcpConfigPath, '{}\n');
   let closed = false;
   const releaseOwned = (): void => {
+    pendingReleases.delete(releaseOwned);
     for (const dir of ownedDirs.splice(0)) releaseTestTempDir(dir);
   };
+  pendingReleases.add(releaseOwned);
   try {
     const app = createApp({
       db,
@@ -135,9 +175,9 @@ export async function bootRealServer(opts: {
             machineId?: string;
           } | null;
           if (typeof body?.machineId === 'string') {
-            db.update(agentTable)
+            db.update(routingRuleTable)
               .set({ machineId: body.machineId })
-              .where(and(eq(agentTable.teamId, team.id), isNull(agentTable.machineId)))
+              .where(and(eq(routingRuleTable.teamId, team.id), isNull(routingRuleTable.machineId)))
               .run();
           }
         }
@@ -172,17 +212,32 @@ export async function bootRealServer(opts: {
         })
         .run();
     }
-    if (db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get() === undefined) {
-      db.insert(agentTable)
+    if (
+      db.select().from(routingRuleTable).where(eq(routingRuleTable.id, AGENT_ID)).get() ===
+      undefined
+    ) {
+      const now = Date.now();
+      db.insert(routingRuleTable)
         .values({
           id: AGENT_ID,
           teamId: team.id,
-          displayName: 'it-builder',
-          description:
-            opts.agentDescription ?? '你是集成测试执行 Agent：直接简短回答，不使用任何工具。',
+          use: 'session',
           provider: 'stub-gw',
           modelId: 'stub-model',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      db.insert(workPolicyTable)
+        .values({
+          id: `${AGENT_ID}-policy`,
+          teamId: team.id,
+          use: 'session',
           tools: ['合并分支', '推送分支'],
+          mcpServers: [],
+          secrets: [],
+          createdAt: now,
+          updatedAt: now,
         })
         .run();
     }
@@ -191,12 +246,18 @@ export async function bootRealServer(opts: {
       if (closed) return;
       closed = true;
       scheduler?.stop();
-      (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
-      await new Promise<void>((resolve, reject) => {
-        server.close((err) => (err ? reject(err) : resolve()));
-      });
-      releaseOwned();
+      liveServers.delete(close);
+      try {
+        (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+        await new Promise<void>((resolve, reject) => {
+          server.close((err) => (err ? reject(err) : resolve()));
+        });
+      } finally {
+        releaseOwned();
+      }
     };
+    liveServers.add(close);
+    registerSweep();
     try {
       onTestFinished(close);
     } catch {
@@ -208,6 +269,7 @@ export async function bootRealServer(opts: {
       teamId: team.id,
       apiKey: issuedKey.plaintext,
       db,
+      svc: { db, hub, machineHub, convHub, user },
       reposDir,
       attachmentsDir,
       skillsDir,
@@ -351,4 +413,48 @@ export async function waitFor(
     if (Date.now() > deadline) throw new Error('waitFor timeout');
     await new Promise((r) => setTimeout(r, intervalMs));
   }
+}
+
+export function updateSessionPolicy(
+  server: RealServer,
+  set: Partial<Pick<typeof workPolicyTable.$inferInsert, 'skillsAllowlist' | 'secrets'>>,
+): void {
+  server.db
+    .update(workPolicyTable)
+    .set(set)
+    .where(and(eq(workPolicyTable.teamId, server.teamId), eq(workPolicyTable.use, 'session')))
+    .run();
+}
+
+export function pinSessionRouteMachine(server: RealServer, machineId: string): void {
+  server.db
+    .update(routingRuleTable)
+    .set({ machineId })
+    .where(and(eq(routingRuleTable.teamId, server.teamId), eq(routingRuleTable.use, 'session')))
+    .run();
+}
+
+export function startLegacyBuild(
+  server: RealServer,
+  todoId: string,
+  opts: { withPlan: boolean; prompt?: string },
+): string {
+  const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+  if (todoRow === undefined) throw new Error(`startLegacyBuild: todo ${todoId} missing`);
+  const id = newUuidv7();
+  const createdAt = Date.now();
+  server.db
+    .insert(buildTable)
+    .values({
+      id,
+      todoId,
+      withPlan: opts.withPlan,
+      prevPhase: todoRow.phase,
+      triggerSource: 'user',
+      createdAt,
+    })
+    .run();
+  enqueueStep(server.svc, id, opts.withPlan ? 'plan' : 'build', todoRow.teamId, opts.prompt);
+  setTodoPhase(server.svc, todoId, 'queued', { latestBuildId: id, lastRunAt: createdAt });
+  return id;
 }

@@ -102,7 +102,7 @@ test('ci shards both vitest suites by the matrix size', () => {
     assert.match(job, /^ {8}shard: \[1(, \d+)+\]$/m, name);
     assert.ok(
       job.includes(
-        `run: VITEST_PROJECT_SET=${suite} pnpm test --shard=\${{ matrix.shard }}/\${{ strategy.job-total }}`,
+        `run: VITEST_PROJECT_SET=${suite} node scripts/test-temp-run.mjs -- pnpm test --shard=\${{ matrix.shard }}/\${{ strategy.job-total }}`,
       ),
       name,
     );

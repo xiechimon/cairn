@@ -4,7 +4,6 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -12,11 +11,11 @@ import {
   symlinkSync,
 } from 'node:fs';
 import { createServer, type Server } from 'node:https';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pushSubscriptionBodySchema } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../src/config.js';
 import {
   build as buildTable,
@@ -76,7 +75,7 @@ export function listen(server: Server): Promise<string> {
 }
 
 async function fakePushServer(): Promise<FakePush> {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-push-cert-'));
+  const dir = makeTestTempDir('cairn-push-cert-');
   const keyPath = join(dir, 'key.pem');
   const certPath = join(dir, 'cert.pem');
   execFileSync(
@@ -172,7 +171,6 @@ function insertChiefThread(s: ReturnType<typeof bootServer>, threadId: string): 
       id: `chief-${s.user.id}-${s.team.id}`,
       userId: s.user.id,
       teamId: s.team.id,
-      agentId: null,
       charter: '',
       lastTurnAt: null,
       createdAt: now,
@@ -197,7 +195,7 @@ function insertChiefThread(s: ReturnType<typeof bootServer>, threadId: string): 
 
 describe('VAPID keys and subscription routes', () => {
   test('rejects symlinked key parents and files', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-vapid-'));
+    const dir = makeTestTempDir('cairn-vapid-');
     const targetDir = join(dir, 'target');
     const parentLink = join(dir, 'parent-link');
     const fileLink = join(dir, 'file-link');
@@ -210,7 +208,7 @@ describe('VAPID keys and subscription routes', () => {
   });
 
   test('repairs existing key and directory permissions', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-vapid-'));
+    const dir = makeTestTempDir('cairn-vapid-');
     const keysPath = join(dir, 'nested', 'vapid.json');
     try {
       const first = loadOrCreateVapidKeys(keysPath);
@@ -361,6 +359,7 @@ describe('subscription authorization boundaries', () => {
           endpoint,
           p256dh: 'original-key',
           auth: 'original-auth',
+          pairedDeviceId: null,
           createdAt: 1,
         };
         s.db.insert(pushSubscription).values(original).run();
@@ -541,7 +540,7 @@ describe('push subscription validation', () => {
 
 describe('VAPID configuration', () => {
   test('loads the configured subject without changing the persisted key pair', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-vapid-'));
+    const dir = makeTestTempDir('cairn-vapid-');
     const keysPath = join(dir, 'vapid.json');
     try {
       const first = loadOrCreateVapidKeys(keysPath, 'https://example.com/push-contact');
@@ -559,7 +558,7 @@ describe('VAPID configuration', () => {
   });
 
   test('creates the key pair when the configured data directory is a symlink', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-vapid-home-'));
+    const dir = makeTestTempDir('cairn-vapid-home-');
     const realData = join(dir, 'fast-disk', 'server');
     const home = join(dir, 'home');
     mkdirSync(realData, { recursive: true });
@@ -581,7 +580,7 @@ describe('VAPID configuration', () => {
   });
 
   test('keeps the joined data directory when it does not exist yet', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-vapid-fresh-'));
+    const dir = makeTestTempDir('cairn-vapid-fresh-');
     const previous = process.env.CAIRN_HOME;
     try {
       process.env.CAIRN_HOME = dir;

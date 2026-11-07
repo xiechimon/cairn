@@ -40,7 +40,10 @@ const row = (page: Page, text: string) => stream(page).getByText(text, { exact: 
 async function offsetOf(page: Page, text: string, scrollToTop = false): Promise<number> {
   return viewport(page).evaluate(
     (node, [label, toTop]) => {
-      if (toTop) node.scrollTop = 0;
+      if (toTop) {
+        node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+        node.scrollTop = 0;
+      }
       const target = [...node.querySelectorAll('*')].find(
         (el) => el.children.length === 0 && el.textContent === label,
       );
@@ -85,6 +88,7 @@ test('a newest page too short to fill the view keeps loading older pages until h
   page,
 }) => {
   const requested = await mockPagedHistory(page, 9, 3);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/app');
   await expect(row(page, 'question 0')).toHaveCount(1);
   expect(requested).toEqual([null, 'h-0006', 'h-0003']);

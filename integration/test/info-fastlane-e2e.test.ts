@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -9,14 +8,8 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { build as buildTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
-import {
-  AGENT_ID,
-  api,
-  bootRealServer,
-  daemonLogLines,
-  type RealServer,
-  waitFor,
-} from './helpers.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
+import { api, bootRealServer, daemonLogLines, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const REPORT_MARK = 'INFO-REPORT-1626: 结论是登录走 OAuth';
@@ -44,7 +37,7 @@ function userTexts(messages: { role: string; content?: unknown }[]): string[] {
 }
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), 'cairn-info-fastlane-home-'));
+  home = makeTestTempDir('cairn-info-fastlane-home-');
   const reportsDir = join(home, 'reports');
   stub = await startStubLlm([
     {
@@ -124,8 +117,6 @@ describe('#1626 info-class fast lane: info card report handed to the downstream 
 
     const infoStart = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
       todoIds: [infoTodo.id],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(infoStart.status).toBe(201);
     const infoBuildId = (infoStart.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -167,8 +158,6 @@ describe('#1626 info-class fast lane: info card report handed to the downstream 
     const requestsBefore = stub.requests.length;
     const codeStart = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
       todoIds: [codeTodoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(codeStart.status).toBe(201);
     const codeBuildId = (codeStart.body as { builds: { id: string }[] }).builds[0]!.id;

@@ -1,3 +1,4 @@
+import { pairingLink } from '@cairn/shared';
 import { useId, useState } from 'react';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
@@ -7,6 +8,7 @@ import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ProfileHeader } from '../components/profile-card.js';
+import { QrCode } from '../components/qr-code.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -63,6 +65,7 @@ export function StructureSection() {
       lede="The small pieces the larger ones are built from: labels, dividers, the layout card shell, and the editable profile header."
     >
       <Specimen
+        id="label-and-separator"
         title="Label and separator"
         note="Label pairs with a control through htmlFor; Separator replaces hr and border-t divs"
         code={`<Label htmlFor="name">Display name</Label>\n<Input id="name" />\n<Separator />\n<Separator orientation="vertical" />`}
@@ -87,6 +90,7 @@ export function StructureSection() {
         </div>
       </Specimen>
       <Specimen
+        id="card-layout-shell"
         title="Card (layout shell)"
         note="The registry Card; real cards are per-face (task card, settings card) and use --radius-card"
         stage="canvas"
@@ -114,6 +118,7 @@ export function StructureSection() {
         </Card>
       </Specimen>
       <Specimen
+        id="profile-header"
         title="Profile header"
         note="Click Edit name, type, press Enter to save or Escape to cancel"
         code={`<ProfileHeader avatar={…} name={name} sub="Avatar and name" onRename={setName} />`}
@@ -140,7 +145,7 @@ export function IdentitySection() {
       title="Agents and models"
       lede="How agents, runtimes and models show up: brand marks for the runtimes, the runtime and model pickers from the agent settings, and icon-only actions with a tooltip."
     >
-      <Specimen title="Brand marks" note="Runtime logos, drawn in currentColor">
+      <Specimen id="brand-marks" title="Brand marks" note="Runtime logos, drawn in currentColor">
         {[
           { label: 'Claude', Mark: ClaudeMark },
           { label: 'Gemini', Mark: GeminiMark },
@@ -155,6 +160,7 @@ export function IdentitySection() {
         ))}
       </Specimen>
       <Specimen
+        id="runtime-and-model-pickers"
         title="Runtime and model pickers"
         note="The same pickers the agent settings page uses; the model list follows the runtime"
         stage="canvas"
@@ -188,6 +194,7 @@ export function IdentitySection() {
         </div>
       </Specimen>
       <Specimen
+        id="icon-tooltip"
         title="Icon tooltip"
         note="IconTooltip names an icon-only button for sight and for screen readers"
         code={`<IconTooltip label="Copy" trigger={<Button variant="ghost" size="icon" />}>\n  <Copy />\n</IconTooltip>`}
@@ -213,9 +220,29 @@ export function IdentitySection() {
           <Settings />
         </IconTooltip>
       </Specimen>
+      <Specimen
+        id="pairing-qr"
+        title="Pairing QR code"
+        note="the code in the pairing dialog, encoding a fixed pairing link; the quiet zone and colors stay the same in both themes so phones can scan it"
+      >
+        <Cell label="Full size, 224px">
+          <QrCode text={PAIRING_LINK} label="Pairing QR code" />
+        </Cell>
+        <Cell label="In a 160px container, it shrinks to fit">
+          <div className="w-40 max-w-full">
+            <QrCode text={PAIRING_LINK} label="Pairing QR code" />
+          </div>
+        </Cell>
+      </Specimen>
     </Section>
   );
 }
+
+const PAIRING_LINK = pairingLink({
+  origin: 'https://studio.example.ts.net',
+  code: 'K7M2-QP9X',
+  environmentId: 'env-4f9c1a',
+});
 
 const LIVE_STEPS: { id: string; step: TraceStep }[] = [
   {
@@ -246,7 +273,11 @@ export function StreamSection() {
       title="Live stream"
       lede="What a running agent looks like: the open group is the live row, spoken in the present tense with a shimmer; a small pulse sits under the last line; the elapsed time lives in the composer next to stop. When the turn ends the pulse goes, the group turns past tense, and a long turn closes with a Worked for rule."
     >
-      <Specimen title="Live row" note="shimmering label, a pulse under it, no timer in the row">
+      <Specimen
+        id="live-row"
+        title="Live row"
+        note="shimmering label, a pulse under it, no timer in the row"
+      >
         <Cell label="detail: in the task transcript">
           <LiveRow variant="detail" label="Running tests" />
         </Cell>
@@ -278,6 +309,7 @@ export function StreamSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="agent-transcript"
         title="Agent transcript"
         note="Thoughts fold, runs show the exit code, edits show the diff size"
         className="block"
@@ -298,7 +330,7 @@ export function StreamSection() {
         <div className="relative flex h-80 flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border">
           <MessageScrollerProvider autoScroll scrollEdgeThreshold={40} defaultScrollPosition="end">
             <MessageScroller className="h-auto min-h-0 flex-1">
-              <FadeScrollerViewport>
+              <FadeScrollerViewport reserveEnd={false}>
                 <MessageScrollerContent className="block gap-0 px-5 pt-4 pb-5">
                   <TraceSteps steps={steps} />
                   <div className="mt-2">

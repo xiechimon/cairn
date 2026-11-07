@@ -1,11 +1,10 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
+import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
-import { type agent, provider, routingRule, team } from '../db/schema.js';
+import { provider, routingRule, team } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
-import { applyRoute } from './routing-rules.js';
-
-type AgentRow = typeof agent.$inferSelect;
+import { isClaudeModel } from './model-routing.js';
 
 export type CoordinatorRouteFallback =
   | 'no-api-key-provider'
@@ -90,6 +89,21 @@ function coordinatorRule(db: Db, teamId: string) {
     .get();
 }
 
+export function paidClaudeAllowed(
+  db: Db,
+  teamId: string,
+  providerId: string,
+  modelId: string,
+): boolean {
+  if (!isClaudeModel(providerId, modelId)) return true;
+  const usage = db
+    .select({ claudeUsage: team.claudeUsage })
+    .from(team)
+    .where(eq(team.id, teamId))
+    .get();
+  return usage?.claudeUsage === 'allow-paid';
+}
+
 export function coordinatorRoute(db: Db, teamId: string) {
   if (!coordinatorRunsOnPi()) return null;
   const rule = coordinatorRule(db, teamId) ?? seedCoordinatorRule(db, teamId);
@@ -105,18 +119,18 @@ export function coordinatorRoute(db: Db, teamId: string) {
       ),
     )
     .get();
-  if (keyed === undefined) return fallback(teamId, 'rule-provider-has-no-key');
-  const usage = db
-    .select({ claudeUsage: team.claudeUsage })
-    .from(team)
-    .where(eq(team.id, teamId))
-    .get();
-  if (usage?.claudeUsage !== 'allow-paid') {
+  if (keyed === undefined) {
+    const row = db
+      .select({ baseUrl: provider.baseUrl })
+      .from(provider)
+      .where(and(eq(provider.teamId, teamId), eq(provider.providerId, rule.provider)))
+      .get();
+    const subscription =
+      row !== undefined && usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable();
+    return subscription ? rule : fallback(teamId, 'rule-provider-has-no-key');
+  }
+  if (!paidClaudeAllowed(db, teamId, rule.provider, rule.modelId)) {
     return fallback(teamId, 'paid-claude-not-allowed');
   }
   return rule;
-}
-
-export function routedChiefAgent(db: Db, teamId: string, agentRow: AgentRow): AgentRow {
-  return applyRoute(agentRow, coordinatorRoute(db, teamId));
 }

@@ -16,9 +16,7 @@ const DISTINCT_ROLES_SHARING_A_VALUE = [
   ['--ring', '--running-text'],
   ['--running-track', '--surface-tertiary'],
   ['--icon', '--text-tertiary'],
-  ['--chip-confirm-bg', '--tile-orange-bg'],
-  ['--chip-confirm-fg', '--tile-orange-fg'],
-  ['--switch-thumb', '--text-on-veil'],
+  ['--qr-light', '--switch-thumb', '--text-on-veil'],
   ['--running-bar', '--switch-on'],
 ].map((group) => group.join(' '));
 

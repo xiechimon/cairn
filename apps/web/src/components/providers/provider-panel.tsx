@@ -1,15 +1,15 @@
 import { cn } from 'cn';
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { SettingsCard } from '../settings-list.js';
+import { SettingsPanel, SettingsSection } from '../settings-list.js';
 import { ToggleSwitch } from '../toggle-switch.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 
 export type ProviderMark = ComponentType<SVGProps<SVGSVGElement>>;
 
-export type ProviderTone = 'ok' | 'warn' | 'off';
+export type ProviderTone = 'ok' | 'warn' | 'fail' | 'off';
 
 export interface ProviderSwitch {
   checked: boolean;
@@ -27,16 +27,19 @@ export interface ProviderItem {
   toggle?: ProviderSwitch;
 }
 
-const TONE_DOT: Record<ProviderTone, string> = {
+const MONO_MARK_CLS = '[&_path]:fill-current';
+
+export const TONE_DOT: Record<ProviderTone, string> = {
   ok: 'bg-running',
-  warn: 'bg-(--chip-confirm-fg)',
+  warn: 'bg-(--waiting-ink)',
+  fail: 'bg-destructive',
   off: 'bg-content-dim',
 };
 
 export function ProviderMarkTile({ Mark }: { Mark: ProviderMark }) {
   return (
     <span className="flex size-8 flex-none items-center justify-center rounded-(--radius-control) bg-background text-content-secondary ring-1 ring-border">
-      <Mark aria-hidden className="size-4" />
+      <Mark aria-hidden className={cn('size-4', MONO_MARK_CLS)} />
     </span>
   );
 }
@@ -58,19 +61,22 @@ export function ProviderInstanceRow({
       data-tone={item.tone}
       aria-current={selected ? 'true' : undefined}
       className={cn(
-        'flex items-start gap-3 px-3.5 py-3 transition-colors duration-(--dur-fast)',
-        selected ? 'bg-(--sidebar-active)' : 'hover:bg-sidebar-hover',
+        'flex items-start gap-3 px-3.5 py-3',
+        selected ? 'bg-secondary' : 'hover:bg-menu-hover',
       )}
     >
       <Button
         variant="ghost"
         onClick={onSelect}
         className={cn(
-          'h-auto min-w-0 flex-auto items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent',
+          'h-auto min-w-0 flex-auto items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent dark:hover:bg-transparent',
           item.tone === 'off' && !selected && 'opacity-60',
         )}
       >
-        <item.Mark aria-hidden className="mt-0.5 size-4 flex-none text-content-secondary" />
+        <item.Mark
+          aria-hidden
+          className={cn('mt-0.5 size-4 flex-none text-content-secondary', MONO_MARK_CLS)}
+        />
         <span className="flex min-w-0 flex-col">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-ui font-medium text-foreground">{item.name}</span>
@@ -103,47 +109,38 @@ export function ProviderPanel({
   items,
   selectedId,
   onSelect,
-  onAdd,
+  header,
   empty,
   children,
 }: {
   items: ProviderItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onAdd?: () => void;
+  header?: ReactNode;
   empty?: ReactNode;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   return (
-    <SettingsCard className="overflow-hidden md:grid md:grid-cols-[17rem_minmax(0,1fr)]">
-      <div
-        data-testid="provider-list"
-        className="flex flex-col divide-y divide-border border-b border-border md:border-r md:border-b-0"
-      >
-        {items.map((item) => (
-          <ProviderInstanceRow
-            key={item.id}
-            item={item}
-            selected={item.id === selectedId}
-            onSelect={() => onSelect(item.id)}
-          />
-        ))}
-        {onAdd !== undefined && (
-          <Button
-            variant="ghost"
-            onClick={onAdd}
-            className="h-auto justify-start gap-2.5 rounded-none px-3.5 py-3 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-sidebar-hover"
-          >
-            <Plus aria-hidden className="size-4" />
-            {t('添加服务商')}
-          </Button>
-        )}
+    <SettingsPanel header={header}>
+      <div className="flex min-w-0 flex-col @3xl:grid @3xl:grid-cols-[17rem_minmax(0,1fr)]">
+        <div
+          data-testid="provider-list"
+          className="flex flex-col divide-y divide-border border-b border-border @3xl:border-r @3xl:border-b-0"
+        >
+          {items.map((item) => (
+            <ProviderInstanceRow
+              key={item.id}
+              item={item}
+              selected={item.id === selectedId}
+              onSelect={() => onSelect(item.id)}
+            />
+          ))}
+        </div>
+        <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
+          {items.length === 0 ? empty : children}
+        </div>
       </div>
-      <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
-        {items.length === 0 ? empty : children}
-      </div>
-    </SettingsCard>
+    </SettingsPanel>
   );
 }
 
@@ -180,13 +177,9 @@ export function ProviderSection({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex flex-col px-1">
-        <h3 className="m-0 text-ui font-medium text-foreground">{title}</h3>
-        {hint !== undefined && <span className="text-meta text-content-tertiary">{hint}</span>}
-      </div>
+    <SettingsSection title={title} description={hint}>
       {children}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -210,7 +203,7 @@ export function ProviderModelRow({
       data-model-id={id}
       data-liveness={dead ? 'dead' : 'alive'}
       className={cn(
-        'flex min-h-11 items-center gap-3 px-4 py-1.5',
+        'settings-flat-block flex min-h-11 items-center gap-3 px-4 py-1.5',
         dead && 'text-content-tertiary',
       )}
     >

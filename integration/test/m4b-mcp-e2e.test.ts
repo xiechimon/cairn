@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -12,8 +11,8 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { message as messageTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -40,7 +39,7 @@ function logLines(): string[] {
 
 beforeAll(async () => {
   external = await startExternalMcp();
-  home = mkdtempSync(join(tmpdir(), 'cairn-m4b-mcp-home-'));
+  home = makeTestTempDir('cairn-m4b-mcp-home-');
   mcpConfig = join(home, 'claude.json');
   writeFileSync(
     mcpConfig,
@@ -128,7 +127,7 @@ describe('MCP client face E2E: local config registration + per-Agent slug author
     const authed = await api(
       server.url,
       'PATCH',
-      `/api/teams/${server.teamId}/agents/${AGENT_ID}`,
+      `/api/teams/${server.teamId}/work-policies/session`,
       {
         mcpServers: ['demo', 'dead', 'ghost'],
       },
@@ -143,8 +142,6 @@ describe('MCP client face E2E: local config registration + per-Agent slug author
     );
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -233,9 +230,9 @@ describe('M4b MCP server face E2E: real sdk Client against /api/mcp (02 §7.2)',
     await client.close();
   }, 120_000);
 
-  test('registry allowlist shape: 32 = 16 read + 16 write, including Thread entry', () => {
-    expect(MCP_TOOL_REGISTRY).toHaveLength(32);
-    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read')).toHaveLength(16);
-    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write')).toHaveLength(16);
+  test('registry allowlist shape: 29 = 15 read + 14 write, including Thread entry', () => {
+    expect(MCP_TOOL_REGISTRY).toHaveLength(29);
+    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read')).toHaveLength(15);
+    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write')).toHaveLength(14);
   });
 });

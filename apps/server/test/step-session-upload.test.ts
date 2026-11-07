@@ -9,10 +9,10 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent as agentTable, step as stepTable } from '../src/db/schema.js';
+import { step as stepTable } from '../src/db/schema.js';
 import { ATTACHMENT_ORPHAN_GRACE_MS, sweepStepSessions } from '../src/services/attachment-gc.js';
 import { readStepSession, stepSessionPath } from '../src/services/machine-uploads.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bootServer, issueApiKey, postProject, req, seedSessionRoute } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -36,27 +36,7 @@ async function setupWorld(): Promise<World> {
   });
   expect(enrollAuth.status).toBe(200);
   const machineJson = machineEnrollResponseSchema.parse(await enrollAuth.json());
-  const agentId = 'agent-stub-session';
-  s.db
-    .insert(agentTable)
-    .values({
-      id: agentId,
-      teamId: s.team.id,
-      displayName: agentId,
-      description: null,
-      status: 'active',
-      avatarUrl: null,
-      provider: null,
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
   const projectId = await postProject(s.app);
   const todoRes = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: '会话附件',
@@ -65,7 +45,6 @@ async function setupWorld(): Promise<World> {
   const todo = (await todoRes.json()) as { id: string };
   const buildRes = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [todo.id],
-    assignment: { plan: null, build: { agentId } },
     withPlan: false,
   });
   expect(buildRes.status).toBe(201);

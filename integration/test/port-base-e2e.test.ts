@@ -1,6 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -16,8 +14,8 @@ import {
   machine as machineTable,
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -46,7 +44,7 @@ async function bootStack(opts: {
 }): Promise<Stack> {
   const stub = await startStubLlm(opts.responses);
   const server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  const home = mkdtempSync(join(tmpdir(), 'cairn-1148-home-'));
+  const home = makeTestTempDir('cairn-1148-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'pb-mbp' },
     {},
@@ -126,8 +124,6 @@ async function startBuild(
   });
   const started = await api(stack.server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
     todoIds: [world.todoId],
-    assignment: { plan: null, build: { agentId: AGENT_ID } },
-    withPlan: false,
   });
   expect(started.status).toBe(201);
   const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -193,9 +189,15 @@ describe('#1260 E2E: chief occupies the machine concurrency slot (cap 1)', () =>
       .set({ maxConcurrent: 1 })
       .where(eq(machineTable.id, stack.machineId))
       .run();
-    const patch = await api(stack.server.url, 'PATCH', `/api/teams/${stack.server.teamId}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: null },
-    });
+    const patch = await api(
+      stack.server.url,
+      'PATCH',
+      `/api/teams/${stack.server.teamId}/routing-rules/coordinator`,
+      {
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+      },
+    );
     expect(patch.status).toBe(200);
 
     const w1 = await startBuild(stack, '并发探针一');

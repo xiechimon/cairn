@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { readReplayFile } from '../src/reliability-report.js';
 
 const DAY = 86_400_000;
@@ -12,7 +12,7 @@ const TASKS = {
 
 const dirs: string[] = [];
 function replayFile(content: unknown): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-rel-window-'));
+  const dir = makeTestTempDir('cairn-rel-window-');
   dirs.push(dir);
   const path = join(dir, 'replay.json');
   writeFileSync(path, JSON.stringify(content));

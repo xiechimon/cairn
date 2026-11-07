@@ -15,7 +15,7 @@ const batchWait = '0 s';
 const checkRetries = 1;
 const scopes = {
   web: ['apps/web/**/*'],
-  backend: ['apps/server/**/*', 'apps/daemon/**/*', 'apps/coordinator/**/*', 'integration/**/*'],
+  backend: ['apps/server/**/*', 'apps/daemon/**/*', 'integration/**/*'],
 };
 const barrierFiles = ['packages/**/*'];
 
@@ -40,7 +40,6 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '          - base = main',
     '          - "#depends-on > 0"',
     '      - -draft',
-    '      - -label = needs-decision',
     '      - -label = coordinator-hold',
     '      - or:',
     `          - -head ~= ${batchHeadRe}`,

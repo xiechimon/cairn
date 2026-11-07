@@ -1,14 +1,12 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_VARS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { step as stepTable } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -73,21 +71,21 @@ function logLines(): string[] {
 }
 
 describe('crash recovery (T2: AgentSession seam × host durable orchestration)', () => {
-  test('SIGKILL mid-step → restart → recover reconciliation → continue session resumes → confirm', async () => {
+  test('SIGKILL mid-step → restart → recover reconciliation → continue session resumes → review', async () => {
     stub = await startStubLlm([
       { content: '第一轮响应（崩溃前）。', delayMs: 6_000 },
       {
         toolCall: {
           name: 'bash',
           arguments: {
-            command: `cat > plan.md <<'EOF'\n# 方案\nKind: fix\n\nContext: 崩溃恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\nEOF`,
+            command: `printf 'crash probe\\n' >> README.md`,
           },
         },
       },
       { content: '恢复后续跑完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500 });
-    home = mkdtempSync(join(tmpdir(), 'cairn-crash-home-'));
+    home = makeTestTempDir('cairn-crash-home-');
     const world = await seedWorld(server.url, server.teamId, {
       title: '崩溃恢复探针',
       spec: '写一行崩溃恢复探针。',
@@ -98,8 +96,6 @@ describe('crash recovery (T2: AgentSession seam × host durable orchestration)',
 
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
@@ -115,14 +111,14 @@ describe('crash recovery (T2: AgentSession seam × host durable orchestration)',
     const midSteps = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
     expect(midSteps).toHaveLength(1);
     expect(midSteps[0]!.status).toBe('claimed');
-    expect(server.todoPhase(world.todoId)).toBe('planning');
+    expect(server.todoPhase(world.todoId)).toBe('building');
 
     const second = spawnDaemon();
     await waitFor(
       () => logLines().some((l) => l.includes('[recover] 1 pending step(s) found')),
       60_000,
     );
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
     await waitFor(() => logLines().some((l) => l.includes('finished (0 running)')), 30_000);
 
     const lines = logLines();

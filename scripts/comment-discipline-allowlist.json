@@ -335,11 +335,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/src/routes/create-agent-dialog.tsx",
-    "line": "// 只出模型名——原版的 `· 128k` 是原版内置模型目录的上下文窗口，cairn 是本",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/src/routes/team-page.tsx",
     "line": "// client-state key (r2 §1.5 `cairn.teamMembersLayout`); chart drops the",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
@@ -715,8 +710,8 @@
     "reason": "external quirk: Tailwind preflight gives [hidden] a display none !important that outranks the base layer"
   },
   {
-    "path": "apps/web/src/chief/chief-conversation.tsx",
-    "line": "            {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}",
+    "path": "apps/web/src/chief/composer-surface.tsx",
+    "line": "      {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}",
     "reason": "ui-drift-gate G4 marker: hidden file input is deliberately native"
   },
   {
@@ -738,5 +733,45 @@
     "path": "integration/vitest.config.ts",
     "line": "    // vite build empties apps/web/dist first, so files that each run it must not run in parallel (#349).",
     "reason": "external quirk: vite build empties its outDir before writing, so parallel builds into one dist clobber each other"
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/dispatch-eligibility.ts",
+    "line": "// Verbatim copy of apps/server/src/services/dispatch-eligibility.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/dispatch-eligibility.ts",
+    "line": "// @ts-nocheck",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/routing-migration.ts",
+    "line": "// Verbatim copy of apps/server/src/services/routing-migration.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/routing-migration.ts",
+    "line": "// @ts-nocheck",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/routing-rules.ts",
+    "line": "// Verbatim copy of apps/server/src/services/routing-rules.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/routing-rules.ts",
+    "line": "// @ts-nocheck",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/schema.ts",
+    "line": "// Verbatim copy of apps/server/src/db/schema.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/server/src/legacy/agent-layer/schema.ts",
+    "line": "// @ts-nocheck",
+    "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   }
 ]

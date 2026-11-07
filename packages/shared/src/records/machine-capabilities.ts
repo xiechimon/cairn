@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { recordId } from './common.js';
 
 export const machineHardwareSchema = z.object({
   cpuCores: z.number().int().positive(),
@@ -13,6 +12,11 @@ export type MachineHardware = z.infer<typeof machineHardwareSchema>;
 export const machineExecutorSchema = z.enum(['orb', 'host']);
 export type MachineExecutor = z.infer<typeof machineExecutorSchema>;
 
+const codexLoginSchema = z.object({
+  state: z.enum(['ok', 'expired', 'absent', 'unknown']),
+  expiresAt: z.number().int().nonnegative().optional(),
+});
+
 export const machineCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()),
   skills: z.array(z.string()),
@@ -20,6 +24,7 @@ export const machineCapabilitiesSchema = z.object({
   executor: machineExecutorSchema.optional(),
   computer: z.literal(true).optional(),
   ownComputer: z.literal(true).optional(),
+  codexLogin: codexLoginSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -35,8 +40,10 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   if (!base.success) return undefined;
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
   const executor = machineExecutorSchema.safeParse(rec.executor);
+  const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
   return {
     ...base.data,
+    ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),
     ...(rec.computer === true ? { computer: true as const } : {}),
@@ -68,19 +75,3 @@ export const stepQueueBlockedSchema = z.object({
   missing: z.array(z.string()),
 });
 export type StepQueueBlocked = z.infer<typeof stepQueueBlockedSchema>;
-
-export const agentMachineFitRowSchema = z.object({
-  machineId: recordId,
-  name: z.string(),
-  online: z.boolean(),
-  runtimeOk: z.boolean(),
-  missing: z.array(z.string()).nullable(),
-  mcpGaps: z.array(z.string()).nullable(),
-  canRun: z.boolean(),
-});
-export type AgentMachineFitRow = z.infer<typeof agentMachineFitRowSchema>;
-
-export const agentMachineFitResponseSchema = z.object({
-  machines: z.array(agentMachineFitRowSchema),
-});
-export type AgentMachineFitResponse = z.infer<typeof agentMachineFitResponseSchema>;

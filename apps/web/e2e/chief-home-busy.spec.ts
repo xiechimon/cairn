@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
+import { openChiefWindow, verticalGap } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -155,9 +155,12 @@ async function mockLive(page: Page, state: State) {
         outage: state.outage,
       });
     if (p === '/api/conversations/chief-home/messages') return json({ messages: state.messages });
-    if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json([TASK]);
     if (p === '/api/projects') return json([PROJECT]);
+    if (p === '/api/teams/t1/machines') return json([{ id: 'm-ready', name: 'omarchy', online: true }]);
+    if (p === '/api/teams/t1/providers') {
+      return json({ presets: [], providers: [{ id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' }] });
+    }
     return json([]);
   });
   return calls;
@@ -426,10 +429,8 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await expect(reply).toHaveCount(1);
     await reply.getByTestId('chief-tools-toggle').click();
     await evidenceShot(page, 'tools-once.png');
-    const replyBox = await reply.boundingBox();
     const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
-    const questionBox = await question.boundingBox();
-    expect(replyBox!.y - (questionBox!.y + questionBox!.height)).toBeLessThan(40);
+    expect(await verticalGap(page, question, reply)).toBeLessThan(40);
     for (const name of ['pull_requests', 'issues', 'run_builds']) {
       await expect(home.getByText(name, { exact: true })).toHaveCount(1);
     }
@@ -484,4 +485,37 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await stopped.getByRole('link', { name: /#9/ }).click();
     await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
+});
+
+test.describe('queued messages never push the input out of the composer', () => {
+  for (const target of [
+    { name: 'home at 600px height', url: '/app', width: 1440, height: 600 },
+    { name: 'drawer at 600px height', url: '/app/schedules?chief=chief-home', width: 1440, height: 600 },
+  ]) {
+    test(`ten queued messages keep the input and send button in view (${target.name})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: target.width, height: target.height });
+      const queued = Array.from({ length: 10 }, (_, n) => ({
+        id: `q${n}`,
+        role: 'user',
+        content: `Queued message number ${n + 1} with enough words to look like a real follow-up`,
+        createdAt: 12 + n,
+      }));
+      await mockLive(page, {
+        activeRun: { phase: 'chief' },
+        pending: queued.map((row) => ({ messageId: row.id, state: 'queued' as const })),
+        fallbackModel: null,
+        outage: null,
+        messages: [FIRST, ...queued],
+      });
+      await page.goto(target.url);
+      const root = target.url.includes('chief=') ? page.locator('.chief-drawer') : page.getByTestId('home-c');
+      await expect(root.getByTestId('queued-message')).toHaveCount(10);
+      await expect(root.getByTestId('chief-composer-input')).toBeInViewport({ ratio: 1 });
+      await expect(root.getByRole('button', { name: '停止 Coordinator 这次回复' })).toBeInViewport({ ratio: 1 });
+      const capsules = await root.getByTestId('queued-capsules').evaluate((node) => node.scrollHeight > node.clientHeight);
+      expect(capsules).toBe(true);
+    });
+  }
 });

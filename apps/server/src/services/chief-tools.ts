@@ -1,6 +1,5 @@
 import type { ChiefNoticeContent, SecretBox, UserRecord } from '@cairn/shared';
 import {
-  AGENT_TOOL_DEFAULTS,
   CHIEF_NOTICE_KIND,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
@@ -16,7 +15,6 @@ import {
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  agent,
   build,
   chief,
   chiefThread,
@@ -35,9 +33,6 @@ import {
   advanceSplitWaves,
   applyBuildStepAction,
   cancelBuild,
-  dispatchSplitChildren,
-  messageTodo,
-  startBuilds,
   stopActiveStepsAfterExit,
 } from './builds.js';
 import {
@@ -50,22 +45,18 @@ import {
 } from './chief.js';
 import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
-import {
-  assertToolAllowedUnderRouting,
-  executeRouterTool,
-  isRouterTool,
-} from './chief-router-tools.js';
+import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
-import { requireIntakeAssignment } from './intake-assignment.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import {
   deleteMemoryEntry,
   listMemoryEntries,
   saveMemoryEntry,
+  searchMemoryEntries,
   updateMemoryEntry,
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
@@ -77,12 +68,10 @@ import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { snoozeTodo } from './snooze.js';
 import { seedFixedTags } from './tags.js';
-import { createSplitTodo, type SplitSubtodoInput } from './todo-split.js';
 import { createTodo, deleteTodo, getTodo, listTodos, setTodoPhase, updateTodo } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
-  intakeAgentAllowlist?: readonly string[];
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -168,14 +157,6 @@ function memoryLayer(params: Params): MemoryLayer {
     throw new HttpError(400, 'invalid params.layer');
   }
   return v as MemoryLayer;
-}
-
-function agentSourceName(db: Db, agentId: string | null): string | null {
-  if (agentId === null) return null;
-  return (
-    db.select({ name: agent.displayName }).from(agent).where(eq(agent.id, agentId)).get()?.name ??
-    null
-  );
 }
 
 function json(result: unknown): string {
@@ -273,30 +254,12 @@ function requireUnarchivedTargets(db: Db, teamId: string, name: string, params: 
   }
 }
 
-function refuseIntakeSplit(row: typeof todo.$inferSelect): void {
-  if (row.assignment?.source === 'intake-label') {
-    throw new HttpError(
-      409,
-      `intake-label-split-refused: Build task #${row.seqNum} as is with its preset agent; an unlinked split cannot preserve its intake label.`,
-    );
-  }
-}
-
 const DOCS_MAX_PATHS = 24;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
 export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
 
-function requireTeamAgent(db: Db, agentId: string, teamId: string) {
-  const row = db
-    .select()
-    .from(agent)
-    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId), eq(agent.status, 'active')))
-    .get();
-  if (!row) throw new HttpError(404, `agent ${agentId} is unavailable in this team`);
-  return row;
-}
 function requireTeamBuild(db: Db, buildId: string, teamId: string) {
   const row = db.select({ todoId: build.todoId }).from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new HttpError(404, `build ${buildId}`);
@@ -316,7 +279,6 @@ export async function executeChiefTool(
 ): Promise<string> {
   const { db } = deps;
   const svc = {
-    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db,
     hub: deps.hub,
     machineHub: deps.machineHub,
@@ -325,16 +287,8 @@ export async function executeChiefTool(
     box: deps.box,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const boundChiefName =
-    ctx.chiefAgentId !== null
-      ? db
-          .select({ name: agent.displayName })
-          .from(agent)
-          .where(eq(agent.id, ctx.chiefAgentId))
-          .get()?.name
-      : undefined;
-  const chiefActor: TransitionActor = { kind: 'agent', name: boundChiefName ?? 'Coordinator' };
-  assertToolAllowedUnderRouting(name);
+  const chiefActor: TransitionActor = { kind: 'agent', name: 'Coordinator' };
+  assertToolNotRemoved(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
   switch (name) {
@@ -384,23 +338,6 @@ export async function executeChiefTool(
         }
       }
       return json(response);
-    }
-    case 'agents': {
-      const rows = db.select().from(agent).where(eq(agent.teamId, ctx.teamId)).all();
-      return json(
-        rows.map((a) => ({
-          id: a.id,
-          displayName: a.displayName,
-          description: a.description,
-          provider: a.provider,
-          modelId: a.modelId,
-          thinkingLevel: a.thinkingLevel,
-          tools: a.tools,
-          defaultSkill: a.defaultSkill,
-          skillsAllowlist: a.skillsAllowlist,
-          mcpServers: a.mcpServers,
-        })),
-      );
     }
     case 'models': {
       const keysvc = { db, box: deps.box };
@@ -512,6 +449,7 @@ export async function executeChiefTool(
     }
     case 'issues':
     case 'pull_requests':
+    case 'github_overlap':
     case 'workflow_runs':
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
@@ -555,86 +493,6 @@ export async function executeChiefTool(
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
       return json({ ...record, sourceBuildId: ctx.chiefId });
     }
-    case 'split_todo': {
-      const todoId = str(params, 'todoId');
-      const parent = requireTeamTodo(db, todoId, ctx.teamId);
-      refuseIntakeSplit(parent);
-      const splitPolicy = requireProjectRow(db, parent.projectId, ctx.teamId).splitPolicy;
-      const rawSubtodos = params.subtodos;
-      if (!Array.isArray(rawSubtodos) || rawSubtodos.length === 0) {
-        throw new HttpError(400, 'invalid params.subtodos: expected non-empty array');
-      }
-      const subtodos: SplitSubtodoInput[] = rawSubtodos.map((raw, i) => {
-        if (typeof raw !== 'object' || raw === null) {
-          throw new HttpError(400, `invalid params.subtodos[${i}]: expected object`);
-        }
-        const item = raw as Record<string, unknown>;
-        const blockedByRaw = item.blockedBy;
-        const blockedBy =
-          blockedByRaw === undefined || blockedByRaw === null
-            ? undefined
-            : Array.isArray(blockedByRaw)
-              ? blockedByRaw.map((n) => {
-                  if (
-                    typeof n !== 'number' ||
-                    !Number.isFinite(n) ||
-                    (splitPolicy === 'human' && !Number.isInteger(n))
-                  ) {
-                    throw new HttpError(
-                      400,
-                      `invalid params.subtodos[${i}].blockedBy: expected integer[]`,
-                    );
-                  }
-                  return n;
-                })
-              : (() => {
-                  throw new HttpError(
-                    400,
-                    `invalid params.subtodos[${i}].blockedBy: expected array`,
-                  );
-                })();
-        const output = optTodoOutput(item, 'output');
-        return {
-          title: str(item, 'title'),
-          spec: str(item, 'spec'),
-          agentId: str(item, 'agentId'),
-          ...(blockedBy !== undefined ? { blockedBy } : {}),
-          ...(output !== undefined ? { output } : {}),
-        };
-      });
-      const result = createSplitTodo(
-        {
-          db,
-          hub: deps.hub,
-          machineHub: deps.machineHub,
-          user: deps.user,
-          vapidKeys: deps.vapidKeys,
-          convHub: deps.convHub,
-          intakeAgentAllowlist: deps.intakeAgentAllowlist,
-        },
-        {
-          parentId: todoId,
-          subtodos,
-          chiefAgentId: ctx.chiefAgentId,
-          chiefId: ctx.chiefId,
-          threadId: ctx.threadId,
-          actorName: chiefActor.name,
-        },
-      );
-      if (result.autoStart) {
-        dispatchSplitChildren(
-          {
-            db,
-            hub: deps.hub,
-            machineHub: deps.machineHub,
-            user: deps.user,
-            convHub: deps.convHub,
-          },
-          todoId,
-        );
-      }
-      return json(result);
-    }
     case 'update_todo': {
       const todoId = str(params, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
@@ -651,34 +509,19 @@ export async function executeChiefTool(
     }
     case 'delete_todos': {
       const ids = strArr(params, 'todoIds');
-      for (const id of ids) {
-        const row = requireTeamTodo(db, id, ctx.teamId);
-        if (row.latestBuildId === null) refuseIntakeSplit(row);
-      }
+      for (const id of ids) requireTeamTodo(db, id, ctx.teamId);
       const deleted = ids.filter((id) => deleteTodo(svc, id));
       return json({ deleted });
     }
     case 'close_todos': {
-      const ids = strArr(params, 'todoIds');
-      for (const id of ids) {
-        const row = db
-          .select()
-          .from(todo)
-          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
-          .get();
-        if (row?.latestBuildId === null) refuseIntakeSplit(row);
-      }
-      return json(transitionTodos(deps, ctx.teamId, ids, 'closed', chiefActor));
+      return json(
+        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'closed', chiefActor),
+      );
     }
     case 'reopen_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor));
     case 'complete_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
-    case 'message_todo': {
-      return json(
-        await messageTodo(deps, ctx.teamId, str(params, 'todoId'), str(params, 'content')),
-      );
-    }
     case 'create_project': {
       const name = str(params, 'name');
       const repoKind = optStr(params, 'repoKind');
@@ -719,57 +562,6 @@ export async function executeChiefTool(
         .where(eq(project.id, projectId))
         .run();
       return json({ id: projectId, repoKind: 'github', githubRepo });
-    }
-    case 'create_agent': {
-      const id = newRecordId();
-      db.insert(agent)
-        .values({
-          id,
-          teamId: ctx.teamId,
-          displayName: str(params, 'displayName'),
-          description: optStr(params, 'description') ?? null,
-          status: 'active',
-          avatarUrl: null,
-          provider: optStr(params, 'provider') ?? null,
-          modelId: optStr(params, 'modelId') ?? null,
-          thinkingLevel: null,
-          tools: [...AGENT_TOOL_DEFAULTS],
-          secrets: [],
-          defaultSkill: null,
-          skillsAllowlist: null,
-          mcpServers: [],
-        })
-        .run();
-      return json({ id });
-    }
-    case 'update_agent': {
-      const agentId = str(params, 'agentId');
-      const row = db
-        .select()
-        .from(agent)
-        .where(and(eq(agent.id, agentId), eq(agent.teamId, ctx.teamId)))
-        .get();
-      if (!row) throw new HttpError(404, `agent ${agentId}`);
-      const sets: Partial<typeof row> = {};
-      const dn = optStr(params, 'displayName');
-      const desc = optStr(params, 'description');
-      const prov = optStr(params, 'provider');
-      const model = optStr(params, 'modelId');
-      if (dn !== undefined) sets.displayName = dn;
-      if (desc !== undefined) sets.description = desc;
-      if (prov !== undefined) sets.provider = prov;
-      if (model !== undefined) sets.modelId = model;
-      if (Object.keys(sets).length > 0)
-        db.update(agent).set(sets).where(eq(agent.id, agentId)).run();
-      return json({ id: agentId, ...sets });
-    }
-    case 'delete_agents': {
-      const ids = strArr(params, 'agentIds');
-      for (const id of ids)
-        db.delete(agent)
-          .where(and(eq(agent.id, id), eq(agent.teamId, ctx.teamId)))
-          .run();
-      return json({ deleted: ids });
     }
     case 'create_skill': {
       const body = parseWith(createSkillBodySchema, params, 'params');
@@ -897,102 +689,6 @@ export async function executeChiefTool(
       return json({ snoozed, skipped });
     }
 
-    case 'run_builds': {
-      const todoIds = strArr(params, 'todoIds');
-      const withPlan = bool(params, 'withPlan', true);
-      const dispatchReason = optStr(params, 'dispatchReason') ?? null;
-      const assignmentIn = params.assignment as
-        | {
-            plan?: { agentId?: string };
-            build?: { agentId?: string };
-            review?: { agentId?: string };
-            verify?: { agentId?: string };
-          }
-        | undefined;
-      const assignment = {
-        plan: assignmentIn?.plan?.agentId ? { agentId: assignmentIn.plan.agentId } : null,
-        build: assignmentIn?.build?.agentId ? { agentId: assignmentIn.build.agentId } : null,
-        review: assignmentIn?.review?.agentId ? { agentId: assignmentIn.review.agentId } : null,
-        verify: assignmentIn?.verify?.agentId ? { agentId: assignmentIn.verify.agentId } : null,
-      };
-      const targets = todoIds.map((todoId) => {
-        const row = requireTeamTodo(db, todoId, ctx.teamId);
-        const effectiveAssignment =
-          row.assignment?.source === 'intake-label'
-            ? {
-                ...assignment,
-                source: row.assignment.source,
-                plan: row.assignment.plan,
-                build: row.assignment.build,
-              }
-            : assignment;
-        return {
-          todoId,
-          row,
-          assignment: effectiveAssignment,
-          projectName: requireProjectRow(db, row.projectId, ctx.teamId).name,
-        };
-      });
-      for (const target of targets) {
-        requireIntakeAssignment(deps, ctx.teamId, target.assignment);
-        if (target.assignment.plan === null && target.assignment.build === null) {
-          throw new HttpError(
-            400,
-            'No agent is assigned to plan or build. Set assignment.build.agentId or assignment.plan.agentId, then retry run_builds.',
-          );
-        }
-        for (const slot of [
-          target.assignment.plan,
-          target.assignment.build,
-          target.assignment.review,
-          target.assignment.verify,
-        ]) {
-          if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
-        }
-      }
-      const started: unknown[] = [];
-      for (const { todoId, row, projectName, assignment } of targets) {
-        const builds = startBuilds(
-          {
-            intakeAgentAllowlist: deps.intakeAgentAllowlist,
-            db,
-            hub: deps.hub,
-            machineHub: deps.machineHub,
-            user: deps.user,
-            vapidKeys: deps.vapidKeys,
-          },
-          {
-            projectId: row.projectId,
-            todoIds: [todoId],
-            assignment,
-            withPlan,
-            triggerSource: 'chief',
-          },
-        );
-        started.push(...builds);
-        const todoRecord = getTodo(svc, todoId);
-        if (todoRecord) {
-          addChiefWatch(deps, {
-            teamId: ctx.teamId,
-            todo: todoRecord,
-            projectName,
-            threadId: ctx.threadId,
-          });
-        }
-      }
-      return json({ builds: started, withPlan, dispatchReason, triggerSource: 'chief' });
-    }
-    case 'run_review': {
-      const buildId = str(params, 'buildId');
-      requireTeamBuild(db, buildId, ctx.teamId);
-      await applyBuildStepAction(deps, buildId, { action: 'review' }, chiefActor.name);
-      return json({ buildId, review: 'fanned-out', dispatchedBy: 'chief' });
-    }
-    case 'confirm_builds': {
-      const buildIds = strArr(params, 'buildIds');
-      for (const buildId of buildIds) await confirmBuild(deps, buildId, chiefActor.name);
-      return json({ confirmed: buildIds });
-    }
     case 'cancel_builds': {
       const buildIds = strArr(params, 'buildIds');
       for (const buildId of buildIds) {
@@ -1055,24 +751,19 @@ export async function executeChiefTool(
       };
       upsertChiefMessage(db, notice);
       deps.convHub?.publishMessage(ctx.threadId, notice);
-      const agentRow = ctx.chiefAgentId
-        ? db.select().from(agent).where(eq(agent.id, ctx.chiefAgentId)).get()
-        : undefined;
       notifyChiefMessage(
         { db, hub: deps.hub, user: deps.user },
         {
           threadId: ctx.threadId,
           message: text,
-          agent: agentRow
-            ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
-            : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+          agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
         },
       );
       return json({ notified: true });
     }
     case 'save_memory': {
       if (ctx.chiefAgentId === null)
-        throw new HttpError(409, 'chief agent not bound — memory has no store');
+        throw new HttpError(409, 'no coordinator routing rule — memory has no store');
       const explicitProject = optStr(params, 'projectId');
       if (explicitProject === undefined && ctx.turnScopeMixed === true) {
         throw new HttpError(
@@ -1097,7 +788,7 @@ export async function executeChiefTool(
         projectId,
         sourceTodoId,
         sourceBuildId: ctx.conversationId,
-        source: agentSourceName(db, ctx.chiefAgentId),
+        source: 'Coordinator',
         layer,
         threadId: layer === 'scratchpad' ? ctx.threadId : null,
       });
@@ -1132,13 +823,13 @@ export async function executeChiefTool(
     }
     case 'memories': {
       if (ctx.chiefAgentId === null) return json([]);
-      return json(
-        listMemoryEntries(
-          db,
-          { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
-          bool(params, 'includeInvalid', false),
-        ),
+      const entries = listMemoryEntries(
+        db,
+        { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
+        bool(params, 'includeInvalid', false),
       );
+      const query = optStr(params, 'query');
+      return json(query === undefined ? entries : searchMemoryEntries(entries, query));
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
@@ -1193,7 +884,7 @@ export type TransitionActor = { kind: 'user' | 'agent'; name: string };
 
 export type TransitionDeps = Pick<
   ChiefToolDeps,
-  'db' | 'hub' | 'machineHub' | 'user' | 'vapidKeys' | 'convHub' | 'intakeAgentAllowlist'
+  'db' | 'hub' | 'machineHub' | 'user' | 'vapidKeys' | 'convHub'
 >;
 
 export function transitionTodos(
@@ -1204,7 +895,6 @@ export function transitionTodos(
   actor: TransitionActor,
 ): { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> } {
   const svc = {
-    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db: deps.db,
     hub: deps.hub,
     machineHub: deps.machineHub,
@@ -1249,7 +939,6 @@ export function transitionTodos(
         if (to === 'done' && owned.phase !== 'done') {
           advanceSplitWaves(
             {
-              intakeAgentAllowlist: deps.intakeAgentAllowlist,
               db: deps.db,
               hub: deps.hub,
               machineHub: deps.machineHub,
@@ -1271,7 +960,6 @@ export function transitionTodos(
 
 function buildDeps(deps: ChiefToolDeps) {
   return {
-    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db: deps.db,
     hub: deps.hub,
     machineHub: deps.machineHub,
@@ -1293,7 +981,7 @@ export async function confirmBuild(
     throw new HttpError(404, `build ${buildId}`);
   }
   try {
-    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor, 'automatic');
   } catch (err) {
     if (
       err instanceof HttpError &&
@@ -1309,7 +997,7 @@ export async function confirmBuild(
 export interface WorkerMemoryCtx {
   teamId: string;
   agentId: string;
-  sourceAgentId?: string;
+  sourceName: string | null;
   todoId: string;
   projectId: string | null;
   buildId: string;
@@ -1339,7 +1027,7 @@ export async function executeWorkerMemoryTool(
         projectId: projectId ?? ctx.projectId,
         sourceTodoId: sourceTodoId ?? ctx.todoId,
         sourceBuildId: ctx.buildId,
-        source: agentSourceName(db, ctx.sourceAgentId ?? ctx.agentId),
+        source: ctx.sourceName,
         layer,
         threadId: layer === 'scratchpad' ? ctx.todoId : null,
         teamScoped: ctx.teamScoped,

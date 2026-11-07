@@ -51,6 +51,16 @@ export async function settleTransitions(page: Page): Promise<void> {
   if (!settled) throw new Error('CSS transitions still running after 20 rounds');
 }
 
+export async function verticalGap(page: Page, upper: Locator, lower: Locator): Promise<number> {
+  await settleTransitions(page);
+  const lowerHandle = await lower.elementHandle();
+  if (lowerHandle == null) throw new Error('verticalGap: lower element is missing');
+  return upper.evaluate((top, bottom) => {
+    const a = top.getBoundingClientRect();
+    return bottom.getBoundingClientRect().top - a.bottom;
+  }, lowerHandle);
+}
+
 export async function pressAndExpect(
   page: Page,
   key: string,
@@ -115,4 +125,20 @@ export async function openChiefWindow(page: Page): Promise<void> {
     if (active instanceof HTMLElement) active.blur();
   });
   await page.keyboard.press('ControlOrMeta+j');
+}
+
+export async function stubLiveApiKeys(page: Page, keys: unknown[] = []) {
+  await page.route('**/api/**', (route, request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/stream')) return route.abort();
+    if (request.method() !== 'GET') return route.fallback();
+    if (path === '/api/teams')
+      return route.fulfill({
+        json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+      });
+    if (path === '/api/user/me')
+      return route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } });
+    if (path === '/api/teams/team-1/api-keys') return route.fulfill({ json: keys });
+    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
+  });
 }

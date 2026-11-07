@@ -66,7 +66,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06');
+    await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c');
 
     const read = () =>
       page.evaluate(() => {
@@ -124,7 +124,7 @@ for (const theme of ['light', 'dark'] as const) {
         const icon = el.querySelector('svg')!.getBoundingClientRect();
         return {
           bg: cs.backgroundColor,
-          shadow: cs.boxShadow,
+          shadow: cs.boxShadow.replaceAll('rgba(0, 0, 0, 0) 0px 0px 0px 0px', '').replaceAll(', ', '') || 'none',
           color: cs.color,
           opacity: cs.opacity,
           iconX: icon.x,
@@ -164,7 +164,7 @@ for (const theme of ['light', 'dark'] as const) {
 for (const theme of ['light', 'dark'] as const) {
   test(`page shell back chevron keeps a keyboard focus ring (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06');
+    await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c');
     // keyboard modality: tab until the back chevron owns focus
     for (let i = 0; i < 40; i++) {
       const onBack = await page.evaluate(

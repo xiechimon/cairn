@@ -16,7 +16,7 @@ async function openAccept(page: Page) {
 
 async function openProviderForm(page: Page) {
   await page.goto('/app/resources/providers?scenario=01');
-  await page.getByRole('button', { name: '新建', exact: true }).click();
+  await page.getByRole('button', { name: '添加服务商' }).click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: '自定义端点' }).click();

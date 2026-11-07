@@ -6,6 +6,7 @@ import { registerChiefRoutes } from './routes-chief.js';
 import { registerComputerScreenRoutes } from './routes-computer-screen.js';
 import { registerComputerRoutes } from './routes-computers.js';
 import { registerCoreRoutes } from './routes-core.js';
+import { registerDraftRoutes } from './routes-drafts.js';
 import { registerFeishuRoutes } from './routes-feishu.js';
 import { registerFlagRoutes } from './routes-flags.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
@@ -26,6 +27,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerTodoRoutes(app, ctx);
   registerBuildRoutes(app, ctx);
   registerUploadRoutes(app, ctx);
+  registerDraftRoutes(app, ctx);
   registerChiefRoutes(app, ctx);
   registerAgentRoutes(app, ctx);
   registerResourceRoutes(app, ctx);
@@ -47,7 +49,6 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
         reposDir: ctx.reposDir,
         attachmentsDir: ctx.attachmentsDir,
         mcpConfigPath: ctx.mcpConfigPath,
-        intakeAgentAllowlist: ctx.intakeAgentAllowlist,
         skillsDir: ctx.skillsDir,
         oauthClient: ctx.oauthClient,
         ...(ctx.convHub !== undefined ? { convHub: ctx.convHub } : {}),

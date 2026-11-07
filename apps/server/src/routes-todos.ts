@@ -12,7 +12,8 @@ import {
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { conflict, notFound, parseWith } from './lib/errors.js';
+import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
+import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import {
   githubIssueDepsOf,
   jsonBody,
@@ -106,6 +107,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.patch('/api/todos/:id', async (c) => {
     const id = c.req.param('id');
     const body = parseWith(patchTodoBodySchema, await jsonBody(c), 'body');
+    if (body.assignment != null) throw new HttpError(410, AGENTS_REMOVED_MESSAGE);
     const prior = getTodo(svc, id);
     if (prior !== null) assertProjectWritable(svc.db, prior.teamId, prior.projectId);
     if (body.projectId !== undefined && body.projectId !== prior?.projectId) {

@@ -6,7 +6,6 @@ import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent as agentTable,
   build as buildTable,
   project as projectTable,
   provider as providerTable,
@@ -16,15 +15,16 @@ import {
 import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
 import {
-  bindAllAgents,
   bootServer,
+  dropQueuedVerify,
   issueApiKey,
   postProject,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
   withVerification,
 } from './helpers.js';
 
-const AGENT_ID = 'agent-702-1';
-const REVIEW_AGENT_ID = 'agent-702-reviewer';
 const PLAN_FILE_NAME = 'plan.md';
 
 const GIT_ENV = {
@@ -68,7 +68,7 @@ interface World {
   done(stepId: string, body: Record<string, unknown>): Promise<void>;
   uploadPlan(stepId: string, content: string): Promise<void>;
   confirm(buildId: string): Promise<void>;
-  startReview(buildId: string, agentId?: string): Promise<Response>;
+  startReview(buildId: string): Promise<Response>;
   merge(buildId: string): Promise<Response>;
   seedConvChanges(buildId: string): Promise<string>;
   todoRow(): ReturnType<typeof loadTodoRow>;
@@ -104,34 +104,17 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      tools: ['合并分支', '推送分支'],
-    })
-    .run();
-
-  s.db
-    .insert(agentTable)
-    .values({
-      id: REVIEW_AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-reviewer',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    tools: ['合并分支', '推送分支'],
+  });
+  seedRoute(s, 'review', { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'restore-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(
@@ -145,12 +128,9 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
   const { id: todoId } = (await todoRes.json()) as { id: string };
 
   async function startBuild(withPlan = true): Promise<string> {
+    if (withPlan) return startLegacyBuild(s, todoId, { withPlan: true });
     const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        withPlan,
-      },
+      body: { todoIds: [todoId] },
     });
     expect(res.status).toBe(201);
     return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
@@ -192,9 +172,9 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     });
     expect(res.status).toBe(202);
   }
-  async function startReview(buildId: string, agentId = REVIEW_AGENT_ID): Promise<Response> {
+  async function startReview(buildId: string): Promise<Response> {
     return call(s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review', agentId },
+      body: { action: 'review' },
     });
   }
   async function merge(buildId: string): Promise<Response> {
@@ -271,6 +251,7 @@ async function driveToDeadlock(
     hasChanges: true,
     ...(commit !== null ? { commit } : {}),
   });
+  dropQueuedVerify(w.s, buildId);
   expect(w.todoRow().phase).toBe('review');
   const reviewRes = await w.startReview(buildId);
   expect(reviewRes.status).toBe(202);

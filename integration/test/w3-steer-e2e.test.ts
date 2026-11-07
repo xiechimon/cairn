@@ -1,13 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -33,8 +31,7 @@ beforeAll(async () => {
       toolCall: {
         name: 'bash',
         arguments: {
-          command:
-            "printf '# 方案\nKind: fix\n\nContext: steer 探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n' > plan.md",
+          command: "printf 'steer probe\\n' >> README.md",
         },
       },
       delayMs: 8_000,
@@ -42,7 +39,7 @@ beforeAll(async () => {
     { content: '收到，补上。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'cairn-w3-steer-home-'));
+  home = makeTestTempDir('cairn-w3-steer-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
@@ -83,8 +80,6 @@ describe('W3 steer E2E: message while building → pending → signal → pull-c
     });
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     expect(started.status).toBe(201);
     const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -104,7 +99,7 @@ describe('W3 steer E2E: message while building → pending → signal → pull-c
       true,
     );
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
 
     const late = await api(server.url, 'POST', `/api/conversations/${buildId}/messages`, {
       content: '晚到的一条',

@@ -1,13 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { trajectoryPackSchema } from '@cairn/shared';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
-import { agent, build, message, project, step, team, todo } from '../src/db/schema.js';
+import { build, message, project, routingRule, step, team, todo } from '../src/db/schema.js';
 import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js';
 import { REVERT_PROMPT_HEAD } from '../src/trajectory-outcome.js';
 
@@ -68,14 +68,22 @@ afterEach(async () => {
 });
 
 function seedInstance(builds: BuildSeed[]) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-outcome-'));
+  const home = makeTestTempDir('cairn-outcome-');
   homes.push(home);
   const opened = openDbWithHandle(join(home, 'server/server.db'));
   const db = opened.db;
   db.insert(team).values({ id: 'team-1', name: 'Test', createdAt: 1 }).run();
   db.insert(project).values({ id: 'project-1', teamId: 'team-1', name: 'Test' }).run();
-  db.insert(agent)
-    .values({ id: 'agent-1', teamId: 'team-1', displayName: 'B', provider: 'test', modelId: 'm' })
+  db.insert(routingRule)
+    .values({
+      id: 'route-1',
+      teamId: 'team-1',
+      use: 'session',
+      provider: 'test',
+      modelId: 'm',
+      createdAt: 1,
+      updatedAt: 1,
+    })
     .run();
   const sessions = join(home, 'server/attachments/step-sessions');
   mkdirSync(sessions, { recursive: true });
@@ -91,7 +99,6 @@ function seedInstance(builds: BuildSeed[]) {
         spec: `Spec ${id}`,
         phaseAt: 1,
         seqNum: ++seq,
-        assignment: { plan: null, build: { agentId: 'agent-1' } },
       })
       .run();
   }

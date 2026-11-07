@@ -1,7 +1,6 @@
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
 import designDoc from '../../DESIGN.md?raw';
-import { ProjectAvatar } from '../board/project-avatar.js';
 import { Button } from '../components/ui/button.js';
 import { docChecks, type GalleryTheme, parseFrontmatter } from './design-doc.js';
 import {
@@ -159,8 +158,6 @@ const MOTION = [
   { name: 'Coordinator window grows', dur: '--dur-overlay', ease: '--ease-drawer' },
 ];
 
-const TILES = [1, 2, 3, 4, 5, 6] as const;
-
 const ELEVATIONS = [
   {
     name: 'Card',
@@ -242,7 +239,11 @@ export function ColorSection() {
       title="Color"
       lede="Four steps of ink on three layers of stone. Ochre means it waits on you, green means it is working. Ratios are measured live against the card."
     >
-      <Specimen title="Ink on the card" note="WCAG 2.x contrast, text needs 4.5, labeled icons 3">
+      <Specimen
+        id="ink-on-the-card"
+        title="Ink on the card"
+        note="WCAG 2.x contrast, text needs 4.5, labeled icons 3"
+      >
         <div className="-my-3 w-full divide-y divide-border">
           {INK.map((ink) => {
             const k = contrast(over(rgba(`var(${ink.cssVar})`), card), card);
@@ -279,36 +280,11 @@ export function ColorSection() {
           })}
         </div>
       </Specimen>
-      <Specimen title="Semantic slots" note="Click a value to copy it">
+      <Specimen id="semantic-slots" title="Semantic slots" note="Click a value to copy it">
         <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           {SEMANTIC.map(([name, cssVar]) => (
             <Swatch key={name} name={name} cssVar={cssVar} />
           ))}
-        </div>
-      </Specimen>
-      <Specimen title="Project tiles" note="Ink letter on an 18% tint of the same hue">
-        <div className="flex flex-wrap gap-4">
-          {TILES.map((i) => {
-            const tint = rgba(`var(--project-tile-${i})`);
-            const k = contrast(rgba(`var(--project-ink-${i})`), over({ ...tint, a: 0.18 }, card));
-            return (
-              <div key={i} className="flex items-center gap-2.5">
-                <ProjectAvatar
-                  name={'CSWDAM'[i - 1] ?? ''}
-                  tone={i - 1}
-                  className="size-8 text-ui"
-                />
-                <span
-                  className={cn(
-                    'text-meta tabular-nums',
-                    k < 4.5 ? 'text-destructive' : 'text-content-tertiary',
-                  )}
-                >
-                  {k.toFixed(2)}
-                </span>
-              </div>
-            );
-          })}
         </div>
       </Specimen>
     </Section>
@@ -327,7 +303,7 @@ function Swatch({ name, cssVar }: { name: string; cssVar: string }) {
   return (
     <Button
       variant="ghost"
-      className="h-auto flex-col items-stretch gap-0 overflow-hidden border-border bg-card p-0 text-left font-normal hover:bg-card hover:shadow-(--e1) dark:hover:bg-card"
+      className="h-auto flex-col items-stretch gap-0 overflow-hidden border-border bg-card p-0 text-left font-normal hover:bg-card dark:hover:bg-card"
       onClick={() => {
         navigator.clipboard
           ?.writeText(`var(${cssVar})`)
@@ -357,6 +333,7 @@ export function TypeSection() {
       lede="Seven sizes. Source Serif 4 for the greeting and page titles, Instrument Sans for everything else, JetBrains Mono for code and times."
     >
       <Specimen
+        id="scale"
         title="Scale"
         note="Tailwind keys text-page, text-heading, text-card-title, text-ui, text-meta, text-caption"
       >
@@ -389,6 +366,7 @@ export function ShapeSection() {
     >
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <Specimen
+          id="concentric-corners"
           title="Concentric corners"
           note={`${menu}px menu − ${pad}px padding = ${menu - pad}px rows`}
           stage="canvas"
@@ -411,7 +389,7 @@ export function ShapeSection() {
             ))}
           </div>
         </Specimen>
-        <Specimen title="Radius scale">
+        <Specimen id="radius-scale" title="Radius scale">
           <div className="-my-3 w-full divide-y divide-border">
             {RADII.map((r) => {
               const px = computedLength(r.expr);
@@ -443,7 +421,7 @@ export function ElevationSection() {
       title="Elevation"
       lede="Three tokens with the hairline ring built in. Cards sit, menus float, dialogs lift. Never add a second ring or a raw shadow."
     >
-      <Specimen title="Three heights" stage="canvas" className="p-0">
+      <Specimen id="three-heights" title="Three heights" stage="canvas" className="p-0">
         <div className="relative h-72 w-full">
           {ELEVATIONS.map((e) => (
             <div key={e.token} className={cn('absolute p-4', e.cls)} style={e.box}>
@@ -466,7 +444,7 @@ export function MotionSection() {
       title="Motion"
       lede="The stone is quiet. Every transition takes one of these durations and curves; play them together to compare."
     >
-      <Specimen title="Durations and curves">
+      <Specimen id="durations-and-curves" title="Durations and curves">
         <div className="flex w-full flex-col gap-1">
           <div className="mb-3">
             <Button onClick={() => setPlayed((p) => !p)}>{played ? 'Reset' : 'Play all'}</Button>
@@ -513,7 +491,6 @@ function runDocCheck(theme: GalleryTheme) {
 
 const DOC_GROUPS: [string, (key: string) => boolean][] = [
   ['Corners', (k) => k.startsWith('rounded.')],
-  ['Tiles', (k) => k.startsWith('project-tiles')],
   ['Running', (k) => k.startsWith('running')],
   ['Ink', (k) => k.startsWith('ink') || k === 'icon'],
   ['Overlay', (k) => k === 'backdrop'],
@@ -667,7 +644,7 @@ export function DocCheckSection({ theme }: { theme: GalleryTheme }) {
                 className={cn(
                   'rounded-full px-2.5 py-0.5 text-meta font-medium',
                   g.ok === g.total
-                    ? 'bg-(--chip-done-bg) text-(--chip-done-fg)'
+                    ? 'bg-secondary text-content-secondary'
                     : 'bg-danger-soft text-destructive',
                 )}
               >

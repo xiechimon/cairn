@@ -1,17 +1,17 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSkillFrontmatter, skillRecordSchema } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
 import { scanLocalSkills } from '../src/services/skills.js';
-import { bootServer, insertMachine, req, type TestServer } from './helpers.js';
+import { bootServer, req, type TestServer } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
+  const root = makeTestTempDir('cairn-skills-');
   roots.push(root);
   return root;
 }
@@ -291,7 +291,7 @@ describe('the skills REST surface (rescanned source)', () => {
   });
 });
 
-describe('agent.skillsAllowlist / defaultSkill validation against the live scan (#1169 field split)', () => {
+describe('work policy skillsAllowlist / defaultSkill validation against the live scan (#1169 field split)', () => {
   function setup() {
     const skillsDir = makeRoot();
     addSkill(skillsDir, 'deploy', { name: 'deploy' });
@@ -300,33 +300,33 @@ describe('agent.skillsAllowlist / defaultSkill validation against the live scan 
     return { s, skillsDir };
   }
 
-  async function createAgent(
-    s: TestServer,
-    body: Record<string, unknown>,
-  ): Promise<{ id: string; row: Record<string, unknown> }> {
-    const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
-      displayName: 'a1',
-      machineId: insertMachine(s),
-      ...body,
-    });
-    expect(res.status).toBe(201);
-    const { id } = (await res.json()) as { id: string };
-    const got = await req(s.app, `GET`, `/api/teams/${s.team.id}/agents/${id}`);
-    const row = (await got.json()) as Record<string, unknown>;
-    return { id, row };
+  function patchPolicy(s: TestServer, body: Record<string, unknown>) {
+    return req(s.app, 'PATCH', `/api/teams/${s.team.id}/work-policies/session`, body);
   }
 
-  test('A1: POST skillsAllowlist carrying an unknown id = silently filtered; absent = null (unrestricted, no longer [])', async () => {
+  async function policyOf(res: Response): Promise<Record<string, unknown>> {
+    expect(res.status).toBe(200);
+    return (await res.json()) as Record<string, unknown>;
+  }
+
+  test('A1: creating with skillsAllowlist carrying an unknown id = silently filtered; absent = null (unrestricted, no longer [])', async () => {
     const { s } = setup();
     try {
-      expect((await createAgent(s, { skillsAllowlist: ['deploy', 'ghost'] })).row).toMatchObject({
+      expect(
+        await policyOf(await patchPolicy(s, { skillsAllowlist: ['deploy', 'ghost'] })),
+      ).toMatchObject({
         skillsAllowlist: ['deploy'],
         defaultSkill: null,
       });
-      expect((await createAgent(s, {})).row).toMatchObject({
-        skillsAllowlist: null,
-        defaultSkill: null,
-      });
+      const fresh = bootServer({ skillsDir: makeRoot() });
+      try {
+        expect(await policyOf(await patchPolicy(fresh, { tools: [] }))).toMatchObject({
+          skillsAllowlist: null,
+          defaultSkill: null,
+        });
+      } finally {
+        fresh.dispose();
+      }
     } finally {
       s.dispose();
     }
@@ -335,23 +335,19 @@ describe('agent.skillsAllowlist / defaultSkill validation against the live scan 
   test('A2: PATCH with null = explicitly cleared to unrestricted; without the field = the list unchanged (undefined and null must not collapse)', async () => {
     const { s } = setup();
     try {
-      const { id, row } = await createAgent(s, { skillsAllowlist: ['deploy'] });
-      expect(row).toMatchObject({ skillsAllowlist: ['deploy'] });
-      const cleared = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agents/${id}`, {
-        skillsAllowlist: null,
+      expect(await policyOf(await patchPolicy(s, { skillsAllowlist: ['deploy'] }))).toMatchObject({
+        skillsAllowlist: ['deploy'],
       });
-      expect(cleared.status).toBe(200);
-      expect(((await cleared.json()) as Record<string, unknown>).skillsAllowlist).toBeNull();
-      const untouched = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agents/${id}`, {
-        displayName: 'renamed',
-      });
-      expect(((await untouched.json()) as Record<string, unknown>).skillsAllowlist).toBeNull();
-      const restricted = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agents/${id}`, {
-        skillsAllowlist: ['review'],
-      });
-      expect(((await restricted.json()) as Record<string, unknown>).skillsAllowlist).toEqual([
-        'review',
+      expect(
+        (await policyOf(await patchPolicy(s, { skillsAllowlist: null }))).skillsAllowlist,
+      ).toBeNull();
+      await patchPolicy(s, { skillsAllowlist: ['deploy'] });
+      expect((await policyOf(await patchPolicy(s, { tools: [] }))).skillsAllowlist).toEqual([
+        'deploy',
       ]);
+      expect(
+        (await policyOf(await patchPolicy(s, { skillsAllowlist: ['review'] }))).skillsAllowlist,
+      ).toEqual(['review']);
     } finally {
       s.dispose();
     }
@@ -360,24 +356,20 @@ describe('agent.skillsAllowlist / defaultSkill validation against the live scan 
   test('A3: defaultSkill is a single-value slot -- string/null pass, arrays (single-element included) are rejected; an unknown id filters to null', async () => {
     const { s } = setup();
     try {
-      const set = await createAgent(s, { defaultSkill: 'deploy' });
-      expect(set.row).toMatchObject({ defaultSkill: 'deploy', skillsAllowlist: null });
-      const unknown = await createAgent(s, { defaultSkill: 'ghost' });
-      expect(unknown.row).toMatchObject({ defaultSkill: null });
-      const cleared = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agents/${unknown.id}`, {
-        defaultSkill: 'review',
+      expect(await policyOf(await patchPolicy(s, { defaultSkill: 'deploy' }))).toMatchObject({
+        defaultSkill: 'deploy',
+        skillsAllowlist: null,
       });
-      expect(((await cleared.json()) as Record<string, unknown>).defaultSkill).toBe('review');
-      const nullBack = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agents/${unknown.id}`, {
-        defaultSkill: null,
-      });
-      expect(((await nullBack.json()) as Record<string, unknown>).defaultSkill).toBeNull();
-      const arr = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
-        displayName: 'arr',
-        machineId: insertMachine(s),
-        defaultSkill: ['deploy'],
-      });
-      expect(arr.status).toBe(400);
+      expect(
+        (await policyOf(await patchPolicy(s, { defaultSkill: 'ghost' }))).defaultSkill,
+      ).toBeNull();
+      expect((await policyOf(await patchPolicy(s, { defaultSkill: 'review' }))).defaultSkill).toBe(
+        'review',
+      );
+      expect(
+        (await policyOf(await patchPolicy(s, { defaultSkill: null }))).defaultSkill,
+      ).toBeNull();
+      expect((await patchPolicy(s, { defaultSkill: ['deploy'] })).status).toBe(400);
     } finally {
       s.dispose();
     }
@@ -386,14 +378,10 @@ describe('agent.skillsAllowlist / defaultSkill validation against the live scan 
   test('A4: zero regression on a non-empty allowlist -- the selected subset passes as is (the filter only eats unknown ids, no reordering, no drops)', async () => {
     const { s, skillsDir } = setup();
     try {
-      const { id } = await createAgent(s, { skillsAllowlist: ['review', 'deploy'] });
+      await patchPolicy(s, { skillsAllowlist: ['review', 'deploy'] });
       rmSync(join(skillsDir, 'deploy'), { recursive: true, force: true });
-      const patched = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agents/${id}`, {
-        skillsAllowlist: ['deploy', 'review', 'ghost'],
-      });
-      expect(((await patched.json()) as Record<string, unknown>).skillsAllowlist).toEqual([
-        'review',
-      ]);
+      const patched = await patchPolicy(s, { skillsAllowlist: ['deploy', 'review', 'ghost'] });
+      expect((await policyOf(patched)).skillsAllowlist).toEqual(['review']);
     } finally {
       s.dispose();
     }

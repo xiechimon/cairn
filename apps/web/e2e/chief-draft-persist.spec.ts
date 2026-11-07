@@ -46,15 +46,40 @@ async function stubBoot(page: Page) {
   });
 }
 
-async function openChiefComposer(page: Page) {
+interface ServerDraft {
+  content: string;
+  updatedAt: number | null;
+  puts: string[];
+}
+
+async function stubServerDraft(page: Page, seed?: string): Promise<ServerDraft> {
+  const store: ServerDraft = {
+    content: seed ?? '',
+    updatedAt: seed === undefined ? null : 1,
+    puts: [],
+  };
+  await page.route(`**/api/teams/${TEAM_ID}/drafts/chief`, async (route, request) => {
+    if (request.method() === 'PUT') {
+      const body = request.postDataJSON() as { content: string };
+      store.puts.push(body.content);
+      store.content = body.content;
+      store.updatedAt = body.content === '' ? null : (store.updatedAt ?? 0) + 1;
+    }
+    return route.fulfill({ json: { content: store.content, updatedAt: store.updatedAt } });
+  });
+  return store;
+}
+
+async function openChiefComposer(page: Page, server?: { seed?: string }) {
   await stubBoot(page);
+  const store = server === undefined ? null : await stubServerDraft(page, server.seed);
   await page.goto('/app/schedules');
 
   await openChiefWindow(page);
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
-  return { drawer: page.locator('.chief-drawer'), input };
+  return { drawer: page.locator('.chief-drawer'), input, store };
 }
 
 const storedDraft = (page: Page) => page.evaluate((key) => localStorage.getItem(key), DRAFT_KEY);
@@ -119,6 +144,7 @@ test('live face: a rejected send keeps the draft in the box and in storage (#631
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
   await input.press('Enter');
 
+  await expect(page.getByText('发送失败，请重试。')).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
   await evidenceShot(page, 'send-rejected-draft-persisted.png');
@@ -168,4 +194,60 @@ test('fixture face: zero writes, zero reads (A0 S11 shape)', async ({ page }) =>
   await expect(input).toHaveAttribute('readonly', '');
   await expect.poll(() => storedDraft(page)).toBe('SEEDED-BY-TEST');
   await evidenceShot(page, 'fixture-face-storage-untouched.png');
+});
+
+test('live face: the draft is saved to the server and a fresh device restores it (D110)', async ({
+  page,
+}) => {
+  const { input, store } = await openChiefComposer(page, {});
+  if (store === null) throw new Error('server stub missing');
+  await input.fill(DRAFT);
+  await expect.poll(() => store.content).toBe(DRAFT);
+  await expect
+    .poll(() => page.evaluate((key) => localStorage.getItem(`${key}.sync`), DRAFT_KEY))
+    .toContain('"dirty":false');
+
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await openChiefWindow(page);
+  await expect(input).toHaveValue(DRAFT);
+  await evidenceShot(page, 'server-draft-restored-on-fresh-device.png');
+});
+
+test('live face: a draft stored by another device appears on open (D110)', async ({ page }) => {
+  const { input } = await openChiefComposer(page, {
+    seed: '![shot.png](attachment:team-1/att-1.png)\n来自另一台设备的草稿',
+  });
+  await openChiefWindow(page);
+  await expect(input).toHaveValue(/来自另一台设备的草稿/);
+  await evidenceShot(page, 'server-draft-from-other-device.png');
+});
+
+test('live face: an accepted send clears the server draft; a rejected send keeps it (D110)', async ({
+  page,
+}) => {
+  const { input, store } = await openChiefComposer(page, {});
+  if (store === null) throw new Error('server stub missing');
+  let accept = false;
+  await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
+    if (request.method() !== 'POST') return route.fallback();
+    if (!accept) return route.fulfill({ status: 500, json: { error: 'upstream refused' } });
+    return route.fulfill({
+      status: 200,
+      json: { thread: { id: 'chief-1', teamId: TEAM_ID, title: DRAFT, createdAt: 0 } },
+    });
+  });
+
+  await input.fill(DRAFT);
+  await expect.poll(() => store.content).toBe(DRAFT);
+  await input.press('Enter');
+  await expect(page.getByText('发送失败，请重试。')).toBeVisible();
+  await expect(input).toHaveValue(DRAFT);
+  expect(store.content).toBe(DRAFT);
+
+  accept = true;
+  await input.press('Enter');
+  await expect(input).toHaveValue('');
+  await expect.poll(() => store.content).toBe('');
+  expect(store.updatedAt).toBeNull();
 });

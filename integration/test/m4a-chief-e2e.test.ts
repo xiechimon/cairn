@@ -1,6 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -14,14 +12,8 @@ import {
   step as stepTable,
   tokenUsage,
 } from '../../apps/server/src/db/schema.js';
-import {
-  AGENT_ID,
-  api,
-  bootRealServer,
-  daemonLogLines,
-  type RealServer,
-  waitFor,
-} from './helpers.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
+import { api, bootRealServer, daemonLogLines, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 let stub: StubLlm;
@@ -41,7 +33,7 @@ beforeAll(async () => {
     { content: '已查看团队项目清单。有什么可以帮你的？' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'cairn-m4a-home-'));
+  home = makeTestTempDir('cairn-m4a-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'm4a-mbp' },
     {},
@@ -74,9 +66,12 @@ afterAll(async () => {
 
 describe('M4a Chief E2E: pi session + remoteTools relay round trip (02 §4.3/r5 §3.1)', () => {
   test('bind → send message → claim chief step → pi relay tool → done → chief_message persisted', async () => {
-    const patch = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: null },
-    });
+    const patch = await api(
+      server.url,
+      'PATCH',
+      `/api/teams/${server.teamId}/routing-rules/coordinator`,
+      { provider: 'stub-gw', modelId: 'stub-model' },
+    );
     expect(patch.status).toBe(200);
 
     const sent = await api(server.url, 'POST', `/api/teams/${server.teamId}/chief/threads`, {

@@ -17,7 +17,13 @@ import {
   ProviderModelRow,
   ProviderSection,
 } from '../components/providers/provider-panel.js';
-import { SETTINGS_HINT_CLS, SettingsCard, SettingsRow } from '../components/settings-list.js';
+import {
+  SETTINGS_HINT_CLS,
+  SettingsCard,
+  SettingsDangerZone,
+  SettingsRow,
+  SettingsSection,
+} from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
@@ -30,11 +36,14 @@ const PROTOCOL_LABELS: Record<ProviderApi, string> = {
   'openai-responses': 'OpenAI Responses',
 };
 
+const SUBSCRIPTION_PRESET_IDS: readonly string[] = ['openai-codex'];
+
 const isOAuthPreset = (providerId: string) =>
   (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(providerId);
 
 export function providerKind(record: ProviderRecord): string {
-  if (isOAuthPreset(record.providerId)) return 'OAuth 登录';
+  if (SUBSCRIPTION_PRESET_IDS.includes(record.providerId)) return '订阅';
+  if (isOAuthPreset(record.providerId)) return 'OAuth';
   if ((PROVIDER_PRESET_IDS as readonly string[]).includes(record.providerId)) return 'API key';
   return '自定义端点';
 }
@@ -47,7 +56,7 @@ export function providerMark(record: ProviderRecord): ProviderMark {
   return Server;
 }
 
-function CommitInput({
+export function CommitInput({
   label,
   value,
   onCommit,
@@ -134,14 +143,13 @@ export interface ProviderEditActions {
 
 export function describeTestResult(result: ProviderTestResult, t: TFunc): string {
   if (result.status === 'ok') {
-    return t('连接正常 · {model} · {ms}ms · 模型数 {n}', {
+    return t('连接正常 · {model} · {ms}ms', {
       model: result.probe.echoedModel ?? result.probe.requestedModel ?? '',
       ms: result.probe.latencyMs ?? 0,
-      n: result.listing.modelCount ?? 0,
     });
   }
-  const error = result.probe.error ?? result.listing.error;
-  const http = result.probe.httpStatus ?? result.listing.httpStatus;
+  const error = result.probe.error;
+  const http = result.probe.httpStatus;
   return t('连接失败 · {type}{http} · {message}', {
     type: error?.type ?? 'other',
     http: http === null ? '' : ` (HTTP ${http})`,
@@ -274,7 +282,7 @@ export function TeamProviderEditor({
               onRemove={() => saveModels(models.filter((m) => m.id !== model.id))}
             />
           ))}
-          <div className="flex min-h-11 items-center gap-2 px-4 py-1.5">
+          <div className="settings-flat-block flex min-h-11 items-center gap-2 px-4 py-1.5">
             <Input
               aria-label={t('添加模型')}
               placeholder={t('添加模型 ID，回车保存')}
@@ -290,11 +298,14 @@ export function TeamProviderEditor({
           </div>
         </SettingsCard>
       </ProviderSection>
-      <div className="flex justify-end">
-        <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
-          {t('移除服务商')}
-        </Button>
-      </div>
+      <SettingsSection title={t('管理')}>
+        <SettingsDangerZone
+          label={t('移除服务商')}
+          description={t('移除后，使用它的模型不再可选。')}
+          actionLabel={t('移除')}
+          onAction={() => setConfirming(true)}
+        />
+      </SettingsSection>
       <AlertDialogShell
         title={t('移除「{name}」？', { name: record.label })}
         ariaLabel={t('移除服务商')}
@@ -407,11 +418,11 @@ export function PiEditor({
       <SettingsCard>
         <SettingsRow
           label={t('服务商')}
-          hint={t('pi 步骤用团队里的服务商，不读这台机器的配置')}
+          hint={t('pi 步骤用所有机器的服务商，不读这台机器的配置')}
           className="flex-wrap gap-y-2 py-2.5"
         >
           <Button variant="outline" size="sm" onClick={onShowTeam}>
-            {t('团队的 {n} 个服务商', { n: providerCount })}
+            {t('所有机器的 {n} 个服务商', { n: providerCount })}
           </Button>
         </SettingsRow>
       </SettingsCard>

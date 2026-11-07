@@ -8,6 +8,7 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
@@ -73,73 +74,78 @@ export function SkillsPage() {
       }
       fixture={fixture}
     >
-      {skills.length === 0 ? (
-        <EmptyState
-          testId="resource-empty"
-          className="mt-6"
-          icon={Puzzle}
-          title={t(SKILL_PAGE_COPY.empty)}
-          description={t(SKILL_PAGE_COPY.directoryHint, { dir: SKILLS_DIR_DEFAULT })}
-          action={{ label: t('新建技能'), onClick: openCreate }}
-        />
-      ) : (
-        <>
-          <div className={RES_SEARCH_ROW_CLS}>
-            <InputGroup className="flex-1">
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupInput
-                type="text"
-                placeholder={t('搜索技能...')}
-                aria-label={t('搜索技能...')}
-              />
-            </InputGroup>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" />}>
-                <ArrowUpDown />
-                <span>{t('排序')}</span>
-                <ChevronDown />
-              </DropdownMenuTrigger>
-              <KeyedMenuContent align="end" side="bottom" sideOffset={8} aria-label={t('排序')}>
-                <DropdownMenuRadioGroup
-                  value={sort}
-                  onValueChange={(next) => setSort(next as SortKind)}
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <KeyedMenuRadioItem
-                      key={option}
-                      value={option}
-                      shortcut={SORT_KEYS[option]}
-                      closeOnClick
-                    >
-                      <span>{t(option)}</span>
-                    </KeyedMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </KeyedMenuContent>
-            </DropdownMenu>
-          </div>
-          <ResourceList>
-            {skills.map((skill) => (
-              <ResourceRow
-                key={skill.name}
-                onOpen={() =>
-                  setDialog({
-                    skill: { id: skill.name, name: skill.name, description: skill.description },
-                  })
-                }
+      <QueryBoundary
+        query={live ? skillsQ : undefined}
+        isEmpty={skills.length === 0}
+        loadingLabel={t('正在加载技能')}
+        errorTitle={t('技能没能加载')}
+        className="mt-6"
+        empty={
+          <EmptyState
+            testId="resource-empty"
+            className="mt-6"
+            icon={Puzzle}
+            title={t(SKILL_PAGE_COPY.empty)}
+            description={t(SKILL_PAGE_COPY.directoryHint, { dir: SKILLS_DIR_DEFAULT })}
+            action={{ label: t('新建技能'), onClick: openCreate }}
+          />
+        }
+      >
+        <div className={RES_SEARCH_ROW_CLS}>
+          <InputGroup className="flex-1">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="text"
+              placeholder={t('搜索技能...')}
+              aria-label={t('搜索技能...')}
+            />
+          </InputGroup>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+              <ArrowUpDown />
+              <span>{t('排序')}</span>
+              <ChevronDown />
+            </DropdownMenuTrigger>
+            <KeyedMenuContent align="end" side="bottom" sideOffset={8} aria-label={t('排序')}>
+              <DropdownMenuRadioGroup
+                value={sort}
+                onValueChange={(next) => setSort(next as SortKind)}
               >
-                <RowText>
-                  <RowTitle>{skill.name}</RowTitle>
-                  <RowDesc>{skill.description}</RowDesc>
-                </RowText>
-                <RowChevron />
-              </ResourceRow>
-            ))}
-          </ResourceList>
-        </>
-      )}
+                {SORT_OPTIONS.map((option) => (
+                  <KeyedMenuRadioItem
+                    key={option}
+                    value={option}
+                    shortcut={SORT_KEYS[option]}
+                    closeOnClick
+                  >
+                    <span>{t(option)}</span>
+                  </KeyedMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </KeyedMenuContent>
+          </DropdownMenu>
+        </div>
+        <ResourceList>
+          {skills.map((skill) => (
+            <ResourceRow
+              key={skill.name}
+              onOpen={() =>
+                setDialog({
+                  skill: { id: skill.name, name: skill.name, description: skill.description },
+                })
+              }
+            >
+              <RowText>
+                <RowTitle>{skill.name}</RowTitle>
+                <RowDesc>{skill.description}</RowDesc>
+              </RowText>
+              <RowChevron />
+            </ResourceRow>
+          ))}
+        </ResourceList>
+      </QueryBoundary>
       <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
       <SkillImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </PageShell>

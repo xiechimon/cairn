@@ -12,21 +12,20 @@ import { ProjectSettingsPage } from './pages/project-settings-page.js';
 import { SchedulesPage } from './pages/schedules-page.js';
 import { PwaBridge } from './pwa/register.js';
 import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './resources/hrefs.js';
-import { MachineDetailPage } from './resources/machine-detail-page.js';
+import { MachineDetailRedirect } from './resources/machine-detail-page.js';
 import { MACHINES_HREF } from './resources/machines-page.js';
 import { MCP_HREF } from './resources/mcp-servers-page.js';
 import { ROUTING_SETTINGS_HREF } from './resources/routing-settings-page.js';
 import { SECRETS_HREF } from './resources/secrets-page.js';
 import { SKILLS_HREF } from './resources/skills-page.js';
 import { ActivityPage } from './routes/activity-page.js';
-import { AGENTS_HREF, AgentDetailPage } from './routes/agent-detail-page.js';
 import { BoardPage } from './routes/board-page.js';
 import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
 import { ACTIVITY_PATH } from './search/activity-href.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { SettingsPage } from './settings/settings-page.js';
-import { SettingsRedirect } from './settings/settings-redirect.js';
+import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 
 export const router = createBrowserRouter([
   {
@@ -47,17 +46,16 @@ export const router = createBrowserRouter([
               { path: '/app/project/:id/files', element: <ProjectPage /> },
               { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
               { path: '/app/team', element: <SettingsRedirect section="team" /> },
-              { path: `${AGENTS_HREF}/:id`, element: <AgentDetailPage /> },
               { path: '/app/account', element: <SettingsRedirect section="account" /> },
               { path: '/app/api-keys', element: <SettingsRedirect section="api-keys" /> },
               { path: SKILLS_HREF, element: <SettingsRedirect section="skills" /> },
               { path: MCP_HREF, element: <SettingsRedirect section="mcp" /> },
               { path: SECRETS_HREF, element: <SettingsRedirect section="secrets" /> },
               { path: MACHINES_HREF, element: <SettingsRedirect section="machines" /> },
-              { path: `${MACHINES_HREF}/:id`, element: <MachineDetailPage /> },
+              { path: `${MACHINES_HREF}/:id`, element: <MachineDetailRedirect /> },
               { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
               { path: PROVIDERS_HREF, element: <SettingsRedirect section="providers" /> },
-              { path: MODEL_ROUTING_HREF, element: <SettingsRedirect section="routing" /> },
+              { path: MODEL_ROUTING_HREF, element: <LegacyModelRoutingRedirect /> },
               {
                 path: ROUTING_SETTINGS_HREF,
                 element: <SettingsRedirect section="work-routing" />,

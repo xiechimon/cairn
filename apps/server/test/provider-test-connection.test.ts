@@ -1,7 +1,6 @@
 import { providerTestResultSchema } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { FetchLike } from '../src/lib/github.js';
 import { PROVIDER_TEST_LIMIT } from '../src/services/provider-test.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
@@ -12,40 +11,112 @@ interface Call {
   url: string;
   method: string;
   headers: Record<string, string>;
-  body: string | undefined;
+  body: string;
 }
 
-type Reply = { status: number; body: unknown; delayMs?: number } | 'hang' | Error;
+type Reply = { status: number; body: unknown } | 'hang' | Error;
 
-function stubFetch(replies: Record<string, Reply>) {
+function sse(events: { event?: string; data: unknown }[]): string {
+  return `${events
+    .map((e) => `${e.event ? `event: ${e.event}\n` : ''}data: ${JSON.stringify(e.data)}\n\n`)
+    .join('')}data: [DONE]\n\n`;
+}
+
+function completion(model: string): string {
+  const chunk = (delta: object, finish: string | null, usage?: object) => ({
+    data: {
+      id: 'chatcmpl-1',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model,
+      choices: [{ index: 0, delta, finish_reason: finish }],
+      ...(usage === undefined ? {} : { usage }),
+    },
+  });
+  return sse([
+    chunk({ role: 'assistant', content: 'pong' }, null),
+    chunk({}, 'stop', { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }),
+  ]);
+}
+
+function anthropicCompletion(model: string): string {
+  return sse([
+    {
+      event: 'message_start',
+      data: {
+        type: 'message_start',
+        message: {
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
+          model,
+          content: [],
+          usage: { input_tokens: 1, output_tokens: 0 },
+        },
+      },
+    },
+    {
+      event: 'content_block_start',
+      data: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    },
+    {
+      event: 'content_block_delta',
+      data: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'pong' },
+      },
+    },
+    { event: 'content_block_stop', data: { type: 'content_block_stop', index: 0 } },
+    {
+      event: 'message_delta',
+      data: {
+        type: 'message_delta',
+        delta: { stop_reason: 'end_turn' },
+        usage: { output_tokens: 1 },
+      },
+    },
+    { event: 'message_stop', data: { type: 'message_stop' } },
+  ]);
+}
+
+function stubFetch(reply: (call: Call) => Reply) {
   const calls: Call[] = [];
-  const fetch: FetchLike = (input, init) => {
-    const url = String(input);
-    calls.push({
-      url,
-      method: init?.method ?? 'GET',
-      headers: init?.headers ?? {},
-      body: init?.body,
-    });
-    const reply = replies[`${init?.method ?? 'GET'} ${new URL(url).pathname}`];
-    if (reply === undefined) throw new Error(`unexpected request ${url}`);
-    if (reply instanceof Error) return Promise.reject(reply);
-    if (reply === 'hang') {
-      return new Promise((_, reject) => {
-        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+  const fetch = ((input: unknown, init?: RequestInit) => {
+    const request = input instanceof Request ? input : null;
+    const headers = new Headers(init?.headers ?? request?.headers);
+    const call: Call = {
+      url: request?.url ?? String(input),
+      method: init?.method ?? request?.method ?? 'GET',
+      headers: Object.fromEntries(headers.entries()),
+      body: typeof init?.body === 'string' ? init.body : '',
+    };
+    calls.push(call);
+    const r = reply(call);
+    if (r instanceof Error) return Promise.reject(r);
+    if (r === 'hang') {
+      const signal = init?.signal ?? request?.signal;
+      return new Promise<Response>((_, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason));
       });
     }
-    const text = typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body);
-    return Promise.resolve({
-      ok: reply.status >= 200 && reply.status < 300,
-      status: reply.status,
-      headers: { get: () => null },
-      json: () => Promise.resolve(JSON.parse(text)),
-      text: () => Promise.resolve(text),
-    });
-  };
+    const text = typeof r.body === 'string' ? r.body : JSON.stringify(r.body);
+    return Promise.resolve(
+      new Response(text, {
+        status: r.status,
+        headers: {
+          'content-type':
+            text.startsWith('data:') || text.startsWith('event:')
+              ? 'text/event-stream'
+              : 'application/json',
+        },
+      }),
+    );
+  }) as typeof globalThis.fetch;
   return { fetch, calls };
 }
+
+const ok = (model: string) => stubFetch(() => ({ status: 200, body: completion(model) }));
 
 async function addProvider(
   s: TestServer,
@@ -76,11 +147,8 @@ afterEach(() => {
 });
 
 describe('provider test connection', () => {
-  test('lists models, probes the cheapest configured model with max_tokens <= 8 and reports only the result summary', async () => {
-    const { fetch, calls } = stubFetch({
-      'GET /v1/models': { status: 200, body: { data: [{ id: 'big' }, { id: 'small' }] } },
-      'POST /v1/chat/completions': { status: 200, body: { model: 'small-2026', choices: [] } },
-    });
+  test('probes the cheapest configured model through the pi stack with max_tokens <= 8 and reports only the result summary', async () => {
+    const { fetch, calls } = ok('small-2026');
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s);
     const res = await req(s.app, 'POST', testPath(s, id), {});
@@ -88,40 +156,55 @@ describe('provider test connection', () => {
     const text = await res.text();
     const result = providerTestResultSchema.parse(JSON.parse(text));
     expect(result.status).toBe('ok');
-    expect(result.listing).toMatchObject({ httpStatus: 200, modelCount: 2, error: null });
     expect(result.probe).toMatchObject({
       requestedModel: 'small',
       echoedModel: 'small-2026',
       httpStatus: 200,
       error: null,
     });
-    expect(result.probe.latencyMs).toBeGreaterThanOrEqual(0);
-    const probe = calls.find((c) => c.method === 'POST');
-    expect(JSON.parse(probe?.body ?? '{}').max_tokens).toBeLessThanOrEqual(8);
-    expect(JSON.parse(probe?.body ?? '{}').model).toBe('small');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://gw.example.com/v1/chat/completions');
+    const sent = JSON.parse(calls[0]?.body ?? '{}');
+    expect(sent.model).toBe('small');
+    expect(sent.max_tokens ?? sent.max_completion_tokens).toBeLessThanOrEqual(8);
     expect(text).not.toContain(KEY);
     expect(text.toLowerCase()).not.toContain('authorization');
   });
 
-  test('an explicit model in the body overrides the cheapest-model choice', async () => {
-    const { fetch, calls } = stubFetch({
-      'GET /v1/models': { status: 200, body: { data: [] } },
-      'POST /v1/chat/completions': { status: 200, body: { model: 'big' } },
-    });
+  test('an explicit model in the body overrides the cheapest-model choice, even when it is not configured', async () => {
+    const { fetch, calls } = ok('other');
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s);
-    const res = await req(s.app, 'POST', testPath(s, id), { model: 'big' });
+    const res = await req(s.app, 'POST', testPath(s, id), { model: 'other' });
     expect(((await res.json()) as { probe: { requestedModel: string } }).probe.requestedModel).toBe(
-      'big',
+      'other',
     );
-    expect(JSON.parse(calls.find((c) => c.method === 'POST')?.body ?? '{}').model).toBe('big');
+    expect(JSON.parse(calls[0]?.body ?? '{}').model).toBe('other');
   });
 
-  test('anthropic providers use /v1/messages with x-api-key when authHeader is off', async () => {
-    const { fetch, calls } = stubFetch({
-      'GET /v1/models': { status: 200, body: { data: [{ id: 'claude-x' }] } },
-      'POST /v1/messages': { status: 200, body: { model: 'claude-x' } },
-    });
+  test('an OpenAI-compatible provider with authHeader off still authenticates with its native Bearer header', async () => {
+    const { fetch, calls } = ok('small');
+    const s = bootServer({ providerTestFetch: fetch });
+    const { id } = await addProvider(s, { authHeader: false });
+    await req(s.app, 'POST', testPath(s, id), {});
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${KEY}`);
+  });
+
+  test('compat.maxTokensField is honoured by the probe request', async () => {
+    const { fetch, calls } = ok('small');
+    const s = bootServer({ providerTestFetch: fetch });
+    const { id } = await addProvider(s, { compat: { maxTokensField: 'max_completion_tokens' } });
+    await req(s.app, 'POST', testPath(s, id), {});
+    const sent = JSON.parse(calls[0]?.body ?? '{}');
+    expect(sent.max_completion_tokens).toBeLessThanOrEqual(8);
+    expect(sent.max_tokens).toBeUndefined();
+  });
+
+  test('anthropic providers use /v1/messages with the native x-api-key', async () => {
+    const { fetch, calls } = stubFetch(() => ({
+      status: 200,
+      body: anthropicCompletion('claude-x'),
+    }));
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s, {
       providerId: 'anthropic',
@@ -132,45 +215,64 @@ describe('provider test connection', () => {
     });
     const res = await req(s.app, 'POST', testPath(s, id), {});
     expect(((await res.json()) as { status: string }).status).toBe('ok');
-    const probe = calls.find((c) => c.method === 'POST');
-    expect(probe?.url).toBe('https://api.anthropic.com/v1/messages');
-    expect(probe?.headers['x-api-key']).toBe(KEY);
-    expect(probe?.headers.authorization).toBeUndefined();
+    expect(calls[0]?.url).toMatch(/^https:\/\/api\.anthropic\.com\/v1\/messages(\?|$)/);
+    expect(calls[0]?.headers['x-api-key']).toBe(KEY);
   });
 
-  test('a provider without /models still gets its probe and reports the listing failure separately', async () => {
-    const { fetch } = stubFetch({
-      'GET /v1/models': { status: 404, body: { error: { message: 'no such route' } } },
-      'POST /v1/chat/completions': { status: 200, body: { model: 'small' } },
-    });
+  test('an upstream success whose model string echoes the key is scrubbed from the summary', async () => {
+    const { fetch } = ok(`small-${KEY}`);
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s);
-    const result = (await (await req(s.app, 'POST', testPath(s, id), {})).json()) as {
-      status: string;
-      listing: { httpStatus: number; error: { type: string } };
-    };
-    expect(result.status).toBe('ok');
-    expect(result.listing.httpStatus).toBe(404);
-    expect(result.listing.error.type).toBe('not_found');
+    const text = await (await req(s.app, 'POST', testPath(s, id), {})).text();
+    expect(text).not.toContain(KEY);
+    expect(JSON.parse(text).probe.echoedModel).toContain('[REDACTED]');
+  });
+
+  test('an explicit model that contains the key is scrubbed from requestedModel', async () => {
+    const { fetch } = ok('x');
+    const s = bootServer({ providerTestFetch: fetch });
+    const { id } = await addProvider(s);
+    const text = await (await req(s.app, 'POST', testPath(s, id), { model: `m-${KEY}` })).text();
+    expect(text).not.toContain(KEY);
+  });
+
+  test('HTTP 200 carrying an application-level error is a failure, not an ok', async () => {
+    const { fetch } = stubFetch(() => ({
+      status: 200,
+      body: { error: { message: `gateway failed for ${KEY}` } },
+    }));
+    const s = bootServer({ providerTestFetch: fetch });
+    const { id } = await addProvider(s);
+    const text = await (await req(s.app, 'POST', testPath(s, id), {})).text();
+    const result = providerTestResultSchema.parse(JSON.parse(text));
+    expect(result.status).toBe('failed');
+    expect(result.probe.error).not.toBeNull();
+    expect(text).not.toContain(KEY);
+  });
+
+  test('a non-JSON success body is a failure, not an ok', async () => {
+    const { fetch } = stubFetch(() => ({ status: 200, body: '<html>captive portal</html>' }));
+    const s = bootServer({ providerTestFetch: fetch });
+    const { id } = await addProvider(s);
+    const result = providerTestResultSchema.parse(
+      await (await req(s.app, 'POST', testPath(s, id), {})).json(),
+    );
+    expect(result.status).toBe('failed');
   });
 
   test('upstream error bodies that echo the key are scrubbed, by literal and by pattern', async () => {
     const other = 'sk-ant-api03-ZZZZZZZZZZZZZZZZZZZZZZZZZZZZ';
-    const { fetch } = stubFetch({
-      'GET /v1/models': { status: 401, body: { error: { message: `bad key ${KEY}` } } },
-      'POST /v1/chat/completions': {
-        status: 401,
-        body: {
-          error: {
-            message: `Incorrect API key provided: ${KEY}; saw Bearer abc.def.ghi and ${other}`,
-          },
+    const { fetch } = stubFetch(() => ({
+      status: 401,
+      body: {
+        error: {
+          message: `Incorrect API key provided: ${KEY}; saw Bearer abc.def.ghi and ${other}`,
         },
       },
-    });
+    }));
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s);
-    const res = await req(s.app, 'POST', testPath(s, id), {});
-    const text = await res.text();
+    const text = await (await req(s.app, 'POST', testPath(s, id), {})).text();
     const result = providerTestResultSchema.parse(JSON.parse(text));
     expect(result.status).toBe('failed');
     expect(result.probe.httpStatus).toBe(401);
@@ -183,10 +285,10 @@ describe('provider test connection', () => {
 
   test('a short key that is not pattern-shaped is still removed by literal match, and long bodies are truncated', async () => {
     const short = 'hunter2hunter2';
-    const { fetch } = stubFetch({
-      'GET /v1/models': { status: 500, body: 'x'.repeat(5000) },
-      'POST /v1/chat/completions': { status: 500, body: `oops ${short} ${'y'.repeat(5000)}` },
-    });
+    const { fetch } = stubFetch(() => ({
+      status: 500,
+      body: `oops ${short} ${'y'.repeat(5000)}`,
+    }));
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s, { apiKey: short });
     const text = await (await req(s.app, 'POST', testPath(s, id), {})).text();
@@ -195,53 +297,32 @@ describe('provider test connection', () => {
     expect(JSON.parse(text).probe.error.type).toBe('server');
   });
 
-  test('network failures that mention the key in the message are scrubbed', async () => {
-    const { fetch } = stubFetch({
-      'GET /v1/models': new Error(`connect failed for ${KEY}`),
-      'POST /v1/chat/completions': new Error(`ECONNREFUSED https://gw.example.com?k=${KEY}`),
-    });
+  test('an unreachable provider is a network failure and its error text is scrubbed', async () => {
+    const { fetch } = stubFetch(() => new Error(`ECONNREFUSED https://gw.example.com?k=${KEY}`));
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s);
     const text = await (await req(s.app, 'POST', testPath(s, id), {})).text();
     expect(text).not.toContain(KEY);
-    expect(JSON.parse(text).probe.error.type).toBe('network');
-  });
-
-  test('a hanging provider times out and reports a timeout error', async () => {
-    const { fetch } = stubFetch({
-      'GET /v1/models': 'hang',
-      'POST /v1/chat/completions': 'hang',
-    });
-    const s = bootServer({ providerTestFetch: fetch, providerTestTimeoutMs: 30 });
-    const { id } = await addProvider(s);
-    const result = (await (await req(s.app, 'POST', testPath(s, id), {})).json()) as {
-      status: string;
-      listing: { error: { type: string } };
-      probe: { error: { type: string }; httpStatus: number | null };
-    };
+    const result = providerTestResultSchema.parse(JSON.parse(text));
     expect(result.status).toBe('failed');
-    expect(result.listing.error.type).toBe('timeout');
-    expect(result.probe.error.type).toBe('timeout');
+    expect(result.probe.error?.type).toBe('network');
     expect(result.probe.httpStatus).toBeNull();
   });
 
-  test('a non-JSON success body is an invalid_response, not an ok', async () => {
-    const { fetch } = stubFetch({
-      'GET /v1/models': { status: 200, body: '<html>captive portal</html>' },
-      'POST /v1/chat/completions': { status: 200, body: '<html>captive portal</html>' },
-    });
-    const s = bootServer({ providerTestFetch: fetch });
+  test('a hanging provider times out and reports a timeout error', async () => {
+    const { fetch } = stubFetch(() => 'hang');
+    const s = bootServer({ providerTestFetch: fetch, providerTestTimeoutMs: 30 });
     const { id } = await addProvider(s);
-    const result = (await (await req(s.app, 'POST', testPath(s, id), {})).json()) as {
-      status: string;
-      probe: { error: { type: string } };
-    };
+    const result = providerTestResultSchema.parse(
+      await (await req(s.app, 'POST', testPath(s, id), {})).json(),
+    );
     expect(result.status).toBe('failed');
-    expect(result.probe.error.type).toBe('invalid_response');
+    expect(result.probe.error?.type).toBe('timeout');
+    expect(result.probe.httpStatus).toBeNull();
   });
 
   test('a provider with no stored key reports no_key and makes no outbound request', async () => {
-    const { fetch, calls } = stubFetch({});
+    const { fetch, calls } = stubFetch(() => 'hang');
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s, { apiKey: null });
     const result = (await (await req(s.app, 'POST', testPath(s, id), {})).json()) as {
@@ -253,27 +334,25 @@ describe('provider test connection', () => {
     expect(calls).toHaveLength(0);
   });
 
-  test('a provider with no models configured or listed reports no_model and sends no probe', async () => {
-    const { fetch, calls } = stubFetch({
-      'GET /v1/models': { status: 200, body: { data: [] } },
-    });
+  test('a provider with no models configured reports no_model and sends nothing', async () => {
+    const { fetch, calls } = stubFetch(() => 'hang');
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s, { models: [] });
     const result = (await (await req(s.app, 'POST', testPath(s, id), {})).json()) as {
       probe: { error: { type: string } };
     };
     expect(result.probe.error.type).toBe('no_model');
-    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    expect(calls).toHaveLength(0);
   });
 
   test('an unknown provider id is 404', async () => {
-    const s = bootServer({ providerTestFetch: stubFetch({}).fetch });
+    const s = bootServer({ providerTestFetch: stubFetch(() => 'hang').fetch });
     const res = await req(s.app, 'POST', testPath(s, 'missing'), {});
     expect(res.status).toBe(404);
   });
 
   test('a caller who is not the owner is refused with 403 and nothing is sent', async () => {
-    const { fetch, calls } = stubFetch({});
+    const { fetch, calls } = stubFetch(() => 'hang');
     const s = bootServer({ providerTestFetch: fetch });
     const { id } = await addProvider(s);
     s.db.run(sql`INSERT INTO user (id, displayName) VALUES ('earlier-user', 'Earlier')`);
@@ -284,7 +363,7 @@ describe('provider test connection', () => {
   });
 
   test('without the bearer token the endpoint answers 401 and sends nothing', async () => {
-    const { fetch, calls } = stubFetch({});
+    const { fetch, calls } = stubFetch(() => 'hang');
     const s = bootServer({ providerTestFetch: fetch, authToken: TOKEN });
     const res = await req(s.app, 'POST', testPath(s, 'any'), {});
     expect(res.status).toBe(401);
@@ -292,10 +371,7 @@ describe('provider test connection', () => {
   });
 
   test('each provider is limited separately; the extra call gets 429', async () => {
-    const { fetch, calls } = stubFetch({
-      'GET /v1/models': { status: 200, body: { data: [] } },
-      'POST /v1/chat/completions': { status: 200, body: { model: 'small' } },
-    });
+    const { fetch, calls } = ok('small');
     const s = bootServer({ providerTestFetch: fetch });
     const first = await addProvider(s);
     const second = await addProvider(s, { providerId: 'gw2' });
@@ -327,10 +403,7 @@ describe('provider test connection', () => {
     const logged: unknown[] = [];
     const sink = (obj: unknown, msg?: string) => logged.push(obj, msg);
     const logger = { error: sink, warn: sink, info: sink, debug: sink } as never;
-    const { fetch } = stubFetch({
-      'GET /v1/models': new Error(`boom ${KEY}`),
-      'POST /v1/chat/completions': { status: 401, body: `denied ${KEY}` },
-    });
+    const { fetch } = stubFetch(() => ({ status: 401, body: `denied ${KEY}` }));
     const s = bootServer({ providerTestFetch: fetch, logger });
     const { id } = await addProvider(s);
     const res = await req(s.app, 'POST', testPath(s, id), {});

@@ -1,25 +1,48 @@
 import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared';
 import { MACHINE_RUNTIMES } from '@cairn/shared';
-import { Cpu } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Cpu, Plus } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { accountStatusOf, type Verification } from '../api/account-verification.js';
+import {
+  type AccountStep,
+  type StickyThread,
+  type SubscriptionAccount,
+  toClaudeAccount,
+} from '../api/claude-accounts.js';
+import {
+  useClaudeSubscriptionSteps,
+  useClaudeSubscriptionStickiness,
+  useClaudeSubscriptions,
+  useCreateClaudeSubscription,
+  useDeleteClaudeSubscription,
+  useRenameClaudeSubscription,
+  useSubscriptionVerification,
+} from '../api/claude-subscriptions.js';
 import { useApiMutations, useMachines, useModelSources, useProviders } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
+import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
+import { useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
+import { CheckedButton } from '../components/checked-button.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
-import { SegmentedTabs } from '../components/segmented.js';
-import { toastError } from '../components/ui/toaster.js';
+import { mergeQueries, QueryBoundary } from '../components/query-state.js';
+import { SettingsScopeSentence, useSettingsScope } from '../components/settings-scope.js';
+import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
+import { Button } from '../components/ui/button.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { PageShell } from '../pages/shell.js';
+import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
 import { PROVIDERS_HREF } from './hrefs.js';
-import { ResourceNewButton } from './parts.js';
 import {
   ClaudeCodeEditor,
   claudeCodeStatus,
@@ -30,22 +53,22 @@ import {
   providerMark,
   TeamProviderEditor,
 } from './provider-editors.js';
-
-const TEAM_SCOPE = 'team';
+import {
+  type SubscriptionActions,
+  SubscriptionDetail,
+  subscriptionStatusView,
+  subscriptionSummary,
+} from './subscription-detail.js';
 
 interface Entry {
   item: ProviderItem;
   editor: ReactNode;
 }
 
+const CLAUDE_SUBSCRIPTION_ADD = 'claude-subscription';
+
 const isMachineRuntime = (value: string): value is MachineRuntime =>
   (MACHINE_RUNTIMES as readonly string[]).includes(value);
-
-function scopeLabel(machine: MachineRow, t: TFunc): string {
-  if (machine.online === false) return `${machine.name} · ${t('离线')}`;
-  if (machine.capabilities?.executor === 'orb') return `${machine.name} · Orb`;
-  return machine.name;
-}
 
 function sourceFor(machine: MachineRow, sources: readonly ModelSource[]): ModelSource | undefined {
   const claude = sources.filter((s) => s.runtime === 'claude-code');
@@ -93,6 +116,53 @@ function teamEntries(
   });
 }
 
+interface SubscriptionEntryDeps {
+  now: number;
+  steps: Record<string, AccountStep[]>;
+  sticky: StickyThread[];
+  verifications: Record<string, Verification>;
+  actionsFor: (account: SubscriptionAccount) => SubscriptionActions;
+  t: TFunc;
+  clock: (ts: number, now: number) => string;
+}
+
+function subscriptionEntries(
+  accounts: readonly SubscriptionAccount[],
+  deps: SubscriptionEntryDeps,
+): Entry[] {
+  return accounts.map((account) => {
+    const verification = deps.verifications[account.id];
+    const view = subscriptionStatusView(
+      account,
+      accountStatusOf(account, verification),
+      deps.now,
+      deps.t,
+      deps.clock,
+    );
+    return {
+      item: {
+        id: `subscription:${account.id}`,
+        name: account.label,
+        Mark: ClaudeMark,
+        status: subscriptionSummary(account, view, deps.now, deps.t),
+        tone: view.tone,
+      },
+      editor: (
+        <SubscriptionDetail
+          key={account.id}
+          account={account}
+          now={deps.now}
+          view={view}
+          verifying={verification?.phase === 'verifying'}
+          steps={deps.steps[account.id]}
+          sticky={deps.sticky.filter((thread) => thread.subscriptionId === account.id)}
+          actions={deps.actionsFor(account)}
+        />
+      ),
+    };
+  });
+}
+
 function machineEntries(
   machine: MachineRow,
   source: ModelSource | undefined,
@@ -132,7 +202,7 @@ function machineEntries(
         id: 'pi',
         name: 'pi',
         Mark: PiMark,
-        status: online ? t('使用团队的服务商') : t('离线'),
+        status: online ? t('使用所有机器的服务商') : t('离线'),
         tone: online ? offTone('pi', 'ok') : 'warn',
         toggle: switchFor('pi'),
       },
@@ -167,7 +237,18 @@ export function ProvidersPage() {
   const providersQ = useProviders(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
+  const client = useQueryClient();
+  const clock = useClock();
+  const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const createSubscription = useCreateClaudeSubscription(teamId);
+  const deleteSubscription = useDeleteClaudeSubscription(teamId);
+  const renameSubscription = useRenameClaudeSubscription(teamId);
+  const verification = useSubscriptionVerification(teamId);
   const [createOpen, setCreateOpen] = useState(false);
+  const [addingSubscription, setAddingSubscription] = useState(false);
+  const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
+    null,
+  );
   const [connectError, setConnectError] = useState<string | null>(null);
 
   const sources = live
@@ -177,6 +258,30 @@ export function ProvidersPage() {
     ? (providersQ.data?.providers ?? [])
     : (fixture.resources?.providers ?? []);
   const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
+  const now = live ? Date.now() : fixture.now;
+  const fixtureAccounts = fixture.resources?.accounts;
+  const subscriptions: SubscriptionAccount[] = (
+    live ? (subscriptionsQ.data ?? []) : (fixtureAccounts?.subscriptions ?? [])
+  ).map((wire) => toClaudeAccount(wire, now));
+  const subscriptionApiIds = live
+    ? (subscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
+    : [];
+  const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionApiIds, live);
+  const stickinessQ = useClaudeSubscriptionStickiness(
+    teamId,
+    live && subscriptionApiIds.length > 0,
+  );
+  const stepsByAccount: Record<string, AccountStep[]> = live
+    ? Object.fromEntries(
+        subscriptionApiIds.flatMap((id, index) => {
+          const page = stepsQ[index]?.data;
+          return page == null || !Array.isArray(page.steps) ? [] : [[id, page.steps]];
+        }),
+      )
+    : (fixtureAccounts?.stepsByAccount ?? {});
+  const stickiness: StickyThread[] = live
+    ? (stickinessQ.data?.threads ?? [])
+    : (fixtureAccounts?.stickiness ?? []);
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
@@ -192,12 +297,28 @@ export function ProvidersPage() {
   }, [searchParams, setSearchParams, t]);
 
   useEffect(() => {
-    if (searchParams.get('add') === null) return;
-    setCreateOpen(true);
+    const add = searchParams.get('add');
+    if (add === null) return;
+    if (add === CLAUDE_SUBSCRIPTION_ADD) setAddingSubscription(true);
+    else setCreateOpen(true);
     const next = new URLSearchParams(searchParams);
     next.delete('add');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  const { scope, machine, setScope } = useSettingsScope(machines);
+  const [mountedAt] = useState(() => Date.now());
+  const checkedAt = Math.max(
+    sourcesQ.dataUpdatedAt,
+    providersQ.dataUpdatedAt,
+    subscriptionsQ.dataUpdatedAt,
+    mountedAt,
+  );
+  const refreshChecks = () => {
+    void sourcesQ.refetch();
+    void providersQ.refetch();
+    void subscriptionsQ.refetch();
+  };
 
   const setParams = (patch: Record<string, string | null>, replace = false) => {
     const params = new URLSearchParams(searchParams);
@@ -207,10 +328,6 @@ export function ProvidersPage() {
     }
     setSearchParams(params, { replace });
   };
-
-  const scopeParam = searchParams.get('scope');
-  const machine = machines.find((m) => m.id !== undefined && m.id === scopeParam);
-  const scope = machine?.id ?? TEAM_SCOPE;
 
   const actionsFor = (record: ProviderRecord): ProviderEditActions =>
     live
@@ -227,6 +344,30 @@ export function ProvidersPage() {
             }),
         }
       : {};
+
+  const announceVerification = (id: string, label: string) => {
+    void verification.verify(id).then((outcome) => {
+      if (outcome?.ok) toastSuccess(t('「{name}」验证通过', { name: label }));
+    });
+  };
+
+  const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => ({
+    onRemove: () => setRemovingSubscription(account),
+    ...(live
+      ? {
+          onVerify: () => announceVerification(account.id, account.label),
+          ...(subscriptionApiIds.includes(account.id)
+            ? {
+                onRename: (label: string) =>
+                  renameSubscription.mutate(
+                    { id: account.id, label },
+                    { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
+                  ),
+              }
+            : {}),
+        }
+      : {}),
+  });
 
   const toggleRuntime = (target: MachineRow) =>
     live && target.id !== undefined
@@ -246,7 +387,18 @@ export function ProvidersPage() {
 
   const entries =
     machine === undefined
-      ? teamEntries(providers, deadModelIds(sources), actionsFor, t)
+      ? [
+          ...subscriptionEntries(subscriptions, {
+            now,
+            steps: stepsByAccount,
+            sticky: stickiness,
+            verifications: verification.states,
+            actionsFor: subscriptionActionsFor,
+            t,
+            clock,
+          }),
+          ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
+        ]
       : machineEntries(
           machine,
           sourceFor(machine, sources),
@@ -255,6 +407,11 @@ export function ProvidersPage() {
           () => setParams({ scope: null, item: null }),
           t,
         );
+  const partialFailure = subscriptionsQ.isError
+    ? 'subscriptions'
+    : providersQ.isError
+      ? 'providers'
+      : null;
   const itemParam = searchParams.get('item');
   const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
 
@@ -263,35 +420,83 @@ export function ProvidersPage() {
       route={PROVIDERS_HREF}
       title={t('模型服务')}
       selected={PROVIDERS_HREF}
-      actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
-      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-2 pb-16">
-        <div className="overflow-x-auto pb-1">
-          <SegmentedTabs
-            label={t('范围')}
-            value={scope}
-            onChange={(next) => setParams({ scope: next === TEAM_SCOPE ? null : next, item: null })}
-            options={[
-              { value: TEAM_SCOPE, label: t('团队') },
-              ...machines.flatMap((m) =>
-                m.id === undefined ? [] : [{ value: m.id, label: scopeLabel(m, t) }],
-              ),
-            ]}
-          />
-        </div>
+      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-4 pb-16">
+        <SettingsScopeSentence
+          machines={machines}
+          scope={scope}
+          onChange={(next) => setScope(next, { item: null })}
+          trailing={
+            <CheckedButton
+              updatedAt={checkedAt}
+              fetching={sourcesQ.isFetching || providersQ.isFetching || subscriptionsQ.isFetching}
+              onRefresh={live ? refreshChecks : undefined}
+            />
+          }
+        />
+        {live && machine === undefined && partialFailure !== null && entries.length > 0 && (
+          <p
+            data-testid="providers-partial-error"
+            role="alert"
+            className="m-0 flex items-center gap-2 px-1 text-meta text-content-tertiary"
+          >
+            {partialFailure === 'subscriptions' ? t('订阅账户没能加载') : t('模型服务没能加载')}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                void (partialFailure === 'subscriptions' ? subscriptionsQ : providersQ).refetch()
+              }
+            >
+              {t('重试')}
+            </Button>
+          </p>
+        )}
         <ProviderPanel
+          header={
+            <div className="flex items-center gap-1">
+              <h2 className="m-0 text-card-title font-semibold text-foreground">{t('服务商')}</h2>
+              {machine === undefined && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('添加服务商')}
+                  title={t('添加服务商')}
+                  data-testid="resource-new"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus aria-hidden strokeWidth={1.75} />
+                </Button>
+              )}
+            </div>
+          }
           items={entries.map((e) => e.item)}
           selectedId={selected?.item.id ?? null}
           onSelect={(id) => setParams({ item: id })}
-          onAdd={machine === undefined ? () => setCreateOpen(true) : undefined}
           empty={
-            <EmptyState
-              testId="providers-empty"
-              icon={Cpu}
-              title={t('尚未添加服务商。')}
-              description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
-            />
+            <QueryBoundary
+              query={
+                live
+                  ? machine === undefined
+                    ? mergeQueries(providersQ, subscriptionsQ)
+                    : sourcesQ
+                  : undefined
+              }
+              isEmpty
+              loadingLabel={t('正在加载模型服务')}
+              errorTitle={t('模型服务没能加载')}
+              empty={
+                <EmptyState
+                  testId="providers-empty"
+                  icon={Cpu}
+                  title={t('尚未添加服务商。')}
+                  description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
+                />
+              }
+            >
+              {null}
+            </QueryBoundary>
           }
         >
           {selected?.editor}
@@ -326,7 +531,63 @@ export function ProvidersPage() {
         }
         connectPending={mutations.startProviderOAuth.isPending}
         connectError={connectError}
+        onPickClaudeSubscription={
+          live
+            ? () => {
+                setCreateOpen(false);
+                createSubscription.reset();
+                setAddingSubscription(true);
+              }
+            : undefined
+        }
       />
+      {addingSubscription && (
+        <AddClaudeSubscriptionDialog
+          onClose={() => {
+            createSubscription.reset();
+            setAddingSubscription(false);
+          }}
+          onCreate={(body) =>
+            createSubscription.mutate(body, {
+              onSuccess: (created) => {
+                createSubscription.reset();
+                setAddingSubscription(false);
+                void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+                setParams({ item: `subscription:${created.id}` }, true);
+                announceVerification(created.id, created.label);
+              },
+            })
+          }
+          pending={createSubscription.isPending}
+          error={createSubscription.isError}
+        />
+      )}
+      <AlertDialogShell
+        title={t('移除「{name}」？', { name: removingSubscription?.label ?? '' })}
+        ariaLabel={t('移除订阅')}
+        open={removingSubscription !== null}
+        onClose={() => setRemovingSubscription(null)}
+        footer={
+          <AlertDialogActions
+            cancelLabel={t('取消')}
+            confirmLabel={t('移除')}
+            confirmDisabled={deleteSubscription.isPending}
+            onCancel={() => setRemovingSubscription(null)}
+            onConfirm={() => {
+              const target = removingSubscription;
+              setRemovingSubscription(null);
+              if (target === null || !live) return;
+              deleteSubscription.mutate(target.id, {
+                onSuccess: () =>
+                  void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] }),
+                onError: (error) => toastError(t('移除失败，请重试。'), error),
+              });
+            }}
+          />
+        }
+      >
+        <p className="m-0">{t('移除后，后续步骤不再使用这个订阅。')}</p>
+      </AlertDialogShell>
     </PageShell>
   );
 }

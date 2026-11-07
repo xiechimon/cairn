@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildTaskPromptText } from '@cairn/shared';
+import {
+  buildTaskPromptText,
+  composeTaskPromptWithInstruction,
+  SESSION_BRIEF,
+} from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -14,12 +17,16 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
-import { AGENT_ID, api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
+import { api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const TASK_TITLE = '空白反馈探针';
 const TASK_SPEC = '重启轮不注入空指令。';
-const TASK_TEXT = buildTaskPromptText(TASK_TITLE, TASK_SPEC);
+const TASK_TEXT = composeTaskPromptWithInstruction(
+  buildTaskPromptText(TASK_TITLE, TASK_SPEC),
+  SESSION_BRIEF,
+);
 
 function userWireText(m: { role: string; content?: unknown }): string | null {
   if (typeof m.content === 'string') return m.content;
@@ -41,7 +48,7 @@ let home: string;
 beforeAll(async () => {
   stub = await startStubLlm([{ status: 400 }, { content: '重启轮照常执行。' }]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'cairn-restart-blank-home-'));
+  home = makeTestTempDir('cairn-restart-blank-home-');
   const paths: StatePaths = statePaths(home, join(home, 'workspaces'));
   const logger = createDaemonLogger({ logFile: paths.daemonLog });
   const config = loadDaemonConfig(
@@ -74,15 +81,13 @@ afterAll(async () => {
 });
 
 describe('blank-feedback restart round (#720 negative case): no empty instruction injected', () => {
-  test('blank feedback → plain restart round: no instruction, no blank user row, session prompt = task text', async () => {
+  test('blank feedback → plain restart round: no feedback instruction, no blank user row, session prompt = task text plus the session brief', async () => {
     const world = await seedWorld(server.url, server.teamId, {
       title: TASK_TITLE,
       spec: TASK_SPEC,
     });
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     const failedBuildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -106,8 +111,8 @@ describe('blank-feedback restart round (#720 negative case): no empty instructio
       .where(eq(stepTable.buildId, newBuildId))
       .orderBy(asc(stepTable.createdAt))
       .all()[0]!;
-    expect(firstStep.kind).toBe('build');
-    expect(firstStep.prompt).toBeNull();
+    expect(firstStep.kind).toBe('session');
+    expect(firstStep.prompt).toBe(SESSION_BRIEF);
 
     const userRows = server.db
       .select()

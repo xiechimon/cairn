@@ -16,11 +16,12 @@ import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { relativeTime } from './rel-time.js';
+import { useServerDraft } from '../overlay/use-server-draft.js';
+import { joinMeta, relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
-import { threadCopy, threadTone } from './thread-copy.js';
+import { threadCopy, threadStatus, threadTone } from './thread-copy.js';
 import { ThreadUsageFooter } from './thread-usage-footer.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
@@ -39,7 +40,7 @@ function StatusLine({
   now: number;
 }) {
   const { t } = useI18n();
-  const meta = [machineName, relativeTime(todo.phaseAt, now, t)].filter((part) => part != null);
+  const meta = joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
@@ -48,8 +49,12 @@ function StatusLine({
       <span className="flex-none font-medium text-content-secondary">
         {todo.quotaWait != null ? t('等额度') : t(threadCopy(todo).state)}
       </span>
-      <span aria-hidden="true">·</span>
-      <span className="min-w-0 truncate">{meta.join(' · ')}</span>
+      {meta !== '' && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="min-w-0 truncate">{meta}</span>
+        </>
+      )}
     </p>
   );
 }
@@ -205,6 +210,13 @@ function ThreadBody({
   const { t } = useI18n();
   const mentions = useThreadMentions(todo.projectId);
   const archived = todo.archivedAt != null;
+  const { live, teamId } = useLiveData();
+  const [draft, setDraft] = useServerDraft({
+    teamId,
+    scope: `todo:${todo.id}`,
+    localKey: `cairn.draft.todo:${todo.id}`,
+    enabled: live,
+  });
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
@@ -218,6 +230,9 @@ function ThreadBody({
           onOpenPlan={onOpenPlan}
           spec={todo.spec.trim() !== '' ? todo.spec : undefined}
           autoScroll={chat.transcript.length > 0}
+          running={threadStatus(todo) === 'running'}
+          settled={chat.transcriptSettled}
+          threadKey={todo.id}
         />
       )}
       {chat.sendError != null && (
@@ -258,6 +273,8 @@ function ThreadBody({
         workingFor={chat.workingFor}
         editable={chat.send !== undefined}
         readOnly={chat.locked}
+        draft={draft}
+        onDraftChange={setDraft}
         {...(chat.send !== undefined ? { onSend: chat.send } : {})}
         {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
         {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}

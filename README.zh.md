@@ -74,7 +74,7 @@ npx @xiechimon/cairn
 |---|---|
 | [docs/getting-started.md](./docs/getting-started.md) | 跑起 server、登记机器、Docker、公网部署、从源码构建 |
 | [docs/configuration.md](./docs/configuration.md) | 全部 server 与 daemon 环境变量 |
-| [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md) | 用 Tailscale 从手机私网访问 |
+| [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md) | 用 Tailscale 从手机私网访问（计划内嵌 tsnet，自动在局域网、tailnet 与可选 Funnel 间选路） |
 | [CONTEXT.md](./CONTEXT.md) | 领域模型与术语表 |
 | [docs/spec/](./docs/spec/) | 实现规范 |
 
@@ -107,4 +107,4 @@ npx @xiechimon/cairn
 
 ## 许可
 
-Apache-2.0 — 见 [LICENSE](./LICENSE)。
+Apache-2.0 — 见 [LICENSE](./LICENSE)。全部代码开源、不做功能门控；只有私有轮换的评测任务 holdout 子集不公开。贡献采用 DCO 签名（`Signed-off-by`），不要求 CLA，见 [CONTRIBUTING.md](./CONTRIBUTING.md)。

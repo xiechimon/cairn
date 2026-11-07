@@ -10,6 +10,7 @@ export const prepushModules = [
   'scripts/prepush.mjs',
   'scripts/heavy-slots.mjs',
   'scripts/english-only-gate.mjs',
+  'scripts/journal-newline-gate.mjs',
   'scripts/scrub-git-env.mjs',
 ];
 
@@ -26,11 +27,17 @@ export const selfTests = [
   'scripts/ops/push-test.test.mjs',
   'scripts/ops/push-worker.test.mjs',
   'scripts/prepush.test.mjs',
+  'scripts/prepush-refuse-main.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/english-only-gate.test.mjs',
+  'scripts/journal-newline-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
+  'scripts/pr-screens-harness.test.mjs',
+  'scripts/pr-screens-report.test.mjs',
+  'scripts/pr-screens-select.test.mjs',
+  'scripts/pr-screens-workflow.test.mjs',
   'scripts/ops/merge-route-audit.test.mjs',
 ];
 
@@ -41,7 +48,6 @@ export const localOnly = [
   ['node', 'scripts/ui-registry-gate.mjs'],
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/lint-warning-cap.mjs'],
-  ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
 ];
 
 const SOURCE_TREES = /^(apps|packages|integration)\//;
@@ -106,10 +112,12 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   }
   const required = [
     language,
+    ['node', 'scripts/journal-newline-gate.mjs'],
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['node', 'scripts/ui-page-style-gate.mjs'],
     ['python3', 'scripts/pr-evidence-archive.test.py'],
+    ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],

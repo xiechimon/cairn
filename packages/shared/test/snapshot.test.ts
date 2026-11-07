@@ -60,6 +60,7 @@ import {
   PROXY_ENV_VARS,
   PROXY_PROBE_LOG_CANON,
   patchChiefBodySchema,
+  planResponseSchema,
   planRowSchema,
   projectBranchesResponseSchema,
   projectFileResponseSchema,
@@ -111,6 +112,7 @@ describe('body/envelope schema snapshots', () => {
     teamStreamEvent: teamStreamEventSchema,
     conversationStreamEvent: conversationStreamEventSchema,
     planRow: planRowSchema,
+    planResponse: planResponseSchema,
     stepJournalRow: stepJournalRowSchema,
     apiKeyRow: apiKeyRowSchema,
     machineJson: machineJsonSchema,
@@ -211,20 +213,20 @@ describe('protocol vocabulary snapshot (02 §5/§6 canonical)', () => {
     expect({ STEP_LIFECYCLE_LOG_LINES, ONLINE_SEQUENCE_CANON }).toMatchSnapshot();
   });
 
-  it('MCP server surface: 24-tool whitelist + six capability groups (02 §7.2)', () => {
+  it('MCP server surface: 21-tool whitelist + six capability groups (02 §7.2)', () => {
     expect({
-      MCP_TOOLS_READ: MCP_TOOLS_READ.slice(0, 11),
-      MCP_TOOLS_WRITE: MCP_TOOLS_WRITE.slice(0, 13),
+      MCP_TOOLS_READ: MCP_TOOLS_READ.slice(0, 10),
+      MCP_TOOLS_WRITE: MCP_TOOLS_WRITE.slice(0, 11),
       MCP_CAPABILITY_GROUPS,
     }).toMatchSnapshot();
-    expect(MCP_TOOLS_READ.slice(11)).toEqual([
+    expect(MCP_TOOLS_READ.slice(10)).toEqual([
       'Threads Waiting on Me',
       'Read Thread',
       'Thread Pull Requests',
       'Wait Thread',
       'Search Threads',
     ]);
-    expect(MCP_TOOLS_WRITE.slice(13)).toEqual(['Start Thread', 'Reply Thread', 'Interrupt Thread']);
+    expect(MCP_TOOLS_WRITE.slice(11)).toEqual(['Start Thread', 'Reply Thread', 'Interrupt Thread']);
   });
 
   it('provider presets 38-item catalog (r3 §2/02 §6.2)', () => {

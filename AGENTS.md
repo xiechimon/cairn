@@ -8,14 +8,14 @@
 - Confirm lockfile changes with ian before committing `pnpm-lock.yaml`; authorized changes require `CAIRN_ALLOW_LOCKFILE_CHANGE=1`.
 - Do not run postinstall scripts without explicit user authorization; install dependencies with scripts disabled unless authorized.
 - Seam discipline: read the comments in `biome.json` before changing locked imports (`@earendil-works/*`, `@modelcontextprotocol/sdk`, `simple-git`, `isomorphic-git`, `cron-parser`); consume them through thin bridges.
-- Keep GitOps, MCP and LLM provider access behind `apps/daemon/src/backend/`; check the seam before moving files or adding dependencies.
+- Keep GitOps, MCP and LLM provider access behind `apps/daemon/src/backend/`; the one exception is the in-server Coordinator runtime, `apps/server/src/coordinator/runtime/` (D114). Check the seam before moving files or adding dependencies.
 - Never kill another lane's processes; inspect the PID, command and working directory before stopping a process you started.
 - Do not set `TMPDIR` without `CAIRN_HEAVY_SLOTS_DIR`; all lanes must share the heavy-work slot directory.
 - Codex security review is no longer part of the merge route (ian, 2026-11-06): `review-gate` requires the code review only. The security-surface lists below still mark protected paths for routing and ownership.
 
 Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`, the one source for protected and auto-merge paths; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
-- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`
+- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
 - MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers}.ts`
 
@@ -37,12 +37,12 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 ## Merge routes
 
 - Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
-- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`. Protected-path PRs enter the merge queue with every other green PR. Never merge or arm auto-merge on a PR labelled `coordinator-hold` or `needs-decision`.
+- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`. Protected-path PRs enter the merge queue with every other green PR. Never merge or arm auto-merge on a PR labelled `coordinator-hold`.
 - ian may admin-merge. When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin`, using the merge method `docs/ops/agent-bot-identity.md` gives its opener (`--squash` for a human-opened PR, `--rebase` for one opened by `app/cairnwright`), once every required check passes on the current head, `review-gate` included, and the PR body has no unchecked task. Without that per-PR authorization, agents never use `--admin`.
 - The eval ruler is protected so no PR can edit what judges it: `integration/eval/**`, `.claude/hillclimb/**`, the trajectory exporter, its outcome fields and the pack schema (the eval globs in `packages/shared/merge-gate-paths.json`).
-- Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him. A `needs-decision` label already on a PR keeps `pr-evidence` red and disarms auto-merge until it is removed; agents remove it only with `CAIRN_DECIDED=1` after ian gave the decision in chat.
+- Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him, and put `coordinator-hold` on the PR while that decision is pending.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
-- A PR labelled `coordinator-hold` neither queues nor merges: the coordinator asked for changes. The session that owns it keeps the label on until it has pushed the requested work, then asks the coordinator to remove it.
+- A PR labelled `coordinator-hold` neither queues nor merges, keeps `pr-evidence` red and has auto-merge disarmed: the coordinator asked for changes or a person's decision is pending. The session that owns it keeps the label on until it has pushed the requested work or ian gave the decision in chat, then asks the coordinator to remove it.
 - Follow `.claude/skills/pr-cairn/SKILL.md` for PR creation and merge mechanics, and `docs/ops/agent-bot-identity.md` for bot versus human identity and merge methods.
 - PRs that `.mergify.yml` admits enter the Mergify merge queue automatically once the `review-gate` check (the Codex cloud review) and `merge-route` pass; stop there and never `gh pr merge` them. Path class does not keep a PR on ian's route.
 
@@ -57,6 +57,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Run related tests by hand during development: `pnpm exec vitest run --changed` and `pnpm --filter @cairn/web e2e:affected`. The full suites run in CI; avoid routine full local e2e runs.
 - After code changes, run `pnpm lint`, `pnpm typecheck` and `pnpm spec:parse`; also run `pnpm spec:parse` after resolving e2e conflicts. Do not run `pnpm build` before committing.
 - Run `pnpm prepush` before pushing. It runs fast checks only; tests run in CI. A push is unverified until CI reports on that head. Run the exact command of any CI step your diff changes.
+- UI work under `apps/web/src`: read `apps/web/DESIGN-RULES.md` first (checkable rules), then `apps/web/DESIGN.md` (full reference). Write the brief from `.claude/skills/design-cairn/SKILL.md`, open the reference shots for the surface in `docs/design/references/`, and show a reference-versus-ours row per state in the PR. A new feature on a main surface needs a page draft before code.
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
 - Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate, and that review on the PR head satisfies the other-vendor review. Fix confirmed findings, and record unfixed findings with reasons in Risk.
 - Protected paths require Codex cloud code review on the PR head. Canonical security surfaces are covered by that review: no separate security approval is required while the 2026-11-06 ruling holds. Docs-only changes outside protected paths skip code review.

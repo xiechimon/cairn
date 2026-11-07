@@ -1,6 +1,5 @@
 import type {
   ActiveRun,
-  Assignment,
   AutonomyGateReason,
   AutonomyKind,
   AutonomySettings,
@@ -23,8 +22,8 @@ import type {
   ModelRef,
   NamedPromptOverrides,
   NotificationType,
-  PersonaRole,
   Phase,
+  PrMergeState,
   ProjectColor,
   ProjectIcon,
   ProjectMergeConfig,
@@ -32,6 +31,7 @@ import type {
   ProviderApi,
   ProviderCompat,
   ProviderModel,
+  PrPanelState,
   RequiredCapabilities,
   RouteOverride,
   RouteUse,
@@ -125,7 +125,6 @@ export const todo = sqliteTable(
     snoozeMode: text('snoozeMode').$type<SnoozeMode>(),
     seqNum: integer('seqNum').notNull(),
     orderIndex: real('orderIndex').notNull().default(0),
-    assignment: json<Assignment | null>('assignment'),
     routeOverride: json<RouteOverride | null>('routeOverride'),
     latestBuildId: text('latestBuildId'),
     lastRunAt: epochMs('lastRunAt'),
@@ -244,6 +243,7 @@ export const step = sqliteTable(
     holdReason: text('holdReason'),
     holdUntil: epochMs('holdUntil'),
     holdCount: integer('holdCount').notNull().default(0),
+    claimCount: integer('claimCount').notNull().default(0),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
@@ -411,6 +411,7 @@ export const plan = sqliteTable('plan', {
   version: integer('version').notNull().default(1),
   content: text('content').notNull().default(''),
   stepId: text('stepId'),
+  autoApprovePausedAt: epochMs('autoApprovePausedAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -478,38 +479,6 @@ export const notification = sqliteTable(
   (t) => [index('notification_type_readAt_idx').on(t.type, t.readAt)],
 );
 
-export const agent = sqliteTable(
-  'agent',
-  {
-    id: text('id').primaryKey(),
-    teamId: text('teamId')
-      .notNull()
-      .references(() => team.id),
-    displayName: text('displayName').notNull(),
-    description: text('description'),
-    status: text('status').notNull().default('active'),
-    avatarUrl: text('avatarUrl'),
-    provider: text('provider'),
-    modelId: text('modelId'),
-    thinkingLevel: text('thinkingLevel'),
-    persona: text('persona').$type<PersonaRole | null>(),
-    machineId: text('machineId').references(() => machine.id),
-    tools: json<string[]>('tools').notNull().default(sql`'[]'`),
-    secrets: json<string[]>('secrets').notNull().default(sql`'[]'`),
-    defaultSkill: text('defaultSkill'),
-    skillsAllowlist: json<string[]>('skillsAllowlist'),
-    mcpServers: json<string[]>('mcpServers').notNull().default(sql`'[]'`),
-    maxConcurrentTasks: integer('maxConcurrentTasks'),
-    requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
-    fallbackModels: json<ModelRef[] | null>('fallbackModels'),
-  },
-  (t) => [
-    uniqueIndex('agent_team_persona_unique')
-      .on(t.teamId, t.persona)
-      .where(sql`${t.persona} is not null`),
-  ],
-);
-
 export const routingRule = sqliteTable(
   'routing_rule',
   {
@@ -529,7 +498,6 @@ export const routingRule = sqliteTable(
     skillsAllowlist: json<string[] | null>('skillsAllowlist'),
     defaultSkill: text('defaultSkill'),
     secrets: json<string[] | null>('secrets'),
-    adoptedAgentIds: json<string[] | null>('adoptedAgentIds'),
     seededFromAgentId: text('seededFromAgentId'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
@@ -555,6 +523,27 @@ export const workPolicy = sqliteTable(
     updatedAt: epochMs('updatedAt').notNull(),
   },
   (t) => [uniqueIndex('work_policy_team_use_unique').on(t.teamId, t.use)],
+);
+
+export const stepRoute = sqliteTable(
+  'step_route',
+  {
+    stepId: text('stepId').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    kind: text('kind').$type<StepKind>().notNull(),
+    difficulty: text('difficulty').$type<'easy' | 'standard' | 'hard'>().notNull(),
+    harness: text('harness').$type<'claude-code' | 'pi'>(),
+    provider: text('provider'),
+    modelId: text('modelId'),
+    machineId: text('machineId'),
+    reason: text('reason').notNull(),
+    rejected:
+      json<{ modelId: string; machineId: string | null; why: string }[]>('rejected').notNull(),
+    decidedAt: epochMs('decidedAt').notNull(),
+  },
+  (t) => [index('step_route_team_decided_idx').on(t.teamId, t.decidedAt)],
 );
 
 export const featureFlag = sqliteTable(
@@ -598,6 +587,12 @@ export const agentMemory = sqliteTable('agent_memory', {
   updatedAt: epochMs('updatedAt').notNull(),
 });
 
+export const dataMigration = sqliteTable('data_migration', {
+  id: text('id').primaryKey(),
+  doneAt: epochMs('doneAt').notNull(),
+  detail: text('detail').notNull(),
+});
+
 export const memorySaveConflict = sqliteTable('memory_save_conflict', {
   id: text('id').primaryKey(),
   candidateIds: json<string[]>('candidateIds').notNull(),
@@ -633,6 +628,7 @@ export const pushSubscription = sqliteTable(
     endpoint: text('endpoint').notNull(),
     p256dh: text('p256dh').notNull(),
     auth: text('auth').notNull(),
+    pairedDeviceId: text('pairedDeviceId'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],
@@ -744,6 +740,22 @@ export const apiKey = sqliteTable('api_key', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
+export const pairedDevice = sqliteTable(
+  'paired_device',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    name: text('name').notNull(),
+    tokenHash: text('tokenHash').notNull(),
+    masked: text('masked').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    lastSeenAt: epochMs('lastSeenAt'),
+  },
+  (t) => [uniqueIndex('paired_device_tokenHash_unique').on(t.tokenHash)],
+);
+
 export const machine = sqliteTable(
   'machine',
   {
@@ -785,6 +797,50 @@ export const harnessProfile = sqliteTable(
   (t) => [uniqueIndex('harness_profile_team_unique').on(t.teamId)],
 );
 
+export const threadPr = sqliteTable(
+  'thread_pr',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    threadId: text('threadId')
+      .notNull()
+      .references(() => todo.id, { onDelete: 'cascade' }),
+    buildId: text('buildId')
+      .notNull()
+      .references(() => build.id, { onDelete: 'cascade' }),
+    repo: text('repo').notNull(),
+    number: integer('number').notNull(),
+    title: text('title').notNull().default(''),
+    url: text('url').notNull(),
+    state: text('state').$type<PrPanelState>().notNull().default('open'),
+    mergeState: text('mergeState').$type<PrMergeState>().notNull().default('unknown'),
+    additions: integer('additions').notNull().default(0),
+    deletions: integer('deletions').notNull().default(0),
+    checksPassed: integer('checksPassed').notNull().default(0),
+    checksFailed: integer('checksFailed').notNull().default(0),
+    checksRunning: integer('checksRunning').notNull().default(0),
+    checksTotal: integer('checksTotal').notNull().default(0),
+    head: text('head').notNull().default(''),
+    verdictResult: text('verdictResult').$type<'pass' | 'block'>(),
+    verdictHead: text('verdictHead'),
+    autoFix: bool('autoFix').notNull().default(true),
+    mergeWhenReady: bool('mergeWhenReady').notNull().default(false),
+    autoArchive: bool('autoArchive').notNull().default(true),
+    dismissed: bool('dismissed').notNull().default(false),
+    blockedSince: epochMs('blockedSince'),
+    wakeRounds: integer('wakeRounds').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('thread_pr_build_unique').on(t.buildId),
+    uniqueIndex('thread_pr_team_repo_number_unique').on(t.teamId, t.repo, t.number),
+    index('thread_pr_threadId_idx').on(t.threadId),
+  ],
+);
+
 export const tokenUsage = sqliteTable(
   'token_usage',
   {
@@ -823,6 +879,31 @@ export const chiefTurnUsage = sqliteTable(
   ],
 );
 
+export const coordinatorConversation = sqliteTable('coordinator_conversation', {
+  threadId: text('threadId').primaryKey(),
+  conversationId: text('conversationId').notNull(),
+  lastMirroredEntryId: text('lastMirroredEntryId'),
+  piVersion: text('piVersion').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const coordinatorEntry = sqliteTable(
+  'coordinator_entry',
+  {
+    chiefMessageId: text('chiefMessageId').primaryKey(),
+    threadId: text('threadId').notNull(),
+    conversationId: text('conversationId').notNull(),
+    entryId: text('entryId').notNull(),
+  },
+  (t) => [index('coordinator_entry_thread_idx').on(t.threadId, t.conversationId)],
+);
+
+export const coordinatorLease = sqliteTable('coordinator_lease', {
+  storeKey: text('storeKey').primaryKey(),
+  owner: text('owner'),
+  heartbeatAt: epochMs('heartbeatAt').notNull(),
+});
+
 export const chiefSummary = sqliteTable('chief_summary', {
   threadId: text('threadId').primaryKey(),
   summary: text('summary').notNull(),
@@ -840,7 +921,6 @@ export const chief = sqliteTable('chief', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
-  agentId: text('agentId'),
   charter: text('charter').notNull().default(''),
   watches: json<ChiefWatch[]>('watches').notNull().default(sql`'[]'`),
   wakes: json<Record<string, unknown>[]>('wakes').notNull().default(sql`'[]'`),
@@ -968,6 +1048,23 @@ export const attachment = sqliteTable('attachment', {
   status: text('status').$type<'pending' | 'ready' | 'failed'>().notNull().default('pending'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const composerDraft = sqliteTable(
+  'composer_draft',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    scope: text('scope').notNull(),
+    content: text('content').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('composer_draft_owner_scope_idx').on(t.teamId, t.userId, t.scope)],
+);
 
 export const githubConnection = sqliteTable('github_connection', {
   teamId: text('teamId')

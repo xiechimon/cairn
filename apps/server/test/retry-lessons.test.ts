@@ -1,6 +1,5 @@
 import type { ClaimedStep } from '@cairn/shared';
 import {
-  buildPlanFirstRoundInstruction,
   buildRestartPrompt,
   buildTaskPromptText,
   classifyUserText,
@@ -10,12 +9,12 @@ import {
   RETRY_LESSONS_HEAD,
   RETRY_LESSONS_MAX_CHARS,
   REVIEW_VERDICT_KIND,
+  SESSION_BRIEF,
   VERIFY_VERDICT_KIND,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   gateState as gateStateTable,
   gateVerdict as gateVerdictTable,
@@ -35,9 +34,8 @@ import {
 import { CI_FIX_GREEN_EVENT } from '../src/services/ci-corrections.js';
 import { buildCiFixPrompt } from '../src/services/ci-loop.js';
 import { claimStep } from '../src/services/machines.js';
-import { bindAllAgents, bootServer, insertMachine, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, seedSessionRoute, type TestServer } from './helpers.js';
 
-const AGENT_ID = 'agent-lessons-1';
 const TITLE = '导出报表';
 const SPEC = '报表页加 CSV 导出。';
 
@@ -66,18 +64,8 @@ function makeWorld(opts: { withPlan?: boolean; sourceRef?: string } = {}): World
     .insert(projectTable)
     .values({ id: projectId, name: `lessons-${suffix}`, teamId: s.team.id })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'lessons-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
   const machineId = insertMachine(s, { name: `m-${suffix}` });
-  bindAllAgents(s, machineId);
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   s.db
     .insert(todoTable)
     .values({
@@ -89,7 +77,6 @@ function makeWorld(opts: { withPlan?: boolean; sourceRef?: string } = {}): World
       phase: 'review',
       phaseAt: nowMs(),
       seqNum: 7,
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
       latestBuildId: buildId,
       ...(opts.sourceRef !== undefined
         ? { sourceKind: 'github-issue', sourceRef: opts.sourceRef }
@@ -109,6 +96,10 @@ function makeWorld(opts: { withPlan?: boolean; sourceRef?: string } = {}): World
     .run();
   const deps: BuildDeps = { ...s.svc, reposDir: s.reposDir, box: s.secretBox };
   return { s, deps, todoId, projectId, buildId, machineId };
+}
+
+function sessionPrompt(...parts: string[]): string {
+  return [SESSION_BRIEF, ...parts].join('\n\n');
 }
 
 function insertCiFixStep(w: World, at: number, failures: Parameters<typeof buildCiFixPrompt>[0]) {
@@ -234,19 +225,6 @@ function pendingStepOf(w: World) {
     .get()!;
 }
 
-async function claimOrNull(w: World): Promise<ClaimedStep | null> {
-  return claim(w).catch(() => null);
-}
-
-function assertPlanSlotEmptyFailsFirstPlanStep(w: World, buildId: string) {
-  const first = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).get()!;
-  expect(first.kind).toBe('plan');
-  expect(first.status).toBe('failed');
-  const failed = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
-  expect(failed.errorMessage).toContain('plan 槽为空');
-  expect(failed.errorMessage).not.toContain('已尝试回落');
-}
-
 async function failedBuildA(w: World) {
   const base = nowMs() - 500_000;
   insertCiFixStep(w, base, {
@@ -296,7 +274,7 @@ describe('#1615 restarting injects the previous round lessons', () => {
     const newId = latestBuildId(w);
     expect(newId).not.toBe(w.buildId);
     const prompt = firstStepPrompt(w, newId)!;
-    expect(prompt.startsWith(buildRestartPrompt('这次先补测试'))).toBe(true);
+    expect(prompt.startsWith(sessionPrompt(buildRestartPrompt('这次先补测试')))).toBe(true);
     const lessons = prompt.slice(prompt.indexOf(RETRY_LESSONS_HEAD));
     expect(prompt.indexOf(RETRY_LESSONS_HEAD)).toBeGreaterThan(0);
     expect(lessons).toContain('typecheck');
@@ -341,17 +319,14 @@ describe('#1615 restarting injects the previous round lessons', () => {
     expect(lessons).not.toContain('这次先补测试');
   });
 
-  test('the direct rerun misses lessons: rerunning straight from failed (POST builds) carries them too, and a plan step with only lessons keeps the plan.md contract line', async () => {
+  test('the direct rerun misses lessons: rerunning straight from failed (POST builds) carries them too, and the session step prompt carries them', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     const [created] = startBuilds(w.deps, {
       projectId: w.projectId,
       todoIds: [w.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     const prompt = firstStepPrompt(w, created!.id)!;
-    expect(prompt.startsWith(buildPlanFirstRoundInstruction())).toBe(true);
     expect(prompt).toContain(RETRY_LESSONS_HEAD);
     expect(prompt).toContain('typecheck');
     expect(prompt).toContain('规划未产出方案');
@@ -444,52 +419,6 @@ describe('#1615 restarting injects the previous round lessons', () => {
     expect(prompt).not.toContain('lint-early');
   });
 
-  test('plan-step reassignment: rerunning straight from failed with an empty plan slot, the first plan step still ends failed as in the first round, no fallback to the build slot', async () => {
-    const w = makeWorld();
-    await failedBuildA(w);
-    const [created] = startBuilds(w.deps, {
-      projectId: w.projectId,
-      todoIds: [w.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    });
-    expect(firstStepPrompt(w, created!.id)).toContain(RETRY_LESSONS_HEAD);
-
-    expect(await claimOrNull(w)).toBeNull();
-    assertPlanSlotEmptyFailsFirstPlanStep(w, created!.id);
-  });
-
-  test('plan-step reassignment: a blank-feedback restart with an empty plan slot stays a pure restart, the first plan step carries no prompt and ends failed as in the first round', async () => {
-    const w = makeWorld();
-    await failedBuildA(w);
-    w.s.db
-      .update(todoTable)
-      .set({ assignment: { plan: null, build: { agentId: AGENT_ID } } })
-      .where(eq(todoTable.id, w.todoId))
-      .run();
-    await restart(w, '  ');
-    const newId = latestBuildId(w);
-    expect(firstStepPrompt(w, newId)).toBeNull();
-
-    expect(await claimOrNull(w)).toBeNull();
-    assertPlanSlotEmptyFailsFirstPlanStep(w, newId);
-  });
-
-  test('plan-step reassignment: a restart with feedback still belongs to the rework family and falls back to the build slot when the plan slot is empty', async () => {
-    const w = makeWorld();
-    await failedBuildA(w);
-    w.s.db
-      .update(todoTable)
-      .set({ assignment: { plan: null, build: { agentId: AGENT_ID } } })
-      .where(eq(todoTable.id, w.todoId))
-      .run();
-    await restart(w, '换个思路');
-
-    const claimed = await claim(w);
-    expect(claimed.step.kind).toBe('plan');
-    expect(claimed.agent?.id).toBe(AGENT_ID);
-  });
-
   test('overlong and unbounded: truncated nearest-first, the whole section stays within the cap', async () => {
     const w = makeWorld();
     const base = nowMs() - 500_000;
@@ -539,21 +468,25 @@ describe('#1615 restarting injects the previous round lessons', () => {
     const w = makeWorld();
     await failedBuildA(w);
     await restart(w, '   ');
-    expect(firstStepPrompt(w, latestBuildId(w))).toBeNull();
+    expect(firstStepPrompt(w, latestBuildId(w))).toBe(SESSION_BRIEF);
   });
 
   test('failure cause only: a failure cause alone is not a lesson, and the restart prompt with feedback is just the user feedback itself', async () => {
     const w = makeWorld();
     failBuild(w, '只有失败原因');
     await restart(w, '把测试也补上');
-    expect(firstStepPrompt(w, latestBuildId(w))).toBe(buildRestartPrompt('把测试也补上'));
+    expect(firstStepPrompt(w, latestBuildId(w))).toBe(
+      sessionPrompt(buildRestartPrompt('把测试也补上')),
+    );
   });
 
   test('an empty section even with nothing usable: when the previous round left nothing, the restart first-step prompt equals the original restart instruction', async () => {
     const w = makeWorld();
     w.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, w.todoId)).run();
     await restart(w, '再来一次');
-    expect(firstStepPrompt(w, latestBuildId(w))).toBe(buildRestartPrompt('再来一次'));
+    expect(firstStepPrompt(w, latestBuildId(w))).toBe(
+      sessionPrompt(buildRestartPrompt('再来一次')),
+    );
   });
 
   test('the first start unchanged: with no previous round the first-step prompt and claim instruction stay the same (snapshot)', async () => {
@@ -562,8 +495,6 @@ describe('#1615 restarting injects the previous round lessons', () => {
     const [created] = startBuilds(w.deps, {
       projectId: w.projectId,
       todoIds: [w.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     const claimed = await claim(w);
     expect({
@@ -571,14 +502,12 @@ describe('#1615 restarting injects the previous round lessons', () => {
       stepPrompt: firstStepPrompt(w, created!.id),
       instruction: claimed.instruction ?? null,
       session: claimed.session.action,
-    }).toMatchInlineSnapshot(`
-      {
-        "instruction": null,
-        "kind": "plan",
-        "session": "new",
-        "stepPrompt": null,
-      }
-    `);
+    }).toEqual({
+      kind: 'session',
+      stepPrompt: SESSION_BRIEF,
+      instruction: SESSION_BRIEF,
+      session: 'new',
+    });
   });
 
   test('presentation-layer misjudgment: a composed line with a lessons section (bare instruction joined with the task prefix) is not taken for a user bubble', async () => {

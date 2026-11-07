@@ -55,6 +55,7 @@ for (const mode of ['chief', 'worker'] as const) {
         {
           teamId: H.teamId,
           agentId: AGENT_ID,
+          sourceName: null,
           todoId: 'source',
           projectId: H.projectId,
           buildId: 'build',
@@ -167,7 +168,7 @@ for (const mode of ['chief', 'worker'] as const) {
 }
 
 describe('memory read-surface semantics consistent', () => {
-  const listUrl = () => `/api/teams/${H.teamId}/agents/${AGENT_ID}/memories`;
+  const listUrl = () => `/api/teams/${H.teamId}/memories`;
 
   test('REST list defaults to only valid entries (the UI memory n/100 numerator), includeInvalid includes history', async () => {
     const old = (await relay('save_memory', { title: '约定', content: '版本一' })) as Entry;

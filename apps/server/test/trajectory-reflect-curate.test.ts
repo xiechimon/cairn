@@ -1,13 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ENV_VARS, type TrajectoryPack } from '@cairn/shared';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../src/config.js';
 import { openDbWithHandle } from '../src/db/client.js';
-import { agent, build, memoryCandidate, project, team, todo } from '../src/db/schema.js';
+import { build, memoryCandidate, project, team, todo } from '../src/db/schema.js';
 import {
   trajectoryExportRunOf,
   trajectoryOutcomeRunOf,
@@ -75,7 +75,7 @@ afterEach(async () => {
 });
 
 function scratch() {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-reflect-curate-'));
+  const dir = makeTestTempDir('cairn-reflect-curate-');
   dirs.push(dir);
   return dir;
 }
@@ -137,10 +137,6 @@ function seedHome(home: string) {
   const opened = openDbWithHandle(join(dataDir, 'server.db'));
   opened.db.insert(team).values({ id: 'team-1', name: 'T', createdAt: 1 }).run();
   opened.db.insert(project).values({ id: 'project-1', teamId: 'team-1', name: 'P' }).run();
-  opened.db
-    .insert(agent)
-    .values({ id: 'agent-1', teamId: 'team-1', displayName: 'A', provider: 'p', modelId: 'm' })
-    .run();
   opened.db
     .insert(todo)
     .values({

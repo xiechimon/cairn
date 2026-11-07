@@ -25,7 +25,7 @@ export function PlanApproval({ approved, approvedText, onApprove, onEdit }: Plan
   return (
     <div data-slot="plan-approval" className="flex flex-wrap gap-2">
       <Button size="sm" onClick={onApprove} className="h-6.5 px-2.25 text-meta">
-        <Check className="size-3" />
+        <Check className="size-3.5" />
         Approve plan
       </Button>
       <Button

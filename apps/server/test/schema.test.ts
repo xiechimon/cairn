@@ -1,5 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { DB_TABLES } from '@cairn/shared';
 import Database from 'better-sqlite3';
@@ -8,6 +7,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { getTableConfig, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER, openMemoryDb } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
@@ -45,7 +45,7 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
   test.each(['0067_schedule_report', '0068_odd_cloak', '0069_push_delivery'])(
     'upgrades a database migrated through %s without rewriting its migration history',
     (previousTag) => {
-      const previous = mkdtempSync(join(tmpdir(), 'cairn-1405-migrations-'));
+      const previous = makeTestTempDir('cairn-1405-migrations-');
       const sqlite = new Database(':memory:');
       const db = drizzle(sqlite, { schema });
       try {
@@ -85,7 +85,7 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
       readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
     ) as { entries: { tag: string; when: number }[] };
     const previous = journal.entries.slice(0, -1);
-    const directory = mkdtempSync(resolve(tmpdir(), 'cairn-migration-prefix-'));
+    const directory = makeTestTempDir('cairn-migration-prefix-');
     const sqlite = new Database(':memory:');
     try {
       mkdirSync(resolve(directory, 'meta'));

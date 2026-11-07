@@ -6,7 +6,6 @@ import {
   DriftField,
   SpiralArt,
   SpiralMark,
-  TexturedTile,
   TextureSkeleton,
 } from '../components/texture/texture.js';
 import type { TextureFilter } from '../components/texture/texture-core.js';
@@ -49,6 +48,7 @@ export function TextureSection() {
       lede="The Cairn spiral and a slow noise field, drawn as ASCII characters or 4×4 Bayer dots in the project hue. Texture marks arrival, emptiness and agents at work; surfaces you read stay flat. Motion runs only while something runs and stops under reduced motion."
     >
       <Specimen
+        id="spiral-art"
         title="Spiral art"
         note="Sign-in and first run: the logo spiral, enlarged and cropped, under a veil that clears for the headline"
         code={`<SpiralArt filter="ascii" className="h-96">\n  <Headline />\n</SpiralArt>`}
@@ -57,7 +57,7 @@ export function TextureSection() {
           <FilterSwitch value={artFilter} onChange={setArtFilter} />
           <SpiralArt filter={artFilter} className="h-96 w-full max-w-120">
             <div className="flex h-96 flex-col justify-end p-6">
-              <p className="m-0 font-serif text-greeting text-project-ink-1">
+              <p className="m-0 font-serif text-greeting text-foreground">
                 Agents that bring back
                 <br />
                 <i>only what needs you.</i>
@@ -67,6 +67,7 @@ export function TextureSection() {
         </div>
       </Specimen>
       <Specimen
+        id="spiral-mark"
         title="Spiral mark"
         note="Large empty states swap the line icon for the spiral in dots"
         code={`<EmptyState media={<SpiralMark />} title="No threads yet" … />`}
@@ -83,6 +84,7 @@ export function TextureSection() {
         </div>
       </Specimen>
       <Specimen
+        id="drift-field"
         title="Drift field"
         note="Behind the Coordinator greeting and on a running card; it freezes to one frame when nothing runs"
         code={`<DriftField active={running} />\n<DriftEdge active={card.running} />`}
@@ -122,22 +124,12 @@ export function TextureSection() {
         </div>
       </Specimen>
       <Specimen
-        title="Textured tiles and loading"
-        note="Project tiles at 40px and up, and a dot sweep for loading; smaller tiles stay flat"
-        code={`<TexturedTile letter="C" tone={1} />\n<TextureSkeleton />`}
+        id="loading"
+        title="Loading"
+        note="A dot sweep for loading"
+        code={`<TextureSkeleton />`}
       >
         <div className="flex w-full flex-col gap-5">
-          <Labeled label="TexturedTile, tones 1–6">
-            <div className="flex gap-3">
-              {(['C', 'S', 'W', 'D', 'A', 'M'] as const).map((letter, i) => (
-                <TexturedTile
-                  key={letter}
-                  letter={letter}
-                  tone={(i + 1) as 1 | 2 | 3 | 4 | 5 | 6}
-                />
-              ))}
-            </div>
-          </Labeled>
           <Labeled label="TextureSkeleton">
             <TextureSkeleton />
           </Labeled>

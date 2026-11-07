@@ -4,12 +4,13 @@ import { mockLive } from './chief-home-mock';
 const TOKEN = `sk-ant-oat01-${'e'.repeat(64)}`;
 
 for (const locale of ['zh', 'en'] as const) {
-test(`connects, verifies and deletes a subscription on the model routing page (${locale})`, async ({ page }) => {
+test(`connects, verifies and deletes a subscription on the providers page (${locale})`, async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem('cairn.locale', value), locale);
   let rejectDelete = true;
   const connections: { id: string; kind: string; label: string; expiresAt: number | null; createdAt: number }[] = [];
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
     if (path === '/api/teams/t1/claude-subscriptions') {
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
@@ -27,10 +28,11 @@ test(`connects, verifies and deletes a subscription on the model routing page ($
       return route.fulfill({ status: 204 });
     }
   });
-  await page.goto('/app/resources/model-routing');
-  await expect(page).toHaveURL(/\/app\/settings\/routing/);
+  await page.goto('/app/resources/providers');
+  await expect(page).toHaveURL(/\/app\/settings\/providers/);
 
-  await page.getByRole('button', { name: locale === 'zh' ? '添加 Claude 账户' : 'Add a Claude account' }).click();
+  await page.getByTestId('resource-new').click();
+  await page.locator('[data-preset-id="claude-subscription"]').click();
   const dialog = page.getByRole('dialog', { name: 'Add Claude subscription' });
   await expect(dialog).toContainText('claude setup-token');
   await dialog.getByTestId('subscription-label').fill('Personal Claude');
@@ -38,31 +40,26 @@ test(`connects, verifies and deletes a subscription on the model routing page ($
   await dialog.getByTestId('subscription-token').fill(TOKEN);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  const row = page.locator('[data-account-id="subscription-1"]');
+  const row = page.locator('[data-instance-id="subscription:subscription-1"]');
   await expect(row).toContainText('Personal Claude');
   await expect(page.locator('body')).not.toContainText(TOKEN);
 
-  await row.getByTestId('account-more').click();
-  await page.getByRole('menuitem', { name: locale === 'zh' ? /验证/ : /Verify/ }).click();
+  const detail = page.getByTestId('subscription-detail');
   await expect(page.getByText(locale === 'zh' ? '「Personal Claude」验证通过' : 'Personal Claude verified')).toBeVisible();
-  await page.screenshot({ path: `/tmp/b1-subscription-before-delete-${locale}.png`, fullPage: true });
 
   const remove = locale === 'zh' ? '移除' : 'Remove';
-  await row.getByTestId('account-more').click();
-  await page.getByRole('menuitem', { name: new RegExp(remove) }).click();
+  const removeButton = detail.getByRole('button', { name: remove, exact: true });
   const confirm = page.getByRole('alertdialog');
+  await removeButton.click();
   await expect(confirm).toContainText('Personal Claude');
   await confirm.getByRole('button', { name: locale === 'zh' ? '取消' : 'Cancel', exact: true }).click();
   await expect(row).toBeVisible();
-  await row.getByTestId('account-more').click();
-  await page.getByRole('menuitem', { name: new RegExp(remove) }).click();
+  await removeButton.click();
   await confirm.getByRole('button', { name: remove, exact: true }).click();
   await expect(page.getByText(locale === 'zh' ? '移除失败，请重试。' : 'Could not remove. Try again.')).toBeVisible();
-  await row.getByTestId('account-more').click();
-  await page.getByRole('menuitem', { name: new RegExp(remove) }).click();
+  await removeButton.click();
   await confirm.getByRole('button', { name: remove, exact: true }).click();
   await expect(row).toHaveCount(0);
-  await page.screenshot({ path: `/tmp/b1-subscription-after-delete-${locale}.png`, fullPage: true });
 });
 
 }

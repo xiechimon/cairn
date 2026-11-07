@@ -10,11 +10,11 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   agentMemory,
-  agent as agentTable,
   chiefMessage,
   chief as chiefTable,
   chiefThread,
   notification as notificationTable,
+  routingRule,
   step as stepTable,
 } from '../src/db/schema.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
@@ -26,7 +26,9 @@ import {
   CHIEF_DIGEST_THRESHOLD_CHARS,
   planChiefDigests,
 } from '../src/services/chief-digest.js';
-import { bootServer, issueApiKey, machineIdByName, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
+
+const COORDINATOR_RULE = 'route-digest';
 
 const TZ = 'Asia/Shanghai';
 const YESTERDAY_EVENING = Date.parse('2026-10-26T20:00:00+08:00');
@@ -96,20 +98,11 @@ async function setup(cliVersion = CHIEF_DIGEST_MIN_CLI_VERSION): Promise<World> 
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'digest-mbp');
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-digest',
-      teamId,
-      displayName: 'digest-agent',
-      description: '调度',
-      modelId: 'stub-model',
-      provider: 'stub-gw',
-      machineId,
-    })
-    .run();
-  await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: 'agent-digest' } },
+  seedRoute(s, 'coordinator', {
+    id: COORDINATOR_RULE,
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId,
   });
   const msgRes = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content: '看板拖完卡片计数不对，修一下' },
@@ -279,7 +272,7 @@ describe('chief long-chat digests (#1939)', () => {
       .where(eq(agentMemory.id, memoryId ?? ''))
       .get();
     expect(memory?.content).toBe('发布卡住时先查 npm 源');
-    expect(memory?.agentId).toBe('agent-digest');
+    expect(memory?.agentId).toBe(COORDINATOR_RULE);
     const main = w.s.db.select().from(chiefThread).where(eq(chiefThread.id, w.threadId)).get();
     expect(main?.sessionId).toBe('');
     expect(
@@ -314,7 +307,7 @@ describe('chief long-chat digests (#1939)', () => {
       .insert(agentMemory)
       .values({
         id: 'mem-old',
-        agentId: 'agent-digest',
+        agentId: COORDINATOR_RULE,
         teamId: w.teamId,
         title: '发布',
         content: '发布卡住时先查 npm 源',
@@ -334,7 +327,7 @@ describe('chief long-chat digests (#1939)', () => {
     };
     expect(content.items[3]?.memory?.id).toBe('mem-old');
     expect(
-      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, 'agent-digest')).all(),
+      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, COORDINATOR_RULE)).all(),
     ).toHaveLength(1);
   });
 
@@ -564,7 +557,7 @@ describe('chief long-chat digests (#1939)', () => {
       .insert(agentMemory)
       .values({
         id: 'mem-near',
-        agentId: 'agent-digest',
+        agentId: COORDINATOR_RULE,
         teamId: w.teamId,
         title: '发布卡住时',
         content: '发布卡住时先重试一次',
@@ -608,7 +601,7 @@ describe('chief long-chat digests (#1939)', () => {
     };
     expect(content.items[3]?.memory).toBeUndefined();
     expect(
-      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, 'agent-digest')).all(),
+      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, COORDINATOR_RULE)).all(),
     ).toHaveLength(0);
   });
 
@@ -630,7 +623,7 @@ describe('chief long-chat digests (#1939)', () => {
     if (!claimed) throw new Error('no digest step');
     await w.done(claimed.step.id, VALID_OUTPUT);
     expect(
-      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, 'agent-digest')).all(),
+      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, COORDINATOR_RULE)).all(),
     ).toHaveLength(0);
   });
 
@@ -714,9 +707,9 @@ describe('chief long-chat digests (#1939)', () => {
     expect(w.digestSteps()).toHaveLength(0);
   });
 
-  test('no bound agent: nothing runs', async () => {
+  test('no coordinator routing rule: nothing runs', async () => {
     const w = await setup();
-    w.s.db.update(chiefTable).set({ agentId: null }).where(eq(chiefTable.id, w.chiefId)).run();
+    w.s.db.delete(routingRule).where(eq(routingRule.use, 'coordinator')).run();
     w.plan(TODAY_0830);
     expect(w.digestSteps()).toHaveLength(0);
     expect(
