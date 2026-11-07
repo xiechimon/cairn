@@ -22,10 +22,11 @@ describe('parseFlushOutput', () => {
     ).toEqual([]);
   });
 
-  it('returns nothing for prose, wrong shapes and non-JSON', () => {
-    expect(parseFlushOutput('I saved nothing.')).toEqual([]);
-    expect(parseFlushOutput('{"memories":"x"}')).toEqual([]);
-    expect(parseFlushOutput('[]')).toEqual([]);
+  it('rejects prose and wrong shapes, and returns nothing for an empty or all-invalid list', () => {
+    expect(() => parseFlushOutput('I saved nothing.')).toThrow('memory flush output');
+    expect(() => parseFlushOutput('{"memories":"x"}')).toThrow('memory flush output');
+    expect(() => parseFlushOutput('[]')).toThrow('memory flush output');
+    expect(parseFlushOutput('{"memories":[]}')).toEqual([]);
     expect(parseFlushOutput(json({ nope: 1 }, 7, null))).toEqual([]);
   });
 
