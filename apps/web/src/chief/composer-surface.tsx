@@ -197,7 +197,7 @@ export function ComposerSurface({
       inert={!active}
       aria-hidden={active ? undefined : true}
       data-invalid={invalid ? '' : undefined}
-      className={`${active ? 'chief-composer ' : ''}${placement} ${home ? HOME_COMPOSER_CLS : DRAWER_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+      className={`${active ? 'chief-composer ' : ''}${placement} ${home ? HOME_COMPOSER_CLS : DRAWER_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)`}
       style={home && active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       {above}
@@ -302,7 +302,6 @@ export function ComposerSurface({
           listboxId={slashListboxId}
         />
       </div>
-      {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
       <input
         ref={fileInputRef}
         type="file"
