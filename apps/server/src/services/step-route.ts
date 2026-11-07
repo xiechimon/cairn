@@ -15,7 +15,8 @@ import { machine, type step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import { missingCapabilityItems } from './dispatch-eligibility.js';
+import { homeMachineRejectReason, missingCapabilityItems } from './dispatch-eligibility.js';
+import { mergedCatalogModels } from './model-liveness.js';
 
 type StepRouteRow = typeof stepRoute.$inferSelect;
 type RoutedTodo = Pick<typeof todo.$inferSelect, 'teamId'> &
@@ -34,12 +35,6 @@ function machineSatisfies(
   const missing = missingCapabilityItems(row, constraints.required);
   return (
     missing.executor === undefined && missing.mcpServers.length === 0 && missing.models.length === 0
-  );
-}
-
-function reportsModel(models: readonly { id: string }[] | undefined, modelId: string): boolean {
-  return (
-    models === undefined || models.length === 0 || models.some((model) => model.id === modelId)
   );
 }
 
@@ -62,6 +57,7 @@ export function capabilityCandidates(
   constraints: RouteConstraints,
 ): CapabilityCandidate[] {
   const now = nowMs();
+  const catalog = mergedCatalogModels();
   const candidates: CapabilityCandidate[] = [];
   for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
     if (!machineSatisfies(row, constraints)) continue;
@@ -84,7 +80,9 @@ export function capabilityCandidates(
         provider: 'claude-code',
         modelId,
         machineId: row.id,
-        available: claudeUsable && reportsModel(report?.models, modelId),
+        available:
+          claudeUsable &&
+          homeMachineRejectReason(row, { provider: 'claude-code', modelId }, catalog) === null,
         ...(claudeInstalled ? {} : { unavailableWhy: 'harness-missing' as const }),
         weeklyUsedPercent: weeklyUsedPercent(row),
       });

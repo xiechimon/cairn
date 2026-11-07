@@ -188,7 +188,6 @@ export function profileForStep(
     ...base,
     provider: decision.chosen.provider,
     modelId: decision.chosen.modelId,
-    machineId: base.machineId ?? decision.chosen.machineId,
   };
 }
 

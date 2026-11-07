@@ -487,7 +487,7 @@ describe('removing the agent table from a seeded legacy install', () => {
     expect(pending?.agent).toMatchObject({
       id: 'rule-session-old',
       provider: 'claude-code',
-      modelId: 'claude-haiku-5-5',
+      modelId: 'claude-sonnet-5-5',
       tools: ['推送分支'],
     });
     const done = await call(

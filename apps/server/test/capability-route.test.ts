@@ -57,7 +57,10 @@ function equipMachine(
         ? {
             installed: true,
             hostname: 'route-box',
-            models: [],
+            models: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map((id) => ({
+              id,
+              name: id,
+            })),
             auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
           }
         : null,
@@ -299,6 +302,15 @@ describe('the router agrees with what dispatch can execute', () => {
     });
     expect(row).toMatchObject({ provider: 'claude-code', modelId: 'claude-haiku-5-5' });
     expect(row.reason).toContain('availability changed during the claim');
+  });
+});
+
+describe('the router leaves the execution constraints of the rule alone', () => {
+  test('the chosen worker does not become the machine pin of an unpinned rule', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'rename one label');
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ machineId: null });
   });
 });
 
