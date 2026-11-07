@@ -180,6 +180,15 @@ test('scrolling up stops following, and the jump button resumes it', async ({ pa
   await emit(page, { type: 'text_delta', text: `${paragraph(4)}\n\n` });
   await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await expect(jump).toHaveAttribute('data-active', 'false');
+
+  await viewport(page).hover();
+  await page.mouse.wheel(0, -700);
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(300);
+  const parkedAfterJump = await gapToBottom(page);
+  await emit(page, { type: 'text_delta', text: `${paragraph(5)}\n\n` });
+  await expect(home(page).getByText(paragraph(5).trim(), { exact: false })).toBeAttached();
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThanOrEqual(parkedAfterJump);
+  await expect(jump).toHaveAttribute('data-active', 'true');
 });
 
 test('the drawer follows a send and its streaming growth too', async ({ page }) => {
@@ -213,6 +222,8 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
   }) => {
     if (activation === 'reduced-motion') await page.emulateMedia({ reducedMotion: 'reduce' });
     if (activation === 'phone-light') {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme: 'light' });
     }
@@ -302,9 +313,7 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
       latestVisible: boolean;
     };
     if (activation === 'click') {
-      await page.screenshot({
-        path: `../../docs/verify/jump-latest-instant/${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-100ms.png`,
-      });
+      await evidenceShot(page, `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-100ms.png`);
     }
     expect(measurement.elapsed).toBeLessThanOrEqual(150);
     expect.soft(measurement.gap).toBeLessThanOrEqual(2);
