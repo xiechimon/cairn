@@ -1,4 +1,4 @@
-import { shortEvent, withHistoryMarker } from '@cairn/shared';
+import { shortEvent, transcriptPromptRowId, withHistoryMarker } from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
 import { defineExtension, GenerationTask, hook } from '@earendil-works/pi-durable';
 
@@ -61,7 +61,10 @@ export function shortenEarlierEvents(
   return messages.map((message, i) => {
     const text = firstText(message);
     if (text === null || i >= latest) return message;
-    if (currentStepId !== undefined && text.includes(withHistoryMarker('', currentStepId).trim())) {
+    if (
+      currentStepId !== undefined &&
+      text.includes(withHistoryMarker('', transcriptPromptRowId(currentStepId)).trim())
+    ) {
       return message;
     }
     const short = shortEvent(text);

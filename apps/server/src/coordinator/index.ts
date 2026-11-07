@@ -6,6 +6,7 @@ import {
   redactSecrets,
   type ThinkingLevel,
   thinkingLevelSchema,
+  transcriptPromptRowId,
   withHistoryMarker,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
@@ -22,7 +23,7 @@ import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
-import { type MachineDeps, publishStepStatus } from '../services/machine-deps.js';
+import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
 import { chiefRemoteTools } from '../services/routing-rules.js';
 import {
   type CoordinatorProviders,
@@ -159,7 +160,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         const providers =
           teamId === null ? null : coordinatorProviders({ db, box: machine.box }, teamId);
         const watermark = parseWatermark(row?.lastMirroredEntryId ?? null);
-        const pendingUsers = new Set(live.map((r) => r.id));
+        const pendingUsers = new Set(live.flatMap((r) => [r.id, transcriptPromptRowId(r.id)]));
         if (watermark?.kind === 'rewind') pendingUsers.add(watermark.anchorMessageId);
         const window = db
           .select({ message: chiefMessage, rowid: sql<number>`rowid` })
@@ -306,6 +307,16 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const chiefRow = db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
     if (chiefRow === undefined) return null;
     const context = chiefTurnContext(machine, row, threadRow, chiefRow.id);
+    const eventRowId = transcriptPromptRowId(row.id);
+    if (row.prompt !== null && context.trigger !== 'user') {
+      upsertChiefRow(machine, {
+        id: eventRowId,
+        threadId: row.buildId,
+        role: 'user',
+        content: row.prompt,
+        createdAt: nowMs(),
+      });
+    }
     const volatileParts = [...context.sections, memoriesSection(context.memories)].filter(
       (part): part is string => part !== null,
     );
@@ -323,7 +334,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         instruction:
           row.prompt === null || context.trigger === 'user'
             ? row.prompt
-            : withHistoryMarker(row.prompt, row.id),
+            : withHistoryMarker(row.prompt, eventRowId),
         agent: {
           id: chiefRow.id,
           displayName: 'Coordinator',

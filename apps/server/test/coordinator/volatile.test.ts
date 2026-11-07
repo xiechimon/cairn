@@ -128,7 +128,7 @@ describe('earlier events reach the model in short form', () => {
   it('keeps the event of the running step whole even after a steered message follows it', () => {
     const out = shortenEarlierEvents(
       [
-        { role: 'user', content: big('s2'), ...t },
+        { role: 'user', content: big('user-s2'), ...t },
         { role: 'user', content: 'also check the other repo', ...t },
       ],
       's2',
