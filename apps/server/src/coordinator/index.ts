@@ -347,6 +347,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const keyed = [providers?.router.provider, providers?.summary.provider].filter(
       (id): id is string => id !== undefined,
     );
+    const heartbeat = setInterval(
+      () => void api.heartbeat(row.id).catch(() => {}),
+      options.heartbeatMs ?? HEARTBEAT_MS,
+    );
     try {
       if (providers === null) throw new Error('Coordinator route resolves to no keyed provider');
       const payload = claimedPayload(row, providers);
@@ -366,6 +370,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         await api.done(row.id, { status: 'failed', errorMessage: scrubbed });
       }
     } finally {
+      clearInterval(heartbeat);
       freshClaims.delete(row.id);
     }
   };

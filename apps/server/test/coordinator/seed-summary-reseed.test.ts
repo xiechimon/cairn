@@ -1,4 +1,4 @@
-import { fauxAssistantMessage } from '@earendil-works/pi-ai';
+import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { chiefMessage, chiefSummary, step } from '../../src/db/schema.js';
@@ -83,4 +83,31 @@ describe('Coordinator reseed builds its summary on demand', () => {
         .map((r) => r.status),
     ).toEqual(['done']);
   });
+
+  it('keeps the step heartbeat alive while a slow summary call runs', async () => {
+    const w = await world('go on');
+    olderRows(w, 130);
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 20,
+    });
+    faux.setResponses([
+      fauxAssistantMessage('slow summary '.repeat(20)),
+      fauxAssistantMessage('answered'),
+    ]);
+    const coordinator = boot(w, faux, { heartbeatMs: 50 });
+    coordinator.wake(w.threadId);
+    const beats = new Set<number>();
+    const deadline = Date.now() + 8_000;
+    while (Date.now() < deadline) {
+      const row = w.s.db.select().from(step).where(eq(step.id, w.stepId)).get();
+      if (row?.status === 'done') break;
+      if (row?.status === 'claimed' && row.lastHeartbeatAt !== null) beats.add(row.lastHeartbeatAt);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    await coordinator.idle();
+    expect(beats.size).toBeGreaterThan(2);
+    expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('done');
+  }, 15_000);
 });
