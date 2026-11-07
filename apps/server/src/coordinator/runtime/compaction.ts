@@ -169,10 +169,14 @@ export function summarizerFor(
     throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
   }
   return async (prompt) => {
-    const reply = await models.completeSimple(model, {
-      systemPrompt: SUMMARY_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-    });
+    const reply = await models.completeSimple(
+      model,
+      {
+        systemPrompt: SUMMARY_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      },
+      { reasoning: 'low' },
+    );
     if (reply.stopReason !== 'stop') {
       throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
     }
