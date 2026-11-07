@@ -55,7 +55,7 @@ export function runTokenCommand(opts: { rotate: boolean }, io: TokenCommandIo): 
   const display =
     host === '0.0.0.0' || host === '::' ? 'localhost' : host.includes(':') ? `[${host}]` : host;
   const url = new URL(`http://${display}:${io.env.PORT ?? '8787'}/app`);
-  url.hash = new URLSearchParams({ token }).toString();
+  url.hash = `token=${encodeURIComponent(token)}`;
   io.writeOut(`Login link: ${url.href}\n`);
   io.writeOut(
     envToken !== null ? `(from environment variable ${ENV_VARS.token})\n` : `(from ${filePath})\n`,
