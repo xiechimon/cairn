@@ -7,7 +7,7 @@ export const FOLLOW_THRESHOLD = 40;
 export const JUMP_THRESHOLD = 120;
 
 const JUMP_BTN_CLS =
-  'absolute bottom-3 inset-s-1/2 size-8 -translate-x-1/2 rounded-full border-0 bg-card text-content-secondary shadow-(--e2) transition-opacity duration-(--dur-fast) ease-(--ease-standard) hover:bg-card hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:opacity-0 data-[active=true]:opacity-100 rtl:translate-x-1/2';
+  'absolute bottom-3 inset-s-1/2 size-8 -translate-x-1/2 rounded-full border-0 bg-card text-content-secondary shadow-(--e2) transition-none hover:bg-card hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:opacity-0 data-[active=true]:opacity-100 rtl:translate-x-1/2';
 
 export function JumpToLatestButton({
   threshold = JUMP_THRESHOLD,
@@ -25,6 +25,7 @@ export function JumpToLatestButton({
 } & Omit<React.ComponentProps<'button'>, 'children' | 'className'>) {
   const { scrollToEnd } = useMessageScroller();
   const [active, setActive] = useState(false);
+  const followingRef = useRef(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -35,20 +36,32 @@ export function JumpToLatestButton({
     if (!viewport) return;
     const sync = () => {
       const dist = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      if (followingRef.current && dist > 2) scrollToEnd({ behavior: 'instant' });
       setActive(dist > threshold);
     };
+    const stopFollowing = () => {
+      followingRef.current = false;
+    };
     sync();
+    for (const type of ['wheel', 'touchmove', 'keydown', 'pointerdown']) {
+      viewport.addEventListener(type, stopFollowing, { passive: true });
+    }
     viewport.addEventListener('scroll', sync, { passive: true });
     const ro = new ResizeObserver(sync);
     ro.observe(viewport);
+    for (const child of viewport.children) ro.observe(child);
     const mo = new MutationObserver(sync);
     mo.observe(viewport, { childList: true, subtree: true, characterData: true });
     return () => {
+      stopFollowing();
+      for (const type of ['wheel', 'touchmove', 'keydown', 'pointerdown']) {
+        viewport.removeEventListener(type, stopFollowing);
+      }
       viewport.removeEventListener('scroll', sync);
       ro.disconnect();
       mo.disconnect();
     };
-  }, [threshold]);
+  }, [scrollToEnd, threshold]);
 
   return (
     <Button
@@ -68,7 +81,8 @@ export function JumpToLatestButton({
         props.onClick?.(e);
         if (e.defaultPrevented) return;
         e.currentTarget.blur();
-        scrollToEnd({ behavior: 'smooth' });
+        followingRef.current = true;
+        scrollToEnd({ behavior: 'instant' });
       }}
     >
       {children}
