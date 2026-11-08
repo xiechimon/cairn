@@ -249,8 +249,9 @@ export async function answerTaskQuestion(
   }
   const answer = { todoId: row.id, question, answer: input.answer, by };
   const result = { todoId: row.id, buildId, requestId: input.requestId };
-  const held = hasClaimedStep(deps, buildId);
-  if (held || pending.length > 1) {
+  const running = hasClaimedStep(deps, buildId);
+  const held = running && question.parkedAt === undefined;
+  if (held || (!running && pending.length > 1)) {
     deps.db.transaction(() => settleQuestionAnswer(deps, buildId, answer));
     return { ...result, delivered: held ? 'held-step' : 'waiting-other-questions' };
   }
