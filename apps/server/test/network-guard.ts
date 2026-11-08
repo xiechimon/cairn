@@ -46,7 +46,7 @@ function socketHost(args: unknown[]): string | null {
   if (Array.isArray(first)) return socketHost(first);
   if (typeof first === 'object' && first !== null) {
     const options = first as { host?: unknown; path?: unknown };
-    if (options.path !== undefined) return null;
+    if (typeof options.path === 'string') return null;
     return typeof options.host === 'string' ? options.host : 'localhost';
   }
   if (typeof first === 'string' && !/^\d+$/.test(first)) return null;
