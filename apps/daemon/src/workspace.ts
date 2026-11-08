@@ -36,7 +36,7 @@ import {
   withGitNetRetries,
 } from './git.js';
 import type { DaemonLogger } from './log.js';
-import { publishStepCommits } from './step-attribution.js';
+import { attributeStepCommits } from './step-attribution.js';
 import {
   runWorkspaceHook,
   WorkspaceHookError,
@@ -365,23 +365,14 @@ export class WorkspaceManager implements WorktreeOps {
     publication: PushPublication,
   ): Promise<void> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
-    const published = await publishStepCommits({
-      ...publication,
-      dir: cwd,
-      branch,
-      credential: credentials,
-    });
-    try {
-      await withGitNetRetries(() =>
-        gitPrim.push(cwd, branch, credentials, (local, remote) =>
-          this.logger.workspace(
-            `push of ${branch} already contained in origin/${branch} (local ${local.slice(0, 7)}, remote ${remote.slice(0, 7)}); nothing to push`,
-          ),
+    await attributeStepCommits({ ...publication, dir: cwd, branch, credential: credentials });
+    await withGitNetRetries(() =>
+      gitPrim.push(cwd, branch, credentials, (local, remote) =>
+        this.logger.workspace(
+          `push of ${branch} already contained in origin/${branch} (local ${local.slice(0, 7)}, remote ${remote.slice(0, 7)}); nothing to push`,
         ),
-      );
-    } finally {
-      await published.release();
-    }
+      ),
+    );
   }
 
   async mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }> {

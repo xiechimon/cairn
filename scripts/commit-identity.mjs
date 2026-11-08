@@ -35,22 +35,8 @@ export function commitsOf(revListArgs) {
         parents: parents.split(' ').filter(Boolean).length,
         author: { name: an, email: ae },
         committer: { name: cn, email: ce },
-        verified: null,
       };
     });
-}
-
-async function verification(repo, sha) {
-  const api = process.env.GITHUB_API_URL ?? 'https://api.github.com';
-  const response = await fetch(`${api}/repos/${repo}/commits/${sha}`, {
-    headers: {
-      accept: 'application/vnd.github+json',
-      ...(process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
-    },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error(`cannot read verification of ${sha}: HTTP ${response.status}`);
-  return (await response.json()).commit?.verification?.verified === true;
 }
 
 function ciRange() {
@@ -61,17 +47,17 @@ function ciRange() {
   return 'HEAD^!';
 }
 
-async function ci() {
+function ci() {
   const repo = process.env.GITHUB_REPOSITORY;
   if (!repo) throw new Error('GITHUB_REPOSITORY is required');
-  const range = ciRange();
+  const headRepo = process.env.HEAD_REPO ?? '';
+  const fromFork = headRepo !== '' && headRepo.toLowerCase() !== repo.toLowerCase();
   const failures = [];
-  for (const commit of commitsOf([range])) {
+  for (const commit of commitsOf([ciRange()])) {
     console.log(
       `${commit.sha} author: ${commit.author.name} <${commit.author.email}> committer: ${commit.committer.name} <${commit.committer.email}>`,
     );
-    const facts = { ...commit, verified: await verification(repo, commit.sha) };
-    const violation = commitIdentityViolation(policy, facts);
+    const violation = commitIdentityViolation(policy, commit, fromFork);
     if (violation) failures.push(violation);
   }
   for (const failure of failures) console.log(`::error::${failure}`);

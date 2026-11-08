@@ -25,9 +25,9 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - name: Every commit is the App through the GitHub API, or ian by hand
+      - name: Every commit is the App or ian, on a branch of this repository
         env:
           BEFORE_SHA: ${{ github.event.before }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: node scripts/commit-identity.mjs ci

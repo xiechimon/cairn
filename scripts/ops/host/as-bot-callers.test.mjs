@@ -14,9 +14,8 @@ const botFiles = {
     join(appTokenDir, 'as-bot-policy.mjs'),
     'utf8',
   ),
-  '.cairn/tools/app-token/bot-git.mjs': readFileSync(join(appTokenDir, 'bot-git.mjs'), 'utf8'),
-  '.cairn/tools/app-token/commit-identity.ts': readFileSync(
-    resolve('packages/shared/src/commit-identity.ts'),
+  '.cairn/tools/app-token/bot-identity.mjs': readFileSync(
+    join(appTokenDir, 'bot-identity.mjs'),
     'utf8',
   ),
   '.cairn/tools/app-token/commit-identity.json': readFileSync(
