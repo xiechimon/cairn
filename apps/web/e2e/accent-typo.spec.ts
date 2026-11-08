@@ -71,7 +71,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.nameHref).toBeNull();
     expect(m.toggle).toEqual({ x: 0, w: 28, h: 28 });
     expect(m.icon).toEqual({ w: 18, h: 18 });
-    expect(m.gap).toBe(2);
+    expect(m.gap).toBe(4);
   });
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {
