@@ -212,7 +212,8 @@ export function ChiefConversation({
   const answerKey = useAnswerKey();
   const [threadOverride, setThreadOverride] = useState(false);
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
-  const answerActive = answerHere && answerKey !== null && !threadOverride && replyQuote === null;
+  const threadOwned = threadOverride || replyQuote !== null;
+  const answerActive = answerHere && answerKey !== null && !threadOwned;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -760,7 +761,7 @@ export function ChiefConversation({
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
         {tray}
-        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
+        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOwned} />
         {composerReplacement ?? (
           <>
             {composerError != null && (

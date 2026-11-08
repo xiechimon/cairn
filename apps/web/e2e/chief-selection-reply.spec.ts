@@ -245,6 +245,10 @@ test.describe('a staged or queued quote keeps its source', () => {
     await input.fill('');
     await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
     await expect(input).toBeVisible();
+    await page.getByTestId('chief-question-option-0-1').click();
+    await expect(
+      page.getByTestId('chief-question-dock').getByRole('button', { name: '提交回答' }),
+    ).toBeVisible();
     await input.fill('补充一句');
     await input.press('Enter');
     await expect.poll(() => sent.at(-1)).toBe(
