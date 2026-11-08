@@ -320,7 +320,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
             <span
-              className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+              className="chat-text -mt-px max-w-[68ch] min-w-0 voice-response text-card-title break-words text-(--foreground)"
               data-testid="agent-text"
             >
               {item.markdown != null ? (
@@ -346,7 +346,7 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+            className="chat-text -mt-px max-w-[68ch] min-w-0 voice-response text-card-title break-words text-(--foreground)"
             data-testid="info-report"
           >
             <ChatMarkdown text={item.markdown} />

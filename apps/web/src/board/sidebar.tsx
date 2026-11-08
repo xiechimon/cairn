@@ -346,7 +346,7 @@ export function BoardSidebar({
         >
           <PanelLeft className={ICON} strokeWidth={STROKE} />
         </Button>
-        <span className="sidebar-team-name ml-0.5 min-w-0 flex-1 truncate font-serif text-page leading-none font-medium tracking-normal text-foreground">
+        <span className="sidebar-team-name ml-0.5 min-w-0 flex-1 truncate voice-title text-page leading-none text-foreground">
           {BRAND.manifestName}
         </span>
         <Tooltip>

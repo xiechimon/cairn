@@ -4,8 +4,8 @@ import { ChevronDown } from '../icons/index.js';
 import { DropdownMenuTrigger } from './ui/dropdown-menu.js';
 
 const SIZE_CLS = {
-  page: '-ml-1.5 h-8 gap-2 rounded-md px-1.5 font-serif text-page tracking-[-0.01em]',
-  pane: 'h-7 gap-1 rounded-lg px-2 text-ui',
+  page: '-ml-1.5 h-8 gap-2 rounded-md px-1.5 voice-title text-page',
+  pane: 'h-7 gap-1 rounded-lg px-2 text-ui font-semibold',
 } as const;
 
 const CHEVRON_PX = { page: 14, pane: 12 } as const;
@@ -25,7 +25,7 @@ export function TitleMenuTrigger({
     <DropdownMenuTrigger
       data-testid={testId}
       className={cn(
-        'inline-flex min-w-0 items-center font-semibold text-(--foreground) outline-none hover:bg-(--menu-hover) focus-visible:ring-2 focus-visible:ring-(--ring) aria-expanded:bg-(--menu-hover)',
+        'inline-flex min-w-0 items-center text-(--foreground) outline-none hover:bg-(--menu-hover) focus-visible:ring-2 focus-visible:ring-(--ring) aria-expanded:bg-(--menu-hover)',
         SIZE_CLS[size],
       )}
     >

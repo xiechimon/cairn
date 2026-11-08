@@ -81,24 +81,24 @@ const SEMANTIC = [
 const TYPE = [
   {
     name: 'Greeting',
-    cls: 'font-serif text-greeting font-semibold tracking-[-0.01em]',
+    cls: 'voice-greeting text-greeting',
     sample: 'Good afternoon, ian',
     token: '--type-greeting',
-    weight: 600,
+    weight: 360,
   },
   {
     name: 'Page',
-    cls: 'font-serif text-page font-semibold',
+    cls: 'voice-title text-page',
     sample: 'Waiting on you',
     token: '--type-page',
-    weight: 600,
+    weight: 500,
   },
   {
     name: 'Brand',
-    cls: 'font-heading text-page font-title',
+    cls: 'voice-title text-page leading-none',
     sample: 'Cairn',
     token: '--type-page',
-    weight: 650,
+    weight: 500,
   },
   {
     name: 'Heading',
@@ -106,6 +106,13 @@ const TYPE = [
     sample: 'Threads',
     token: '--type-heading',
     weight: 650,
+  },
+  {
+    name: 'Response',
+    cls: 'voice-response text-card-title',
+    sample: 'Round 6 found no /work in the orb; fixed, round 7 is running.',
+    token: '--type-card-title',
+    weight: 400,
   },
   {
     name: 'Card title',
