@@ -83,7 +83,7 @@ function prePush() {
     if (!localSha || ZERO.test(localSha) || !remoteRef?.startsWith('refs/heads/')) continue;
     const range =
       remoteSha && !ZERO.test(remoteSha)
-        ? [`${remoteSha}..${localSha}`]
+        ? [`${remoteSha}..${localSha}`, '--not', '--remotes']
         : [localSha, '--not', '--remotes'];
     const violation = pushViolation(policy, commitsOf(range), process.env);
     if (violation) {
