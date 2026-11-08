@@ -88,7 +88,13 @@ final class AppModel {
     func answer(_ question: PendingQuestion, answers: [QuestionAnswer]) async throws {
         guard let coordinator else { return }
         try await client.answer(teamId: team.id, threadId: coordinator.id, requestId: question.ask.requestId, answers: answers)
-        try await refresh()
+        await load()
+    }
+
+    func message(taskId: String, content: String) async throws -> String {
+        let conversation = try await client.messageTask(taskId: taskId, content: content).conversationId
+        await load()
+        return conversation
     }
 
     func adoptCoordinator(_ thread: CoordinatorThread) {

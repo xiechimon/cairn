@@ -77,8 +77,7 @@ struct TaskThreadView: View {
     }
 
     private func send(_ content: String) async throws {
-        conversationId = try await model.client.messageTask(taskId: task.id, content: content).conversationId
-        try await model.refresh()
+        conversationId = try await model.message(taskId: task.id, content: content)
         await reload()
     }
 }

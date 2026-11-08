@@ -99,6 +99,34 @@ final class ClientBehaviorTests: XCTestCase {
         XCTAssertEqual(StubServer.requests.first?.url?.path, "/api/conversations/build_1/stream")
     }
 
+    private func refreshFailsAfter(_ mutationPath: String, reply: String) -> URLSession {
+        StubServer.session { request in
+            request.httpMethod == "POST" && request.url?.path == mutationPath
+                ? .init(status: 201, body: reply)
+                : .init(status: 503, body: #"{"error":"refresh down"}"#)
+        }
+    }
+
+    func testAcceptedAnswerIsNotReportedAsFailedWhenRefreshFails() async throws {
+        let path = "/api/teams/team_1/chief/threads/chief_1/questions/r1/answer"
+        let model = AppModel(client: client(refreshFailsAfter(path, reply: "{}")), team: Team(id: "team_1", name: "Team"))
+        model.adoptCoordinator(CoordinatorThread(id: "chief_1", title: "", updatedAt: 0, lastTurnAt: nil))
+        let ask = AskQuestion(requestId: "r1", status: "pending", questions: [], answers: nil)
+        let message = ThreadMessage(id: "m1", role: "assistant", content: .question(ask), createdAt: 0)
+        try await model.answer(PendingQuestion(message: message, ask: ask), answers: [])
+        XCTAssertEqual(StubServer.requests.filter { $0.httpMethod == "POST" }.count, 1)
+        XCTAssertEqual(model.error, "Server error 503: refresh down")
+    }
+
+    func testDeliveredTaskMessageIsNotReportedAsFailedWhenRefreshFails() async throws {
+        let session = refreshFailsAfter("/api/todos/t1/messages", reply: #"{"todoId":"t1","conversationId":"build_2","delivered":"started"}"#)
+        let model = AppModel(client: client(session), team: Team(id: "team_1", name: "Team"))
+        let conversation = try await model.message(taskId: "t1", content: "retry please")
+        XCTAssertEqual(conversation, "build_2")
+        XCTAssertEqual(StubServer.requests.filter { $0.httpMethod == "POST" }.count, 1)
+        XCTAssertEqual(model.error, "Server error 503: refresh down")
+    }
+
     func testRestoreFailureIsRecoverable() async {
         let account = server.absoluteString
         KeychainToken.write("stub-token", account: account)

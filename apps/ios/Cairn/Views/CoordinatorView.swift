@@ -76,7 +76,6 @@ struct CoordinatorView: View {
         liveText = ""
         running = true
         await reload()
-        running = true
     }
 
     private func answer(_ question: PendingQuestion, answers: [QuestionAnswer]) async throws {
