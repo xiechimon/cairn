@@ -17,17 +17,17 @@ Ticket: #700 (B-C13, measured at #519: after the review step's verdict JSON, `se
 ## Preconditions and how to run
 
 ```sh
-# 1. Stack (worktree code)
+# 1. Stack (worktree code; a background task, it stays up until vp.mjs cleanup or the task ends)
 VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/launch.mjs
-# 2. Stub (tiers see the script's header comment; markers: EXTRACT-FAIL-MARKER = scenario B / Blocking findings = the delayed re-planning round)
-STUB_PORT=8921 node .claude/skills/verify-cairn/scripts/stub-review-700.mjs &
+# 2. Stub (a background task; tiers see the script's header comment; markers: EXTRACT-FAIL-MARKER = scenario B / Blocking findings = the delayed re-planning round)
+STUB_PORT=8921 node scripts/owned-process.mjs --name review-700-stub -- node .claude/skills/verify-cairn/scripts/stub-review-700.mjs
 # 3. Seed (two todos = the two scenarios; the provider baseUrl points at the stub)
 VERIFY_REPO_ROOT=<worktree> STUB_LLM_URL=http://127.0.0.1:8921/v1 \
   node .claude/skills/verify-cairn/scripts/setup-review-700-seed.mjs   # stdout JSON
-# 4. Real daemon (the 4th process, cleanup.mjs does not reap it — start and collect it yourself)
+# 4. Real daemon (a background task; it dies with that task, cleanup.mjs does not stop it)
 cd <worktree>/apps/daemon && env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
   -u all_proxy -u ALL_PROXY CAIRN_HOME=/tmp/cairn-review700-daemon-home \
-  corepack pnpm exec tsx src/cli.ts start --foreground \
+  node ../../scripts/owned-process.mjs --name review-700-daemon -- corepack pnpm exec tsx src/cli.ts start --foreground \
   --server http://127.0.0.1:8791 --api-key <the seed's apiKeyPlain> \
   --team <the seed's teamId> --name review-700-mbp
 # Wait until GET /api/teams/<teamId>/machines shows online:true

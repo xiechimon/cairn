@@ -169,7 +169,7 @@ export async function runCanary({
       await runCommand(
         process.execPath,
         [join(import.meta.dirname, 'orb-host-check.mjs'), '--json'],
-        { timeout: null, detached: true, env: { ...process.env, CAIRN_ORB_RUNTIME: runtime } },
+        { timeout: null, owned: true, env: { ...process.env, CAIRN_ORB_RUNTIME: runtime } },
       ),
     );
     if (!result.ok) throw new Error(`Orb host prerequisites failed: ${result.errors.join('; ')}`);
