@@ -26,7 +26,11 @@ describe('the team-level first-PR prompt (issue #2001)', () => {
       avatarStyle: null,
       firstPrReportPrompt: OFF,
     };
-    expect(teamRecordSchema.parse(team)).toEqual(team);
+    expect(teamRecordSchema.parse(team)).toEqual({
+      ...team,
+      coAuthorTrailer: true,
+      requestInstructorReview: false,
+    });
     expect(
       teamRecordSchema.safeParse({
         id: 'team_1',
