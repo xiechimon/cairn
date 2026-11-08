@@ -196,6 +196,32 @@ test('a token that commits as someone other than the App fails and leaves the br
   expect(await runGitOk(['for-each-ref', 'refs/cairn/publish'], { cwd: w.remote })).toBe('');
 });
 
+test('without an App identity a user token never publishes through the API', async () => {
+  const w = await workspace();
+  const before = await w.commit('one');
+  const github = await fakeGithub(w.remote, {
+    name: 'xiechimon',
+    email: '157263579+xiechimon@users.noreply.github.com',
+  });
+  const published = await publishStepCommits({
+    dir: w.dir,
+    branch: w.branch,
+    base: w.base,
+    identity: null,
+    coAuthor: null,
+    credential: {
+      username: 'x-access-token',
+      password: 'user-token',
+      url: 'https://github.com/o/r.git',
+      kind: 'unattributed',
+    },
+    github: { owner: 'o', repo: 'r', apiBase: github.apiBase },
+  });
+  expect(published.verified).toBe(false);
+  expect(github.requests).toEqual([]);
+  expect(await w.git(['rev-parse', 'HEAD'])).toBe(before);
+});
+
 const sourceFiles = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);

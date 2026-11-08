@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -68,7 +69,7 @@ export async function prepareRecoveryBranch(input: {
       exclude: [base],
       coAuthor: null,
       expectedAuthor: identity,
-      stagingRef: `refs/cairn/publish/recovery-${reverted.slice(0, 12)}`,
+      stagingRef: `refs/cairn/publish/recovery-${reverted.slice(0, 12)}-${randomBytes(6).toString('hex')}`,
     });
     try {
       await git('push', 'origin', `${published.tip}:refs/heads/${branch}`);
