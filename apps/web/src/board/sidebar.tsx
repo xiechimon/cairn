@@ -29,6 +29,7 @@ import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
 import { useNeedsYou } from './needs-you-store.js';
+import { coordinatorSearch } from './open-composer.js';
 import { splitProjectsByArchive } from './project-archive.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
 import { SidebarThreadGroups } from './sidebar-thread-groups.js';
@@ -176,6 +177,7 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
   const threadParams = new URLSearchParams(baseParams);
   if (projectParam !== null) threadParams.set('project', projectParam);
   const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
@@ -274,9 +276,7 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link
-            {...railLink({ pathname: '/app', search: plain }, coordinatorActive, coordinatorLabel)}
-          >
+          <Link {...railLink(coordinatorTarget, coordinatorActive, coordinatorLabel)}>
             <BrandGlyph className={ICON} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
@@ -372,7 +372,7 @@ export function BoardSidebar({
             icon={<BrandGlyph className="size-4" />}
             label={t('Coordinator')}
             active={coordinatorActive}
-            onClick={() => navigate({ pathname: '/app', search: plain })}
+            onClick={() => navigate(coordinatorTarget)}
           />
           {attention > 0 && (
             <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2">

@@ -545,6 +545,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/host/test-temp-guard.test.mjs
 
+      - name: Worktree reaper removes only clean, idle, finished trees
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/host/worktree-reaper.test.mjs
+
       - name: merge-pr Mergify queue fixtures
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/host/merge-pr-queue.test.mjs

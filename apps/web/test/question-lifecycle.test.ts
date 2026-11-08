@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
-import { answerSummary, awaitingStream, leavingQuestion } from '../src/chief/question-lifecycle.js';
+import { answerSummary, awaitingStream } from '../src/chief/question-lifecycle.js';
 
 type Question = Extract<ChiefStreamItem, { kind: 'question' }>;
 
@@ -64,35 +64,5 @@ describe('the answered question becomes one line', () => {
   test('missing or empty answers summarize to an empty string', () => {
     expect(answerSummary(question({ answers: null }))).toBe('');
     expect(answerSummary(question({ answers: [{ header: 'Merge' }] }))).toBe('');
-  });
-});
-
-describe('the dock keeps a finished question long enough to fade', () => {
-  const pending = question({ status: 'pending', answers: null });
-  const none = new Map();
-
-  test('a request that is now answered in the stream is the leaving card', () => {
-    const answered = question();
-    expect(leavingQuestion(pending, [answered], none)).toBe(answered);
-  });
-
-  test('a request still pending or absent, and never settled here, has nothing to fade', () => {
-    expect(leavingQuestion(pending, [pending], none)).toBeNull();
-    expect(leavingQuestion(pending, [], none)).toBeNull();
-    expect(leavingQuestion(null, [question()], none)).toBeNull();
-  });
-
-  test('a request this client settled fades with its answers before the stream catches up', () => {
-    const answers = [{ header: 'Merge', choices: ['Wait'] }];
-    expect(leavingQuestion(pending, [pending], new Map([['q1', answers]]))).toEqual({
-      ...pending,
-      status: 'answered',
-      answers,
-    });
-  });
-
-  test('a cancelled request fades the same way', () => {
-    const cancelled = question({ status: 'cancelled', answers: null });
-    expect(leavingQuestion(pending, [cancelled], none)).toBe(cancelled);
   });
 });

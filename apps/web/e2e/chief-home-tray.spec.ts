@@ -270,68 +270,6 @@ test('the chip and the sidebar badge count the same things, and the inbox lists 
   await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveText('2');
 });
 
-test('on desktop the question card is capped at 40% of the viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 500 });
-  await openWithQuestion(page, [], DOCK);
-  const box = await page.getByTestId('chief-question-card').boundingBox();
-  expect(box!.height).toBeLessThanOrEqual(500 * 0.4 + 1);
-});
-
-test('on a phone only the question and options show; the controls live under the more menu', async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
-  await openWithQuestion(page, [], DOCK);
-  const card = page.getByTestId('chief-question-card');
-  await expect(card.getByTestId('chief-question-text')).toBeVisible();
-  await expect(card.getByTestId('chief-question-option-0-0')).toBeVisible();
-  await expect(card.getByTestId('chief-question-collapse')).toBeHidden();
-  await expect(card.getByTestId('chief-question-dismiss')).toBeHidden();
-  await expect(card.getByTestId('chief-question-position')).toHaveCount(0);
-  await card.getByTestId('chief-question-more').click();
-  await expect(page.getByRole('menuitem', { name: 'Collapse question' })).toBeVisible();
-  await page.getByRole('menuitem', { name: 'Dismiss question' }).click();
-  await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
-});
-
-test('on desktop the more menu stays hidden and the controls show in the header', async ({ page }) => {
-  await openWithQuestion(page, [], DOCK);
-  const card = page.getByTestId('chief-question-card');
-  await expect(card.getByTestId('chief-question-more')).toBeHidden();
-  await expect(card.getByTestId('chief-question-dismiss')).toBeVisible();
-});
-
-test('a single question has no progress bar', async ({ page }) => {
-  await openWithQuestion(page, [], DOCK);
-  await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-prev')).toHaveCount(0);
-});
-
-test('an answered card fades out over 200ms and leaves a one-line summary in the conversation', async ({ page }) => {
-  const { answered } = await openWithQuestion(page, [], DOCK);
-  await page.evaluate(() => {
-    const seen: { animation: string; duration: string }[] = [];
-    (window as unknown as { __leaving: typeof seen }).__leaving = seen;
-    new MutationObserver(() => {
-      const node = document.querySelector('[data-testid="chief-question-leaving"]');
-      if (node === null || seen.length > 0) return;
-      const style = getComputedStyle(node);
-      seen.push({ animation: style.animationName, duration: style.animationDuration });
-    }).observe(document.body, { childList: true, subtree: true });
-  });
-  await page.getByTestId('chief-question-option-0-0').click();
-  await page.getByTestId('chief-question-primary').click();
-  await expect.poll(() => answered.length).toBe(1);
-  await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
-  const line = page.getByTestId('chief-stream').getByTestId('chief-question-line');
-  await expect(line).toHaveText('Answered: Wait for CI');
-  await expect(page.getByTestId('chief-stream').getByTestId('chief-question-card')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-leaving')).toHaveCount(0);
-  const seen = await page.evaluate(
-    () => (window as unknown as { __leaving: { animation: string; duration: string }[] }).__leaving,
-  );
-  expect(seen).toEqual([{ animation: 'question-fade-out', duration: '0.2s' }]);
-  await expect(page).toHaveTitle('Cairn');
-});
-
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 

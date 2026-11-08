@@ -1,4 +1,5 @@
 import {
+  ownerDecides,
   redactSecrets,
   THREAD_MESSAGE_EXCERPT_MAX,
   type ThreadMessageBody,
@@ -28,12 +29,8 @@ import {
 import { assertProjectWritable } from './project-writable.js';
 import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
-import {
-  answerWorkerQuestionsById,
-  pendingWorkerQuestionIds,
-  pendingWorkerQuestions,
-} from './worker-question-store.js';
-import { recordDecisions } from './worker-questions.js';
+import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
+import { settleQuestionAnswer } from './worker-questions.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -252,11 +249,24 @@ export async function answerTaskQuestion(
       `requestId ${input.requestId} is not pending on thread #${row.seqNum}${pending.length > 0 ? `; pending: ${pending.map((q) => q.requestId).join(', ')}` : ''}`,
     );
   }
-  answerWorkerQuestionsById(deps, buildId, [input.requestId], input.answer);
-  recordDecisions(deps, row.id, [{ question, answer: input.answer, by }]);
+  if (
+    by === 'coordinator' &&
+    question.escalation !== undefined &&
+    ownerDecides(question.escalation.class)
+  ) {
+    throw new HttpError(
+      409,
+      `requestId ${input.requestId} is a ${question.escalation.class} question with the user; only the user answers it`,
+    );
+  }
+  const answer = { todoId: row.id, question, answer: input.answer, by };
   const result = { todoId: row.id, buildId, requestId: input.requestId };
-  if (hasClaimedStep(deps, buildId)) return { ...result, delivered: 'held-step' };
-  if (pending.length > 1) return { ...result, delivered: 'waiting-other-questions' };
+  const running = hasClaimedStep(deps, buildId);
+  const held = running && question.parkedAt === undefined;
+  if (held || (!running && pending.length > 1)) {
+    deps.db.transaction(() => settleQuestionAnswer(deps, buildId, answer));
+    return { ...result, delivered: held ? 'held-step' : 'waiting-other-questions' };
+  }
   const sent = await sendBuildSteer(
     deps,
     buildId,
@@ -264,7 +274,9 @@ export async function answerTaskQuestion(
       content: `Answer to your question ${input.requestId}:\n${input.answer}`,
       clientMessageId: newRecordId(),
     },
-    by === 'person' ? { human: true, afterTurn: true } : { actor: 'Coordinator', afterTurn: true },
+    by === 'person'
+      ? { human: true, afterTurn: true, answer }
+      : { actor: 'Coordinator', afterTurn: true, answer },
   );
   return { ...result, buildId: sent.conversationId, delivered: sent.delivered };
 }

@@ -202,6 +202,12 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
   });
 }
 
+function coordinatorQuestions(db: ChiefToolDeps['db'], buildId: string) {
+  return pendingWorkerQuestions(db, buildId).filter(
+    (question) => question.escalation === undefined,
+  );
+}
+
 function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
   const { db } = deps;
   const lineOf = (buildId: string | null): string | null => {
@@ -226,15 +232,16 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
     )
     .orderBy(desc(todo.phaseAt))
     .all()
-    .filter((row) => pendingWorkerQuestions(db, row.latestBuildId as string).length > 0);
-  const askingIds = new Set(asking.map((row) => row.id));
-  const questions = asking.map((row) => ({
+    .map((row) => ({ row, pending: coordinatorQuestions(db, row.latestBuildId as string) }))
+    .filter(({ pending }) => pending.length > 0);
+  const askingIds = new Set(asking.map(({ row }) => row.id));
+  const questions = asking.map(({ row, pending }) => ({
     todoId: row.id,
     seqNum: row.seqNum,
     title: tidy(row.title, TITLE_MAX),
     kind: 'question' as const,
     line: lineOf(row.latestBuildId),
-    questions: pendingWorkerQuestions(db, row.latestBuildId as string).map((content) => ({
+    questions: pending.map((content) => ({
       requestId: content.requestId,
       items: content.questions.map((q) => ({
         header: tidy(q.header, QUESTION_TEXT_MAX),

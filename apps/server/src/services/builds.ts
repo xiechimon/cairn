@@ -70,6 +70,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  like,
   ne,
   notInArray,
   or,
@@ -184,7 +185,11 @@ import {
   pendingWorkerQuestions,
   writeWorkerQuestion,
 } from './worker-question-store.js';
-import { settleWorkerReply } from './worker-questions.js';
+import {
+  type QuestionAnswer,
+  settleQuestionAnswer,
+  settleWorkerReply,
+} from './worker-questions.js';
 
 export interface BuildDeps {
   githubAppTokenSocket?: string | null | undefined;
@@ -238,6 +243,10 @@ function recordStop(db: Db, buildId: string, by: StopAttribution): void {
     .run();
 }
 
+function clearStop(db: Db, buildId: string): void {
+  db.update(build).set({ stop: null }).where(eq(build.id, buildId)).run();
+}
+
 function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
   const record = toBuildRecord(row);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
@@ -257,6 +266,7 @@ interface BuildSteerOptions {
   human?: boolean;
   actor?: string;
   schedule?: { id: string; createdBy: string; at: number };
+  answer?: QuestionAnswer;
 }
 
 function continuationTodo(
@@ -424,7 +434,9 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      if (human) settleWorkerReply(deps, conversationId, body.content);
+      if (continuationOptions.answer !== undefined)
+        settleQuestionAnswer(deps, conversationId, continuationOptions.answer);
+      else if (human) settleWorkerReply(deps, conversationId, body.content);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
@@ -1018,8 +1030,9 @@ export function enqueueStep(
       createdAt,
     })
     .run();
+  clearStop(deps.db, buildId);
   if (isBuildStepKind(kind)) {
-    deps.db.update(build).set({ reportLine: null, stop: null }).where(eq(build.id, buildId)).run();
+    deps.db.update(build).set({ reportLine: null }).where(eq(build.id, buildId)).run();
   }
   deps.machineHub?.wake(teamId);
   deps.convHub?.publishStep(buildId, {
@@ -2521,6 +2534,7 @@ export function applyStepFailure(
     applyStoppedStep(deps, stepRow.id);
     return;
   }
+  clearStop(db, stepRow.buildId);
   releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
@@ -2953,6 +2967,22 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
 }
 
 const ZERO_CHANGE_EXCERPT_MAX = 1_200;
+const ZERO_CHANGE_REQUEST_PREFIX = 'no-change-';
+
+function zeroChangeAlreadyAsked(deps: BuildDeps, buildId: string): boolean {
+  return (
+    deps.db
+      .select({ id: message.id })
+      .from(message)
+      .where(
+        and(
+          eq(message.conversationId, buildId),
+          like(message.id, `${ZERO_CHANGE_REQUEST_PREFIX}%`),
+        ),
+      )
+      .get() !== undefined
+  );
+}
 
 function endedWithoutChanges(
   stepRow: typeof step.$inferSelect,
@@ -2975,9 +3005,22 @@ function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {
     .orderBy(desc(message.createdAt))
     .all();
   for (const row of rows) {
-    if (typeof row.content === 'string' && row.content.trim() !== '') return row.content.trim();
+    const text = spokenText(row.content).trim();
+    if (text !== '') return text;
   }
   return null;
+}
+
+function spokenText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .flatMap((block: unknown) => {
+      if (block === null || typeof block !== 'object') return [];
+      const { type, text } = block as { type?: unknown; text?: unknown };
+      return type === 'text' && typeof text === 'string' ? [text] : [];
+    })
+    .join('\n');
 }
 
 function askAboutZeroChange(deps: BuildDeps, stepRow: typeof step.$inferSelect): void {
@@ -2988,7 +3031,7 @@ function askAboutZeroChange(deps: BuildDeps, stepRow: typeof step.$inferSelect):
       : last.length > ZERO_CHANGE_EXCERPT_MAX
         ? `${last.slice(0, ZERO_CHANGE_EXCERPT_MAX - 1)}…`
         : last;
-  const requestId = `no-change-${stepRow.id}`;
+  const requestId = `${ZERO_CHANGE_REQUEST_PREFIX}${stepRow.id}`;
   writeWorkerQuestion(
     deps,
     stepRow.buildId,
@@ -3032,6 +3075,7 @@ export function completeStep(
     applyStoppedStep(deps, stepId);
     return;
   }
+  clearStop(deps.db, stepRow.buildId);
   if (settleParkedStep(deps, stepRow, { status: 'success' })) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) {
@@ -3071,7 +3115,11 @@ export function completeStep(
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
-  if (endedWithoutChanges(stepRow, todoRow, outcome)) askAboutZeroChange(deps, stepRow);
+  if (
+    endedWithoutChanges(stepRow, todoRow, outcome) &&
+    !zeroChangeAlreadyAsked(deps, stepRow.buildId)
+  )
+    askAboutZeroChange(deps, stepRow);
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
   const gateFailure = stepArtifactGate(
     deps,

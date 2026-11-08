@@ -1,16 +1,16 @@
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
-  useState,
   useSyncExternalStore,
 } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
+import { useOpenComposer } from '../board/open-composer.js';
 import { resolveScenario } from '../fixtures/scenario.js';
-import { ChiefDrawer } from './chief-drawer.js';
+import { isEditableTarget } from '../overlay/hotkeys.js';
 import { questionDockState } from './question-dock-state.js';
 import { questionDraftKey } from './question-drafts.js';
 import { type OriginChiefQuestion, originChiefQuestions } from './question-origin.js';
@@ -18,7 +18,6 @@ import { type ChiefSurface, useChiefSurface } from './use-chief-surface.js';
 
 export interface ChiefRootApi {
   surface: ChiefSurface;
-  openChiefThread: (threadId: string) => void;
   pendingQuestions: OriginChiefQuestion[];
 }
 
@@ -35,31 +34,46 @@ export function useChiefRoot(): ChiefRootApi {
   return api;
 }
 
+function useOpenCoordinatorKey(): void {
+  const openComposer = useOpenComposer();
+  useLayoutEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.isComposing || event.defaultPrevented || event.repeat) return;
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'j') return;
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+      openComposer();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openComposer]);
+}
+
 export function ChiefRoot() {
   const [searchParams] = useSearchParams();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const fixture = resolveScenario(searchParams);
+  const onHome = pathname === '/app';
   const chiefParam = searchParams.get('chief');
-  const consumeChiefParam = useCallback(() => {
-    const rest = new URLSearchParams(searchParams);
-    rest.delete('chief');
-    navigate(`?${rest.toString()}`, { replace: true });
-  }, [searchParams, navigate]);
-  const [linkThreadId, setLinkThreadId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!onHome && chiefParam !== null) navigate({ pathname: '/app', search }, { replace: true });
+  }, [onHome, chiefParam, search, navigate]);
   const deepLink = useMemo(
     () => ({
-      threadId: chiefParam ?? linkThreadId,
+      threadId: onHome ? chiefParam : null,
       onConsumed: () => {
-        if (chiefParam !== null) consumeChiefParam();
-        setLinkThreadId(null);
+        if (!onHome || chiefParam === null) return;
+        const rest = new URLSearchParams(searchParams);
+        rest.delete('chief');
+        navigate(`?${rest.toString()}`, { replace: true });
       },
     }),
-    [chiefParam, linkThreadId, consumeChiefParam],
+    [onHome, chiefParam, searchParams, navigate],
   );
-  const onHome = pathname === '/app';
   const { teamId } = useLiveData();
-  const surface = useChiefSurface(fixture, deepLink, onHome);
+  const surface = useChiefSurface(fixture, deepLink);
+  useOpenCoordinatorKey();
   const settled = useSyncExternalStore(
     questionDockState.subscribe,
     questionDockState.settled,
@@ -90,37 +104,13 @@ export function ChiefRoot() {
       );
     }
   }, [stream, conversationId, teamId]);
-  const onSettings = useCallback(() => {
-    if (pathname === '/app') surface.setChiefView('settings');
-    else navigate('/app?chief=settings');
-  }, [pathname, surface, navigate]);
   const api = useMemo<ChiefRootApi>(
-    () => ({
-      surface,
-      openChiefThread: setLinkThreadId,
-      pendingQuestions,
-    }),
+    () => ({ surface, pendingQuestions }),
     [surface, pendingQuestions],
   );
-  const ownsConversation = onHome;
-  const windowOpen = surface.chiefView === 'drawer' && !ownsConversation;
   return (
     <ChiefRootContext.Provider value={api}>
       <Outlet />
-      {!ownsConversation && (
-        <ChiefDrawer
-          open={windowOpen}
-          chief={surface.chiefData}
-          onSettings={onSettings}
-          onClose={() => surface.setChiefView('none')}
-          onSend={surface.onSend}
-          onRewind={surface.onRewind}
-          onWithdraw={surface.onWithdraw}
-          onSteer={surface.onSteer}
-          onStop={surface.onStop}
-          earlier={surface.earlier}
-        />
-      )}
     </ChiefRootContext.Provider>
   );
 }

@@ -17,7 +17,7 @@ test('the home is one Coordinator conversation: serif greeting, the conversation
   await page.goto(home('home-c'));
   const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
   await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
-  await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 3 in progress');
+  await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 4 in progress');
   await expect(chip(page).getByTestId('needs-you-count')).toHaveText('3');
   await expect(page.getByTestId('chief-stream').getByTestId('inline-question')).toBeVisible();
   await expect(page.getByTestId('chief-composer-block').getByTestId('needs-you-inbox-row')).toHaveCount(0);
@@ -63,7 +63,8 @@ test('the Tasks panel lists running threads and a running row opens its thread',
   const rows = page
     .locator('.side-panel [data-slot="stone-group"][data-tone="working"]')
     .locator('[data-slot="thread-row"]');
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(4);
+  await expect(rows.filter({ hasText: 'Rerun the relay probe' })).toHaveCount(1);
   await rows.filter({ hasText: 'Push for finished threads' }).getByRole('button').first().click();
   await expect(page).toHaveURL(/\/app\?.*thread=home-c-working-a/);
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');

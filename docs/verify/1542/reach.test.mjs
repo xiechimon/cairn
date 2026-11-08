@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 const selector = 'scripts/e2e-affected.mjs';
-const selectorDeps = ['scripts/heavy-slots.mjs', 'scripts/e2e-affected-select.mjs', 'scripts/timed-partition.mjs'];
+const selectorDeps = ['scripts/heavy-slots.mjs', 'scripts/owned-process.mjs', 'scripts/e2e-affected-select.mjs', 'scripts/timed-partition.mjs'];
 for (const [file, code] of [
   ['apps/web/e2e/unmapped-reach.spec.ts', 1],
   ['apps/web/e2e/board-reach.spec.ts', 0],

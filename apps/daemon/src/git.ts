@@ -39,11 +39,22 @@ export function runGit(
     let timedOut = false;
     const killGroup = (signal: NodeJS.Signals) => {
       if (child.pid === undefined) return;
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+          windowsHide: true,
+          stdio: 'ignore',
+        }).on('error', () => child.kill(signal));
+        return;
+      }
       try {
         process.kill(-child.pid, signal);
       } catch {
         child.kill(signal);
       }
+    };
+    const releasePipes = () => {
+      child.stdout.destroy();
+      child.stderr.destroy();
     };
     const timers: NodeJS.Timeout[] = [];
     if (bounded) {
@@ -64,7 +75,9 @@ export function runGit(
       reject(err);
     });
     child.on('exit', () => {
-      if (timedOut) killGroup('SIGKILL');
+      if (!timedOut) return;
+      killGroup('SIGKILL');
+      timers.push(setTimeout(releasePipes, TIMEOUT_KILL_GRACE_MS));
     });
     child.on('close', (code, signal) => {
       for (const t of timers) clearTimeout(t);
@@ -516,14 +529,6 @@ export const gitPrim = {
       .map((entry) => entry.slice(3));
   },
 
-  async stagedPaths(dir: string): Promise<string[]> {
-    const out = await runGitOk(['diff', '--cached', '--name-only', '-z', '--no-renames'], {
-      cwd: dir,
-      timeoutMs: META_TIMEOUT_MS,
-    });
-    return out.split('\0').filter((path) => path !== '');
-  },
-
   async gitPath(dir: string, name: string): Promise<string> {
     const path = await runGitOk(['rev-parse', '--path-format=absolute', '--git-path', name], {
       cwd: dir,
@@ -560,7 +565,36 @@ export const gitPrim = {
   },
 
   async unstagePath(dir: string, path: string): Promise<void> {
-    await runGitOk(['reset', '-q', '--', path], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
+    await gitPrim.unstagePaths(dir, [path]);
+  },
+
+  async unstagePaths(dir: string, paths: readonly string[]): Promise<void> {
+    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
+      await runGitOk(['reset', '-q', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)], {
+        cwd: dir,
+        env: { GIT_LITERAL_PATHSPECS: '1' },
+        timeoutMs: META_TIMEOUT_MS,
+      });
+    }
+  },
+
+  async indexEntries(dir: string, paths: readonly string[]): Promise<Map<string, string>> {
+    const entries = new Map<string, string>();
+    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
+      const out = await runGitOk(
+        ['ls-files', '--stage', '-z', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)],
+        { cwd: dir, env: { GIT_LITERAL_PATHSPECS: '1' }, timeoutMs: META_TIMEOUT_MS },
+      );
+      for (const entry of out.split('\0')) {
+        const tab = entry.indexOf('\t');
+        if (tab < 0) continue;
+        const path = entry.slice(tab + 1);
+        const stage = entry.slice(0, tab);
+        const prior = entries.get(path);
+        entries.set(path, prior === undefined ? stage : `${prior},${stage}`);
+      }
+    }
+    return entries;
   },
 
   async pathsContainingInRef(

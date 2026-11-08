@@ -240,7 +240,7 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     expect(step).not.toBeNull();
     expect(step!.mcpServers).toEqual(['demo', 'ghost']);
     expect(step!.remoteTools?.map((t) => t.name)).toEqual(
-      workerRemoteTools('session', false).map((t) => t.name),
+      workerRemoteTools('session', false, true).map((t) => t.name),
     );
     s.dispose();
   });

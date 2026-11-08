@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, message, step, todo } from '../src/db/schema.js';
+import { build, message, steerPending, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
@@ -122,7 +122,9 @@ describe('a parked question is its own state and wakes the Coordinator (task sta
         id: 'agent-last',
         conversationId: buildId,
         role: 'assistant',
-        content: 'Before I change the copy: should the banned string stay?',
+        content: [
+          { type: 'text', text: 'Before I change the copy: should the banned string stay?' },
+        ],
         createdAt: Date.now(),
         actor: null,
       })
@@ -132,6 +134,25 @@ describe('a parked question is its own state and wakes the Coordinator (task sta
     expect(H.s.db.select().from(build).where(eq(build.id, buildId)).get()?.errorMessage).toBeNull();
     const wake = coordinatorSteps().at(-1);
     expect(wake?.prompt).toContain('should the banned string stay?');
+  });
+
+  test('once the zero-change question is answered, a second zero-change step ends the loop instead of asking again', async () => {
+    const { todoId, buildId, stepRow } = startSession();
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    await relay('answer_question', {
+      todoId,
+      requestId: `no-change-${stepRow.id}`,
+      answer: 'The task needs no code change.',
+    });
+    const resumed = sessionSteps(buildId).find((row) => row.status === 'pending');
+    if (resumed === undefined) throw new Error('no resumed session step');
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, resumed.id)).run();
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    endStep(resumed.id, { hasChanges: false });
+
+    expect(questionStatus(buildId, `no-change-${resumed.id}`)).toBeUndefined();
+    expect(phaseOf(todoId)).toBe('review');
   });
 });
 
@@ -191,6 +212,48 @@ describe('answers route by request id to the same build and session (task stall 
     await expect(
       relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'again' }),
     ).rejects.toMatchObject({ status: 409 });
+  });
+
+  test('an answer whose continuation is refused stays unanswered and leaves no decision, so the same request id can be answered again', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark();
+    endStep(stepRow.id);
+    H.s.db.update(todo).set({ phase: 'closed' }).where(eq(todo.id, todoId)).run();
+    await expect(
+      relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' }),
+    ).rejects.toBeDefined();
+    expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+    expect(getTodo(deps(), todoId)?.decisions ?? []).toEqual([]);
+
+    H.s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, todoId)).run();
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' });
+    expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
+    expect(getTodo(deps(), todoId)?.decisions).toEqual([
+      expect.objectContaining({ requestId: REQUEST_A, answer: 'Repo rule wins.' }),
+    ]);
+  });
+
+  test('an answer to a parked question while its step is still claimed is steered into that step, not only recorded', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark();
+    const stored = H.s.db.select().from(message).where(eq(message.id, REQUEST_A)).get();
+    H.s.db
+      .update(message)
+      .set({ content: { ...(stored?.content as object), parkedAt: Date.now() } })
+      .where(eq(message.id, REQUEST_A))
+      .run();
+    const out = (await relay('answer_question', {
+      todoId,
+      requestId: REQUEST_A,
+      answer: 'Repo rule wins.',
+    })) as { delivered: string };
+    expect(out.delivered).not.toBe('held-step');
+    const steer = H.s.db
+      .select()
+      .from(steerPending)
+      .where(eq(steerPending.conversationId, buildId))
+      .get();
+    expect(steer?.stepId).toBe(stepRow.id);
+    expect(steer?.content).toContain('Repo rule wins.');
+    expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
   });
 
   test('the Coordinator cannot answer a parked question by free text: message_thread points it at answer_question', async () => {

@@ -31,11 +31,11 @@ import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { needsYouThreads } from './needs-you.js';
+import { inProgressThreads, needsYouThreads } from './needs-you.js';
 import { NeedsYouChip, NeedsYouPanel } from './needs-you-inbox.js';
 import { useNeedsYou } from './needs-you-store.js';
 import { composeRequest } from './open-composer.js';
-import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
+import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -146,13 +146,8 @@ export function HomeC({
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState('');
-  const { chiefData, chiefView, setChiefView } = surface;
+  const { chiefData } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
-  useEffect(() => {
-    if (chiefView !== 'drawer') return;
-    setChiefView('none');
-    composerRef.current?.focus({ preventScroll: true });
-  }, [chiefView, setChiefView]);
   const loaded = surface.load === 'ready';
   useEffect(() => {
     if (composeAt === null || !loaded) return;
@@ -173,9 +168,7 @@ export function HomeC({
   const entries = needsYouThreads(scoped);
   const needsYou = useNeedsYou(scoped);
   const thread = useComposerThreadTarget(scoped);
-  const running = scoped.filter(
-    (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
-  );
+  const running = inProgressThreads(scoped);
 
   const greeting = (
     <Greeting as="h2">
@@ -441,8 +434,7 @@ export function HomeC({
         )}
         <ChiefScrollProvider>
           <ChiefConversation
-            variant="global"
-            chief={{ ...chiefData, stream, examples: undefined }}
+            chief={{ ...chiefData, stream }}
             onSend={
               thread.picked !== null
                 ? thread.send
@@ -469,7 +461,6 @@ export function HomeC({
             }
             composerError={thread.error}
             targetPlaceholder={thread.placeholder}
-            questionDock={false}
             pendingQuestion={(item) => {
               const request = needsYou.questions.find(
                 (pending) => pending.item.requestId === item.requestId,

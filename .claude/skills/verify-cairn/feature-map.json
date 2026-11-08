@@ -149,6 +149,48 @@
       ]
     },
     {
+      "id": "selection-reply",
+      "name": "Selection reply",
+      "summary": "Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.",
+      "states": "Bar above the selection, quote staged above the composer, sent bubble with the quote, no bar on touch selections, light and dark, 1440 and 390 wide.",
+      "centrality": 1,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/chief/selection-reply.tsx",
+          "apps/web/src/chief/selection-reply-model.ts",
+          "apps/web/src/chief/reply-quote-block.tsx"
+        ],
+        "other": [
+          "packages/shared/src/reply-quote.ts"
+        ]
+      },
+      "routes": {
+        "web": [
+          "/app"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "type select two or more characters inside one Coordinator reply",
+        "click testid:selection-reply"
+      ],
+      "research": [
+        "docs/research/selection-reply-2026-11-08.md"
+      ],
+      "frontendDesign": [
+        "docs/design/selection-reply-2026-11-08.md"
+      ],
+      "backendDesign": [
+        "docs/design/selection-reply-2026-11-08.md"
+      ],
+      "evidence": [
+        "apps/web/e2e/chief-selection-reply.spec.ts",
+        "packages/shared/test/reply-quote.test.ts",
+        "apps/web/test/selection-reply-model.test.ts"
+      ]
+    },
+    {
       "id": "coordinator-context",
       "name": "Coordinator context and compaction",
       "summary": "Each Coordinator turn is assembled by the server within a token budget from recent messages, an index of older ones, history tools and ledger facts, so compaction is invisible to the user.",
@@ -279,14 +321,14 @@
     {
       "id": "questions",
       "name": "Question cards",
-      "summary": "Questions from the Coordinator or a thread appear as answerable cards above the composer, stay parked quietly, and keep per-question drafts.",
-      "states": "A question card sits above the composer with numbered options and a recommended one; it can be collapsed, answered later, or cancelled, and shows a line once answered.",
+      "summary": "The Coordinator's question appears as a compact card in the conversation where it was asked and in the needs-you inbox, answerable with one click or in your own words; the composer stays a normal composer.",
+      "states": "A pending card with options (recommended first) and an own-words field; multi-question requests step through a card; an inline failure keeps the card; once answered the card leaves and a line remains.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/chief/chief-question-card.tsx",
-          "apps/web/src/chief/chief-question-dock.tsx",
+          "apps/web/src/chief/quick-question.tsx",
           "apps/web/src/chief/question-lifecycle.ts"
         ],
         "server": [
@@ -363,7 +405,6 @@
         "gap": "no design for which records enter the tray, their order and when they leave"
       },
       "evidence": [
-        "apps/web/e2e/chief-home-needs-you.spec.ts",
         "apps/web/e2e/chief-home-tray.spec.ts",
         "apps/server/test/needs-you.test.ts"
       ],

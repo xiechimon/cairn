@@ -149,9 +149,11 @@ test('a thread asking you takes the reply as its answer; an empty reply cannot b
       waitingOn: { on: 'owner', retryAt: null },
       ask: { text: 'Keep the old grant?', requestId: 'ask-12', options: [], defaultAnswer: null },
     },
+    todo('todo-13', 13, 'Rerun the relay probe', 'failed', 'build-13'),
   ]);
   await page.goto('/app');
   const target = await card(page, 'Fix the orb permission');
+  await expect(page.getByTestId('needs-you-inbox')).not.toContainText('Rerun the relay probe');
   await expect(target).toContainText('The answer goes to #12, which then picks up again.');
   await expect(target.getByRole('button', { name: 'Send' })).toBeDisabled();
   await target.getByRole('textbox', { name: 'Reply to #12' }).press('Enter');

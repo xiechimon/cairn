@@ -1,5 +1,6 @@
 import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
+import { threadStatus } from './thread-copy.js';
 
 function actRank(todo: TodoRecord): number {
   if (todo.phase === 'needs_input' || todo.phase === 'confirm') return 0;
@@ -23,6 +24,18 @@ export function needsYouThreads(todos: readonly TodoRecord[]): TodoRecord[] {
   return todos
     .filter((todo) => todo.archivedAt == null && waitsOnOwner(todo))
     .sort((a, b) => actRank(a) - actRank(b) || b.phaseAt - a.phaseAt);
+}
+
+function waitsOnCoordinator(todo: TodoRecord): boolean {
+  const status = threadStatus(todo);
+  return (status === 'needs-you' || status === 'failed') && !waitsOnOwner(todo);
+}
+
+export function inProgressThreads(todos: readonly TodoRecord[]): TodoRecord[] {
+  return todos.filter(
+    (todo) =>
+      todo.archivedAt == null && (threadStatus(todo) === 'running' || waitsOnCoordinator(todo)),
+  );
 }
 
 export function pendingQuestions(stream: readonly ChiefStreamItem[]): ChiefQuestionItem[] {

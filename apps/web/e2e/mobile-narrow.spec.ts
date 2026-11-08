@@ -1,5 +1,4 @@
 import { expect, test, type Locator } from '@playwright/test';
-import { openChiefWindow } from './helpers.js';
 
 const DETAIL_REVIEW = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
@@ -65,19 +64,6 @@ for (const width of [360, 390]) {
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(0);
-    });
-
-    test('M4 Coordinator window stays inside the viewport and minimizes', async ({ page }) => {
-      await page.goto('/app/schedules');
-      await expect(page.locator('.chief-fab')).toHaveCount(0);
-      await openChiefWindow(page);
-      const drawer = page.locator('.chief-drawer');
-      await expect(drawer).toBeVisible();
-      const drawerBox = (await drawer.boundingBox()) as { x: number; width: number };
-      expect(drawerBox.x).toBeGreaterThanOrEqual(0);
-      expect(drawerBox.x + drawerBox.width).toBeLessThanOrEqual(width);
-      await page.getByRole('button', { name: '最小化' }).click();
-      await expect(drawer).toBeHidden();
     });
 
     test('M5 搜索面板：整面板留在视口内，Esc 可关', async ({ page }) => {

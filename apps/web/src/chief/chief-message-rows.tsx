@@ -1,3 +1,4 @@
+import { parseReplyQuote } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
@@ -26,6 +27,8 @@ import { ChiefDigestRow } from './chief-digest-row.js';
 import type { ChiefQuestionItem } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
+import { ReplyQuoteBlock } from './reply-quote-block.js';
+import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
@@ -160,8 +163,6 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string):
   });
 }
 
-export const TurnElapsedContext = createContext(true);
-
 export const HandoffCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
 
 function HandoffRow({ todoId }: { todoId: string }) {
@@ -283,7 +284,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onRewindRequest,
   pendingQuestion,
 }: ChiefStreamRowProps) {
-  const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message')
@@ -338,7 +338,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Marker>
       </MessageScrollerItem>
     );
-  if (item.kind === 'user')
+  if (item.kind === 'user') {
+    const reply = parseReplyQuote(item.text);
+    const shown = reply?.body ?? item.markdown;
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`${USER_ROW_CLS} justify-end`} data-testid="chief-msg">
@@ -348,14 +350,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           >
             <div
               data-testid="chief-bubble"
-              data-md={item.markdown != null ? '' : undefined}
-              className={`${BUBBLE_USER_CLS} ${item.markdown != null ? BUBBLE_MD_CLS : ''}`}
+              data-md={shown != null ? '' : undefined}
+              {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+              className={`${BUBBLE_USER_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
             >
-              {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} conversational />
-              ) : (
-                item.text
-              )}
+              {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
+              {shown != null ? <ChatMarkdown text={shown} conversational /> : item.text}
             </div>
             <div
               className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
@@ -389,6 +389,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
+  }
   if (item.kind === 'thinking')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
@@ -485,7 +486,10 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             />
           )}
           <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
-            <BubbleContent className={BUBBLE_ROBOT_CLS}>
+            <BubbleContent
+              className={BUBBLE_ROBOT_CLS}
+              {...(item.id != null && item.typing !== true ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+            >
               {item.markdown != null ? (
                 <ChatMarkdown text={item.markdown} conversational />
               ) : (
@@ -527,9 +531,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 )}
               </Button>
               <MessageStamp createdAt={item.createdAt} />
-              {showElapsed && item.seconds !== '' && (
-                <span>{t('完成 {n}', { n: item.seconds })}</span>
-              )}
               {item.fallbackModel != null && (
                 <span data-testid="chief-fallback-note">
                   {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
