@@ -26,6 +26,7 @@ export interface MachineDeps {
   user: UserRecord;
   vapidKeys?: VapidKeys | null;
   reposDir: string;
+  workspacesDir?: string | undefined;
   attachmentsDir: string;
   skillsDir: string;
   mcpConfigPath?: string;

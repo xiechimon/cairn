@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { ENV_VARS } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
@@ -211,6 +212,9 @@ const coordinator = config.coordinatorInServer
         user: seeded.user,
         vapidKeys,
         reposDir,
+        workspacesDir: resolve(
+          process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces'),
+        ),
         attachmentsDir,
         skillsDir: config.skillsDir,
         mcpConfigPath: config.mcpConfigPath,

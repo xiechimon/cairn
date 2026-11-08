@@ -1,0 +1,183 @@
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { eq } from 'drizzle-orm';
+import { describe, expect, test } from 'vitest';
+import { project } from '../src/db/schema.js';
+import { runGit } from '../src/lib/git.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
+import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+
+registerChiefHarness();
+
+type Docs = { files: { path: string; commit?: string; content?: string; error?: string }[] };
+
+async function bindRepo(kind: 'github' | 'local' | 'hosted') {
+  const dir = join(H.s.reposDir, 'docs-fixture');
+  mkdirSync(join(dir, 'scripts'), { recursive: true });
+  writeFileSync(join(dir, 'scripts/owned-process.mjs'), 'export const spawn = true;\n');
+  writeFileSync(join(dir, '.env'), 'PRIVATE_FIXTURE=not-a-real-secret\n');
+  symlinkSync('/outside-project/credentials', join(dir, 'link'));
+  for (const args of [
+    ['init', '--initial-branch=main'],
+    ['add', 'scripts/owned-process.mjs', '.env', 'link'],
+    ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-m', 'fixture'],
+  ]) {
+    const result = await runGit(args, { cwd: dir });
+    expect(result.code, result.stderr).toBe(0);
+  }
+  H.s.db
+    .update(project)
+    .set({
+      repoKind: kind,
+      githubRepo: kind === 'github' ? 'fixture/repository' : null,
+      localPath: kind === 'hosted' ? null : dir,
+      repoName: kind === 'hosted' ? 'docs' : null,
+    })
+    .where(eq(project.id, H.projectId))
+    .run();
+  if (kind === 'hosted') {
+    const bare = join(H.s.reposDir, H.teamId, 'docs.git');
+    mkdirSync(join(H.s.reposDir, H.teamId), { recursive: true });
+    expect((await runGit(['clone', '--bare', dir, bare])).code).toBe(0);
+  }
+  return dir;
+}
+
+async function docs(paths: string[], ref?: string): Promise<Docs> {
+  return (await relay('docs', { projectId: H.projectId, paths, ...(ref ? { ref } : {}) })) as Docs;
+}
+
+describe('Coordinator repository reads', () => {
+  for (const kind of ['github', 'local', 'hosted'] as const) {
+    test(`${kind}: reads committed source and returns its immutable version`, async () => {
+      const dir = await bindRepo(kind);
+      const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim();
+      writeFileSync(join(dir, 'scripts/owned-process.mjs'), 'uncommitted replacement');
+      expect((await docs(['scripts/owned-process.mjs'])).files).toEqual([
+        expect.objectContaining({
+          path: 'scripts/owned-process.mjs',
+          commit,
+          content: 'export const spawn = true;\n',
+        }),
+      ]);
+    });
+  }
+
+  test('github uses its identity-checked project repository cache, not another thread', async () => {
+    const dir = await bindRepo('github');
+    const workspacesDir = join(H.s.reposDir, 'workspaces');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', dir, cache])).code).toBe(0);
+    expect(
+      (
+        await runGit(['remote', 'set-url', 'origin', 'https://github.com/fixture/repository.git'], {
+          cwd: cache,
+        })
+      ).code,
+    ).toBe(0);
+    H.s.db
+      .update(project)
+      .set({ localPath: '/different-machine/repo' })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const read = async () =>
+      JSON.parse(
+        await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+          projectId: H.projectId,
+          paths: ['scripts/owned-process.mjs'],
+        }),
+      ) as Docs;
+    expect((await read()).files[0]?.content).toBe('export const spawn = true;\n');
+    expect(
+      (
+        await runGit(['remote', 'set-url', 'origin', 'https://github.com/other/project.git'], {
+          cwd: cache,
+        })
+      ).code,
+    ).toBe(0);
+    expect((await read()).files[0]?.content).toBeUndefined();
+    expect((await read()).files[0]?.error).toMatch(/repository.*mismatch/i);
+  });
+
+  test('github without a local binding reports the actual missing repository', async () => {
+    H.s.db
+      .update(project)
+      .set({ repoKind: 'github', githubRepo: 'fixture/repository', localPath: null })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const result = await docs(['scripts/owned-process.mjs']);
+    expect(result.files[0]?.error).toMatch(/github.*repository.*unavailable/i);
+    expect(result.files[0]?.error).not.toContain('hosted');
+  });
+
+  test('missing local directory and missing file/ref remain visible per path', async () => {
+    await bindRepo('github');
+    expect((await docs(['absent'])).files[0]?.error).toContain('file absent');
+    expect((await docs(['scripts/owned-process.mjs'], 'absent-ref')).files[0]?.error).toContain(
+      'ref absent-ref',
+    );
+    H.s.db
+      .update(project)
+      .set({ localPath: join(H.s.reposDir, 'missing') })
+      .where(eq(project.id, H.projectId))
+      .run();
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toMatch(
+      /repository.*unavailable/i,
+    );
+  });
+
+  test('refuses traversal and credential files without following repository symlinks', async () => {
+    await bindRepo('local');
+    for (const path of ['../outside', '/etc/passwd', '.git/config', '.env']) {
+      const result = (await docs([path])).files[0];
+      expect(result?.error).toBeDefined();
+      expect(result?.content).toBeUndefined();
+    }
+    expect((await docs(['link'])).files[0]?.content).toBe('/outside-project/credentials');
+  });
+
+  test('a missing project, missing hosted repository, and non-repository binding are visible', async () => {
+    await expect(
+      relay('docs', { projectId: 'missing', paths: ['source.ts'] }),
+    ).rejects.toMatchObject({ status: 404 });
+    H.s.db
+      .update(project)
+      .set({ repoKind: 'hosted', repoName: 'missing' })
+      .where(eq(project.id, H.projectId))
+      .run();
+    expect((await docs(['source.ts'])).files[0]?.error).toBeDefined();
+    const dir = join(H.s.reposDir, 'not-git');
+    mkdirSync(dir, { recursive: true });
+    H.s.db
+      .update(project)
+      .set({ repoKind: 'github', githubRepo: 'fixture/repository', localPath: dir })
+      .where(eq(project.id, H.projectId))
+      .run();
+    expect((await docs(['source.ts'])).files[0]?.error).toContain('not a git repository');
+  });
+
+  test('another team cannot read a bound repository', async () => {
+    await bindRepo('github');
+    await expect(
+      relay(
+        'docs',
+        { projectId: H.projectId, paths: ['scripts/owned-process.mjs'] },
+        { teamId: 'other-team' },
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  test('reads the actual owned-process source through the Coordinator tool executor', async () => {
+    H.s.db
+      .update(project)
+      .set({ repoKind: 'github', githubRepo: 'xiechimon/cairn', localPath: resolve('.') })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const result = await docs(['scripts/owned-process.mjs']);
+    expect(result.files[0]?.content).toBe(readFileSync('scripts/owned-process.mjs', 'utf8'));
+    expect(result.files[0]?.commit).toBe(
+      (await runGit(['rev-parse', 'HEAD'])).stdout.toString().trim(),
+    );
+  });
+});

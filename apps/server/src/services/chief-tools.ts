@@ -89,6 +89,7 @@ export interface ChiefToolDeps {
   vapidKeys?: VapidKeys | null;
   convHub?: ConversationStreamHub;
   reposDir: string;
+  workspacesDir?: string | undefined;
   attachmentsDir: string;
   skillsDir: string;
   mcpConfigPath?: string;
@@ -422,8 +423,19 @@ export async function executeChiefTool(
       const files: Record<string, unknown>[] = [];
       for (const p of capped) {
         try {
-          const f = await readFile({ db, reposDir: deps.reposDir }, projectId, p, ref);
-          files.push({ path: f.path, ref: f.ref, encoding: f.encoding, content: f.content });
+          const f = await readFile(
+            { db, reposDir: deps.reposDir, workspacesDir: deps.workspacesDir },
+            projectId,
+            p,
+            ref,
+          );
+          files.push({
+            path: f.path,
+            ref: f.ref,
+            commit: f.commit,
+            encoding: f.encoding,
+            content: f.content,
+          });
         } catch (err) {
           files.push({ path: p, error: err instanceof Error ? err.message : String(err) });
         }

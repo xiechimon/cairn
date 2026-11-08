@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import {
@@ -32,6 +32,7 @@ export type ProjectRow = typeof project.$inferSelect;
 export interface RepoCtx {
   db: Db;
   reposDir: string;
+  workspacesDir?: string | undefined;
 }
 
 export function slugifyRepoName(name: string): string {
@@ -213,7 +214,37 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
   if (row.repoKind === 'hosted' && row.repoName !== null) {
     return repoDirFor(ctx.reposDir, row.teamId, row.repoName);
   }
-  if (row.repoKind === 'local') {
+  if (row.repoKind === 'github' && ctx.workspacesDir !== undefined) {
+    const ref = githubRepoOfProject(row);
+    if (ref === null) throw new HttpError(409, 'invalid GitHub repository binding');
+    if (!/^[A-Za-z0-9_-]+$/.test(row.id))
+      throw new HttpError(409, 'invalid project repository identity');
+    const cache = join(ctx.workspacesDir, row.id, 'repo');
+    if (existsSync(cache)) {
+      const expected = join(realpathSync(ctx.workspacesDir), row.id, 'repo');
+      if (realpathSync(cache) !== expected)
+        throw new HttpError(403, 'project repository cache escapes its root');
+      const origin = await runGit(['config', '--local', '--get', 'remote.origin.url'], {
+        cwd: cache,
+        timeoutMs: 15000,
+      });
+      const url = origin.stdout.toString('utf8').trim();
+      const slug = url.match(
+        /^(?:https:\/\/github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?\/?$/,
+      )?.[1];
+      if (origin.code !== 0 || slug?.toLowerCase() !== `${ref.owner}/${ref.repo}`.toLowerCase()) {
+        throw new HttpError(409, 'project repository cache identity mismatch');
+      }
+      return cache;
+    }
+  }
+  if (row.repoKind === 'local' || row.repoKind === 'github') {
+    if (row.repoKind === 'github' && (row.localPath === null || !existsSync(row.localPath))) {
+      throw new HttpError(
+        404,
+        'github repository unavailable on this server: no accessible local binding',
+      );
+    }
     if (row.localPath === null) {
       throw notFound(`local repo for project ${projectId}`);
     }
@@ -229,7 +260,7 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
     }
     return row.localPath;
   }
-  throw notFound(`hosted repo for project ${projectId}`);
+  throw notFound(`repository binding for project ${projectId}`);
 }
 
 async function resolveCommitOr404(dir: string, ref: string): Promise<string> {
@@ -285,6 +316,17 @@ export async function readFile(
   refParam?: string,
 ): Promise<ProjectFileResponse> {
   if (!isSafeRepoPath(path)) throw new HttpError(400, `invalid query path: ${path}`);
+  const segments = path.toLowerCase().split(/[\\/]/);
+  if (
+    segments.some((segment) =>
+      /^(?:\.git|\.ssh|\.aws|\.gnupg|\.env(?:\..*)?|\.npmrc|\.pypirc|credentials(?:\.json)?|id_rsa|id_ed25519)$/.test(
+        segment,
+      ),
+    ) ||
+    /\.(?:pem|key|p12|pfx)$/i.test(path)
+  ) {
+    throw new HttpError(403, 'credential file access denied');
+  }
   const dir = await requireRepoReadDir(ctx, projectId);
   const ref = refParam ?? 'HEAD';
   const commit = await resolveCommitOr404(dir, ref);
