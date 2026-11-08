@@ -63,7 +63,7 @@ Results: 95 and 60 passed respectively, for 331 related tests across 13 files. A
 | --- | --- |
 | `pnpm lint` | Passed |
 | `pnpm typecheck` | Passed, all packages including integration |
-| `pnpm spec:parse` | Passed: 1,581 web tests collected and 70 integration files parsed |
+| `pnpm spec:parse` | Passed after main sync: 1,582 web tests collected and 70 integration files parsed |
 | `pnpm prepush` | Passed, 23 checks |
 | `pnpm exec vitest run --changed` | First invocation exceeded the command timeout |
 | `env -u PI_CACHE_RETENTION pnpm exec vitest run --changed` | 9,332 passed, 11 failed, 1 expected failure, 1 skipped; 656 files |
@@ -98,3 +98,9 @@ The installed pi SDK HTTP test is separate from this live-app probe: the live ap
 Live: isolated server machine API, SQLite rows and real app task/Coordinator surfaces; production evidence was read-only.
 Mocked: machine completion and local HTTP provider errors; no real provider call.
 Not covered: live relay availability, historical SDK logs, deployment timing, production rollout, and the outstanding local gallery differences.
+
+## CI compatibility follow-up
+
+After syncing main, the unchanged light/dark sidebar header tests reproduced CI's failure: #3420 used the page-title token, while #3400 changed it to 24px. The documented wordmark contract remains 20px. A separate brand token restores that contract without changing assertions, font families, page-title sizing, logo direction or any snapshot. See the [UI brief, overlap, measured screenshots and reference comparison](sidebar-compat.md).
+
+The four focused sidebar/header specs pass all 50 tests. The expanded five-file run passes 55 tests but retains both local gallery failures, including specimens without the sidebar. The final UI-only `vitest --changed` run passes 8 tests; lint, typecheck, spec parsing and prepush pass. Latest-head CI must confirm the gate; no local result substitutes for it.

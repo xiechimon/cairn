@@ -1,0 +1,34 @@
+[
+  {
+    "width": 1440,
+    "theme": "light",
+    "size": "20px",
+    "font": "sourceSerif4, Georgia, \"Songti SC\", \"Noto Serif CJK SC\", serif",
+    "pageSize": "calc(1.5rem * calc(calc(16 / 17) * 17 / 16))",
+    "overflow": false
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "size": "20px",
+    "font": "sourceSerif4, Georgia, \"Songti SC\", \"Noto Serif CJK SC\", serif",
+    "pageSize": "calc(1.5rem * calc(calc(16 / 17) * 17 / 16))",
+    "overflow": false
+  },
+  {
+    "width": 390,
+    "theme": "light",
+    "size": "20px",
+    "font": "sourceSerif4, Georgia, \"Songti SC\", \"Noto Serif CJK SC\", serif",
+    "pageSize": "calc(1.5rem * calc(calc(16 / 17) * 17 / 16))",
+    "overflow": false
+  },
+  {
+    "width": 390,
+    "theme": "dark",
+    "size": "20px",
+    "font": "sourceSerif4, Georgia, \"Songti SC\", \"Noto Serif CJK SC\", serif",
+    "pageSize": "calc(1.5rem * calc(calc(16 / 17) * 17 / 16))",
+    "overflow": false
+  }
+]

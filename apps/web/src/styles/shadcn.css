@@ -120,6 +120,7 @@
   --chat-extra-space: 35vh;
   --type-scale: calc(var(--rem-scale) * 17 / 16);
   --type-page: calc(1.5rem * var(--type-scale));
+  --type-brand: calc(1.25rem * var(--type-scale));
   --type-heading: calc(0.9375rem * var(--type-scale));
   --type-greeting: calc(2rem * var(--type-scale));
   --type-card-title: calc(0.9375rem * var(--type-scale));
