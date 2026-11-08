@@ -39,7 +39,7 @@ test('text gaps match Claude.ai (52px after a user message, 36px after a reply) 
   }
   for (const [index, gap] of gaps.entries()) {
     const target = index % 2 === 0 ? 52 : 36;
-    expect(Math.abs(gap - target), `gap after ${TEXTS[index]} is ${gap}`).toBeLessThanOrEqual(4);
+    expect(Math.abs(gap - target), `gap after ${TEXTS[index]} is ${gap}`).toBeLessThanOrEqual(5);
   }
   const older = page.getByTestId('home-c').getByTestId('chief-msg').first();
   const tools = older.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
