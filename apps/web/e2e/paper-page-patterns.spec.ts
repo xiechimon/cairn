@@ -18,7 +18,7 @@ test('the account settings card rides --radius-card (R1, R3)', async ({ page }) 
   await page.goto('/app/account?scenario=13');
   const card = page.locator('.account-card');
   await expect(card).toBeVisible();
-  expect(await tokenRadius(page), 'R1').toBe('14px');
+  expect(await tokenRadius(page), 'R1').toBe('12px');
   await expect(card, 'R3').toHaveCSS('border-top-left-radius', await tokenRadius(page));
   await expect(card).toHaveClass(/settings-card/);
 });
@@ -55,7 +55,7 @@ test('account settings rows are equal 52px with no doubled edge divider (S1, S2)
 });
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`API keys empty state: bare ink-3 icon, default primary, type keys (${theme}) (E1–E4)`, async ({
+  test(`API keys empty state: bare ink-2 icon, default primary, type keys (${theme}) (E1–E4)`, async ({
     page,
   }) => {
     await setTheme(page, theme);
@@ -101,14 +101,14 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(m.tileBg, 'E1: no tinted tile behind the icon').toBe('rgba(0, 0, 0, 0)');
     expect(m.tileShadow, 'E1: no ring tile either').toBe('none');
-    expect(m.iconColor, 'E2: icon in ink-3').toBe(m.ink3);
+    expect(m.iconColor, 'E2: icon in ink-2').toBe(m.ink2);
     expect(m.iconSize).toBe(32);
     expect(m.button.variant, 'E3').toBe('default');
     expect(m.button.size, 'E3').toBe('default');
     expect(m.button.h, 'E3: 32px').toBe(32);
     expect(m.button.radius, 'E3: 8px corners, not a pill').toBe('8px');
     expect(m.button.w, 'E3: not a full-width bar').toBeLessThan(m.emptyWidth / 2);
-    expect(m.title, 'E4').toEqual(['17px', '650']);
+    expect(m.title, 'E4').toEqual(['15px', '500']);
     expect(m.desc, 'E4').toEqual(['14px', m.ink2]);
     expect(m.descWidth, 'E4: description capped near 44ch').toBeLessThanOrEqual(320);
   });

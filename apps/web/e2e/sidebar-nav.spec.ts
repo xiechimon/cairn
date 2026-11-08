@@ -103,7 +103,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
-  await expect.poll(() => pillBg(row)).toBe('rgba(230, 232, 226, 0.05)');
+  await expect.poll(() => pillBg(row)).toBe('rgba(255, 255, 255, 0.075)');
 
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
@@ -112,7 +112,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
     .locator('[data-slot="sidebar-project-row"]')
     .first();
   await lightRow.hover();
-  await expect.poll(() => pillBg(lightRow)).toBe('rgb(220, 222, 215)');
+  await expect.poll(() => pillBg(lightRow)).toBe('rgba(0, 0, 0, 0.05)');
 });
 
 test('rail hover tints the row', async ({ page }) => {
@@ -122,7 +122,7 @@ test('rail hover tints the row', async ({ page }) => {
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
-  await expect.poll(() => pillBg(row)).toBe('rgba(230, 232, 226, 0.05)');
+  await expect.poll(() => pillBg(row)).toBe('rgba(255, 255, 255, 0.075)');
 });
 
 test('selected row keeps its sheet fill under hover', async ({ page }) => {

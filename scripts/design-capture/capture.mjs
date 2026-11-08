@@ -39,6 +39,7 @@ const launch = () =>
     hasTouch: mobile,
     colorScheme: args.scheme,
     reducedMotion: 'no-preference',
+    serviceWorkers: args.product === 'cairn' ? 'block' : 'allow',
     ignoreDefaultArgs: ['--enable-automation'],
     args: [
       '--disable-blink-features=AutomationControlled',

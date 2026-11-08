@@ -8,7 +8,7 @@ async function openSearch(page: Page) {
   await pressAndExpect(page, 'Meta+k', searchPanel(page));
 }
 
-test('CDS search panel: 18px edge-radius + de-boxed input', async ({ page }) => {
+test('CDS search panel: 12px edge-radius + de-boxed input', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await openSearch(page);
   const panel = searchPanel(page);
@@ -28,8 +28,8 @@ test('CDS search panel: 18px edge-radius + de-boxed input', async ({ page }) => 
     };
   });
 
-  expect(m.edgeRadius).toBe('18px');
-  expect(m.radius).toBe('18px');
+  expect(m.edgeRadius).toBe('12px');
+  expect(m.radius).toBe('12px');
   expect(m.inputBorder).toBe('0px');
   expect(m.inputRadius).toBe('0px');
   // De-boxed: no filled input plate — transparent / none over the panel surface.
