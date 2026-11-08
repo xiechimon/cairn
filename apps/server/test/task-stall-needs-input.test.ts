@@ -256,6 +256,32 @@ describe('answers route by request id to the same build and session (task stall 
     expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
   });
 
+  test('two pending questions answered A then B resume the session carrying both answers', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A);
+    await askWorkerQuestion(
+      deps(),
+      stepRow,
+      { requestId: REQUEST_B, questions: COPY_QUESTION },
+      { holdMs: 0 },
+    );
+    endStep(stepRow.id);
+    const first = (await relay('answer_question', {
+      todoId,
+      requestId: REQUEST_A,
+      answer: 'Answer for A: repo rule.',
+    })) as { delivered: string };
+    expect(first.delivered).toBe('waiting-other-questions');
+    await relay('answer_question', {
+      todoId,
+      requestId: REQUEST_B,
+      answer: 'Answer for B: brief.',
+    });
+    const resumed = sessionSteps(buildId).filter((row) => row.status === 'pending');
+    expect(resumed).toHaveLength(1);
+    expect(resumed[0]?.prompt).toContain('Answer for A: repo rule.');
+    expect(resumed[0]?.prompt).toContain('Answer for B: brief.');
+  });
+
   test('the Coordinator cannot answer a parked question by free text: message_thread points it at answer_question', async () => {
     const { todoId, stepRow } = await askAndPark();
     endStep(stepRow.id);
