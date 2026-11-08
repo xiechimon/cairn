@@ -90,6 +90,7 @@ import { injectMemoriesCapped, MEMORY_INJECT_TOKEN_CAP } from './memory.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyChiefMessage } from './notifications.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
+import { projectMergeConfigOf } from './projects.js';
 import { retryIsParked } from './retry-parking.js';
 import { chiefRemoteTools, coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
@@ -1104,11 +1105,22 @@ function failureNeedsCoordinator(deps: ChiefDeps, todoRecord: TodoRecord): boole
   );
 }
 
-function enqueueFailedWake(
+function infoReviewNeedsCoordinator(deps: ChiefDeps, todoRecord: TodoRecord): boolean {
+  if (todoRecord.output !== 'info') return false;
+  const projectRow = deps.db
+    .select()
+    .from(project)
+    .where(eq(project.id, todoRecord.projectId))
+    .get();
+  return projectRow !== undefined && projectMergeConfigOf(projectRow).mergePolicy === 'human';
+}
+
+function enqueueUnwatchedWake(
   deps: ChiefDeps,
   threadId: string,
   todoRecord: TodoRecord,
   id: string,
+  kind: 'failed' | 'gate',
 ): void {
   const buildRow =
     todoRecord.latestBuildId === null
@@ -1116,8 +1128,8 @@ function enqueueFailedWake(
       : deps.db.select().from(build).where(eq(build.id, todoRecord.latestBuildId)).get();
   enqueueChiefStep(deps, threadId, {
     id,
-    prompt: wakeFacts('failed', todoRecord, buildRow?.errorMessage ?? null),
-    trigger: 'failed',
+    prompt: wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null),
+    trigger: kind,
     provenance: watchProvenance(todoRecord.id),
     scopeProjectId: todoRecord.projectId,
   });
@@ -1138,16 +1150,20 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
     if (!isWatched(teamChiefs, todoRecord.id)) {
       const coordinator = coordinatorThreadRow(deps, ensureChief(deps, todoRecord.teamId));
       const wakeStepId = newRecordId();
+      const wake =
+        to === 'failed' && failureNeedsCoordinator(deps, todoRecord)
+          ? 'failed'
+          : to === 'review' && infoReviewNeedsCoordinator(deps, todoRecord)
+            ? 'gate'
+            : null;
       insertThreadReport(
         deps,
         coordinator.id,
         todoRecord,
         to,
-        to === 'failed' ? { wakeStepId } : undefined,
+        wake !== null || to === 'failed' ? { wakeStepId } : undefined,
       );
-      if (to === 'failed' && failureNeedsCoordinator(deps, todoRecord)) {
-        enqueueFailedWake(deps, coordinator.id, todoRecord, wakeStepId);
-      }
+      if (wake !== null) enqueueUnwatchedWake(deps, coordinator.id, todoRecord, wakeStepId, wake);
     }
   }
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
@@ -1256,6 +1272,9 @@ function wakeFactText(
 ): string {
   switch (kind) {
     case 'gate': {
+      if (todo.phase === 'review' && todo.output === 'info') {
+        return `任务 ${ref} 的研究报告已交付，验收归你，不归用户：读报告，满意就用 complete_todos 收下，需要补充就用 message_thread 让它补。只有 design、payment、credential、intended-behavior 四类决定才 notify_user 或 ask_user。`;
+      }
       return `任务 ${ref} 停驻在 ${todo.phase} 关口，等人处理。不要自己放行：需要用户知道或决定时，用 notify_user 或 ask_user 说明，否则直接结束本轮。`;
     }
     case 'settle':

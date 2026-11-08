@@ -1,9 +1,9 @@
-import { QUESTION_DEADLINE_MS } from '@cairn/shared';
+import { DEFAULT_AUTONOMY_SETTINGS, QUESTION_DEADLINE_MS } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { chiefMessage, message, notification, step, todo } from '../src/db/schema.js';
+import { chiefMessage, message, notification, project, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
-import { buildChiefSystemPrompt } from '../src/services/chief.js';
+import { buildChiefSystemPrompt, triggerChiefWakes } from '../src/services/chief.js';
 import { listNeedsYou } from '../src/services/needs-you.js';
 import { sweepQuestionDeadlines } from '../src/services/question-deadlines.js';
 import { getTodo } from '../src/services/todos.js';
@@ -134,6 +134,42 @@ describe('a parked question goes to the Coordinator, not the owner (task stall S
       .all()
       .filter((row) => row.kind === 'chief' && row.prompt?.includes('api key is missing') === true);
     expect(wakes).toHaveLength(1);
+  });
+});
+
+describe('a research report the owner no longer accepts goes to the Coordinator (task stall S11)', () => {
+  test('an unwatched info thread reaching review in a human-policy project wakes the Coordinator to accept it', () => {
+    H.s.db
+      .update(project)
+      .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const todoId = `todo-${Math.random().toString(36).slice(2, 8)}`;
+    H.s.db
+      .insert(todo)
+      .values({
+        id: todoId,
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: 'Survey the queue libraries',
+        spec: 'Compare three.',
+        phase: 'review',
+        phaseAt: 1,
+        seqNum: 141,
+        output: 'info',
+      })
+      .run();
+    const record = getTodo(deps(), todoId);
+    if (record === null) throw new Error('todo missing');
+    triggerChiefWakes(toolDeps(), record, 'review');
+    const wakes = H.s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((row) => row.kind === 'chief' && row.prompt?.includes('#141') === true);
+    expect(wakes).toHaveLength(1);
+    expect(wakes[0]?.prompt).toContain('complete_todos');
+    expect(ownerNeedsYou()).not.toContain(todoId);
   });
 });
 
