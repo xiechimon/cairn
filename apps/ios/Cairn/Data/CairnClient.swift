@@ -38,8 +38,23 @@ struct CairnClient: Sendable {
         try await get("/api/teams/\(teamId)/chief/threads")
     }
 
-    func tasks(teamId: String) async throws -> [TaskSummary] {
+    func tasks(teamId: String) async throws -> [TaskRecord] {
         try await get("/api/todos", query: [URLQueryItem(name: "teamId", value: teamId)])
+    }
+
+    func projects(teamId: String) async throws -> [Project] {
+        try await get("/api/projects", query: [URLQueryItem(name: "teamId", value: teamId)])
+    }
+
+    func messageTask(taskId: String, content: String) async throws {
+        let _: Accepted = try await post("/api/todos/\(taskId)/messages", body: SendBody(content: content))
+    }
+
+    func answer(teamId: String, threadId: String, requestId: String, answers: [QuestionAnswer]) async throws {
+        let _: Accepted = try await post(
+            "/api/teams/\(teamId)/chief/threads/\(threadId)/questions/\(requestId)/answer",
+            body: AnswerBody(answers: answers)
+        )
     }
 
     func messages(threadId: String) async throws -> MessagePage {
@@ -76,6 +91,10 @@ struct CairnClient: Sendable {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    private struct AnswerBody: Encodable {
+        let answers: [QuestionAnswer]
     }
 
     private struct SendBody: Encodable {

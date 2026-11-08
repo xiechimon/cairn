@@ -17,11 +17,36 @@ struct RootView: View {
     @Environment(Session.self) private var session
 
     var body: some View {
-        if session.isSignedIn {
-            ThreadListView()
+        if let model = session.model {
+            MainTabs(model: model)
+        } else if session.isSignedIn {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.canvas.ignoresSafeArea())
+                .task { try? await session.restore() }
         } else {
             SignInView()
         }
+    }
+}
+
+struct MainTabs: View {
+    let model: AppModel
+    @State private var tab = 0
+
+    var body: some View {
+        TabView(selection: $tab) {
+            Tab("Needs you", systemImage: "tray", value: 0) {
+                InboxView(model: model)
+            }
+            .badge(model.inbox.count)
+            Tab("Coordinator", image: "CoordinatorGlyph", value: 1) {
+                CoordinatorView(model: model)
+            }
+        }
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .task { await model.load() }
+        .onChange(of: tab) { Task { await model.load() } }
     }
 }
 

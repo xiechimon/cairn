@@ -126,15 +126,17 @@ What works, all Measured from `CairnUITests/PilotJourneyTests` passing in light 
 
 Found and fixed during the pilot (Measured): `textContentType(.password)` on the token field triggered the iOS "Save Password?" sheet over the thread list; the transcript did not stay pinned to the newest message when the keyboard was up (fixed with `defaultScrollAnchor(.bottom)` and asserted in the UI test); white text on the dark-mode accent had low contrast; `localhost` failed to connect through an IPv4-only forward while `127.0.0.1` worked.
 
+Second pass after ian's review (Measured, same UI test in light and dark): the app now follows `docs/design/mobile-information-architecture.md`. It opens on the needs-you inbox, built the way the web home builds it (`threadStatus` over `GET /api/todos` plus pending `ask_user` questions from the Coordinator thread), with Going on collapsed. A question is answered in place through the answer route, and the Coordinator conversation is the second tab. The new brand spiral replaces the placeholders as the app icon, an Icon Composer `.icon` with light, dark and tinted vector variants checked with `ictool`; it is also the sign-in mark and the Coordinator glyph. The pending question came from a real `ask_user` tool call issued by the stub model; task phases were seeded directly in SQLite because no route sets them.
+
 Gaps, not built in the pilot:
 
 | Gap | Needed for | Notes |
 |---|---|---|
 | Pairing instead of the owner token | any device beyond ian's own | `POST /api/remote/pair` already issues revocable device tokens; the app needs a code-entry or QR screen. Inferred. |
 | HTTPS reachability from a phone | a real device | ATS allows plain HTTP only for local addresses; a phone needs the server over HTTPS (for example Tailscale Serve on the tailnet). Inferred. |
-| Task threads, approvals, `ask_user` answers, stop, attachments, markdown blocks | parity with web | Only the Coordinator thread is interactive; tasks are listed read-only; markdown renders inline styles only. Measured from the code. |
+| Plan approval, retry, merge, stop, attachments, markdown blocks | parity with web | Questions are answerable and task threads take messages; approve, retry and merge are not wired; markdown renders inline styles only. Measured from the code. |
 | APNs push and Live Activities | "needs you" and run progress on the lock screen | Server-side APNs sender plus a widget extension; needs ian's Apple key. Inferred. |
-| App icon, launch polish, iPad layout | TestFlight review of the build | Measured: the asset catalog has no icon image. |
+| iPad layout, localization | TestFlight review of the build | English only; the web's Chinese source strings are not yet in a String Catalog. Measured from the code. |
 | Signing for distribution | TestFlight | The Mac has one "Apple Development" identity and no provisioning profiles; TestFlight needs a paid Apple Developer Program team and an App Store Connect app record. Measured for the Mac; Guess for the membership status. |
 
 Estimate to an internal TestFlight build (Guess): about 2 to 3 agent-days for pairing, HTTPS setup notes, icon and archive/upload automation, plus ian's own steps (Developer Program membership if not already paid, App Store Connect app record, two-factor prompts). Push and Live Activities add about 3 to 5 agent-days, mostly server-side.

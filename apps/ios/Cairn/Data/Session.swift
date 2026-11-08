@@ -47,7 +47,7 @@ final class Session {
     private static let serverKey = "cairn.serverURL"
 
     private(set) var client: CairnClient?
-    private(set) var team: Team?
+    private(set) var model: AppModel?
     var serverText: String
 
     init() {
@@ -73,24 +73,31 @@ final class Session {
             throw CairnError.badServerURL
         }
         let candidate = CairnClient(credentials: Credentials(serverURL: url, token: token.trimmingCharacters(in: .whitespacesAndNewlines)))
-        let teams = try await candidate.teams()
+        guard let team = try await candidate.teams().first else {
+            throw CairnError.server(status: 404, message: "This token has no team.")
+        }
         KeychainToken.write(candidate.credentials.token, account: trimmed)
         UserDefaults.standard.set(trimmed, forKey: Self.serverKey)
         serverText = trimmed
-        team = teams.first
         client = candidate
+        model = AppModel(client: candidate, team: team)
     }
 
-    func loadTeam() async throws -> Team? {
-        if let team { return team }
-        guard let client else { return nil }
-        team = try await client.teams().first
-        return team
+    func restore() async throws {
+        guard model == nil, let client else { return }
+        do {
+            guard let team = try await client.teams().first else {
+                throw CairnError.server(status: 404, message: "This token has no team.")
+            }
+            model = AppModel(client: client, team: team)
+        } catch CairnError.unauthorized {
+            signOut()
+        }
     }
 
     func signOut() {
         KeychainToken.delete(account: serverText)
         client = nil
-        team = nil
+        model = nil
     }
 }

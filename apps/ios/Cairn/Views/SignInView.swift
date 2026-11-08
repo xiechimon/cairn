@@ -15,10 +15,13 @@ struct SignInView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Image(systemName: "triangle.fill")
-                            .font(.system(size: 28, weight: .semibold))
-                            .foregroundStyle(Color.ink)
-                            .accessibilityHidden(true)
+                        CairnMark()
+                            .fill(Color.ink)
+                            .frame(width: 40, height: 40)
+                            .padding(.bottom, 4)
+                            .accessibilityElement()
+                            .accessibilityLabel("cairn")
+                            .accessibilityIdentifier("brand-mark")
                         Text("Sign in to cairn")
                             .font(.largeTitle.weight(.semibold))
                             .foregroundStyle(Color.ink)

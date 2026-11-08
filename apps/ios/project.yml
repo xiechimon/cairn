@@ -17,6 +17,11 @@ targets:
     platform: iOS
     sources:
       - path: Cairn
+        excludes:
+          - AppIcon.icon
+      - path: Cairn/AppIcon.icon
+        type: file
+        buildPhase: resources
     info:
       path: Cairn/Info.plist
       properties:
@@ -32,6 +37,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.cairn.ios
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: NO
   CairnUITests:

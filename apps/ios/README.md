@@ -1,6 +1,6 @@
 # cairn for iOS (pilot)
 
-A native SwiftUI client for the Coordinator: sign in with a server address and token, list the Coordinator thread and open tasks, open the thread, and send a message with the reply streamed live. Stack choice and platform requirements: [`docs/research/ios-app-pilot-2026-11-08.md`](../../docs/research/ios-app-pilot-2026-11-08.md).
+A native SwiftUI client: sign in with a server address and token, then a two-tab app. Tab 1 is the needs-you inbox (Coordinator questions, tasks waiting on you, failed tasks, and a collapsed Going on row); an item opens its full-screen thread or question card. Tab 2 is the Coordinator conversation. Layout and information architecture follow [`docs/design/mobile-information-architecture.md`](../../docs/design/mobile-information-architecture.md), shared with a future Android app. Stack choice and platform requirements: [`docs/research/ios-app-pilot-2026-11-08.md`](../../docs/research/ios-app-pilot-2026-11-08.md).
 
 This is a pilot, not a shipping app. It is not part of the pnpm workspace and has no CI job.
 
@@ -24,7 +24,7 @@ The simulator shares the Mac's network, so `http://127.0.0.1:<port>` reaches a s
 
 ## UI journey test
 
-`CairnUITests/PilotJourneyTests.swift` signs in with a wrong token (expects the rejection message), signs in with the real one, opens the Coordinator thread, sends a message and waits for the reply, attaching a screenshot at each step. Credentials come from the environment at run time:
+`CairnUITests/PilotJourneyTests.swift` signs in with a wrong token (expects the rejection message), signs in with the real one, checks the inbox (one Coordinator question and three tasks), expands Going on, answers the question, opens a task thread, sends a Coordinator message and waits for the reply, and opens the account sheet, attaching a screenshot at each step. The server needs that seed: a pending `ask_user` question and tasks in `confirm`, `failed`, `review` and `building`. Credentials come from the environment at run time:
 
 ```sh
 TEST_RUNNER_CAIRN_PILOT_SERVER=http://127.0.0.1:8787 \
@@ -38,11 +38,24 @@ xcrun xcresulttool export attachments --path results.xcresult --output-path shot
 
 The reply assertion matches the scratch stub model used for the pilot evidence; against a real model, relax it to "an assistant message appears".
 
+## App icon
+
+`Cairn/AppIcon.icon` is an Icon Composer document: the plate colors and one vector layer per appearance (`mark.svg`, `mark-dark.svg`, `mark-tinted.svg`) from the brand spiral. Render any appearance without Xcode's UI:
+
+```sh
+"/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool" \
+  Cairn/AppIcon.icon --export-image --output-file icon.png --platform iOS \
+  --rendition TintedDark --width 1024 --height 1024 --scale 1
+```
+
+In-app marks use `CairnMark` (`Cairn/Brand/CairnMark.swift`), which draws the same spiral from its generator parameters; the tab icon is the small spiral as a template SVG.
+
 ## API used
 
 | Screen | Request |
 |---|---|
 | Sign in | `GET /api/teams` with `Authorization: Bearer <token>` |
-| Thread list | `GET /api/teams/:id/chief/threads`, `GET /api/todos?teamId=:id` |
-| Thread | `GET /api/conversations/:tid/messages`, `GET /api/conversations/:tid/stream` (SSE `text_delta`, `message`, `step`) |
-| Send | `POST /api/conversations/:tid/messages`, or `POST /api/teams/:id/chief/threads` for the first message |
+| Needs you | `GET /api/todos?teamId=`, `GET /api/projects?teamId=`, Coordinator messages for pending `ask_user_question` rows |
+| Question | `POST /api/teams/:id/chief/threads/:tid/questions/:requestId/answer` |
+| Task thread | `GET /api/conversations/<latestBuildId>/messages`, `POST /api/todos/:id/messages` |
+| Coordinator | `GET /api/teams/:id/chief/threads`, `GET /api/conversations/:tid/messages`, `GET /api/conversations/:tid/stream` (SSE), `POST /api/conversations/:tid/messages` or `POST /api/teams/:id/chief/threads` for the first message |
