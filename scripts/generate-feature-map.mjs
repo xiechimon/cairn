@@ -165,17 +165,32 @@ function testIdsIn(files) {
   const ids = new Set();
   for (const rel of files) {
     const text = read(rel);
-    for (const match of text.matchAll(
-      /data-testid=(?:"([^"]+)"|\{\s*'([^']+)'\s*\}|\{\s*`([^`]+)`\s*\}|\{[^}]*?\?\s*'([^']+)')/g,
-    )) {
-      const id = match[1] ?? match[2] ?? match[4] ?? match[3].replace(/\$\{[^}]*\}.*$/, '*');
-      ids.add(id);
+    for (const match of text.matchAll(/\b(?:data-testid|testId)=(?:"([^"]+)"|\{([^{}]*)\})/g)) {
+      if (match[1] !== undefined) {
+        ids.add(match[1]);
+        continue;
+      }
+      for (const literal of match[2].matchAll(/'([^'\n]+)'|"([^"\n]+)"/g)) {
+        ids.add(literal[1] ?? literal[2]);
+      }
     }
-    for (const match of text.matchAll(/\btestId=(?:"([^"]+)"|\{\s*'([^']+)'\s*\})/g)) {
-      ids.add(match[1] ?? match[2]);
+    for (const match of text.matchAll(/\b(?:data-testid|testId)=\{\s*`([^`]+)`/g)) {
+      ids.add(match[1].replace(/\$\{.*$/, '*'));
     }
   }
   return [...ids].sort();
+}
+
+function routePattern(key) {
+  const source = key
+    .split('/')
+    .map((part) => {
+      if (/^:[\w]+\?$/.test(part)) return '(?:/[^/]+)?';
+      if (/^:[\w]+$/.test(part)) return '/[^/]+';
+      return part ? `/${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}` : '';
+    })
+    .join('');
+  return new RegExp(`^${source || '/'}$`);
 }
 
 function labelsIn(files) {
@@ -273,7 +288,10 @@ function validateStep(id, step, facts, errors) {
     return;
   }
   const [, verb, arg] = parsed;
-  if (verb === 'open' && !facts.routes.web.some((route) => route.key === arg)) {
+  if (
+    verb === 'open' &&
+    !facts.routes.web.some((route) => route.key === arg || routePattern(route.key).test(arg))
+  ) {
     errors.push(`${id}: reach step "${step}" opens ${arg}, which is not a web route`);
   }
   if (verb === 'settings' && !facts.sections.some((section) => section.id === arg)) {

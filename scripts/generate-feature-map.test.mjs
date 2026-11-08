@@ -28,7 +28,13 @@ const SETTINGS_TSX = `const GROUPS = [
 `;
 
 const SCHEDULES_TSX = `export function SchedulesPage() {
-  return <button data-testid="schedule-new" aria-keyshortcuts="Mod+K">{t('新建')}</button>;
+  return (
+    <div>
+      <button data-testid="schedule-new" aria-keyshortcuts="Mod+K">{t('新建')}</button>
+      <span data-testid={open ? 'schedule-open' : 'schedule-closed'} />
+      <span data-testid={\`schedule-row-\${id}\`} />
+    </div>
+  );
 }
 `;
 
@@ -169,7 +175,10 @@ test('a complete registry renders a map that --check accepts', () => {
   assert.match(doc, /## Eval coverage/);
   const skill = readFileSync(join(root, SKILL_MAP), 'utf8');
   assert.match(skill, /1\. `open \/app\/schedules`/);
-  assert.match(skill, /Test ids in its code: `schedule-new`/);
+  assert.match(
+    skill,
+    /Test ids in its code: `schedule-closed`, `schedule-new`, `schedule-open`, `schedule-row-\*`/,
+  );
   assert.match(skill, /Keyboard shortcuts in its code: `Mod\+K`/);
   assert.match(skill, /`账号` \(Account\)/);
   assert.match(skill, /States: Empty list/);
@@ -383,6 +392,29 @@ test('renaming a test id in feature code without regenerating fails --check', ()
     ),
   );
   checkFails(root, /feature-map\.md differs from/);
+});
+
+test('reach steps may use concrete ids for parameterized routes and either branch of a conditional test id', () => {
+  const registry = baseRegistry();
+  registry.features[0].reach = [
+    'open /app/schedules/42',
+    'click testid:schedule-open',
+    'click testid:schedule-closed',
+    'click testid:schedule-row-7',
+  ];
+  const root = makeFixtureRepo(registry);
+  generated(root);
+  assert.equal(run(root, ['--check']).status, 0);
+  checkFails(
+    makeFixtureRepo({
+      ...registry,
+      features: [
+        { ...registry.features[0], reach: ['open /app/schedules/42/edit'] },
+        registry.features[1],
+      ],
+    }),
+    /opens \/app\/schedules\/42\/edit, which is not a web route/,
+  );
 });
 
 for (const [step, pattern] of [
