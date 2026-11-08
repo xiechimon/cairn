@@ -14,21 +14,44 @@ export function composeRequest(state: unknown): number | null {
     : null;
 }
 
+function keptParams(search: string): URLSearchParams {
+  const current = new URLSearchParams(search);
+  const params = new URLSearchParams();
+  for (const key of KEPT_PARAMS) {
+    const value = current.get(key);
+    if (value !== null) params.set(key, value);
+  }
+  return params;
+}
+
+export function coordinatorSearch(search: string): string {
+  const query = keptParams(search).toString();
+  return query === '' ? '' : `?${query}`;
+}
+
+export function useOpenCoordinatorThread(): (threadId: string) => void {
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  return useCallback(
+    (threadId: string) => {
+      const params = keptParams(search);
+      params.set('chief', threadId);
+      navigate({ pathname: '/app', search: `?${params.toString()}` });
+    },
+    [navigate, search],
+  );
+}
+
 export function useOpenComposer(): (projectId?: string | null) => void {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   return useCallback(
     (projectId?: string | null) => {
-      const current = new URLSearchParams(search);
       const routeProject =
         pathname === '/app'
-          ? current.get('project')
+          ? new URLSearchParams(search).get('project')
           : (matchPath('/app/project/:id/*', pathname)?.params.id ?? null);
-      const params = new URLSearchParams();
-      for (const key of KEPT_PARAMS) {
-        const value = current.get(key);
-        if (value !== null) params.set(key, value);
-      }
+      const params = keptParams(search);
       const project = projectId ?? routeProject;
       if (project != null) {
         params.set('project', project);

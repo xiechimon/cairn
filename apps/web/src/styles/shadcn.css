@@ -55,7 +55,6 @@
   --dur-reveal: 120ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --z-docked: 10;
   --z-floating: 15;
@@ -97,7 +96,6 @@
   --radius-tile: 10px;
   --radius-bubble: 12px;
   --radius-control: 8px;
-  --radius-window: 18px;
   --e1: 0 0 0 1px var(--border);
   --e2: var(--shadow-floating), inset 0 0 0 1px var(--elevated-ring);
   --e3: var(--shadow-dialog), 0 0 0 1px var(--dialog-ring);

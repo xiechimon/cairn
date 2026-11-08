@@ -162,8 +162,6 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string):
   });
 }
 
-export const TurnElapsedContext = createContext(true);
-
 export const HandoffCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
 
 function HandoffRow({ todoId }: { todoId: string }) {
@@ -283,7 +281,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onToggleTools,
   onRewindRequest,
 }: ChiefStreamRowProps) {
-  const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message')
@@ -519,9 +516,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 )}
               </Button>
               <MessageStamp createdAt={item.createdAt} />
-              {showElapsed && item.seconds !== '' && (
-                <span>{t('完成 {n}', { n: item.seconds })}</span>
-              )}
               {item.fallbackModel != null && (
                 <span data-testid="chief-fallback-note">
                   {t('由备用模型 {model} 回答', { model: item.fallbackModel })}

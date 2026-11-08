@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
+import { stubCoordinatorChief } from './helpers.js';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -40,7 +40,7 @@ const PROJECT = {
   localPath: null,
 };
 
-async function openDrawer(page: Page) {
+async function openCoordinator(page: Page) {
   await page.route('**/api/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
@@ -75,6 +75,7 @@ async function openDrawer(page: Page) {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: [] });
   });
+  await stubCoordinatorChief(page, TEAM_ID, USER.id);
   let posts = 0;
   await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
@@ -90,22 +91,21 @@ async function openDrawer(page: Page) {
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   await membersLoaded;
 
-  await openChiefWindow(page);
-  const drawer = page.locator('.chief-drawer');
-  await expect(drawer).toBeVisible();
+  const coordinator = page.getByTestId('home-c');
+  await expect(coordinator).toBeVisible();
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
-  const menu = drawer.locator('.slash-menu');
-  const rows = drawer.locator('.slash-menu-row');
-  return { drawer, input, menu, rows, posts: () => posts };
+  const menu = coordinator.locator('.slash-menu');
+  const rows = coordinator.locator('.slash-menu-row');
+  return { coordinator, input, menu, rows, posts: () => posts };
 }
 
 test('trigger: `/` opens builtins plus skills, review/stop hidden (F2)', async ({ page }) => {
-  const { input, menu, rows } = await openDrawer(page);
+  const { input, menu, rows } = await openCoordinator(page);
 
   await input.fill('/');
   await expect(menu).toBeVisible();
@@ -124,7 +124,7 @@ test('trigger: `/` opens builtins plus skills, review/stop hidden (F2)', async (
 });
 
 test('`/clear` runs without sending and toasts confirmation (F1)', async ({ page }) => {
-  const { input, menu, rows, posts } = await openDrawer(page);
+  const { input, menu, rows, posts } = await openCoordinator(page);
 
   await input.fill('some draft');
   await input.fill('/clear');
@@ -133,17 +133,15 @@ test('`/clear` runs without sending and toasts confirmation (F1)', async ({ page
   await input.press('Enter');
   await expect(menu).toBeHidden();
   await expect(input).toHaveValue('');
-  // Visible feedback: the shared sonner source confirms the clear.
   const toast = page.locator('[data-sonner-toast]');
   await expect(toast).toContainText('已清空');
   await expect(toast.first()).toBeVisible();
-  // Nothing went out to the chief wire.
   expect(posts()).toBe(0);
   await evidenceShot(page, 'chief-slash-clear-toast.png');
 });
 
 test('Tab completes without running; Enter without highlight sends (F4)', async ({ page }) => {
-  const { input, menu, posts } = await openDrawer(page);
+  const { input, menu, posts } = await openCoordinator(page);
 
   await input.fill('/clear');
   await input.press('Tab');
@@ -151,14 +149,13 @@ test('Tab completes without running; Enter without highlight sends (F4)', async 
   await expect(input).toHaveValue('/clear ');
   expect(posts()).toBe(0);
 
-  // Plain Enter with no highlight keeps the chief send semantics.
   await input.fill('hello chief');
   await input.press('Enter');
   await expect.poll(posts).toBe(1);
 });
 
 test('mid-prompt accept inserts literal text, never runs (F3)', async ({ page }) => {
-  const { input, menu, rows, posts } = await openDrawer(page);
+  const { input, menu, rows, posts } = await openCoordinator(page);
 
   await input.fill('hi /clear');
   await expect(rows.first()).toHaveText('clear');
@@ -169,8 +166,8 @@ test('mid-prompt accept inserts literal text, never runs (F3)', async ({ page })
   expect(posts()).toBe(0);
 });
 
-test('/help opens the command panel with the drawer builtins', async ({ page }) => {
-  const { input, rows } = await openDrawer(page);
+test('/help opens the command panel with the Coordinator builtins', async ({ page }) => {
+  const { input, rows } = await openCoordinator(page);
 
   await input.fill('/');
   await expect(rows).toHaveCount(4);
@@ -189,12 +186,12 @@ test('/help opens the command panel with the drawer builtins', async ({ page }) 
   await evidenceShot(page, 'chief-slash-help.png');
 });
 
-test('Esc closes the menu and the drawer survives (F5)', async ({ page }) => {
-  const { drawer, input, menu } = await openDrawer(page);
+test('Esc closes the menu and the Coordinator survives (F5)', async ({ page }) => {
+  const { coordinator, input, menu } = await openCoordinator(page);
 
   await input.fill('/');
   await expect(menu).toBeVisible();
   await input.press('Escape');
   await expect(menu).toBeHidden();
-  await expect(drawer).toBeVisible();
+  await expect(coordinator).toBeVisible();
 });

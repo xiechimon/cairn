@@ -1,6 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -183,89 +182,7 @@ async function shot(page: Page, name: string) {
   await evidenceShot(page, name);
 }
 
-const drawer = (page: Page) => page.locator('.chief-drawer');
-const chip = (page: Page) => drawer(page).getByTestId('chief-project-chip');
-const input = (page: Page) => drawer(page).getByTestId('chief-composer-input');
 const homeInput = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
-
-async function openDrawer(page: Page) {
-  await page.goto('/app/schedules');
-  await openChiefWindow(page);
-  await expect(drawer(page)).toBeVisible();
-}
-
-test.describe('the drawer composer picks a project (T6 #2009)', () => {
-  test('the chip starts on 自动, lists every project with its description, and the pick rides on the send', async ({
-    page,
-  }) => {
-    const state = await mockLive(page);
-    await openDrawer(page);
-    await expect(chip(page)).toHaveText(/自动/);
-    await expect(chip(page)).toHaveAttribute('aria-label', '发给哪个项目：自动，由 Coordinator 判断');
-    await chip(page).click();
-    const menu = page.getByRole('menu', { name: '发给哪个项目' });
-    await expect(menu).toBeVisible();
-    const items = menu.getByRole('menuitemradio');
-    await expect(items).toHaveCount(4);
-    await expect(items.nth(0)).toContainText('Coordinator 判断，拿不准会问你');
-    await expect(items.nth(0)).toHaveAttribute('aria-checked', 'true');
-    await expect(items.nth(2)).toContainText('官网 cairn.xmon.me');
-    await shot(page, 'chip-menu.png');
-    await items.nth(2).click();
-    await expect(menu).toHaveCount(0);
-    await expect(chip(page)).toHaveText(/cairn-site/);
-    await input(page).fill('把按钮颜色统一一下');
-    await input(page).press('Enter');
-    await expect
-      .poll(() => state.sent)
-      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
-    await expect(chip(page)).toHaveText(/cairn-site/);
-    await shot(page, 'chip-picked.png');
-  });
-
-  test('the pick survives a reload, and 自动 sends no projectId', async ({ page }) => {
-    const state = await mockLive(page);
-    await openDrawer(page);
-    await chip(page).click();
-    await page.getByRole('menuitemradio', { name: /radar-digest/ }).click();
-    await page.reload();
-    await expect(drawer(page)).toBeVisible();
-    await expect(chip(page)).toHaveText(/radar-digest/);
-    await chip(page).click();
-    await page.getByRole('menuitemradio', { name: /自动/ }).click();
-    await expect(chip(page)).toHaveText(/自动/);
-    await input(page).fill('早上的摘要没收到');
-    await input(page).press('Enter');
-    await expect.poll(() => state.sent).toEqual([{ content: '早上的摘要没收到', clientMessageId: expect.any(String) }]);
-  });
-
-  test('typing @ and picking a project sets the chip and leaves no @ text behind', async ({
-    page,
-  }) => {
-    const state = await mockLive(page);
-    await openDrawer(page);
-    await input(page).fill('修一下链接 ');
-    await input(page).pressSequentially('@site');
-    const option = page.getByRole('option', { name: /cairn-site/ });
-    await expect(option).toBeVisible();
-    await input(page).press('ArrowDown');
-    await expect(input(page)).toHaveAttribute('aria-activedescendant', /.+/);
-    await input(page).press('Enter');
-    await expect(chip(page)).toHaveText(/cairn-site/);
-    await expect(input(page)).toHaveValue('修一下链接 ');
-    await input(page).press('Enter');
-    await expect
-      .poll(() => state.sent)
-      .toEqual([{ content: '修一下链接', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
-  });
-
-  test('a team with one project shows no chip', async ({ page }) => {
-    await mockLive(page, { projects: [PROJECTS[0]!] });
-    await openDrawer(page);
-    await expect(input(page)).toBeVisible();
-    await expect(chip(page)).toHaveCount(0);
-  });
-});
 
 test.describe('the home sends to the project it is filtered to (#2531)', () => {
   test('the home has no chip; a project-filtered home sends that projectId and the unfiltered home sends none', async ({

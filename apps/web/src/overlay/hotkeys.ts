@@ -5,13 +5,7 @@ const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditabl
 export const isEditableTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && target.closest(EDITABLE) !== null;
 
-export const isEditableOutsideChiefDrawer = (target: EventTarget | null): boolean =>
-  isEditableTarget(target) &&
-  !(target instanceof HTMLElement && target.closest('.chief-drawer') !== null);
-
 const COMPOSE_TARGET_ATTR = 'data-compose-target';
-
-const CHIEF_DRAWER = '.chief-drawer';
 
 const BLOCKING_LAYER =
   '.overlay, [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
@@ -20,9 +14,7 @@ const isTypedCharacter = (event: KeyboardEvent): boolean =>
   (event.key.length === 1 && event.key !== ' ') || event.key === 'Process';
 
 const blockingLayerOpen = (): boolean =>
-  [...document.querySelectorAll(BLOCKING_LAYER)].some(
-    (el) => !el.matches(CHIEF_DRAWER) && el.checkVisibility(),
-  );
+  [...document.querySelectorAll(BLOCKING_LAYER)].some((el) => el.checkVisibility());
 
 function isOnTop(el: HTMLElement): boolean {
   const box = el.getBoundingClientRect();
@@ -35,7 +27,7 @@ function visibleComposeTarget(): HTMLTextAreaElement | null {
   const usable = [
     ...document.querySelectorAll<HTMLTextAreaElement>(`textarea[${COMPOSE_TARGET_ATTR}]`),
   ].filter((el) => !el.readOnly && !el.disabled && el.checkVisibility() && isOnTop(el));
-  return usable.find((el) => el.closest(CHIEF_DRAWER) === null) ?? usable[0] ?? null;
+  return usable[0] ?? null;
 }
 
 export function useTypeToCompose(): void {
