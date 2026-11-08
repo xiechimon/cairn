@@ -1,6 +1,9 @@
 {
   "repo": "xiechimon/cairn",
   "pending": {
+    "docs/research/android-installed-web-app-2026-11-08.md": "branch cairn/conv-01a1bc75-55c8-7565-84f8-dc8879517b12; research and design segment of #3475",
+    "docs/design/android-installed-web-app-frontend.md": "branch cairn/conv-01a1bc75-55c8-7565-84f8-dc8879517b12; page drafts and owner selection pending",
+    "docs/design/android-installed-web-app-backend.md": "branch cairn/conv-01a1bc75-55c8-7565-84f8-dc8879517b12; separately dispatched implementation pending",
     "docs/research/agent-small-computer-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/ai-frontend-quality-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/branch-model-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
@@ -85,6 +88,30 @@
     }
   ],
   "features": [
+    {
+      "id": "android-installed-web-app-intake",
+      "name": "Android installed app notifications and intake",
+      "summary": "Planned per-device decision and completion notification preferences, exact-question landing, launcher shortcuts and offline-safe inbound sharing for the existing installed web app.",
+      "states": "Planned: permission denied or dismissed, independently enabled categories, pending or resolved question, cold and warm launch, signed-out share review, offline durable intake, and storage or upload failure. Not implemented; page drafts and owner selection are pending.",
+      "centrality": 2,
+      "status": "planned",
+      "reach": [
+        "open /app"
+      ],
+      "verify": [
+        "docs/verify/android-installed-web-app-acceptance.md"
+      ],
+      "research": [
+        "docs/research/android-installed-web-app-2026-11-08.md"
+      ],
+      "frontendDesign": [
+        "docs/design/android-installed-web-app-frontend.md"
+      ],
+      "backendDesign": [
+        "docs/design/android-installed-web-app-backend.md"
+      ],
+      "evidence": []
+    },
     {
       "id": "coordinator-chat",
       "name": "Coordinator chat",

@@ -443,6 +443,25 @@ Reach:
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](../../../docs/spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/snooze.test.ts`, `apps/server/test/archive.test.ts`
 
+### android-installed-web-app-intake
+
+**Android installed app notifications and intake** (planned, centrality 2). Planned per-device decision and completion notification preferences, exact-question landing, launcher shortcuts and offline-safe inbound sharing for the existing installed web app.
+
+States: Planned: permission denied or dismissed, independently enabled categories, pending or resolved question, cold and warm launch, signed-out share review, offline durable intake, and storage or upload failure. Not implemented; page drafts and owner selection are pending.
+
+Reach:
+
+1. `open /app`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: none
+- Verify recipes: [docs/verify/android-installed-web-app-acceptance.md](../../../docs/verify/android-installed-web-app-acceptance.md)
+- Research: [docs/research/android-installed-web-app-2026-11-08.md](../../../docs/research/android-installed-web-app-2026-11-08.md) (not on main)
+- Frontend design: [docs/design/android-installed-web-app-frontend.md](../../../docs/design/android-installed-web-app-frontend.md) (not on main)
+- Backend design: [docs/design/android-installed-web-app-backend.md](../../../docs/design/android-installed-web-app-backend.md) (not on main)
+- Evidence: none
+
 ### desktop-app
 
 **Desktop app** (planned, centrality 2). D45 and D100: a web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.

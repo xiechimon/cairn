@@ -15,15 +15,15 @@
 
 | Item | Count |
 |---|---|
-| Features | 56 |
+| Features | 57 |
 | status shipped | 46 |
 | status partial | 7 |
-| status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 17 |
+| status planned | 4 |
+| research, frontend design and backend design all present or not applicable | 18 |
 | Research gaps | 20 |
 | Frontend design gaps | 26 |
 | Backend design gaps | 26 |
-| notes cited but not on main | 20 |
+| notes cited but not on main | 23 |
 
 ## Coverage
 
@@ -50,6 +50,7 @@
 | [Thread PR panel and auto-fix](#thread-pr-panel) | 1 | shipped | yes | yes | yes |  |
 | [Thread transcript and work trace](#thread-transcript) | 1 | shipped | yes | yes | yes |  |
 | [Threads](#threads) | 1 | shipped | yes | yes | yes |  |
+| [Android installed app notifications and intake](#android-installed-web-app-intake) | 2 | planned | yes (not on main) | yes (not on main) | yes (not on main) |  |
 | [Desktop app](#desktop-app) | 2 | planned | yes (not on main) | gap | gap | B6 |
 | [First run](#first-run) | 2 | shipped | yes (not on main) | yes | gap | B6 |
 | [Machine enrollment](#machine-enrollment) | 2 | shipped | yes | gap | gap | B5 |
@@ -383,6 +384,14 @@ Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the 
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main)
 
+### android-installed-web-app-intake
+
+**Android installed app notifications and intake** (planned). Planned per-device decision and completion notification preferences, exact-question landing, launcher shortcuts and offline-safe inbound sharing for the existing installed web app.
+
+- Research: [docs/research/android-installed-web-app-2026-11-08.md](research/android-installed-web-app-2026-11-08.md) (not on main)
+- Frontend design: [docs/design/android-installed-web-app-frontend.md](design/android-installed-web-app-frontend.md) (not on main)
+- Backend design: [docs/design/android-installed-web-app-backend.md](design/android-installed-web-app-backend.md) (not on main)
+
 ### desktop-app
 
 **Desktop app** (planned). D45 and D100: a web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
@@ -667,11 +676,14 @@ Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the 
 
 | Note | Where it is |
 |---|---|
+| `docs/design/android-installed-web-app-backend.md` | branch cairn/conv-01a1bc75-55c8-7565-84f8-dc8879517b12; separately dispatched implementation pending |
+| `docs/design/android-installed-web-app-frontend.md` | branch cairn/conv-01a1bc75-55c8-7565-84f8-dc8879517b12; page drafts and owner selection pending |
 | `docs/design/pilot-coordinator-chat-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/design/qcard-variants/README.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/agent-machine-routing.md` | branch origin/claude/elegant-jones-a3e2a9 |
 | `docs/research/agent-small-computer-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/ai-frontend-quality-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
+| `docs/research/android-installed-web-app-2026-11-08.md` | branch cairn/conv-01a1bc75-55c8-7565-84f8-dc8879517b12; research and design segment of #3475 |
 | `docs/research/branch-model-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/chat-markdown-polish-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/coordinator-computer.md` | branch origin/docs/coordinator-computer |
