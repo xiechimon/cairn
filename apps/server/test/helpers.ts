@@ -72,6 +72,7 @@ export function bootServer(
     logger?: AppContext['logger'];
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
+    providerTestTimeoutMs?: number;
     authToken?: string | null;
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
@@ -142,6 +143,9 @@ export function bootServer(
       oauthStates,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
+      ...(opts.providerTestTimeoutMs === undefined
+        ? {}
+        : { providerTestTimeoutMs: opts.providerTestTimeoutMs }),
       githubFetch: opts.githubFetch ?? rejectingGithubFetch,
       ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
       ...(opts.skillImportFetch !== undefined ? { skillImportFetch: opts.skillImportFetch } : {}),

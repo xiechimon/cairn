@@ -67,6 +67,16 @@ export type CreateProviderBody = z.infer<typeof createProviderBodySchema>;
 export const patchProviderBodySchema = createProviderBodySchema.partial();
 export type PatchProviderBody = z.infer<typeof patchProviderBodySchema>;
 
+export const testProviderBodySchema = z.object({
+  model: z.string().min(1).max(256).optional(),
+});
+
+export const providerTestResultSchema = z.strictObject({
+  status: z.enum(['ok', 'failed']),
+  reason: z.string().nullable(),
+});
+export type ProviderTestResult = z.infer<typeof providerTestResultSchema>;
+
 export const PROVIDER_PRESET_IDS = [
   'github-copilot',
   'openai-codex',
