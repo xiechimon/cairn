@@ -4,7 +4,7 @@ Append the task, scope and acceptance commands after the matching template; all 
 
 ## Starting tasks and reporting (#1556)
 
-Do not start long background tasks directly with `( ... & )` or `nohup ... &`: the process-group cleanup when a tool call returns kills them (ledger #1556). Always use `scripts/dispatch-agent.mjs`:
+Do not start long background tasks directly with `( ... & )`, `nohup`, `setsid` or `disown`: depending on the harness they are either killed when the tool call returns (ledger #1556) or outlive their owner for days. Servers and stacks a step needs run as a background task through `node scripts/owned-process.mjs -- <command>`, which dies with its owner. Agent jobs that must outlive the tool call use `scripts/dispatch-agent.mjs`, which binds them to the agent session and a 12h ceiling:
 
 ```sh
 node scripts/dispatch-agent.mjs start <id> [--cwd <dir>] [--ticket <ticket> [--force]] -- <full command>

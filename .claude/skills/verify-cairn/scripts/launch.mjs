@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
+import { spawnOwned } from '../../../../scripts/owned-process.mjs';
 
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
 const ROOT = process.env.VERIFY_REPO_ROOT
@@ -35,14 +35,6 @@ function groupAlive(pid) {
   }
 }
 
-function killGroup(pid) {
-  try {
-    process.kill(-pid, 'SIGTERM');
-  } catch {
-
-  }
-}
-
 async function main() {
   if (!(await portFree(SERVER_PORT))) {
     console.error(`VERIFY_PORT ${SERVER_PORT} 被占——别的 lane?不能杀,换端口重试:`);
@@ -59,8 +51,9 @@ async function main() {
   if (existsSync(portsFile)) {
     try {
       const prev = JSON.parse(readFileSync(portsFile, 'utf8'));
-      if (prev.serverPid != null && groupAlive(prev.serverPid)) {
-        console.error(`栈已在跑(server pid ${prev.serverPid},ports.json 在 ${RUN_DIR})`);
+      const live = [prev.supervisorPid, prev.serverPid].find((pid) => pid != null && groupAlive(pid));
+      if (live !== undefined) {
+        console.error(`a stack is already running (pid ${live}, ports.json in ${RUN_DIR})`);
         console.error('先 node scripts/cleanup.mjs 回收,或 doctor.mjs 体检');
         process.exit(1);
       }
@@ -74,7 +67,8 @@ async function main() {
   mkdirSync(SKILLS_DIR, { recursive: true });
 
   const serverLog = openSync(join(RUN_DIR, 'server.log'), 'a');
-  const server = spawn('pnpm', ['exec', 'tsx', 'src/index.ts'], {
+  const server = spawnOwned('pnpm', ['exec', 'tsx', 'src/index.ts'], {
+    name: 'verify-server',
     cwd: join(ROOT, 'apps', 'server'),
     env: {
       ...process.env,
@@ -83,15 +77,12 @@ async function main() {
       CAIRN_SKILLS_DIR: SKILLS_DIR,
       CAIRN_AUTH: 'off',
     },
-    detached: true,
     stdio: ['ignore', serverLog, serverLog],
   });
-  writeFileSync(join(RUN_DIR, 'server.pid'), `${server.pid}\n`);
-
-  server.unref();
+  writeFileSync(join(RUN_DIR, 'server.pid'), `${server.child.pid}\n`);
 
   const webLog = openSync(join(RUN_DIR, 'web.log'), 'a');
-  const web = spawn(
+  const web = spawnOwned(
     process.execPath,
     [
       join('node_modules', 'vite', 'bin', 'vite.js'),
@@ -102,14 +93,22 @@ async function main() {
       '127.0.0.1',
     ],
     {
+      name: 'verify-web',
       cwd: join(ROOT, 'apps', 'web'),
       env: { ...process.env, CAIRN_DEV_SERVER_PORT: String(SERVER_PORT) },
-      detached: true,
       stdio: ['ignore', webLog, webLog],
     },
   );
-  writeFileSync(join(RUN_DIR, 'web.pid'), `${web.pid}\n`);
-  web.unref();
+  writeFileSync(join(RUN_DIR, 'web.pid'), `${web.child.pid}\n`);
+
+  const stopStack = () => Promise.all([server.stop(), web.stop()]);
+  let stopping = false;
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
+    process.once(signal, async () => {
+      stopping = true;
+      await stopStack();
+      process.exit(0);
+    });
 
   const tailOf = (name, lines = 30) => {
     const p = join(RUN_DIR, name);
@@ -117,12 +116,11 @@ async function main() {
     return readFileSync(p, 'utf8').trim().split('\n').slice(-lines).join('\n');
   };
 
-  const bail = (msg) => {
+  const bail = async (msg) => {
     console.error(msg);
     console.error(`--- server.log 尾 ---\n${tailOf('server.log')}`);
     console.error(`--- web.log 尾 ---\n${tailOf('web.log')}`);
-    killGroup(server.pid);
-    killGroup(web.pid);
+    await stopStack();
     process.exit(1);
   };
 
@@ -135,7 +133,7 @@ async function main() {
       } catch {
 
       }
-      if (Date.now() > deadline) bail(`${label} 未就绪:${url}`);
+      if (Date.now() > deadline) await bail(`${label} 未就绪:${url}`);
       await sleep(300);
     }
   };
@@ -152,8 +150,9 @@ async function main() {
         webPort: WEB_PORT,
         homeDir: HOME_DIR,
         skillsDir: SKILLS_DIR,
-        serverPid: server.pid,
-        webPid: web.pid,
+        supervisorPid: process.pid,
+        serverPid: server.child.pid,
+        webPid: web.child.pid,
         startedAt: new Date().toISOString(),
       },
       null,
@@ -167,7 +166,17 @@ async function main() {
   console.log(`  CAIRN_HOME     ${HOME_DIR}(全新库,seed 用户 Owner)`);
   console.log(`  技能目录        ${SKILLS_DIR}(scratch,空集起步;放技能见 features/skills-page.md)`);
   console.log(`  运行态          ${RUN_DIR}`);
-  console.log('next:node scripts/doctor.mjs 体检 → node scripts/drive.mjs <probe>');
+  console.log(`  supervisor     pid ${process.pid}: the stack lives exactly as long as this process and its parent chain`);
+  console.log('next:node scripts/doctor.mjs 体检 → node scripts/drive.mjs <probe>; stop with vp.mjs cleanup');
+
+  const ended = await Promise.race([
+    server.exited.then(() => 'server'),
+    web.exited.then(() => 'vite dev'),
+  ]);
+  if (stopping) return;
+  console.error(`${ended} exited; stopping the whole stack`);
+  await stopStack();
+  process.exit(1);
 }
 
 await main();
