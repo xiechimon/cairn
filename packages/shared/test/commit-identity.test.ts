@@ -381,4 +381,24 @@ describe('verified publish', () => {
     ).rejects.toThrow(/authored as xiechimon/);
     expect(r.remoteRefs.has(stagingRef)).toBe(false);
   });
+
+  test('a dropped connection on the first staging-ref delete still removes the ref', async () => {
+    const r = lane();
+    let drops = 1;
+    const api: PublishApi = async (method, path, body) => {
+      if (method === 'DELETE' && drops-- > 0) throw new TypeError('fetch failed');
+      return r.api(method, path, body);
+    };
+    const result = await publishVerifiedCommits({
+      git: r.git,
+      api,
+      tip: r.second,
+      exclude: ['--remotes'],
+      coAuthor: null,
+      expectedAuthor: bot,
+      stagingRef,
+    });
+    await result.release();
+    expect(r.remoteRefs.has(stagingRef)).toBe(false);
+  });
 });
