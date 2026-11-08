@@ -67,6 +67,15 @@ test('builders emit only keys from the maps and drop absent values', () => {
   expect(attributes[1]?.[GENAI_ATTR.providerName]).toBe('p');
 });
 
+test('chat spans carry cost on the key Langfuse reads, and an unpriced turn carries none', () => {
+  const priced = chatAttributes({ model: 'gpt-6.1-sol', costUsd: 0.47806 }, {});
+  expect(priced[GENAI_ATTR.usageCost]).toEqual({ double: 0.47806 });
+  expect(priced).not.toHaveProperty(CAIRN_ATTR.costUsd);
+  const unpriced = chatAttributes({ model: 'glm-5.3', usage: { input: 10 }, costUsd: 0 }, {});
+  expect(unpriced).not.toHaveProperty(GENAI_ATTR.usageCost);
+  expect(chatAttributes({ model: 'm' }, {})).not.toHaveProperty(GENAI_ATTR.usageCost);
+});
+
 test('no other source file spells a gen_ai.* key', () => {
   const src = resolve(import.meta.dirname, '../src');
   const offenders = readdirSync(src, { recursive: true, encoding: 'utf8' })

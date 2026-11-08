@@ -21,6 +21,7 @@ export const GENAI_ATTR = {
   usageOutputTokens: 'gen_ai.usage.output_tokens',
   usageCacheReadInputTokens: 'gen_ai.usage.cache_read.input_tokens',
   usageCacheCreationInputTokens: 'gen_ai.usage.cache_creation.input_tokens',
+  usageCost: 'gen_ai.usage.cost',
   toolName: 'gen_ai.tool.name',
   toolCallId: 'gen_ai.tool.call.id',
   toolCallArguments: 'gen_ai.tool.call.arguments',
@@ -295,7 +296,8 @@ export function chatAttributes(
     [GENAI_ATTR.usageCacheReadInputTokens]: usage?.cacheRead,
     [GENAI_ATTR.usageCacheCreationInputTokens]: usage?.cacheWrite,
     [CAIRN_ATTR.rawStopReason]: turn.rawFinishReason,
-    [CAIRN_ATTR.costUsd]: turn.costUsd === undefined ? null : { double: turn.costUsd },
+    [GENAI_ATTR.usageCost]:
+      turn.costUsd === undefined || turn.costUsd <= 0 ? null : { double: turn.costUsd },
   });
 }
 
