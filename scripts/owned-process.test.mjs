@@ -5,19 +5,11 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { ownerChain, processInfo, spawnOwned } from './owned-process.mjs';
+import { ownedScopeAvailable, ownerChain, processInfo, spawnOwned } from './owned-process.mjs';
 import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const CLI = join(import.meta.dirname, 'owned-process.mjs');
-const scopeAvailable =
-  process.platform === 'linux' &&
-  spawnSync(
-    'systemd-run',
-    ['--user', '--scope', '--quiet', '--collect', '--expand-environment=no', 'true'],
-    {
-      stdio: 'ignore',
-    },
-  ).status === 0;
+const scopeAvailable = ownedScopeAvailable();
 const modes = scopeAvailable ? ['scope', 'group'] : ['group'];
 
 function token() {
@@ -175,14 +167,18 @@ test('scope mode runs the command inside its own transient scope with a runtime 
   assert.ok(await waitFor(() => pidsRunning(marker).length === 0), 'child reaped');
 });
 
-test('scope mode ends the child at the runtime ceiling', { skip: !scopeAvailable }, async () => {
-  const marker = token();
-  const result = spawnSync('node', [CLI, '--max-runtime-sec', '1', '--', 'sleep', marker], {
-    stdio: 'ignore',
+for (const mode of modes) {
+  test(`${mode}: the child ends at the runtime ceiling`, () => {
+    const marker = token();
+    const result = spawnSync('node', [CLI, '--max-runtime-sec', '1', '--', 'sleep', marker], {
+      env: modeEnv(mode),
+      stdio: 'ignore',
+      timeout: 30_000,
+    });
+    assert.notEqual(result.status, 0);
+    assert.equal(pidsRunning(marker).length, 0);
   });
-  assert.notEqual(result.status, 0);
-  assert.equal(pidsRunning(marker).length, 0);
-});
+}
 
 test('the parent owner chain is every ancestor up to the subreaper', () => {
   const table = {

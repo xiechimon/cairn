@@ -74,6 +74,10 @@ function insideOwnedScope() {
 }
 
 let scopeProbe;
+export function ownedScopeAvailable() {
+  return systemdRun() !== undefined;
+}
+
 function systemdRun() {
   if (process.platform !== 'linux' || process.env[MODE_ENV] === 'group' || insideOwnedScope())
     return undefined;
@@ -250,7 +254,11 @@ export function spawnOwned(
   const target = { id, unit, pgid: child.pid, graceMs };
   const sentinel = spawn(
     process.execPath,
-    [OWNED_PROCESS_CLI, '--sentinel', JSON.stringify({ target, chain })],
+    [
+      OWNED_PROCESS_CLI,
+      '--sentinel',
+      JSON.stringify({ target, chain, deadline: Date.now() + maxRuntimeSec * 1000 }),
+    ],
     {
       stdio: ['pipe', 'ignore', 'ignore'],
       detached: true,
@@ -364,14 +372,18 @@ function parseCli(argv) {
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   if (process.argv[2] === '--sentinel') {
-    const { target, chain } = JSON.parse(process.argv[3]);
+    const { target, chain, deadline } = JSON.parse(process.argv[3]);
     let helperGone = false;
     process.stdin.on('end', () => {
       helperGone = true;
     });
     process.stdin.resume();
     for (const signal of FORWARDED_SIGNALS) process.on(signal, () => {});
-    while (!helperGone && chain.every(({ pid, start }) => processInfo(pid)?.start === start))
+    while (
+      !helperGone &&
+      Date.now() < deadline &&
+      chain.every(({ pid, start }) => processInfo(pid)?.start === start)
+    )
       await sleep(POLL_MS);
     await killTarget(target);
     process.exit(0);
