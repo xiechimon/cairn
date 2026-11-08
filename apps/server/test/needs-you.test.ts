@@ -263,6 +263,64 @@ describe('needs you (#1800)', () => {
     },
   );
 
+  test.each(['restart', 'continuation'] as const)(
+    'a human %s waits for claimed siblings before reusing a parked build',
+    async (action) => {
+      const w = openWorld();
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'old-claimed-sibling',
+          buildId: w.buildId,
+          kind: 'session',
+          status: 'claimed',
+          createdAt: nowMs(),
+        })
+        .run();
+      w.s.db
+        .update(stepTable)
+        .set({ checkpointCommit: 'a'.repeat(40) })
+        .where(eq(stepTable.id, w.stepId))
+        .run();
+      const first = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+      applyStepFailure(w.deps, first, 'model_not_found: glm-5.3');
+      const retry = () =>
+        action === 'restart'
+          ? applyBuildStepAction(
+              w.deps,
+              w.buildId,
+              { action: 'restart', feedback: 'Routing repaired', clientMessageId: 'person-retry' },
+              'Owner',
+              'person',
+            )
+          : sendBuildSteer(
+              w.deps,
+              w.buildId,
+              { content: 'Routing repaired', clientMessageId: 'person-continue' },
+              { human: true, afterTurn: true },
+            );
+      await expect(retry()).rejects.toThrow(/active steps/i);
+      expect(phaseOf(w)).toBe('failed');
+      expect(
+        w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all(),
+      ).toHaveLength(2);
+      const sibling = w.s.db
+        .select()
+        .from(stepTable)
+        .where(eq(stepTable.id, 'old-claimed-sibling'))
+        .get()!;
+      applyStepFailure(w.deps, sibling, 'connection reset');
+      await retry();
+      expect(phaseOf(w)).toBe('queued');
+      expect(
+        w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all(),
+      ).toHaveLength(3);
+      expect(
+        w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
+      ).toBeNull();
+    },
+  );
+
   test('an automatic same-build enqueue cannot bypass model parking', () => {
     const w = openWorld();
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;

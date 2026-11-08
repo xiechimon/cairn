@@ -309,6 +309,7 @@ export async function sendBuildSteer(
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
   if ((continuationOptions.human ?? deps.steerOptions?.human) !== true)
     assertAutomaticRetryAllowed(deps, buildRow.todoId);
+  else assertParkedBuildIdle(deps, buildRow);
   const running = db
     .select()
     .from(step)
@@ -1414,6 +1415,7 @@ export async function applyBuildStepAction(
   if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
   if (origin === 'automatic') assertAutomaticRetryAllowed(deps, row.todoId);
+  else assertParkedBuildIdle(deps, row);
 
   if (body.action === 'restart') {
     if (todoRecord.phase !== 'failed') {
@@ -1883,6 +1885,14 @@ function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
 
 export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
   return mergingBuilds.has(buildId) || stepKindInFlight(deps, buildId) !== null;
+}
+
+function assertParkedBuildIdle(deps: BuildDeps, row: BuildRow): void {
+  if (retryIsParked(row.errorMessage ?? '') && hasActiveStep(deps, row.id))
+    throw new HttpError(
+      409,
+      `${row.errorMessage} Wait for active steps to finish before retrying.`,
+    );
 }
 
 export function lastPushedCheckpoint(
