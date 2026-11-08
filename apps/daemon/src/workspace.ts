@@ -12,6 +12,7 @@ import {
   type BoundGitCredentials,
   BRIEF_MARKER_BEGIN,
   BRIEF_RECONCILE_FILENAMES,
+  type CommitIdentity,
   conversationBranch,
   type GitCredentialSource,
   LOCAL_ERROR_REASON_COPY,
@@ -19,6 +20,7 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
+  type PushPublication,
   READONLY_EXPORT_MARKER,
   ReadOnlyWorkspaceError,
   RemoteBranchDivergedError,
@@ -34,6 +36,7 @@ import {
   withGitNetRetries,
 } from './git.js';
 import type { DaemonLogger } from './log.js';
+import { publishStepCommits } from './step-attribution.js';
 import {
   runWorkspaceHook,
   WorkspaceHookError,
@@ -334,7 +337,7 @@ export class WorkspaceManager implements WorktreeOps {
     }
   }
 
-  async commitAll(cwd: string, message: string, identity: { name: string; email: string }) {
+  async commitAll(cwd: string, message: string, identity: CommitIdentity) {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
     await gitPrim.addAll(cwd);
     const leaked = await gitPrim.stagedPathsContaining(cwd, BRIEF_MARKER_BEGIN, [
@@ -355,15 +358,30 @@ export class WorkspaceManager implements WorktreeOps {
     ]);
   }
 
-  async push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void> {
+  async push(
+    cwd: string,
+    branch: string,
+    credentials: BoundGitCredentials | null,
+    publication: PushPublication,
+  ): Promise<void> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
-    await withGitNetRetries(() =>
-      gitPrim.push(cwd, branch, credentials, (local, remote) =>
-        this.logger.workspace(
-          `push of ${branch} already contained in origin/${branch} (local ${local.slice(0, 7)}, remote ${remote.slice(0, 7)}); nothing to push`,
+    const published = await publishStepCommits({
+      ...publication,
+      dir: cwd,
+      branch,
+      credential: credentials,
+    });
+    try {
+      await withGitNetRetries(() =>
+        gitPrim.push(cwd, branch, credentials, (local, remote) =>
+          this.logger.workspace(
+            `push of ${branch} already contained in origin/${branch} (local ${local.slice(0, 7)}, remote ${remote.slice(0, 7)}); nothing to push`,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      await published.release();
+    }
   }
 
   async mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }> {

@@ -330,6 +330,7 @@ export const machineToolResponseSchema = z.union([
 ]);
 
 export const machineTokenResponseSchema = z.object({
+  commitIdentity: z.object({ name: z.string(), email: z.string() }).nullable().optional(),
   coAuthor: z
     .object({ name: z.string(), email: z.string(), login: z.string() })
     .nullable()

@@ -21,6 +21,8 @@ import { WorkspaceManager } from '../src/workspace.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
 import { testTempDir } from './test-temp-dir.js';
 
+const NO_PUBLICATION = { base: null, identity: null, coAuthor: null, github: null };
+
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 
 function fakeLogger(): DaemonLogger & { lines: string[] } {
@@ -99,7 +101,7 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     await expect(ws.commitAll(prepared.cwd, 'report', IDENTITY)).rejects.toThrow(
       'readonly workspace rejects git writes',
     );
-    await expect(ws.push(prepared.cwd, prepared.branch, null)).rejects.toThrow(
+    await expect(ws.push(prepared.cwd, prepared.branch, null, NO_PUBLICATION)).rejects.toThrow(
       'readonly workspace rejects git writes',
     );
   }, 30_000);
@@ -173,7 +175,7 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     const first = await ws.commitAll(prepared.cwd, 'build: probe', IDENTITY);
     expect(first.committed).toBe(true);
     expect(first.head).toMatch(/^[0-9a-f]{40}$/);
-    await ws.push(prepared.cwd, prepared.branch, null);
+    await ws.push(prepared.cwd, prepared.branch, null, NO_PUBLICATION);
     const remoteRef = await runGit(['rev-parse', '--verify', `refs/heads/${prepared.branch}`], {
       cwd: originDir,
     });
@@ -506,7 +508,7 @@ test.each([null, 'nope'])(
 
 test('a remote conversation branch can resume when origin HEAD fallback names a missing base', async () => {
   const first = await ws.prepare(prepareInput(CONV_A));
-  await ws.push(first.cwd, first.branch, null);
+  await ws.push(first.cwd, first.branch, null, NO_PUBLICATION);
   rmSync(first.cwd, { recursive: true, force: true });
   const spy = vi.spyOn(gitPrim, 'remoteDefaultBranch').mockResolvedValue('nope');
   try {

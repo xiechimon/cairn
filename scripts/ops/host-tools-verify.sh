@@ -22,6 +22,7 @@ dest_of() {
     scripts/ops/host/lanes/*) echo "$LANES_ROOT/${1#scripts/ops/host/lanes/}" ;;
     scripts/ops/host/bin/*) echo "$BIN_ROOT/${1#scripts/ops/host/bin/}" ;;
     scripts/ops/host/units/*) echo "$UNITS_ROOT/${1#scripts/ops/host/units/}" ;;
+    packages/shared/src/commit-identity.ts | packages/shared/commit-identity.json) echo "$TOOLS_ROOT/app-token/${1##*/}" ;;
   esac
 }
 
@@ -35,7 +36,7 @@ elif [ $# -gt 0 ]; then
 fi
 
 sha="$(git -C "$CHECKOUT" rev-parse --short "$REF")" || { echo "cannot resolve $REF in $CHECKOUT" >&2; exit 2; }
-rels="$(git -C "$CHECKOUT" ls-tree -r --name-only "$REF" -- scripts/ops/host/tools scripts/ops/host/lanes scripts/ops/host/bin scripts/ops/host/units)"
+rels="$(git -C "$CHECKOUT" ls-tree -r --name-only "$REF" -- scripts/ops/host/tools scripts/ops/host/lanes scripts/ops/host/bin scripts/ops/host/units packages/shared/src/commit-identity.ts packages/shared/commit-identity.json)"
 bad=0
 managed="$(mktemp)"
 trap 'rm -f "$managed"' EXIT
