@@ -1,19 +1,12 @@
-import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  type GitIdentity,
-  localCommitIdentity,
-  type PublishApi,
-  publishVerifiedCommits,
-} from '@cairn/shared';
+import { type GitIdentity, localCommitIdentity } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { autonomousMergeAdmission, build, project, team, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
 import { type FetchLike, githubPull, isFullSha } from '../lib/github.js';
-import { githubApiBaseUrl } from '../lib/github-api-base.js';
-import { type AutonomousToken, githubTokenFetch, isAppToken } from '../lib/github-token.js';
+import { type AutonomousToken, isAppToken } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
@@ -24,11 +17,9 @@ export async function prepareRecoveryBranch(input: {
   base: string;
   reverted: string;
   token: AutonomousToken;
-  identity: GitIdentity | null;
-  api: PublishApi;
+  identity: GitIdentity;
 }): Promise<string> {
-  const { url, base, reverted, token } = input;
-  const identity = input.identity ?? localCommitIdentity('Cairn');
+  const { url, base, reverted, token, identity } = input;
   if (!isFullSha(base) || !isFullSha(reverted)) throw new Error('Recovery requires full SHAs');
   const dir = await mkdtemp(join(tmpdir(), 'cairn-recovery-'));
   const branch = `cairn-recovery/${reverted.slice(0, 8)}`;
@@ -63,57 +54,18 @@ export async function prepareRecoveryBranch(input: {
       '-m',
       `Revert autonomous merge ${reverted.slice(0, 8)}\n\nThis reverts commit ${reverted}.`,
     );
-    const published =
-      input.identity === null
-        ? { tip: local, release: async () => {} }
-        : await publishVerifiedCommits({
-            git: (args) => git(...args),
-            api: input.api,
-            tip: local,
-            exclude: [base],
-            coAuthor: null,
-            expectedAuthor: input.identity,
-            stagingRef: `refs/cairn/publish/recovery-${reverted.slice(0, 12)}-${randomBytes(6).toString('hex')}`,
-          });
-    try {
-      await git('push', 'origin', `${published.tip}:refs/heads/${branch}`);
-    } finally {
-      await published.release();
-    }
+    await git('push', 'origin', `${local}:refs/heads/${branch}`);
     return branch;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
 }
 
-async function recoveryIdentity(
-  deps: BuildDeps,
-  token: AutonomousToken,
-): Promise<GitIdentity | null> {
-  if (!isAppToken(token)) return null;
+async function recoveryIdentity(deps: BuildDeps, token: AutonomousToken): Promise<GitIdentity> {
+  if (!isAppToken(token)) return localCommitIdentity('Cairn');
   const identity = await softwareCommitIdentity(deps);
   if (identity === null) throw new Error('Recovery App identity unavailable');
   return identity;
-}
-
-function recoveryApi(fetchImpl: FetchLike, token: AutonomousToken, repo: string): PublishApi {
-  return async (method, path, body) => {
-    const response = await githubTokenFetch(fetchImpl, token)(
-      `${githubApiBaseUrl()}/repos/${repo}${path}`,
-      {
-        method,
-        headers: {
-          authorization: `Bearer ${token}`,
-          accept: 'application/vnd.github+json',
-          'content-type': 'application/json',
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
-    if (!response.ok) throw new Error(`Recovery GitHub ${method} ${path} failed`);
-    return response.status === 204 ? null : response.json();
-  };
 }
 
 export async function recentRecoveryTarget(
@@ -262,7 +214,6 @@ export async function recoverRedAutonomousMain(
         reverted,
         token,
         identity: await recoveryIdentity(deps, token),
-        api: recoveryApi(fetchImpl, token, repo),
       });
     else if (!ref.ok) continue;
     const opened = await brakeRequest(fetchImpl, token, repo, 'pulls', {

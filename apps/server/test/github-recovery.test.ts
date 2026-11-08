@@ -35,98 +35,23 @@ test('recovery publishes one exact revert commit on a named branch and preserves
       name: 'cairnwright[bot]',
       email: '347615582+cairnwright[bot]@users.noreply.github.com',
     };
-    const interrupted = git('commit-tree', `${base}^{tree}`, '-p', base, '-m', 'interrupted');
-    git('update-ref', `refs/cairn/publish/recovery-${bad.slice(0, 12)}`, interrupted);
-    const calls: string[] = [];
     const branch = await prepareRecoveryBranch({
       url: dir,
       base,
       reverted: bad,
       token: 'token' as AutonomousToken,
       identity: bot,
-      api: async (method, path, body) => {
-        calls.push(`${method} ${path}`);
-        const input = body as { tree: string; parents: string[]; message: string } | undefined;
-        if (method === 'POST' && input) {
-          const sha = execFileSync(
-            'git',
-            [
-              'commit-tree',
-              input.tree,
-              ...input.parents.flatMap((p) => ['-p', p]),
-              '-m',
-              input.message,
-            ],
-            {
-              cwd: dir,
-              encoding: 'utf8',
-              env: {
-                ...process.env,
-                GIT_AUTHOR_NAME: bot.name,
-                GIT_AUTHOR_EMAIL: bot.email,
-                GIT_COMMITTER_NAME: 'GitHub',
-                GIT_COMMITTER_EMAIL: 'noreply@github.com',
-              },
-            },
-          ).trim();
-          return { sha, author: bot, verification: { verified: true } };
-        }
-        const ref = path.replace('/git/', '');
-        if (method === 'PATCH') git('update-ref', ref, (body as { sha: string }).sha);
-        if (method === 'DELETE') git('update-ref', '-d', ref);
-        return null;
-      },
     });
     expect(branch).toBe(`cairn-recovery/${bad.slice(0, 8)}`);
     expect(git('show', '-s', '--format=%an <%ae>|%cn <%ce>', branch)).toBe(
-      `${bot.name} <${bot.email}>|GitHub <noreply@github.com>`,
+      `${bot.name} <${bot.email}>|${bot.name} <${bot.email}>`,
     );
-    expect(calls.filter((c) => c.startsWith('POST'))).toEqual(['POST /git/commits']);
-    expect(git('for-each-ref', '--format=%(refname)', 'refs/cairn')).toBe(
-      `refs/cairn/publish/recovery-${bad.slice(0, 12)}`,
-    );
+    expect(git('for-each-ref', 'refs/cairn')).toBe('');
     expect(git('show', `${branch}:file`)).toBe('good');
     expect(git('show', `${branch}:later`)).toBe('keep');
     expect(git('rev-list', '--count', `${base}..${branch}`)).toBe('1');
     expect(git('show', '-s', '--format=%B', branch)).toContain(`This reverts commit ${bad}`);
     expect(git('rev-parse', 'main')).toBe(base);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('recovery with only a user token never publishes the revert as that user', async () => {
-  const dir = makeTestTempDir('server-recovery-user-');
-  try {
-    const git = (...args: string[]) =>
-      execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim();
-    git('init', '-b', 'main');
-    git('config', 'user.name', 'Test');
-    git('config', 'user.email', 'test@example.com');
-    writeFileSync(join(dir, 'file'), 'good\n');
-    git('add', 'file');
-    git('commit', '-m', 'green');
-    writeFileSync(join(dir, 'file'), 'bad\n');
-    git('add', 'file');
-    git('commit', '-m', 'bad');
-    const bad = git('rev-parse', 'HEAD');
-    const calls: string[] = [];
-    const branch = await prepareRecoveryBranch({
-      url: dir,
-      base: bad,
-      reverted: bad,
-      token: 'token' as AutonomousToken,
-      identity: null,
-      api: async (method, path) => {
-        calls.push(`${method} ${path}`);
-        return null;
-      },
-    });
-    expect(calls).toEqual([]);
-    expect(git('show', '-s', '--format=%an <%ae>|%cn <%ce>', branch)).toBe(
-      'Cairn <cairn@localhost>|Cairn <cairn@localhost>',
-    );
-    expect(git('show', `${branch}:file`)).toBe('good');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

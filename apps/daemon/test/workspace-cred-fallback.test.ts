@@ -7,7 +7,7 @@ import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
-const NO_PUBLICATION = { base: null, identity: null, coAuthor: null, github: null };
+const NO_PUBLICATION = { base: null, identity: null, coAuthor: null };
 
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 const TOKEN: BoundGitCredentials = {

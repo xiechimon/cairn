@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
@@ -59,18 +58,7 @@ function repo(t) {
   return { cwd, git, ok, base };
 }
 
-async function verificationServer(t, verified) {
-  const server = createServer((req, res) => {
-    const sha = req.url.split('/').at(-1);
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ commit: { verification: { verified: verified.has(sha) } } }));
-  });
-  await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  t.after(() => server.close());
-  return `http://127.0.0.1:${server.address().port}`;
-}
-
-function runCi(r, api) {
+function runCi(r, headRepo = 'xiechimon/cairn') {
   return new Promise((done) => {
     const child = spawn(process.execPath, [script, 'ci'], {
       cwd: r.cwd,
@@ -78,7 +66,7 @@ function runCi(r, api) {
         ...cleanEnv,
         BASE_SHA: r.base,
         GITHUB_REPOSITORY: 'xiechimon/cairn',
-        GITHUB_API_URL: api,
+        HEAD_REPO: headRepo,
       },
     });
     let stdout = '';
@@ -93,25 +81,38 @@ function runCi(r, api) {
 }
 
 const ciCases = [
-  ['source 1 as the host pushes it today: bot author, git push, unverified', bot, bot, false, 1],
-  ['source 2: the retired Cairnwright user', retiredUser, bot, false, 1],
-  ['source 2 after a rebase merge by ian', retiredUser, { ...owner, name: 'Xmon Dai' }, false, 1],
-  ['source 4: the synthetic cairn.local step identity', session, session, false, 1],
-  ['baeb30d98 (#3486): a cairn task commit the App made through the GitHub API', bot, web, true, 0],
-  ['a bot-shaped commit GitHub did not sign', bot, web, false, 1],
   [
-    'the bot name on a forged email, signed by GitHub',
-    { ...bot, email: 'bot@evil.test' },
+    'baeb30d98 (#3486): a cairn task commit the App made through the GitHub API',
+    bot,
     web,
-    true,
+    'xiechimon/cairn',
+    0,
+  ],
+  ['a cairn task commit the App made with git', bot, bot, 'xiechimon/cairn', 0],
+  ['ian committing by hand', owner, owner, 'xiechimon/cairn', 0],
+  ['the App identity forged in a fork', bot, bot, 'stranger/cairn', 1],
+  ['the owner identity forged in a fork', owner, owner, 'stranger/cairn', 1],
+  ['source 2: the retired Cairnwright user', retiredUser, bot, 'xiechimon/cairn', 1],
+  [
+    'source 2 after a rebase merge by ian',
+    retiredUser,
+    { ...owner, name: 'Xmon Dai' },
+    'xiechimon/cairn',
     1,
   ],
-  ['the bot email under a human name', { ...bot, name: 'xiechimon' }, web, true, 1],
-  ['the owner name on a stranger email', { ...owner, email: 'xiechimon@evil.test' }, web, true, 1],
-  ['ian committing by hand', owner, owner, false, 0],
+  ['source 4: the synthetic cairn.local step identity', session, session, 'xiechimon/cairn', 1],
+  ['the bot name on a forged email', { ...bot, email: 'bot@evil.test' }, web, 'xiechimon/cairn', 1],
+  ['the bot email under a human name', { ...bot, name: 'xiechimon' }, web, 'xiechimon/cairn', 1],
+  [
+    'the owner name on a stranger email',
+    { ...owner, email: 'xiechimon@evil.test' },
+    web,
+    'xiechimon/cairn',
+    1,
+  ],
 ];
 
-for (const [name, author, committer, verified, expected] of ciCases) {
+for (const [name, author, committer, headRepo, expected] of ciCases) {
   test(`commit-author CI: ${name} exits ${expected}`, async (t) => {
     const r = repo(t);
     r.ok(['switch', '-q', '-c', 'cairn/conv-01a1bc77-10b5-7dec-b021-4fe865bf6370']);
@@ -128,9 +129,7 @@ for (const [name, author, committer, verified, expected] of ciCases) {
       author,
       committer,
     );
-    const sha = r.ok(['rev-parse', 'HEAD']);
-    const api = await verificationServer(t, new Set(verified ? [sha] : []));
-    const result = await runCi(r, api);
+    const result = await runCi(r, headRepo);
     assert.equal(result.status, expected, result.stdout);
     if (expected === 1) assert.match(result.stdout, /::error::/);
   });
@@ -140,7 +139,7 @@ test('commit-author CI: one bad commit under a good tip still fails', async (t) 
   const r = repo(t);
   r.ok(['commit', '-q', '--allow-empty', '-m', 'session'], session);
   r.ok(['commit', '-q', '--allow-empty', '-m', 'ian'], owner);
-  const result = await runCi(r, await verificationServer(t, new Set()));
+  const result = await runCi(r);
   assert.equal(result.status, 1, result.stdout);
   assert.match(result.stdout, /cairn\.local/);
 });
@@ -179,7 +178,7 @@ for (const identity of [retiredUser, session])
     assert.equal(r.git(['commit', '-q', '--allow-empty', '-m', 'x'], identity).status, 1);
   });
 
-test('pre-push: an agent pushing a bot commit made with plain git is told to publish through the API', (t) => {
+test('pre-push: an agent pushing a commit it made as ian is told to commit as the App', (t) => {
   const r = repo(t);
   const remote = makeTestTempDir('commit-identity-remote-');
   t.after(() => releaseTestTempDir(remote));
@@ -187,21 +186,25 @@ test('pre-push: an agent pushing a bot commit made with plain git is told to pub
   r.ok(['remote', 'add', 'origin', remote]);
   r.ok(['push', '-q', 'origin', 'main']);
   installHook(r, 'pre-push');
-  r.ok(['commit', '-q', '--allow-empty', '-m', 'local bot'], bot);
+  r.ok(['commit', '-q', '--allow-empty', '-m', 'as ian'], owner);
   const pushed = r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], bot, bot, agentEnv);
   assert.equal(pushed.status, 1);
-  assert.match(pushed.stderr, /as-bot\.sh git push/);
+  assert.match(pushed.stderr, /as-bot\.sh git commit/);
   r.ok(['reset', '-q', '--hard', 'HEAD~1']);
-  r.ok(['commit', '-q', '--allow-empty', '-m', 'api made'], bot, web);
+  r.ok(['commit', '-q', '--allow-empty', '-m', 'as the App'], bot);
   assert.equal(
     r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], bot, bot, agentEnv).status,
     0,
   );
 });
 
-test('the workflow runs the shared check with a GitHub token and Node that runs TypeScript', () => {
+test('the workflow runs the shared check without any token, on the PR head repository', () => {
   assert.match(workflow, /run: node scripts\/commit-identity\.mjs ci/);
-  assert.match(workflow, /GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(
+    workflow,
+    /HEAD_REPO: \$\{\{ github\.event\.pull_request\.head\.repo\.full_name \}\}/,
+  );
+  assert.doesNotMatch(workflow, /GITHUB_TOKEN/);
   assert.match(workflow, /actions\/setup-node@[0-9a-f]{40} # v/);
   assert.match(workflow, /node-version: 24/);
   assert.match(workflow, /persist-credentials: false/);

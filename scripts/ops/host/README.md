@@ -16,8 +16,8 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 |---|---|---|
 | `tools/backup/db-backup.sh` | `cairn-db-backup.service` | Wraps `scripts/ops/backup-server-db.sh`, syncs attachments, pushes both to the rsync remote |
 | `tools/eval-env.sh` | sourced by `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression`, `cairn-review-eval` | Exports the eval relay URL and key without printing them |
-| `tools/app-token/as-bot.sh` | every bot caller below, and agent sessions | Runs one `gh` or `git` command with a 1h App installation token in that process only, after `as-bot-policy.mjs` approves it (see below). Git runs as `cairnwright[bot]` for author and committer, through `bot-git.mjs` |
-| `tools/app-token/bot-git.mjs` | `as-bot.sh` | `git push` and `git sign <base>` replay every commit the GitHub API did not make through `POST /git/commits`, so each lands authored by the App, committed by GitHub and Verified, with `CAIRN_COAUTHOR` appended; other git commands pass through. It imports `commit-identity.ts` and `commit-identity.json`, which deploy installs from `packages/shared/` |
+| `tools/app-token/as-bot.sh` | every bot caller below, and agent sessions | Runs one `gh` or `git` command with a 1h App installation token in that process only, after `as-bot-policy.mjs` approves it (see below). Git runs as `cairnwright[bot]` for author and committer, and `git commit` adds the `CAIRN_COAUTHOR` trailer |
+| `tools/app-token/bot-identity.mjs` | `as-bot.sh`, `lanes/sign-commits.sh` | Prints the bot name, its noreply email and the owner co-author trailer from `commit-identity.json`, which deploy installs from `packages/shared/` |
 | `tools/app-token/token.mjs` | `as-bot.sh` | Mints the installation token from `~/.cairn/cairn-bot.json`; holds no secret and reads the key from the path in that file |
 | `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Leaves a queue-route PR to Mergify; squash-merges an owner-route PR with the human login, pinned to the head whose `review-gate` check passed |
 | `tools/rearm-automerge.sh` | called by `overnight/driver.sh` | Disarms and re-arms auto-merge on bot PRs whose merge state changed |
@@ -45,7 +45,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/weekly/{eval-weekly,learn-eval,memory-regression}.sh`, `baseline-record.mts` | `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression` | Weekly evals; `eval-weekly.sh` here is the older host copy of `scripts/ops/eval-weekly.sh` |
 | `lanes/dispatch-issue.sh` | called by the governor, `main-watch` and `merge-order` scripts | Starts a lane worker for an issue after the gates below |
 | `lanes/{build-prompt,run-worker,test-build-prompt}.sh` | `dispatch-issue.sh` | Render the worker prompt, run the worker, test the prompt renderer |
-| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | Republish every lane commit through the API (`as-bot.sh git sign`), rebase, push and regenerate migrations for a lane branch |
+| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | Rewrite every lane commit since main to `cairnwright[bot]` with the co-author trailer, rebase, push and regenerate migrations for a lane branch |
 | `lanes/{deploy-omarchy,wait-rr}.sh` | by hand | Deploy and wait helpers |
 
 ## Documented behavior covered by tests
@@ -60,7 +60,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 
 **The host still runs its own `as-bot.sh`, which has no allowlist.** The repo copy adds `tools/app-token/as-bot-policy.mjs`; `as-bot.sh` runs it before minting a token and exits 126 with `as-bot: refused: <reason>` on a denied command, so a refused command never gets a token. A later deploy must copy `as-bot.sh`, `as-bot-policy.mjs` and `token.mjs` together. `scripts/ops/secret-reach/broker.mjs` (#2189) scopes the token's permissions and has no command allowlist, so nothing there was reusable; the two layers stack.
 
-Allowed: `gh pr view|list|comment|create|close|update-branch`, `gh pr edit` with only `--add-label`/`--remove-label`, `gh pr merge <pr> --disable-auto` (nothing else; the bot never merges), `gh issue view|list|comment|create|edit|pin`, `gh api` reads with one endpoint and only `--method GET`, `--paginate`, `--jq`, `--template`, `--include`, `--silent`, `--slurp`, `--cache` (fields only with an explicit GET), `git fetch origin` with `-q`, `-f`/`--force`, `--prune`, `--no-tags`, `git commit`, `git sign <full base SHA>`, `git rebase <upstream>` with `-q` and `-X theirs|ours`, or `git rebase --continue|--abort|--skip`, `git -C <dir> ...`, and `git push origin <src>:<branch>` where the branch is not `main`/`master`, optionally with `--force-with-lease`, `--no-verify`, `-u`, `-q`.
+Allowed: `gh pr view|list|comment|create|close|update-branch`, `gh pr edit` with only `--add-label`/`--remove-label`, `gh pr merge <pr> --disable-auto` (nothing else; the bot never merges), `gh issue view|list|comment|create|edit|pin`, `gh api` reads with one endpoint and only `--method GET`, `--paginate`, `--jq`, `--template`, `--include`, `--silent`, `--slurp`, `--cache` (fields only with an explicit GET), `git fetch origin` with `-q`, `-f`/`--force`, `--prune`, `--no-tags`, `git commit`, `git rebase <upstream>` with `-q` and `-X theirs|ours`, or `git rebase --continue|--abort|--skip`, `git -C <dir> ...`, and `git push origin <src>:<branch>` where the branch is not `main`/`master`, optionally with `--force-with-lease`, `--no-verify`, `-u`, `-q`.
 
 Deploy-lag recovery also permits `gh issue close <positive number> -R xiechimon/cairn -c "Caught up: omarchy runs <40 lowercase hex SHA>."`, with `--repo` and `--comment` as equivalent separate flags. No global or duplicate repository flags, URL/zero issue IDs, other messages or extra flags are accepted. `deploy-watch.sh` identifies the issue through the bot author and lag title; failure to close it fails the recovery tick.
 
@@ -80,7 +80,6 @@ Measured with `grep -rn as-bot` over `~/.cairn/tools`, `~/lanes/*.sh` and `~/.co
 | `lanes/finish-branch.sh` | `git push -q --no-verify --force-with-lease origin HEAD:<branch>` | allowed |
 | `lanes/rebase-main.sh` | `git rebase -q origin/main`, `git rebase --continue` | allowed |
 | `lanes/regen-migration.sh` | `git rebase -q -X theirs origin/main`, `git commit -qm ... --no-verify` (both commits) | allowed |
-| `lanes/sign-commits.sh` | `git sign <merge-base SHA>` | allowed |
 | `tools/governor/split-issue.sh` | `gh issue create`, `gh issue comment` | allowed |
 | `tools/governor/block-governor.sh` | `gh issue comment`, `gh pr close` | allowed |
 | `tools/plan/plan-issues.sh` | `gh issue edit --body-file -` | allowed |

@@ -56,7 +56,7 @@ The review verdict lands as a **PR comment** (`gh pr comment`; write long conten
 
 ## Merge method and commit identity
 
-Every PR merges by squash, whoever opened it. A squash commit is authored by the PR opener, so an App-opened PR lands on main as `cairnwright[bot]` and an ian-opened PR as ian. Inside the PR, every commit is either `cairnwright[bot]` created through the GitHub API (committer `GitHub`, Verified) or ian's own commit; the `commit-author` check enforces this from `packages/shared/commit-identity.json`, and `docs/ops/agent-bot-identity.md` explains the identity.
+Every PR merges by squash, whoever opened it. A squash commit is authored by the PR opener, so an App-opened PR lands on main as `cairnwright[bot]` and an ian-opened PR as ian. Inside the PR, every commit on a branch of this repository is authored by `cairnwright[bot]` or by ian, and a fork PR carries neither identity; the `commit-author` check enforces this from `packages/shared/commit-identity.json`, and `docs/ops/agent-bot-identity.md` explains the identity.
 
 ## Mechanical checks are not the reviewer's job (do not be a CI parrot)
 

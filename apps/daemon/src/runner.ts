@@ -115,7 +115,6 @@ import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImages } from './step-attachments.js';
-import { stepGithubTarget } from './step-attribution.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
@@ -831,8 +830,6 @@ async function runClaimedStep(
   const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
   const stepIdentity: CommitIdentity =
     appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
-  const stepGithub =
-    repo?.kind === 'github' && repo.cloneUrl ? stepGithubTarget(repo.cloneUrl) : null;
   const withStepGit = async (
     operation: (credential: BoundGitCredentials | null) => Promise<void>,
   ) => {
@@ -1942,18 +1939,7 @@ async function runClaimedStep(
         base: headAtStart,
         identity: appIdentity,
         coAuthor: tokenRes.coAuthor ?? null,
-        github: stepGithub,
       });
-      if (stepGithub !== null && credential === null) {
-        logger.step('pushed without GitHub API commits: no step token for this push');
-        transcript.upsert({
-          id: `unverified-push-${stepId}`,
-          role: 'system',
-          content:
-            '本轮推送用的是机器凭据，没有步令牌，提交没有经 GitHub API 重建：它们不是 Verified，commit-author 检查会拦下这张 PR。',
-          createdAt: now(),
-        });
-      }
     });
   let headCommit: string | null = null;
   let branchDrift: { expected: string; actual: string } | null = null;

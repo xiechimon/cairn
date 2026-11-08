@@ -74,7 +74,6 @@ export interface PushPublication {
   base: string | null;
   identity: CommitIdentity | null;
   coAuthor: CommitIdentity | null;
-  github: { owner: string; repo: string; apiBase: string } | null;
 }
 
 export interface WorktreePrepareInput {
