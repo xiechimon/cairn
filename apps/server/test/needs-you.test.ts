@@ -360,6 +360,34 @@ describe('needs you (#1800)', () => {
     ).toContain('Task parked');
   });
 
+  test('concurrent human recoveries create one worker on a reused build', async () => {
+    const w = openWorld();
+    w.s.db
+      .update(stepTable)
+      .set({ checkpointCommit: 'a'.repeat(40) })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+    const first = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    applyStepFailure(w.deps, first, 'model_not_found: glm-5.3');
+    const outcomes = await Promise.allSettled(
+      ['one', 'two'].map((id) =>
+        applyBuildStepAction(
+          w.deps,
+          w.buildId,
+          { action: 'restart', feedback: 'Routing repaired', clientMessageId: `concurrent-${id}` },
+          'Owner',
+          'person',
+        ),
+      ),
+    );
+    expect(outcomes.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(
+      w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all(),
+    ).toHaveLength(2);
+    expect(phaseOf(w)).toBe('queued');
+  });
+
   test('an automatic same-build enqueue cannot bypass model parking', () => {
     const w = openWorld();
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;

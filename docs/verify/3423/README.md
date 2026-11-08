@@ -27,6 +27,7 @@ The runtime counts distinct failed builds, not failed steps, in `(now - 1 hour, 
 | PR pollers | Six regressions reproduced managed CI/review/conflict wakes, legacy collaborator feedback, a rejection during intake, and a deferred cap overwriting the reason | Both pollers recheck fresh parking state before mutation; the cap notice cannot replace it |
 | Claimed siblings | Seven regressions reproduced ordinary failure, quota fallback, successful completion and stopping erasing parking or advancing the task | A shared terminal-outcome barrier records the sibling step result without changing the parked build or todo |
 | Human recovery | Explicit restart or continuation could clear parking while an old sibling remained claimed; selecting an older PR build needed the same check | Recovery validates the actual fresh reuse target and waits for its active steps; the same request succeeds after drain |
+| Concurrent recovery | Two person restarts both crossed the PR lookup and created two workers | Phase, latest build and active target are revalidated in the same transaction as enqueue; only one request succeeds |
 | Watched todo re-orchestration | Failure enqueued 1 Coordinator step | 0 Coordinator steps, visible structured notice |
 | Rolling-hour breaker | Fourth failure retained only its ordinary error | Parked at 4, no automatic new build |
 | Legacy timestamps | Null completion timestamps escaped the count | Legacy failed builds count using creation time |
@@ -49,14 +50,14 @@ pnpm exec vitest run \
   packages/shared/test/task-failure.test.ts
 ```
 
-Result: 8 files, 175 tests passed. Additional PR-poller and queue regressions passed:
+Result: 8 files, 176 tests passed. Additional PR-poller and queue regressions passed:
 
 ```sh
 pnpm exec vitest run apps/server/test/pr-wakes.test.ts apps/server/test/loop-feedback.test.ts
 pnpm exec vitest run apps/server/test/composer-queue-stop.test.ts apps/server/test/chief-queue-steer-stop.test.ts apps/server/test/queued-cancel-release.test.ts
 ```
 
-Results: 95 and 60 passed respectively, for 330 related tests across 13 files. A final combined invocation of these same 13 files also passed all 330 tests.
+Results: 95 and 60 passed respectively, for 331 related tests across 13 files. A final combined invocation of these same 13 files also passed all 331 tests.
 
 | Command | Result |
 | --- | --- |

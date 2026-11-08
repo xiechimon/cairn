@@ -1437,126 +1437,147 @@ export async function applyBuildStepAction(
     const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
     const prClosed: 'merged' | 'closed' | null =
       reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
-    if (reworkTarget !== null && prClosed === null) {
-      const currentTarget = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
-      if (currentTarget) assertParkedBuildIdle(deps, currentTarget);
-      const now = nowMs();
-      const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
-      recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
-      if (feedbackText !== null) {
+    return deps.db.transaction(() => {
+      const current = getTodo(deps, row.todoId);
+      if (
+        !current ||
+        current.archivedAt !== null ||
+        current.phase !== 'failed' ||
+        current.latestBuildId !== row.id
+      )
+        throw new HttpError(
+          409,
+          'Task changed while restart was being prepared; retry from its current state.',
+        );
+      todoRecord = current;
+      if (origin === 'automatic') assertAutomaticRetryAllowed(deps, current.id);
+      if (reworkTarget !== null && prClosed === null) {
+        const currentTarget = deps.db
+          .select()
+          .from(build)
+          .where(eq(build.id, reworkTarget.id))
+          .get();
+        if (currentTarget) assertParkedBuildIdle(deps, currentTarget);
+        if (hasActiveStep(deps, reworkTarget.id))
+          throw new HttpError(409, 'Wait for active steps to finish before restarting this build.');
+        const now = nowMs();
+        const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
+        recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
+        if (feedbackText !== null) {
+          insertMessageRow(deps, reworkTarget.id, {
+            id: newRecordId(),
+            role: 'user',
+            content: feedbackText,
+            createdAt: now,
+          });
+        }
         insertMessageRow(deps, reworkTarget.id, {
+          id: newRecordId(),
+          role: 'system',
+          content: buildReworkReuseNote({
+            prNumber: reworkTarget.prNumber,
+            prUrl: reworkTarget.prUrl,
+            failureReason: reworkTarget.errorMessage,
+          }),
+          createdAt: now,
+        });
+        const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
+        const reuseKind = buildRunsSession(deps, reworkTarget.id)
+          ? 'session'
+          : reworkTarget.withPlan
+            ? 'plan'
+            : 'build';
+        enqueueStep(
+          deps,
+          reworkTarget.id,
+          reuseKind,
+          todoRecord.teamId,
+          withRetryLessons(
+            restartPrompt,
+            reuseKind === 'session' ? 'build' : reuseKind,
+            reuseLessons,
+          ),
+          true,
+          origin === 'person',
+        );
+        deps.db
+          .update(build)
+          .set({
+            errorMessage: null,
+            prevPhase: 'failed',
+          })
+          .where(eq(build.id, reworkTarget.id))
+          .run();
+        setTodoPhase(deps, todoRecord.id, 'queued', {
+          latestBuildId: reworkTarget.id,
+          lastRunAt: now,
+        });
+        const reusedRow = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
+        if (!reusedRow) throw new Error('build missing after update');
+        publishBuild(deps, reusedRow);
+        return;
+      }
+      const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
+      recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
+      const newId = newUuidv7();
+      const createdAt = nowMs();
+      deps.db
+        .insert(build)
+        .values({
+          id: newId,
+          todoId: todoRecord.id,
+          withPlan: false,
+          prevPhase: todoRecord.phase,
+          triggerSource: 'user',
+          planDocId: null,
+          errorMessage: null,
+          prUrl: null,
+          prNumber: null,
+          changes: null,
+          diffHash: null,
+          createdAt,
+        })
+        .run();
+      if (feedbackText !== null) {
+        insertMessageRow(deps, newId, {
           id: newRecordId(),
           role: 'user',
           content: feedbackText,
-          createdAt: now,
+          createdAt,
         });
       }
-      insertMessageRow(deps, reworkTarget.id, {
-        id: newRecordId(),
-        role: 'system',
-        content: buildReworkReuseNote({
-          prNumber: reworkTarget.prNumber,
-          prUrl: reworkTarget.prUrl,
-          failureReason: reworkTarget.errorMessage,
-        }),
-        createdAt: now,
-      });
+      if (prClosed !== null && reworkTarget !== null) {
+        insertMessageRow(deps, newId, {
+          id: newRecordId(),
+          role: 'system',
+          content: buildReworkNewBranchNote({
+            prNumber: reworkTarget.prNumber,
+            prUrl: reworkTarget.prUrl,
+            branch: conversationBranch(newId),
+            outcome: prClosed,
+          }),
+          createdAt,
+        });
+      }
       const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-      const reuseKind = buildRunsSession(deps, reworkTarget.id)
-        ? 'session'
-        : reworkTarget.withPlan
-          ? 'plan'
-          : 'build';
       enqueueStep(
         deps,
-        reworkTarget.id,
-        reuseKind,
+        newId,
+        'session',
         todoRecord.teamId,
-        withRetryLessons(
-          restartPrompt,
-          reuseKind === 'session' ? 'build' : reuseKind,
-          reuseLessons,
-        ),
-        true,
+        [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n'),
+        false,
         origin === 'person',
       );
-      deps.db
-        .update(build)
-        .set({
-          errorMessage: null,
-          prevPhase: 'failed',
-        })
-        .where(eq(build.id, reworkTarget.id))
-        .run();
       setTodoPhase(deps, todoRecord.id, 'queued', {
-        latestBuildId: reworkTarget.id,
-        lastRunAt: now,
+        latestBuildId: newId,
+        lastRunAt: createdAt,
       });
-      const reusedRow = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
-      if (!reusedRow) throw new Error('build missing after update');
-      publishBuild(deps, reusedRow);
+      const newRow = deps.db.select().from(build).where(eq(build.id, newId)).get();
+      if (!newRow) throw new Error('build missing after insert');
+      publishBuild(deps, newRow);
       return;
-    }
-    const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
-    recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
-    const newId = newUuidv7();
-    const createdAt = nowMs();
-    deps.db
-      .insert(build)
-      .values({
-        id: newId,
-        todoId: todoRecord.id,
-        withPlan: false,
-        prevPhase: todoRecord.phase,
-        triggerSource: 'user',
-        planDocId: null,
-        errorMessage: null,
-        prUrl: null,
-        prNumber: null,
-        changes: null,
-        diffHash: null,
-        createdAt,
-      })
-      .run();
-    if (feedbackText !== null) {
-      insertMessageRow(deps, newId, {
-        id: newRecordId(),
-        role: 'user',
-        content: feedbackText,
-        createdAt,
-      });
-    }
-    if (prClosed !== null && reworkTarget !== null) {
-      insertMessageRow(deps, newId, {
-        id: newRecordId(),
-        role: 'system',
-        content: buildReworkNewBranchNote({
-          prNumber: reworkTarget.prNumber,
-          prUrl: reworkTarget.prUrl,
-          branch: conversationBranch(newId),
-          outcome: prClosed,
-        }),
-        createdAt,
-      });
-    }
-    const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-    enqueueStep(
-      deps,
-      newId,
-      'session',
-      todoRecord.teamId,
-      [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n'),
-      false,
-      origin === 'person',
-    );
-    setTodoPhase(deps, todoRecord.id, 'queued', {
-      latestBuildId: newId,
-      lastRunAt: createdAt,
     });
-    const newRow = deps.db.select().from(build).where(eq(build.id, newId)).get();
-    if (!newRow) throw new Error('build missing after insert');
-    publishBuild(deps, newRow);
-    return;
   }
 
   if (body.action === 'confirm') {
