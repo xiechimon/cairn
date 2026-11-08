@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { project } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
+import { readFile } from '../src/services/git.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
 registerChiefHarness();
@@ -81,11 +82,12 @@ describe('Coordinator repository reads', () => {
       .set({ localPath: '/different-machine/repo' })
       .where(eq(project.id, H.projectId))
       .run();
-    const read = async () =>
+    const read = async (ref?: string) =>
       JSON.parse(
         await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
           projectId: H.projectId,
           paths: ['scripts/owned-process.mjs'],
+          ...(ref ? { ref } : {}),
         }),
       ) as Docs;
     expect((await read()).files[0]?.content).toBe('export const spawn = true;\n');
@@ -111,6 +113,8 @@ describe('Coordinator repository reads', () => {
       (await runGit(['fetch', dir, 'main:refs/remotes/origin/main'], { cwd: cache })).code,
     ).toBe(0);
     expect((await read()).files[0]?.content).toBe('updated upstream source\n');
+    expect((await read('main')).files[0]?.content).toBe('updated upstream source\n');
+    expect((await read('refs/heads/main')).files[0]?.content).toBe('updated upstream source\n');
     expect(
       (
         await runGit(['remote', 'set-url', 'origin', 'https://github.com/other/project.git'], {
@@ -147,6 +151,13 @@ describe('Coordinator repository reads', () => {
     expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toMatch(
       /repository.*unavailable/i,
     );
+  });
+
+  test('credential restrictions apply to Coordinator reads, not authenticated file browsing', async () => {
+    await bindRepo('local');
+    const file = await readFile({ db: H.s.db, reposDir: H.s.reposDir }, H.projectId, '.env');
+    expect(file.content).toBe('PRIVATE_FIXTURE=not-a-real-secret\n');
+    expect((await docs(['.env'])).files[0]?.error).toBe('credential file access denied');
   });
 
   test('refuses traversal and credential files without following repository symlinks', async () => {

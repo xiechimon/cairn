@@ -316,26 +316,15 @@ export async function readFile(
   refParam?: string,
 ): Promise<ProjectFileResponse> {
   if (!isSafeRepoPath(path)) throw new HttpError(400, `invalid query path: ${path}`);
-  const segments = path.toLowerCase().split(/[\\/]/);
-  if (
-    segments.some((segment) =>
-      /^(?:\.git|\.ssh|\.aws|\.gnupg|\.env(?:\..*)?|\.npmrc|\.pypirc|credentials(?:\.json)?|id_rsa|id_ed25519)$/.test(
-        segment,
-      ),
-    ) ||
-    /\.(?:pem|key|p12|pfx)$/i.test(path)
-  ) {
-    throw new HttpError(403, 'credential file access denied');
-  }
   const dir = await requireRepoReadDir(ctx, projectId);
   let ref = refParam ?? 'HEAD';
-  if (
-    refParam === undefined &&
-    ctx.workspacesDir !== undefined &&
-    dir === join(ctx.workspacesDir, projectId, 'repo')
-  ) {
+  if (ctx.workspacesDir !== undefined && dir === join(ctx.workspacesDir, projectId, 'repo')) {
     const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
-    if (row?.baseBranch != null) {
+    if (refParam !== undefined) {
+      const branch = refParam.replace(/^refs\/heads\//, '');
+      const remoteRef = `refs/remotes/origin/${branch}`;
+      if (await systemGitOps.resolveCommit(dir, remoteRef)) ref = remoteRef;
+    } else if (row?.baseBranch != null) {
       ref = `refs/remotes/origin/${row.baseBranch}`;
     } else {
       const head = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {

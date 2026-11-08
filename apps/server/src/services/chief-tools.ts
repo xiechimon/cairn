@@ -423,6 +423,17 @@ export async function executeChiefTool(
       const files: Record<string, unknown>[] = [];
       for (const p of capped) {
         try {
+          const segments = p.toLowerCase().split(/[\\/]/);
+          if (
+            segments.some((segment) =>
+              /^(?:\.git|\.ssh|\.aws|\.gnupg|\.env(?:\..*)?|\.npmrc|\.pypirc|credentials(?:\.json)?|id_rsa|id_ed25519)$/.test(
+                segment,
+              ),
+            ) ||
+            /\.(?:pem|key|p12|pfx)$/i.test(p)
+          ) {
+            throw new HttpError(403, 'credential file access denied');
+          }
           const f = await readFile(
             { db, reposDir: deps.reposDir, workspacesDir: deps.workspacesDir },
             projectId,
