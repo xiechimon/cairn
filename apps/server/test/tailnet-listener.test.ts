@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
@@ -262,6 +262,7 @@ describe('tailnet socket lifecycle', () => {
     crashed.kill('SIGKILL');
     await exited;
     expect(statSync(socketPath).isSocket()).toBe(true);
+    chmodSync(socketPath, 0o600);
     const tailnet = await listenOnTailnetSocket(s.app, socketPath);
     closers.push(() => tailnet.close());
     expect((await viaSocket(socketPath, '/api/teams', bearer)).status).toBe(200);

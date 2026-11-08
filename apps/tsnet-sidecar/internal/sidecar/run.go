@@ -87,6 +87,8 @@ type runner struct {
 
 	running       bool
 	dnsName       string
+	ownerLogin    string
+	selfTagged    bool
 	lastAuthURL   string
 	lastStatusErr string
 }
@@ -138,6 +140,7 @@ func (r *runner) stop() {
 func (r *runner) poll(ctx context.Context) error {
 	status, err := r.node.Status(ctx)
 	if err != nil {
+		r.running = false
 		if message := err.Error(); message != r.lastStatusErr {
 			r.lastStatusErr = message
 			r.out.Error("status: " + message)
@@ -147,6 +150,9 @@ func (r *runner) poll(ctx context.Context) error {
 	r.lastStatusErr = ""
 
 	if !status.Running {
+		if r.running && status.AuthURL == "" {
+			r.out.Error("tailnet is not ready")
+		}
 		r.running = false
 		if status.AuthURL != "" && status.AuthURL != r.lastAuthURL {
 			r.lastAuthURL = status.AuthURL
@@ -155,7 +161,14 @@ func (r *runner) poll(ctx context.Context) error {
 		return nil
 	}
 	r.lastAuthURL = ""
-	if status.DNSName == "" || r.running {
+	if status.DNSName == "" {
+		if r.running {
+			r.out.Error("tailnet DNS name is unavailable")
+		}
+		r.running = false
+		return nil
+	}
+	if r.running && r.dnsName == status.DNSName && r.ownerLogin == status.OwnerLogin && r.selfTagged == status.SelfTagged {
 		return nil
 	}
 	if r.tailnet == nil {
@@ -167,7 +180,9 @@ func (r *runner) poll(ctx context.Context) error {
 	}
 	r.running = true
 	r.dnsName = status.DNSName
-	r.out.Ready(status.IPs, status.DNSName)
+	r.ownerLogin = status.OwnerLogin
+	r.selfTagged = status.SelfTagged
+	r.out.Ready(status)
 	return nil
 }
 

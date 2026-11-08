@@ -1,6 +1,8 @@
 import { accessSync, chmodSync, constants, lstatSync, mkdirSync, statSync } from 'node:fs';
+import { request } from 'node:http';
 import { join } from 'node:path';
 import type { Hono } from 'hono';
+import { z } from 'zod';
 import type { TsnetSettings } from '../config.js';
 import { listenOnTailnetSocket, type TailnetListener } from '../lib/tailnet-listener.js';
 import {
@@ -36,6 +38,7 @@ export interface StartTsnetRemoteInput {
   logger: SidecarLogger;
   parentEnv?: NodeJS.ProcessEnv;
   spawnProcess?: SpawnSidecar;
+  readLocalStatus?: () => Promise<unknown>;
 }
 
 export function tsnetPathsOf(homeDir: string): TsnetPaths {
@@ -92,31 +95,156 @@ function failedRemote(message: string): TsnetRemote {
   return { status: () => ({ ...status }), stop: () => Promise.resolve() };
 }
 
+const localStatusSchema = z.object({
+  BackendState: z.string(),
+  Self: z
+    .object({
+      DNSName: z.string().optional(),
+      UserID: z.number().int().or(z.string()).optional(),
+      Tags: z.array(z.string()).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  User: z.record(z.string(), z.object({ LoginName: z.string() })).optional(),
+  TailscaleIPs: z.array(z.string()).optional(),
+});
+
+export function parseLocalStatus(body: string): unknown {
+  return JSON.parse(body, (key: string, value: unknown, context?: { source?: string }): unknown =>
+    key === 'UserID' && typeof value === 'number' ? context?.source : value,
+  );
+}
+
+function readSystemStatus(): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const socketPath =
+      process.platform === 'darwin'
+        ? '/var/run/tailscaled.socket'
+        : '/var/run/tailscale/tailscaled.sock';
+    const req = request(
+      {
+        socketPath,
+        path: '/localapi/v0/status?peers=false',
+        headers: { host: 'local-tailscaled.sock' },
+      },
+      (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk: string) => {
+          body += chunk;
+          if (body.length > 4 * 1024 * 1024)
+            req.destroy(new Error('LocalAPI status exceeds limit'));
+        });
+        res.on('error', reject);
+        res.on('end', () => {
+          try {
+            if (res.statusCode !== 200) throw new Error('LocalAPI status unavailable');
+            resolve(parseLocalStatus(body));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+    req.setTimeout(2_000, () => req.destroy(new Error('LocalAPI status timed out')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<TsnetRemote | null> {
   const { settings, logger } = input;
   if (!settings.enabled) return null;
   const paths = tsnetPathsOf(input.homeDir);
   let listener: TailnetListener;
   let supervisor: SidecarSupervisor | null = null;
+  let socketStatus: SidecarStatus = {
+    state: 'ready',
+    authUrl: null,
+    ips: [],
+    dnsName: null,
+    ownerLogin: null,
+    selfTagged: false,
+    lastError: null,
+    restarts: 0,
+  };
+  let stopped = false;
+  const refreshSystemStatus = async () => {
+    try {
+      const status = localStatusSchema.parse(await (input.readLocalStatus ?? readSystemStatus)());
+      if (stopped) return;
+      const running = status.BackendState === 'Running';
+      const selfTagged = (status.Self?.Tags?.length ?? 0) > 0;
+      const userId = status.Self?.UserID;
+      socketStatus = {
+        ...socketStatus,
+        dnsName: running ? (status.Self?.DNSName?.replace(/\.$/, '') ?? null) : null,
+        ips: running ? (status.TailscaleIPs ?? []) : [],
+        selfTagged,
+        ownerLogin:
+          running && !selfTagged && userId !== undefined
+            ? (status.User?.[String(userId)]?.LoginName ?? null)
+            : null,
+        lastError: null,
+      };
+    } catch {
+      if (!stopped)
+        socketStatus = {
+          ...socketStatus,
+          ownerLogin: null,
+          selfTagged: false,
+          dnsName: null,
+          ips: [],
+          lastError:
+            'LocalAPI status unavailable; only the explicit socket allowlist can grant identity access',
+        };
+    }
+  };
   try {
     if (input.authToken === null) {
       throw new Error(
         'tailnet access requires the access token, but token auth is disabled (CAIRN_AUTH=off); unset CAIRN_AUTH',
       );
     }
-    verifyBinary(settings.binaryPath);
+    if (settings.mode !== 'socket') verifyBinary(settings.binaryPath);
     verifySocketPathFits(paths.socketPath);
     ensurePrivateDir(paths.root, 'tsnet directory');
     ensurePrivateDir(paths.stateDir, 'tsnet state directory');
+    if (settings.mode === 'socket') await refreshSystemStatus();
     listener = await listenOnTailnetSocket(
       input.app,
       paths.socketPath,
-      () => supervisor?.status().dnsName ?? null,
+      () =>
+        settings.mode === 'socket' ? socketStatus.dnsName : (supervisor?.status().dnsName ?? null),
+      () => {
+        const status = settings.mode === 'socket' ? socketStatus : supervisor?.status();
+        return {
+          ownerLogin: status?.state === 'ready' ? (status.ownerLogin ?? null) : null,
+          selfTagged: status?.selfTagged ?? false,
+          allowedLogins: settings.allowedLogins ?? [],
+        };
+      },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error({ error: message }, 'tsnet remote access is enabled but could not start');
     return failedRemote(message);
+  }
+  if (settings.mode === 'socket') {
+    const timer = setInterval(() => {
+      void refreshSystemStatus();
+    }, 30_000);
+    timer.unref();
+    logger.info({ socket: paths.socketPath }, 'private tailnet socket ready for system tailscaled');
+    return {
+      status: () => ({ ...socketStatus, ips: [...socketStatus.ips] }),
+      stop: async () => {
+        stopped = true;
+        clearInterval(timer);
+        socketStatus = { ...socketStatus, state: 'stopped', ownerLogin: null };
+        await listener.close();
+      },
+    };
   }
   if (settings.uploadLogs) {
     logger.warn({}, 'tsnet node log upload to Tailscale is enabled by CAIRN_TSNET_UPLOAD_LOGS');

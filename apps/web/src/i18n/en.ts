@@ -1831,6 +1831,7 @@ export const EN: Record<string, string> = {
   正在加载对话: 'Loading the conversation',
   '加载完成后才能发送。': 'You can send once loading finishes.',
   远程访问: 'Remote access',
+  '已通过 Tailscale 登录为 {login}': 'Signed in as {login} via Tailscale',
   配对新设备: 'Pair a new device',
   '用手机扫描二维码，5 分钟内有效，只能用一次。':
     'Scan with your phone. Valid for 5 minutes, works once.',
