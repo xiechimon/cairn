@@ -171,6 +171,33 @@ private struct ThinkingIndicator: View {
     }
 }
 
+@MainActor
+func followConversation(
+    _ client: CairnClient,
+    threadId: String,
+    onDelta: (String) -> Void,
+    reload: () async -> Void
+) async {
+    await reload()
+    while !Task.isCancelled {
+        do {
+            for try await event in client.stream(threadId: threadId) {
+                switch event.type {
+                case "text_delta": onDelta(event.text ?? "")
+                case "message", "step": await reload()
+                default: break
+                }
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            try? await Task.sleep(for: .seconds(2))
+        }
+        guard !Task.isCancelled else { return }
+        await reload()
+    }
+}
+
 extension View {
     @ViewBuilder func minimizesNavigationBarOnScroll() -> some View {
         if #available(iOS 27, *) {

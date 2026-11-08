@@ -5,13 +5,14 @@ struct TaskThreadView: View {
     let task: TaskRecord
     @State private var conversationId: String?
     @State private var messages: [ThreadMessage] = []
+    @State private var liveText = ""
     @State private var loaded = false
     @State private var error: String?
 
     var body: some View {
         ConversationView(
             messages: messages,
-            liveText: "",
+            liveText: liveText,
             running: false,
             loaded: loaded,
             error: error,
@@ -45,10 +46,19 @@ struct TaskThreadView: View {
         .navigationTitle("#\(task.seqNum)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .task {
-            conversationId = task.latestBuildId
-            await reload()
+        .task(id: conversationId) {
+            guard let conversationId else {
+                loaded = true
+                return
+            }
+            await followConversation(model.client, threadId: conversationId, onDelta: { liveText += $0 }, reload: reload)
         }
+    }
+
+    init(model: AppModel, task: TaskRecord) {
+        self.model = model
+        self.task = task
+        _conversationId = State(initialValue: task.latestBuildId)
     }
 
     private func reload() async {
@@ -58,6 +68,7 @@ struct TaskThreadView: View {
         }
         do {
             messages = try await model.client.messages(threadId: build).messages
+            liveText = ""
             error = nil
         } catch {
             self.error = error.localizedDescription

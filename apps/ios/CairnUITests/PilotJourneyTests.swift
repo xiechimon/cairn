@@ -42,9 +42,7 @@ final class PilotJourneyTests: XCTestCase {
 
         let rows = app.descendants(matching: .any).matching(identifier: "inbox-row")
         XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15))
-        let savePassword = app.buttons["Not Now"]
-        if savePassword.waitForExistence(timeout: 5) { savePassword.tap() }
-        XCTAssertTrue(savePassword.waitForNonExistence(timeout: 5))
+        XCTAssertFalse(app.sheets["Save Password?"].waitForExistence(timeout: 5), "the token must not be offered to Passwords")
         XCTAssertTrue(app.navigationBars["Needs you"].exists)
         XCTAssertEqual(rows.count, 4, "one Coordinator question plus plan-ready, failed and review tasks")
         XCTAssertTrue(rows.element(boundBy: 0).label.contains("Release"))

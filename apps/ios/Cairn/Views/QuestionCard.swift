@@ -3,7 +3,7 @@ import SwiftUI
 struct QuestionCard: View {
     let question: PendingQuestion
     let onAnswer: (PendingQuestion, [QuestionAnswer]) async throws -> Void
-    @State private var picks: [Int: String] = [:]
+    @State private var picks: [Int: [String]] = [:]
     @State private var busy = false
     @State private var error: String?
 
@@ -28,6 +28,11 @@ struct QuestionCard: View {
                         .font(.body)
                         .foregroundStyle(Color.ink)
                         .fixedSize(horizontal: false, vertical: true)
+                    if question.ask.isPending && item.multiSelect == true && !item.options.isEmpty {
+                        Text("Pick any that apply.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.inkMuted)
+                    }
                     if question.ask.isPending && item.options.isEmpty {
                         TextField("Your answer", text: binding(for: index), axis: .vertical)
                             .lineLimit(1...6)
@@ -39,8 +44,10 @@ struct QuestionCard: View {
                             OptionRow(
                                 number: number + 1,
                                 option: option,
-                                selected: picks[index] == option.label
-                            ) { picks[index] = option.label }
+                                selected: picks[index, default: []].contains(option.label)
+                            ) {
+                                picks[index] = QuestionItem.pick(option.label, in: picks[index, default: []], multiSelect: item.multiSelect == true)
+                            }
                         }
                     } else if let chosen = question.ask.answers?.first(where: { $0.header == item.header }) {
                         Label(chosen.choices?.joined(separator: ", ") ?? chosen.text ?? "", systemImage: "checkmark")
@@ -74,7 +81,7 @@ struct QuestionCard: View {
     }
 
     private func binding(for index: Int) -> Binding<String> {
-        Binding(get: { picks[index] ?? "" }, set: { picks[index] = $0 })
+        Binding(get: { picks[index]?.first ?? "" }, set: { picks[index] = [$0] })
     }
 
     private func submit() async {

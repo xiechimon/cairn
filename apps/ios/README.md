@@ -24,7 +24,7 @@ The simulator shares the Mac's network, so `http://127.0.0.1:<port>` reaches a s
 
 ## Unit tests
 
-`CairnTests` runs against a `URLProtocol` stub, so it needs no server: message history follows `nextCursor` to the oldest page, a task message returns the conversation it landed in, free-text questions answer with `text`, and a failed session restore stays recoverable.
+`CairnTests` runs against a `URLProtocol` stub, so it needs no server: message history follows `nextCursor` to the oldest page, a task message returns the conversation it landed in, free-text questions answer with `text` and multi-select questions keep every pick, a conversation stream event reloads the open thread, and a failed session restore stays recoverable.
 
 ```sh
 xcodebuild -project Cairn.xcodeproj -scheme Cairn \

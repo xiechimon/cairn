@@ -60,27 +60,10 @@ struct CoordinatorView: View {
 
     private func listen() async {
         guard let thread = model.coordinator else { return }
-        await reload()
-        while !Task.isCancelled {
-            do {
-                for try await event in model.client.stream(threadId: thread.id) {
-                    switch event.type {
-                    case "text_delta":
-                        running = true
-                        liveText += event.text ?? ""
-                    case "message", "step":
-                        await reload()
-                    default:
-                        break
-                    }
-                }
-            } catch is CancellationError {
-                return
-            } catch {
-                try? await Task.sleep(for: .seconds(2))
-            }
-            await reload()
-        }
+        await followConversation(model.client, threadId: thread.id, onDelta: { delta in
+            running = true
+            liveText += delta
+        }, reload: reload)
     }
 
     private func send(_ content: String) async throws {

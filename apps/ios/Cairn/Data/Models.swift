@@ -88,6 +88,11 @@ struct QuestionItem: Decodable, Hashable, Sendable {
     let question: String
     let options: [QuestionOption]
     let multiSelect: Bool?
+
+    static func pick(_ label: String, in picked: [String], multiSelect: Bool) -> [String] {
+        guard multiSelect else { return [label] }
+        return picked.contains(label) ? picked.filter { $0 != label } : picked + [label]
+    }
 }
 
 struct QuestionAnswer: Codable, Hashable, Sendable {
@@ -104,14 +109,19 @@ struct AskQuestion: Decodable, Hashable, Sendable {
 
     var isPending: Bool { status == "pending" }
 
-    func reply(_ replies: [Int: String]) -> [QuestionAnswer]? {
+    func reply(_ replies: [Int: [String]]) -> [QuestionAnswer]? {
         var answers: [QuestionAnswer] = []
         for (index, item) in questions.enumerated() {
-            let reply = (replies[index] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !reply.isEmpty else { return nil }
-            answers.append(item.options.isEmpty
-                ? QuestionAnswer(header: item.header, choices: nil, text: reply)
-                : QuestionAnswer(header: item.header, choices: [reply], text: nil))
+            let picked = replies[index] ?? []
+            if item.options.isEmpty {
+                let text = (picked.first ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { return nil }
+                answers.append(QuestionAnswer(header: item.header, choices: nil, text: text))
+            } else {
+                let choices = item.options.map(\.label).filter(picked.contains)
+                guard !choices.isEmpty else { return nil }
+                answers.append(QuestionAnswer(header: item.header, choices: choices, text: nil))
+            }
         }
         return answers
     }

@@ -100,9 +100,13 @@ struct SignInView: View {
         guard !busy else { return }
         busy = true
         error = nil
+        let entered = token
+        token = ""
+        field = nil
         do {
-            try await session.signIn(server: server, token: token)
+            try await session.signIn(server: server, token: entered)
         } catch {
+            token = entered
             self.error = error.localizedDescription
         }
         busy = false

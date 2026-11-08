@@ -69,11 +69,11 @@ States:
 
 ### Task thread (pushed)
 
-Header: task title (inline title), status word and reason line under it. Body: the spec as the first block, then the conversation. Bottom: the composer `Message this thread`. Empty conversation shows `No messages yet` under the spec. A message that starts a replacement build switches the screen to the conversation the server returns. Actions that need server routes not wired on mobile yet (approve plan, retry, merge) do not appear as buttons; the reason line says what is needed.
+Header: task title (inline title), status word and reason line under it. Body: the spec as the first block, then the conversation. Bottom: the composer `Message this thread`. Empty conversation shows `No messages yet` under the spec. A message that starts a replacement build switches the screen to the conversation the server returns. While the screen is open it follows the conversation stream, so new task messages and streamed text appear without reopening it. Actions that need server routes not wired on mobile yet (approve plan, retry, merge) do not appear as buttons; the reason line says what is needed.
 
 ### Question (pushed)
 
-The question card: header, question, numbered options with the recommended option marked `Recommended`, or a `Your answer` text field when the question has no options, and the `Answer` primary button enabled once every question has a pick or non-blank text. After answering, the screen shows the chosen option and returns to the inbox.
+The question card: header, question, numbered options with the recommended option marked `Recommended`, or a `Your answer` text field when the question has no options; a multi-select question adds `Pick any that apply.` and toggles each option. The `Answer` primary button is enabled once every question has a pick or non-blank text. After answering, the screen shows the chosen option and returns to the inbox.
 
 ### Tab 2: Coordinator
 
