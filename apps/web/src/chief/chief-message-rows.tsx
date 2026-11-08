@@ -71,7 +71,7 @@ const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
 const USER_ROW_CLS = 'mt-6';
 const EVENT_ROW_CLS = 'mt-6';
-const REPLY_ROW_CLS = 'mt-9';
+const REPLY_ROW_CLS = 'mt-11';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
