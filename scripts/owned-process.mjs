@@ -65,9 +65,22 @@ function onPath(binary) {
   return undefined;
 }
 
+function insideOwnedScope() {
+  try {
+    return readFileSync('/proc/self/cgroup', 'utf8').includes('/cairn-owned-');
+  } catch {
+    return false;
+  }
+}
+
 let scopeProbe;
+export function ownedScopeAvailable() {
+  return systemdRun() !== undefined;
+}
+
 function systemdRun() {
-  if (process.platform !== 'linux' || process.env[MODE_ENV] === 'group') return undefined;
+  if (process.platform !== 'linux' || process.env[MODE_ENV] === 'group' || insideOwnedScope())
+    return undefined;
   if (scopeProbe === undefined) {
     const binary = onPath('systemd-run');
     scopeProbe =
@@ -93,14 +106,20 @@ function deathSignalPrefix() {
   return setprivProbe ? [setprivProbe, '--pdeathsig', 'KILL', '--'] : [];
 }
 
+function carriesOwner(entries, id) {
+  const prefix = `${OWNER_ENV}=`;
+  return entries.some(
+    (entry) => entry.startsWith(prefix) && entry.slice(prefix.length).split(',').includes(id),
+  );
+}
+
 function markedPids(id) {
-  const marker = `${OWNER_ENV}=${id}`;
   if (process.platform === 'linux') {
     const pids = [];
     for (const entry of readdirSync('/proc')) {
       if (!/^\d+$/.test(entry)) continue;
       try {
-        if (readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0').includes(marker))
+        if (carriesOwner(readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0'), id))
           pids.push(Number(entry));
       } catch {}
     }
@@ -112,7 +131,7 @@ function markedPids(id) {
   });
   return (ps.stdout ?? '')
     .split('\n')
-    .filter((line) => line.split(/\s/).includes(marker))
+    .filter((line) => carriesOwner(line.split(/\s/), id))
     .map((line) => Number.parseInt(line, 10))
     .filter((pid) => Number.isInteger(pid) && pid !== process.pid);
 }
@@ -183,6 +202,7 @@ export function spawnOwned(
     name = basename(command),
     maxRuntimeSec = DEFAULT_MAX_RUNTIME_SEC,
     graceMs = GRACE_MS,
+    chain = ownerChain(process.pid, owner),
   } = {},
 ) {
   const id = randomUUID();
@@ -190,7 +210,10 @@ export function spawnOwned(
   const unit = scopeRunner
     ? `cairn-owned-${name.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 40)}-${process.pid}-${id.slice(0, 8)}`
     : undefined;
-  const childEnv = { ...env, [OWNER_ENV]: id };
+  const childEnv = {
+    ...env,
+    [OWNER_ENV]: [...(env[OWNER_ENV] ?? '').split(',').filter(Boolean), id].join(','),
+  };
   const busEnv = Object.fromEntries(
     SYSTEMD_BUS_ENV.filter((key) => process.env[key] !== undefined).map((key) => [
       key,
@@ -234,9 +257,13 @@ export function spawnOwned(
     [
       OWNED_PROCESS_CLI,
       '--sentinel',
-      JSON.stringify({ target, chain: ownerChain(process.pid, owner) }),
+      JSON.stringify({ target, chain, deadline: Date.now() + maxRuntimeSec * 1000 }),
     ],
-    { stdio: ['pipe', 'ignore', 'ignore'], detached: true },
+    {
+      stdio: ['pipe', 'ignore', 'ignore'],
+      detached: true,
+      env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== OWNER_ENV)),
+    },
   );
   sentinel.on('error', () => {});
   const exited = new Promise((resolveExit) => {
@@ -279,8 +306,8 @@ export function launchOwnedDetached(
     process.execPath,
     [
       OWNED_PROCESS_CLI,
-      '--owner',
-      'session',
+      '--owner-chain',
+      JSON.stringify(ownerChain(process.pid, 'session')),
       '--name',
       name,
       '--max-runtime-sec',
@@ -334,6 +361,7 @@ function parseCli(argv) {
     if (value === undefined) break;
     if (flag === '--owner' && (value === 'parent' || value === 'session')) options.owner = value;
     else if (flag === '--name') options.name = value;
+    else if (flag === '--owner-chain') options.chain = JSON.parse(value);
     else if (flag === '--timeout-ms' && /^\d+$/.test(value)) options.timeoutMs = Number(value);
     else if (flag === '--max-runtime-sec' && /^[1-9]\d*$/.test(value))
       options.maxRuntimeSec = Number(value);
@@ -344,14 +372,18 @@ function parseCli(argv) {
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   if (process.argv[2] === '--sentinel') {
-    const { target, chain } = JSON.parse(process.argv[3]);
+    const { target, chain, deadline } = JSON.parse(process.argv[3]);
     let helperGone = false;
     process.stdin.on('end', () => {
       helperGone = true;
     });
     process.stdin.resume();
     for (const signal of FORWARDED_SIGNALS) process.on(signal, () => {});
-    while (!helperGone && chain.every(({ pid, start }) => processInfo(pid)?.start === start))
+    while (
+      !helperGone &&
+      Date.now() < deadline &&
+      chain.every(({ pid, start }) => processInfo(pid)?.start === start)
+    )
       await sleep(POLL_MS);
     await killTarget(target);
     process.exit(0);

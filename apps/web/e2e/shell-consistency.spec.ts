@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { openChiefWindow } from './helpers.js';
+import { pressOpenCoordinator } from './helpers.js';
 
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 const SIDEBAR_KEY = 'cairn.sidebar-collapsed'; // apps/web/src/board/app-sidebar.tsx
@@ -60,30 +60,19 @@ const headContentX = (page: Page) =>
     };
   });
 
-test.describe('⌘J wakes the window on every shell family', () => {
+test.describe('⌘J reaches the Coordinator page from every shell family', () => {
   const families = [
-    { name: 'board', route: '/app/schedules?scenario=01', gear: true },
-    { name: 'pages', route: '/app/schedules?scenario=11', gear: true },
+    { name: 'board', route: '/app/schedules?scenario=01', home: '/app?scenario=01' },
+    { name: 'pages', route: '/app/schedules?scenario=11', home: '/app?scenario=11' },
   ] as const;
 
-  for (const { name, route, gear } of families) {
-    test(`${name}: ⌘J opens the window, minimize returns to the surface`, async ({
-      page,
-    }) => {
+  for (const { name, route, home } of families) {
+    test(`${name}: ⌘J navigates to the Coordinator page`, async ({ page }) => {
       await page.goto(route);
-
-      await expect(page.locator('.chief-drawer')).toBeHidden();
-      await expect(page.locator('.chief-drawer')).toHaveCount(1);
-
-      await openChiefWindow(page);
-      await expect(page.locator('.chief-drawer')).toBeVisible();
-
-      await expect(page.locator('.chief-drawer button[aria-label="Coordinator 设置"]')).toHaveCount(
-        gear ? 1 : 0,
-      );
-
-      await page.locator('.chief-drawer button[aria-label="最小化"]').click();
-      await expect(page.locator('.chief-drawer')).toBeHidden();
+      await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+      await pressOpenCoordinator(page);
+      await expect(page).toHaveURL(new RegExp(`${home.replace('?', '\\?')}$`));
+      await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
     });
   }
 });

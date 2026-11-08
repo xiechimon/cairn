@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { HISTORY, mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
+import { pressOpenCoordinator } from './helpers.js';
 
 test.describe('home is one continuous Coordinator chat (T1)', () => {
-  test('a fresh home shows the greeting, the composer and the running count, and no chief drawer', async ({
+  test('a fresh home shows the greeting, the composer and the running count, and no floating Coordinator', async ({
     page,
   }) => {
     await mockLive(page, { threads: [], messages: [] });
@@ -14,7 +14,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page.getByTestId('home-c-since')).toContainText('1 件在进行');
     await expect(home.getByTestId('chief-composer-input')).toBeVisible();
     await expect(page.locator('.chief-fab')).toHaveCount(0);
-    await expect(page.locator('.chief-drawer')).toBeHidden();
+    await expect(page.getByRole('complementary', { name: 'Coordinator' })).toHaveCount(0);
     const composer = await home.locator('.chief-composer').boundingBox();
     const hero = await page.getByTestId('home-c-hero').boundingBox();
     const viewport = page.viewportSize();
@@ -114,30 +114,24 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 
-  test('cmd+J on home focuses the home composer instead of opening the drawer', async ({ page }) => {
+  test('cmd+J on home focuses the home composer', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app');
     await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toBeVisible();
     await page.keyboard.press('ControlOrMeta+j');
     await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
-    await expect(page.locator('.chief-drawer')).toBeHidden();
   });
 
-  test('a page other than home keeps the Coordinator drawer', async ({ page }) => {
+  test('a page other than home has no Coordinator; cmd+J navigates to it', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app/schedules');
     await expect(page.getByTestId('home-c')).toHaveCount(0);
-    await openChiefWindow(page);
-    await expect(page.locator('.chief-drawer')).toBeVisible();
-  });
-
-  test('a task chip in the drawer opens the task page', async ({ page }) => {
-    await mockLive(page, { threads: [THREAD], messages: HISTORY });
-    await page.goto('/app/schedules');
-    await openChiefWindow(page);
-    const drawer = page.locator('.chief-drawer');
-    await drawer.locator('a.mention-chip--todo').first().click();
-    await expect(page).toHaveURL(/[?&]thread=todo-1/);
+    await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+    await pressOpenCoordinator(page);
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText(
+      '已经补给它了',
+    );
   });
 
   test('phone width: the chat fills the screen and the composer stays on screen', async ({ page }) => {

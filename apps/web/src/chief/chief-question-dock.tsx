@@ -147,15 +147,7 @@ function useLeavingQuestion(shownId: string | undefined): ChiefQuestionItem | nu
   return leaving;
 }
 
-export function ChiefQuestionDock({
-  home,
-  bound,
-  ownFooter,
-}: {
-  home: boolean;
-  bound: boolean;
-  ownFooter: boolean;
-}) {
+export function ChiefQuestionDock({ bound, ownFooter }: { bound: boolean; ownFooter: boolean }) {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const numberKeys = bound && searchParams.get(THREAD_PARAM) === null;
@@ -170,7 +162,7 @@ export function ChiefQuestionDock({
   const at = clampQuestionIndex(index, pending.length);
   const shown = pending[at];
   const leaving = useLeavingQuestion(shown?.item.requestId);
-  const wrapCls = `${DOCK_CLS} ${home ? 'mx-auto mt-2 w-[calc(100%-2rem)] max-w-182' : 'mx-4 mt-2'}`;
+  const wrapCls = `${DOCK_CLS} mx-auto mt-2 w-[calc(100%-2rem)] max-w-182`;
   if (shown === undefined) {
     if (leaving === null) return null;
     return (

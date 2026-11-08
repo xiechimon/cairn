@@ -11,6 +11,7 @@ import {
   formatAttachmentToken,
   type MachineAttachmentResponse,
   PLAN_FILE_NAME,
+  WORKER_REMOTE_TOOLS,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
@@ -53,6 +54,7 @@ function claimed(opts: {
   title?: string;
   spec?: string;
   continueId?: string;
+  remoteTools?: ClaimedStep['remoteTools'];
 }): ClaimedStep {
   const todo = {
     id: 't1',
@@ -70,6 +72,7 @@ function claimed(opts: {
         : { action: 'new', sessionId: null },
     ...(opts.instruction !== undefined ? { instruction: opts.instruction } : {}),
     todo,
+    remoteTools: opts.remoteTools ?? [...WORKER_REMOTE_TOOLS],
     project: { id: 'p1', name: 'demo', repo: null },
     agent: {
       id: 'a1',
@@ -309,5 +312,29 @@ describe('F1 first-round prompt of a non-GitHub-imported task unchanged byte for
         join(home, 'plans', 'conv-1', PLAN_FILE_NAME),
       ),
     );
+  });
+});
+
+describe('the naming instruction follows the claimed tool list', () => {
+  test('a step claimed without set_task_meta gets no instruction to call it', async () => {
+    const step = claimed({
+      kind: 'build',
+      source: { sourceKind: null, sourceRef: null },
+      title: '修登录按钮',
+      remoteTools: WORKER_REMOTE_TOOLS.filter((tool) => tool.name !== 'set_task_meta'),
+    });
+    const { systemPrompt } = await deliver(step);
+    expect(systemPrompt).not.toContain('set_task_meta');
+    expect(systemPrompt).not.toContain('本任务当前标题是占位截断');
+  });
+
+  test('the first implementation step, claimed with set_task_meta, is told to name the task', async () => {
+    const step = claimed({
+      kind: 'build',
+      source: { sourceKind: null, sourceRef: null },
+      title: '修登录按钮',
+    });
+    const { systemPrompt } = await deliver(step);
+    expect(systemPrompt).toContain('set_task_meta');
   });
 });
