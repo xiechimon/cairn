@@ -201,7 +201,10 @@ test('a GitHub PR targeting main is refused when the configured base is dev', as
 test('the CI conflict round merges origin/dev when the project base is dev', async () => {
   const { s, fetch } = githubWorld('dev', 'dirty');
   await req(s.app, 'PATCH', '/api/projects/branch-project', { baseBranch: 'dev' });
-  const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: fetch });
+  const poller = createCiPoller(
+    { ...s.svc, box: s.secretBox, githubFetch: fetch },
+    { githubFetch: fetch },
+  );
   await poller.sweep();
   const fix = s.db
     .select()
