@@ -70,7 +70,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.nameText).toBe('Cairn');
     expect(m.nameHref).toBeNull();
     expect(m.toggle).toEqual({ x: 0, w: 28, h: 28 });
-    expect(m.icon).toEqual({ w: 20, h: 20 });
+    expect(m.icon).toEqual({ w: 18, h: 18 });
     expect(m.gap).toBe(2);
   });
 

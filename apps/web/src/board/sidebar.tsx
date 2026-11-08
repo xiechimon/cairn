@@ -344,7 +344,7 @@ export function BoardSidebar({
           aria-label={t('收起侧边栏')}
           onClick={onToggle}
         >
-          <PanelLeft className="size-5" strokeWidth={STROKE} />
+          <PanelLeft className={ICON} strokeWidth={STROKE} />
         </Button>
         <span className="sidebar-team-name ml-0.5 min-w-0 flex-1 truncate font-serif text-page leading-none font-medium tracking-normal text-foreground">
           {BRAND.manifestName}
