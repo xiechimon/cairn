@@ -541,6 +541,13 @@ test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
         login: 'human',
         email: '12+human@users.noreply.github.com',
       });
+      await call(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, {
+        body: { coAuthorTrailer: false },
+      });
+      const optedOut = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
+        cred: w.token,
+      });
+      expect(machineTokenResponseSchema.parse(await optedOut.json()).coAuthor).toBeNull();
       expect(result.git?.kind).toBe(reason === null ? 'app' : 'unattributed');
       if (reason === null)
         expect((result.git?.expiresAt ?? 0) - Date.now()).toBeGreaterThan(50 * 60000);

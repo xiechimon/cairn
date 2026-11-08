@@ -834,6 +834,13 @@
       "when": 1794020913485,
       "tag": "0122_github_attribution",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "6",
+      "when": 1794110481707,
+      "tag": "0123_team_attribution_settings",
+      "breakpoints": true
     }
   ]
 }

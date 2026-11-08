@@ -9673,6 +9673,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
       ],
       "type": "string",
     },
+    "coAuthorTrailer": {
+      "default": true,
+      "type": "boolean",
+    },
     "createdAt": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
@@ -9747,6 +9751,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     "plan": {
       "type": "string",
     },
+    "requestInstructorReview": {
+      "default": false,
+      "type": "boolean",
+    },
   },
   "required": [
     "id",
@@ -9754,6 +9762,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     "createdAt",
     "plan",
     "avatarStyle",
+    "coAuthorTrailer",
+    "requestInstructorReview",
   ],
   "type": "object",
 }
