@@ -35,13 +35,14 @@ test('a task row opens its thread beside the Coordinator, and closing it returns
   await expect(tasksPanel(page)).toBeVisible();
 });
 
-test('a needs-you card opens the thread in the side chat', async ({ page }) => {
+test('a needs-you inbox row opens the thread in the side chat', async ({ page }) => {
   await page.goto(HOME);
-  await page
-    .locator('[data-slot="thread-card"]')
-    .filter({ hasText: 'Connect a Claude subscription token' })
-    .getByRole('button', { name: '查看 thread' })
-    .click();
+  await page.getByTestId('needs-you-chip').click();
+  const row = page
+    .getByTestId('needs-you-inbox-row')
+    .filter({ hasText: 'Connect a Claude subscription token' });
+  await row.hover();
+  await row.getByRole('button', { name: '查看 thread' }).click();
   await expect(sideChat(page)).toContainText('Connect a Claude subscription token');
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
 });

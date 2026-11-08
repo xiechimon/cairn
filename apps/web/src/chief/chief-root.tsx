@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -52,14 +60,25 @@ export function ChiefRoot() {
   const onHome = pathname === '/app';
   const { teamId } = useLiveData();
   const surface = useChiefSurface(fixture, deepLink, onHome);
+  const settled = useSyncExternalStore(
+    questionDockState.subscribe,
+    questionDockState.settled,
+    questionDockState.settled,
+  );
   const pendingQuestions = useMemo(
     () =>
       originChiefQuestions(surface.chiefData.stream ?? [], {
         teamId: teamId ?? 'local',
         conversationId: surface.chiefData.threadId ?? 'chief',
         title: surface.chiefData.threadTitle,
-      }),
-    [surface.chiefData.stream, surface.chiefData.threadId, surface.chiefData.threadTitle, teamId],
+      }).filter((request) => !settled.has(request.item.requestId)),
+    [
+      surface.chiefData.stream,
+      surface.chiefData.threadId,
+      surface.chiefData.threadTitle,
+      teamId,
+      settled,
+    ],
   );
   const conversationId = surface.chiefData.threadId ?? 'chief';
   const stream = surface.chiefData.stream;

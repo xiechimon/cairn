@@ -31,7 +31,7 @@ import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { needsYouThreads } from './needs-you.js';
-import { NeedsYouTray } from './needs-you-tray.js';
+import { NeedsYouChip, NeedsYouPanel, useNeedsYouInbox } from './needs-you-inbox.js';
 import { composeRequest } from './open-composer.js';
 import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
@@ -172,6 +172,7 @@ export function HomeC({
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
   const entries = needsYouThreads(scoped);
+  const inbox = useNeedsYouInbox(entries);
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
@@ -281,9 +282,16 @@ export function HomeC({
       data-testid="home-c-pane-buttons"
       className="flex h-12 flex-none items-center gap-0.5 pr-3 pl-5 max-[640px]:pl-14"
     >
-      <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
-        {projectName ?? t('Coordinator')}
-      </h1>
+      <div className="mr-auto flex min-w-0 items-center gap-1.5">
+        <h1 className="m-0 min-w-0 truncate text-ui font-semibold text-foreground">
+          {projectName ?? t('Coordinator')}
+        </h1>
+        <NeedsYouChip
+          count={inbox.entries.length}
+          open={pane === 'inbox' && threadId === null}
+          onToggle={() => togglePane('inbox')}
+        />
+      </div>
       <MachineChip
         machines={computers}
         open={pane === 'machines' && threadId === null}
@@ -333,6 +341,13 @@ export function HomeC({
   const workPanel =
     threadId !== null ? null : pane === 'machines' ? (
       <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
+    ) : pane === 'inbox' ? (
+      <NeedsYouPanel
+        inbox={inbox}
+        now={now}
+        onOpenThread={openThread}
+        onClose={() => showPane(null)}
+      />
     ) : (
       pane !== null && (
         <WorkPanel
@@ -455,7 +470,6 @@ export function HomeC({
             }
             composerError={thread.error}
             targetPlaceholder={thread.placeholder}
-            tray={<NeedsYouTray threads={entries} />}
             composerTools={
               <>
                 <ComposerThreadTarget

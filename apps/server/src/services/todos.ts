@@ -3,6 +3,7 @@ import type {
   Phase,
   RouteOverride,
   SecretBox,
+  TodoAsk,
   TodoOutputKind,
   TodoRecord,
   TodoSourceKind,
@@ -129,6 +130,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     }
   }
   const waitingOn = waitingOnOf(deps, row);
+  const ask = askOf(deps, row);
   const usage = db
     .select({
       rows: sql<number>`count(*)`,
@@ -173,6 +175,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     sourceRef: row.sourceRef,
     output: row.output,
     ...(waitingOn !== undefined ? { waitingOn } : {}),
+    ...(ask !== undefined ? { ask } : {}),
     ...((row.phase === 'done' || row.phase === 'closed') && row.latestBuildId !== null
       ? { verified: buildVerified(db, row.latestBuildId) }
       : {}),
@@ -191,6 +194,37 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
       : {}),
     ...(row.routeOverride != null ? { routeOverride: row.routeOverride } : {}),
   };
+}
+
+const ASKING_PHASES: readonly Phase[] = ['needs_input', 'confirm', 'review', 'failed'];
+
+function askOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoAsk | undefined {
+  if (row.latestBuildId === null || !ASKING_PHASES.includes(row.phase)) return undefined;
+  if (row.phase === 'needs_input') {
+    const pending = pendingWorkerQuestions(deps.db, row.latestBuildId);
+    const asked = pending.find((question) => question.escalation !== undefined) ?? pending[0];
+    const first = asked?.questions[0];
+    if (asked !== undefined && first !== undefined) {
+      return {
+        text: first.question,
+        requestId: asked.requestId,
+        options: first.options.map((option) => ({
+          label: option.label,
+          ...(option.description !== undefined && option.description !== ''
+            ? { description: option.description }
+            : {}),
+        })),
+        defaultAnswer: asked.escalation?.defaultAnswer ?? null,
+      };
+    }
+  }
+  const line = deps.db
+    .select({ line: build.reportLine })
+    .from(build)
+    .where(eq(build.id, row.latestBuildId))
+    .get()?.line;
+  if (line === null || line === undefined || line.trim() === '') return undefined;
+  return { text: line.trim(), requestId: null, options: [], defaultAnswer: null };
 }
 
 function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | undefined {

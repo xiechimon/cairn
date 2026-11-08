@@ -78,6 +78,14 @@ export const taskDecisionSchema = z.object({
 });
 export type TaskDecision = z.infer<typeof taskDecisionSchema>;
 
+export const todoAskSchema = z.object({
+  text: z.string(),
+  requestId: z.string().nullable(),
+  options: z.array(z.object({ label: z.string(), description: z.string().optional() })),
+  defaultAnswer: z.string().nullable(),
+});
+export type TodoAsk = z.infer<typeof todoAskSchema>;
+
 export const todoRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -112,6 +120,7 @@ export const todoRecordSchema = z.object({
       retryAt: epochMs.nullable(),
     })
     .optional(),
+  ask: todoAskSchema.optional(),
   quotaWait: quotaWaitSchema.nullable().optional(),
   usageCost: usageCostSchema.optional(),
   verified: z.boolean().optional(),

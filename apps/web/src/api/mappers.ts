@@ -198,6 +198,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     v: w.v,
     chiefCreated: w.sourceBuildId !== null,
     waitingOn: w.waitingOn ?? undefined,
+    ...(w.ask !== undefined ? { ask: w.ask } : {}),
     output: w.output,
     quotaWait: w.quotaWait ?? null,
     sourceKind: w.sourceKind,

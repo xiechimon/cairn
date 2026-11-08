@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
 import { threadTargetsOf } from '../src/board/composer-thread-target.js';
-import { replyDeliveryOf } from '../src/board/needs-you-thread-card.js';
+import { replyDeliveryOf } from '../src/board/thread-reply-send.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
 import { EN } from '../src/i18n/en.js';
 import { translate } from '../src/i18n/translate.js';
@@ -60,8 +60,9 @@ describe('direct thread messages in the Coordinator conversation', () => {
   });
 });
 
-describe('how a home card reply reaches its thread', () => {
+describe('how an inbox reply reaches its thread', () => {
   test.each([
+    ['needs_input', 'answer'],
     ['confirm', 'revision'],
     ['review', 'revision'],
     ['failed', 'restart'],

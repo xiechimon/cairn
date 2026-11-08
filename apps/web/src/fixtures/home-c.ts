@@ -156,3 +156,71 @@ export const homeCEmpty: FixtureSet = {
   chief: { ...conversation, stream: [], streamAt: [], hasEarlier: false },
   now: r7(9, 0),
 };
+
+function askingTodo(
+  id: string,
+  seqNum: number,
+  title: string,
+  minutesAgo: number,
+  ask: NonNullable<TodoRecord['ask']>,
+): TodoRecord {
+  return {
+    ...homeTodo(id, seqNum, title, 'needs_input', PROJECT_ID),
+    waitingOn: { on: 'owner', retryAt: null },
+    phaseAt: r7(20, 30) - minutesAgo * 60_000,
+    ask,
+  };
+}
+
+export const HOME_INBOX_THREADS: TodoRecord[] = [
+  askingTodo('inbox-retry', 2311, '定中继探针的重试次数', 4, {
+    text: '中继探针失败后最多重跑几次再放弃？',
+    requestId: 'ask-inbox-retry',
+    options: [{ label: '三次', description: '和其他探针一致' }, { label: '五次' }],
+    defaultAnswer: '三次',
+  }),
+  askingTodo('inbox-digest', 2312, '给夜间摘要起个名字', 11, {
+    text: '摘要标题用「夜报」还是「今日回顾」？',
+    requestId: 'ask-inbox-digest',
+    options: [{ label: '夜报' }, { label: '今日回顾' }],
+    defaultAnswer: null,
+  }),
+  askingTodo('inbox-drafts', 2313, '草稿要不要跨设备同步', 26, {
+    text: '手机上写了一半的草稿，换到电脑上要不要接着显示？同步需要把草稿存到服务器。',
+    requestId: 'ask-inbox-drafts',
+    options: [],
+    defaultAnswer: '先不同步，只存本机',
+  }),
+  askingTodo('inbox-badge', 2314, '确认侧栏角标的颜色', 48, {
+    text: '角标沿用琥珀色，还是改成和失败一样的红色？',
+    requestId: 'ask-inbox-badge',
+    options: [{ label: '琥珀色' }, { label: '红色' }],
+    defaultAnswer: '琥珀色',
+  }),
+  askingTodo('inbox-webhook', 2315, '旧 webhook 留还是删', 95, {
+    text: '旧的 GitHub webhook 还有两个仓库在用，现在删会断它们的通知。删吗？',
+    requestId: 'ask-inbox-webhook',
+    options: [{ label: '先留着' }, { label: '现在删' }],
+    defaultAnswer: null,
+  }),
+  {
+    ...homeTodo('inbox-confirm', 2316, '把输入框拆成两个文件', 'confirm', PROJECT_ID),
+    phaseAt: r7(20, 30) - 3 * 3_600_000,
+    ask: {
+      text: '计划拆成 composer-surface 和 composer-tools 两个文件，测试跟着搬。',
+      requestId: null,
+      options: [],
+      defaultAnswer: null,
+    },
+  },
+];
+
+export const homeInbox: FixtureSet = {
+  ...homeC,
+  todos: [
+    ...HOME_INBOX_THREADS,
+    ...homeC.todos.filter(
+      (todo) => !['home-c-confirm', 'home-c-failed', 'home-c-review'].includes(todo.id),
+    ),
+  ],
+};

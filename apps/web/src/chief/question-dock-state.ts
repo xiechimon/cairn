@@ -1,3 +1,4 @@
+import type { AskUserAnswer } from '@cairn/shared';
 import { toast } from 'sonner';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 
@@ -36,6 +37,7 @@ let focusIndex = 0;
 let uploads = 0;
 const answers = new Map<string, string>();
 const closed = new Set<string>();
+let settled: ReadonlyMap<string, AskUserAnswer[] | null> = new Map();
 
 export function answerKeyOf(draftKey: string, step: number): string {
   return `${draftKey}#${step}`;
@@ -87,6 +89,14 @@ export const questionDockState = {
     if ((answers.get(key) ?? '') === text) return;
     if (text === '') answers.delete(key);
     else answers.set(key, text);
+    emit();
+  },
+  settled(): ReadonlyMap<string, AskUserAnswer[] | null> {
+    return settled;
+  },
+  settle(requestId: string, answers: AskUserAnswer[] | null): void {
+    if (settled.has(requestId)) return;
+    settled = new Map([...settled, [requestId, answers]]);
     emit();
   },
   isClosed(draftKey: string): boolean {

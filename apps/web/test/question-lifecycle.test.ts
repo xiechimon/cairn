@@ -69,20 +69,30 @@ describe('the answered question becomes one line', () => {
 
 describe('the dock keeps a finished question long enough to fade', () => {
   const pending = question({ status: 'pending', answers: null });
+  const none = new Map();
 
   test('a request that is now answered in the stream is the leaving card', () => {
     const answered = question();
-    expect(leavingQuestion('q1', [answered])).toBe(answered);
+    expect(leavingQuestion(pending, [answered], none)).toBe(answered);
   });
 
-  test('a request still pending or absent has nothing to fade', () => {
-    expect(leavingQuestion('q1', [pending])).toBeNull();
-    expect(leavingQuestion('q1', [])).toBeNull();
-    expect(leavingQuestion(null, [question()])).toBeNull();
+  test('a request still pending or absent, and never settled here, has nothing to fade', () => {
+    expect(leavingQuestion(pending, [pending], none)).toBeNull();
+    expect(leavingQuestion(pending, [], none)).toBeNull();
+    expect(leavingQuestion(null, [question()], none)).toBeNull();
+  });
+
+  test('a request this client settled fades with its answers before the stream catches up', () => {
+    const answers = [{ header: 'Merge', choices: ['Wait'] }];
+    expect(leavingQuestion(pending, [pending], new Map([['q1', answers]]))).toEqual({
+      ...pending,
+      status: 'answered',
+      answers,
+    });
   });
 
   test('a cancelled request fades the same way', () => {
     const cancelled = question({ status: 'cancelled', answers: null });
-    expect(leavingQuestion('q1', [cancelled])).toBe(cancelled);
+    expect(leavingQuestion(pending, [cancelled], none)).toBe(cancelled);
   });
 });

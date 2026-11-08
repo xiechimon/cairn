@@ -1,5 +1,10 @@
 import { existsSync } from 'node:fs';
-import { type AskUserQuestion, type MachineAskResponse, SESSION_FILE_NAME } from '@cairn/shared';
+import {
+  type AskUserQuestion,
+  type MachineAskResponse,
+  QUESTION_SETTLED_REASON,
+  SESSION_FILE_NAME,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
@@ -336,6 +341,7 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
       { body: { answers: [{ header: '缩进', choices: ['Spaces'] }] } },
     );
     expect(dup.status).toBe(409);
+    expect(((await dup.json()) as { reason?: string }).reason).toBe(QUESTION_SETTLED_REASON);
   });
 
   test('answer other... free-form string: a single upload is legal (Steps card last line free text), two = 400', async () => {

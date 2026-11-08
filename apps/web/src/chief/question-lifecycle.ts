@@ -1,3 +1,4 @@
+import type { AskUserAnswer } from '@cairn/shared';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import type { ChiefQuestionItem } from './chief-question-card.js';
 
@@ -30,14 +31,16 @@ export function answerSummary(item: ChiefQuestionItem): string {
 }
 
 export function leavingQuestion(
-  requestId: string | null,
+  last: ChiefQuestionItem | null,
   stream: readonly ChiefStreamItem[],
+  settled: ReadonlyMap<string, AskUserAnswer[] | null>,
 ): ChiefQuestionItem | null {
-  if (requestId === null) return null;
-  return (
-    stream.find(
-      (item): item is ChiefQuestionItem =>
-        item.kind === 'question' && item.requestId === requestId && item.status !== 'pending',
-    ) ?? null
+  if (last === null) return null;
+  const done = stream.find(
+    (item): item is ChiefQuestionItem =>
+      item.kind === 'question' && item.requestId === last.requestId && item.status !== 'pending',
   );
+  if (done !== undefined) return done;
+  if (!settled.has(last.requestId)) return null;
+  return { ...last, status: 'answered', answers: settled.get(last.requestId) ?? null };
 }

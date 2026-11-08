@@ -82,38 +82,69 @@ async function openWithQuestion(page: Page, todos: unknown[] = []) {
   return { state, answered };
 }
 
-test('needs-you threads sit in a tray above the composer, three at most, with the rest counted', async ({ page }) => {
-  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: FIVE });
-  await page.goto('/app');
-  const tray = page.getByTestId('chief-composer-block').getByTestId('needs-you');
-  await expect(tray.locator('[data-slot="needs-you-item"]')).toHaveCount(3);
-  await expect(tray.getByTestId('needs-you-count')).toHaveText('5');
-  await expect(page.getByTestId('chief-stream').getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('home-c-lead').getByTestId('needs-you')).toHaveCount(0);
-  const trayBox = await tray.boundingBox();
-  const composerBox = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
-  expect(trayBox!.y + trayBox!.height).toBeLessThanOrEqual(composerBox!.y + 1);
-  await tray.getByRole('button', { name: '2 more' }).click();
-  await expect(tray.locator('[data-slot="needs-you-item"]')).toHaveCount(5);
-  await tray.getByRole('button', { name: 'Show less' }).click();
-  await expect(tray.locator('[data-slot="needs-you-item"]')).toHaveCount(3);
-});
-
-test('the tray stays in view after the history scrolls', async ({ page }) => {
-  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: FIVE.slice(0, 2) });
-  await page.goto('/app');
-  await page.getByTestId('home-c').getByTestId('chief-body').evaluate((node) => {
-    node.scrollTop = 0;
+for (const size of [
+  { name: 'desktop', width: 1470, height: 900 },
+  { name: 'phone', width: 390, height: 844 },
+]) {
+  test(`needs-you threads live behind the title chip, never above the composer, and open, answer and close in the inbox (${size.name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const todos = FIVE.map((todo) => ({ ...todo }));
+    todos[0] = {
+      ...todos[0]!,
+      phase: 'needs_input',
+      waitingOn: { on: 'owner', retryAt: null },
+      ask: {
+        text: 'Split by tenant or by region first?',
+        requestId: 'ask-split',
+        options: [{ label: 'Tenant' }, { label: 'Region' }],
+        defaultAnswer: 'Tenant',
+      },
+    } as (typeof todos)[number];
+    const sent: unknown[] = [];
+    await mockLive(page, { threads: [THREAD], messages: HISTORY, todos }, (path, route, json) => {
+      if (!/^\/api\/todos\/[^/]+\/messages$/.test(path) || route.request().method() !== 'POST') {
+        return undefined;
+      }
+      sent.push({ path, body: route.request().postDataJSON() });
+      return json({ todoId: 'todo-1', conversationId: 'build-1', delivered: 'steer' }, 201);
+    });
+    await page.goto('/app');
+    await expect(page.getByTestId('chief-composer-block').getByTestId('needs-you-inbox-row')).toHaveCount(0);
+    const chip = page.getByTestId('home-c').getByTestId('needs-you-chip');
+    await expect(chip.getByTestId('needs-you-count')).toHaveText('5');
+    await chip.click();
+    const rows = page.getByTestId('needs-you-inbox-row');
+    await expect(rows).toHaveCount(5);
+    const first = rows.filter({ hasText: 'Plan the routing split' });
+    await expect(first.getByTestId('needs-you-inbox-ask')).toHaveText('Split by tenant or by region first?');
+    await first.getByTestId('needs-you-inbox-toggle').click();
+    await expect(first.getByRole('textbox', { name: 'Reply to #1' })).toBeFocused();
+    await expect(first.getByRole('button', { name: 'Tenant', exact: true })).toBeVisible();
+    if (size.name === 'desktop') {
+      const composer = page.getByTestId('home-c').locator('.chief-composer');
+      await expect(composer).toBeInViewport();
+      const panel = await page.locator('.side-panel').boundingBox();
+      const chat = await page.getByTestId('home-c').boundingBox();
+      expect(chat!.x + chat!.width).toBeLessThanOrEqual(panel!.x + 1);
+    }
+    await first.getByRole('button', { name: 'Tenant', exact: true }).click();
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toMatchObject({ path: '/api/todos/todo-1/messages', body: { content: 'Tenant' } });
+    await expect(rows).toHaveCount(4);
+    await expect(chip.getByTestId('needs-you-count')).toHaveText('4');
+    await page.locator('.side-panel').getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByTestId('needs-you-inbox')).toHaveCount(0);
+    await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
   });
-  await expect(page.getByTestId('needs-you')).toBeInViewport();
-  await expect(page.getByTestId('needs-you')).toHaveCount(1);
-});
+}
 
-test('no needs-you thread and no question means no tray and a plain tab title', async ({ page }) => {
+test('no needs-you thread and no question means no chip and a plain tab title', async ({ page }) => {
   await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: [TASK] });
   await page.goto('/app');
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
-  await expect(page.getByTestId('needs-you')).toHaveCount(0);
+  await expect(page.getByTestId('needs-you-chip')).toHaveCount(0);
   await expect(page).toHaveTitle('Cairn');
 });
 
@@ -211,14 +242,16 @@ test('an answered card fades out over 200ms and leaves a one-line summary in the
   await expect(page).toHaveTitle('Cairn');
 });
 
-test('on a phone every tray row still has a button that opens its thread', async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
+test.describe('on a touch phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('every inbox row shows a button that opens its thread', async ({ page }) => {
   await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: FIVE });
-  await page.goto('/app');
-  const tray = page.getByTestId('chief-composer-block').getByTestId('needs-you');
-  const rows = tray.locator('[data-slot="needs-you-item"]');
-  await expect(rows).toHaveCount(3);
-  for (let i = 0; i < 3; i++) {
+  await page.goto('/app?pane=inbox');
+  const rows = page.getByTestId('needs-you-inbox-row');
+  await expect(rows).toHaveCount(5);
+  for (let i = 0; i < 5; i++) {
     await expect(rows.nth(i).getByRole('button', { name: 'View thread' })).toBeVisible();
   }
+});
 });

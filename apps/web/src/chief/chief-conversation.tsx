@@ -155,7 +155,6 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
-  tray?: ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -186,7 +185,6 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
-  tray,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
@@ -724,7 +722,6 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        {tray}
         <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
         {composerReplacement ?? (
           <>

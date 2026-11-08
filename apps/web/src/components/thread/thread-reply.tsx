@@ -9,9 +9,10 @@ import {
   InputGroupTextarea,
 } from '../ui/input-group.js';
 
-export type ThreadReplyDelivery = 'steer' | 'revision' | 'restart';
+export type ThreadReplyDelivery = 'answer' | 'steer' | 'revision' | 'restart';
 
 export const THREAD_REPLY_HINT: Record<ThreadReplyDelivery, string> = {
+  answer: '作为回答发给 #{seq}，它会接着跑。',
   steer: '直接发给 #{seq}，插进它这一轮。',
   revision: '作为改计划的意见发给 #{seq}，不算批准。',
   restart: '#{seq} 会带着这句话重跑。',
@@ -61,7 +62,7 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
     <InputGroup
       data-slot="thread-reply"
       className={cn(
-        'h-auto has-disabled:bg-transparent has-disabled:opacity-100 dark:has-disabled:bg-input/30',
+        'h-auto rounded-(--radius-composer) border-0 bg-card shadow-(--shadow-composer) has-disabled:bg-card has-disabled:opacity-100 has-[[data-slot=input-group-control]:focus-visible]:ring-0 has-[[data-slot=input-group-control]:focus-visible]:shadow-(--shadow-composer-focus) dark:bg-card dark:has-disabled:bg-card',
         className,
       )}
     >

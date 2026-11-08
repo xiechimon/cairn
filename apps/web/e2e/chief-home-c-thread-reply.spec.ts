@@ -107,23 +107,23 @@ async function stubHome(
   return sent;
 }
 
-const card = (page: Page, title: string) =>
-  page.getByTestId('needs-you').locator('[data-slot="thread-card"]').filter({ hasText: title });
+async function card(page: Page, title: string) {
+  await page.getByTestId('needs-you-chip').click();
+  const row = page.getByTestId('needs-you-inbox-row').filter({ hasText: title });
+  await row.getByTestId('needs-you-inbox-toggle').click();
+  return row;
+}
 
-test('a needs-you card replies straight to its thread and says where it went', async ({ page }) => {
+test('an inbox row replies straight to its thread, says where it goes, and leaves once sent', async ({ page }) => {
   const sent = await stubHome(page, [todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1')]);
   await page.goto('/app');
-  const target = card(page, 'Split the routing migration');
-  await expect(target.locator('[data-slot="thread-reply"]')).toHaveCount(0);
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
+  const target = await card(page, 'Split the routing migration');
   const box = target.getByRole('textbox', { name: 'Reply to #7' });
   await expect(box).toBeFocused();
   await expect(target).toContainText('Plan feedback for #7, not an approval.');
   await box.fill('Split the migration out first');
   await box.press('Enter');
-  await expect(target).toContainText('Sent to #7.');
-  await expect(box).toHaveValue('');
-  await expect(box).not.toBeEditable();
+  await expect(target).toHaveCount(0);
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatchObject({
     todoId: 'todo-7',
@@ -134,8 +134,7 @@ test('a needs-you card replies straight to its thread and says where it went', a
 test('a refused reply keeps the draft and says it was not sent', async ({ page }) => {
   await stubHome(page, [todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1')], 409);
   await page.goto('/app');
-  const target = card(page, 'Split the routing migration');
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
+  const target = await card(page, 'Split the routing migration');
   const box = target.getByRole('textbox', { name: 'Reply to #7' });
   await box.fill('Keep this text');
   await box.press('Enter');
@@ -143,12 +142,16 @@ test('a refused reply keeps the draft and says it was not sent', async ({ page }
   await expect(box).toHaveValue('Keep this text');
 });
 
-test('a failed thread offers a reply that reruns it; an empty reply cannot be sent', async ({ page }) => {
-  const sent = await stubHome(page, [todo('todo-12', 12, 'Fix the orb permission', 'failed', 'build-12')]);
+test('a thread asking you takes the reply as its answer; an empty reply cannot be sent', async ({ page }) => {
+  const sent = await stubHome(page, [
+    {
+      ...todo('todo-12', 12, 'Fix the orb permission', 'needs_input', 'build-12'),
+      waitingOn: { on: 'owner', retryAt: null },
+    },
+  ]);
   await page.goto('/app');
-  const target = card(page, 'Fix the orb permission');
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
-  await expect(target).toContainText('Reruns #12 with this note.');
+  const target = await card(page, 'Fix the orb permission');
+  await expect(target).toContainText('The answer goes to #12, which then picks up again.');
   await expect(target.getByRole('button', { name: 'Send' })).toBeDisabled();
   await target.getByRole('textbox', { name: 'Reply to #12' }).press('Enter');
   expect(sent).toHaveLength(0);
@@ -190,8 +193,7 @@ test('while a reply is in flight the box is read-only; on success the thread lea
     }),
   );
   await page.goto('/app');
-  const target = card(page, 'Split the routing migration');
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
+  const target = await card(page, 'Split the routing migration');
   const box = target.getByRole('textbox', { name: 'Reply to #7' });
   await box.fill('Do A');
   await box.press('Enter');

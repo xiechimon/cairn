@@ -18,18 +18,20 @@ import { needsYouThreads } from './needs-you.js';
 import { relativeTime } from './rel-time.js';
 import { THREAD_PARAM, threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
 
-export type WorkPane = 'tasks' | 'made' | 'machines';
+export type WorkPane = 'tasks' | 'made' | 'machines' | 'inbox';
 
 export const PANE_PARAM = 'pane';
 
 export function paneOf(value: string | null): WorkPane | null {
-  return value === 'tasks' || value === 'made' || value === 'machines' ? value : null;
+  return value === 'tasks' || value === 'made' || value === 'machines' || value === 'inbox'
+    ? value
+    : null;
 }
 
 const live = (todo: TodoRecord) => todo.archivedAt == null;
 
 interface WorkPanelProps {
-  pane: Exclude<WorkPane, 'machines'>;
+  pane: Exclude<WorkPane, 'machines' | 'inbox'>;
   todos: readonly TodoRecord[];
   projectId: string | null;
   schedules: readonly ScheduleRecord[];

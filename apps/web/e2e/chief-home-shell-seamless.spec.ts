@@ -92,32 +92,34 @@ for (const theme of ['light', 'dark'] as const) {
       expect([canvas.panelTop, canvas.panelBottom]).toEqual([9, -1]);
     });
 
-    test('needs-you borders have symmetric room inside their scrollport', async ({ page }) => {
-      await page.goto('/app?scenario=home-c&thread=home-c-review');
-      const tray = page.getByTestId('needs-you');
-      await expect(tray.locator('[data-slot="thread-card"]')).toHaveCount(3);
-      const edges = await tray.evaluate((node) => {
-        const rect = node.getBoundingClientRect();
-        const left = rect.left + node.clientLeft;
-        const right = left + node.clientWidth;
-        return Array.from(node.querySelectorAll('[data-slot="thread-card"]'), (row) => {
-          const box = row.getBoundingClientRect();
+    test('a hovered or open inbox row is one full-width band that holds its trailing button', async ({
+      page,
+    }) => {
+      await page.goto('/app?scenario=home-c&pane=inbox');
+      const rows = page.getByTestId('needs-you-inbox-row');
+      await expect(rows).toHaveCount(2);
+      await rows.first().getByTestId('needs-you-inbox-toggle').click();
+      await rows.nth(1).hover();
+      for (const row of [rows.first(), rows.nth(1)]) {
+        const band = await row.evaluate((node) => {
+          const list = node.parentElement!;
+          const listBox = list.getBoundingClientRect();
+          const style = getComputedStyle(list);
+          const box = node.getBoundingClientRect();
+          const button = node.querySelector('button[aria-label]')!.getBoundingClientRect();
           return {
-            left: box.left - left,
-            right: right - box.right,
-            top: box.top - rect.top,
-            bottom: rect.top + node.clientHeight - box.bottom,
-            width: box.width,
+            left: box.left - listBox.left - Number.parseFloat(style.paddingLeft),
+            right: listBox.right - Number.parseFloat(style.paddingRight) - box.right,
+            buttonInside: button.right <= box.right && button.left >= box.left,
+            background: getComputedStyle(node).backgroundColor,
+            shadow: getComputedStyle(node).boxShadow,
           };
         });
-      });
-      for (const edge of edges) {
-        expect.soft(edge.left).toBeGreaterThanOrEqual(8);
-        expect.soft(edge.right).toBeGreaterThanOrEqual(8);
-        expect.soft(Math.abs(edge.left - edge.right)).toBeLessThanOrEqual(1);
-        expect.soft(edge.top).toBeGreaterThanOrEqual(1);
-        expect.soft(edge.bottom).toBeGreaterThanOrEqual(1);
-        expect(edge.width).toBeGreaterThan(0);
+        expect.soft(Math.abs(band.left)).toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(band.right)).toBeLessThanOrEqual(1);
+        expect.soft(band.buttonInside).toBe(true);
+        expect.soft(band.background).not.toBe('rgba(0, 0, 0, 0)');
+        expect(band.shadow).toBe('none');
       }
     });
   });
@@ -129,7 +131,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: 900 });
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.goto('/app?scenario=home-c');
-      await expect(page.getByTestId('needs-you')).toBeVisible();
+      await expect(page.getByTestId('needs-you-chip')).toBeVisible();
       for (const thread of [false, true]) {
         if (thread) {
           await page.goto('/app?scenario=home-c&thread=home-c-review');

@@ -344,6 +344,8 @@ export const askUserQuestionContentSchema = z.object({
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;
 
+export const QUESTION_SETTLED_REASON = 'question-settled';
+
 export const askUserAnswerBodySchema = z.object({
   answers: z.array(askUserAnswerSchema).min(1),
 });

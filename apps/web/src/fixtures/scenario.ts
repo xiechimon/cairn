@@ -100,7 +100,7 @@ import {
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
-import { homeC, homeCEmpty } from './home-c.js';
+import { homeC, homeCEmpty, homeInbox } from './home-c.js';
 import type { FixtureSet } from './records.js';
 import { RESOURCES } from './resources.js';
 
@@ -143,6 +143,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'sidebar-snooze': sidebarSnooze,
       'sidebar-groups': sidebarGroups,
       'home-c': homeC,
+      'home-inbox': homeInbox,
       activity: activityFixture,
       'activity-many': activityManyFixture,
       'activity-empty': { ...homeC, todos: [] },

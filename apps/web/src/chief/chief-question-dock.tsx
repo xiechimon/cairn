@@ -125,19 +125,22 @@ export function useAnswerKey(): string | null {
   return answerKeyOf(draftKeyOf(shown), stepOf(shown));
 }
 
-function useLeavingQuestion(shownId: string | undefined): ChiefQuestionItem | null {
+function useLeavingQuestion(shown: ChiefQuestionItem | undefined): ChiefQuestionItem | null {
   const root = useOptionalChiefRoot();
   const streamRef = useRef(root?.surface.chiefData.stream ?? []);
   streamRef.current = root?.surface.chiefData.stream ?? [];
-  const lastId = useRef<string | null>(null);
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
+  const shownId = shown?.requestId;
+  const last = useRef<ChiefQuestionItem | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [leaving, setLeaving] = useState<ChiefQuestionItem | null>(null);
   useEffect(() => {
-    const previous = lastId.current;
-    lastId.current = shownId ?? null;
+    const previous = last.current;
+    last.current = shownRef.current ?? null;
     if (shownId !== undefined) setLeaving(null);
-    if (previous === null || previous === shownId) return;
-    const done = leavingQuestion(previous, streamRef.current);
+    if (previous === null || previous.requestId === shownId) return;
+    const done = leavingQuestion(previous, streamRef.current, questionDockState.settled());
     if (done === null) return;
     setLeaving(done);
     clearTimeout(timer.current);
@@ -169,7 +172,7 @@ export function ChiefQuestionDock({
   );
   const at = clampQuestionIndex(index, pending.length);
   const shown = pending[at];
-  const leaving = useLeavingQuestion(shown?.item.requestId);
+  const leaving = useLeavingQuestion(shown?.item);
   const wrapCls = `${DOCK_CLS} ${home ? 'mx-auto mt-2 w-[calc(100%-2rem)] max-w-182' : 'mx-4 mt-2'}`;
   if (shown === undefined) {
     if (leaving === null) return null;

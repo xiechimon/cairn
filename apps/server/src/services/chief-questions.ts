@@ -7,6 +7,7 @@ import {
   askUserQuestionContentSchema,
   askUserQuestionSchema,
   isChiefConversationId,
+  QUESTION_SETTLED_REASON,
   type UserRecord,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -224,6 +225,7 @@ export function answerQuestion(
     throw new HttpError(
       409,
       `question ${input.requestId} already ${content.status}${reason ? `: ${reason}` : ''}`,
+      QUESTION_SETTLED_REASON,
     );
   }
   if (input.answers.length !== content.questions.length) {

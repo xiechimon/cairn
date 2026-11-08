@@ -20,8 +20,8 @@ import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, GitBranch, MessageSquare, X } from '../icons/index.js';
-import { replyDeliveryOf } from './needs-you-thread-card.js';
 import { threadCopy } from './thread-copy.js';
+import { replyDeliveryOf } from './thread-reply-send.js';
 
 export interface ThreadTarget {
   todo: TodoRecord;

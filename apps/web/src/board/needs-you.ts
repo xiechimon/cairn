@@ -1,9 +1,7 @@
 import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
 
-export const ACT_ORDER = ['needs-you', 'failed', 'review'] as const;
-
-export function actRank(todo: TodoRecord): number {
+function actRank(todo: TodoRecord): number {
   if (todo.phase === 'needs_input' || todo.phase === 'confirm') return 0;
   return 1;
 }
@@ -35,16 +33,4 @@ export function pendingQuestions(stream: readonly ChiefStreamItem[]): ChiefQuest
 
 export function needsYouCount(todos: readonly TodoRecord[], pendingQuestionCount = 0): number {
   return needsYouThreads(todos).length + pendingQuestionCount;
-}
-
-export const TRAY_PINNED = 3;
-
-export function trayWindow<T>(
-  entries: readonly T[],
-  open: boolean,
-): { shown: readonly T[]; more: number } {
-  return {
-    shown: open ? entries : entries.slice(0, TRAY_PINNED),
-    more: Math.max(0, entries.length - TRAY_PINNED),
-  };
 }

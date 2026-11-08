@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApiMutations, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useSendKey } from '../api/use-send-key.js';
-import { replyDeliveryOf } from '../board/needs-you-thread-card.js';
+import { replyDeliveryOf } from '../board/thread-reply-send.js';
 import { ThreadReply } from '../components/thread/thread-reply.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';

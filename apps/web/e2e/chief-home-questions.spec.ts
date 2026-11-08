@@ -129,6 +129,69 @@ test('answering removes the card and the badge count; the next question takes it
   await expect(badge).toHaveCount(0);
 });
 
+test('a successful answer closes the card at once, even while the conversation still reads it as pending', async ({
+  page,
+}) => {
+  const posts: string[] = [];
+  const state = structuredClone(ONE);
+  await mockLive(page, state, (path, route, json) => {
+    const match = /\/questions\/([^/]+)\/answer$/.exec(path);
+    if (match === null || route.request().method() !== 'POST') return undefined;
+    posts.push(path);
+    const row = state.messages.find((m) => m.id === `row-${match[1]}`)!;
+    const body = route.request().postDataJSON() as { answers: unknown[] };
+    return json({ ...JSON.parse(row.content as string), status: 'answered', answers: body.answers });
+  });
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  await dock.getByTestId('chief-question-option-0-0').click();
+  await page.getByTestId('chief-question-primary').click();
+  await expect.poll(() => posts.length).toBe(1);
+  await expect(dock).toHaveCount(0);
+  await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-error')).toHaveCount(0);
+  expect(posts).toHaveLength(1);
+});
+
+test('a submit the server reports as already answered closes the card without an error', async ({
+  page,
+}) => {
+  const state = structuredClone(ONE);
+  await mockLive(page, state, (path, route, json) => {
+    if (!/\/questions\/[^/]+\/answer$/.test(path) || route.request().method() !== 'POST') {
+      return undefined;
+    }
+    return json(
+      { error: 'question ask-0000000a already answered', reason: 'question-settled' },
+      409,
+    );
+  });
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  await dock.getByTestId('chief-question-option-0-0').click();
+  await page.getByTestId('chief-question-primary').click();
+  await expect(dock).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-error')).toHaveCount(0);
+});
+
+test('a refused submit for any other reason keeps the card and the draft and says so', async ({
+  page,
+}) => {
+  const state = structuredClone(ONE);
+  await mockLive(page, state, (path, route, json) => {
+    if (!/\/questions\/[^/]+\/answer$/.test(path) || route.request().method() !== 'POST') {
+      return undefined;
+    }
+    return json({ error: 'chief thread chief-global is archived' }, 409);
+  });
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  await dock.getByTestId('chief-question-option-0-0').click();
+  await page.getByTestId('chief-question-primary').click();
+  await expect(page.getByTestId('chief-question-error')).toBeVisible();
+  await expect(dock.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('free text answers inline', async ({ page }) => {
   const answered: { path: string; body: unknown }[] = [];
   const state = structuredClone(ONE);
@@ -1098,9 +1161,9 @@ test('answer drafts per request and the thread draft stay separate through every
       },
     },
     {
-      name: 'submit B: the option is what is sent',
+      name: 'submit B: the option is what is sent, and A takes the composer at once',
       run: () => composer.press('Enter'),
-      composer: '',
+      composer: 'ansA22',
       extra: async () => {
         await expect
           .poll(() => answered.map((row) => row.body.answers))

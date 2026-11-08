@@ -57,7 +57,7 @@ test('two pending decisions are answered one at a time above the composer; the r
     return json(JSON.parse(state.messages.find((row) => row.id === `row-${requestId}`)!.content));
   });
   await page.goto('/app');
-  await expect(page.getByTestId('needs-you')).toHaveCount(0);
+  await expect(page.getByTestId('needs-you-inbox')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
   const panel = page.getByTestId('chief-question-dock');
   const card = panel.getByTestId('chief-question-card');

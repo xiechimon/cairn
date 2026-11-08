@@ -1,4 +1,4 @@
-import type { AskUserAnswer, TranscriptRow } from '@cairn/shared';
+import { type AskUserAnswer, QUESTION_SETTLED_REASON, type TranscriptRow } from '@cairn/shared';
 import {
   useCallback,
   useEffect,
@@ -11,6 +11,7 @@ import {
 import { useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
+import { ApiError } from '../api/client.js';
 import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
 import {
   useApiMutations,
@@ -42,6 +43,7 @@ import {
   coordinatorLoad,
   globalCoordinatorThread,
 } from './coordinator-load.js';
+import { questionDockState } from './question-dock-state.js';
 import {
   questionActionThread,
   questionDraftKey,
@@ -275,11 +277,18 @@ export function useChiefSurface(
         mutations.chiefAnswerQuestion.mutate(
           { threadId, requestId: input.requestId, answers: input.answers },
           {
-            onSuccess: () => {
+            onSuccess: (answered) => {
+              questionDockState.settle(input.requestId, answered.answers);
               questionDraftStore.clear(key);
               questionSubmitStore.clear(key);
             },
             onError: (e) => {
+              if (e instanceof ApiError && e.reason === QUESTION_SETTLED_REASON) {
+                questionDockState.settle(input.requestId, null);
+                questionDraftStore.clear(key);
+                questionSubmitStore.clear(key);
+                return;
+              }
               questionSubmitStore.patch(key, {
                 submitting: false,
                 error: t('提交回答失败，草稿还在，请再试一次。'),

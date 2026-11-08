@@ -21,6 +21,7 @@ import {
   type TagRecord,
   type ThreadMessageContent,
   type ThreadReportContent,
+  type TodoAsk,
   type UsageCost,
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
@@ -68,6 +69,7 @@ export interface TodoRecord {
   v: number;
   chiefCreated?: boolean;
   waitingOn?: { on: 'machine' | 'quota' | 'coordinator' | 'owner'; retryAt: number | null };
+  ask?: TodoAsk;
   output?: 'code' | 'info';
   quotaWait?: QuotaWait | null;
   sourceKind?: string | null;

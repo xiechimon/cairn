@@ -5815,6 +5815,51 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "ask": {
+              "additionalProperties": false,
+              "properties": {
+                "defaultAnswer": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "options": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                      },
+                      "label": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "label",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "requestId": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "text": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "text",
+                "requestId",
+                "options",
+                "defaultAnswer",
+              ],
+              "type": "object",
+            },
             "blockedBy": {
               "anyOf": [
                 {
@@ -9906,6 +9951,51 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
           "type": "null",
         },
       ],
+    },
+    "ask": {
+      "additionalProperties": false,
+      "properties": {
+        "defaultAnswer": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "options": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string",
+              },
+              "label": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "label",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "requestId": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "text": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "text",
+        "requestId",
+        "options",
+        "defaultAnswer",
+      ],
+      "type": "object",
     },
     "blockedBy": {
       "anyOf": [
