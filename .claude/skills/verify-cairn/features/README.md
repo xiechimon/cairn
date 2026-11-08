@@ -1,6 +1,6 @@
 # cairn verification feature map
 
-This directory is the canonical source for verifying cairn's user-visible behavior. Read this index before driving, then follow the feature file as a recipe. An entry the map misses = verification is incomplete: having casually verified one entry does not mean the whole feature is verified.
+This directory is the canonical source for verifying cairn's user-visible behavior. To find which feature a report or screenshot shows and how to reach it, read [../feature-map.md](../feature-map.md) first; its rows link the recipes here. Read this index before driving, then follow the feature file as a recipe. An entry the map misses = verification is incomplete: having casually verified one entry does not mean the whole feature is verified.
 
 The entry points, actions and terminal states of the Control Glass five journeys (new task / dispatch / review diff / request changes / merge) live in [glass-journeys.md](./glass-journeys.md). The click-through script is at `.cursor/skills/verify-cairn/scripts/glass.mjs`, the flow and judgments at `.cursor/skills/verify-cairn/SKILL.md`. The cursor-side `features/` symlinks to this directory and does not store a second copy.
 
