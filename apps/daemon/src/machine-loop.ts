@@ -9,6 +9,7 @@ import type {
   MachineCapabilities,
 } from '@cairn/shared';
 import {
+  ANSWERS_ACK_VERSION,
   CLAIM_BACKOFF_CAP_MS,
   CLAIM_POLL_INTERVAL_MS,
   type ClaudeLogin,
@@ -235,6 +236,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     executor: orbProvider.kind,
     ...(orbComputer ? { computer: true as const } : {}),
     ...(hostComputer ? { ownComputer: true as const } : {}),
+    answersAck: ANSWERS_ACK_VERSION,
   });
 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
@@ -845,7 +847,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       try {
         step = await client.claim(
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
-          { maxWorkers: localCap },
+          { maxWorkers: localCap, answersAck: ANSWERS_ACK_VERSION },
         );
         backoff = backoffBase;
       } catch (err) {

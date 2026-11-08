@@ -648,6 +648,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "answersAck": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer",
+    },
     "maxWorkers": {
       "maximum": 9007199254740991,
       "minimum": 1,
@@ -6216,6 +6221,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "on": {
                   "enum": [
                     "machine",
+                    "machine-update",
                     "quota",
                   ],
                   "type": "string",
@@ -8793,6 +8799,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "answersAck": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
             "codexLogin": {
               "additionalProperties": false,
               "properties": {
@@ -10306,6 +10317,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "on": {
           "enum": [
             "machine",
+            "machine-update",
             "quota",
           ],
           "type": "string",
