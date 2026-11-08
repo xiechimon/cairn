@@ -7,6 +7,8 @@ import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
+const NO_PUBLICATION = { base: null, identity: null, coAuthor: null };
+
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 const TOKEN: BoundGitCredentials = {
   username: 'x-access-token',
@@ -204,7 +206,7 @@ describe('#2006 closing push of a work branch the remote already contains', () =
   test('failure mode 1: Update-branch merge commit on top of the local commit -> closing push returns normally and logs one line naming both short SHAs', async () => {
     const { cwd, local, remote } = await branchAlreadyUpdated();
 
-    await expect(ws.push(cwd, 'work', null)).resolves.toBeUndefined();
+    await expect(ws.push(cwd, 'work', null, NO_PUBLICATION)).resolves.toBeUndefined();
 
     const lines = logger.lines.filter((l) => l.includes('already contained'));
     expect(lines).toHaveLength(1);
@@ -230,7 +232,9 @@ describe('#2006 closing push of a work branch the remote already contains', () =
     expect(head).not.toBeNull();
     expect(remoteTip).not.toBe(head);
 
-    await expect(ws.push(cwd, 'work', null)).rejects.toThrow(/non-fast-forward|fetch first/);
+    await expect(ws.push(cwd, 'work', null, NO_PUBLICATION)).rejects.toThrow(
+      /non-fast-forward|fetch first/,
+    );
 
     expect(logger.lines.filter((l) => l.includes('already contained'))).toEqual([]);
   }, 30_000);

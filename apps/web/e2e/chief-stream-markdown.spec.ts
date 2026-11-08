@@ -383,7 +383,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     expect(geo.font).toBe('15px');
 
     const fence = coordinator.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
-    const pre = fence.locator('pre.chat-md-code');
+    const pre = fence.getByTestId('md-code-block');
     await expect(pre).toBeVisible();
     const margins = await pre.evaluate((el) => ({
       top: getComputedStyle(el).marginTop,

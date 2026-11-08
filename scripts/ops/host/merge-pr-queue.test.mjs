@@ -130,11 +130,12 @@ test('a PR Mergify already queued is neither commented nor merged', (t) => {
   assert.equal(result.merged, false);
 });
 
-test('an unprotected bot-opened PR with a passing review-gate check keeps the rebase route', (t) => {
+test('an unprotected bot-opened PR is left to Mergify like any other PR', (t) => {
   const result = mergePr(t, { opener: 'app/cairnwright', route: 'success' });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.commented, false);
-  assert.ok(result.merged);
+  assert.equal(result.merged, false);
+  assert.match(result.stdout, /Mergify queues it automatically/);
 });
 
 for (const gate of ['failure', 'in_progress', null])

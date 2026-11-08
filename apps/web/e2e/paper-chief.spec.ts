@@ -65,8 +65,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
     win = await openHome(page, THREAD);
-    const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
-    await expect(note, 'W5').toHaveCSS('font-size', '13px');
+    const note = win.getByTestId('chief-stream').getByTestId('chief-note').first();
+    await expect(note, 'W5').toHaveCSS('font-size', '15px');
     const foot = win.getByTestId('chief-msg-foot').first();
     await expect(foot, 'W5').toHaveCSS('font-size', '13px');
     await win.getByTestId('chief-tools-toggle').click();
