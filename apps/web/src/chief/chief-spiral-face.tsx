@@ -1,4 +1,5 @@
-import { BrandGlyph } from '../components/brand-glyph.js';
+import { BrandGlyphMark } from '../components/brand-glyph.js';
+import { BRAND_GLYPH } from '../lib/brand-mark.js';
 
 export function ChiefSpiralFace({
   size,
@@ -18,7 +19,12 @@ export function ChiefSpiralFace({
       className={`flex-none ${className}`}
     >
       <circle cx="50" cy="50" r="50" fill="var(--fab-surface)" />
-      <BrandGlyph busy={busy} x="22" y="22" width="56" height="56" color="var(--fab-mark)" />
+      <g
+        transform={`translate(22 22) scale(${56 / BRAND_GLYPH.small.box})`}
+        color="var(--fab-mark)"
+      >
+        <BrandGlyphMark busy={busy} />
+      </g>
     </svg>
   );
 }
