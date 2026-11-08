@@ -38,7 +38,7 @@ function formatElapsed(seconds: number, t: TFunc): string {
 
 const ROW_BASE = 'chat-row flex items-start';
 const AGENT_ROW = 'chat-row chat-row--agent flex flex-col items-start';
-const AGENT_TEXT_WIDTH = 'max-w-[min(68ch,100%)]';
+const AGENT_TEXT_WIDTH = 'w-full max-w-[68ch]';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
