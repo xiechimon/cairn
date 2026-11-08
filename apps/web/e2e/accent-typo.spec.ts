@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { BRAND_GLYPH } from '../src/lib/brand-mark.js';
 
 for (const theme of ['light', 'dark'] as const) {
   test(`font baseline: body 450, var font really loaded (${theme})`, async ({
@@ -29,7 +30,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(w).toBe('650');
   });
 
-  test(`sidebar header carries the Cairn pixel mark + name (${theme})`, async ({ page }) => {
+  test(`sidebar header carries the Cairn brand glyph + name (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/schedules?scenario=01');
 
@@ -37,13 +38,12 @@ for (const theme of ['light', 'dark'] as const) {
       const row = document.querySelector('.sidebar-team-row');
       const mark = row?.querySelector('.sidebar-brand-mark');
       const name = row?.querySelector('.sidebar-team-name');
-      if (!row || !mark || !name) throw new Error('sidebar brand head missing');
-      const ms = getComputedStyle(mark);
+      const paths = mark?.querySelectorAll('path') ?? [];
+      if (!row || !mark || !name || paths.length === 0) throw new Error('sidebar brand head missing');
       const r = mark.getBoundingClientRect();
       return {
-        maskImage: ms.getPropertyValue('mask-image') || ms.getPropertyValue('-webkit-mask-image'),
-        maskSize: ms.getPropertyValue('mask-size') || ms.getPropertyValue('-webkit-mask-size'),
-        markPaint: ms.backgroundColor,
+        paths: [...paths].map((p) => p.getAttribute('d')),
+        markPaint: getComputedStyle(paths[0] as Element).stroke,
         rowInk: getComputedStyle(row).color,
         markText: mark.textContent,
         markBox: { w: r.width, h: r.height },
@@ -51,11 +51,7 @@ for (const theme of ['light', 'dark'] as const) {
         nameHref: name.getAttribute('href'),
       };
     });
-    expect(m.maskImage).toContain('/logo-mark.svg');
-    // A one-value mask-size means `<value> auto`. Chrome for Testing 153
-    // serializes it as `100% auto`, Chromium 141 as `100%` (#1427).
-    const maskSize = m.maskSize.trim().split(/\s+/);
-    expect(maskSize.length === 1 ? [...maskSize, 'auto'] : maskSize).toEqual(['100%', 'auto']);
+    expect(m.paths).toEqual([BRAND_GLYPH.small.d]);
     expect(m.markPaint).toBe(m.rowInk);
     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
     expect(m.markText).toBe('');

@@ -1,4 +1,4 @@
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../../lib/brand-mark.js';
+import { BRAND_GLYPH } from '../../lib/brand-mark.js';
 
 export type TextureFilter = 'ascii' | 'dither';
 
@@ -68,22 +68,23 @@ export function paintSpiral(
 ): void {
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, width, height);
-  const [x, y, size] = BRAND_MARK_VIEWBOX;
-  const k = (Math.min(width, height) * frame.scale) / size / 1.28;
-  const mark = new Path2D(BRAND_MARK_PATH);
+  const { box, scale, offset, band, d } = BRAND_GLYPH.large;
+  const k = (Math.min(width, height) * frame.scale) / box / 1.28;
+  const mark = new Path2D(d);
   ctx.save();
   ctx.translate(width * frame.cx, height * frame.cy);
   ctx.rotate(frame.rotate);
-  ctx.scale(k, k);
-  ctx.translate(-(x + size / 2), -(y + size / 2));
+  ctx.scale(k * scale, k * scale);
+  ctx.translate(offset[0], offset[1]);
+  ctx.lineCap = 'round';
   if (frame.grow) {
-    ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgb(0 0 0 / 0.14)';
-    ctx.lineWidth = size * 0.07;
+    ctx.lineWidth = band + (box * 0.07) / scale;
     ctx.stroke(mark);
   }
-  ctx.fillStyle = 'rgb(0 0 0 / 0.95)';
-  ctx.fill(mark);
+  ctx.strokeStyle = 'rgb(0 0 0 / 0.95)';
+  ctx.lineWidth = band;
+  ctx.stroke(mark);
   ctx.restore();
 }
 

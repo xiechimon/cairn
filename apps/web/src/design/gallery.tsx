@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import { type RefObject, useEffect, useRef, useState } from 'react';
+import { BrandGlyph } from '../components/brand-glyph.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { AutomationSection } from './components-automation.js';
 import {
@@ -310,11 +311,7 @@ export function Gallery() {
     <div className="flex h-full bg-canvas text-foreground">
       <aside className="hidden h-full w-62 flex-none flex-col overflow-y-auto px-3 py-5 md:flex">
         <a href="#top" className="flex items-center gap-2 px-2.5 pb-1 text-foreground no-underline">
-          <span
-            aria-hidden
-            className="size-4 bg-foreground"
-            style={{ mask: 'url(/logo-mark.svg) center / contain no-repeat' }}
-          />
+          <BrandGlyph className="size-4" />
           <span
             className="text-heading font-semibold"
             style={{ fontFamily: 'var(--font-display)' }}

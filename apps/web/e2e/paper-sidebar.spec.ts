@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { BRAND_GLYPH } from '../src/lib/brand-mark.js';
 
 const sidebar = (page: Page) => page.getByRole('complementary');
 
@@ -17,12 +18,7 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   const team = page.getByTestId('team-row');
   const mark = team.getByTestId('brand-mark');
   await expect(mark).toHaveText('');
-  expect(
-    await mark.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return cs.getPropertyValue('mask-image') || cs.getPropertyValue('-webkit-mask-image');
-    }),
-  ).toContain('/logo-mark.svg');
+  await expect(mark.locator('path')).toHaveAttribute('d', BRAND_GLYPH.small.d);
   await expect(team.getByText('Cairn', { exact: true })).toBeVisible();
   await expect(team.getByRole('link')).toHaveCount(0);
   await expect(team.getByRole('button', { name: '搜索' })).toBeVisible();
