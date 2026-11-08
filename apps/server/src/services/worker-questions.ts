@@ -141,7 +141,12 @@ export async function askWorkerQuestion(
   }
 }
 
-export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string): void {
+export function settleWorkerReply(
+  deps: TodoDeps,
+  buildId: string,
+  text: string,
+  deliveredAt: number | null,
+): void {
   const todoRow = todoOfBuild(deps, buildId);
   const pending = pendingWorkerQuestions(deps.db, buildId);
   if (pending.length === 0) return;
@@ -150,7 +155,7 @@ export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string)
     buildId,
     pending.map((question) => question.requestId),
     text,
-    nowMs(),
+    deliveredAt,
   );
   recordDecisions(
     deps,
