@@ -206,7 +206,7 @@ export function trajectoryReflectCurateRunOf(
   };
 }
 
-const SCHEDULE_GATE_PHASES = new Set(['confirm', 'review']);
+const SCHEDULE_GATE_PHASES = new Set(['confirm', 'needs_input', 'review']);
 
 export function createScheduler(
   deps: BuildDeps,

@@ -256,6 +256,34 @@ describe('answers route by request id to the same build and session (task stall 
     expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
   });
 
+  test('two parked answers steered into a claimed step before it fetches either both stay queued', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A);
+    await askWorkerQuestion(
+      deps(),
+      stepRow,
+      { requestId: REQUEST_B, questions: COPY_QUESTION },
+      { holdMs: 0 },
+    );
+    for (const id of [REQUEST_A, REQUEST_B]) {
+      const stored = H.s.db.select().from(message).where(eq(message.id, id)).get();
+      H.s.db
+        .update(message)
+        .set({ content: { ...(stored?.content as object), parkedAt: Date.now() } })
+        .where(eq(message.id, id))
+        .run();
+    }
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Answer for A.' });
+    await relay('answer_question', { todoId, requestId: REQUEST_B, answer: 'Answer for B.' });
+    const steer = H.s.db
+      .select()
+      .from(steerPending)
+      .where(eq(steerPending.conversationId, buildId))
+      .get();
+    expect(steer?.stepId).toBe(stepRow.id);
+    expect(steer?.content).toContain('Answer for A.');
+    expect(steer?.content).toContain('Answer for B.');
+  });
+
   test('two pending questions answered A then B resume the session carrying both answers', async () => {
     const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A);
     await askWorkerQuestion(

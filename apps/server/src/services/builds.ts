@@ -325,6 +325,29 @@ export interface BuildSteerResult {
   delivered: 'steer' | 'new-turn';
 }
 
+export function queueSteer(
+  db: Db,
+  conversationId: string,
+  stepId: string,
+  content: string,
+  now: number,
+): void {
+  const pending = db
+    .select()
+    .from(steerPending)
+    .where(eq(steerPending.conversationId, conversationId))
+    .get();
+  const values = {
+    stepId,
+    content: pending?.stepId === stepId ? `${pending.content}\n\n${content}` : content,
+    createdAt: now,
+  };
+  db.insert(steerPending)
+    .values({ conversationId, ...values })
+    .onConflictDoUpdate({ target: steerPending.conversationId, set: values })
+    .run();
+}
+
 export async function sendBuildSteer(
   deps: BuildDeps,
   conversationId: string,
@@ -415,7 +438,7 @@ export async function sendBuildSteer(
         }
         if (
           wake.createdBy.startsWith('worker:') &&
-          ['confirm', 'review'].includes(todoRow?.phase ?? '')
+          ['confirm', 'needs_input', 'review'].includes(todoRow?.phase ?? '')
         ) {
           throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
         }
@@ -477,15 +500,7 @@ export async function sendBuildSteer(
         });
       }
       if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
-      if (running) {
-        db.insert(steerPending)
-          .values({ conversationId, stepId: running.id, content, createdAt: now })
-          .onConflictDoUpdate({
-            target: steerPending.conversationId,
-            set: { stepId: running.id, content, createdAt: now },
-          })
-          .run();
-      }
+      if (running) queueSteer(db, conversationId, running.id, content, now);
       if (todoRow) {
         if (
           !continuationOptions.schedule &&
