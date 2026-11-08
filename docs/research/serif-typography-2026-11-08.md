@@ -51,14 +51,14 @@ All measured with fontTools. `tnum` exists, so tabular digits stay available und
 
 ## Decision for cairn
 
-Follow claude.ai's split, keep cairn's own size scale (DESIGN.md's seven sizes were measured against Claude Code and are not part of this question), and take claude.ai's weights and tracking.
+Follow claude.ai's split and take its weights and tracking. Sizes come from cairn's type tokens, which #3400 aligned with claude.ai (greeting 32/38, page title 24/32, body 15/21).
 
 | Cairn surface | Role | Face | Size / line height | Weight | Tracking |
 |---|---|---|---|---|---|
 | Sidebar wordmark "Cairn" | `voice-title` | Source Serif 4 | 20px / 20px | 500 | normal |
-| Coordinator greeting | `voice-greeting` | Source Serif 4 | 26px / 32px | 360 light, 320 dark | normal |
-| Page titles: page shell `h1`, settings headers, Coordinator settings, project title menu | `voice-title` | Source Serif 4 | 20px / 26px | 500 | normal |
-| Agent replies: Coordinator reply bubble, thread agent text and reports, with their headings, bold, lists and tables | `voice-response` | Source Serif 4 | 15px / 22.5px | 400 (headings and bold 600) | normal |
+| Coordinator greeting | `voice-greeting` | Source Serif 4 | 32px / 38px | 360 light, 320 dark | normal |
+| Page titles: page shell `h1`, settings headers, Coordinator settings, project title menu | `voice-title` | Source Serif 4 | 24px / 32px | 500 | normal |
+| Agent replies: Coordinator reply bubble, thread agent text and reports, with their headings, bold, lists and tables | `voice-response` | Source Serif 4 | 15px / 21px | 400 (headings and bold 600) | normal |
 | Code, inline code, task cards, attachment and mention chips inside replies | unchanged | JetBrains Mono / Instrument Sans | unchanged | unchanged | unchanged |
 | User messages, thinking, composer, dialog and pane titles, section headings, rows, meta | unchanged | Instrument Sans | unchanged | unchanged | unchanged |
 | Chinese under the serif | font chain | PingFang SC → Hiragino Sans GB → Microsoft YaHei → Noto Sans CJK SC | inherits | inherits | inherits |
