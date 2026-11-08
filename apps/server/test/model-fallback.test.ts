@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   machine as machineTable,
@@ -576,6 +576,76 @@ describe('model fallback chain (#1493)', () => {
       expect(stepRow(w, 'claimed-sibling').status).toBe(
         outcome.status === 'success' ? 'done' : outcome.status,
       );
+      expect(
+        w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all(),
+      ).toHaveLength(2);
+    },
+  );
+
+  test.each([
+    ['success', { status: 'success', hasChanges: true }, true],
+    ['provider failure', { status: 'failed', errorMessage: 'Connection error.' }, false],
+    ['task failure', { status: 'failed', errorMessage: 'git push failed (1)' }, false],
+    ['stop', { status: 'stopped' }, false],
+    [
+      'silent success',
+      {
+        status: 'success',
+        noOutput: true,
+        usage: [{ model: 'relay-b/model-b', input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }],
+      },
+      false,
+    ],
+  ] as const)(
+    'a parked fallback sibling settles its provider probe on %s',
+    async (_label, outcome, clearsFailures) => {
+      const w = await setupWorld();
+      const buildId = await startBuild(w);
+      const first = await claim(w);
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'fallback-probe-sibling',
+          buildId,
+          kind: 'session',
+          status: 'claimed',
+          machineId: stepRow(w, first.stepId).machineId,
+          claimedAt: Date.now(),
+          createdAt: Date.now(),
+          fallback: {
+            model: { provider: 'relay-b', modelId: 'model-b' },
+            tried: ['relay-a/model-a', 'relay-b/model-b'],
+            zeroUsageRetried: false,
+          },
+        })
+        .run();
+      await done(w, first.stepId, { status: 'failed', errorMessage: 'model_not_found: model-a' });
+      const reason = w.s.db
+        .select()
+        .from(buildTable)
+        .where(eq(buildTable.id, buildId))
+        .get()?.errorMessage;
+      for (let i = 0; i < 5; i++) providerHealth.recordFailure('relay-b');
+      const circuit = vi.spyOn(providerHealth, 'state').mockReturnValue('half_open');
+      const failures = vi.spyOn(providerHealth, 'recordFailure');
+      try {
+        expect(providerHealth.tryAcquire('relay-b')).toBe(true);
+        expect(providerHealth.tryAcquire('relay-b')).toBe(false);
+        await done(w, 'fallback-probe-sibling', outcome);
+        expect(providerHealth.tryAcquire('relay-b')).toBe(true);
+        if (_label === 'provider failure') expect(failures).toHaveBeenCalledWith('relay-b');
+        else expect(failures).not.toHaveBeenCalled();
+      } finally {
+        circuit.mockRestore();
+        failures.mockRestore();
+      }
+      expect(providerHealth.state('relay-b')).toBe(clearsFailures ? 'healthy' : 'open');
+      expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.phase).toBe(
+        'failed',
+      );
+      expect(
+        w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()?.errorMessage,
+      ).toBe(reason);
       expect(
         w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all(),
       ).toHaveLength(2);

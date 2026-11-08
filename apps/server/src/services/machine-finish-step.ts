@@ -382,6 +382,12 @@ async function finishStepReport(
     return;
   }
   if (worker !== null && settleParkedStep(deps, stepRow, outcome)) {
+    if (worker.agentRow)
+      recordProviderOutcome(
+        effectiveModel(worker.agentRow, stepRow).provider,
+        outcome,
+        isZeroUsageSilentSuccess(stepRow.kind, outcome),
+      );
     if (outcome.skillInjectionFacts !== undefined)
       recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
     emitRuntimeStepSpan(deps.db, stepId);
