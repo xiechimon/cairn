@@ -2,6 +2,9 @@ import {
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
+  encodeReplyQuote,
+  parseReplyQuote,
+  replyQuoteText,
 } from '@cairn/shared';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
@@ -76,6 +79,8 @@ import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
+import { ReplyQuoteBlock } from './reply-quote-block.js';
+import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
@@ -334,6 +339,7 @@ export function ChiefConversation({
     const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
     incoming.current?.focus({ preventScroll: true });
   }, [activeComposer]);
+  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const restoreToThread = (update: (current: string) => string) => {
     setThreadOverride(true);
     setLiveDraft(update);
@@ -356,12 +362,26 @@ export function ChiefConversation({
       : (text: string) => {
           followSentRef.current = true;
           userKeyAtSendRef.current = latestUserKeyRef.current;
-          const sent = onSend(text, chipProjectId);
-          Promise.resolve(sent).catch(() => {
-            followSentRef.current = false;
-          });
+          const quoted = replyQuote;
+          const sent = onSend(
+            quoted === null ? text : encodeReplyQuote(quoted, text),
+            chipProjectId,
+          );
+          Promise.resolve(sent).then(
+            () => setReplyQuote((current) => (current === quoted ? null : current)),
+            () => {
+              followSentRef.current = false;
+            },
+          );
           return sent;
         };
+  const stageReply = useCallback((draft: ReplyQuoteDraft) => {
+    setReplyQuote(draft);
+    setThreadOverride(true);
+    if (shownComposerRef.current === THREAD_COMPOSER)
+      surfaceRef.current?.focus({ preventScroll: true });
+    else threadFocusPendingRef.current = true;
+  }, []);
   useEffect(() => {
     if (open) return;
     setRewindConfirm(null);
@@ -407,7 +427,11 @@ export function ChiefConversation({
           onWithdraw(messageId).then(
             () => {
               followSentRef.current = false;
-              restoreToThread((cur) => (cur === '' ? text : `${cur}\n${text}`));
+              const reply = parseReplyQuote(text);
+              const body = reply?.body ?? text;
+              if (reply !== null)
+                setReplyQuote({ sourceMessageId: reply.sourceMessageId ?? '', quote: reply.quote });
+              restoreToThread((cur) => (cur === '' ? body : `${cur}\n${body}`));
             },
             () => {},
           );
@@ -451,7 +475,7 @@ export function ChiefConversation({
       ? [
           {
             id: item.id,
-            content: item.text,
+            content: replyQuoteText(item.text),
             ...(item.pending === 'held' ? { note: t('已存下，Coordinator 恢复后会处理') } : {}),
             held: item.pending === 'held',
           },
@@ -460,12 +484,17 @@ export function ChiefConversation({
   );
   const outstandingReports = outstandingReportIds(chief.stream ?? []);
   const capsules = (
-    <QueuedCapsules
-      messages={queuedCapsules}
-      onSendNow={onSteer ? (id) => onSteer(id) : undefined}
-      onRemove={withdraw}
-      removeLabel={t('撤回')}
-    />
+    <>
+      {replyQuote !== null && (
+        <ReplyQuoteBlock quote={replyQuote.quote} onRemove={() => setReplyQuote(null)} />
+      )}
+      <QueuedCapsules
+        messages={queuedCapsules}
+        onSendNow={onSteer ? (id) => onSteer(id) : undefined}
+        onRemove={withdraw}
+        removeLabel={t('撤回')}
+      />
+    </>
   );
   const tools = (
     <>
@@ -699,6 +728,11 @@ export function ChiefConversation({
               <ArrowDown width={16} height={16} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
+            <SelectionReply
+              containerRef={viewportRef}
+              enabled={open && onSend != null && composerReplacement == null}
+              onReply={stageReply}
+            />
             {earlier != null && (
               <ChiefEarlierLoader
                 earlier={earlier}
