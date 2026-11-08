@@ -186,6 +186,18 @@ describe('provider connection check', () => {
     expect(calls[0]?.headers.has('authorization')).toBe(false);
   });
 
+  test('honours a saved Bearer override for an Anthropic-compatible gateway', async () => {
+    const calls = transport({
+      status: 401,
+      body: { error: { type: 'authentication_error', message: 'fixture denial' } },
+    });
+    const s = bootServer();
+    await result(s, await addProvider(s, { api: 'anthropic-messages', authHeader: true }));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers.get('authorization') === `Bearer ${KEY}`).toBe(true);
+    expect(calls[0]?.headers.has('x-api-key')).toBe(false);
+  });
+
   test('reports missing models without an outbound request', async () => {
     const calls = transport({ status: 200, body: completion() });
     const s = bootServer();

@@ -47,6 +47,12 @@ CI also caught an omitted route-vocabulary registration in wire.test.ts; registe
 
 The second cloud review found two P2 instances in separate classes: paired-device credentials inherited the database owner's capability, and a completed or in-flight check survived saved configuration edits. A real paired-device enrollment test reproduced true capability on a credential whose POST is forbidden; a false capability now also requires no pairedDeviceId. Browser negative controls reproduced both stale completed status and in-flight status; the check row is now keyed by the serialized saved provider record, including its key-rotation update timestamp. A configuration update remounts the row, invalidating both old state and late results. Final focused run: 217 tests across six related files, six browser cases, lint, typecheck, spec parsing and prepush all passed.
 
+## Materializer re-evaluation after three review rounds
+
+The third review found that the shared server materializer itself omitted authHeader, unlike the daemon materializer. Reconsidered the assumption that server and daemon materializers were already equivalent. Do not patch authentication in the probe: fix stepProvider's credential resolution to use pi-ai header-owned auth for an explicit Bearer override, retaining native protocol authentication otherwise. This also corrects real in-server runs for those saved gateways. The new Anthropic Bearer-only regression failed before the fix; native Anthropic x-api-key and OpenAI native Bearer tests remain green. No second protocol implementation was added. Overlap lookup for provider.ts returned no overlapping PR.
+
+Final focused verification including the CI-timeout file: 222 tests passed in seven files; verify-dispatch's four cases pass locally. A broader import-graph-related run was attempted but exceeded the shell timeout without a final suite result; do not claim it passed. Lint, typecheck, spec parsing and prepush were rerun successfully. Keep CI ownership until the current head reports.
+
 ## UI comparison
 
 | State | Reference | Ours | Verdict |
