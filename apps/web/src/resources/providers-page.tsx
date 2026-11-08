@@ -337,6 +337,7 @@ export function ProvidersPage() {
               toastError(t('保存失败，请重试。'), error);
               throw error;
             }),
+          test: () => mutations.testProvider.mutateAsync(record.id),
           remove: () =>
             mutations.deleteProvider.mutate(record.id, {
               onError: (error) => toastError(t('移除失败，请重试。'), error),

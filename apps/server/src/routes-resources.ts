@@ -11,10 +11,12 @@ import {
   patchMachineBodySchema,
   patchProviderBodySchema,
   patchScheduleBodySchema,
+  redactSecrets,
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
   THINKING_LEVELS,
+  testProviderBodySchema,
 } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -39,6 +41,7 @@ import {
 } from './services/claude-subscriptions.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
+import { isOwner } from './services/feature-flags.js';
 import {
   deleteGithubConnection,
   readGithubConnectionStatus,
@@ -62,6 +65,7 @@ import {
   startGithubConnectionAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
+import { ProviderTestLimiter, testProviderConnection } from './services/provider-test.js';
 import {
   createProvider,
   deleteProvider,
@@ -404,6 +408,33 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const body = parseWith(patchProviderBodySchema, await jsonBody(c), 'body');
     return c.json(updateProvider(keysvc, teamId, c.req.param('pid'), body));
+  });
+
+  const providerTestLimiter = new ProviderTestLimiter();
+  app.post('/api/teams/:id/providers/:pid/test', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (!isOwner(ctx.db, ctx.user.id)) {
+      throw new HttpError(
+        403,
+        redactSecrets('Only the owner can test a provider connection.').value as string,
+      );
+    }
+    const body = parseWith(testProviderBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    const id = c.req.param('pid');
+    providerTestLimiter.take(id);
+    return c.json(
+      await testProviderConnection(
+        {
+          ...keysvc,
+          fetch: ctx.providerTestFetch ?? globalThis.fetch,
+          ...(ctx.providerTestTimeoutMs === undefined
+            ? {}
+            : { timeoutMs: ctx.providerTestTimeoutMs }),
+        },
+        { teamId, id, ...body },
+      ),
+    );
   });
 
   app.delete('/api/teams/:id/providers/:pid', (c) => {

@@ -1,0 +1,53 @@
+import { expect, test } from '@playwright/test';
+import { mockLive } from './chief-home-mock';
+
+const RECORD = {
+  kind: 'custom', providerId: 'relay-fixture', label: 'Relay connection',
+  baseUrl: 'https://gateway.example.invalid/v1', api: 'openai-completions',
+  authHeader: false, compat: {}, models: [{ id: 'small-model', name: 'Small model' }],
+  id: 'prov-relay', createdBy: 'u1', createdAt: 1, updatedAt: 1,
+};
+
+test('connection check shows only a status and scrubbed failure details', async ({ page }) => {
+  let result = { status: 'ok', reason: null as string | null };
+  const posts: string[] = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/providers/prov-relay/test') {
+      posts.push(route.request().method());
+      return json(result);
+    }
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [RECORD] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  const editor = page.getByTestId('provider-editor');
+  await expect(editor.getByLabel('名称')).toHaveValue('Relay connection');
+  await editor.getByRole('button', { name: '测试', exact: true }).click();
+  const outcome = editor.getByTestId('provider-test-result');
+  await expect(outcome).toHaveText('连接正常');
+  expect(posts).toEqual(['POST']);
+  result = { status: 'failed', reason: 'Incorrect credential: [REDACTED]' };
+  await editor.getByRole('button', { name: '测试', exact: true }).click();
+  await expect(outcome).toHaveText('连接失败，请检查连接设置后重试。');
+  await editor.getByText('详情', { exact: true }).click();
+  await expect(editor.getByTestId('provider-test-reason')).toHaveText(result.reason);
+  await expect(outcome).not.toContainText('small-model');
+});
+
+test('pending checks disable repeat clicks and transport errors use safe copy', async ({ page }) => {
+  let release: (() => void) | undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/providers/prov-relay/test') return held.then(() => route.abort());
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [RECORD] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  const editor = page.getByTestId('provider-editor');
+  await editor.getByRole('button', { name: '测试', exact: true }).click();
+  await expect(editor.getByRole('button', { name: '测试中…', exact: true })).toBeDisabled();
+  release?.();
+  await expect(editor.getByTestId('provider-test-result')).toHaveText('测试没能跑完，请重试。');
+});
