@@ -21,6 +21,7 @@ const count = z.number().int().min(0);
 export const prPanelRowSchema = z.object({
   buildId: recordId,
   threadId: recordId,
+  projectId: recordId.nullable(),
   repo: z.string(),
   number: z.number().int().min(1),
   title: z.string(),
@@ -29,8 +30,17 @@ export const prPanelRowSchema = z.object({
   mergeState: prMergeStateSchema,
   additions: count,
   deletions: count,
-  checks: z.object({ passed: count, failed: count, running: count, total: count }),
+  branch: z.string(),
+  base: z.string(),
+  checks: z.object({
+    passed: count,
+    failed: count,
+    running: count,
+    total: count,
+    failedNames: z.array(z.string()),
+  }),
   head: z.string(),
+  checksReadFor: z.string(),
   verdict: z.object({ result: z.enum(['pass', 'block']), judgedHead: z.string() }).nullable(),
   autoFix: z.boolean(),
   mergeWhenReady: z.boolean(),
@@ -38,6 +48,7 @@ export const prPanelRowSchema = z.object({
   dismissed: z.boolean(),
   blockedSince: epochMs.nullable(),
   wakeRounds: count,
+  lastReadAt: epochMs,
 });
 export type PrPanelRow = z.infer<typeof prPanelRowSchema>;
 

@@ -5,10 +5,15 @@ export type PrCardState =
   | 'conflicts'
   | 'checks-running'
   | 'checks-failed'
+  | 'review-pending'
   | 'review-block'
   | 'review-pass'
   | 'queued'
   | 'merged'
+  | 'closed'
+  | 'draft'
+  | 'behind'
+  | 'merge-blocked'
   | 'owner-route';
 
 export type PrCardResult = 'pass' | 'block' | 'pending';
@@ -29,12 +34,19 @@ export interface PrCardChecks {
   failed: number;
   running: number;
   total: number;
+  failedNames?: string[];
 }
 
 export interface PrCardModel {
   number: number;
   title: string;
-  branch: string;
+  branch?: string;
+  base?: string;
+  repo?: string;
+  additions?: number;
+  deletions?: number;
+  readAgoMinutes?: number;
+  ciUnread?: boolean;
   state: PrCardState;
   checks: PrCardChecks;
   verdict: PrCardVerdict | null;
@@ -75,7 +87,10 @@ export function shortHead(sha: string): string {
   return sha.slice(0, SHORT_HEAD_LENGTH);
 }
 
-export function isVerdictStale(pr: Pick<PrCardModel, 'verdict' | 'currentHead'>): boolean {
+export function isVerdictStale(
+  pr: Pick<PrCardModel, 'verdict' | 'currentHead' | 'state'>,
+): boolean {
+  if (pr.state === 'merged' || pr.state === 'closed') return false;
   return pr.verdict != null && pr.verdict.judgedHead !== pr.currentHead;
 }
 

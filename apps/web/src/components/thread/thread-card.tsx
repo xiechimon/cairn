@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { StoneTone } from '../stone/tone.js';
 import { ToneGlyph } from '../stone/tone-glyph.js';
 import { Button } from '../ui/button.js';
+import { PrLink } from './pr-link.js';
 
 export interface ThreadCardProps {
   title: string;
@@ -14,6 +15,7 @@ export interface ThreadCardProps {
   viewLabel?: string;
   onView?: () => void;
   footer?: ReactNode;
+  prLink?: { number: number; url: string };
   compact?: boolean;
   className?: string;
 }
@@ -28,6 +30,7 @@ export function ThreadCard({
   viewLabel = 'View thread',
   onView,
   footer,
+  prLink,
   compact = false,
   className,
 }: ThreadCardProps) {
@@ -47,6 +50,9 @@ export function ThreadCard({
             {title}
           </h3>
           <span className="sr-only">{stateLabel}</span>
+          {prLink != null && (
+            <PrLink number={prLink.number} url={prLink.url} className="flex-none text-meta" />
+          )}
           <p className="m-0 min-w-0 flex-1 truncate text-meta text-content-secondary @max-lg:sr-only">
             {reason}
           </p>
@@ -84,6 +90,9 @@ export function ThreadCard({
         <div className="flex items-baseline gap-2.5">
           <h3 className="m-0 min-w-0 truncate text-ui font-semibold text-foreground">{title}</h3>
           <span className="sr-only">{stateLabel}</span>
+          {prLink != null && (
+            <PrLink number={prLink.number} url={prLink.url} className="text-meta" />
+          )}
         </div>
         <p className="mt-0.5 mb-0 text-meta text-content-secondary">{reason}</p>
         <div className="mt-3 flex flex-wrap gap-2">

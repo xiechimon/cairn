@@ -242,6 +242,7 @@ function fixture() {
         title: 'change',
         htmlUrl: null,
         headSha: 'abc',
+        headRef: 'work',
         mergeableState: 'clean',
         additions: 1,
         deletions: 0,

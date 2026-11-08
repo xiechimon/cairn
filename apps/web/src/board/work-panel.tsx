@@ -1,10 +1,14 @@
 import { PackageCheck } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
+import { usePrs } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { mergeQueries, QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
+import { PrList } from '../components/thread/pr-list.js';
+import { prByThread } from '../components/thread/pr-panel-model.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
@@ -12,7 +16,7 @@ import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
 import { needsYouThreads } from './needs-you.js';
 import { relativeTime } from './rel-time.js';
-import { threadCopy, threadStatus, threadTone } from './thread-copy.js';
+import { THREAD_PARAM, threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
 
 export type WorkPane = 'tasks' | 'made' | 'machines';
 
@@ -27,6 +31,7 @@ const live = (todo: TodoRecord) => todo.archivedAt == null;
 interface WorkPanelProps {
   pane: Exclude<WorkPane, 'machines'>;
   todos: readonly TodoRecord[];
+  projectId: string | null;
   schedules: readonly ScheduleRecord[];
   now: number;
   onClose: () => void;
@@ -38,6 +43,7 @@ interface WorkPanelProps {
 export function WorkPanel({
   pane,
   todos,
+  projectId,
   schedules,
   now,
   onClose,
@@ -52,9 +58,19 @@ export function WorkPanel({
     onCollapsedChange: (next: boolean) => setFolded((prev) => ({ ...prev, [id]: next })),
   });
   const title = pane === 'tasks' ? t('任务') : t('成果');
+  const { live: connected, teamId } = useLiveData();
+  const prs = usePrs(teamId, undefined, connected);
+  const scopedPrs = (prs.data ?? []).filter(
+    (pr) => projectId === null || pr.projectId === projectId,
+  );
+  const prOf = prByThread(scopedPrs);
+  const [, setSearchParams] = useSearchParams();
   const row = (todo: TodoRecord, tone = threadTone(todo)) => (
     <ThreadRow
       key={todo.id}
+      {...(prOf.has(todo.id)
+        ? { prLink: { number: prOf.get(todo.id)?.number ?? 0, url: prOf.get(todo.id)?.url ?? '' } }
+        : {})}
       title={todo.title}
       tone={tone}
       reason={t(threadCopy(todo).reason)}
@@ -113,6 +129,46 @@ export function WorkPanel({
           />
         ))}
       </StoneGroup>
+      {connected && (
+        <section data-testid="work-prs" className="flex flex-col pt-1">
+          <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-meta font-medium text-content-secondary">
+            {t('拉取请求')}
+            <span className="font-normal text-content-tertiary tabular-nums">
+              {scopedPrs.length}
+            </span>
+          </h3>
+          {prs.status === 'error' ? (
+            <p className="m-0 flex items-center gap-2 pb-2 pl-2.5 text-meta text-content-tertiary">
+              {t('PR 列表加载失败，稍后会自动重试。')}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6.5 text-meta"
+                onClick={() => void prs.refetch()}
+              >
+                {t('重试')}
+              </Button>
+            </p>
+          ) : scopedPrs.length === 0 ? (
+            <p className="m-0 pb-2 pl-2.5 text-meta text-content-tertiary">
+              {t('任务开出 PR 后会列在这里。')}
+            </p>
+          ) : (
+            <PrList
+              rows={scopedPrs}
+              onOpenThread={onOpenThread}
+              onViewChanges={(pr) =>
+                setSearchParams((prev) => {
+                  const params = new URLSearchParams(prev);
+                  params.set(THREAD_PARAM, pr.threadId);
+                  params.set(VIEW_PARAM, 'changes');
+                  return params;
+                })
+              }
+            />
+          )}
+        </section>
+      )}
       <Button
         variant="ghost"
         size="sm"

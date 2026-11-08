@@ -1,36 +1,22 @@
 import { cn } from 'cn';
-import { ChevronDown, ExternalLink, GitPullRequest } from 'lucide-react';
+import { ChevronDown, Clock, GitMerge, GitPullRequest, GitPullRequestClosed } from 'lucide-react';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
-import { Button } from '../ui/button.js';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible.js';
 import { isVerdictStale, type PrCardModel, type PrCardResult } from './pr-card-model.js';
+import { PrLink } from './pr-link.js';
+import { PrRowMenu } from './pr-row-menu.js';
 
 export interface PrCardProps {
   pr: PrCardModel;
   onViewDiff?: () => void;
   onResolve?: () => void;
   githubHref?: string;
+  readOnly?: boolean;
   className?: string;
 }
 
 type Tone = 'neutral' | 'ok' | 'warn' | 'fail';
-
-const TONE_CHIP: Record<Tone, string> = {
-  neutral: 'bg-secondary text-content-secondary',
-  ok: 'bg-secondary text-content-secondary',
-  warn: 'bg-secondary text-(--waiting-ink)',
-  fail: 'bg-secondary text-destructive',
-};
-
-const TONE_TEXT: Record<Tone, string> = {
-  neutral: 'text-content-secondary',
-  ok: 'text-content-secondary',
-  warn: 'text-(--waiting-ink)',
-  fail: 'text-(--fail-fg)',
-};
-
-const RESULT_TONE: Record<PrCardResult, Tone> = { pass: 'ok', block: 'fail', pending: 'neutral' };
 
 function resultWord(result: PrCardResult, t: TFunc): string {
   if (result === 'pass') return 'PASS';
@@ -38,8 +24,8 @@ function resultWord(result: PrCardResult, t: TFunc): string {
   return t('待定');
 }
 
-function pillOf(pr: PrCardModel, t: TFunc): { label: string; tone: Tone } {
-  if (pr.state !== 'merged' && isVerdictStale(pr)) return { label: t('需重新审核'), tone: 'warn' };
+export function pillOf(pr: PrCardModel, t: TFunc): { label: string; tone: Tone } {
+  if (isVerdictStale(pr)) return { label: t('需重新审核'), tone: 'warn' };
   switch (pr.state) {
     case 'open':
       return { label: t('已开启'), tone: 'neutral' };
@@ -49,8 +35,18 @@ function pillOf(pr: PrCardModel, t: TFunc): { label: string; tone: Tone } {
       return { label: t('检查运行中'), tone: 'neutral' };
     case 'checks-failed':
       return { label: t('检查未通过'), tone: 'fail' };
+    case 'review-pending':
+      return { label: t('等待审核'), tone: 'neutral' };
     case 'review-block':
       return { label: t('审核未通过'), tone: 'fail' };
+    case 'closed':
+      return { label: t('已关闭'), tone: 'neutral' };
+    case 'draft':
+      return { label: t('草稿'), tone: 'neutral' };
+    case 'behind':
+      return { label: t('落后于 main'), tone: 'warn' };
+    case 'merge-blocked':
+      return { label: t('GitHub 暂不允许合并'), tone: 'warn' };
     case 'review-pass':
       return { label: t('可合并'), tone: 'ok' };
     case 'queued':
@@ -66,220 +62,202 @@ function Sha({ value }: { value: string }) {
   return <code className="font-mono tabular-nums">{value}</code>;
 }
 
-function VerdictLine({ pr }: { pr: PrCardModel }) {
-  const { t } = useI18n();
-  const { verdict } = pr;
-  const stale = isVerdictStale(pr);
-  const current = (
-    <>
-      {' · head '}
-      <Sha value={pr.currentHead} />
-    </>
-  );
-  if (pr.state === 'merged' && verdict != null) {
-    return (
-      <p className="m-0 text-meta text-content-secondary">
-        {t('审核 {result}', { result: resultWord(verdict.result, t) })}
-        {' · '}
-        {t('评审于')} <Sha value={verdict.judgedHead} />
-      </p>
-    );
-  }
-  if (pr.state === 'checks-running' || pr.state === 'checks-failed') {
-    return (
-      <p
-        className={cn(
-          'm-0 text-meta',
-          pr.state === 'checks-failed' ? 'text-(--fail-fg)' : 'text-content-secondary',
-        )}
-      >
-        {checksSummary(pr, t)}
-        {current}
-      </p>
-    );
-  }
-  if (pr.state === 'conflicts') {
-    return (
-      <p className="m-0 text-meta text-(--fail-fg)">
-        {t('与 main 冲突，解决后才会审核')}
-        {current}
-      </p>
-    );
-  }
-  if (pr.state === 'owner-route') {
-    return (
-      <p className="m-0 text-meta text-(--waiting-ink)">
-        {pr.ownerRoute ?? t('交给负责人合并')}
-        {verdict != null && !stale && (
-          <>
-            {' · '}
-            {t('审核 {result}', { result: resultWord(verdict.result, t) })}
-            {' · '}
-            {t('评审于')} <Sha value={verdict.judgedHead} />
-          </>
-        )}
-      </p>
-    );
-  }
-  if (verdict == null) {
-    return (
-      <p className="m-0 text-meta text-content-tertiary">
-        {t('还没有审核')}
-        {current}
-      </p>
-    );
-  }
-  if (stale) {
-    return (
-      <p className="m-0 text-meta text-(--waiting-ink)">
-        {t('head 已移到')} <Sha value={pr.currentHead} /> {'· '}
-        {t('审核结论已过期')} ({t('评审于')} <Sha value={verdict.judgedHead} />)
-      </p>
-    );
-  }
+const FAILED_NAMES_SHOWN = 3;
+
+function failedLine(pr: PrCardModel, t: TFunc): string | null {
+  const { failed, failedNames = [] } = pr.checks;
+  if (failed === 0) return null;
+  if (failedNames.length === 0) return t('{failed} 个失败', { failed });
+  const shown = failedNames.slice(0, FAILED_NAMES_SHOWN).join(', ');
+  const more = failedNames.length - FAILED_NAMES_SHOWN;
+  return t('{failed} 个失败：{names}', {
+    failed,
+    names: more > 0 ? `${shown} +${more}` : shown,
+  });
+}
+
+function dotOf(pr: PrCardModel): { tone: string; label: 'failed' | 'running' | 'passed' } {
+  if (pr.checks.failed > 0) return { tone: 'bg-destructive', label: 'failed' };
+  if (pr.checks.running > 0) return { tone: 'bg-content-tertiary', label: 'running' };
+  return { tone: 'bg-content-tertiary', label: 'passed' };
+}
+
+function stateIcon(pr: PrCardModel) {
+  const Icon =
+    pr.state === 'merged'
+      ? GitMerge
+      : pr.state === 'closed'
+        ? GitPullRequestClosed
+        : GitPullRequest;
   return (
-    <p className={cn('m-0 text-meta', TONE_TEXT[RESULT_TONE[verdict.result]])}>
-      {t('审核 {result}', { result: resultWord(verdict.result, t) })} {'· '}
-      {t('评审于')} <Sha value={verdict.judgedHead} />
-    </p>
+    <Icon aria-hidden strokeWidth={1.75} className="size-3.5 flex-none text-content-tertiary" />
   );
 }
 
-function checksSummary(pr: PrCardModel, t: TFunc): string {
-  const { passed, failed, running, total } = pr.checks;
-  if (failed > 0) return t('{failed} 个失败 · {passed}/{total} 通过', { failed, passed, total });
-  if (running > 0)
-    return t('{running} 个运行中 · {passed}/{total} 通过', { running, passed, total });
-  return t('{passed}/{total} 通过', { passed, total });
+function CheckCount({ pr }: { pr: PrCardModel }) {
+  const { t } = useI18n();
+  const { passed, total } = pr.checks;
+  if (total === 0 && pr.ciUnread === true) {
+    return (
+      <span
+        data-slot="pr-checks"
+        data-ci="unread"
+        className="flex-none text-meta text-content-tertiary"
+      >
+        {t('CI 未读取')}
+      </span>
+    );
+  }
+  if (total === 0) return null;
+  const dot = dotOf(pr);
+  return (
+    <span
+      data-slot="pr-checks"
+      data-ci={dot.label}
+      title={t('检查通过 {passed} / {total}', { passed, total })}
+      className="inline-flex flex-none items-center gap-1 text-meta text-content-tertiary tabular-nums"
+    >
+      <span aria-hidden className={cn('size-1.5 rounded-full', dot.tone)} />
+      {passed}/{total}
+    </span>
+  );
+}
+
+function verdictText(pr: PrCardModel, t: TFunc): string | null {
+  const { verdict } = pr;
+  if (pr.state === 'owner-route') return pr.ownerRoute ?? t('交给负责人合并');
+  if (pr.state === 'conflicts') return t('与 main 冲突，解决后才会审核');
+  if (pr.state === 'behind') return t('分支落后，更新后才能合并');
+  if (pr.state === 'merge-blocked') return t('审核已通过，GitHub 还不允许合并');
+  if (verdict == null) {
+    return pr.state === 'draft' || pr.state === 'closed' ? null : t('还没有审核');
+  }
+  if (isVerdictStale(pr)) {
+    return `${t('审核结论已过期')} (${t('评审于')} ${verdict.judgedHead} → ${pr.currentHead})`;
+  }
+  return `${t('审核 {result}', { result: resultWord(verdict.result, t) })} · ${t('评审于')} ${verdict.judgedHead}`;
 }
 
 function Details({ pr }: { pr: PrCardModel }) {
   const { t } = useI18n();
   const lenses = pr.verdict?.lenses ?? [];
   const blockers = pr.blockers ?? [];
+  const verdict = verdictText(pr, t);
+  const failures = failedLine(pr, t);
+  const hasBranch = pr.branch !== undefined && pr.branch !== '';
   return (
-    <dl className="m-0 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 pt-2 text-meta">
-      <dt className="text-content-tertiary">{t('分支')}</dt>
-      <dd className="m-0 min-w-0 truncate font-mono text-content-secondary">{pr.branch}</dd>
-      <dt className="text-content-tertiary">{t('检查')}</dt>
-      <dd className="m-0 text-content-secondary">{checksSummary(pr, t)}</dd>
-      {pr.verdict != null && (
-        <>
-          <dt className="text-content-tertiary">{t('评审 head')}</dt>
-          <dd className="m-0 text-content-secondary">
-            <Sha value={pr.verdict.judgedHead} />
-            {isVerdictStale(pr) && (
-              <>
-                {' → '}
-                <Sha value={pr.currentHead} />
-              </>
-            )}
-          </dd>
-        </>
+    <div
+      data-slot="pr-card-details"
+      className="flex flex-col gap-1 pt-1.5 pl-5.5 text-meta text-content-tertiary"
+    >
+      <p data-slot="pr-card-title" className="m-0 break-words text-ui text-foreground">
+        {pr.title}
+      </p>
+      {(hasBranch || pr.additions !== undefined) && (
+        <p className="m-0 flex min-w-0 flex-wrap items-center gap-x-1.5 tabular-nums">
+          {hasBranch && (
+            <span className="min-w-0 truncate font-mono">
+              {pr.branch}
+              {pr.base !== undefined && pr.base !== '' ? ` → ${pr.base}` : ''}
+            </span>
+          )}
+          {pr.additions !== undefined && pr.deletions !== undefined && (
+            <span>
+              +{pr.additions} −{pr.deletions}
+            </span>
+          )}
+        </p>
       )}
+      {failures !== null && (
+        <p data-slot="pr-card-failures" className="m-0 break-words">
+          {failures}
+        </p>
+      )}
+      {verdict !== null && <p className="m-0">{verdict}</p>}
       {lenses.length > 0 && (
-        <>
-          <dt className="text-content-tertiary">{t('审核视角')}</dt>
-          <dd className="m-0 flex flex-wrap gap-1">
-            {lenses.map((lens) => (
-              <span
-                key={lens.name}
-                className={cn(
-                  'inline-flex h-5 items-center rounded-md px-1.5 text-caption',
-                  TONE_CHIP[RESULT_TONE[lens.result]],
-                )}
-              >
-                {lens.name} {resultWord(lens.result, t)}
-              </span>
-            ))}
-          </dd>
-        </>
+        <p className="m-0">
+          {lenses.map((lens) => `${lens.name} ${resultWord(lens.result, t)}`).join(' · ')}
+        </p>
       )}
-      {blockers.length > 0 && (
-        <>
-          <dt className="text-content-tertiary">{t('阻塞项')}</dt>
-          <dd className="m-0 flex min-w-0 flex-col gap-0.5 text-content-secondary">
-            {blockers.map((blocker) => (
-              <span key={blocker} className="min-w-0 break-words">
-                {blocker}
-              </span>
-            ))}
-          </dd>
-        </>
-      )}
-    </dl>
-  );
-}
-
-function Actions({ pr, onViewDiff, onResolve, githubHref }: PrCardProps) {
-  const { t } = useI18n();
-  const needsResolve =
-    pr.state === 'conflicts' || pr.state === 'checks-failed' || pr.state === 'review-block';
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {needsResolve && (
-        <Button size="sm" onClick={onResolve} className="h-6.5 px-2.25 text-meta">
-          {t('解决')}
-        </Button>
-      )}
-      <Button size="sm" variant="outline" onClick={onViewDiff} className="h-6.5 px-2.25 text-meta">
-        {t('查看 diff')}
-      </Button>
-      {githubHref != null && (
-        <Button
-          size="sm"
-          variant="ghost"
-          nativeButton={false}
-          render={<a href={githubHref} target="_blank" rel="noreferrer" />}
-          className="h-6.5 px-2.25 text-meta"
-        >
-          {t('在 GitHub 打开')}
-          <ExternalLink />
-        </Button>
+      {blockers.map((blocker) => (
+        <p key={blocker} className="m-0 min-w-0 break-words">
+          {blocker}
+        </p>
+      ))}
+      {verdict === null && (
+        <p className="m-0">
+          {t('评审 head')} <Sha value={pr.currentHead} />
+        </p>
       )}
     </div>
   );
 }
 
 export function PrCard(props: PrCardProps) {
-  const { pr, className } = props;
+  const { pr, className, githubHref, onViewDiff, onResolve, readOnly } = props;
   const { t } = useI18n();
   const pill = pillOf(pr, t);
+  const needsResolve =
+    readOnly !== true &&
+    (pr.state === 'conflicts' || pr.state === 'checks-failed' || pr.state === 'review-block');
   return (
     <article
       data-slot="pr-card"
       data-state={pr.state}
-      data-stale={pr.state !== 'merged' && isVerdictStale(pr) ? '' : undefined}
-      className={cn(
-        'flex min-w-0 flex-col gap-2.5 rounded-xl bg-card px-3.5 py-3 shadow-(--e1)',
-        className,
-      )}
+      data-stale={isVerdictStale(pr) ? '' : undefined}
+      className={cn('@container/pr min-w-0 rounded-(--radius-control) py-1.5 pr-1 pl-2', className)}
     >
-      <div className="flex items-center gap-2">
-        <GitPullRequest className="size-3.5 flex-none text-content-secondary" />
-        <span className="flex-none text-meta text-content-secondary tabular-nums">
-          #{pr.number}
-        </span>
-        <h3 className="m-0 min-w-0 flex-1 truncate text-ui font-semibold text-foreground">
-          {pr.title}
-        </h3>
-        <span
-          data-slot="pr-card-state"
-          className={cn(
-            'inline-flex h-5.5 flex-none items-center rounded-lg px-2 text-caption font-medium whitespace-nowrap',
-            TONE_CHIP[pill.tone],
-          )}
-        >
-          {pill.label}
-        </span>
-      </div>
-      <VerdictLine pr={pr} />
-      <Actions {...props} />
       <Collapsible className="group/details">
-        <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-md text-meta text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
-          {t('详情')}
-          <ChevronDown className="size-3.5 transition-transform group-data-[open]/details:rotate-180" />
-        </CollapsibleTrigger>
+        <div data-slot="pr-card-row" className="flex items-center gap-2">
+          {stateIcon(pr)}
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-meta text-content-secondary">
+            {githubHref != null ? (
+              <PrLink number={pr.number} url={githubHref} />
+            ) : (
+              <span className="flex-none font-medium tabular-nums">PR #{pr.number}</span>
+            )}
+            <span aria-hidden className="flex-none text-content-tertiary">
+              ·
+            </span>
+            <span data-slot="pr-card-state" className="min-w-0 truncate">
+              {pill.label}
+            </span>
+            <CheckCount pr={pr} />
+            {pr.additions !== undefined && pr.deletions !== undefined && (
+              <span
+                data-slot="pr-card-diff"
+                className="hidden flex-none items-center gap-1.5 text-content-tertiary tabular-nums @min-[24rem]/pr:flex"
+              >
+                <span aria-hidden>·</span>
+                <span>+{pr.additions}</span>
+                <span>−{pr.deletions}</span>
+              </span>
+            )}
+          </div>
+          <CollapsibleTrigger
+            aria-label={t('详情')}
+            className="inline-flex size-6 flex-none items-center justify-center rounded-md text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <ChevronDown className="size-3.5 group-data-[open]/details:rotate-180" />
+          </CollapsibleTrigger>
+          {githubHref != null && (
+            <PrRowMenu
+              number={pr.number}
+              url={githubHref}
+              onViewChanges={onViewDiff}
+              onResolve={needsResolve ? onResolve : undefined}
+            />
+          )}
+        </div>
+        {pr.readAgoMinutes != null && (
+          <p
+            data-slot="pr-card-late"
+            className="m-0 flex items-center gap-1.5 pt-0.5 pl-5.5 text-meta text-content-tertiary"
+          >
+            <Clock className="size-3.5 flex-none" aria-hidden />
+            {t('{n} 分钟前读取，GitHub 可能被限流或延迟', { n: pr.readAgoMinutes })}
+          </p>
+        )}
         <CollapsibleContent>
           <Details pr={pr} />
         </CollapsibleContent>

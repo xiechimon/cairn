@@ -34,9 +34,12 @@ export function threadStatus(todo: TodoRecord): ThreadStatus {
 
 export const THREAD_PARAM = 'thread';
 
+export const VIEW_PARAM = 'view';
+
 export function threadHref(id: string, homeSearch: string): string {
   const params = new URLSearchParams(homeSearch);
   params.set(THREAD_PARAM, id);
+  params.delete(VIEW_PARAM);
   return `/app?${params.toString()}`;
 }
 
