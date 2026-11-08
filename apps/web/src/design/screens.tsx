@@ -23,11 +23,6 @@ const SCREENS = [
     parts: 'Agent turns, tool activity rows, live row',
   },
   {
-    title: 'Coordinator window',
-    url: '/app/schedules?scenario=100',
-    parts: 'Floating Coordinator conversation over a page',
-  },
-  {
     title: 'Project tasks',
     url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks',
     parts: 'Project header, segmented tabs, task list',
