@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   machine as machineTable,
@@ -82,6 +82,7 @@ function insertProvider(s: TestServer, providerId: string): void {
 
 async function setupWorld(
   fallbackModels: { provider: string; modelId: string }[] | null = DEFAULT_FALLBACKS,
+  modelId = 'model-a',
 ): Promise<World> {
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: 3_600_000 });
   disposables.push(() => s.dispose());
@@ -101,7 +102,7 @@ async function setupWorld(
     .run();
   seedRoute(s, 'session', {
     provider: 'relay-a',
-    modelId: 'model-a',
+    modelId,
     fallbackModels,
     machineId: machineRow.id,
   });
@@ -507,9 +508,152 @@ describe('model fallback chain (#1493)', () => {
     });
   });
 
-  test('X10: model 404 and auth failure also switch', async () => {
+  test('model rejection parks instead of using the configured fallback chain', async () => {
+    const w = await setupWorld(DEFAULT_FALLBACKS, 'glm-5.3');
+    const buildId = await startBuild(w);
+    const c = await claim(w);
+    await done(w, c.stepId, {
+      status: 'failed',
+      errorMessage:
+        '404: {"message":"Model \\"glm-5.3\\" is not supported by any configured account in this group","type":"model_not_found"}',
+    });
+    expect(stepRow(w, c.stepId).status).toBe('failed');
+    expect(stepRow(w, c.stepId).fallback).toBeNull();
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()?.errorMessage,
+    ).toContain('glm-5.3');
+    const next = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+      cred: w.token,
+      body: {},
+    });
+    expect(((await next.json()) as { step: unknown }).step).toBeNull();
+  });
+
+  test.each([
+    { status: 'failed', errorMessage: 'connection reset' },
+    {
+      status: 'failed',
+      errorMessage: '402 quota exceeded',
+      quotaBlock: { kind: 'quota', providerId: 'relay-a', reason: 'quota exceeded' },
+    },
+    {
+      status: 'success',
+      hasChanges: true,
+      usage: [{ model: 'relay-a/glm-5.3', input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }],
+    },
+    { status: 'stopped' },
+  ])(
+    'a claimed sibling report cannot requeue or unpark the build: $status $errorMessage',
+    async (outcome) => {
+      const w = await setupWorld(DEFAULT_FALLBACKS, 'glm-5.3');
+      const buildId = await startBuild(w);
+      const first = await claim(w);
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'claimed-sibling',
+          buildId,
+          kind: 'session',
+          status: 'claimed',
+          machineId: stepRow(w, first.stepId).machineId,
+          claimedAt: Date.now(),
+          createdAt: Date.now(),
+        })
+        .run();
+      await done(w, first.stepId, { status: 'failed', errorMessage: 'model_not_found: glm-5.3' });
+      const reason = w.s.db
+        .select()
+        .from(buildTable)
+        .where(eq(buildTable.id, buildId))
+        .get()?.errorMessage;
+      await done(w, 'claimed-sibling', outcome);
+      expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.phase).toBe(
+        'failed',
+      );
+      expect(
+        w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()?.errorMessage,
+      ).toBe(reason);
+      expect(stepRow(w, 'claimed-sibling').status).toBe(
+        outcome.status === 'success' ? 'done' : outcome.status,
+      );
+      expect(
+        w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all(),
+      ).toHaveLength(2);
+    },
+  );
+
+  test.each([
+    ['success', { status: 'success', hasChanges: true }, true],
+    ['provider failure', { status: 'failed', errorMessage: 'Connection error.' }, false],
+    ['task failure', { status: 'failed', errorMessage: 'git push failed (1)' }, false],
+    ['stop', { status: 'stopped' }, false],
+    [
+      'silent success',
+      {
+        status: 'success',
+        noOutput: true,
+        usage: [{ model: 'relay-b/model-b', input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }],
+      },
+      false,
+    ],
+  ] as const)(
+    'a parked fallback sibling settles its provider probe on %s',
+    async (_label, outcome, clearsFailures) => {
+      const w = await setupWorld();
+      const buildId = await startBuild(w);
+      const first = await claim(w);
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'fallback-probe-sibling',
+          buildId,
+          kind: 'session',
+          status: 'claimed',
+          machineId: stepRow(w, first.stepId).machineId,
+          claimedAt: Date.now(),
+          createdAt: Date.now(),
+          fallback: {
+            model: { provider: 'relay-b', modelId: 'model-b' },
+            tried: ['relay-a/model-a', 'relay-b/model-b'],
+            zeroUsageRetried: false,
+          },
+        })
+        .run();
+      await done(w, first.stepId, { status: 'failed', errorMessage: 'model_not_found: model-a' });
+      const reason = w.s.db
+        .select()
+        .from(buildTable)
+        .where(eq(buildTable.id, buildId))
+        .get()?.errorMessage;
+      for (let i = 0; i < 5; i++) providerHealth.recordFailure('relay-b');
+      const circuit = vi.spyOn(providerHealth, 'state').mockReturnValue('half_open');
+      const failures = vi.spyOn(providerHealth, 'recordFailure');
+      try {
+        expect(providerHealth.tryAcquire('relay-b')).toBe(true);
+        expect(providerHealth.tryAcquire('relay-b')).toBe(false);
+        await done(w, 'fallback-probe-sibling', outcome);
+        expect(providerHealth.tryAcquire('relay-b')).toBe(true);
+        if (_label === 'provider failure') expect(failures).toHaveBeenCalledWith('relay-b');
+        else expect(failures).not.toHaveBeenCalled();
+      } finally {
+        circuit.mockRestore();
+        failures.mockRestore();
+      }
+      expect(providerHealth.state('relay-b')).toBe(clearsFailures ? 'healthy' : 'open');
+      expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.phase).toBe(
+        'failed',
+      );
+      expect(
+        w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()?.errorMessage,
+      ).toBe(reason);
+      expect(
+        w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all(),
+      ).toHaveLength(2);
+    },
+  );
+
+  test('X10: auth failure still switches', async () => {
     for (const errorMessage of [
-      'POST /v1/messages 404 model_not_found',
       'Error: 401 {"type":"error","error":{"type":"authentication_error"}}',
     ]) {
       const w = await setupWorld();

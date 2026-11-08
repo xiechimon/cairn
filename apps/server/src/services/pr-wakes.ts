@@ -35,6 +35,7 @@ import { newRecordId } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
 import { reconcilePrReviewFindings } from './pr-review-findings.js';
+import { retryIsParked } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
@@ -75,6 +76,7 @@ export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
         !current ||
         current.latestBuildId !== row.buildId ||
         currentBuild?.prNumber !== row.number ||
+        retryIsParked(currentBuild?.errorMessage ?? '') ||
         current.archivedAt !== null ||
         current.phase === 'closed' ||
         blockingWorkerQuestions(deps.db, row.buildId).length > 0 ||
@@ -321,7 +323,8 @@ export function createPrWakes(deps: BuildDeps) {
         currentPr.number !== row.number ||
         currentPr.repo !== row.repo ||
         currentPr.head !== row.head ||
-        currentBuild?.prNumber !== row.number
+        currentBuild?.prNumber !== row.number ||
+        retryIsParked(currentBuild?.errorMessage ?? '')
       )
         return;
       const active = deps.db

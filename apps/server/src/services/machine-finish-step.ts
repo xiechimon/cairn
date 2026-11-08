@@ -39,6 +39,7 @@ import {
   mergedPrElsewhere,
   noteDeliveredPlanResidual,
   reportedVerdictHeads,
+  settleParkedStep,
   toBuildRecord,
 } from './builds.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
@@ -380,6 +381,18 @@ async function finishStepReport(
     emitRuntimeStepSpan(deps.db, stepId);
     return;
   }
+  if (worker !== null && settleParkedStep(deps, stepRow, outcome)) {
+    if (worker.agentRow)
+      recordProviderOutcome(
+        effectiveModel(worker.agentRow, stepRow).provider,
+        outcome,
+        isZeroUsageSilentSuccess(stepRow.kind, outcome),
+      );
+    if (outcome.skillInjectionFacts !== undefined)
+      recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
+  }
   if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
   if (worker?.agentRow) {
@@ -406,6 +419,25 @@ async function finishStepReport(
       });
       return;
     }
+  }
+  if (
+    worker !== null &&
+    outcome.status === 'failed' &&
+    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
+  ) {
+    const ran = worker.agentRow ? effectiveModel(worker.agentRow, stepRow) : null;
+    if (ran?.provider && ran.modelId) markModelDead(ran.provider, ran.modelId);
+    if (outcome.skillInjectionFacts !== undefined)
+      recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
+    applyStepFailure(
+      deps,
+      stepRow,
+      `${outcome.errorMessage ?? ''}\nModel ${ran?.modelId ?? 'unknown'} is unavailable.`,
+      reportedVerdictHeads(stepRow, { gateHeadSha: body.gateHeadSha, commit: body.commit }),
+    );
+    publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
   }
   if (worker !== null) {
     const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);

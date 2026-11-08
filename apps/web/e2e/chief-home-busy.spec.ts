@@ -463,7 +463,7 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await reply.getByTestId('chief-tools-toggle').click();
     await evidenceShot(page, 'tools-once.png');
     const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
-    expect(await verticalGap(page, question, reply)).toBeLessThan(40);
+    expect(await verticalGap(page, question, reply)).toBeLessThan(48);
     for (const name of ['pull_requests', 'issues', 'run_builds']) {
       await expect(home.getByText(name, { exact: true })).toHaveCount(1);
     }

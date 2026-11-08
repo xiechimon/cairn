@@ -416,7 +416,7 @@ describe('F-P2 pairing authority stays with the owner token', () => {
       headers: device,
       body: { enrollId: 'x' },
     });
-    expect(confirm.status).toBe(401);
+    expect(confirm.status).toBe(403);
   });
 
   test('no token and forged tailnet identity cannot mint codes or list devices', async () => {

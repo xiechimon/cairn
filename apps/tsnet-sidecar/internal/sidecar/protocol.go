@@ -19,12 +19,14 @@ const (
 )
 
 type Event struct {
-	Type    string   `json:"type"`
-	URL     string   `json:"url,omitempty"`
-	IPs     []string `json:"ips,omitempty"`
-	DNSName string   `json:"dnsName,omitempty"`
-	Enabled *bool    `json:"enabled,omitempty"`
-	Error   string   `json:"error,omitempty"`
+	Type       string   `json:"type"`
+	URL        string   `json:"url,omitempty"`
+	IPs        []string `json:"ips,omitempty"`
+	DNSName    string   `json:"dnsName,omitempty"`
+	OwnerLogin string   `json:"ownerLogin,omitempty"`
+	SelfTagged bool     `json:"selfTagged"`
+	Enabled    *bool    `json:"enabled,omitempty"`
+	Error      string   `json:"error,omitempty"`
 }
 
 type Command struct {
@@ -51,8 +53,8 @@ func (e *Emitter) AuthURL(url string) {
 	e.Emit(Event{Type: EventAuthURL, URL: url})
 }
 
-func (e *Emitter) Ready(ips []string, dnsName string) {
-	e.Emit(Event{Type: EventReady, IPs: ips, DNSName: dnsName})
+func (e *Emitter) Ready(status Status) {
+	e.Emit(Event{Type: EventReady, IPs: status.IPs, DNSName: status.DNSName, OwnerLogin: status.OwnerLogin, SelfTagged: status.SelfTagged})
 }
 
 func (e *Emitter) FunnelOn(url string) {

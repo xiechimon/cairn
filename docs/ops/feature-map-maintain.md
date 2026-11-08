@@ -1,53 +1,48 @@
 # Feature-map maintain
 
-Continuous upkeep for Cairn's two feature maps. Modeled on poteto's `/maintain-verification-skill` daily loop, split so mechanical ticket-register freshness and empirical verify-cairn maintain do not share one gate.
+How Cairn keeps its feature map current. The model is poteto's feature map: materialized memory, stored with the verification skill, that tells an agent what features the app has, how a user reaches each one (routes, keyboard shortcuts, the elements to click) and what each one does, so a vague report or screenshot becomes a reproducible drive.
 
-## Dual-map roles
+## Files
 
-| Map | Path | Role | Upkeep |
-|---|---|---|---|
-| Ticket living register | `docs/feature-map.md` | Mechanically extracted ticket × tier × verification anchors | `node scripts/generate-feature-map.mjs` / `--check` |
-| Empirical verification map | `.claude/skills/verify-cairn/features/` | User-POV entries, drive recipes, Gotchas for `/verify-cairn` | `/maintain-verify-cairn` (source + live); index hygiene in daily Actions |
+| File | Role | Edited by |
+|---|---|---|
+| `.claude/skills/verify-cairn/feature-map.json` | The registry: one row per user-facing feature with code areas, route patterns, reach steps, states, research, frontend design, backend design, evidence, verify recipes, and the gap batches | hand, in the PR that changes the feature |
+| `.claude/skills/verify-cairn/feature-map.md` | Agent-facing map: per feature, the reach steps plus the routes, settings path, keyboard shortcuts and test ids extracted from `apps/web/src` | `node scripts/generate-feature-map.mjs` |
+| `docs/feature-map.md` | Coverage view: research and design per feature, gaps by batch, notes not on main, eval coverage | `node scripts/generate-feature-map.mjs` |
+| `.claude/skills/verify-cairn/features/` | Drive recipes for `/verify-cairn`, linked from the registry rows | `/maintain-verify-cairn` |
 
-Do not hand-edit `docs/feature-map.md`. Do not edit product code during empirical maintain to make a red drive look green — that is a product regression ticket, not a map fix.
+## The check
+
+`node scripts/generate-feature-map.mjs --check` runs in the CI `gates` job on every PR (with `FEATURE_REGISTRY_BASE_SHA` set to the PR base) and fails when:
+
+- a web route in `apps/web/src/App.tsx`, a settings section in `apps/web/src/settings/settings-page.tsx` or a server route in `apps/server/src/app.ts` and `routes*.ts` maps to no feature, or a route pattern matches nothing;
+- a reach step opens a route, names a settings section, clicks a test id or a `t()` label, or presses a key that the source does not have;
+- a research, frontend design or backend design slot is empty instead of linking files or saying `{"gap": ...}` or `{"na": ...}`;
+- a linked file, code path, evidence path or verify recipe does not exist and is not listed under `pending`;
+- a shipped feature has no evidence, or a built feature has no reach steps or states;
+- a gap has no batch, a batch holds no gap, or the PR adds a gap that the base did not have, so a new feature must arrive with its research and designs;
+- either generated file differs from what the registry and the code produce, which is how test-id, shortcut and route drift is caught.
+
+`scripts/prepush.mjs` counts a document the registry cites as one a check reads, so a docs-only PR that deletes or renames a cited note still runs the gates.
 
 ## Daily Actions loop
 
-Workflow: `.github/workflows/feature-map-daily-check.yml` (cron `17 18 * * *`, also `workflow_dispatch`).
+Workflow: `.github/workflows/feature-map-daily-check.yml` (cron `17 18 * * *`, also `workflow_dispatch`). It runs `node scripts/feature-map-maintain.mjs --file-issue`:
 
-Runs `node scripts/feature-map-maintain.mjs --file-issue`:
+1. **feature-map**: the same `generate-feature-map.mjs --check`, as a net for anything that reached main without the gates.
+2. **verify-features-index**: every `features/*.md` except `README.md` is linked from `features/README.md`, and every link target exists.
 
-1. **ticket-register** — `generate-feature-map.mjs --check` (needs `gh` + API; workflow sets `GH_TOKEN`).
-2. **verify-features-index** — every `features/*.md` except `README.md` is linked from `features/README.md`, and every README link target exists.
+On failure the job exits non-zero and opens or comments one deduped issue titled `chore: feature-map maintain failed` (labels `documentation`, `batch:next`, `by:cairn`, marker `<!-- feature-map-maintain -->`). Issue filing needs `permissions.issues: write` and `github.token` only.
 
-On failure the job exits non-zero and opens or comments one deduped issue titled `chore: feature-map maintain failed` (labels `documentation`, `batch:next`, `by:cairn`). Marker in the body: `<!-- feature-map-maintain -->`.
+## Live maintain routine
 
-This check is **not** a PR merge gate. Putting ticket-register `--check` on PR CI reds unrelated PRs whenever GitHub issue state churns (#1527). Empirical map merge coverage stays with `vp-registry-gate` inside the verify-cairn self-test.
-
-## Cursor Cloud / agent routine (empirical map)
-
-Use `.claude/skills/maintain-verify-cairn/SKILL.md` (poteto maintain semantics, scoped to verify-cairn):
-
-1. Index hygiene on `features/`.
-2. Source wave per feature file (read-only).
-3. Live pass via verify-cairn Launch → Doctor → Drive; evidence survives Cleanup.
-4. Outcome: `clean` | `changed` (one PR under the skill directory only) | `blocked` (file/report; do not patch product).
-
-Schedule that pass with a Cursor Cloud Automation or Project timer. GitHub Actions cannot substitute a real browser live pass.
-
-## Human setup
-
-1. Enable scheduled GitHub Actions for the repository (GitHub pauses schedules on long-idle repos).
-2. **No extra secret** for issue filing: `permissions.issues: write` + `github.token` is enough. Labels `documentation`, `batch:next`, and `by:cairn` must already exist (they do on this repo).
-3. Optional later: a PAT (`FEATURE_MAP_REFRESH_TOKEN` historically) only if you want the bot to open regeneration PRs that still trigger CI — out of scope for the daily check.
-4. Optional later: restore a slim path-existence staleness check; the full class/css baseline gate stays retired after #2200 unless re-approved.
+Use `.claude/skills/maintain-verify-cairn/SKILL.md`: index hygiene, a read-only source wave per feature, a live pass with verify-cairn Launch, Doctor and Drive, then one PR under the skill directory. When a live pass shows that a row's reach steps no longer get to the feature, fix the row in `feature-map.json` and regenerate. Do not edit product code to make a red drive look green; that is a product regression ticket.
 
 ## Local commands
 
 ```sh
-node scripts/feature-map-maintain.mjs
-node scripts/feature-map-maintain.mjs --file-issue --dry-run
-node scripts/feature-map-maintain.mjs --skip-ticket-register
+node scripts/generate-feature-map.mjs
 node scripts/generate-feature-map.mjs --check
-node --test scripts/feature-map-maintain.test.mjs
+node scripts/feature-map-maintain.mjs --file-issue --dry-run
+node --test scripts/generate-feature-map.test.mjs scripts/feature-map-maintain.test.mjs
 ```

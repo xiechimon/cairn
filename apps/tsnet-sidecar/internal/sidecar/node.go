@@ -5,16 +5,20 @@ import (
 	"net"
 	"strings"
 
+	"tailscale.com/client/tailscale/apitype"
+	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/tsnet"
 )
 
 const backendRunning = "Running"
 
 type Status struct {
-	Running bool
-	AuthURL string
-	DNSName string
-	IPs     []string
+	Running    bool
+	AuthURL    string
+	DNSName    string
+	IPs        []string
+	OwnerLogin string
+	SelfTagged bool
 }
 
 type Node interface {
@@ -47,17 +51,25 @@ func (n *TsnetNode) Status(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
+	return statusFromLocal(status), nil
+}
+
+func statusFromLocal(status *ipnstate.Status) Status {
 	result := Status{
 		Running: status.BackendState == backendRunning,
 		AuthURL: status.AuthURL,
 	}
 	if status.Self != nil {
 		result.DNSName = strings.TrimSuffix(status.Self.DNSName, ".")
+		result.SelfTagged = status.Self.IsTagged()
+		if !result.SelfTagged {
+			result.OwnerLogin = status.User[status.Self.UserID].LoginName
+		}
 	}
 	for _, ip := range status.TailscaleIPs {
 		result.IPs = append(result.IPs, ip.String())
 	}
-	return result, nil
+	return result
 }
 
 func (n *TsnetNode) ListenTLS(addr string) (net.Listener, error) {
@@ -77,13 +89,17 @@ func (n *TsnetNode) WhoIs(ctx context.Context, remoteAddr string) (Identity, err
 	if err != nil {
 		return Identity{}, err
 	}
-	if response.Node != nil && response.Node.IsTagged() {
-		return Identity{}, nil
+	return identityFromWhoIs(response), nil
+}
+
+func identityFromWhoIs(response *apitype.WhoIsResponse) Identity {
+	if response.Node == nil || response.Node.IsTagged() || (response.Node.Hostinfo.Valid() && response.Node.Hostinfo.ShareeNode()) {
+		return Identity{}
 	}
 	if response.UserProfile == nil {
-		return Identity{}, nil
+		return Identity{}
 	}
-	return Identity{Login: response.UserProfile.LoginName, Name: response.UserProfile.DisplayName}, nil
+	return Identity{Login: response.UserProfile.LoginName, Name: response.UserProfile.DisplayName}
 }
 
 func (n *TsnetNode) Close() error {

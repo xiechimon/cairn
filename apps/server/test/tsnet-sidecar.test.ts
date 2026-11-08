@@ -193,6 +193,29 @@ describe('restart backoff', () => {
 });
 
 describe('sidecar events become status', () => {
+  test('owner metadata is exposed only while ready and never survives missing metadata or errors', async () => {
+    const h = harness();
+    const ready = {
+      type: 'ready',
+      dnsName: 'cairn.tail.example',
+      ownerLogin: 'owner@example.com',
+      selfTagged: false,
+    };
+    await h.latest().emitLine(ready);
+    expect(h.supervisor.status()).toMatchObject({
+      ownerLogin: 'owner@example.com',
+      selfTagged: false,
+    });
+    await h.latest().emitLine({ type: 'ready', dnsName: 'cairn.tail.example' });
+    expect(h.supervisor.status().ownerLogin).toBeNull();
+    await h.latest().emitLine(ready);
+    await h.latest().emitLine({ type: 'error', error: 'status unavailable' });
+    expect(h.supervisor.status().ownerLogin).toBeNull();
+    await h.latest().emitLine(ready);
+    h.latest().exit(1);
+    expect(h.supervisor.status().ownerLogin).toBeNull();
+    await h.supervisor.stop();
+  });
   test('starts in starting, then needs-login with the URL, then ready with the node address', async () => {
     const h = harness();
     expect(h.supervisor.status().state).toBe('starting');

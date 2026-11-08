@@ -155,8 +155,10 @@ test('sending before the Coordinator is ready shows an actionable translated mes
   page,
 }) => {
   await open(page, fresh());
-  await page.getByRole('textbox').first().fill('hello');
-  await page.keyboard.press('Enter');
+  const composer = page.getByTestId('chief-composer-input');
+  await expect(page.getByTestId('loading-composer')).toHaveCount(0);
+  await composer.fill('hello');
+  await composer.press('Enter');
   const toast = page.locator('[data-sonner-toast]').first();
   await expect(toast).toContainText('Coordinator 还不能回答');
   await expect(toast).toContainText('输入框下方的按钮');

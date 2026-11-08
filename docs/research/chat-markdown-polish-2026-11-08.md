@@ -1,6 +1,6 @@
 # Research: claude.ai list bullets, code blocks, copy button and status lines, measured for cairn's chat transcript (2026-11-08)
 
-Question. ian flagged four transcript rendering defects: thin list bullets, an always-visible copy button under a code block, a code block whose font he dislikes and whose one-line box stretches across the message, and the centered "Xmon Dai 发起了合并" divider with the reply footer below it colliding with its text. Each fix must follow claude.ai one-to-one, from measurement.
+Question. ian flagged four transcript rendering defects: thin list bullets, an always-visible copy button under a code block, a code block whose font he dislikes and whose one-line box stretches across the message, and the centered `<user> started the merge` divider (a Chinese UI string) with the reply footer below it colliding with its text. Each fix must follow claude.ai one-to-one, from measurement.
 
 Labels: measured = read or run first-hand this round; inferred = derived from measured, checkable; guess = the rest.
 
@@ -9,8 +9,8 @@ Labels: measured = read or run first-hand this round; inferred = derived from me
 | Source | What it gave | Status |
 |---|---|---|
 | claude.ai in the built-in browser, 2026-11-08 | Signed out: `/new` redirects to `/logout?involuntary=1` then `/login`. Not signed in, per the brief. The login page still loads the app stylesheet `assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c6a992d55-CIgJ-QZZ.css` (2.1 MB), which holds the `.prose` rules | measured |
-| Computed-style dumps and frames, `~/.cache/cairn-design-capture/final/claude-ai-1440-{light,dark}/chat-long/` (2026-11-07, ian's account, a Python binary-search reply with lists, inline code and a fenced block) | Every element's computed style per step: `initial`, `scroll-up`, `hover-reply-actions`, `hover-code-block`; frames at 1.25 device px per CSS px | measured |
-| `~/.cache/cairn-design-capture/runs/2026-11-07T08-55-37-claude-ai-1440-dark/tool-search/` | The "Searched the web" status row, dark only | measured |
+| Computed-style dumps and frames, `<scratch-cache>/cairn-design-capture/final/claude-ai-1440-{light,dark}/chat-long/` (2026-11-07, ian's account, a Python binary-search reply with lists, inline code and a fenced block) | Every element's computed style per step: `initial`, `scroll-up`, `hover-reply-actions`, `hover-code-block`; frames at 1.25 device px per CSS px | measured |
+| `<scratch-cache>/cairn-design-capture/runs/2026-11-07T08-55-37-claude-ai-1440-dark/tool-search/` | The "Searched the web" status row, dark only | measured |
 | Claude desktop app Code tab | Not measured: no computer-use tool in this session, and the brief forbids ian's own Chrome | not covered |
 
 ## 1. List bullets
@@ -73,7 +73,7 @@ claude.ai has no full-width rule for events inside a turn. Its "Searched the web
 
 Claude desktop Code tab: not measured this round (see Sources).
 
-Cairn before: `TurnRule`, a centered `text-meta` label between two 1px `--border` rules, used for the merge note, "由 Coordinator 发起" and "已工作 N 分钟". The skills summary was also centered.
+Cairn before: `TurnRule`, a centered `text-meta` label between two 1px `--border` rules, used for the merge note, `由 Coordinator 发起` ("started by Coordinator") and `已工作 N 分钟` ("worked N minutes"). The skills summary was also centered.
 
 Cairn after: `StatusLine`, a left-aligned `min-h-7` row at `text-card-title` (15 / 21) in `--text-secondary` with an 8px gap and no rules. The skills summary is left-aligned too. No icon, because claude.ai's status row has none.
 
@@ -81,4 +81,4 @@ Footer overlap: the agent row was `flex items-start` with the reply text and its
 
 ## Evidence
 
-Comparison images in `~/.cache/chat-polish/`: `compare-1-lists-{light,dark}.png`, `compare-2-3-code-{light,dark}.png`, `compare-2-copy-states-{light,dark}.png`, `compare-4-status-{light,dark}.png`. claude.ai crops are rescaled ×1.6 to match cairn's 2× captures. The light status row has no claude.ai crop because only dark tool-search runs exist.
+Comparison images in `<scratch-cache>/chat-polish/`: `compare-1-lists-{light,dark}.png`, `compare-2-3-code-{light,dark}.png`, `compare-2-copy-states-{light,dark}.png`, `compare-4-status-{light,dark}.png`. claude.ai crops are rescaled ×1.6 to match cairn's 2× captures. The light status row has no claude.ai crop because only dark tool-search runs exist.

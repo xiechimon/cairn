@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="site/logo.svg" alt="Cairn" width="64" height="64">
+  <img src="apps/web/public/icon-512.png" alt="Cairn" width="64" height="64">
   <h1>Cairn</h1>
 
   <p>

@@ -60,10 +60,7 @@ export function SettingsHeader({
         <>
           <div className="flex min-w-0 flex-auto flex-col gap-0.5">
             <h2
-              className={cn(
-                'm-0 truncate font-serif text-page font-semibold text-foreground',
-                titleClassName,
-              )}
+              className={cn('m-0 truncate voice-title text-page text-foreground', titleClassName)}
             >
               {title}
             </h2>

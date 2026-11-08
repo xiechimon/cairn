@@ -241,6 +241,85 @@ function fixture() {
   return { s, mock, t, pull, fail, steps, settle, comment };
 }
 
+describe('parked builds reject PR-driven redispatch', () => {
+  test.each(['model_not_found: glm-5.3', 'Task parked: 4 failed builds in one hour (limit 3).'])(
+    'managed CI, conflict and review events preserve parking: %s',
+    async (reason) => {
+      const f = fixture();
+      const watch = watchFor(f.s, f.mock);
+      await watch.sweep();
+      f.s.db.update(buildTable).set({ errorMessage: reason }).run();
+      f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+      f.fail(1);
+      f.comment(1);
+      f.pull.mergeable = 'dirty';
+      await watch.sweep();
+      await watchFor(f.s, f.mock).sweep();
+      expect(f.steps()).toHaveLength(0);
+      expect(f.s.db.select().from(todoTable).get()?.phase).toBe('failed');
+      expect(f.s.db.select().from(buildTable).get()?.errorMessage).toBe(reason);
+      expect(rows(f.s)[0]?.wakeRounds).toBe(0);
+    },
+  );
+
+  test.each(['model_not_found: glm-5.3', 'Task parked: 4 failed builds in one hour (limit 3).'])(
+    'legacy collaborator feedback preserves parking: %s',
+    async (reason) => {
+      const f = fixture();
+      const poller = createPrFeedbackPoller(
+        { ...f.s.svc, box: f.s.secretBox },
+        { githubFetch: f.mock.fetch },
+      );
+      await poller.sweep();
+      f.s.db.update(buildTable).set({ errorMessage: reason }).run();
+      f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+      f.comment(1);
+      await poller.sweep();
+      await poller.sweep();
+      expect(f.steps()).toHaveLength(0);
+      expect(f.s.db.select().from(todoTable).get()?.phase).toBe('failed');
+      expect(f.s.db.select().from(buildTable).get()?.errorMessage).toBe(reason);
+    },
+  );
+
+  test('a model rejection arriving during GitHub intake is checked before clearing the error', async () => {
+    const f = fixture();
+    const watch = watchFor(f.s, f.mock);
+    await watch.sweep();
+    f.fail(1);
+    const fetch = f.mock.fetch.getMockImplementation()!;
+    f.mock.fetch.mockImplementationOnce(async (input, init) => {
+      f.s.db.update(buildTable).set({ errorMessage: 'model_not_found: glm-5.3' }).run();
+      f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+      return fetch(input, init);
+    });
+    await watch.sweep();
+    expect(f.steps()).toHaveLength(0);
+    expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('glm-5.3');
+  });
+
+  test('a deferred PR cap notice cannot overwrite the terminal parking reason', async () => {
+    const f = fixture();
+    const watch = watchFor(f.s, f.mock);
+    await watch.sweep();
+    f.s.db
+      .update(message)
+      .set({
+        content: {
+          pendingNotice: { buildId: f.t.buildId, content: 'PR Auto-fix needs you: synthetic cap' },
+        },
+      })
+      .where(eq(message.id, `pr-wakes:${f.s.team.id}:octo/demo#${f.t.prNumber}`))
+      .run();
+    f.s.db.update(buildTable).set({ errorMessage: 'model_not_found: glm-5.3' }).run();
+    f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+    f.mock.failing.add(`octo/demo#${f.t.prNumber}`);
+    await watch.sweep();
+    expect(f.s.db.select().from(buildTable).get()?.errorMessage).toBe('model_not_found: glm-5.3');
+    expect(f.steps()).toHaveLength(0);
+  });
+});
+
 describe('D109 S3 F2 bounded, durable PR wakes', () => {
   test('CI wakes three times per head, deduplicates reruns and survives poller restart', async () => {
     const f = fixture();
@@ -693,10 +772,15 @@ test('scheduler coalesces concurrent CI and PR deadlines into one PrWatch read',
   f.comment(1);
   f.pull.mergeable = 'dirty';
   vi.useFakeTimers();
-  const scheduler = createScheduler({ ...f.s.svc, box: f.s.secretBox }, { tickMs: 60_000 }, null, {
-    githubFetch: f.mock.fetch,
-    logger: { info() {} },
-  });
+  const scheduler = createScheduler(
+    { ...f.s.svc, box: f.s.secretBox, githubFetch: f.mock.fetch },
+    { tickMs: 60_000 },
+    null,
+    {
+      githubFetch: f.mock.fetch,
+      logger: { info() {} },
+    },
+  );
   try {
     scheduler.start();
     await vi.advanceTimersByTimeAsync(100);
@@ -722,10 +806,15 @@ test('scheduler cannot fall back to legacy fixes when the first PrWatch read fai
     text: async () => '',
   }));
   vi.useFakeTimers();
-  const scheduler = createScheduler({ ...f.s.svc, box: f.s.secretBox }, { tickMs: 60_000 }, null, {
-    githubFetch: f.mock.fetch,
-    logger: { info() {} },
-  });
+  const scheduler = createScheduler(
+    { ...f.s.svc, box: f.s.secretBox, githubFetch: f.mock.fetch },
+    { tickMs: 60_000 },
+    null,
+    {
+      githubFetch: f.mock.fetch,
+      logger: { info() {} },
+    },
+  );
   try {
     scheduler.start();
     await vi.advanceTimersByTimeAsync(100);

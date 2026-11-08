@@ -285,11 +285,11 @@ describe('#2057 the Tailscale identity header grants nothing', () => {
     expect(res.status).toBe(401);
   });
 
-  test('CAIRN_TAILSCALE_USERS is reported as ignored, not silently dropped', () => {
+  test('CAIRN_TAILSCALE_USERS is reported as socket-only, never trusted on TCP', () => {
     expect(ignoredTailscaleUsersWarning({})).toBeNull();
     expect(ignoredTailscaleUsersWarning({ CAIRN_TAILSCALE_USERS: '' })).toBeNull();
     expect(ignoredTailscaleUsersWarning({ CAIRN_TAILSCALE_USERS: 'a@github' })).toMatch(
-      /CAIRN_TAILSCALE_USERS.*ignored/,
+      /CAIRN_TAILSCALE_USERS.*private tailnet Unix socket.*TCP never grants access/,
     );
   });
 });

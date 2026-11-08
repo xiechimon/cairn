@@ -18,6 +18,8 @@
   --font-serif: var(--font-source-serif);
   --text-page: var(--type-page);
   --text-page--line-height: calc(32 / 24);
+  --text-brand: var(--type-brand);
+  --text-brand--line-height: 1;
   --text-greeting: var(--type-greeting);
   --text-greeting--line-height: calc(38 / 32);
   --font-weight-title: var(--title-weight);
@@ -330,6 +332,23 @@
   .board-notify-banner {
     corner-shape: superellipse(1.5);
   }
+}
+
+@utility voice-greeting {
+  font-family: var(--font-serif);
+  font-weight: var(--voice-greeting-weight);
+  letter-spacing: normal;
+}
+
+@utility voice-title {
+  font-family: var(--font-serif);
+  font-weight: var(--voice-title-weight);
+  letter-spacing: normal;
+}
+
+@utility voice-response {
+  font-family: var(--font-serif);
+  font-weight: var(--voice-response-weight);
 }
 
 @utility pe-chief-launcher {

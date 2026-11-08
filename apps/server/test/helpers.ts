@@ -36,6 +36,7 @@ import { productionHarnessEvalConfig } from '../src/services/harness-eval-produc
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { VapidKeys } from '../src/services/push.js';
 import { setTodoPhase } from '../src/services/todos.js';
+import { rejectingGithubFetch } from './network-guard.js';
 
 export interface LegacyWorldIds {
   userId: string;
@@ -71,6 +72,7 @@ export function bootServer(
     logger?: AppContext['logger'];
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
+    providerTestTimeoutMs?: number;
     authToken?: string | null;
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
@@ -141,7 +143,10 @@ export function bootServer(
       oauthStates,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
-      ...(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {}),
+      ...(opts.providerTestTimeoutMs === undefined
+        ? {}
+        : { providerTestTimeoutMs: opts.providerTestTimeoutMs }),
+      githubFetch: opts.githubFetch ?? rejectingGithubFetch,
       ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
       ...(opts.skillImportFetch !== undefined ? { skillImportFetch: opts.skillImportFetch } : {}),
       ...(opts.skillImportTimeoutMs !== undefined

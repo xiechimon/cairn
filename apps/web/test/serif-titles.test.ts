@@ -7,7 +7,7 @@ const SRC = join(import.meta.dirname, '../src');
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return entry.name === 'design' ? [] : sources(path);
+    if (entry.isDirectory()) return sources(path);
     return entry.name.endsWith('.tsx') ? [path] : [];
   });
 }
@@ -16,12 +16,37 @@ function openingTags(source: string, tag: string): string[] {
   return [...source.matchAll(new RegExp(`<${tag}\\b([^>]*)>`, 'g'))].map((m) => m[1] ?? '');
 }
 
-describe('the greeting and page titles use the serif title voice (DESIGN.md Typography)', () => {
-  it('the Greeting component is serif at the greeting size', () => {
-    const greeting = readFileSync(join(SRC, 'components/stream/greeting.tsx'), 'utf8');
-    expect(greeting).toContain('font-serif');
-    expect(greeting).toContain('text-greeting');
+const STYLES = join(SRC, 'styles');
+
+function read(path: string): string {
+  return readFileSync(join(SRC, path), 'utf8');
+}
+
+describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
+  it('each voice role is a utility over the serif face and a weight token', () => {
+    const app = readFileSync(join(STYLES, 'app.css'), 'utf8');
+    for (const role of ['greeting', 'title', 'response']) {
+      expect(app).toMatch(
+        new RegExp(
+          `@utility voice-${role} \\{\\s*font-family: var\\(--font-serif\\);\\s*font-weight: var\\(--voice-${role}-weight\\);`,
+        ),
+      );
+    }
+  });
+
+  it('Chinese under the serif falls back to the sans CJK faces, as claude.ai does', () => {
+    const fonts = readFileSync(join(STYLES, 'fonts.css'), 'utf8');
+    const chain = /--font-source-serif:([^;]*);/.exec(fonts)?.[1] ?? '';
+    expect(chain).toContain('"PingFang SC"');
+    expect(chain).toContain('"Noto Sans CJK SC"');
+    expect(chain).not.toMatch(/Songti|Serif CJK/);
+  });
+
+  it('the Greeting component is the greeting voice at the greeting size', () => {
+    const greeting = read('components/stream/greeting.tsx');
+    expect(greeting).toContain('voice-greeting text-greeting');
     expect(greeting).not.toContain('font-heading');
+    expect(greeting).not.toContain('font-semibold');
   });
 
   it('no page h1 is set in the heading face', () => {
@@ -33,13 +58,30 @@ describe('the greeting and page titles use the serif title voice (DESIGN.md Typo
     expect(offenders).toEqual([]);
   });
 
-  it('the home greets with the serif Greeting', () => {
-    const home = readFileSync(join(SRC, 'board/home-c.tsx'), 'utf8');
-    expect(home).toContain('<Greeting as="h2">');
+  it('serif is only reached through a voice role', () => {
+    const offenders = sources(SRC)
+      .filter((file) => readFileSync(file, 'utf8').includes('font-serif'))
+      .map((file) => relative(SRC, file));
+    expect(offenders).toEqual([]);
   });
 
-  it('the page-size title menu trigger is serif', () => {
-    const trigger = readFileSync(join(SRC, 'components/title-menu-trigger.tsx'), 'utf8');
-    expect(trigger).toMatch(/page: '[^']*font-serif text-page/);
+  it('the home greets with the serif Greeting', () => {
+    expect(read('board/home-c.tsx')).toContain('<Greeting as="h2">');
+  });
+
+  it('page titles and the wordmark are the title voice', () => {
+    expect(read('components/title-menu-trigger.tsx')).toMatch(/page: '[^']*voice-title text-page/);
+    expect(read('pages/shell.tsx')).toContain('voice-title text-page');
+    expect(read('components/settings-list.tsx')).toContain('voice-title text-page');
+    expect(read('chief/chief-settings.tsx')).toContain('voice-title text-page');
+    expect(read('board/sidebar.tsx')).toMatch(/sidebar-team-name[^"]*voice-title text-brand/);
+  });
+
+  it('agent replies are the response voice and user messages are not', () => {
+    expect(read('chief/chief-message-rows.tsx')).toMatch(/BUBBLE_ROBOT_CLS = '[^']*voice-response/);
+    const transcript = read('detail/transcript.tsx');
+    expect(transcript).toMatch(/voice-response[^"]*"\s*data-testid="agent-text"/);
+    expect(transcript).toMatch(/voice-response[^"]*"\s*data-testid="info-report"/);
+    expect(transcript).not.toMatch(/voice-response[^"]*"\s*data-testid="user-bubble"/);
   });
 });
