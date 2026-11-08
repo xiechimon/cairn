@@ -423,7 +423,7 @@ test('pending blocking worker question prevents release until answered', async (
   await f.reconcile();
   expect(f.state.draft).toBe(true);
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(false);
-  answerWorkerQuestionsById({ db: f.s.db }, 'b', ['question'], 'Proceed');
+  answerWorkerQuestionsById({ db: f.s.db }, 'b', ['question'], 'Proceed', null);
   await f.reconcile();
   expect(f.state.draft).toBe(false);
   expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);

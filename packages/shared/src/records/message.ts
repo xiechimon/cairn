@@ -313,6 +313,7 @@ export const askUserQuestionContentSchema = z.object({
   answers: z.array(askUserAnswerSchema).nullable(),
   cancelReason: z.string().optional(),
   parkedAt: z.number().int().optional(),
+  deliveredAt: z.number().int().optional(),
   provenance: provenanceSchema.optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;

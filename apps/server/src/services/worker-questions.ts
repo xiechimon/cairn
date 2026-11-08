@@ -150,6 +150,7 @@ export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string)
     buildId,
     pending.map((question) => question.requestId),
     text,
+    nowMs(),
   );
   recordDecisions(
     deps,
@@ -165,12 +166,17 @@ export interface QuestionAnswer {
   by: TaskDecision['by'];
 }
 
-export function settleQuestionAnswer(deps: TodoDeps, buildId: string, input: QuestionAnswer): void {
+export function settleQuestionAnswer(
+  deps: TodoDeps,
+  buildId: string,
+  input: QuestionAnswer,
+  deliveredAt: number | null,
+): void {
   const current = readWorkerQuestion(deps.db, buildId, input.question.requestId);
   if (current?.status !== 'pending') {
     throw new HttpError(409, `requestId ${input.question.requestId} is no longer pending`);
   }
-  answerWorkerQuestionsById(deps, buildId, [input.question.requestId], input.answer);
+  answerWorkerQuestionsById(deps, buildId, [input.question.requestId], input.answer, deliveredAt);
   recordDecisions(deps, input.todoId, [
     { question: input.question, answer: input.answer, by: input.by },
   ]);

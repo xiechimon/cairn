@@ -252,7 +252,7 @@ export async function answerTaskQuestion(
   const running = hasClaimedStep(deps, buildId);
   const held = running && question.parkedAt === undefined;
   if (held || (!running && pending.length > 1)) {
-    deps.db.transaction(() => settleQuestionAnswer(deps, buildId, answer));
+    deps.db.transaction(() => settleQuestionAnswer(deps, buildId, answer, held ? nowMs() : null));
     return { ...result, delivered: held ? 'held-step' : 'waiting-other-questions' };
   }
   const sent = await sendBuildSteer(

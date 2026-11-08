@@ -181,7 +181,10 @@ import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 import {
   blockingWorkerQuestions,
   cancelPendingWorkerQuestions,
+  deliveredAnswerText,
+  markAnswersDelivered,
   pendingWorkerQuestions,
+  undeliveredAnswers,
   writeWorkerQuestion,
 } from './worker-question-store.js';
 import {
@@ -434,13 +437,16 @@ export async function sendBuildSteer(
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
       if (continuationOptions.answer !== undefined)
-        settleQuestionAnswer(deps, conversationId, continuationOptions.answer);
+        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, now);
       else if (human) settleWorkerReply(deps, conversationId, body.content);
+      const carried = undeliveredAnswers(db, conversationId);
+      markAnswersDelivered(deps, conversationId, carried, now);
+      const content = [...carried.map(deliveredAnswerText), body.content].join('\n\n');
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
         role: 'user' as const,
-        content: body.content,
+        content,
         createdAt: now,
       };
       if (targetBuildId !== conversationId) {
@@ -472,10 +478,10 @@ export async function sendBuildSteer(
       if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
       if (running) {
         db.insert(steerPending)
-          .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
+          .values({ conversationId, stepId: running.id, content, createdAt: now })
           .onConflictDoUpdate({
             target: steerPending.conversationId,
-            set: { stepId: running.id, content: body.content, createdAt: now },
+            set: { stepId: running.id, content, createdAt: now },
           })
           .run();
       }
@@ -518,7 +524,7 @@ export async function sendBuildSteer(
                 ? 'session'
                 : 'build',
             todoRow.teamId,
-            body.content,
+            content,
             false,
             human && !continuationOptions.schedule,
           );
