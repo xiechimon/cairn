@@ -475,6 +475,7 @@ export const EN: Record<string, string> = {
     'API keys connect machines from the command line and let MCP clients reach your workbench.',
   新建密钥: 'New key',
   复制: 'Copy',
+  复制代码: 'Copy code',
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',

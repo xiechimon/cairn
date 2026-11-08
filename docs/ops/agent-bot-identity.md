@@ -24,13 +24,15 @@ Lives outside the repo at `~/.cairn/tools/app-token/`; the repo gains no depende
 - `as-bot.sh <command>`: calls `token.mjs` to swap a token, places it only in that command's process environment, and then `exec`s the command:
   - `GH_TOKEN`: for `gh`.
   - git's http extraheader: injected through the `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n` environment variables, never through command-line arguments. `credential.helper` is also cleared so pushes do not go through `gh auth git-credential`.
-  - git author and committer: `GIT_AUTHOR_*`, `GIT_COMMITTER_*` set to `cairnwright[bot]` and the noreply email above.
+  - git author and committer: `GIT_AUTHOR_*`, `GIT_COMMITTER_*` set to `cairnwright[bot]` and the noreply email above, read from `packages/shared/commit-identity.json`.
+  - `CAIRN_COAUTHOR`: defaults to `Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>`, which `as-bot.sh git commit` adds as a trailer; set it to an empty string for autonomous work nobody instructed.
 - gh's global default account is still xiechimon; neither `gh auth login` nor `gh auth switch` has been run.
 
 Usage:
 
 ```sh
-~/.cairn/tools/app-token/as-bot.sh git push origin <branch>
+~/.cairn/tools/app-token/as-bot.sh git commit -m "<scope>(<ticket>): <subject>"
+~/.cairn/tools/app-token/as-bot.sh git push origin HEAD:<branch>
 node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...
 ```
 
@@ -46,7 +48,7 @@ Now going through `as-bot.sh` (the dispatching side):
 - Opening PRs (`gh pr create`).
 - Merge preparation follows the identity checks below; merge authorization uses the human login.
 
-The agents (codex, pi, grok) themselves never commit and never push.
+Agent sessions (Claude Code, Codex, pi) commit and push through `as-bot.sh` as well. The repository's pre-commit hook rejects a commit made in an agent session (`agentEnv` in `packages/shared/commit-identity.json`) unless both its author and committer are `cairnwright[bot]`, and the pre-push hook rejects an agent pushing any commit not authored by `cairnwright[bot]`.
 
 Other scripts that write to the remote should likewise prefix their commands with `as-bot.sh` when they need the App identity: `scripts/cleanup-merged-branches.sh` (`git push origin --delete`, `gh pr list`).
 
@@ -59,46 +61,21 @@ Not switched:
 
 Merging, approving, and label changes — operations that need a human identity — still use xiechimon's gh login and never go through the App token.
 
-## Merge identity
+## Commit identity
 
-The GitHub App identity opens PRs and authenticates pushes. The Git author on main is a separate identity. The `commit-author` workflow rejects `cairnwright[bot]` in any checked commit's author name or email. PRs check `BASE_SHA..HEAD` from the PR base to its explicit head. Main pushes check `BEFORE_SHA..HEAD`; when the previous SHA is missing or all zeros, the check falls back to `HEAD^!` (the tip only).
+There is one software identity: `cairnwright[bot]`. Every commit made by software — cairn steps, the Coordinator, host scripts and agent sessions — is authored and committed by it with plain git, and pushed like any other commit, with the repository's hooks. Only commits ian types himself carry his identity. When ian instructed the work, the commit carries `Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>`; product steps honour the team's `coAuthorTrailer` setting, and autonomous or scheduled work carries no human trailer.
 
-Read the PR opener and all commit authors with `gh pr view <n> --json author,commits` before choosing the merge method.
+Where the identity is decided: the server resolves the App identity once (`appCommitIdentity`) and hands it to the daemon in the step token. Before a step push, the daemon rewrites every unpublished commit of the step to that identity and adds the trailer (`attributeStepCommits`); the push credential never changes the author. Recovery branches commit as the App identity. Host scripts read it from `packages/shared/commit-identity.json` (`bot-identity.mjs`), and `lanes/sign-commits.sh` rewrites lane commits since main the same way. A cairn server with no GitHub App has no bot identity: commits cairn makes itself use `localCommitIdentity` (`<name> <cairn@localhost>`), and commits an agent made keep their author.
 
-- Accepted bot commit authors: `Cairnwright`, `cairnwright[bot]`.
-- The latter is accepted only with `Cairn-Thread:` and `Co-authored-by: xiechimon` trailers; `merge-pr.sh` and `sign-commits.sh` treat them the same and any other bot author is foreign. Commits are still made as `Cairnwright`, and the `commit-author` workflow still rejects `cairnwright[bot]` until #2289.
-- Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher's `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.
-- Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.
+Commits are not signed: no path creates commits through the GitHub API, so there is no temporary ref, no second upload and no token-dependent author.
+
+`commit-author` (`.github/workflows/commit-author.yml`, `scripts/commit-identity.mjs ci`) is an allowlist over `BASE_SHA..HEAD` for PRs and `BEFORE_SHA..HEAD` for main pushes (`HEAD^!` when the previous SHA is missing or all zeros). A commit passes when it is authored by `cairnwright[bot]` or ian and committed by the App, ian, GitHub or Mergify, on a branch of this repository (`HEAD_REPO` equals the repository; a fork cannot carry either identity, because only the App and ian can push here); or when it is a Mergify queue merge. Anything else fails, including the retired regular user `Cairnwright`, synthetic identities and either identity claimed from a fork.
+
+Every PR merges by squash; the squash commit is authored by the PR opener, so App-opened PRs land on main as `cairnwright[bot]`.
+
 - Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (path class does not route to ian), no unchecked tasks anywhere in the body and no `coordinator-hold` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
 
-Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.
-
-The product merge API enforces this boundary for `xiechimon/cairn` (case-insensitive): an open PR must have a nonempty opener login, account type `User`, and no `[bot]` login suffix before the server sends its SHA-bound squash request. Bot or unknown opener identity returns HTTP 409 without writing merge messages, changing steps, or changing the task phase. The opener comes from the pull response's `user` object, independently of `author_association`. Other repositories retain their existing merge behavior. Already-merged PR reconciliation remains available.
-
-This prevents unsafe squash through the product API only. Direct GitHub merges and the external dispatcher still require identity preparation, rebase, and verification of the resulting main commit and Actions run. Historical failed commits are retained.
-
-This repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.
-
-## Commit preparation
-
-App authentication authorizes remote operations; Git authorship records who prepared the commit. Do not prepare commits with `as-bot.sh` or `as-bot-author.sh`. The latter helper sets bot author and committer identities. Prepare commits outside both wrappers. Explicit environment assignments below override inherited author and committer names and emails, including values exported by a parent dispatcher:
-
-```sh
-GIT_AUTHOR_NAME=Cairnwright \
-GIT_AUTHOR_EMAIL=348051526+cairnwright@users.noreply.github.com \
-GIT_COMMITTER_NAME=Cairnwright \
-GIT_COMMITTER_EMAIL=348051526+cairnwright@users.noreply.github.com \
-git commit --file COMMIT_MSG.txt
-git log --format='%H author: %an <%ae> committer: %cn <%ce>' origin/main..HEAD
-```
-
-Check every commit in that range before pushing: neither its author name nor email may contain `cairnwright[bot]`; its committer name and email must also be free of that identity. Bot-opened PRs still require the single prepared commit and rebase path above. The token wrapper remains the authentication path for pushes and PR creation.
-
-## Recovery after a rejected main push
-
-Preserve main history. Prepare and merge the correction through the identity checks above. A subsequent compliant push checks `BEFORE_SHA..HEAD`, excluding historical violations outside its own pushed range. When `BEFORE_SHA` is missing or all zeros, the workflow checks `HEAD^!`. PR validation checks every commit in `BASE_SHA..HEAD`, including a forbidden author beneath a compliant tip.
-
-Read the resulting main commit's author and its `commit-author` Actions result after the merge. A green result establishes compliance for the checked range; it does not repair `b667fc4d133208d7650b66906d4be97a01939615` or any other historical commit. Keep the author gate unchanged. Dispatcher enforcement belongs to the external helper; this checkout cannot establish its implementation or which bypass caused the merge.
+The regular GitHub user `cairnwright` is no longer used by anything; whether to keep or delete it is ian's decision.
 
 ## Token constraints
 
@@ -150,32 +127,3 @@ state transaction can leave the lock behind; acquisition fails closed after
 30 seconds rather than bypassing the cap. Inspect and remove an abandoned lock
 only after confirming no process is using it. Invalid state fails closed as well.
 Clock rollback retains future reservations and delays creation conservatively.
-
-## Incident recovery commit preparation
-
-For #2101, prepare the reviewed correction outside both identity wrappers. This recovery procedure supersedes the historical bot-wrapped commit example above. App authentication for pushes and PR creation remains separate from commit authorship. Repository configuration alone cannot override inherited author or committer environment variables.
-
-```sh
-GIT_AUTHOR_NAME=Cairnwright \
-GIT_AUTHOR_EMAIL=348051526+cairnwright@users.noreply.github.com \
-GIT_COMMITTER_NAME=Cairnwright \
-GIT_COMMITTER_EMAIL=348051526+cairnwright@users.noreply.github.com \
-git commit --file COMMIT_MSG.txt
-```
-
-Keep the reviewed message and its co-author trailers. Verify the resulting author and committer with `git log -1 --format='%an <%ae>|%cn <%ce>%n%B'`. Bot-opened PRs still require exactly one Cairnwright-authored commit and the verified external helper's rebase route. Do not squash a bot-opened PR to recover this incident.
-
-The dispatcher must use this preparation command for the correction, verify the helper on the dispatch host, and inspect the actual main commit after the authorized merge. Then read the subsequent main push's `commit-author` Actions result. A compliant new push range can pass while the historical rejected commit remains intact; rerunning the historical failed range still fails. Until both main metadata and the later green run are recorded, #2101 recovery remains pending. Local fixtures cannot establish external helper enforcement or main acceptance.
-
-
-For #2136, the same recipe applies. Main tip `78b85594328fe2c26680060d1ad9dfa28e97d76b` and prior `c683123a69b8737ba7f2dac4cf404408e4cd4d5d` were authored as `cairnwright[bot]` after GitHub squash auto-merge of bot-opened PRs whose branch tips used the allowed `Cairnwright` identity. Preserve both historical commits and do not force-push main. Prepare one compliant correction outside both identity wrappers, keep co-author trailers, and merge by the identity-aware rebase route when the PR opener is the App. Until both the resulting main commit metadata and a later green `commit-author` Actions run are recorded, #2136 recovery remains pending. Local fixtures and this documentation change alone do not establish production recovery.
-
-The trusted main push step in `.github/workflows/commit-author.yml` runs `scripts/commit-author-recovery.test.mjs`. It executes this recipe with inherited bot identity in an isolated Git repository, preserves co-author trailers and historical commit bytes, and checks both the subsequent push range and the rejected historical range using the workflow shell.
-
-### Incident #2136
-
-The rejected main commit is `c683123a69b8737ba7f2dac4cf404408e4cd4d5d`, authored by `cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com>`. The [failed commit-author job](https://github.com/xiechimon/cairn/actions/runs/40801882028/job/123211659439) checked `3d76fe37f04d5cce9b9a5305bea3c68dc727859e..c683123a69b8737ba7f2dac4cf404408e4cd4d5d`. The rejection is correct; retain the workflow shell and historical commit unchanged.
-
-Use the recovery preparation recipe above, preserve co-author trailers, and verify the PR opener and every commit author before the later authorized merge. A bot-opened PR requires exactly one prepared Cairnwright commit and rebase through the inspected external helper. The dispatcher bypass responsible for this incident has not been established from this checkout.
-
-Production acceptance remains pending: record the resulting main commit's author and committer, its SHA, and the subsequent main push's green `commit-author` Actions URL before declaring recovery. Local fixture success verifies the recipe and checked ranges only. It does not establish dispatcher enforcement or production recovery; rerunning the original rejected range must still fail.

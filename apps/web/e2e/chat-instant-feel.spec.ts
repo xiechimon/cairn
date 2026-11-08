@@ -38,7 +38,7 @@ for (const width of [1440, 375]) {
       expect(ancestors.flat()).not.toContain('auto');
       const inline = scroller.locator('code').first();
       expect(await inline.evaluate((el) => getComputedStyle(el).overflowWrap)).toBe('anywhere');
-      const code = scroller.getByTestId('md-code');
+      const code = scroller.getByTestId('md-code').locator('xpath=..');
       expect(await code.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
       await code.evaluate((el) => { el.scrollLeft = 100; });
       expect(await code.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);

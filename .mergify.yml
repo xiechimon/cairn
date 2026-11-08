@@ -117,7 +117,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-    merge_method: rebase
+    merge_method: squash
     batch_size: 5
     batch_max_wait_time: 0 s
     max_checks_retries: 1

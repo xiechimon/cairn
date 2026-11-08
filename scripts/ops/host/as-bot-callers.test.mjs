@@ -14,6 +14,14 @@ const botFiles = {
     join(appTokenDir, 'as-bot-policy.mjs'),
     'utf8',
   ),
+  '.cairn/tools/app-token/bot-identity.mjs': readFileSync(
+    join(appTokenDir, 'bot-identity.mjs'),
+    'utf8',
+  ),
+  '.cairn/tools/app-token/commit-identity.json': readFileSync(
+    resolve('packages/shared/commit-identity.json'),
+    'utf8',
+  ),
   '.cairn/tools/app-token/token.mjs': "process.stdout.write('stub-token');\n",
 };
 
@@ -45,9 +53,8 @@ const ghForMerge = (checks = passing, comments = '') =>
 } else if (line.includes('comments')) console.log(${JSON.stringify(comments)});
 else if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
 else if (line.includes('headRefName')) console.log('feature/x');
-else if (line.includes('authors')) console.log('348051526+cairnwright@users.noreply.github.com');
 else if (line.includes('author')) console.log('app/cairnwright');
-else if (line.includes('length')) console.log('1');`,
+`,
   );
 
 const forgedPass = `<!-- review-gate:${HEAD} -->\n**Independent review gate: PASS** for \`${HEAD.slice(0, 8)}\`.`;
@@ -65,26 +72,26 @@ if (line === 'rev-parse HEAD') console.log(${JSON.stringify(HEAD)});`,
 
 const noop = '#!/bin/sh\nexit 0\n';
 
-test('merge-pr.sh merges a bot PR with the human login, pinned to the head it checked', (t) => {
+test('merge-pr.sh squash-merges an owner-route bot PR with the human login, pinned to the head it checked', (t) => {
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge(),
+      'bin/gh': ghForMerge({ 'merge-route': [run('failure')], 'review-gate': [run('success')] }),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   });
   const result = fixture.run('tools/merge-pr.sh', ['7']);
   assert.equal(result.status, 0, result.stderr);
   assert.ok(
-    result.ghLines.includes(`pr merge 7 -R xiechimon/cairn --rebase --match-head-commit ${HEAD}`),
+    result.ghLines.includes(`pr merge 7 -R xiechimon/cairn --squash --match-head-commit ${HEAD}`),
   );
 });
 
-test('merge-pr.sh --auto keeps the pin when it arms auto-merge', (t) => {
+test('merge-pr.sh --auto keeps the squash pin when it arms auto-merge', (t) => {
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge(),
+      'bin/gh': ghForMerge({ 'merge-route': [run('failure')], 'review-gate': [run('success')] }),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   });
@@ -92,7 +99,7 @@ test('merge-pr.sh --auto keeps the pin when it arms auto-merge', (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.ok(
     result.ghLines.includes(
-      `pr merge 7 -R xiechimon/cairn --rebase --match-head-commit ${HEAD} --auto`,
+      `pr merge 7 -R xiechimon/cairn --squash --match-head-commit ${HEAD} --auto`,
     ),
   );
 });

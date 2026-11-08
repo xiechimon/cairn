@@ -10,6 +10,7 @@ export * from './brief-file.js';
 export * from './capability-routing.js';
 export * from './chief-event.js';
 export * from './claude-subscription.js';
+export * from './commit-identity.js';
 export * from './experience-candidate.js';
 export * from './failure-attribution.js';
 export * from './failure-replay-candidate.js';

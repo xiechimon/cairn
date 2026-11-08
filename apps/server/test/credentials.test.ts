@@ -1,9 +1,10 @@
 import { and, eq } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { routingRule, step as stepTable } from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
+import * as appToken from '../src/services/github-app-token.js';
 import { stepToken } from '../src/services/machine-step-token.js';
 import { createProvider } from '../src/services/providers.js';
 import { createSecret } from '../src/services/secrets.js';
@@ -259,6 +260,39 @@ test('finished steps retain provider-key responses', async () => {
     expect((await stepToken(deps, machineId, stepId)).provider).toMatchObject({
       apiKey: RELAY_KEY,
     });
+  }
+});
+
+test('a step commits as the App bot user when the App is configured, and as nobody in particular without one', async () => {
+  const s = await withRoutedStack();
+  const machineId = insertMachine(s, { name: 'identity' });
+  const stepId = addStep(s, s.buildId, 'build');
+  s.db
+    .update(stepTable)
+    .set({ machineId, status: 'claimed' })
+    .where(eq(stepTable.id, stepId))
+    .run();
+  const deps = {
+    ...s.svc,
+    box: s.secretBox,
+    reposDir: s.reposDir,
+    attachmentsDir: s.attachmentsDir,
+    skillsDir: s.skillsDir,
+  };
+  expect((await stepToken(deps, machineId, stepId)).commitIdentity).toBeNull();
+  const bot = {
+    name: 'cairnwright[bot]',
+    email: '347615582+cairnwright[bot]@users.noreply.github.com',
+  };
+  const lookup = vi.spyOn(appToken, 'appCommitIdentity').mockResolvedValue(bot);
+  try {
+    expect(
+      (await stepToken({ ...deps, githubAppTokenSocket: '/app.sock' }, machineId, stepId))
+        .commitIdentity,
+    ).toEqual(bot);
+    expect(lookup).toHaveBeenLastCalledWith({ config: { githubAppTokenSocket: '/app.sock' } });
+  } finally {
+    lookup.mockRestore();
   }
 });
 
