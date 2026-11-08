@@ -24,6 +24,11 @@ function keptParams(search: string): URLSearchParams {
   return params;
 }
 
+export function coordinatorSearch(search: string): string {
+  const query = keptParams(search).toString();
+  return query === '' ? '' : `?${query}`;
+}
+
 export function useOpenCoordinatorThread(): (threadId: string) => void {
   const navigate = useNavigate();
   const { search } = useLocation();
