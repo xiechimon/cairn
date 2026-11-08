@@ -280,6 +280,35 @@ export const chiefMarkdown: FixtureSet = {
   },
 };
 
+const CHIEF_CODE_REPLY = [
+  '读取记录的函数如下：',
+  '',
+  '```python',
+  'from pathlib import Path',
+  '',
+  'def load_records(path: Path) -> list[dict]:',
+  '    """Load JSON records from a file."""',
+  '    # utf-8 only',
+  '    with path.open("r", encoding="utf-8") as f:',
+  '        return json.load(f)[:10] or None',
+  '```',
+].join('\n');
+
+export const chiefCode: FixtureSet = {
+  todos: [legacyReview, legacyDone],
+  now: r7(13, 14),
+  chief: {
+    view: 'none',
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '读取记录的函数…',
+    stream: [
+      { kind: 'user', text: '写一个读取 JSON 记录的函数' },
+      { kind: 'robot', markdown: CHIEF_CODE_REPLY, seconds: '12s' },
+    ],
+  },
+};
+
 export const chiefQuestion: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),

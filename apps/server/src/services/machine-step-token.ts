@@ -10,7 +10,7 @@ import {
   resolveStepCredentials,
 } from './credentials.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { autonomousToken } from './github-autonomous-token.js';
+import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
 import { humanWorkIdentity } from './github-work-attribution.js';
 import {
   isChiefConversation,
@@ -62,6 +62,7 @@ export async function stepToken(
         : null;
   }
   return {
+    commitIdentity: await softwareCommitIdentity(deps),
     coAuthor:
       todoRow &&
       stepRow?.scheduleId == null &&

@@ -1,6 +1,6 @@
 import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import {
   autonomousMergeAdmission,
   build,
@@ -17,6 +17,7 @@ import {
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
 import { requestMerge, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import * as appToken from '../src/services/github-app-token.js';
 import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
 import { claimStep } from '../src/services/machine-claim.js';
@@ -191,6 +192,41 @@ test('a ready local autonomous judgment enqueues exactly one bound merge', async
       defaultBranch: 'main',
     },
   });
+});
+
+test('the local merge commits as the App bot user', async () => {
+  const f = await fixture();
+  const bot = {
+    name: 'cairnwright[bot]',
+    email: '347615582+cairnwright[bot]@users.noreply.github.com',
+  };
+  const lookup = vi.spyOn(appToken, 'appCommitIdentity');
+  lookup.mockResolvedValueOnce(bot);
+  try {
+    expect((await enqueueLocalMerge(f.deps, 'build', 'main')).enqueued).toBe(true);
+  } finally {
+    lookup.mockRestore();
+  }
+  const [row] = f.s.db
+    .select()
+    .from(step)
+    .all()
+    .filter((r) => r.kind === 'merge');
+  const { command } = JSON.parse(row?.prompt ?? '{}');
+  expect(command.identity).toEqual(bot);
+  expect(JSON.stringify(command)).not.toMatch(/cairn@localhost/);
+});
+
+test('without a GitHub App the local merge keeps the local cairn identity', async () => {
+  const f = await fixture();
+  expect((await enqueueLocalMerge(f.deps, 'build', 'main')).enqueued).toBe(true);
+  const [row] = f.s.db
+    .select()
+    .from(step)
+    .all()
+    .filter((r) => r.kind === 'merge');
+  const { command } = JSON.parse(row?.prompt ?? '{}');
+  expect(command.identity).toEqual({ name: f.deps.user.displayName, email: 'cairn@localhost' });
 });
 
 for (const policy of ['human', 'shadow'] as const) {

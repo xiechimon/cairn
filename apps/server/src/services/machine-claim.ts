@@ -23,6 +23,7 @@ import {
   WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import {
   build,
   chief,
@@ -91,6 +92,7 @@ import { listProjectTagVocab } from './tags.js';
 import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
+import { carriedAnswerIds } from './worker-question-store.js';
 
 function workerSkillInjection(
   deps: MachineDeps,
@@ -159,6 +161,16 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .all()
     .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
+}
+
+function answerIdsOf(
+  db: Db,
+  buildId: string,
+  instruction: string | null,
+): { answerIds?: string[] } {
+  if (instruction === null) return {};
+  const ids = carriedAnswerIds(db, buildId, instruction);
+  return ids.length > 0 ? { answerIds: ids } : {};
 }
 
 export function serverTakesTurn(
@@ -582,6 +594,7 @@ async function tryClaim(
       ...(localMerge !== null ? { localMerge } : {}),
       session,
       ...(instruction !== null ? { instruction } : {}),
+      ...answerIdsOf(db, cand.stepRow.buildId, instruction),
       todo: {
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,

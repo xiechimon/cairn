@@ -31,8 +31,22 @@ test('recovery publishes one exact revert commit on a named branch and preserves
     git('add', 'later');
     git('commit', '-m', 'later');
     const base = git('rev-parse', 'HEAD');
-    const branch = await prepareRecoveryBranch(dir, base, bad, 'token' as AutonomousToken);
+    const bot = {
+      name: 'cairnwright[bot]',
+      email: '347615582+cairnwright[bot]@users.noreply.github.com',
+    };
+    const branch = await prepareRecoveryBranch({
+      url: dir,
+      base,
+      reverted: bad,
+      token: 'token' as AutonomousToken,
+      identity: bot,
+    });
     expect(branch).toBe(`cairn-recovery/${bad.slice(0, 8)}`);
+    expect(git('show', '-s', '--format=%an <%ae>|%cn <%ce>', branch)).toBe(
+      `${bot.name} <${bot.email}>|${bot.name} <${bot.email}>`,
+    );
+    expect(git('for-each-ref', 'refs/cairn')).toBe('');
     expect(git('show', `${branch}:file`)).toBe('good');
     expect(git('show', `${branch}:later`)).toBe('keep');
     expect(git('rev-list', '--count', `${base}..${branch}`)).toBe('1');

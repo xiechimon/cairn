@@ -8,6 +8,7 @@ import type {
   MachineCapabilities,
   MachinePresenceBody,
   MachineSkillsManifestResponse,
+  SteerAnswer,
   StepActivityReport,
   StepRecord,
   ToolCallRecord,
@@ -39,7 +40,7 @@ import {
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
-import { markAnswersDelivered, undeliveredAnswers } from './worker-question-store.js';
+import { ackAnswers, answerTextOf, undeliveredAnswers } from './worker-question-store.js';
 
 export { claimStep, meetsMcpVersionGate } from './machine-claim.js';
 export {
@@ -59,18 +60,26 @@ export function fetchSteer(
   deps: { db: Db },
   machine: { id: string | null },
   stepId: string,
-): { content: string | null } {
+): { content: string | null; answers?: SteerAnswer[] } {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow || stepRow.machineId !== machine.id || stepRow.status !== 'claimed') {
     return { content: null };
   }
+  const answers = isChiefConversation(stepRow.buildId)
+    ? []
+    : undeliveredAnswers(db, stepRow.buildId).map((content) => ({
+        requestId: content.requestId,
+        text: answerTextOf(content),
+      }));
+  const withAnswers = (content: string | null) =>
+    answers.length > 0 ? { content, answers } : { content };
   const pending = db
     .select()
     .from(steerPending)
     .where(eq(steerPending.conversationId, stepRow.buildId))
     .get();
-  if (!pending) return { content: null };
+  if (!pending) return withAnswers(null);
   if (
     pending.stepId === stepId &&
     isChiefConversation(stepRow.buildId) &&
@@ -80,25 +89,21 @@ export function fetchSteer(
   }
   db.delete(steerPending).where(eq(steerPending.conversationId, stepRow.buildId)).run();
   if (pending.stepId !== stepId) {
-    return { content: null };
+    return withAnswers(null);
   }
-  markAnswersDelivered(deps, stepRow.buildId, undeliveredAnswers(db, stepRow.buildId), nowMs());
-  return { content: pending.content };
+  return withAnswers(pending.content);
 }
 
 export function ackSteer(
   deps: { db: Db; convHub?: ConversationStreamHub; machineHub?: MachineWakeHub },
   machine: { id: string | null; teamId: string },
   stepId: string,
+  answerIds: readonly string[] = [],
 ): { ok: true } {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (
-    stepRow?.machineId === machine.id &&
-    stepRow.status === 'claimed' &&
-    isChiefConversation(stepRow.buildId)
-  ) {
-    ackChiefSteer(deps, machine.teamId, stepRow);
-  }
+  if (stepRow?.machineId !== machine.id || stepRow.status !== 'claimed') return { ok: true };
+  if (isChiefConversation(stepRow.buildId)) ackChiefSteer(deps, machine.teamId, stepRow);
+  else if (answerIds.length > 0) ackAnswers(deps, stepRow.buildId, answerIds, nowMs());
   return { ok: true };
 }
 

@@ -159,6 +159,7 @@ export const claimedStepSchema = z.object({
     priorMachineId: z.string().optional(),
   }),
   instruction: z.string().nullable().optional(),
+  answerIds: z.array(z.string().min(1)).optional(),
   todo: z
     .object({
       id: recordId,
@@ -259,9 +260,21 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
 
+export const steerAnswerSchema = z.object({
+  requestId: z.string().min(1),
+  text: z.string(),
+});
+export type SteerAnswer = z.infer<typeof steerAnswerSchema>;
+
 export const machineSteerResponseSchema = z.object({
   content: z.string().nullable(),
+  answers: z.array(steerAnswerSchema).optional(),
 });
+
+export const machineSteerAckBodySchema = z.object({
+  answerIds: z.array(z.string().min(1)).max(100).optional(),
+});
+export type MachineSteerAckBody = z.infer<typeof machineSteerAckBodySchema>;
 export type MachineSteerResponse = z.infer<typeof machineSteerResponseSchema>;
 
 export const machineStopResponseSchema = z.object({
@@ -330,6 +343,7 @@ export const machineToolResponseSchema = z.union([
 ]);
 
 export const machineTokenResponseSchema = z.object({
+  commitIdentity: z.object({ name: z.string(), email: z.string() }).nullable().optional(),
   coAuthor: z
     .object({ name: z.string(), email: z.string(), login: z.string() })
     .nullable()

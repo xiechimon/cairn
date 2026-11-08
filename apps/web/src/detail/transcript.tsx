@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { clockTime, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { StatusLine } from '../components/chat/status-line.js';
 import { Button } from '../components/ui/button.js';
 import {
   Collapsible,
@@ -36,30 +37,12 @@ function formatElapsed(seconds: number, t: TFunc): string {
 }
 
 const ROW_BASE = 'chat-row flex items-start';
+const AGENT_ROW = 'chat-row chat-row--agent flex flex-col items-start';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
 function prevRunningWork(prev: TranscriptItem | undefined): boolean {
   return prev?.kind === 'work' && prev.steps.some((step) => step.kind === 'call' && step.running);
-}
-
-function TurnRule({
-  children,
-  className,
-  testId,
-}: {
-  children: ReactNode;
-  className?: string;
-  testId?: string;
-}) {
-  return (
-    <div
-      className={`chat-note flex items-center gap-3 text-center text-meta text-(--text-tertiary) before:h-px before:flex-1 before:bg-(--border) after:h-px after:flex-1 after:bg-(--border) ${className ?? ''}`}
-      data-testid={testId}
-    >
-      <span className="max-w-[68ch] min-w-0 [overflow-wrap:anywhere]">{children}</span>
-    </div>
-  );
 }
 
 function endsWithAgentRow(item: TranscriptItem | undefined): boolean {
@@ -262,9 +245,9 @@ function Row({
       );
     case 'note':
       return (
-        <TurnRule className="mt-5" testId="transcript-note">
+        <StatusLine className="mt-5" testId="transcript-note">
           {t(item.text)}
-        </TurnRule>
+        </StatusLine>
       );
     case 'scheduled':
       return (
@@ -301,7 +284,7 @@ function Row({
     case 'chief':
       return (
         <div className={`${ROW_BASE} ${margin}`}>
-          <TurnRule className="w-full">{t('由 Coordinator 发起')}</TurnRule>
+          <StatusLine className="w-full">{t('由 Coordinator 发起')}</StatusLine>
         </div>
       );
     case 'user':
@@ -336,9 +319,9 @@ function Row({
     case 'robot':
       return (
         <>
-          <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+          <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
             <span
-              className="chat-text -mt-px max-w-[68ch] min-w-0 voice-response text-card-title break-words text-(--foreground)"
+              className="chat-text -mt-px agent-measure min-w-0 voice-response text-card-title break-words text-(--foreground)"
               data-testid="agent-text"
             >
               {item.markdown != null ? (
@@ -354,17 +337,17 @@ function Row({
             )}
           </div>
           {item.footer?.seconds != null && item.footer.seconds >= 60 && (
-            <TurnRule className="mt-3" testId="worked-for-rule">
+            <StatusLine className="mt-3" testId="worked-for-rule">
               {t('已工作 {n} 分钟', { n: Math.floor(item.footer.seconds / 60) })}
-            </TurnRule>
+            </StatusLine>
           )}
         </>
       );
     case 'report':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 voice-response text-card-title break-words text-(--foreground)"
+            className="chat-text -mt-px agent-measure min-w-0 voice-response text-card-title break-words text-(--foreground)"
             data-testid="info-report"
           >
             <ChatMarkdown text={item.markdown} />
@@ -373,15 +356,15 @@ function Row({
       );
     case 'thinking':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
-          <span className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
+          <span className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)">
             <ThinkingRow text={item.text} />
           </span>
         </div>
       );
     case 'agent-todo':
       return (
-        <div className="mt-3.5 max-w-[68ch]" data-testid="agent-todo">
+        <div className="mt-3.5 agent-measure" data-testid="agent-todo">
           <TaskCard
             items={item.items.map((it) => ({
               state: it.state,
@@ -394,7 +377,7 @@ function Row({
       return <FailRow item={item} margin={margin} t={t} />;
     case 'streaming':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <LiveRow
             variant="detail"
             label={item.label}
@@ -467,22 +450,20 @@ function Row({
       return <WorkTrace item={item} defaultExpanded={defaultExpanded} entering={entering} t={t} />;
     case 'skills':
       return (
-        <div
-          className="chat-note mx-auto mt-5 flex max-w-[68ch] flex-wrap items-baseline justify-center gap-x-1.5 text-center text-meta text-(--text-tertiary)"
-          data-testid="skills-summary"
-        >
-          {item.read.length > 0 && <span>{t('技能：{n}', { n: item.read.join(', ') })}</span>}
-          {item.read.length > 0 && item.denied.length > 0 && <span aria-hidden="true">·</span>}
-          {item.denied.length > 0 && <span>{t('挡下：{n}', { n: item.denied.join(', ') })}</span>}
-        </div>
+        <StatusLine className="mt-5" testId="skills-summary">
+          {[
+            ...(item.read.length > 0 ? [t('技能：{n}', { n: item.read.join(', ') })] : []),
+            ...(item.denied.length > 0 ? [t('挡下：{n}', { n: item.denied.join(', ') })] : []),
+          ].join(' · ')}
+        </StatusLine>
       );
     case 'elapsed':
       return <ActionRow seconds={item.seconds} t={t} />;
     case 'review':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+            className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -564,9 +545,9 @@ function Row({
       );
     case 'verify':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+            className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -622,9 +603,9 @@ function FailRow({
 }) {
   const [rawOpen, setRawOpen] = useState(false);
   return (
-    <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+    <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
       <span
-        className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+        className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>

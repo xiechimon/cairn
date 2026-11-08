@@ -63,17 +63,22 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   const note = await page.getByTestId('transcript-note').first().evaluate((el) => {
     const s = getComputedStyle(el);
     const text = el.firstElementChild!.getBoundingClientRect();
-    const rule = el.getBoundingClientRect();
+    const line = el.getBoundingClientRect();
     return {
-      align: s.textAlign,
-      display: s.display,
-      leftGap: text.left - rule.left,
-      rightGap: rule.right - text.right,
+      leftGap: text.left - line.left,
+      before: getComputedStyle(el, '::before').content,
+      after: getComputedStyle(el, '::after').content,
+      fontSize: s.fontSize,
+      lineHeight: s.lineHeight,
+      color: s.color,
+      secondary: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
     };
   });
-  expect(note.align).toBe('center');
-  expect(note.display).toBe('flex');
-  expect(Math.abs(note.leftGap - note.rightGap)).toBeLessThanOrEqual(1);
+  expect(note.leftGap).toBe(0);
+  expect(note.before).toBe('none');
+  expect(note.after).toBe('none');
+  expect(note.fontSize).toBe('15px');
+  expect(note.lineHeight).toBe('21px');
   // the capped measure must not push the column into horizontal overflow
   const overflow = await page.evaluate(() => {
     const col = document.querySelector('.side-panel [data-testid="transcript-col"]')!;

@@ -30,6 +30,7 @@ import {
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
+  CONTINUE_PROMPTS,
   checkPlanContract,
   conversationBranch,
   DEFAULT_SHIP_ROUTE,
@@ -59,6 +60,7 @@ import {
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
+  withCoAuthor,
   withRetryLessons,
 } from '@cairn/shared';
 import {
@@ -137,6 +139,7 @@ import { githubReadToken } from './github-autonomous-token.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { teamUserToken } from './github-connection.js';
 import { githubText } from './github-text.js';
+import { humanWorkIdentity } from './github-work-attribution.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
@@ -170,6 +173,7 @@ import {
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
+import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import {
   abandonsQuestions,
   childrenOfTodo,
@@ -183,7 +187,6 @@ import {
   blockingWorkerQuestions,
   cancelPendingWorkerQuestions,
   deliveredAnswerText,
-  markAnswersDelivered,
   pendingWorkerQuestions,
   undeliveredAnswers,
   writeWorkerQuestion,
@@ -437,18 +440,17 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      const carried = undeliveredAnswers(db, conversationId);
-      const deliveredAt = running ? null : now;
       if (continuationOptions.answer !== undefined)
-        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, deliveredAt);
-      else if (human) settleWorkerReply(deps, conversationId, body.content, deliveredAt);
-      if (!running) markAnswersDelivered(deps, conversationId, carried, now);
-      const content = [...carried.map(deliveredAnswerText), body.content].join('\n\n');
+        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, null);
+      const answeredNow =
+        continuationOptions.answer !== undefined ||
+        (human && settleWorkerReply(deps, conversationId, body.content, null));
+      const content = answeredNow ? '' : body.content;
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
         role: 'user' as const,
-        content,
+        content: body.content,
         createdAt: now,
       };
       if (targetBuildId !== conversationId) {
@@ -1009,6 +1011,20 @@ export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()):
   return released;
 }
 
+function withUndeliveredAnswers(
+  db: Db,
+  buildId: string,
+  kind: StepRecord['kind'],
+  prompt: string | undefined,
+): string | null {
+  const answers =
+    isBuildStepKind(kind) || kind === 'plan'
+      ? undeliveredAnswers(db, buildId).map(deliveredAnswerText)
+      : [];
+  if (answers.length === 0) return prompt ?? null;
+  return [...answers, prompt ?? CONTINUE_PROMPTS[kind]].filter((part) => part !== '').join('\n\n');
+}
+
 export function enqueueStep(
   deps: BuildDeps,
   buildId: string,
@@ -1031,7 +1047,7 @@ export function enqueueStep(
       kind,
       machineId: null,
       status: 'pending',
-      prompt: prompt ?? null,
+      prompt: withUndeliveredAnswers(deps.db, buildId, kind, prompt),
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
@@ -2335,18 +2351,6 @@ async function mergeThroughGithub(
       });
       return { delegated: true };
     }
-    if (
-      repoRef.owner.toLowerCase() === 'xiechimon' &&
-      repoRef.repo.toLowerCase() === 'cairn' &&
-      (pull.openerType !== 'User' ||
-        !pull.openerLogin?.trim() ||
-        pull.openerLogin.toLowerCase().endsWith('[bot]'))
-    ) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} cannot be squash merged by cairn: xiechimon/cairn requires a verified human opener. Return bot-opened PRs to the dispatcher for identity preparation and rebase via ~/.cairn/tools/merge-pr.sh; restore missing opener identity before retrying.`,
-      );
-    }
     const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
     if (checkpoint === null || !isFullSha(checkpoint)) {
       throw new HttpError(
@@ -2375,7 +2379,12 @@ async function mergeThroughGithub(
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
       commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
-      commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
+      commitMessage: withCoAuthor(
+        closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
+        readTeamAttributionSettings(deps.db, before.todoRow.teamId).coAuthorTrailer
+          ? humanWorkIdentity(deps.db, before.todoRow, row.triggerSource)
+          : null,
+      ),
     });
     if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')
       settleAutonomousMerge(deps.db, row.id, result.kind === 'merged' ? 'merged' : 'refused');

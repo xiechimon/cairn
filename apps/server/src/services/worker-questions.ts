@@ -115,10 +115,10 @@ export function settleWorkerReply(
   buildId: string,
   text: string,
   deliveredAt: number | null,
-): void {
+): boolean {
   const todoRow = todoOfBuild(deps, buildId);
   const pending = pendingWorkerQuestions(deps.db, buildId);
-  if (pending.length === 0) return;
+  if (pending.length === 0) return false;
   answerWorkerQuestionsById(
     deps,
     buildId,
@@ -131,6 +131,7 @@ export function settleWorkerReply(
     todoRow.id,
     pending.map((question) => ({ question, answer: text, by: 'person' as const })),
   );
+  return true;
 }
 
 export interface QuestionAnswer {
