@@ -1,3 +1,8 @@
+// Paper type-scale keys vs the `cn` class merger. The bare `cn` package reads
+// any unknown `text-*` as a color, so `text-meta text-content-tertiary` used to
+// lose `text-meta`, and every components/ui primitive merges className through
+// cn. The keys are read from app.css so a new theme key without a matching cn
+// entry fails here.
 import { readFileSync } from 'node:fs';
 import { cn } from 'cn';
 import { describe, expect, test } from 'vitest';

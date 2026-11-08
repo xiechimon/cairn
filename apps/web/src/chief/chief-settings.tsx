@@ -97,7 +97,7 @@ export function ChiefSettings({
         >
           <ChevronLeft width={16} height={16} />
         </IconTooltip>
-        <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
+        <h1 className="min-w-0 truncate voice-title text-page text-foreground">
           {t('Coordinator 设置')}
         </h1>
       </header>

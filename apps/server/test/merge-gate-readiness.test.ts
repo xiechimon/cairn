@@ -1844,70 +1844,39 @@ describe('ADR 0026 independent protected-path review', () => {
     expect(mergeReadiness(i).ready).toBe(true);
   });
 
-  test('a provider prefix or a variant suffix is still the same model', () => {
-    expect(codesOf(reviewedBy('anthropic/claude-opus-5-5', 'claude-opus-5-5'))).toContain(
-      'independent-review-missing',
-    );
-    expect(codesOf(reviewedBy('claude-opus-5-5[1m]', 'claude-opus-5-5'))).toContain(
-      'independent-review-missing',
-    );
-    expect(codesOf(reviewedBy('claude-opus-5-5[1M]', 'CLAUDE-OPUS-5-5'))).toContain(
-      'independent-review-missing',
-    );
-    expect(codesOf(reviewedBy('claude-opus-5-5 ', 'claude-opus-5-5'))).toContain(
-      'independent-review-missing',
-    );
+  test('a Codex review in a fresh context passes whoever wrote the change', () => {
+    expect(mergeReadiness(reviewedBy('gpt-6.1-sol', 'gpt-5.5')).ready).toBe(true);
+    expect(mergeReadiness(reviewedBy('openai/gpt-5.5[1m]', 'gpt-5.5')).ready).toBe(true);
+    expect(mergeReadiness(reviewedBy('claude-opus-5-5', 'openai/gpt-5.5[1m]')).ready).toBe(true);
+    expect(mergeReadiness(reviewedBy('not-a-real-model', 'gpt-5.5')).ready).toBe(true);
   });
 
-  test('a radius relay alias is the same upstream model', () => {
-    expect(codesOf(reviewedBy('radius/balanced', 'kimi-k3'))).toContain(
-      'independent-review-missing',
-    );
-    expect(codesOf(reviewedBy('cheap', 'deepseek-v4.1-flash'))).toContain(
-      'independent-review-missing',
-    );
-    expect(codesOf(reviewedBy('precise[1m]', 'openai/gpt-5.6-sol'))).toContain(
-      'independent-review-missing',
-    );
-  });
-
-  test('the same vendor blocks, and the blocker names that vendor', () => {
-    const anthropic = reviewedBy('claude-opus-5-5', 'claude-sonnet-5-5');
+  test('a reviewer that is not Codex blocks, and the blocker names its vendor', () => {
+    const anthropic = reviewedBy('gpt-5.5', 'claude-opus-5-5');
     expect(codesOf(anthropic)).toContain('independent-review-missing');
     expect(detailOf(anthropic, 'independent-review-missing')).toContain(
-      'reviewer shares author vendor Anthropic',
+      'reviewer vendor Anthropic is not Codex',
     );
-    const google = reviewedBy('gemini-2.5-pro', 'google/gemini-2.5-flash');
+    const google = reviewedBy('claude-opus-5-5', 'google/gemini-2.5-flash');
     expect(detailOf(google, 'independent-review-missing')).toContain(
-      'reviewer shares author vendor Google',
+      'reviewer vendor Google is not Codex',
     );
-    const moonshot = reviewedBy('moonshotai/kimi-k2.6', 'kimi-k3');
-    expect(detailOf(moonshot, 'independent-review-missing')).toContain(
-      'reviewer shares author vendor Moonshot',
-    );
-  });
-
-  test('an id with no known vendor blocks instead of passing', () => {
-    const authorUnknown = reviewedBy('not-a-real-model', 'gpt-5.5');
-    expect(codesOf(authorUnknown)).toContain('independent-review-missing');
-    expect(detailOf(authorUnknown, 'independent-review-missing')).toContain(
-      'author vendor unknown',
-    );
-    const reviewerUnknown = reviewedBy('claude-opus-5-5', 'not-a-real-model');
-    expect(detailOf(reviewerUnknown, 'independent-review-missing')).toContain(
-      'reviewer vendor unknown',
-    );
-    expect(detailOf(reviewerUnknown, 'independent-review-missing')).toContain(
-      'author vendor Anthropic',
+    const relay = reviewedBy('claude-opus-5-5', 'radius/balanced');
+    expect(detailOf(relay, 'independent-review-missing')).toContain(
+      'reviewer vendor Moonshot is not Codex',
     );
   });
 
-  test('different vendors still pass after prefix and suffix normalization', () => {
-    expect(
-      mergeReadiness(reviewedBy('anthropic/claude-opus-5-5[1m]', 'openai/gpt-5.5')).ready,
-    ).toBe(true);
-    expect(mergeReadiness(reviewedBy('google/gemini-2.5-pro[1m]', 'gpt-5.5')).ready).toBe(true);
-    expect(mergeReadiness(reviewedBy('radius/balanced', 'openai/gpt-5.5')).ready).toBe(true);
+  test('a reviewer model with no known vendor blocks instead of passing', () => {
+    const unknown = reviewedBy('claude-opus-5-5', 'not-a-real-model');
+    expect(codesOf(unknown)).toContain('independent-review-missing');
+    expect(detailOf(unknown, 'independent-review-missing')).toContain('reviewer vendor unknown');
+  });
+
+  test('the author reviewing its own change blocks even on Codex', () => {
+    const i = reviewedBy('gpt-5.5', 'gpt-5.5');
+    i.verdicts = i.verdicts.map((v) => ({ ...v, reviewerId: 'writer' }));
+    expect(codesOf(i)).toContain('independent-review-missing');
   });
 });
 

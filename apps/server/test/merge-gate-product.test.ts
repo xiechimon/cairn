@@ -563,7 +563,7 @@ describe('in-product merge gate', () => {
     },
   );
 
-  test('D71 reviewer identity is the model the review step actually ran: a same-vendor fallback is not independent', async () => {
+  test('D71 reviewer identity is the model the review step actually ran: a review that fell back off Codex does not count', async () => {
     const { s, buildId, stepId } = await world();
     completeStep(s.svc, stepId, { hasChanges: true });
     s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
@@ -646,7 +646,7 @@ describe('in-product merge gate', () => {
     expect(result?.blockers.map((b) => b.code)).toContain('independent-review-missing');
   });
 
-  test('D71 author identity is the model the build step actually ran: a build that fell back to the reviewer vendor is not independent', async () => {
+  test('a Codex review counts even when the build itself ran on Codex', async () => {
     const { s, buildId, stepId } = await world();
     s.db
       .update(step)
@@ -729,7 +729,7 @@ describe('in-product merge gate', () => {
       })
       .run();
     const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
-    expect(result?.blockers.map((b) => b.code)).toContain('independent-review-missing');
+    expect(result?.blockers.map((b) => b.code)).not.toContain('independent-review-missing');
   });
 
   test('an oversize patch gets no size blocker and no extra size review (D68)', async () => {

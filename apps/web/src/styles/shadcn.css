@@ -110,6 +110,9 @@
   --chief-launcher-inset: 8px;
   --chief-launcher-clearance: calc(var(--chief-launcher-size) + var(--chief-launcher-inset) * 2);
   --title-weight: 500;
+  --voice-greeting-weight: 320;
+  --voice-title-weight: 500;
+  --voice-response-weight: 400;
   --rem-scale: calc(16 / 17);
   --sidebar-w: 248px;
   --chat-max-w: 768px;
@@ -243,6 +246,7 @@
 }
 
 .light {
+  --voice-greeting-weight: 360;
   --top: inset 0 1px 0 rgb(255 255 255 / 0);
   --cds-shadow-xs: 0 1px 2px rgb(29 35 31 / 0.06);
   --cds-shadow-sm: 0 1px 2px rgb(29 35 31 / 0.06), 0 2px 8px rgb(29 35 31 / 0.06);

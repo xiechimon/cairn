@@ -139,7 +139,7 @@ import { storeInfoReport } from './info-handoff.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
-import { modelsAreIndependent } from './merge-gate/model-identity.js';
+import { isCodexReviewModel } from './merge-gate/model-identity.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGateReadPort } from './merge-gate-github.js';
 import { assertMergeRequiredChecks } from './merge-required-checks.js';
@@ -1230,7 +1230,7 @@ export function maybeEnqueueIndependentReview(
   const reviewRoute = routeForStep(deps.db, todoRow, 'review');
   if (reviewRoute === null) return;
   const authorModel = authorModelOf(deps, todoRow, buildId);
-  if (authorModel === null || !modelsAreIndependent(authorModel, reviewRoute.modelId)) return;
+  if (authorModel === null || !isCodexReviewModel(reviewRoute.modelId)) return;
   const agentId = reviewRoute.id;
   const plan = latestPlanRow(deps, buildId);
   const reviewInstruction = reviewInstructionOf(deps, todoRow.teamId, 'review');

@@ -772,10 +772,15 @@ test('scheduler coalesces concurrent CI and PR deadlines into one PrWatch read',
   f.comment(1);
   f.pull.mergeable = 'dirty';
   vi.useFakeTimers();
-  const scheduler = createScheduler({ ...f.s.svc, box: f.s.secretBox }, { tickMs: 60_000 }, null, {
-    githubFetch: f.mock.fetch,
-    logger: { info() {} },
-  });
+  const scheduler = createScheduler(
+    { ...f.s.svc, box: f.s.secretBox, githubFetch: f.mock.fetch },
+    { tickMs: 60_000 },
+    null,
+    {
+      githubFetch: f.mock.fetch,
+      logger: { info() {} },
+    },
+  );
   try {
     scheduler.start();
     await vi.advanceTimersByTimeAsync(100);
@@ -801,10 +806,15 @@ test('scheduler cannot fall back to legacy fixes when the first PrWatch read fai
     text: async () => '',
   }));
   vi.useFakeTimers();
-  const scheduler = createScheduler({ ...f.s.svc, box: f.s.secretBox }, { tickMs: 60_000 }, null, {
-    githubFetch: f.mock.fetch,
-    logger: { info() {} },
-  });
+  const scheduler = createScheduler(
+    { ...f.s.svc, box: f.s.secretBox, githubFetch: f.mock.fetch },
+    { tickMs: 60_000 },
+    null,
+    {
+      githubFetch: f.mock.fetch,
+      logger: { info() {} },
+    },
+  );
   try {
     scheduler.start();
     await vi.advanceTimersByTimeAsync(100);

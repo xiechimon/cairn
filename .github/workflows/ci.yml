@@ -510,6 +510,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-page-style-gate.test.mjs
 
+      - name: Feature map covers every route and stays in step with the code
+        if: ${{ !cancelled() }}
+        env:
+          FEATURE_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$FEATURE_REGISTRY_BASE_SHA" ]; then git fetch origin "$FEATURE_REGISTRY_BASE_SHA"; fi
+          node scripts/generate-feature-map.mjs --check
+
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs scripts/generate-feature-map.test.mjs
