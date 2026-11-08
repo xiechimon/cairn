@@ -1,8 +1,3 @@
-// Paper type-scale keys vs the `cn` class merger. The bare `cn` package reads
-// any unknown `text-*` as a color, so `text-meta text-content-tertiary` used to
-// lose `text-meta`, and every components/ui primitive merges className through
-// cn. The keys are read from app.css so a new theme key without a matching cn
-// entry fails here.
 import { readFileSync } from 'node:fs';
 import { cn } from 'cn';
 import { describe, expect, test } from 'vitest';
@@ -12,8 +7,8 @@ const appCss = readFileSync(new URL('../src/styles/app.css', import.meta.url), '
 const typeKeys = [...appCss.matchAll(/^\s*--text-([a-z]+(?:-[a-z]+)*):/gm)].map((m) => m[1]);
 
 describe('cn keeps Paper type-scale keys', () => {
-  test('app.css declares the eight type keys', () => {
-    expect(typeKeys).toEqual(['page', 'greeting', 'heading', 'card-title', 'ui', 'meta', 'code', 'caption']);
+  test('app.css declares the nine type keys', () => {
+    expect(typeKeys).toEqual(['page', 'brand', 'greeting', 'heading', 'card-title', 'ui', 'meta', 'code', 'caption']);
   });
 
   test.each(typeKeys)('text-%s survives next to a text color', (key) => {
