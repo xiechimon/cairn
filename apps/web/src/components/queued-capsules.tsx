@@ -10,6 +10,7 @@ import { toastError, toastSuccess } from './ui/toaster.js';
 export interface QueuedCapsule {
   id: string;
   content: string;
+  label?: string;
   error?: string | null;
   note?: string;
   held?: boolean;
@@ -163,7 +164,7 @@ export function QueuedCapsules({
             key={message.id}
             data-testid="queued-message"
             data-state={failed ? 'failed' : 'queued'}
-            title={message.note ?? message.content}
+            title={message.note ?? message.label ?? message.content}
             className={`${CAPSULE_CLS} ${failed ? CAPSULE_FAILED_CLS : CAPSULE_QUEUED_CLS}`}
           >
             <Clock
@@ -180,11 +181,11 @@ export function QueuedCapsules({
                 onClick={() => startEdit(message)}
                 className="h-auto min-w-0 shrink cursor-text justify-start rounded-sm p-0 text-meta font-normal text-foreground hover:bg-transparent dark:hover:bg-transparent"
               >
-                <span className="truncate">{message.content}</span>
+                <span className="truncate">{message.label ?? message.content}</span>
               </Button>
             ) : (
               <span data-testid="queued-message-text" className="min-w-0 truncate">
-                {message.content}
+                {message.label ?? message.content}
               </span>
             )}
             {failed && (

@@ -211,7 +211,8 @@ export function ChiefConversation({
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
   const [threadOverride, setThreadOverride] = useState(false);
-  const answerActive = answerHere && answerKey !== null && !threadOverride;
+  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
+  const answerActive = answerHere && answerKey !== null && !threadOverride && replyQuote === null;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -339,7 +340,6 @@ export function ChiefConversation({
     const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
     incoming.current?.focus({ preventScroll: true });
   }, [activeComposer]);
-  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const restoreToThread = (update: (current: string) => string) => {
     setThreadOverride(true);
     setLiveDraft(update);
@@ -475,7 +475,8 @@ export function ChiefConversation({
       ? [
           {
             id: item.id,
-            content: replyQuoteText(item.text),
+            content: item.text,
+            label: replyQuoteText(item.text),
             ...(item.pending === 'held' ? { note: t('已存下，Coordinator 恢复后会处理') } : {}),
             held: item.pending === 'held',
           },

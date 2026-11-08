@@ -180,6 +180,80 @@ test.describe('select text in a Coordinator message, then Reply', () => {
   }
 });
 
+test.describe('a staged or queued quote keeps its source', () => {
+  test('withdrawing a held quoted message restores the quote, and resending carries it', async ({
+    page,
+  }) => {
+    const wire = `<!-- reply source=m6 -->\n> ${LAST_REPLY}\n\n补完记得跑一下 e2e`;
+    const state = {
+      threads: [{ ...THREAD, pending: [{ messageId: 'q1', state: 'held' }] }],
+      messages: [...HISTORY, { id: 'q1', role: 'user', content: wire, createdAt: 30 }],
+    };
+    const sent = await mockLive(page, state, (path, route, json) => {
+      if (path !== `/api/teams/t1/chief/threads/${THREAD.id}/messages/q1`) return undefined;
+      if (route.request().method() !== 'DELETE') return undefined;
+      state.threads = [{ ...THREAD, pending: [] }];
+      state.messages = state.messages.filter((row) => row.id !== 'q1');
+      return json({ ok: true });
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    const held = home.getByTestId('queued-message');
+    await expect(held).toHaveCount(1);
+    await expect(held).toContainText('补完记得跑一下 e2e');
+    await expect(held).not.toContainText('<!--');
+    await held.getByRole('button', { name: '撤回' }).click();
+    await expect(page.getByTestId('composer-reply-quote')).toHaveText(LAST_REPLY);
+    const input = home.getByTestId('chief-composer-input');
+    await expect(input).toHaveValue('补完记得跑一下 e2e');
+    await input.press('Enter');
+    await expect.poll(() => sent.at(-1)).toBe(wire);
+  });
+
+  test('with a question pending, erasing the draft keeps the quote on the thread composer', async ({
+    page,
+  }) => {
+    const answered: string[] = [];
+    const question = {
+      id: 'row-ask-1',
+      role: 'assistant',
+      createdAt: 40,
+      content: JSON.stringify({
+        kind: 'ask_user_question',
+        requestId: 'ask-00000001',
+        status: 'pending',
+        questions: [
+          { header: 'Merge · #9', question: 'Who merges it?', options: [{ label: 'Hold it' }, { label: 'Send it to ian' }] },
+        ],
+        answers: null,
+        provenance: 'watch:todo-1',
+      }),
+    };
+    const state = { threads: [THREAD], messages: [...HISTORY, question] };
+    const sent = await mockLive(page, state, (path, route, json) => {
+      if (!/\/questions\/[^/]+\/answer$/.test(path)) return undefined;
+      answered.push(path);
+      return json({});
+    });
+    await page.goto('/app');
+    await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+    await selectIn(page, 'm6', '已经补给它了');
+    await page.getByTestId('selection-reply').click();
+    const home = page.getByTestId('home-c');
+    const input = home.getByTestId('chief-composer-input');
+    await input.fill('先别合');
+    await input.fill('');
+    await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
+    await expect(input).toBeVisible();
+    await input.fill('补充一句');
+    await input.press('Enter');
+    await expect.poll(() => sent.at(-1)).toBe(
+      '<!-- reply source=m6 -->\n> 已经补给它了\n\n补充一句',
+    );
+    expect(answered).toEqual([]);
+  });
+});
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
