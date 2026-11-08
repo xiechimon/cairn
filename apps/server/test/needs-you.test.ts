@@ -21,6 +21,7 @@ import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import {
   applyBuildStepAction,
   applyStepFailure,
+  applyStoppedStep,
   type BuildDeps,
   completeStep,
   enqueueStep,
@@ -223,6 +224,44 @@ describe('needs you (#1800)', () => {
     expect(reason).toContain('Task parked');
     expect(readQueuedMessages(w.s.db, w.buildId)[0]?.error).toBe(reason);
   });
+
+  test.each(['failure', 'success', 'stop'] as const)(
+    'a claimed sibling %s cannot replace parking or advance the task',
+    async (outcome) => {
+      const w = openWorld();
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'claimed-sibling',
+          buildId: w.buildId,
+          kind: 'session',
+          status: 'claimed',
+          createdAt: nowMs(),
+        })
+        .run();
+      const first = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+      applyStepFailure(w.deps, first, 'model_not_found: glm-5.3');
+      const reason = w.s.db
+        .select()
+        .from(buildTable)
+        .where(eq(buildTable.id, w.buildId))
+        .get()?.errorMessage;
+      const sibling = w.s.db
+        .select()
+        .from(stepTable)
+        .where(eq(stepTable.id, 'claimed-sibling'))
+        .get()!;
+      if (outcome === 'failure') applyStepFailure(w.deps, sibling, 'connection reset');
+      else if (outcome === 'success') completeStep(w.deps, sibling.id, { hasChanges: true });
+      else applyStoppedStep(w.deps, sibling.id);
+      await sweepFailedRetries(w.deps);
+      expect(phaseOf(w)).toBe('failed');
+      expect(buildCount(w)).toBe(1);
+      expect(
+        w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
+      ).toBe(reason);
+    },
+  );
 
   test('an automatic same-build enqueue cannot bypass model parking', () => {
     const w = openWorld();

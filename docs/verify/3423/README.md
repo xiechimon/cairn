@@ -25,6 +25,7 @@ The runtime counts distinct failed builds, not failed steps, in `(now - 1 hour, 
 | Same-build enqueue | Automatic enqueue succeeded after parking | Rejected before inserting a step |
 | Queued-message drain | Stopping a pending peer let an after-stop queued message reopen the parked build | Remains parked; queued text is retained with the same clear error |
 | PR pollers | Six regressions reproduced managed CI/review/conflict wakes, legacy collaborator feedback, a rejection during intake, and a deferred cap overwriting the reason | Both pollers recheck fresh parking state before mutation; the cap notice cannot replace it |
+| Claimed siblings | Seven regressions reproduced ordinary failure, quota fallback, successful completion and stopping erasing parking or advancing the task | A shared terminal-outcome barrier records the sibling step result without changing the parked build or todo |
 | Watched todo re-orchestration | Failure enqueued 1 Coordinator step | 0 Coordinator steps, visible structured notice |
 | Rolling-hour breaker | Fourth failure retained only its ordinary error | Parked at 4, no automatic new build |
 | Legacy timestamps | Null completion timestamps escaped the count | Legacy failed builds count using creation time |
@@ -47,14 +48,14 @@ pnpm exec vitest run \
   packages/shared/test/task-failure.test.ts
 ```
 
-Result: 8 files, 165 tests passed. Additional PR-poller and queue regressions passed:
+Result: 8 files, 172 tests passed. Additional PR-poller and queue regressions passed:
 
 ```sh
 pnpm exec vitest run apps/server/test/pr-wakes.test.ts apps/server/test/loop-feedback.test.ts
 pnpm exec vitest run apps/server/test/composer-queue-stop.test.ts apps/server/test/chief-queue-steer-stop.test.ts apps/server/test/queued-cancel-release.test.ts
 ```
 
-Results: 95 and 60 passed respectively, for 320 related tests across 13 files.
+Results: 95 and 60 passed respectively, for 327 related tests across 13 files. A final combined invocation of these same 13 files also passed all 327 tests.
 
 | Command | Result |
 | --- | --- |

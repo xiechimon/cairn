@@ -2,6 +2,7 @@ import type {
   BuildMergePermission,
   BuildRecord,
   GithubRepoRef,
+  MachineDoneBody,
   MergeReadiness,
   Phase,
   ReviewGate,
@@ -701,6 +702,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  if (settleParkedStep(deps, stepRow, { status: 'stopped' })) return;
   releaseUnissuedMergeAdmission(db, stepRow);
   db.update(step)
     .set({ status: 'stopped', finishedAt: nowMs(), archiveStop: null })
@@ -2392,6 +2394,44 @@ export function noteDeliveredPlanResidual(
   return true;
 }
 
+export function settleParkedStep(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+  outcome: Pick<MachineDoneBody, 'status' | 'errorMessage'>,
+): boolean {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  if (!buildRow || !retryIsParked(buildRow.errorMessage ?? '')) return false;
+  parkFailedBuild(deps, buildRow.id);
+  const owner = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (
+    owner &&
+    owner.latestBuildId === buildRow.id &&
+    owner.archivedAt === null &&
+    owner.phase !== 'failed' &&
+    canTransitionPhase(owner.phase, 'failed')
+  )
+    setTodoPhase(deps, owner.id, 'failed');
+  const status = outcome.status === 'success' ? 'done' : outcome.status;
+  const finishedAt = nowMs();
+  if (outcome.status !== 'success') releaseUnissuedMergeAdmission(deps.db, stepRow);
+  deps.db
+    .update(step)
+    .set({ status, finishedAt, archiveStop: null })
+    .where(eq(step.id, stepRow.id))
+    .run();
+  deps.db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
+  afterStopPhaseByBuild.delete(stepRow.buildId);
+  finishScheduledStep(
+    deps,
+    stepRow,
+    outcome.status === 'failed'
+      ? { status: 'failed', error: outcome.errorMessage ?? buildRow.errorMessage ?? 'Task parked' }
+      : { status: outcome.status === 'success' ? 'completed' : 'stopped' },
+  );
+  publishStepRow(deps, { ...stepRow, status, finishedAt, archiveStop: null });
+  return true;
+}
+
 export function applyStepFailure(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
@@ -2400,6 +2440,7 @@ export function applyStepFailure(
   preservedCommits?: readonly string[],
 ): void {
   const { db } = deps;
+  if (settleParkedStep(deps, stepRow, { status: 'failed', errorMessage: rawErrorMessage })) return;
   db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
   if (
     db.select({ archiveStop: step.archiveStop }).from(step).where(eq(step.id, stepRow.id)).get()
@@ -2866,6 +2907,7 @@ export function completeStep(
     applyStoppedStep(deps, stepId);
     return;
   }
+  if (settleParkedStep(deps, stepRow, { status: 'success' })) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) {
     deps.db

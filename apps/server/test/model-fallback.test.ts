@@ -529,6 +529,59 @@ describe('model fallback chain (#1493)', () => {
     expect(((await next.json()) as { step: unknown }).step).toBeNull();
   });
 
+  test.each([
+    { status: 'failed', errorMessage: 'connection reset' },
+    {
+      status: 'failed',
+      errorMessage: '402 quota exceeded',
+      quotaBlock: { kind: 'quota', providerId: 'relay-a', reason: 'quota exceeded' },
+    },
+    {
+      status: 'success',
+      hasChanges: true,
+      usage: [{ model: 'relay-a/glm-5.3', input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }],
+    },
+    { status: 'stopped' },
+  ])(
+    'a claimed sibling report cannot requeue or unpark the build: $status $errorMessage',
+    async (outcome) => {
+      const w = await setupWorld(DEFAULT_FALLBACKS, 'glm-5.3');
+      const buildId = await startBuild(w);
+      const first = await claim(w);
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'claimed-sibling',
+          buildId,
+          kind: 'session',
+          status: 'claimed',
+          machineId: stepRow(w, first.stepId).machineId,
+          claimedAt: Date.now(),
+          createdAt: Date.now(),
+        })
+        .run();
+      await done(w, first.stepId, { status: 'failed', errorMessage: 'model_not_found: glm-5.3' });
+      const reason = w.s.db
+        .select()
+        .from(buildTable)
+        .where(eq(buildTable.id, buildId))
+        .get()?.errorMessage;
+      await done(w, 'claimed-sibling', outcome);
+      expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.phase).toBe(
+        'failed',
+      );
+      expect(
+        w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()?.errorMessage,
+      ).toBe(reason);
+      expect(stepRow(w, 'claimed-sibling').status).toBe(
+        outcome.status === 'success' ? 'done' : outcome.status,
+      );
+      expect(
+        w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all(),
+      ).toHaveLength(2);
+    },
+  );
+
   test('X10: auth failure still switches', async () => {
     for (const errorMessage of [
       'Error: 401 {"type":"error","error":{"type":"authentication_error"}}',

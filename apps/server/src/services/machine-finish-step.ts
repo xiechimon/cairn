@@ -39,6 +39,7 @@ import {
   mergedPrElsewhere,
   noteDeliveredPlanResidual,
   reportedVerdictHeads,
+  settleParkedStep,
   toBuildRecord,
 } from './builds.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
@@ -377,6 +378,12 @@ async function finishStepReport(
       recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
     applyStoppedStep(deps, stepId);
     publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
+  }
+  if (worker !== null && settleParkedStep(deps, stepRow, outcome)) {
+    if (outcome.skillInjectionFacts !== undefined)
+      recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
     emitRuntimeStepSpan(deps.db, stepId);
     return;
   }
