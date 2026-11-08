@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { needsYouCount, needsYouThreads, pendingQuestions } from '../src/board/needs-you.js';
+import {
+  inProgressThreads,
+  needsYouCount,
+  needsYouThreads,
+  pendingQuestions,
+} from '../src/board/needs-you.js';
 import { todo } from './helpers.js';
 
 const question = (status: 'pending' | 'answered') => ({
@@ -27,6 +32,23 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
     expect(needsYouThreads(set).map((row) => row.seqNum).sort()).toEqual([1, 2, 4]);
     expect(needsYouCount(set)).toBe(3);
     expect(pendingQuestions(stream)).toHaveLength(1);
+  });
+
+  test('a thread the Coordinator now owns stays visible as in progress instead of dropping out of every group', () => {
+    const set = [
+      todo(1, 'confirm'),
+      todo(3, 'failed'),
+      { ...todo(8, 'needs_input'), waitingOn: { on: 'coordinator' as const, retryAt: null } },
+      { ...todo(9, 'review'), output: 'info' as const },
+      todo(5, 'building'),
+      todo(6, 'done'),
+      { ...todo(10, 'failed'), archivedAt: 1 },
+    ];
+    expect(
+      inProgressThreads(set)
+        .map((row) => row.seqNum)
+        .sort((a, b) => a - b),
+    ).toEqual([3, 5, 8, 9]);
   });
 
   test('archived threads leave the set, stale ones stay', () => {

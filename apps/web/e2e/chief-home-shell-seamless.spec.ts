@@ -95,7 +95,7 @@ for (const theme of ['light', 'dark'] as const) {
     test('needs-you borders have symmetric room inside their scrollport', async ({ page }) => {
       await page.goto('/app?scenario=home-c&thread=home-c-review');
       const tray = page.getByTestId('needs-you');
-      await expect(tray.locator('[data-slot="thread-card"]')).toHaveCount(3);
+      await expect(tray.locator('[data-slot="thread-card"]')).toHaveCount(2);
       const edges = await tray.evaluate((node) => {
         const rect = node.getBoundingClientRect();
         const left = rect.left + node.clientLeft;

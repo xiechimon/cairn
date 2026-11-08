@@ -153,6 +153,26 @@ describe('repo rules beat the brief; only owner classes escalate (task stall S3)
     expect(notices).toHaveLength(1);
     expect(notices[0]?.snippet).toContain('Repo rule wins; rewrite the string.');
   });
+
+  test('an escalated owner-class question leaves the Coordinator queue and refuses a Coordinator answer', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'design',
+      defaultAnswer: 'Repo rule wins; rewrite the string.',
+    });
+    const view = (await relay('needs_you', {})) as {
+      questions?: { todoId: string }[];
+      others?: { todoId: string }[];
+    };
+    expect(JSON.stringify(view)).not.toContain(REQUEST);
+    await expect(
+      relay('answer_question', { todoId, requestId: REQUEST, answer: 'Brief wins.' }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId)).toBe('pending');
+    expect(getTodo(deps(), todoId)?.phase).toBe('needs_input');
+  });
 });
 
 describe('a timeout wakes the Coordinator, then reaches the owner with a default (task stall S1)', () => {

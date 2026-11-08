@@ -381,7 +381,13 @@ test.each([true, false])(
     await f.wake();
     await f.wake();
     expect(f.state.draft).toBe(true);
-    expect(f.s.db.select().from(step).all()).toEqual([]);
+    const steps = f.s.db.select().from(step).all();
+    expect(steps.filter((row) => row.kind !== 'chief')).toEqual([]);
+    expect(
+      steps
+        .filter((row) => row.kind === 'chief')
+        .every((row) => row.prompt?.startsWith('[wake:failed]')),
+    ).toBe(true);
     expect(JSON.stringify(f.s.db.select().from(message).all())).toContain(
       'Review round cap (3) reached; rethink or hand to the owner.',
     );

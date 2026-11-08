@@ -143,14 +143,17 @@ test('a refused reply keeps the draft and says it was not sent', async ({ page }
   await expect(box).toHaveValue('Keep this text');
 });
 
-test('a failed thread offers a reply that reruns it; an empty reply cannot be sent', async ({ page }) => {
-  const sent = await stubHome(page, [todo('todo-12', 12, 'Fix the orb permission', 'failed', 'build-12')]);
+test('a failed thread goes to the Coordinator, not Needs you; an empty reply cannot be sent', async ({ page }) => {
+  const sent = await stubHome(page, [
+    todo('todo-12', 12, 'Fix the orb permission', 'failed', 'build-12'),
+    todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1'),
+  ]);
   await page.goto('/app');
-  const target = card(page, 'Fix the orb permission');
+  await expect(card(page, 'Fix the orb permission')).toHaveCount(0);
+  const target = card(page, 'Split the routing migration');
   await target.getByRole('button', { name: 'Reply', exact: true }).click();
-  await expect(target).toContainText('Reruns #12 with this note.');
   await expect(target.getByRole('button', { name: 'Send' })).toBeDisabled();
-  await target.getByRole('textbox', { name: 'Reply to #12' }).press('Enter');
+  await target.getByRole('textbox', { name: 'Reply to #7' }).press('Enter');
   expect(sent).toHaveLength(0);
 });
 

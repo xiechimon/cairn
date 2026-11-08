@@ -30,10 +30,10 @@ import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { needsYouThreads } from './needs-you.js';
+import { inProgressThreads, needsYouThreads } from './needs-you.js';
 import { NeedsYouTray } from './needs-you-tray.js';
 import { composeRequest } from './open-composer.js';
-import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
+import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -168,9 +168,7 @@ export function HomeC({
   );
   const entries = needsYouThreads(scoped);
   const thread = useComposerThreadTarget(scoped);
-  const running = scoped.filter(
-    (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
-  );
+  const running = inProgressThreads(scoped);
 
   const greeting = (
     <Greeting as="h2">

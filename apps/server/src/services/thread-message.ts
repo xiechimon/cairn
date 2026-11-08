@@ -1,4 +1,5 @@
 import {
+  ownerDecides,
   redactSecrets,
   THREAD_MESSAGE_EXCERPT_MAX,
   type ThreadMessageBody,
@@ -245,6 +246,16 @@ export async function answerTaskQuestion(
     throw new HttpError(
       409,
       `requestId ${input.requestId} is not pending on thread #${row.seqNum}${pending.length > 0 ? `; pending: ${pending.map((q) => q.requestId).join(', ')}` : ''}`,
+    );
+  }
+  if (
+    by === 'coordinator' &&
+    question.escalation !== undefined &&
+    ownerDecides(question.escalation.class)
+  ) {
+    throw new HttpError(
+      409,
+      `requestId ${input.requestId} is a ${question.escalation.class} question with the user; only the user answers it`,
     );
   }
   const answer = { todoId: row.id, question, answer: input.answer, by };

@@ -25,7 +25,7 @@ import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
 import { ScheduleDetailController } from '../schedules/schedule-detail-dialog.js';
-import { needsYouThreads } from './needs-you.js';
+import { inProgressThreads, needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadStatus, threadTone } from './thread-copy.js';
@@ -79,7 +79,7 @@ export function ProjectHome({
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleRecord | null>(null);
   const own = todos.filter((todo) => todo.projectId === project.id && todo.archivedAt == null);
   const needsYou = needsYouThreads(own);
-  const running = own.filter((todo) => threadStatus(todo) === 'running');
+  const running = inProgressThreads(own);
   const idle = own.filter((todo) => threadStatus(todo) === 'idle');
   const done = own
     .filter((todo) => threadStatus(todo) === 'done')

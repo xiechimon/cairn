@@ -14,7 +14,7 @@ import { Button } from '../components/ui/button.js';
 import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
-import { needsYouThreads } from './needs-you.js';
+import { inProgressThreads, needsYouThreads } from './needs-you.js';
 import { relativeTime } from './rel-time.js';
 import { THREAD_PARAM, threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
 
@@ -79,7 +79,7 @@ export function WorkPanel({
     />
   );
   const needsYou = needsYouThreads(todos);
-  const running = todos.filter((todo) => threadStatus(todo) === 'running' && live(todo));
+  const running = inProgressThreads(todos).filter(live);
   const active = new Set([...needsYou, ...running].map((todo) => todo.id));
   const waitingSchedules = schedules.filter((schedule) => !active.has(schedule.todoId));
   const scheduled = new Set(waitingSchedules.map((schedule) => schedule.todoId));
