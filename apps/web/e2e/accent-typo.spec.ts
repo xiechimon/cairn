@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { BRAND_GLYPH } from '../src/lib/brand-mark.js';
 
 for (const theme of ['light', 'dark'] as const) {
   test(`font baseline: body 450, var font really loaded (${theme})`, async ({
@@ -30,34 +29,49 @@ for (const theme of ['light', 'dark'] as const) {
     expect(w).toBe('650');
   });
 
-  test(`sidebar header carries the Cairn brand glyph + name (${theme})`, async ({ page }) => {
+  test(`sidebar header is the toggle then the serif wordmark, no logo (${theme})`, async ({
+    page,
+  }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/schedules?scenario=01');
 
-    const m = await page.evaluate(() => {
+    const m = await page.evaluate(async () => {
+      await document.fonts.ready;
       const row = document.querySelector('.sidebar-team-row');
-      const mark = row?.querySelector('.sidebar-brand-mark');
+      const toggle = row?.querySelector('.sidebar-team-collapse');
       const name = row?.querySelector('.sidebar-team-name');
-      const paths = mark?.querySelectorAll('path') ?? [];
-      if (!row || !mark || !name || paths.length === 0) throw new Error('sidebar brand head missing');
-      const r = mark.getBoundingClientRect();
+      if (!row || !toggle || !name) throw new Error('sidebar head missing');
+      const cs = getComputedStyle(name);
+      const t = toggle.getBoundingClientRect();
+      const icon = toggle.querySelector('svg')!.getBoundingClientRect();
+      const n = name.getBoundingClientRect();
       return {
-        paths: [...paths].map((p) => p.getAttribute('d')),
-        markPaint: getComputedStyle(paths[0] as Element).stroke,
-        rowInk: getComputedStyle(row).color,
-        markText: mark.textContent,
-        markBox: { w: r.width, h: r.height },
+        marks: row.querySelectorAll('[data-testid="brand-mark"], .sidebar-brand-mark').length,
+        family: cs.fontFamily,
+        serifLoaded: document.fonts.check('500 20px "sourceSerif4"'),
+        size: cs.fontSize,
+        weight: cs.fontWeight,
+        tracking: cs.letterSpacing,
+        lineHeight: cs.lineHeight,
         nameText: name.textContent,
         nameHref: name.getAttribute('href'),
+        toggle: { x: t.x - row.getBoundingClientRect().x, w: t.width, h: t.height },
+        icon: { w: icon.width, h: icon.height },
+        gap: n.x - t.right,
       };
     });
-    expect(m.paths).toEqual([BRAND_GLYPH.small.d]);
-    expect(m.markPaint).toBe(m.rowInk);
-    expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
-    expect(m.markText).toBe('');
-    expect(m.markBox).toEqual({ w: 22, h: 22 });
-    expect(m.nameText).toContain('Cairn');
+    expect(m.marks).toBe(0);
+    expect(m.family).toContain('sourceSerif4');
+    expect(m.serifLoaded).toBe(true);
+    expect(m.size).toBe('20px');
+    expect(m.weight).toBe('500');
+    expect(m.tracking).toBe('normal');
+    expect(m.lineHeight).toBe('20px');
+    expect(m.nameText).toBe('Cairn');
     expect(m.nameHref).toBeNull();
+    expect(m.toggle).toEqual({ x: 0, w: 28, h: 28 });
+    expect(m.icon).toEqual({ w: 18, h: 18 });
+    expect(m.gap).toBe(4);
   });
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {

@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { BRAND_GLYPH } from '../src/lib/brand-mark.js';
 
 const sidebar = (page: Page) => page.getByRole('complementary');
 
@@ -16,9 +15,7 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
 
   const team = page.getByTestId('team-row');
-  const mark = team.getByTestId('brand-mark');
-  await expect(mark).toHaveText('');
-  await expect(mark.locator('path')).toHaveAttribute('d', BRAND_GLYPH.small.d);
+  await expect(team.getByTestId('brand-mark')).toHaveCount(0);
   await expect(team.getByText('Cairn', { exact: true })).toBeVisible();
   await expect(team.getByRole('link')).toHaveCount(0);
   await expect(team.getByRole('button', { name: '搜索' })).toBeVisible();
@@ -26,7 +23,21 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   const nameFont = await team
     .getByText('Cairn', { exact: true })
     .evaluate((el) => getComputedStyle(el).fontFamily);
-  expect(nameFont).toContain('instrumentSans');
+  expect(nameFont).toContain('sourceSerif4');
+
+  const headOrder = await team.evaluate((row) =>
+    [
+      row.querySelector('button[aria-label="收起侧边栏"]'),
+      row.querySelector('.sidebar-team-name'),
+      row.querySelector('button[aria-label="搜索"]'),
+    ].map((el) => {
+      if (!el) throw new Error('sidebar head part missing');
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right };
+    }),
+  );
+  expect(headOrder[0].right).toBeLessThanOrEqual(headOrder[1].left);
+  expect(headOrder[1].right).toBeLessThanOrEqual(headOrder[2].left);
 
   const order = [
     await top(page, '[data-testid="team-row"]'),

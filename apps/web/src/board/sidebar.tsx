@@ -336,14 +336,18 @@ export function BoardSidebar({
     >
       <div
         data-testid="team-row"
-        className="sidebar-team-row flex h-11 flex-none items-center gap-0.5 text-foreground"
+        className="sidebar-team-row flex h-11 flex-none items-center text-foreground"
       >
-        <span className="sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 px-2 text-foreground">
-          <BrandGlyph
-            data-testid="brand-mark"
-            className="sidebar-brand-mark block size-5.5 flex-none"
-          />
-          <span className="truncate font-heading text-page font-title">{BRAND.manifestName}</span>
+        <Button
+          variant="ghost"
+          className={`sidebar-team-collapse ${ICON_BTN}`}
+          aria-label={t('收起侧边栏')}
+          onClick={onToggle}
+        >
+          <PanelLeft className={ICON} strokeWidth={STROKE} />
+        </Button>
+        <span className="sidebar-team-name ml-1 min-w-0 flex-1 truncate font-serif text-page leading-none font-medium tracking-normal text-foreground">
+          {BRAND.manifestName}
         </span>
         <Tooltip>
           <TooltipTrigger
@@ -362,14 +366,6 @@ export function BoardSidebar({
             <Kbd>⌘K</Kbd>
           </TooltipContent>
         </Tooltip>
-        <Button
-          variant="ghost"
-          className={`sidebar-team-collapse ${ICON_BTN}`}
-          aria-label={t('收起侧边栏')}
-          onClick={onToggle}
-        >
-          <PanelLeft className="size-4" strokeWidth={STROKE} />
-        </Button>
       </div>
 
       <div className="mt-2 flex flex-none flex-col gap-px">

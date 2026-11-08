@@ -51,12 +51,10 @@ const headContentX = (page: Page) =>
   page.evaluate(() => {
 
     const row = document.querySelector('[data-testid="team-row"]');
-    const mark = row?.querySelector('[data-testid="brand-mark"]');
     const name = row?.querySelector('.sidebar-team-name');
     const toggle = row?.querySelector('button[aria-label="收起侧边栏"]');
-    if (!row || !mark || !name || !toggle) throw new Error('sidebar brand head missing');
+    if (!row || !name || !toggle) throw new Error('sidebar brand head missing');
     return {
-      iconX: mark.getBoundingClientRect().x,
       nameX: name.getBoundingClientRect().x,
       toggleX: toggle.getBoundingClientRect().x,
     };
