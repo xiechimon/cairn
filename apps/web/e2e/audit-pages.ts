@@ -65,7 +65,6 @@ export const PAGES: AuditPage[] = [
     },
     ready: (p) => p.getByTestId('work-call').first(),
   },
-  { name: 'chief window', url: '/app/schedules?scenario=100', ready: (p) => p.locator('.chief-drawer') },
   { name: 'schedules list', url: '/app/schedules?scenario=r3-93', ready: (p) => p.locator('.sched-card').first() },
   { name: 'schedules form', url: '/app/schedules?scenario=r3-92', ready: (p) => p.getByRole('dialog', { name: '新建定时' }) },
   {

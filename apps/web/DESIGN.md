@@ -91,7 +91,6 @@ rounded:
   menu: 14px         # --radius-popover: menus, floating surfaces, dropdowns
   bubble: 12px       # --radius-bubble: user chat bubble
   composer: 14px     # --radius-composer
-  window: 18px       # --radius-window: Coordinator window
   full: 9999px
 spacing:
   grid: 4px
@@ -331,14 +330,13 @@ Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIAL
 
 ## Motion
 
-The stone is quiet. Motion only says where a surface came from or that something is still working. Anything the user triggers often, and any reply to their own input, is instant. Values come from the motion slots in `src/styles/shadcn.css` (`--dur-fast` / `--dur-overlay` / `--ease-standard` / `--ease-out-expo` / `--ease-drawer`) or the tw-animate-css defaults. A new surface first finds its row in the table below; if none fits, it gets no motion. A new slot must ship with its consumer in the same PR.
+The stone is quiet. Motion only says where a surface came from or that something is still working. Anything the user triggers often, and any reply to their own input, is instant. Values come from the motion slots in `src/styles/shadcn.css` (`--dur-fast` / `--dur-overlay` / `--ease-standard` / `--ease-out-expo`) or the tw-animate-css defaults. A new surface first finds its row in the table below; if none fits, it gets no motion. A new slot must ship with its consumer in the same PR.
 
 | Kind | Surface | Duration | Easing | Animated properties |
 |---|---|---|---|---|
 | Micro-interaction | Hover and press tint on rows, cards and buttons; segmented controls; disclosure chevrons | 150ms (`--dur-fast`) | `--ease-standard` (same as tw `ease-out`) | `background-color` / `color` / `box-shadow` / `transform` |
 | Micro-interaction | Task card hover lift and shadow | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
 | Overlay | Dialog, confirmation surface, ⌘K | 200ms in and out (`--dur-overlay` / `duration-200`) | Default tw `ease` | `opacity` + `scale(.95→1)` |
-| Overlay | Coordinator window grows from and returns to the lower-right corner | 200ms in and out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin near the lower-right corner |
 | Overlay | Menu, popover, Select | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
 | Overlay | Tooltip | 150ms in (tw-animate default), no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
 | Overlay | Inline popovers (mention, slash, chip) | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.98→1)` |
@@ -420,4 +418,4 @@ The board top bar has no bottom rule. Its primary action is a centered new-task 
 
 On phones up to 640px, the sidebar folds into a drawer opened by a 44px menu button at the top left (top bars reserve 52px for it; the task detail page keeps its back chevron instead). Board columns become one vertical list, empty columns and the old empty start ghost are hidden, and horizontal board scrolling is disabled. The new-task bar is fixed above the safe-area inset at the bottom of the viewport. The needs-you strip remains before the board list.
 
-There is no floating Coordinator launcher (removed on 2026-11-02). The sidebar's `Coordinator` row is the entry; off the home, Cmd/Ctrl+J opens the Coordinator window. The Coordinator home has a 48px top bar: the title (`Coordinator` or the filtered project) on the left, the `任务` and `成果` icon buttons on the right; they open the right-hand `SidePanel`. `任务` is one list grouped as needs you, in progress and idle (schedules inside idle, shown once and only while their task is not active); `成果` lists finished work. Nothing sits above the composer.
+There is no floating Coordinator launcher or window: the Coordinator lives only on the home route `/app`. The sidebar's `Coordinator` row is the entry; Cmd/Ctrl+J, notification links and question links navigate to the home, and pending questions raise the row's needs-you count. `apps/web/test/no-floating-coordinator.test.ts` fails if a floating Coordinator returns. The Coordinator home has a 48px top bar: the title (`Coordinator` or the filtered project) on the left, the `任务` and `成果` icon buttons on the right; they open the right-hand `SidePanel`. `任务` is one list grouped as needs you, in progress and idle (schedules inside idle, shown once and only while their task is not active); `成果` lists finished work. Nothing sits above the composer.

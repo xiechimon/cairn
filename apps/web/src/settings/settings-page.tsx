@@ -163,10 +163,7 @@ export function SettingsPage() {
     windowRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      const overlayOpen = [...document.querySelectorAll('[data-open]')].some(
-        (el) => el.closest('.chief-drawer') === null,
-      );
-      if (overlayOpen) return;
+      if (document.querySelector('[data-open]') !== null) return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&

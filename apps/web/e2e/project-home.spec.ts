@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openChiefWindow } from './helpers.js';
 
 const PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
 const CRED_PROJECT_ID = 'home-c-cred';
@@ -82,17 +81,6 @@ test('the Coordinator shortcut on a project home opens the project chat with the
   await page.keyboard.press('ControlOrMeta+j');
   await expect(page).toHaveURL(/chat=1/);
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
-});
-
-test('a Coordinator window already open elsewhere does not turn a project click into the chat', async ({
-  page,
-}) => {
-  await page.goto('/app/schedules?scenario=home-c');
-  await openChiefWindow(page);
-  await expect(page.locator('.chief-drawer')).toBeVisible();
-  await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'cairn' }).click();
-  await expect(home(page)).toBeVisible();
-  await expect(page).not.toHaveURL(/chat=1/);
 });
 
 test('instructions, memory, secrets and concurrency show where they will live', async ({ page }) => {
