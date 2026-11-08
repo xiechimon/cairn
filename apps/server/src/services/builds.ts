@@ -325,29 +325,6 @@ export interface BuildSteerResult {
   delivered: 'steer' | 'new-turn';
 }
 
-export function queueSteer(
-  db: Db,
-  conversationId: string,
-  stepId: string,
-  content: string,
-  now: number,
-): void {
-  const pending = db
-    .select()
-    .from(steerPending)
-    .where(eq(steerPending.conversationId, conversationId))
-    .get();
-  const values = {
-    stepId,
-    content: pending?.stepId === stepId ? `${pending.content}\n\n${content}` : content,
-    createdAt: now,
-  };
-  db.insert(steerPending)
-    .values({ conversationId, ...values })
-    .onConflictDoUpdate({ target: steerPending.conversationId, set: values })
-    .run();
-}
-
 export async function sendBuildSteer(
   deps: BuildDeps,
   conversationId: string,
@@ -460,11 +437,12 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      if (continuationOptions.answer !== undefined)
-        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, now);
-      else if (human) settleWorkerReply(deps, conversationId, body.content);
       const carried = undeliveredAnswers(db, conversationId);
-      markAnswersDelivered(deps, conversationId, carried, now);
+      const deliveredAt = running ? null : now;
+      if (continuationOptions.answer !== undefined)
+        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, deliveredAt);
+      else if (human) settleWorkerReply(deps, conversationId, body.content, deliveredAt);
+      if (!running) markAnswersDelivered(deps, conversationId, carried, now);
       const content = [...carried.map(deliveredAnswerText), body.content].join('\n\n');
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
@@ -500,7 +478,15 @@ export async function sendBuildSteer(
         });
       }
       if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
-      if (running) queueSteer(db, conversationId, running.id, content, now);
+      if (running) {
+        db.insert(steerPending)
+          .values({ conversationId, stepId: running.id, content, createdAt: now })
+          .onConflictDoUpdate({
+            target: steerPending.conversationId,
+            set: { stepId: running.id, content, createdAt: now },
+          })
+          .run();
+      }
       if (todoRow) {
         if (
           !continuationOptions.schedule &&

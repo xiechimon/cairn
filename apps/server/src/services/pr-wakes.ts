@@ -7,7 +7,15 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { build, githubConnection, message, step, threadPr, todo } from '../db/schema.js';
+import {
+  build,
+  githubConnection,
+  message,
+  steerPending,
+  step,
+  threadPr,
+  todo,
+} from '../db/schema.js';
 import {
   type FetchLike,
   type GithubCheckRun,
@@ -24,7 +32,7 @@ import {
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import type { AutonomousToken } from '../lib/github-token.js';
 import { newRecordId } from '../lib/ids.js';
-import { type BuildDeps, enqueueStep, queueSteer } from './builds.js';
+import { type BuildDeps, enqueueStep } from './builds.js';
 import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
 import { reconcilePrReviewFindings } from './pr-review-findings.js';
 import { retryIsParked } from './retry-parking.js';
@@ -342,7 +350,21 @@ export function createPrWakes(deps: BuildDeps) {
         });
         const claimed = active.find((s) => s.status === 'claimed');
         if (claimed) {
-          queueSteer(deps.db, row.buildId, claimed.id, content, now);
+          const pending = deps.db
+            .select()
+            .from(steerPending)
+            .where(eq(steerPending.conversationId, row.buildId))
+            .get();
+          const values = {
+            stepId: claimed.id,
+            content: pending?.stepId === claimed.id ? `${pending.content}\n\n${content}` : content,
+            createdAt: now,
+          };
+          deps.db
+            .insert(steerPending)
+            .values({ conversationId: row.buildId, ...values })
+            .onConflictDoUpdate({ target: steerPending.conversationId, set: values })
+            .run();
           deps.machineHub?.steerSignal(row.teamId, claimed.id);
         } else if (active[0]) {
           deps.db

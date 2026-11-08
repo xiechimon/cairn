@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, message, steerPending, step, todo } from '../src/db/schema.js';
+import { build, message, project, steerPending, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
-import { claimStep } from '../src/services/machines.js';
+import { claimStep, fetchSteer } from '../src/services/machines.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -256,7 +256,7 @@ describe('answers route by request id to the same build and session (task stall 
     expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
   });
 
-  test('two parked answers steered into a claimed step before it fetches either both stay queued', async () => {
+  test('two parked answers steered into a claimed step before it fetches either both reach the step, and the fetch marks them delivered', async () => {
     const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A);
     await askWorkerQuestion(
       deps(),
@@ -282,6 +282,17 @@ describe('answers route by request id to the same build and session (task stall 
     expect(steer?.stepId).toBe(stepRow.id);
     expect(steer?.content).toContain('Answer for A.');
     expect(steer?.content).toContain('Answer for B.');
+
+    const fetched = fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id);
+    expect(fetched.content).toContain('Answer for A.');
+    const delivered = (id: string) => {
+      const content = H.s.db.select().from(message).where(eq(message.id, id)).get()?.content as
+        | { deliveredAt?: number }
+        | undefined;
+      return content?.deliveredAt;
+    };
+    expect(delivered(REQUEST_A)).toBeTypeOf('number');
+    expect(delivered(REQUEST_B)).toBeTypeOf('number');
   });
 
   test('two pending questions answered A then B resume the session carrying both answers', async () => {
@@ -309,6 +320,31 @@ describe('answers route by request id to the same build and session (task stall 
     expect(resumed[0]?.prompt).toContain('Answer for A: repo rule.');
     expect(resumed[0]?.prompt).toContain('Answer for B: brief.');
   });
+
+  test.each(['task', 'project'] as const)(
+    'an answer to a question on an archived %s is refused and settles nothing',
+    async (archived) => {
+      const { todoId, buildId, stepRow } = await askAndPark();
+      endStep(stepRow.id);
+      if (archived === 'task') {
+        H.s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, todoId)).run();
+      } else {
+        H.s.db
+          .update(project)
+          .set({ archivedAt: Date.now() })
+          .where(eq(project.id, H.projectId))
+          .run();
+      }
+      await expect(
+        relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' }),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+      expect(getTodo(deps(), todoId)?.decisions ?? []).toEqual([]);
+      if (archived === 'project') {
+        H.s.db.update(project).set({ archivedAt: null }).where(eq(project.id, H.projectId)).run();
+      }
+    },
+  );
 
   test('the Coordinator cannot answer a parked question by free text: message_thread points it at answer_question', async () => {
     const { todoId, stepRow } = await askAndPark();

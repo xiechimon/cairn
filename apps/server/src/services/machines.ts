@@ -39,6 +39,7 @@ import {
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
+import { markAnswersDelivered, undeliveredAnswers } from './worker-question-store.js';
 
 export { claimStep, meetsMcpVersionGate } from './machine-claim.js';
 export {
@@ -81,6 +82,7 @@ export function fetchSteer(
   if (pending.stepId !== stepId) {
     return { content: null };
   }
+  markAnswersDelivered(deps, stepRow.buildId, undeliveredAnswers(db, stepRow.buildId), nowMs());
   return { content: pending.content };
 }
 

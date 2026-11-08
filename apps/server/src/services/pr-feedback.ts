@@ -1,11 +1,11 @@
 import { isBuildStepKind, neutralizeIssueAttachmentTokens } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { build, message, project, step, team, threadPr, todo } from '../db/schema.js';
+import { build, message, project, steerPending, step, team, threadPr, todo } from '../db/schema.js';
 import { type FetchLike, githubCollaboratorPermission, githubPull } from '../lib/github.js';
 import { feedbackHighWaterSchema, githubPrFeedback } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import { nowMs } from '../lib/ids.js';
-import { type BuildDeps, enqueueStep, queueSteer } from './builds.js';
+import { type BuildDeps, enqueueStep } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { publishStepRow } from './quota-wait.js';
@@ -216,7 +216,26 @@ export function createPrFeedbackPoller(
                 active = active.filter((row) => isBuildStepKind(row.kind) || row.kind === 'plan');
                 const claimed = active.find((row) => row.status === 'claimed');
                 if (claimed) {
-                  queueSteer(deps.db, target.build.id, claimed.id, content, nowMs());
+                  const pending = deps.db
+                    .select()
+                    .from(steerPending)
+                    .where(eq(steerPending.conversationId, target.build.id))
+                    .get();
+                  const steerContent =
+                    pending?.stepId === claimed.id ? `${pending.content}\n\n${content}` : content;
+                  deps.db
+                    .insert(steerPending)
+                    .values({
+                      conversationId: target.build.id,
+                      stepId: claimed.id,
+                      content: steerContent,
+                      createdAt: nowMs(),
+                    })
+                    .onConflictDoUpdate({
+                      target: steerPending.conversationId,
+                      set: { stepId: claimed.id, content: steerContent, createdAt: nowMs() },
+                    })
+                    .run();
                   deps.machineHub?.steerSignal(current.teamId, claimed.id);
                 } else if (active.length === 0) {
                   deps.db
