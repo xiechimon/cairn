@@ -24,6 +24,7 @@ import { seed } from './db/seed.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
   setCoordinatorInServer,
@@ -212,9 +213,12 @@ const coordinator = config.coordinatorInServer
         user: seeded.user,
         vapidKeys,
         reposDir,
-        workspacesDir: resolve(
-          process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces'),
-        ),
+        get workspacesDir() {
+          return localWorkspaceRoot(
+            config.homeDir,
+            resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
+          );
+        },
         attachmentsDir,
         skillsDir: config.skillsDir,
         mcpConfigPath: config.mcpConfigPath,

@@ -1,9 +1,12 @@
-import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { loadDaemonConfig } from '../../daemon/src/config.js';
+import { ensureStateDirs, statePaths } from '../../daemon/src/state.js';
 import { project } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
+import { localWorkspaceRoot } from '../src/lib/workspace-root.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { readFile } from '../src/services/git.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
@@ -124,6 +127,49 @@ describe('Coordinator repository reads', () => {
     ).toBe(0);
     expect((await read()).files[0]?.content).toBeUndefined();
     expect((await read()).files[0]?.error).toMatch(/repository.*mismatch/i);
+  });
+
+  test('uses the persisted daemon CLI root, including changes after server startup', async () => {
+    const dir = await bindRepo('github');
+    const home = join(H.s.reposDir, 'daemon-home');
+    const defaultRoot = join(home, 'workspaces');
+    const deps = {
+      ...toolDeps(),
+      get workspacesDir() {
+        return localWorkspaceRoot(home, defaultRoot);
+      },
+    };
+    expect(deps.workspacesDir).toBe(defaultRoot);
+    const config = loadDaemonConfig({ home, workspacesDir: join(H.s.reposDir, 'cli-root') }, {});
+    ensureStateDirs(statePaths(config.home, config.workspacesDir));
+    expect(deps.workspacesDir).toBe(config.workspacesDir);
+    const cache = join(config.workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(config.workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', dir, cache])).code).toBe(0);
+    expect(
+      (
+        await runGit(['remote', 'set-url', 'origin', 'https://github.com/fixture/repository.git'], {
+          cwd: cache,
+        })
+      ).code,
+    ).toBe(0);
+    H.s.db.update(project).set({ localPath: null }).where(eq(project.id, H.projectId)).run();
+    const result = JSON.parse(
+      await executeChiefTool(deps, ctx(), 'docs', {
+        projectId: H.projectId,
+        paths: ['scripts/owned-process.mjs'],
+      }),
+    ) as Docs;
+    expect(result.files[0]?.content).toBe('export const spawn = true;\n');
+    expect(result.files[0]?.commit).toBe(
+      (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim(),
+    );
+    const state = join(home, 'workspace-root.json');
+    chmodSync(state, 0o644);
+    expect(() => deps.workspacesDir).toThrow('unsafe local workspace root state');
+    chmodSync(state, 0o600);
+    writeFileSync(state, JSON.stringify({ workspacesDir: '../outside' }));
+    expect(() => deps.workspacesDir).toThrow();
   });
 
   test('github without a local binding reports the actual missing repository', async () => {
