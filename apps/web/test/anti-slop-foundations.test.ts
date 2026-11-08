@@ -68,7 +68,15 @@ describe('V3 blur only on the measured claude.ai selection bar', () => {
   test('the selection bar is the one blurred surface', () => {
     expect(offenders(/backdrop-blur|backdrop-filter:\s*blur|filter:\s*blur\(/).sort()).toEqual([
       'chief/selection-reply.tsx',
+      'components/ui/alert-dialog.tsx',
+      'components/ui/dialog.tsx',
     ]);
+  });
+
+  test('the pristine dialog overlays keep their upstream blur class but render none', () => {
+    expect(appCss).toMatch(
+      /\[data-slot="dialog-overlay"\],\s*\[data-slot="alert-dialog-overlay"\] \{[^}]*backdrop-filter: none;/,
+    );
   });
 
   test('it blurs by the measured 8px', () => {
