@@ -458,7 +458,7 @@ type ListEntry = { block: ListBlock; children: ListNode[] };
 export type ListNode = { ordered: boolean; depth: number; entries: ListEntry[] };
 type RenderPart =
   | { kind: 'block'; block: ChatBlock; index: number }
-  | { kind: 'list'; list: ListNode; index: number };
+  | { kind: 'list'; list: ListNode; index: number; followsList: boolean };
 
 function isListBlock(block: ChatBlock): block is ListBlock {
   return block.kind === 'bullet' || block.kind === 'ordered';
@@ -491,7 +491,8 @@ function renderParts(blocks: ChatBlock[]): RenderPart[] {
   let run: ListBlock[] = [];
   let runStart = 0;
   const flushRun = () => {
-    for (const list of nestLists(run)) parts.push({ kind: 'list', list, index: runStart });
+    for (const [n, list] of nestLists(run).entries())
+      parts.push({ kind: 'list', list, index: runStart, followsList: n > 0 });
     run = [];
   };
   blocks.forEach((block, index) => {
@@ -558,6 +559,11 @@ function MarkdownList({
   );
 }
 
+function listGap(part: Extract<RenderPart, { kind: 'list' }>): string {
+  if (part.followsList) return 'mt-[1.5em]';
+  return part.index === 0 ? 'mt-0' : 'mt-[0.75em]';
+}
+
 const COPIED_MS = 1500;
 
 function CodeBlock({ lang, text }: { lang?: string; text: string }) {
@@ -581,11 +587,11 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
           {lang}
         </div>
       )}
-      <div className="absolute top-0 right-0 z-10 inline-flex h-8 items-center px-2">
+      <div className="absolute top-2 right-0 z-10 inline-flex h-8 items-center px-2">
         <Button
           variant="ghost"
           size="icon-sm"
-          className="chat-md-code-copy text-(--foreground) opacity-0 transition-none group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100"
+          className="chat-md-code-copy rounded-(--cds-radius-lg) text-(--foreground) opacity-0 transition-none hover:bg-(--prose-code-fill) dark:hover:bg-(--prose-code-fill) group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100"
           aria-label={t('复制代码')}
           data-testid="md-code-copy"
           onClick={() => {
@@ -595,7 +601,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
           {copied ? <Check width={16} height={16} /> : <Copy width={16} height={16} />}
         </Button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overscroll-x-contain">
         <pre
           className="chat-md-code m-0 p-3.5 font-prose-mono text-[0.875rem] leading-[1.625] whitespace-pre text-(--foreground)"
           data-lang={lang ?? ''}
@@ -622,12 +628,7 @@ export function ChatMarkdown({
       {parts.map((part, i) => {
         if (part.kind === 'list')
           return (
-            <MarkdownList
-              key={i}
-              list={part.list}
-              sameKindRun={0}
-              className={part.index === 0 ? 'mt-0' : 'mt-0.5'}
-            />
+            <MarkdownList key={i} list={part.list} sameKindRun={0} className={listGap(part)} />
           );
         const block = part.block;
         switch (block.kind) {

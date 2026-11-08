@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { StatusLine } from '../components/chat/status-line.js';
 import { Button } from '../components/ui/button.js';
 import {
   Collapsible,
@@ -42,25 +43,6 @@ const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
 function prevRunningWork(prev: TranscriptItem | undefined): boolean {
   return prev?.kind === 'work' && prev.steps.some((step) => step.kind === 'call' && step.running);
-}
-
-function StatusLine({
-  children,
-  className,
-  testId,
-}: {
-  children: ReactNode;
-  className?: string;
-  testId?: string;
-}) {
-  return (
-    <div
-      className={`chat-note flex min-h-7 items-center gap-2 text-card-title text-(--text-secondary) ${className ?? ''}`}
-      data-testid={testId}
-    >
-      <span className="max-w-[68ch] min-w-0 [overflow-wrap:anywhere]">{children}</span>
-    </div>
-  );
 }
 
 function endsWithAgentRow(item: TranscriptItem | undefined): boolean {
@@ -450,14 +432,12 @@ function Row({
       return <WorkTrace item={item} defaultExpanded={defaultExpanded} entering={entering} t={t} />;
     case 'skills':
       return (
-        <div
-          className="chat-note mt-5 flex max-w-[68ch] flex-wrap items-baseline gap-x-1.5 text-meta text-(--text-tertiary)"
-          data-testid="skills-summary"
-        >
-          {item.read.length > 0 && <span>{t('技能：{n}', { n: item.read.join(', ') })}</span>}
-          {item.read.length > 0 && item.denied.length > 0 && <span aria-hidden="true">·</span>}
-          {item.denied.length > 0 && <span>{t('挡下：{n}', { n: item.denied.join(', ') })}</span>}
-        </div>
+        <StatusLine className="mt-5" testId="skills-summary">
+          {[
+            ...(item.read.length > 0 ? [t('技能：{n}', { n: item.read.join(', ') })] : []),
+            ...(item.denied.length > 0 ? [t('挡下：{n}', { n: item.denied.join(', ') })] : []),
+          ].join(' · ')}
+        </StatusLine>
       );
     case 'elapsed':
       return <ActionRow seconds={item.seconds} t={t} />;

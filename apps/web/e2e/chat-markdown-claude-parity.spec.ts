@@ -1,12 +1,13 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const CHIEF_MD = '/app/schedules?scenario=chief-md';
+const CHIEF_MD = '/app?scenario=chief-md';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 
 async function openChiefReply(page: Page) {
   await page.goto(CHIEF_MD);
-  await expect(page.locator('.chief-drawer')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
   return page
+    .getByTestId('home-c')
     .getByTestId('chief-msg')
     .filter({ has: page.locator('h2.chat-md-head') })
     .first();
@@ -69,10 +70,13 @@ test('code block copy sits in the block header, hidden at rest, shown on block h
   expect(placement.size).toBe(28);
   expect(placement.right).toBeGreaterThanOrEqual(8);
   expect(placement.right).toBeLessThanOrEqual(9);
-  expect(placement.top).toBeLessThanOrEqual(3);
+  expect(placement.top).toBeGreaterThanOrEqual(10);
+  expect(placement.top).toBeLessThanOrEqual(11);
 
   await copy.hover();
   await expect(copy).toHaveCSS('box-shadow', 'none');
+  await expect(copy).toHaveCSS('border-top-left-radius', '8px');
+  await expect(copy).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
   await page.mouse.move(1, 1);
   await copy.focus();
@@ -136,4 +140,32 @@ test('status events are a left-aligned muted line with no rules, and a reply foo
     return { textBottom: text.bottom, footerTop: footer.top };
   });
   expect(overlap.footerTop).toBeGreaterThanOrEqual(overlap.textBottom);
+});
+
+test('Coordinator status events are the same left-aligned status line, clear of the reply footer above', async ({
+  page,
+}) => {
+  await page.goto(CHIEF_MD);
+  const home = page.getByTestId('home-c');
+  const note = home.getByTestId('chief-note').first();
+  await expect(note).toHaveText('17:26');
+  const style = await note.evaluate((el) => {
+    const s = getComputedStyle(el);
+    const text = el.firstElementChild!.getBoundingClientRect();
+    return {
+      before: getComputedStyle(el, '::before').content,
+      after: getComputedStyle(el, '::after').content,
+      leftGap: text.left - el.getBoundingClientRect().left,
+      fontSize: s.fontSize,
+      lineHeight: s.lineHeight,
+      minHeight: s.minHeight,
+      color: s.color,
+    };
+  });
+  expect(style.before).toBe('none');
+  expect(style.after).toBe('none');
+  expect(style.leftGap).toBe(0);
+  expect(style.fontSize).toBe('15px');
+  expect(style.lineHeight).toBe('21px');
+  expect(style.minHeight).toBe('28px');
 });
