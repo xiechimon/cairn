@@ -14,11 +14,10 @@ const REPO_ROOT = resolve(import.meta.dirname, '..');
 const GENERATE_SCRIPT = join(REPO_ROOT, 'scripts', 'generate-feature-map.mjs');
 
 export function parseArgs(argv) {
-  const args = { fileIssue: false, dryRun: false, skipTicketRegister: false, help: false };
+  const args = { fileIssue: false, dryRun: false, help: false };
   for (const a of argv) {
     if (a === '--file-issue') args.fileIssue = true;
     else if (a === '--dry-run') args.dryRun = true;
-    else if (a === '--skip-ticket-register') args.skipTicketRegister = true;
     else if (a === '--help' || a === '-h') args.help = true;
     else throw new Error(`unknown argument ${a}`);
   }
@@ -73,7 +72,7 @@ export function checkVerifyFeaturesIndex(featuresDir = join(REPO_ROOT, FEATURES_
   };
 }
 
-export function runTicketRegisterCheck({
+export function runFeatureMapCheck({
   spawn = spawnSync,
   scriptPath = GENERATE_SCRIPT,
   env = process.env,
@@ -87,7 +86,7 @@ export function runTicketRegisterCheck({
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
   if (result.error) {
     return {
-      id: 'ticket-register',
+      id: 'feature-map',
       ok: false,
       summary: `generate-feature-map failed to start: ${result.error.message}`,
       findings: [result.error.message],
@@ -96,11 +95,11 @@ export function runTicketRegisterCheck({
   }
   const ok = result.status === 0;
   return {
-    id: 'ticket-register',
+    id: 'feature-map',
     ok,
     summary: ok
-      ? 'docs/feature-map.md matches a fresh extraction'
-      : 'docs/feature-map.md differs from a fresh extraction (or generate failed)',
+      ? 'the feature registry, the code and both generated maps agree'
+      : 'the feature registry or a generated map drifted from the code',
     findings: ok ? [] : [output || `exit ${result.status}`],
     output,
   };
@@ -131,7 +130,7 @@ export function buildIssueBody({ report, runUrl }) {
   const lines = [
     ISSUE_MARKER,
     '',
-    'Daily feature-map maintain found a gap. Dual-map roles: `docs/feature-map.md` is the ticket living register; `.claude/skills/verify-cairn/features/` is the empirical verification map. See `docs/ops/feature-map-maintain.md`.',
+    'Daily feature-map maintain found a gap. `.claude/skills/verify-cairn/feature-map.json` is the feature registry, rendered to `.claude/skills/verify-cairn/feature-map.md` and `docs/feature-map.md`; `.claude/skills/verify-cairn/features/` holds the drive recipes. See `docs/ops/feature-map-maintain.md`.',
     '',
     '```',
     report.trimEnd(),
@@ -140,7 +139,7 @@ export function buildIssueBody({ report, runUrl }) {
   ];
   if (runUrl) lines.push(`Workflow run: ${runUrl}`, '');
   lines.push(
-    'Suggested fix for a stale ticket register: `node scripts/generate-feature-map.mjs` and open a regeneration PR.',
+    'Suggested fix for feature-map drift: fix the registry rows the check names, run `node scripts/generate-feature-map.mjs`, and open a PR.',
     'Suggested fix for verify-cairn index gaps: update `features/README.md` or restore the missing feature file; do not edit product code to silence the check.',
   );
   return lines.join('\n');
@@ -238,9 +237,7 @@ export function fileMaintainIssue({
 
 export function runMaintain(args, deps = {}) {
   const checks = [];
-  if (!args.skipTicketRegister) {
-    checks.push(deps.runTicketRegisterCheck?.() ?? runTicketRegisterCheck(deps));
-  }
+  checks.push(deps.runFeatureMapCheck?.() ?? runFeatureMapCheck(deps));
   checks.push(deps.checkVerifyFeaturesIndex?.() ?? checkVerifyFeaturesIndex(deps.featuresDir));
   const aggregated = aggregateChecks(checks);
   process.stdout.write(aggregated.report);
@@ -283,7 +280,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const args = parseArgs(process.argv.slice(2));
     if (args.help) {
       process.stdout.write(
-        'usage: node scripts/feature-map-maintain.mjs [--file-issue] [--dry-run] [--skip-ticket-register]\n',
+        'usage: node scripts/feature-map-maintain.mjs [--file-issue] [--dry-run]\n',
       );
       process.exit(0);
     }
