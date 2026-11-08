@@ -532,14 +532,14 @@ function MarkdownList({
   const first = list.entries[0]?.block;
   return (
     <Tag
-      className={`chat-md-list ${MD_LIST} ${listStyle(list.ordered, sameKindRun)} ${className}`}
+      className={`${MD_LIST} ${listStyle(list.ordered, sameKindRun)} ${className}`}
       data-testid={list.ordered ? 'md-list-ordered' : 'md-list-bullet'}
       {...(list.ordered && first?.kind === 'ordered' ? { start: first.ordinal } : {})}
     >
       {list.entries.map((entry, i) => (
         <li
           key={i}
-          className={`chat-md-item chat-md-item--${list.ordered ? 'ordered' : 'bullet'} ${MD_LIST_ITEM}`}
+          className={`${list.ordered ? 'chat-md-item chat-md-item--ordered' : 'chat-md-item chat-md-item--bullet'} ${MD_LIST_ITEM}`}
           data-testid={list.ordered ? 'md-item-ordered' : 'md-item-bullet'}
           data-depth={entry.block.depth}
           {...(entry.block.kind === 'ordered' ? { value: entry.block.ordinal } : {})}
@@ -576,12 +576,12 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
   }, [copied]);
   return (
     <div
-      className="chat-md-code-block group/code relative my-2 min-w-0 max-w-full rounded-(--cds-radius-xl) border-[0.5px] border-(--prose-code-line) bg-(--prose-code-surface)"
+      className="group/code relative my-2 min-w-0 max-w-full rounded-(--cds-radius-xl) border-[0.5px] border-(--prose-code-line) bg-(--prose-code-surface)"
       data-testid="md-code-block"
     >
       {lang !== undefined && (
         <div
-          className="chat-md-code-lang px-3.5 pt-3.5 font-sans text-code-lang text-(--text-secondary)"
+          className="px-3.5 pt-3.5 font-sans text-code-lang text-(--text-secondary)"
           data-testid="md-code-lang"
         >
           {lang}
@@ -591,7 +591,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="chat-md-code-copy rounded-(--cds-radius-lg) text-(--foreground) opacity-0 transition-none hover:bg-(--prose-code-fill) dark:hover:bg-(--prose-code-fill) group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100"
+          className="rounded-(--cds-radius-lg) text-(--foreground) opacity-0 transition-none hover:bg-(--prose-code-fill) dark:hover:bg-(--prose-code-fill) group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100"
           aria-label={t('复制代码')}
           data-testid="md-code-copy"
           onClick={() => {
