@@ -28,12 +28,8 @@ import {
 import { assertProjectWritable } from './project-writable.js';
 import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
-import {
-  answerWorkerQuestionsById,
-  pendingWorkerQuestionIds,
-  pendingWorkerQuestions,
-} from './worker-question-store.js';
-import { recordDecisions } from './worker-questions.js';
+import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
+import { settleQuestionAnswer } from './worker-questions.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -251,11 +247,13 @@ export async function answerTaskQuestion(
       `requestId ${input.requestId} is not pending on thread #${row.seqNum}${pending.length > 0 ? `; pending: ${pending.map((q) => q.requestId).join(', ')}` : ''}`,
     );
   }
-  answerWorkerQuestionsById(deps, buildId, [input.requestId], input.answer);
-  recordDecisions(deps, row.id, [{ question, answer: input.answer, by }]);
+  const answer = { todoId: row.id, question, answer: input.answer, by };
   const result = { todoId: row.id, buildId, requestId: input.requestId };
-  if (hasClaimedStep(deps, buildId)) return { ...result, delivered: 'held-step' };
-  if (pending.length > 1) return { ...result, delivered: 'waiting-other-questions' };
+  const held = hasClaimedStep(deps, buildId);
+  if (held || pending.length > 1) {
+    deps.db.transaction(() => settleQuestionAnswer(deps, buildId, answer));
+    return { ...result, delivered: held ? 'held-step' : 'waiting-other-questions' };
+  }
   const sent = await sendBuildSteer(
     deps,
     buildId,
@@ -263,7 +261,9 @@ export async function answerTaskQuestion(
       content: `Answer to your question ${input.requestId}:\n${input.answer}`,
       clientMessageId: newRecordId(),
     },
-    by === 'person' ? { human: true, afterTurn: true } : { actor: 'Coordinator', afterTurn: true },
+    by === 'person'
+      ? { human: true, afterTurn: true, answer }
+      : { actor: 'Coordinator', afterTurn: true, answer },
   );
   return { ...result, buildId: sent.conversationId, delivered: sent.delivered };
 }

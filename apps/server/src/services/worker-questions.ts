@@ -158,6 +158,24 @@ export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string)
   );
 }
 
+export interface QuestionAnswer {
+  todoId: string;
+  question: AskUserQuestionContent;
+  answer: string;
+  by: TaskDecision['by'];
+}
+
+export function settleQuestionAnswer(deps: TodoDeps, buildId: string, input: QuestionAnswer): void {
+  const current = readWorkerQuestion(deps.db, buildId, input.question.requestId);
+  if (current?.status !== 'pending') {
+    throw new HttpError(409, `requestId ${input.question.requestId} is no longer pending`);
+  }
+  answerWorkerQuestionsById(deps, buildId, [input.question.requestId], input.answer);
+  recordDecisions(deps, input.todoId, [
+    { question: input.question, answer: input.answer, by: input.by },
+  ]);
+}
+
 function questionText(question: AskUserQuestionContent): string {
   return question.questions.map((q) => q.question).join('\n');
 }

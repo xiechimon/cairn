@@ -7292,41 +7292,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
 ]
 `;
 
-exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values + board columns + semantics (02 §4.1) 1`] = `
-{
-  "BOARD_COLUMNS": [
-    "待开始",
-    "执行中",
-    "待处理",
-    "已完成",
-  ],
-  "PHASE_SEMANTICS": {
-    "building": "在改",
-    "closed": "未完成即搁置",
-    "confirm": "计划就绪等你",
-    "done": "已接受，若选了则已合并",
-    "failed": "run 停在错误上",
-    "needs_input": "agent 问了问题，等按 requestId 回答",
-    "planning": "读仓库写计划",
-    "queued": "已启动，等空闲机器",
-    "review": "改动就绪等你（\`待验收\`≡\`审核\` 同 phase，CONTEXT.md 裁决）",
-    "todo": "已建档未开始",
-  },
-  "PHASE_VALUES": [
-    "todo",
-    "queued",
-    "planning",
-    "confirm",
-    "building",
-    "needs_input",
-    "review",
-    "done",
-    "failed",
-    "closed",
-  ],
-}
-`;
-
 exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase ten values + board columns + semantics (02 §4.1) 1`] = `
 {
   "BOARD_COLUMNS": [

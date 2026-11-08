@@ -114,6 +114,7 @@ describe('a stop records who stopped the work and why (task stall S8)', () => {
       const stepRow = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get();
       if (!stepRow) throw new Error('step missing');
       H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+      H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
       await relay('stop_thread', { todoId, reason: 'priority: finish #131 first' });
       expect(buildStop(buildId)).not.toBeNull();
       finish(stepRow.id);

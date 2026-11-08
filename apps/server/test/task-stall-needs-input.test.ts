@@ -133,6 +133,25 @@ describe('a parked question is its own state and wakes the Coordinator (task sta
     const wake = coordinatorSteps().at(-1);
     expect(wake?.prompt).toContain('should the banned string stay?');
   });
+
+  test('once the zero-change question is answered, a second zero-change step ends the loop instead of asking again', async () => {
+    const { todoId, buildId, stepRow } = startSession();
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    await relay('answer_question', {
+      todoId,
+      requestId: `no-change-${stepRow.id}`,
+      answer: 'The task needs no code change.',
+    });
+    const resumed = sessionSteps(buildId).find((row) => row.status === 'pending');
+    if (resumed === undefined) throw new Error('no resumed session step');
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, resumed.id)).run();
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    endStep(resumed.id, { hasChanges: false });
+
+    expect(questionStatus(buildId, `no-change-${resumed.id}`)).toBeUndefined();
+    expect(phaseOf(todoId)).toBe('review');
+  });
 });
 
 describe('answers route by request id to the same build and session (task stall S1, S2)', () => {
@@ -191,6 +210,24 @@ describe('answers route by request id to the same build and session (task stall 
     await expect(
       relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'again' }),
     ).rejects.toMatchObject({ status: 409 });
+  });
+
+  test('an answer whose continuation is refused stays unanswered and leaves no decision, so the same request id can be answered again', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark();
+    endStep(stepRow.id);
+    H.s.db.update(todo).set({ phase: 'closed' }).where(eq(todo.id, todoId)).run();
+    await expect(
+      relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' }),
+    ).rejects.toBeDefined();
+    expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+    expect(getTodo(deps(), todoId)?.decisions ?? []).toEqual([]);
+
+    H.s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, todoId)).run();
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' });
+    expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
+    expect(getTodo(deps(), todoId)?.decisions).toEqual([
+      expect.objectContaining({ requestId: REQUEST_A, answer: 'Repo rule wins.' }),
+    ]);
   });
 
   test('the Coordinator cannot answer a parked question by free text: message_thread points it at answer_question', async () => {
