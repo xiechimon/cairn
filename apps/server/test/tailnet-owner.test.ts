@@ -184,7 +184,12 @@ test('A7: another uid cannot adopt the socket', async () => {
   await expect(listenOnTailnetSocket(s.app, s.socketPath)).rejects.toThrow(/user|owner/);
 });
 
-test('A8: tailnet owner approves enrollment; device tokens cannot approve or manage pairing', async () => {
+test.each([
+  '/api/machine/enroll/confirm',
+  '/api/machine/enroll/%63onfirm',
+  '/%61pi/machine/enroll/confirm',
+  '/api/machine/%65nroll/confirm',
+])('A8: only the owner can approve enrollment through %s', async (confirmPath) => {
   const s = await setup();
   const started = await call(
     s.socketPath,
@@ -198,7 +203,7 @@ test('A8: tailnet owner approves enrollment; device tokens cannot approve or man
   expect((await call(s.socketPath, '/api/remote/pairing', 'POST', headers)).status).toBe(403);
   expect(
     (
-      await call(s.socketPath, '/api/machine/enroll/confirm', 'POST', headers, {
+      await call(s.socketPath, confirmPath, 'POST', headers, {
         enrollId: started.body.enrollId,
       })
     ).status,

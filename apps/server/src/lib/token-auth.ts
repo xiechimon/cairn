@@ -105,7 +105,7 @@ export function registerTokenAuth(
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();
     const admit = () =>
-      pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, pathname)
+      pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, c.req.path)
         ? c.json({ error: 'only the owner token can do this' }, 403)
         : next();
     const authorization = c.req.header('authorization');
