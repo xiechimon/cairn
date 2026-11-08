@@ -9,7 +9,7 @@ import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { ChatMarkdown } from '../detail/chat-markdown.js';
+import { ChatMarkdown, MD_LIST, MD_LIST_ITEM } from '../detail/chat-markdown.js';
 import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type {
   ChiefContent,
@@ -480,14 +480,15 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                       <Segments segments={p} />
                     </p>
                   ))}
-                  {item.bullets?.map((b, j) => (
-                    <p key={`b${j}`} className="mt-0.5 flex gap-2 text-card-title">
-                      <span className="flex-none">•</span>
-                      <span>
-                        <Segments segments={b} />
-                      </span>
-                    </p>
-                  ))}
+                  {item.bullets != null && item.bullets.length > 0 && (
+                    <ul className={`mt-0.5 list-disc text-card-title ${MD_LIST}`}>
+                      {item.bullets.map((b, j) => (
+                        <li key={`b${j}`} className={MD_LIST_ITEM}>
+                          <Segments segments={b} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </>
               )}
             </BubbleContent>

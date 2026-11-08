@@ -36,6 +36,7 @@ function formatElapsed(seconds: number, t: TFunc): string {
 }
 
 const ROW_BASE = 'chat-row flex items-start';
+const AGENT_ROW = 'chat-row chat-row--agent flex flex-col items-start';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
@@ -43,7 +44,7 @@ function prevRunningWork(prev: TranscriptItem | undefined): boolean {
   return prev?.kind === 'work' && prev.steps.some((step) => step.kind === 'call' && step.running);
 }
 
-function TurnRule({
+function StatusLine({
   children,
   className,
   testId,
@@ -54,7 +55,7 @@ function TurnRule({
 }) {
   return (
     <div
-      className={`chat-note flex items-center gap-3 text-center text-meta text-(--text-tertiary) before:h-px before:flex-1 before:bg-(--border) after:h-px after:flex-1 after:bg-(--border) ${className ?? ''}`}
+      className={`chat-note flex min-h-7 items-center gap-2 text-card-title text-(--text-secondary) ${className ?? ''}`}
       data-testid={testId}
     >
       <span className="max-w-[68ch] min-w-0 [overflow-wrap:anywhere]">{children}</span>
@@ -244,9 +245,9 @@ function Row({
       );
     case 'note':
       return (
-        <TurnRule className="mt-5" testId="transcript-note">
+        <StatusLine className="mt-5" testId="transcript-note">
           {t(item.text)}
-        </TurnRule>
+        </StatusLine>
       );
     case 'scheduled':
       return (
@@ -283,7 +284,7 @@ function Row({
     case 'chief':
       return (
         <div className={`${ROW_BASE} ${margin}`}>
-          <TurnRule className="w-full">{t('由 Coordinator 发起')}</TurnRule>
+          <StatusLine className="w-full">{t('由 Coordinator 发起')}</StatusLine>
         </div>
       );
     case 'user':
@@ -318,7 +319,7 @@ function Row({
     case 'robot':
       return (
         <>
-          <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+          <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
             <span
               className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
               data-testid="agent-text"
@@ -336,15 +337,15 @@ function Row({
             )}
           </div>
           {item.footer?.seconds != null && item.footer.seconds >= 60 && (
-            <TurnRule className="mt-3" testId="worked-for-rule">
+            <StatusLine className="mt-3" testId="worked-for-rule">
               {t('已工作 {n} 分钟', { n: Math.floor(item.footer.seconds / 60) })}
-            </TurnRule>
+            </StatusLine>
           )}
         </>
       );
     case 'report':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
             className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="info-report"
@@ -355,7 +356,7 @@ function Row({
       );
     case 'thinking':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)">
             <ThinkingRow text={item.text} />
           </span>
@@ -376,7 +377,7 @@ function Row({
       return <FailRow item={item} margin={margin} t={t} />;
     case 'streaming':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <LiveRow
             variant="detail"
             label={item.label}
@@ -450,7 +451,7 @@ function Row({
     case 'skills':
       return (
         <div
-          className="chat-note mx-auto mt-5 flex max-w-[68ch] flex-wrap items-baseline justify-center gap-x-1.5 text-center text-meta text-(--text-tertiary)"
+          className="chat-note mt-5 flex max-w-[68ch] flex-wrap items-baseline gap-x-1.5 text-meta text-(--text-tertiary)"
           data-testid="skills-summary"
         >
           {item.read.length > 0 && <span>{t('技能：{n}', { n: item.read.join(', ') })}</span>}
@@ -462,7 +463,7 @@ function Row({
       return <ActionRow seconds={item.seconds} t={t} />;
     case 'review':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
             className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
@@ -546,7 +547,7 @@ function Row({
       );
     case 'verify':
       return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
             className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
@@ -604,7 +605,7 @@ function FailRow({
 }) {
   const [rawOpen, setRawOpen] = useState(false);
   return (
-    <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+    <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
       <span
         className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
         data-testid="agent-text"

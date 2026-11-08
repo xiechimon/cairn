@@ -13,6 +13,7 @@
   --color-icon: var(--icon);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-prose-mono: var(--font-system-mono);
   --font-heading: var(--font-display);
   --font-serif: var(--font-source-serif);
   --text-page: var(--type-page);

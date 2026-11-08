@@ -205,6 +205,9 @@
   --switch-on: var(--card-button);
   --tag-tint: 22%;
   --code-pill-bg: #2a2a2a;
+  --prose-code-surface: rgb(32 32 32 / 0.5);
+  --prose-code-line: rgb(255 255 255 / 0.04);
+  --prose-code-fill: rgb(255 255 255 / 0.075);
   --bubble-base: #262626;
   --bubble-wash-a: rgb(130 180 111 / 0.16);
   --bubble-wash-b: rgb(111 147 187 / 0.14);
@@ -257,6 +260,9 @@
   --shadow-composer-hover: var(--shadow-composer);
   --shadow-composer-focus:
     0 4px 20px rgb(0 0 0 / 0.035), inset 0 0 0 var(--hairline) rgb(0 0 0 / 0.2);
+  --prose-code-surface: rgb(255 255 255 / 0.5);
+  --prose-code-line: rgb(0 0 0 / 0.08);
+  --prose-code-fill: rgb(0 0 0 / 0.05);
   --canvas: #fafafa;
   --background: #ffffff;
   --foreground: #1a1a1a;

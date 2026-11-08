@@ -1,0 +1,139 @@
+import { expect, type Page, test } from '@playwright/test';
+
+const CHIEF_MD = '/app/schedules?scenario=chief-md';
+const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
+
+async function openChiefReply(page: Page) {
+  await page.goto(CHIEF_MD);
+  await expect(page.locator('.chief-drawer')).toBeVisible();
+  return page
+    .getByTestId('chief-msg')
+    .filter({ has: page.locator('h2.chat-md-head') })
+    .first();
+}
+
+test('bullets are native list markers in claude.ai geometry: disc, text colour, 2em list indent, 0.5em item gap', async ({
+  page,
+}) => {
+  const reply = await openChiefReply(page);
+  const items = await reply.getByTestId('md-item-bullet').evaluateAll((els) =>
+    els.map((li) => {
+      const list = li.parentElement as HTMLElement;
+      const parentItem = list.parentElement?.closest('li');
+      return {
+        depth: li.getAttribute('data-depth'),
+        display: getComputedStyle(li).display,
+        style: getComputedStyle(list).listStyleType,
+        parentList: parentItem?.parentElement?.tagName ?? null,
+        markerColor: getComputedStyle(li, '::marker').color,
+        textColor: getComputedStyle(li).color,
+        fontSize: Number.parseFloat(getComputedStyle(li).fontSize),
+        listPad: Number.parseFloat(getComputedStyle(list).paddingInlineStart),
+        itemPad: Number.parseFloat(getComputedStyle(li).paddingInlineStart),
+      };
+    }),
+  );
+  expect(items).toHaveLength(4);
+  for (const item of items) {
+    expect(item.display).toBe('list-item');
+    expect(item.markerColor).toBe(item.textColor);
+    expect(item.listPad).toBeCloseTo(item.fontSize * 2, 1);
+    expect(item.itemPad).toBeCloseTo(item.fontSize * 0.5, 1);
+  }
+  const nested = items.find((item) => item.depth === '1');
+  expect(nested?.parentList).toBe('OL');
+  expect(nested?.style).toBe('disc');
+  expect(items.filter((item) => item.depth === '0').every((item) => item.style === 'disc')).toBe(
+    true,
+  );
+});
+
+test('code block copy sits in the block header, hidden at rest, shown on block hover and on keyboard focus, and copies the code', async ({
+  page,
+}) => {
+  const reply = await openChiefReply(page);
+  const block = reply.getByTestId('md-code-block');
+  const copy = block.getByTestId('md-code-copy');
+  await expect(block.getByTestId('md-code-lang')).toHaveText('sh');
+  await page.mouse.move(1, 1);
+  await expect(copy).toHaveCSS('opacity', '0');
+
+  await block.hover();
+  await expect(copy).toHaveCSS('opacity', '1');
+  await expect(copy).toHaveCSS('transition-duration', '0s');
+  const placement = await block.evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    const c = el.querySelector('[data-testid="md-code-copy"]')!.getBoundingClientRect();
+    return { right: b.right - c.right, top: c.top - b.top, size: c.width };
+  });
+  expect(placement.size).toBe(28);
+  expect(placement.right).toBeGreaterThanOrEqual(8);
+  expect(placement.right).toBeLessThanOrEqual(9);
+  expect(placement.top).toBeLessThanOrEqual(3);
+
+  await copy.hover();
+  await expect(copy).toHaveCSS('box-shadow', 'none');
+
+  await page.mouse.move(1, 1);
+  await copy.focus();
+  await expect(copy).toBeFocused();
+  await expect(copy).toHaveCSS('opacity', '1');
+
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await copy.click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'curl -s localhost:8787/healthz',
+  );
+});
+
+test('code block stays inside the reply column and long lines scroll inside it', async ({
+  page,
+}) => {
+  const reply = await openChiefReply(page);
+  const geo = await reply.getByTestId('md-code-block').evaluate((el) => {
+    const column = el.closest('[data-testid="chief-msg-col"]')!.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const pre = el.querySelector('pre')!;
+    return {
+      inside: box.left >= column.left - 0.5 && box.right <= column.right + 0.5,
+      scroller: getComputedStyle(pre.parentElement!).overflowX,
+      whiteSpace: getComputedStyle(pre).whiteSpace,
+      fontSize: getComputedStyle(pre).fontSize,
+      lineHeight: getComputedStyle(pre).lineHeight,
+      radius: getComputedStyle(el).borderTopLeftRadius,
+    };
+  });
+  expect(geo.inside).toBe(true);
+  expect(geo.scroller).toBe('auto');
+  expect(geo.whiteSpace).toBe('pre');
+  expect(geo.fontSize).toBe('14px');
+  expect(geo.lineHeight).toBe('22.75px');
+  expect(geo.radius).toBe('12px');
+});
+
+test('status events are a left-aligned muted line with no rules, and a reply footer never overlaps the reply text', async ({
+  page,
+}) => {
+  await page.goto(DONE);
+  const note = page.getByTestId('transcript-note').filter({ hasText: 'Xmon Dai' }).first();
+  await expect(note).toBeVisible();
+  const rules = await note.evaluate((el) => ({
+    before: getComputedStyle(el, '::before').content,
+    after: getComputedStyle(el, '::after').content,
+    align: getComputedStyle(el).textAlign,
+  }));
+  expect(rules.before).toBe('none');
+  expect(rules.after).toBe('none');
+  expect(rules.align).not.toBe('center');
+
+  const reply = page
+    .locator('[data-row="agent"]')
+    .filter({ hasText: 'git merge origin/main' })
+    .first();
+  const overlap = await reply.evaluate((row) => {
+    const text = row.querySelector('[data-testid="agent-text"]')!.getBoundingClientRect();
+    const footer = row.querySelector('[data-testid="msg-actions"]')!.getBoundingClientRect();
+    return { textBottom: text.bottom, footerTop: footer.top };
+  });
+  expect(overlap.footerTop).toBeGreaterThanOrEqual(overlap.textBottom);
+});
