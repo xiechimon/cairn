@@ -67,7 +67,11 @@ describe('Coordinator steer', () => {
         `/api/teams/${w.teamId}/chief/threads/${w.threadId}/messages/${queued?.id}/steer`,
       );
       expect(steered.status).toBe(200);
-      await until(() => w.s.db.select().from(step).all().length === 1);
+      await until(
+        () =>
+          w.s.db.select().from(step).where(eq(step.id, queued!.id)).get()?.holdReason ===
+          'steer_acked',
+      );
     };
     await steerNew();
     await steerNew();
@@ -79,7 +83,14 @@ describe('Coordinator steer', () => {
       { answers: [{ header: 'Pick', choices: ['A'] }] },
     );
     expect(answered.status).toBe(200);
-    await until(() => w.s.db.select().from(step).get()?.status === 'done');
+    await until(() =>
+      w.s.db
+        .select()
+        .from(step)
+        .where(eq(step.kind, 'chief'))
+        .all()
+        .some((row) => row.status === 'done'),
+    );
     coordinator.wake(w.threadId);
     await coordinator.idle();
 

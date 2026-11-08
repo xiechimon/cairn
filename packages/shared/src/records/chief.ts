@@ -224,7 +224,7 @@ export const chiefRewindBodySchema = z.object({
 });
 export type ChiefRewindBody = z.infer<typeof chiefRewindBodySchema>;
 
-export const CHIEF_WAKE_KINDS = ['gate', 'settle', 'failed'] as const;
+export const CHIEF_WAKE_KINDS = ['gate', 'settle', 'failed', 'question'] as const;
 export type ChiefWakeKind = (typeof CHIEF_WAKE_KINDS)[number];
 
 export function chiefThreadTitle(firstMessage: string): string {

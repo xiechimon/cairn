@@ -209,6 +209,19 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
     stepRow(id: string) {
       return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
     },
+    replyAfter(messageId: string) {
+      const steered = s.db.select().from(chiefMessage).where(eq(chiefMessage.id, messageId)).get();
+      s.db
+        .insert(chiefMessage)
+        .values({
+          id: `reply-${messageId}`,
+          threadId: threadId ?? '',
+          role: 'assistant',
+          content: 'Reading the steer.',
+          createdAt: (steered?.createdAt ?? Date.now()) + 1,
+        })
+        .run();
+    },
   };
 }
 
@@ -222,6 +235,9 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     expect((await w.thread()).pending).toEqual([]);
     expect(await w.fetchSteer(first!.step.id)).toBe('第二句');
     await w.ackSteer(first!.step.id);
+    expect(w.stepRow(second)?.holdReason).toBe('steer_acked');
+    w.replyAfter(second);
+    await w.done(first!.step.id, { status: 'success' });
     expect(w.stepRow(second)).toBeUndefined();
     expect(w.messages().some((m) => m.id === second)).toBe(true);
   });
@@ -358,9 +374,11 @@ describe('steer (T5): `现在插话`', () => {
     expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
     expect(w.stepRow(queued)).toBeDefined();
     await w.ackSteer(running!.step.id);
-    expect(w.stepRow(queued)).toBeUndefined();
+    expect(w.stepRow(queued)?.holdReason).toBe('steer_acked');
     expect(w.messages().find((m) => m.id === queued)!.createdAt).toBeGreaterThanOrEqual(before);
+    w.replyAfter(queued);
     await w.done(running!.step.id, { status: 'success' });
+    expect(w.stepRow(queued)).toBeUndefined();
     expect(await w.claim()).toBeNull();
   });
 
@@ -429,10 +447,12 @@ describe('steer (T5): `现在插话`', () => {
     expect((await w.steer(b)).status).toBe(200);
     expect(await w.fetchSteer(running!.step.id)).toBeNull();
     await w.ackSteer(running!.step.id);
-    expect(w.stepRow(a)).toBeUndefined();
-    expect(w.stepRow(b)).toBeDefined();
+    expect(w.stepRow(a)?.holdReason).toBe('steer_acked');
+    expect(w.stepRow(b)?.holdReason).toBe('steer');
     expect(await w.fetchSteer(running!.step.id)).toBe('插话 B');
+    w.replyAfter(a);
     await w.done(running!.step.id, { status: 'success' });
+    expect(w.stepRow(a)).toBeUndefined();
     const next = await w.claim();
     expect(next?.step.id).toBe(b);
   });
@@ -460,6 +480,46 @@ describe('steer (T5): `现在插话`', () => {
     expect(w.s.db.select().from(steerPending).all()).toHaveLength(0);
     const next = await w.claim();
     expect(next?.instruction).toBe('补一句');
+  });
+
+  test('a steer acked into a turn that ends without answering it is not lost: it runs as the next turn (task stall S1)', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const queued = w.queue('Explicit confirmations: re-run each task now.');
+    expect((await w.steer(queued)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBe(
+      'Explicit confirmations: re-run each task now.',
+    );
+    await w.ackSteer(running!.step.id);
+    await w.done(running!.step.id, { status: 'success' });
+    const next = await w.claim();
+    expect(next?.step.id).toBe(queued);
+    expect(next?.instruction).toBe('Explicit confirmations: re-run each task now.');
+  });
+
+  test('a steer the turn answered after the ack is consumed and does not run again', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const queued = w.queue('改成只看 cairn 项目');
+    expect((await w.steer(queued)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
+    await w.ackSteer(running!.step.id);
+    const ackedAt = w.messages().find((m) => m.id === queued)!.createdAt;
+    w.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'reply-after-steer',
+        threadId: w.threadId,
+        role: 'assistant',
+        content: 'Switched to the cairn project only.',
+        createdAt: ackedAt + 1,
+      })
+      .run();
+    await w.done(running!.step.id, { status: 'success' });
+    expect(w.stepRow(queued)).toBeUndefined();
+    expect(await w.claim()).toBeNull();
   });
 
   test('the chief prompt requires using a steer and saying what changed', async () => {

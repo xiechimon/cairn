@@ -22,7 +22,7 @@ test('worker question rows reach the task transcript', () => {
     steps: [],
     plans: [],
     build: null,
-    todo: todo(1, 'review', true),
+    todo: todo(1, 'needs_input'),
     machineName: null,
     userName: 'u',
     liveText: '',
@@ -36,9 +36,9 @@ test('worker question rows reach the task transcript', () => {
   );
 });
 
-function wire(awaiting?: boolean) {
+function wire() {
   return {
-    ...todo(1, 'review', awaiting),
+    ...todo(1, 'needs_input'),
     assignment: null,
     sourceKind: null,
     sourceRef: null,
@@ -49,7 +49,6 @@ function wire(awaiting?: boolean) {
   };
 }
 
-test('display todo keeps awaitingReply', () => {
-  expect(toDisplayTodo(wire(true)).awaitingReply).toBe(true);
-  expect(toDisplayTodo(wire()).awaitingReply).toBeUndefined();
+test('display todo keeps the needs_input phase', () => {
+  expect(toDisplayTodo(wire()).phase).toBe('needs_input');
 });

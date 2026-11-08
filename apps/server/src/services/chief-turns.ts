@@ -31,7 +31,8 @@ const LIVE_STATUSES = ['pending', 'claimed', 'waiting_quota'] as const;
 
 const STEERED_HOLD = 'steer';
 const STEER_SENT_HOLD = 'steer_sent';
-const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD];
+const STEER_ACKED_HOLD = 'steer_acked';
+const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD, STEER_ACKED_HOLD];
 
 export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
@@ -311,7 +312,7 @@ export function ackChiefSteer(
   );
   const now = nowMs();
   for (const row of sent) {
-    deps.db.delete(step).where(eq(step.id, row.id)).run();
+    deps.db.update(step).set({ holdReason: STEER_ACKED_HOLD }).where(eq(step.id, row.id)).run();
     deps.db.update(chiefMessage).set({ createdAt: now }).where(eq(chiefMessage.id, row.id)).run();
     const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
     if (message) deps.convHub?.publishMessage(threadId, message);
@@ -324,7 +325,41 @@ export function ackChiefSteer(
   if (next?.stepId === running.id) deps.machineHub?.steerSignal(teamId, running.id);
 }
 
+function answeredAfter(db: Db, threadId: string, messageId: string): boolean {
+  const steered = db.select().from(chiefMessage).where(eq(chiefMessage.id, messageId)).get();
+  if (steered === undefined) return false;
+  return (
+    db
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(
+        and(
+          eq(chiefMessage.threadId, threadId),
+          eq(chiefMessage.role, 'assistant'),
+          gt(chiefMessage.createdAt, steered.createdAt),
+        ),
+      )
+      .get() !== undefined
+  );
+}
+
 export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
+  const acked = db
+    .select()
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, finished.buildId),
+        eq(step.status, 'pending'),
+        eq(step.holdReason, STEER_ACKED_HOLD),
+      ),
+    )
+    .all();
+  for (const row of acked) {
+    if (answeredAfter(db, finished.buildId, row.id)) {
+      db.delete(step).where(eq(step.id, row.id)).run();
+    }
+  }
   db.delete(steerPending)
     .where(
       and(eq(steerPending.conversationId, finished.buildId), eq(steerPending.stepId, finished.id)),

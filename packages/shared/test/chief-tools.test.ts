@@ -162,11 +162,12 @@ describe('47-item vocabulary', () => {
 });
 
 describe('D60 router tools', () => {
-  it('are five tools outside the 47-item base vocabulary, so the base count stays 47', () => {
+  it('are six tools outside the 47-item base vocabulary, so the base count stays 47', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([
       'open_thread',
       'message_thread',
       'stop_thread',
+      'answer_question',
       'threads',
       'needs_you',
     ]);

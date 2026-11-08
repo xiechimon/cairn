@@ -161,7 +161,12 @@ export async function runCoordinatorTurn(
           );
           await api.ackSteer?.(stepId);
         })
-        .catch(() => {})
+        .catch((error: unknown) => {
+          console.warn(
+            `coordinator steer for step ${stepId} was not delivered; it stays queued for the next turn`,
+            error,
+          );
+        })
         .finally(() => {
           steering = false;
         });

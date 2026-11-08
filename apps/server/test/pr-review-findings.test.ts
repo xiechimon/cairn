@@ -18,7 +18,7 @@ import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-rev
 import { createPrWakes } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import {
-  answerPendingWorkerQuestions,
+  answerWorkerQuestionsById,
   writeWorkerQuestion,
 } from '../src/services/worker-question-store.js';
 import { stubGithubApp } from './github-identity-fixture.js';
@@ -423,7 +423,7 @@ test('pending blocking worker question prevents release until answered', async (
   await f.reconcile();
   expect(f.state.draft).toBe(true);
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(false);
-  expect(answerPendingWorkerQuestions({ db: f.s.db }, 'b', 'Proceed')).toBe(true);
+  answerWorkerQuestionsById({ db: f.s.db }, 'b', ['question'], 'Proceed');
   await f.reconcile();
   expect(f.state.draft).toBe(false);
   expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);

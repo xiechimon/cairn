@@ -3,9 +3,10 @@ import { canBoardDrop, type Phase } from '@cairn/shared';
 export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   todo: ['queued', 'confirm', 'closed'],
   queued: ['planning', 'building', 'failed', 'closed'],
-  planning: ['confirm', 'failed', 'closed'],
+  planning: ['confirm', 'needs_input', 'failed', 'closed'],
   confirm: ['building', 'planning', 'failed', 'queued', 'closed'],
-  building: ['review', 'failed', 'done', 'closed'],
+  building: ['review', 'needs_input', 'failed', 'done', 'closed'],
+  needs_input: ['building', 'planning', 'queued', 'failed', 'done', 'closed'],
   review: ['done', 'failed', 'queued', 'planning', 'closed'],
   done: ['queued'],
   failed: ['queued', 'closed', 'review'],

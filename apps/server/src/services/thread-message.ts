@@ -28,7 +28,12 @@ import {
 import { assertProjectWritable } from './project-writable.js';
 import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
-import { answerWorkerQuestionsById, pendingWorkerQuestionIds } from './worker-question-store.js';
+import {
+  answerWorkerQuestionsById,
+  pendingWorkerQuestionIds,
+  pendingWorkerQuestions,
+} from './worker-question-store.js';
+import { recordDecisions } from './worker-questions.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -90,7 +95,23 @@ async function deliver(
   body: ThreadMessageBody,
   origin: ThreadMessageOrigin,
 ): Promise<{ conversationId: string; delivered: ThreadMessageDelivery }> {
+  const pending = pendingWorkerQuestionIds(deps.db, buildId);
+  if (origin.origin === 'coordinator' && pending.length > 0) {
+    throw new HttpError(
+      409,
+      `thread #${row.seqNum} has a pending question (requestId ${pending.join(', ')}); answer it with answer_question`,
+    );
+  }
   const running = hasClaimedStep(deps, buildId);
+  if (pending.length > 0 && !running) {
+    const sent = await sendBuildSteer(
+      deps,
+      buildId,
+      { content: body.content, clientMessageId: body.clientMessageId },
+      { human: true, afterTurn: true },
+    );
+    return { conversationId: sent.conversationId, delivered: sent.delivered };
+  }
   if (running || row.phase === 'building' || row.phase === 'done') {
     const sent = await sendBuildSteer(
       deps,
@@ -189,9 +210,7 @@ export async function messageThreadAsUser(
   }
   const buildId = row.latestBuildId;
   return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
-    const parked = pendingWorkerQuestionIds(deps.db, buildId);
     const sent = await deliver(deps, row, buildId, body, origin);
-    answerWorkerQuestionsById(deps, buildId, parked, body.content);
     try {
       recordInCoordinator(deps, row, body, sent, origin);
     } catch (error) {
@@ -199,4 +218,52 @@ export async function messageThreadAsUser(
     }
     return { todoId: row.id, ...sent };
   });
+}
+
+export interface QuestionAnswerResult {
+  todoId: string;
+  buildId: string;
+  requestId: string;
+  delivered: 'held-step' | 'waiting-other-questions' | ThreadMessageDelivery;
+}
+
+export async function answerTaskQuestion(
+  deps: BuildDeps,
+  teamId: string,
+  input: { todoId: string; requestId: string; answer: string },
+  by: 'person' | 'coordinator',
+): Promise<QuestionAnswerResult> {
+  const row = deps.db
+    .select()
+    .from(todo)
+    .where(and(eq(todo.id, input.todoId), eq(todo.teamId, teamId)))
+    .get();
+  if (!row) throw new HttpError(404, `todo ${input.todoId}`);
+  if (row.latestBuildId === null) {
+    throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
+  }
+  const buildId = row.latestBuildId;
+  const pending = pendingWorkerQuestions(deps.db, buildId);
+  const question = pending.find((q) => q.requestId === input.requestId);
+  if (question === undefined) {
+    throw new HttpError(
+      409,
+      `requestId ${input.requestId} is not pending on thread #${row.seqNum}${pending.length > 0 ? `; pending: ${pending.map((q) => q.requestId).join(', ')}` : ''}`,
+    );
+  }
+  answerWorkerQuestionsById(deps, buildId, [input.requestId], input.answer);
+  recordDecisions(deps, row.id, [{ question, answer: input.answer, by }]);
+  const result = { todoId: row.id, buildId, requestId: input.requestId };
+  if (hasClaimedStep(deps, buildId)) return { ...result, delivered: 'held-step' };
+  if (pending.length > 1) return { ...result, delivered: 'waiting-other-questions' };
+  const sent = await sendBuildSteer(
+    deps,
+    buildId,
+    {
+      content: `Answer to your question ${input.requestId}:\n${input.answer}`,
+      clientMessageId: newRecordId(),
+    },
+    by === 'person' ? { human: true, afterTurn: true } : { actor: 'Coordinator', afterTurn: true },
+  );
+  return { ...result, buildId: sent.conversationId, delivered: sent.delivered };
 }

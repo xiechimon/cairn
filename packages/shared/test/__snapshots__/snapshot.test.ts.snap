@@ -121,6 +121,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "gate",
             "settle",
             "failed",
+            "question",
             "wake",
           ],
           "type": "string",
@@ -479,6 +480,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                       "planning",
                       "confirm",
                       "building",
+                      "needs_input",
                       "review",
                       "done",
                       "failed",
@@ -779,6 +781,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                     "gate",
                     "settle",
                     "failed",
+                    "question",
                     "wake",
                   ],
                   "type": "string",
@@ -1137,6 +1140,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                               "planning",
                               "confirm",
                               "building",
+                              "needs_input",
                               "review",
                               "done",
                               "failed",
@@ -4031,6 +4035,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                           "planning",
                           "confirm",
                           "building",
+                          "needs_input",
                           "review",
                           "done",
                           "failed",
@@ -5215,6 +5220,7 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
               "planning",
               "confirm",
               "building",
+              "needs_input",
               "review",
               "done",
               "failed",
@@ -5442,6 +5448,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                   "planning",
                   "confirm",
                   "building",
+                  "needs_input",
                   "review",
                   "done",
                   "failed",
@@ -5808,9 +5815,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
-            "awaitingReply": {
-              "type": "boolean",
-            },
             "blockedBy": {
               "anyOf": [
                 {
@@ -5850,6 +5854,43 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "string",
                 "null",
               ],
+            },
+            "decisions": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "answer": {
+                    "type": "string",
+                  },
+                  "at": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer",
+                  },
+                  "by": {
+                    "enum": [
+                      "person",
+                      "coordinator",
+                    ],
+                    "type": "string",
+                  },
+                  "question": {
+                    "type": "string",
+                  },
+                  "requestId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "requestId",
+                  "question",
+                  "answer",
+                  "by",
+                  "at",
+                ],
+                "type": "object",
+              },
+              "type": "array",
             },
             "hasChanges": {
               "type": "boolean",
@@ -5902,6 +5943,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "planning",
                 "confirm",
                 "building",
+                "needs_input",
                 "review",
                 "done",
                 "failed",
@@ -6270,6 +6312,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "planning",
                     "confirm",
                     "building",
+                    "needs_input",
                     "review",
                     "done",
                     "failed",
@@ -7263,6 +7306,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values
     "confirm": "计划就绪等你",
     "done": "已接受，若选了则已合并",
     "failed": "run 停在错误上",
+    "needs_input": "agent 问了问题，等按 requestId 回答",
     "planning": "读仓库写计划",
     "queued": "已启动，等空闲机器",
     "review": "改动就绪等你（\`待验收\`≡\`审核\` 同 phase，CONTEXT.md 裁决）",
@@ -7274,6 +7318,42 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values
     "planning",
     "confirm",
     "building",
+    "needs_input",
+    "review",
+    "done",
+    "failed",
+    "closed",
+  ],
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase ten values + board columns + semantics (02 §4.1) 1`] = `
+{
+  "BOARD_COLUMNS": [
+    "待开始",
+    "执行中",
+    "待处理",
+    "已完成",
+  ],
+  "PHASE_SEMANTICS": {
+    "building": "在改",
+    "closed": "未完成即搁置",
+    "confirm": "计划就绪等你",
+    "done": "已接受，若选了则已合并",
+    "failed": "run 停在错误上",
+    "needs_input": "agent 问了问题，等按 requestId 回答",
+    "planning": "读仓库写计划",
+    "queued": "已启动，等空闲机器",
+    "review": "改动就绪等你（\`待验收\`≡\`审核\` 同 phase，CONTEXT.md 裁决）",
+    "todo": "已建档未开始",
+  },
+  "PHASE_VALUES": [
+    "todo",
+    "queued",
+    "planning",
+    "confirm",
+    "building",
+    "needs_input",
     "review",
     "done",
     "failed",
@@ -8210,6 +8290,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > bui
             "planning",
             "confirm",
             "building",
+            "needs_input",
             "review",
             "done",
             "failed",
@@ -9543,6 +9624,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
             "planning",
             "confirm",
             "building",
+            "needs_input",
             "review",
             "done",
             "failed",
@@ -9858,9 +9940,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         },
       ],
     },
-    "awaitingReply": {
-      "type": "boolean",
-    },
     "blockedBy": {
       "anyOf": [
         {
@@ -9900,6 +9979,43 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "string",
         "null",
       ],
+    },
+    "decisions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "type": "string",
+          },
+          "at": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "by": {
+            "enum": [
+              "person",
+              "coordinator",
+            ],
+            "type": "string",
+          },
+          "question": {
+            "type": "string",
+          },
+          "requestId": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "requestId",
+          "question",
+          "answer",
+          "by",
+          "at",
+        ],
+        "type": "object",
+      },
+      "type": "array",
     },
     "hasChanges": {
       "type": "boolean",
@@ -9952,6 +10068,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "planning",
         "confirm",
         "building",
+        "needs_input",
         "review",
         "done",
         "failed",
