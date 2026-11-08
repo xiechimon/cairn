@@ -276,7 +276,10 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         if (id === null) return;
         mutations.chiefCancelQuestion.mutate(
           { threadId: id, requestId },
-          { onError: (e) => toastError(t('取消提问失败，请重试。'), e) },
+          {
+            onSuccess: () => questionDockState.settle(requestId, null),
+            onError: (e) => toastError(t('取消提问失败，请重试。'), e),
+          },
         );
       }
     : undefined;

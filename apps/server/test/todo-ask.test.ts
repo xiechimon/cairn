@@ -213,3 +213,38 @@ describe('an answer never lands in an archived project', () => {
     expect(statusOf(buildId, REQUEST)?.status).toBe('pending');
   });
 });
+
+describe('an answer passes the same writability guard as a thread message', () => {
+  test('an archived thread with two pending requests refuses the answer and settles nothing', async () => {
+    const started = startedTodo('Archived with two asks');
+    const claimed = H.s.db.select().from(step).where(eq(step.id, started.stepId)).get()!;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTION },
+      { holdMs: 0 },
+    );
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      {
+        requestId: SECOND,
+        questions: [{ header: 'Name', question: 'Name the probe?', options: [] }],
+      },
+      { holdMs: 0 },
+    );
+    completeStep(deps(), started.stepId, { hasChanges: true });
+    H.s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, started.todoId)).run();
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/todos/${started.todoId}/questions/${REQUEST}/answer`,
+      {
+        answer: 'Three',
+      },
+    );
+    expect(res.status).toBe(409);
+    expect(statusOf(started.buildId, REQUEST)?.status).toBe('pending');
+    expect(statusOf(started.buildId, SECOND)?.status).toBe('pending');
+  });
+});

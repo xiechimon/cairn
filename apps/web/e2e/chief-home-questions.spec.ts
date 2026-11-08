@@ -181,6 +181,32 @@ test('a multi-step request in the conversation sends every answer at once', asyn
     ]);
 });
 
+for (const where of ['conversation', 'inbox'] as const) {
+  test(`dismissing the Coordinator question from the ${where} cancels it and removes it everywhere`, async ({
+    page,
+  }) => {
+    const cancelled: string[] = [];
+    await mockLive(page, structuredClone(ONE), (path, route, json) => {
+      if (!/\/questions\/[^/]+\/cancel$/.test(path) || route.request().method() !== 'POST') {
+        return undefined;
+      }
+      cancelled.push(path);
+      return json({ ok: true });
+    });
+    await page.goto(where === 'inbox' ? '/app?pane=inbox' : '/app');
+    const scope =
+      where === 'inbox' ? page.getByTestId('needs-you-inbox-question') : inline(page);
+    if (where === 'inbox') await scope.getByTestId('needs-you-inbox-toggle').click();
+    await scope.getByTestId('quick-question-cancel').click();
+    await expect.poll(() => cancelled).toEqual([
+      `/api/teams/t1/chief/threads/${THREAD.id}/questions/ask-0000000a/cancel`,
+    ]);
+    await expect(inline(page)).toHaveCount(0);
+    await expect(page.getByTestId('needs-you-inbox-question')).toHaveCount(0);
+    await expect(badge(page)).toHaveCount(0);
+  });
+}
+
 test('a request with several questions takes your own words for each step on home', async ({ page }) => {
   const answered: { path: string; body: unknown }[] = [];
   const state = structuredClone(MIXED);

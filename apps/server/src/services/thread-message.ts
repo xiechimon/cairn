@@ -185,6 +185,15 @@ function recordInCoordinator(
   deps.convHub?.publishMessage(thread.id, message);
 }
 
+function writableBuildOf(deps: Pick<BuildDeps, 'db'>, row: TodoRow): string {
+  if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  assertProjectWritable(deps.db, row.teamId, row.projectId);
+  if (row.latestBuildId === null) {
+    throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
+  }
+  return row.latestBuildId;
+}
+
 export async function messageThreadAsUser(
   deps: BuildDeps,
   teamId: string,
@@ -200,12 +209,7 @@ export async function messageThreadAsUser(
   if (!row) throw new HttpError(404, `todo ${todoId}`);
   const replay = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
   if (replay !== undefined) return replay;
-  if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
-  assertProjectWritable(deps.db, row.teamId, row.projectId);
-  if (row.latestBuildId === null) {
-    throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
-  }
-  const buildId = row.latestBuildId;
+  const buildId = writableBuildOf(deps, row);
   return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
     const sent = await deliver(deps, row, buildId, body, origin);
     try {
@@ -236,11 +240,7 @@ export async function answerTaskQuestion(
     .where(and(eq(todo.id, input.todoId), eq(todo.teamId, teamId)))
     .get();
   if (!row) throw new HttpError(404, `todo ${input.todoId}`);
-  assertProjectWritable(deps.db, row.teamId, row.projectId);
-  if (row.latestBuildId === null) {
-    throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
-  }
-  const buildId = row.latestBuildId;
+  const buildId = writableBuildOf(deps, row);
   const pending = pendingWorkerQuestions(deps.db, buildId);
   const question = pending.find((q) => q.requestId === input.requestId);
   if (question === undefined) {

@@ -36,7 +36,9 @@ export function useAnswerCoordinator(request: OriginChiefQuestion) {
       answers,
       threadId: request.conversationId,
     });
-  return { key, submitting, error, answer };
+  const cancel = (requestId: string) =>
+    root?.surface.onCancelQuestion?.(requestId, request.conversationId);
+  return { key, submitting, error, answer, cancel };
 }
 
 export function QuickQuestion({
@@ -46,7 +48,7 @@ export function QuickQuestion({
   request: OriginChiefQuestion;
   hideText?: boolean;
 }) {
-  const { key, submitting, error, answer } = useAnswerCoordinator(request);
+  const { key, submitting, error, answer, cancel } = useAnswerCoordinator(request);
   const [first] = request.item.questions;
   if (
     request.item.questions.length !== 1 ||
@@ -61,6 +63,7 @@ export function QuickQuestion({
           draftKey={key}
           ownAnswer
           onAnswer={(input) => answer(input.answers)}
+          onCancel={cancel}
         />
         {error !== null && (
           <p
@@ -110,6 +113,7 @@ export function QuickQuestion({
       <OwnAnswer
         disabled={submitting}
         onSend={(text) => answer([{ header: question.header, choices: [text] }])}
+        onCancel={() => cancel(request.item.requestId)}
       />
       {error !== null && (
         <p
@@ -142,7 +146,15 @@ export function InlineCoordinatorQuestion({ request }: { request: OriginChiefQue
   );
 }
 
-function OwnAnswer({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
+function OwnAnswer({
+  disabled,
+  onSend,
+  onCancel,
+}: {
+  disabled: boolean;
+  onSend: (text: string) => void;
+  onCancel: () => void;
+}) {
   const { t } = useI18n();
   const [text, setText] = useState('');
   const send = () => {
@@ -174,6 +186,16 @@ function OwnAnswer({ disabled, onSend }: { disabled: boolean; onSend: (text: str
         onClick={send}
       >
         {t('发送')}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        data-testid="quick-question-cancel"
+        className="text-content-tertiary"
+        disabled={disabled}
+        onClick={onCancel}
+      >
+        {t('取消提问')}
       </Button>
     </div>
   );
