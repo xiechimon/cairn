@@ -15,7 +15,7 @@ test('the home is one Coordinator conversation: serif greeting, a pinned decisio
   await page.goto(home('home-c'));
   const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
   await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
-  await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 3 in progress');
+  await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 4 in progress');
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(2);
   await expect(needsYou(page)).not.toContainText('relay-186 cannot run glm-5.3-flash');
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
@@ -65,7 +65,8 @@ test('the Tasks panel lists running threads and a running row opens its thread',
   const rows = page
     .locator('.side-panel [data-slot="stone-group"][data-tone="working"]')
     .locator('[data-slot="thread-row"]');
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(4);
+  await expect(rows.filter({ hasText: 'Rerun the relay probe' })).toHaveCount(1);
   await rows.filter({ hasText: 'Push for finished threads' }).getByRole('button').first().click();
   await expect(page).toHaveURL(/\/app\?.*thread=home-c-working-a/);
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
