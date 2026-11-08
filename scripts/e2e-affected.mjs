@@ -20,6 +20,7 @@ import {
   slotPortReport,
   writeSlotPlaywrightConfig,
 } from './heavy-slots.mjs';
+import { runOwned } from './owned-process.mjs';
 import { partitionByWeight } from './timed-partition.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -78,7 +79,7 @@ function shardOf(selection, shard) {
   return partitionByWeight(selection, weights, count)[index - 1];
 }
 
-function runPlaywright(specs, full) {
+async function runPlaywright(specs, full) {
   const args = ['exec', 'playwright', 'test'];
   const env = { ...leaseEnv(lease), E2E_PORT: PORT };
   if (lease !== null) {
@@ -101,12 +102,7 @@ function runPlaywright(specs, full) {
   }
   args.push('--reporter=list', ...specs.map((spec) => `e2e/${spec}`));
   if (!full) args.push('--workers', process.env.E2E_AFFECTED_WORKERS ?? '2');
-  const res = spawnSync('pnpm', args, {
-    cwd: WEB_DIR,
-    stdio: 'inherit',
-    env,
-  });
-  process.exit(res.status ?? 1);
+  process.exit(await runOwned('pnpm', args, { cwd: WEB_DIR, env, name: 'e2e' }));
 }
 
 const argv = process.argv.slice(2);
@@ -169,4 +165,4 @@ console.log(`  ${run.join(' ')}`);
 
 if (dryRun || run.length === 0) process.exit(0);
 const lease = await acquireSlot();
-runPlaywright(run, full);
+await runPlaywright(run, full);
