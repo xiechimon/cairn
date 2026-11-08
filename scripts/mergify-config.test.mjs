@@ -44,7 +44,7 @@ const rules = Object.fromEntries(
 
 for (const [name, author, method] of [
   ['default', '- -author = cairnwright[bot]', 'squash'],
-  ['bot', '- author = cairnwright[bot]', 'rebase'],
+  ['bot', '- author = cairnwright[bot]', 'squash'],
 ])
   test(`the ${name} rule requires the review-gate check from GitHub Actions and keeps PR-only gates off the draft`, () => {
     const [queue, merge] = rules[name].split('    merge_conditions:\n');
@@ -64,7 +64,8 @@ for (const [name, author, method] of [
     assert.match(merge, /max_checks_retries: 1$/m);
   });
 
-test('neither queue caps commit count; merge-pr.sh still enforces bot single-commit rebase identity', () => {
+test('neither queue caps commit count, and both squash so the PR opener authors the main commit', () => {
+  assert.doesNotMatch(readFileSync(configPath, 'utf8'), /merge_method: rebase/);
   assert.doesNotMatch(rules.bot, /#commits/);
   assert.doesNotMatch(rules.default, /#commits/);
 });

@@ -167,6 +167,7 @@ install_host_tools() {
       scripts/ops/host/lanes/*) dest="$HOST_LANES_ROOT/${rel#scripts/ops/host/lanes/}" ;;
       scripts/ops/host/bin/*) dest="$HOST_BIN_ROOT/${rel#scripts/ops/host/bin/}" ;;
       scripts/ops/host/units/*) dest="$HOST_UNITS_ROOT/${rel#scripts/ops/host/units/}" ;;
+      packages/shared/commit-identity.json) dest="$HOST_TOOLS_ROOT/app-token/${rel##*/}" ;;
       *) continue ;;
     esac
     source="$CHECKOUT/$rel"
@@ -199,7 +200,7 @@ install_host_tools() {
         [ "$was_missing" = 0 ] || new_timers="$new_timers $(basename "$rel")" ;;
       scripts/ops/host/units/*) units_changed=1 ;;
     esac
-  done < <(git -C "$CHECKOUT" ls-tree -r --name-only "$target" -- scripts/ops/host/tools scripts/ops/host/lanes scripts/ops/host/bin scripts/ops/host/units)
+  done < <(git -C "$CHECKOUT" ls-tree -r --name-only "$target" -- scripts/ops/host/tools scripts/ops/host/lanes scripts/ops/host/bin scripts/ops/host/units packages/shared/commit-identity.json)
   if [ -n "$units_changed" ]; then
     systemctl --user daemon-reload || log "host tools: daemon-reload failed"
     for timer in $new_timers; do

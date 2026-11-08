@@ -3,38 +3,25 @@ import { ChiefDigestRow } from '../chief/chief-digest-row.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
 import { ChiefQuestionCard } from '../chief/chief-question-card.js';
-import { ProjectMenu } from '../chief/project-menu.js';
-import { Button } from '../components/ui/button.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
-import { ChevronDown } from '../icons/index.js';
 import {
   DIGEST_ITEMS,
   NOW,
-  PROJECT,
-  PROJECT_TITLE,
   QUESTION_ANSWERED,
   QUESTION_CANCELLED,
   QUESTION_PENDING,
 } from './product-fixtures.js';
 import { Cell, Labeled, Section, Specimen } from './specimen.js';
 
-const PROJECTS = [
-  { id: PROJECT, name: PROJECT_TITLE, description: 'The workbench itself' },
-  { id: 'docs-site', name: 'docs-site', description: 'Public documentation' },
-  { id: 'mobile', name: 'mobile' },
-];
-
 const CHIEF = { id: 'chief', displayName: 'Coordinator', avatarUrl: null };
 
 export function ProductChiefSection() {
   const [last, setLast] = useState<string | null>(null);
-  const [project, setProject] = useState<string | null>(null);
-  const [pickTarget, setPickTarget] = useState<string | null>(PROJECT);
   return (
     <Section
       id="product-chief"
       title="Coordinator"
-      lede="The Coordinator's parts: questions it asks you, the conversation digest, the home summary line, its identity, outage banners and the project picker."
+      lede="The Coordinator's parts: questions it asks you, the conversation digest, the home summary line, its identity, and outage banners."
     >
       <Specimen
         id="question-card"
@@ -124,40 +111,6 @@ export function ProductChiefSection() {
             onSettings={() => setLast('Change model')}
           />
         </Labeled>
-      </Specimen>
-      <Specimen
-        id="project-menu"
-        title="Project menu"
-        note="ProjectMenu with and without the automatic choice"
-        stage="canvas"
-      >
-        <Cell label="With Auto">
-          <ProjectMenu
-            title="项目"
-            projects={PROJECTS}
-            value={project}
-            withAuto
-            onPick={setProject}
-            trigger={<Button variant="outline" />}
-          >
-            {PROJECTS.find((p) => p.id === project)?.name ?? 'Auto'}
-            <ChevronDown data-icon="inline-end" />
-          </ProjectMenu>
-        </Cell>
-        <Cell label="Projects only, opens upward">
-          <ProjectMenu
-            title="项目"
-            projects={PROJECTS}
-            value={pickTarget}
-            withAuto={false}
-            side="top"
-            onPick={setPickTarget}
-            trigger={<Button variant="ghost" />}
-          >
-            {PROJECTS.find((p) => p.id === pickTarget)?.name ?? ''}
-            <ChevronDown data-icon="inline-end" />
-          </ProjectMenu>
-        </Cell>
       </Specimen>
     </Section>
   );

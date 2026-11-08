@@ -70,6 +70,12 @@ export interface CommitIdentity {
   email: string;
 }
 
+export interface PushPublication {
+  base: string | null;
+  identity: CommitIdentity | null;
+  coAuthor: CommitIdentity | null;
+}
+
 export interface WorktreePrepareInput {
   projectId: string;
   conversationId: string;
@@ -108,7 +114,12 @@ export interface WorktreeOps {
     message: string,
     identity: CommitIdentity,
   ): Promise<{ committed: boolean; head: string | null }>;
-  push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void>;
+  push(
+    cwd: string,
+    branch: string,
+    credentials: BoundGitCredentials | null,
+    publication: PushPublication,
+  ): Promise<void>;
   mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }>;
   headCommit(cwd: string): Promise<string | null>;
   countAhead(cwd: string, defaultBranch: string): Promise<number>;

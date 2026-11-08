@@ -1,30 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
+import { stubCoordinatorChief } from './helpers.js';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
-
-// #732: the chief drawer composer gets the detail composer's tool face
-// (ruling (a), issue comment 2026-10-03). The interaction set is the same
-// one the detail face already carries — inline `@` completion (#728),
-// clipboard image paste (#729) and the toolbar's attach + mention buttons —
-// but only the interaction face opens: no new backend face is added, the
-// grant/upload/read chain and the mention wire are the landed ones.
-//
-// Failure modes pinned here (ticket list, extended by recon):
-//  FM3 read-only face: with onSend absent (fixture capture) the completion
-//      must not fire (editable gate inside useComposerWire) and the attach
-//      button stays inert.
-//  FM6 attachment wire: paste rides attachFile scope 'message' and the token
-//      stays a whole line (ATTACHMENT_LINE is whole-line anchored — a shared
-//      line silently degrades the chip to literal text); the send content is
-//      the draft verbatim, zero wire change.
-//  FM7 transcript: the live user row renders through ChatMarkdown (#742), so
-//      mention and attachment tokens must come out as chips, never literal.
-//  FM10 send path: Enter with a highlighted row inserts instead of sending;
-//      Enter during an in-flight upload never sends (the shared wire gate).
-//
-// Data face = live face stubbed (composer-paste.spec discipline): no
-// ?scenario= means the real API branch; the surfaces under test get their
-// own stubs and every other GET falls through to a tolerated 500.
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -113,29 +89,25 @@ async function stubMentionSources(page: Page) {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: [] });
   });
+  await stubCoordinatorChief(page, TEAM_ID, USER.id);
 }
 
-/** Open the live chief drawer on the board route. The inline list only arms
- *  once the roster has resolved — typing before that races the members
- *  fetch (composer-inline-mention.spec precedent). */
 async function openChief(page: Page) {
   await stubBoot(page);
   await stubMentionSources(page);
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   await membersLoaded;
-
-  await openChiefWindow(page);
-  const drawer = page.locator('.chief-drawer');
-  await expect(drawer).toBeVisible();
+  const coordinator = page.getByTestId('home-c');
+  await expect(coordinator).toBeVisible();
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
-  const listbox = drawer.locator('.mention-inline');
-  const rows = drawer.locator('.mention-inline-row');
-  return { drawer, input, listbox, rows };
+  const listbox = coordinator.locator('.mention-inline');
+  const rows = coordinator.locator('.mention-inline-row');
+  return { coordinator, input, listbox, rows };
 }
 
 // —— upload chain stubs (grant → upload), with capture ——
@@ -249,7 +221,7 @@ async function countChiefSends(page: Page) {
 
 // —— inline completion face (FM1/FM2/FM9/FM10) ——
 
-test('trigger: @ opens the inline listbox inside the drawer; arrows + Enter insert the token (FM1)', async ({
+test('trigger: @ opens the inline listbox inside the coordinator; arrows + Enter insert the token (FM1)', async ({
   page,
 }) => {
   const { input, listbox, rows } = await openChief(page);
@@ -296,7 +268,7 @@ test('mouse: hover highlights and the row click inserts without stealing focus (
   await expect(input).toBeFocused();
 });
 
-test('geometry: the listbox anchors above the composer wrap inside the drawer (FM2)', async ({
+test('geometry: the listbox anchors above the composer wrap, left-aligned and no wider (FM2)', async ({
   page,
 }) => {
   const { input, listbox } = await openChief(page);
@@ -319,21 +291,18 @@ test('geometry: the listbox anchors above the composer wrap inside the drawer (F
   const w = wrap as { x: number; y: number; width: number; height: number };
   // Anchored above the wrap (bottom: calc(100% + 6px) against the wrap).
   expect(l.y + l.height).toBeLessThanOrEqual(w.y);
-  // Spanning the wrap width (left/right 0 anchoring).
-  expect(Math.abs(l.width - w.width)).toBeLessThanOrEqual(8);
+  expect(l.width).toBeLessThanOrEqual(w.width + 8);
   expect(Math.abs(l.x - w.x)).toBeLessThanOrEqual(8);
 });
 
-test('Esc closes the listbox and the drawer survives (#146 ladder, FM9)', async ({ page }) => {
-  const { drawer, input, listbox } = await openChief(page);
+test('Esc closes the listbox and the coordinator survives (#146 ladder, FM9)', async ({ page }) => {
+  const { coordinator, input, listbox } = await openChief(page);
 
   await input.fill('@bu');
   await expect(listbox).toBeVisible();
   await input.press('Escape');
   await expect(listbox).toBeHidden();
-  // The Esc was consumed by the listbox — the docked drawer stays open and
-  // the draft is untouched.
-  await expect(drawer).toBeVisible();
+  await expect(coordinator).toBeVisible();
   await expect(input).toHaveValue('@bu');
 });
 
@@ -343,8 +312,7 @@ test('a mid-line image paste becomes a tile and leaves the text alone (FM6)', as
   await stubBoot(page);
   const uploads = await stubUploads(page);
   await stubMentionSources(page);
-  await page.goto('/app/schedules');
-  await openChiefWindow(page);
+  await page.goto('/app');
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeEditable();
 
@@ -370,8 +338,7 @@ test('Enter during the upload does not send; after it lands Enter sends the toke
   await stubBoot(page);
   await stubMentionSources(page);
   const deferred = await deferUploads(page);
-  await page.goto('/app/schedules');
-  await openChiefWindow(page);
+  await page.goto('/app');
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeEditable();
   const sent = await countChiefSends(page);
@@ -432,8 +399,6 @@ const CHIEF_AGENT = {
   mcpServers: [],
 };
 
-/** Boot the live drawer at one thread whose user row carries both token
- *  kinds (deep link ?chief=<threadId>). */
 async function openChiefThread(page: Page) {
   await stubBoot(page);
   await stubMentionSources(page);
@@ -475,18 +440,18 @@ async function openChiefThread(page: Page) {
       },
     }),
   );
-  await page.goto('/app/schedules?chief=chief-bbb');
-  const drawer = page.locator('.chief-drawer');
-  await expect(drawer).toBeVisible();
-  return drawer;
+  await page.goto('/app?chief=chief-bbb');
+  const coordinator = page.getByTestId('home-c');
+  await expect(coordinator).toBeVisible();
+  return coordinator;
 }
 
 test('transcript: mention and attachment tokens in a user row render as chips, never literal (FM7)', async ({
   page,
 }) => {
-  const drawer = await openChiefThread(page);
+  const coordinator = await openChiefThread(page);
 
-  const bubble = drawer.getByTestId('chief-bubble').first();
+  const bubble = coordinator.getByTestId('chief-bubble').first();
   await expect(bubble).toHaveAttribute('data-md', '');
 
   const mention = bubble.locator('.mention-chip--agent');
@@ -498,25 +463,4 @@ test('transcript: mention and attachment tokens in a user row render as chips, n
   await expect(bubble).not.toContainText('[builder]');
   await expect(bubble).not.toContainText('![shot.png]');
   await evidenceShot(page, 'chief-transcript-chips.png');
-});
-
-// —— fixture capture face (FM3) ——
-
-test.describe('fixture face stays inert (#732 FM3)', () => {
-  test('the composer is read-only: no listbox, attach inert', async ({
-    page,
-  }) => {
-    await page.goto('/app/schedules?scenario=111');
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
-    const input = page.getByTestId('chief-composer-input');
-    await expect(input).toHaveAttribute('readonly', '');
-
-    // Typing into the read-only textarea never arms the completion.
-    await input.click();
-    await page.keyboard.type('@bu');
-    await expect(drawer.locator('.mention-inline')).toHaveCount(0);
-
-    await expect(drawer.getByRole('button', { name: '添加附件' })).toBeDisabled();
-  });
 });

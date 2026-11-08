@@ -3,6 +3,7 @@ import { CHIEF_DIGEST_GROUP_LABELS, CHIEF_DIGEST_GROUPS } from '@cairn/shared';
 import { useId, useState } from 'react';
 import { useApiMutations, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { STATUS_LINE_CLS } from '../components/chat/status-line.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -10,10 +11,9 @@ import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, Trash2 } from '../icons/index.js';
 
-const DIVIDER_CLS =
-  "my-3 flex items-center gap-3 text-meta text-content-tertiary before:h-px before:flex-1 before:bg-border before:content-[''] after:h-px after:flex-1 after:bg-border after:content-['']";
+const DIVIDER_CLS = `${STATUS_LINE_CLS} mt-6 mb-3`;
 const TOGGLE_CLS =
-  'h-7 max-w-[calc(100%-3rem)] gap-1.5 rounded-(--radius-control) px-2 text-meta font-normal whitespace-normal text-content-tertiary hover:text-foreground aria-expanded:bg-transparent aria-expanded:text-foreground [&_svg]:transition-transform [&_svg]:duration-200 aria-expanded:[&_svg]:rotate-180';
+  'h-auto min-h-7 max-w-full gap-2 border-0 bg-transparent p-0 text-left text-card-title font-normal whitespace-normal text-(--text-secondary) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent dark:hover:text-(--foreground) aria-expanded:bg-transparent aria-expanded:text-(--foreground) [&_svg]:transition-transform [&_svg]:duration-200 aria-expanded:[&_svg]:rotate-180';
 const CARD_CLS =
   'mb-3 flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui leading-6 text-content-secondary';
 const GROUP_CLS = 'grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5';

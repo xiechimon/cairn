@@ -1,9 +1,9 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const GATED = '/app/schedules?scenario=100';
-const READY = '/app/schedules?scenario=111';
-const THREAD = '/app/schedules?scenario=114';
-const QUESTION = '/app/schedules?scenario=chief-question';
+const GATED = '/app?scenario=100';
+const READY = '/app?scenario=111';
+const THREAD = '/app?scenario=114';
+const QUESTION = '/app?scenario=chief-question';
 const SETTINGS = (tab: string) => `/app?scenario=${tab}`;
 
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
@@ -37,32 +37,18 @@ function css(locator: Locator, prop: string) {
   return locator.evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
 }
 
-async function openWindow(page: Page, url: string) {
+async function openHome(page: Page, url: string) {
   await page.goto(url);
-  const win = page.locator('aside.chief-drawer');
-  await expect(win).toBeVisible();
-  await win.evaluate((el) =>
-    Promise.all(el.getAnimations().map((a) => a.finished)).then(() => undefined),
-  );
-  return win;
+  const home = page.getByTestId('home-c');
+  await expect(home).toBeVisible();
+  return home;
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`window: heading face, Paper gate banner and hero cards (${theme})`, async ({ page }) => {
+  test(`home: Paper gate banner (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
-    const win = await openWindow(page, GATED);
-    const display = await probe(page, 'fontFamily', 'var(--font-display)');
-    const card = await probe(page, 'backgroundColor', 'var(--card)');
+    const win = await openHome(page, GATED);
     const secondary = await probe(page, 'backgroundColor', 'var(--secondary)');
-
-    const title = win.getByRole('heading', { name: 'Coordinator', level: 2 });
-    await expect(title, 'W1').toHaveCSS('font-family', display);
-    await expect(title, 'W1').toHaveCSS('font-size', '15px');
-    await expect(title, 'W1').toHaveCSS('font-weight', '500');
-    const winBox = await win.boundingBox();
-    const titleBox = await title.boundingBox();
-    expect((titleBox?.x ?? 0) - (winBox?.x ?? 0), 'W1').toBeCloseTo(16, 0);
-
     const banner = win.getByTestId('chief-gate');
     await expect(banner, 'W2').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
     expect(await css(banner, 'background-color'), 'W2: not tinted').not.toBe(secondary);
@@ -70,26 +56,17 @@ for (const theme of ['light', 'dark'] as const) {
     const gateButton = banner.getByRole('button', { name: '设置' });
     expect((await gateButton.boundingBox())?.height, 'W2').toBe(32);
     await expect(gateButton, 'W2').toHaveCSS('border-top-left-radius', '8px');
-
-    const hero = win.getByRole('heading', { name: '选择一个主题开始' });
-    await expect(hero, 'W3').toHaveCSS('font-family', display);
-    await expect(hero, 'W3').toHaveCSS('font-size', '15px');
-    const example = win.getByTestId('chief-examples').getByRole('button').first();
-    await expect(example, 'W3').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
-    await expect(example, 'W3').toHaveCSS('background-color', card);
-    const tile = example.locator('svg').first().locator('xpath=..');
-    expect(await css(tile, 'background-color'), 'W3: bare icon').toBe('rgba(0, 0, 0, 0)');
   });
 
-  test(`window: bound hero and stream type keys (${theme})`, async ({ page }) => {
+  test(`home: bound composer and stream type keys (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
-    let win = await openWindow(page, READY);
+    let win = await openHome(page, READY);
     await expect(win.getByTestId('chief-gate'), 'W2: bound has no gate').toHaveCount(0);
     await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
-    win = await openWindow(page, THREAD);
-    const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
-    await expect(note, 'W5').toHaveCSS('font-size', '13px');
+    win = await openHome(page, THREAD);
+    const note = win.getByTestId('chief-stream').getByTestId('chief-note').first();
+    await expect(note, 'W5').toHaveCSS('font-size', '15px');
     const foot = win.getByTestId('chief-msg-foot').first();
     await expect(foot, 'W5').toHaveCSS('font-size', '13px');
     await win.getByTestId('chief-tools-toggle').click();
@@ -162,7 +139,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`question card: card face, status triad, type keys (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
-    const win = await openWindow(page, QUESTION);
+    const win = await openHome(page, QUESTION);
     const card = await probe(page, 'backgroundColor', 'var(--card)');
     const accent = await probe(page, 'color', 'var(--card-button)');
     const ink3 = await probe(page, 'color', 'var(--text-tertiary)');

@@ -32,7 +32,6 @@ const conversation: ChiefContent = {
   threadTitle: 'Coordinator',
   threadId: 'chief-global',
   hasEarlier: true,
-  examples: undefined,
   stream: [
     {
       kind: 'user',

@@ -55,7 +55,6 @@
   --dur-reveal: 120ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --z-docked: 10;
   --z-floating: 15;
@@ -97,7 +96,6 @@
   --radius-tile: 10px;
   --radius-bubble: 12px;
   --radius-control: 8px;
-  --radius-window: 18px;
   --e1: 0 0 0 1px var(--border);
   --e2: var(--shadow-floating), inset 0 0 0 1px var(--elevated-ring);
   --e3: var(--shadow-dialog), 0 0 0 1px var(--dialog-ring);
@@ -214,6 +212,18 @@
   --switch-on: var(--card-button);
   --tag-tint: 22%;
   --code-pill-bg: #2a2a2a;
+  --prose-code-surface: rgb(32 32 32 / 0.5);
+  --prose-code-line: rgb(255 255 255 / 0.04);
+  --prose-code-fill: rgb(255 255 255 / 0.075);
+  --code-token-plain: currentColor;
+  --code-token-keyword: #cc7bf4;
+  --code-token-function: #70b8ff;
+  --code-token-string: #9be963;
+  --code-token-constant: #5eeded;
+  --code-token-parameter: #f7ab5f;
+  --code-token-type: #fbad60;
+  --code-token-punctuation: #d3d7de;
+  --code-token-comment: #818898;
   --bubble-base: #262626;
   --bubble-wash-a: rgb(130 180 111 / 0.16);
   --bubble-wash-b: rgb(111 147 187 / 0.14);
@@ -272,6 +282,17 @@
   --shadow-composer-hover: var(--shadow-composer);
   --shadow-composer-focus:
     0 4px 20px rgb(0 0 0 / 0.035), inset 0 0 0 var(--hairline) rgb(0 0 0 / 0.2);
+  --prose-code-surface: rgb(255 255 255 / 0.5);
+  --prose-code-line: rgb(0 0 0 / 0.08);
+  --prose-code-fill: rgb(0 0 0 / 0.05);
+  --code-token-keyword: #8100c2;
+  --code-token-function: #0051c2;
+  --code-token-string: #008000;
+  --code-token-constant: #008080;
+  --code-token-parameter: #b84f05;
+  --code-token-type: #b34a00;
+  --code-token-punctuation: #2b303b;
+  --code-token-comment: #6e7687;
   --canvas: #fafafa;
   --background: #ffffff;
   --foreground: #1a1a1a;

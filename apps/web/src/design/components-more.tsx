@@ -4,6 +4,7 @@ import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { LivePulse, LiveRow } from '../components/chat/live-row.js';
+import { StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -299,12 +300,10 @@ export function StreamSection() {
             <LivePulse className="mt-1 ml-0.5" />
           </div>
         </Cell>
-        <Cell label="the turn ended: past tense, no pulse, Worked for rule">
+        <Cell label="the turn ended: past tense, no pulse, Worked for status line">
           <div className="w-100">
             <TraceGroup steps={FINISHED_STEPS} />
-            <div className="mt-3 flex items-center gap-3 text-center text-meta text-content-tertiary before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-              Worked for 4 minutes
-            </div>
+            <StatusLine className="mt-3">Worked for 4 minutes</StatusLine>
           </div>
         </Cell>
       </Specimen>
