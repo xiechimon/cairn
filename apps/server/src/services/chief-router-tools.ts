@@ -159,12 +159,16 @@ function ownerReplyTime(db: Db, ctx: ChiefToolCtx, messageId: string): number {
 }
 
 function escalate(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
+  const defaultAnswer = str(params, 'defaultAnswer');
+  if (defaultAnswer.length > ANSWER_MAX) {
+    throw new HttpError(400, `invalid params.defaultAnswer: at most ${ANSWER_MAX} characters`);
+  }
   return json(
     escalateQuestion(deps, ctx.teamId, {
       todoId: str(params, 'todoId'),
       requestId: str(params, 'requestId'),
       class: str(params, 'class'),
-      defaultAnswer: tidy(str(params, 'defaultAnswer'), ANSWER_MAX),
+      defaultAnswer,
     }),
   );
 }

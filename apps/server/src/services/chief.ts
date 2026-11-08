@@ -1115,12 +1115,11 @@ function infoReviewNeedsCoordinator(deps: ChiefDeps, todoRecord: TodoRecord): bo
   return projectRow !== undefined && projectMergeConfigOf(projectRow).mergePolicy === 'human';
 }
 
-function enqueueUnwatchedWake(
+function enqueueFailedWake(
   deps: ChiefDeps,
   threadId: string,
   todoRecord: TodoRecord,
   id: string,
-  kind: 'failed' | 'gate',
 ): void {
   const buildRow =
     todoRecord.latestBuildId === null
@@ -1128,8 +1127,8 @@ function enqueueUnwatchedWake(
       : deps.db.select().from(build).where(eq(build.id, todoRecord.latestBuildId)).get();
   enqueueChiefStep(deps, threadId, {
     id,
-    prompt: wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null),
-    trigger: kind,
+    prompt: wakeFacts('failed', todoRecord, buildRow?.errorMessage ?? null),
+    trigger: 'failed',
     provenance: watchProvenance(todoRecord.id),
     scopeProjectId: todoRecord.projectId,
   });
@@ -1163,7 +1162,10 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
         to,
         wake !== null || to === 'failed' ? { wakeStepId } : undefined,
       );
-      if (wake !== null) enqueueUnwatchedWake(deps, coordinator.id, todoRecord, wakeStepId, wake);
+      if (wake === 'failed') enqueueFailedWake(deps, coordinator.id, todoRecord, wakeStepId);
+      if (wake === 'gate') {
+        enqueueGateWake(deps, coordinator.id, { ...todoRecord, phase: to }, false, wakeStepId);
+      }
     }
   }
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();

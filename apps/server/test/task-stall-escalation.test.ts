@@ -169,7 +169,35 @@ describe('a research report the owner no longer accepts goes to the Coordinator 
       .filter((row) => row.kind === 'chief' && row.prompt?.includes('#141') === true);
     expect(wakes).toHaveLength(1);
     expect(wakes[0]?.prompt).toContain('complete_todos');
+    expect(wakes[0]?.prompt).toMatch(/\nGate todo=\S+ build=\S* phase=review attempt=0$/);
     expect(ownerNeedsYou()).not.toContain(todoId);
+  });
+});
+
+describe('an escalation keeps the default answer exactly as proposed', () => {
+  test('a multiline default is stored with its newlines and indentation', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    const defaultAnswer = 'Use this config:\n  retries: 3\n  backoff: exponential';
+    await relay('escalate_question', { todoId, requestId: REQUEST, class: 'other', defaultAnswer });
+    const stored = H.s.db
+      .select()
+      .from(message)
+      .where(and(eq(message.id, REQUEST), eq(message.conversationId, buildId)))
+      .get()?.content as { escalation?: { defaultAnswer: string | null } } | undefined;
+    expect(stored?.escalation?.defaultAnswer).toBe(defaultAnswer);
+  });
+
+  test('an oversized default is refused instead of truncated', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await expect(
+      relay('escalate_question', {
+        todoId,
+        requestId: REQUEST,
+        class: 'other',
+        defaultAnswer: 'x'.repeat(20_001),
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(questionStatus(buildId)).toBe('pending');
   });
 });
 
