@@ -23,6 +23,7 @@ import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
+import type { ChiefQuestionItem } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
 import type { ThreadActivity } from './thread-activity.js';
@@ -230,6 +231,7 @@ interface ChiefStreamRowProps {
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
+  pendingQuestion?: ((item: ChiefQuestionItem) => ReactNode) | undefined;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -279,6 +281,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   toolsOpen,
   onToggleTools,
   onRewindRequest,
+  pendingQuestion,
 }: ChiefStreamRowProps) {
   const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
@@ -396,7 +399,19 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  if (item.kind === 'question' && item.status === 'pending') return null;
+  if (item.kind === 'question' && item.status === 'pending') {
+    const inline = pendingQuestion?.(item) ?? null;
+    if (inline === null) return null;
+    return (
+      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
+          <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+            {inline}
+          </MessageContent>
+        </Message>
+      </MessageScrollerItem>
+    );
+  }
   if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>

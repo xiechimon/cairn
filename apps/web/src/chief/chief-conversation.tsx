@@ -65,6 +65,7 @@ import {
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
+import type { ChiefQuestionItem } from './chief-question-card.js';
 import { ChiefQuestionDock, useAnswerKey, useQuestionDockVisible } from './chief-question-dock.js';
 import { serverDraftBinding } from './composer-binding.js';
 import {
@@ -155,6 +156,8 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
+  questionDock?: boolean;
+  pendingQuestion?: (item: ChiefQuestionItem) => ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -185,10 +188,13 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
+  questionDock = true,
+  pendingQuestion,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
-  const questionAttached = useQuestionDockVisible();
+  const dockVisible = useQuestionDockVisible();
+  const questionAttached = questionDock && dockVisible;
   const projectMark = useProjectMark();
   const { t } = useI18n();
   const composerPlaceholder =
@@ -202,7 +208,8 @@ export function ChiefConversation({
           : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
-  const answerKey = useAnswerKey();
+  const dockAnswerKey = useAnswerKey();
+  const answerKey = questionDock ? dockAnswerKey : null;
   const [threadOverride, setThreadOverride] = useState(false);
   const answerActive = answerHere && answerKey !== null && !threadOverride;
   const { live, teamId } = useLiveData();
@@ -395,7 +402,7 @@ export function ChiefConversation({
       : undefined;
   const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
-  const turnElapsed = questionAttached
+  const turnElapsed = dockVisible
     ? null
     : (turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null);
   const withdraw =
@@ -416,7 +423,7 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = awaitingStream(chief.stream ?? [], questionAttached).map((item, i) => ({
+  const allRows = awaitingStream(chief.stream ?? [], dockVisible).map((item, i) => ({
     item,
     i,
   }));
@@ -518,6 +525,7 @@ export function ChiefConversation({
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
+      pendingQuestion={pendingQuestion}
     />
   );
   const keepsOwnRow = (item: ChiefStreamItem) =>
@@ -722,7 +730,9 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
+        {questionDock && (
+          <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
+        )}
         {composerReplacement ?? (
           <>
             {composerError != null && (

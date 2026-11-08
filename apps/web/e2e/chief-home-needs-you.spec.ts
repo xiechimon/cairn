@@ -56,7 +56,7 @@ test('two pending decisions are answered one at a time above the composer; the r
     );
     return json(JSON.parse(state.messages.find((row) => row.id === `row-${requestId}`)!.content));
   });
-  await page.goto('/app');
+  await page.goto(`/app/schedules?chief=${THREAD.id}`);
   await expect(page.getByTestId('needs-you-inbox')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
   const panel = page.getByTestId('chief-question-dock');
@@ -98,7 +98,7 @@ test('own words: the composer text is the answer', async ({ page }) => {
       return json({});
     },
   );
-  await page.goto('/app');
+  await page.goto(`/app/schedules?chief=${THREAD.id}`);
   const card = page.getByTestId('chief-question-dock').getByTestId('chief-question-card');
   await expect(card).toBeVisible();
   await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
@@ -123,7 +123,7 @@ test('the question dock steps between pending questions', async ({ page }) => {
     ],
     todos: [],
   });
-  await page.goto('/app');
+  await page.goto(`/app/schedules?chief=${THREAD.id}`);
   const dock = page.getByTestId('chief-question-dock');
   await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
   await expect(page.getByTestId('chief-question-prev')).toBeDisabled();

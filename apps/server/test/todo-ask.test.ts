@@ -1,10 +1,11 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, step, todo } from '../src/db/schema.js';
+import { build, message, step, todo } from '../src/db/schema.js';
 import { completeStep, startBuilds } from '../src/services/builds.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -100,5 +101,103 @@ describe('a thread waiting on you carries what it asks', () => {
     const { todoId, buildId } = startedTodo('Serif greeting fix');
     H.s.db.update(build).set({ reportLine: 'Halfway.' }).where(eq(build.id, buildId)).run();
     expect(getTodo(deps(), todoId)?.ask).toBeUndefined();
+  });
+});
+
+const SECOND = 'ask-eeeeeeee-1111-2222-3333-444444444444';
+
+function statusOf(buildId: string, requestId: string) {
+  const row = H.s.db
+    .select()
+    .from(message)
+    .where(and(eq(message.id, requestId), eq(message.conversationId, buildId)))
+    .get();
+  return row?.content as { status?: string; answers?: unknown } | undefined;
+}
+
+describe('answering one shown question from the inbox', () => {
+  test('settles only the request it names, with every question in that request, and leaves another pending request alone', async () => {
+    const started = startedTodo('Two questions at once');
+    const claimed = H.s.db.select().from(step).where(eq(step.id, started.stepId)).get()!;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      {
+        requestId: REQUEST,
+        questions: [
+          ...QUESTION,
+          {
+            header: 'Backoff',
+            question: 'Linear or exponential?',
+            options: [{ label: 'Linear' }, { label: 'Exponential' }],
+          },
+        ],
+      },
+      { holdMs: 0 },
+    );
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      {
+        requestId: SECOND,
+        questions: [{ header: 'Name', question: 'Name the probe?', options: [] }],
+      },
+      { holdMs: 0 },
+    );
+    completeStep(deps(), started.stepId, { hasChanges: true });
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/todos/${started.todoId}/questions/${REQUEST}/answer`,
+      { answer: 'Three, linear' },
+    );
+    expect(res.status).toBe(200);
+    expect(statusOf(started.buildId, REQUEST)).toMatchObject({
+      status: 'answered',
+      answers: [
+        { header: 'Retry budget', text: 'Three, linear' },
+        { header: 'Backoff', text: 'Three, linear' },
+      ],
+    });
+    expect(statusOf(started.buildId, SECOND)?.status).toBe('pending');
+  });
+
+  test('a request that is no longer pending is refused, not applied to another one', async () => {
+    const { todoId, buildId } = await escalatedQuestion();
+    const first = await req(H.s.app, 'POST', `/api/todos/${todoId}/questions/${REQUEST}/answer`, {
+      answer: 'Three',
+    });
+    expect(first.status).toBe(200);
+    const again = await req(H.s.app, 'POST', `/api/todos/${todoId}/questions/${REQUEST}/answer`, {
+      answer: 'Five',
+    });
+    expect(again.status).toBe(409);
+    expect(statusOf(buildId, REQUEST)).toMatchObject({ answers: [{ text: 'Three' }] });
+  });
+});
+
+describe('a request with several questions offers no one-click options', () => {
+  test('the ask joins every question and drops options that would answer only the first', async () => {
+    const started = startedTodo('Several questions');
+    const claimed = H.s.db.select().from(step).where(eq(step.id, started.stepId)).get()!;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      {
+        requestId: REQUEST,
+        questions: [
+          ...QUESTION,
+          { header: 'Backoff', question: 'Linear or exponential?', options: [{ label: 'Linear' }] },
+        ],
+      },
+      { holdMs: 0 },
+    );
+    completeStep(deps(), started.stepId, { hasChanges: true });
+    expect(getTodo(deps(), started.todoId)?.ask).toEqual({
+      text: 'How many reruns should the relay probe get before it gives up?\nLinear or exponential?',
+      requestId: REQUEST,
+      options: [],
+      defaultAnswer: null,
+    });
   });
 });

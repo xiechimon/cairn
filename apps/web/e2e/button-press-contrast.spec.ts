@@ -74,8 +74,9 @@ for (const theme of ['light', 'dark'] as const) {
     test('the Coordinator answer button stays readable while pressed', async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app?scenario=chief-question');
-      await page.getByTestId('home-c').locator('.chief-composer textarea, .chief-composer [contenteditable]').first().fill('hello');
-      await expectReadable(page, page.getByTestId('chief-question-primary'), 'chief answer');
+      const card = page.getByTestId('inline-question');
+      await card.getByTestId('chief-question-option-0-0').click();
+      await expectReadable(page, card.getByTestId('chief-question-next'), 'chief answer');
     });
 
     test('the thread composer Send button stays readable while pressed', async ({ page }) => {

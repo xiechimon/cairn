@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
@@ -29,7 +28,7 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
-import { needsYouCount } from './needs-you.js';
+import { useNeedsYou } from './needs-you-store.js';
 import { splitProjectsByArchive } from './project-archive.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
 import { SidebarThreadGroups } from './sidebar-thread-groups.js';
@@ -205,8 +204,7 @@ export function BoardSidebar({
     () => groupThreads(shownTodos, activeProject),
     [shownTodos, activeProject],
   );
-  const chiefRoot = useOptionalChiefRoot();
-  const attention = needsYouCount(shownTodos, chiefRoot?.pendingQuestions.length ?? 0);
+  const attention = useNeedsYou(shownTodos).count;
   const projectNames = useMemo(
     () => new Map([...projectRows, ...archivedRows].map((row) => [row.id, row.name])),
     [projectRows, archivedRows],

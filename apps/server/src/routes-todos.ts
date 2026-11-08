@@ -8,6 +8,7 @@ import {
   snoozeTodoBodySchema,
   type TodoRecord,
   threadMessageBodySchema,
+  threadQuestionAnswerBodySchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
@@ -34,7 +35,7 @@ import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { assertProjectWritable } from './services/project-writable.js';
 import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
-import { messageThreadAsUser } from './services/thread-message.js';
+import { answerTaskQuestion, messageThreadAsUser } from './services/thread-message.js';
 import {
   createTodo,
   deleteTodo,
@@ -84,6 +85,18 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/todos/:id/messages', async (c) => {
     const body = parseWith(threadMessageBodySchema, await jsonBody(c), 'body');
     return c.json(await messageThreadAsUser(svc, ctx.team.id, c.req.param('id'), body), 201);
+  });
+
+  app.post('/api/todos/:id/questions/:requestId/answer', async (c) => {
+    const body = parseWith(threadQuestionAnswerBodySchema, await jsonBody(c), 'body');
+    return c.json(
+      await answerTaskQuestion(
+        svc,
+        ctx.team.id,
+        { todoId: c.req.param('id'), requestId: c.req.param('requestId'), answer: body.answer },
+        'person',
+      ),
+    );
   });
 
   app.post('/api/projects/:id/todos', async (c) => {

@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
+import { InlineCoordinatorQuestion } from '../chief/quick-question.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -31,7 +32,8 @@ import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { needsYouThreads } from './needs-you.js';
-import { NeedsYouChip, NeedsYouPanel, useNeedsYouInbox } from './needs-you-inbox.js';
+import { NeedsYouChip, NeedsYouPanel } from './needs-you-inbox.js';
+import { useNeedsYou } from './needs-you-store.js';
 import { composeRequest } from './open-composer.js';
 import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
@@ -168,11 +170,8 @@ export function HomeC({
     () => streamForProject(chiefData.stream ?? [], projectId),
     [chiefData.stream, projectId],
   );
-  const conversation = stream.filter(
-    (item) => !(item.kind === 'question' && item.status === 'pending'),
-  );
   const entries = needsYouThreads(scoped);
-  const inbox = useNeedsYouInbox(entries);
+  const needsYou = useNeedsYou(scoped);
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
@@ -194,7 +193,7 @@ export function HomeC({
           day: 'numeric',
           weekday: 'short',
         }).format(now),
-        ...(entries.length > 0 ? [t('{n} 项待你处理', { n: entries.length })] : []),
+        ...(needsYou.count > 0 ? [t('{n} 项待你处理', { n: needsYou.count })] : []),
         ...(running.length > 0 ? [t('{n} 件在进行', { n: running.length })] : []),
       ].join(' · ')}
     </p>
@@ -287,7 +286,7 @@ export function HomeC({
           {projectName ?? t('Coordinator')}
         </h1>
         <NeedsYouChip
-          count={inbox.entries.length}
+          count={needsYou.count}
           open={pane === 'inbox' && threadId === null}
           onToggle={() => togglePane('inbox')}
         />
@@ -343,7 +342,7 @@ export function HomeC({
       <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
     ) : pane === 'inbox' ? (
       <NeedsYouPanel
-        inbox={inbox}
+        needsYou={needsYou}
         now={now}
         onOpenThread={openThread}
         onClose={() => showPane(null)}
@@ -443,7 +442,7 @@ export function HomeC({
         <ChiefScrollProvider>
           <ChiefConversation
             variant="global"
-            chief={{ ...chiefData, stream: conversation, examples: undefined }}
+            chief={{ ...chiefData, stream, examples: undefined }}
             onSend={
               thread.picked !== null
                 ? thread.send
@@ -470,6 +469,13 @@ export function HomeC({
             }
             composerError={thread.error}
             targetPlaceholder={thread.placeholder}
+            questionDock={false}
+            pendingQuestion={(item) => {
+              const request = needsYou.questions.find(
+                (pending) => pending.item.requestId === item.requestId,
+              );
+              return request === undefined ? null : <InlineCoordinatorQuestion request={request} />;
+            }}
             composerTools={
               <>
                 <ComposerThreadTarget

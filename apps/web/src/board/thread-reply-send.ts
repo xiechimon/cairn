@@ -7,8 +7,6 @@ import type { Phase, TodoRecord } from '../fixtures/records.js';
 
 export function replyDeliveryOf(phase: Phase): ThreadReplyDelivery | null {
   switch (phase) {
-    case 'needs_input':
-      return 'answer';
     case 'confirm':
     case 'review':
       return 'revision';
@@ -29,10 +27,20 @@ export function useThreadReply(todo: TodoRecord): {
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const sendKey = useSendKey();
-  const delivery = todo.latestBuildId != null ? replyDeliveryOf(todo.phase) : null;
+  const requestId = todo.phase === 'needs_input' ? (todo.ask?.requestId ?? null) : null;
+  const delivery =
+    todo.latestBuildId == null ? null : requestId !== null ? 'answer' : replyDeliveryOf(todo.phase);
   const send = async (content: string) => {
     if (!live) {
       if (DEMO_MODE) blockDemoWrite();
+      return;
+    }
+    if (requestId !== null) {
+      await mutations.answerThreadQuestion.mutateAsync({
+        todoId: todo.id,
+        requestId,
+        answer: content,
+      });
       return;
     }
     await mutations.messageThread.mutateAsync({

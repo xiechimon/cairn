@@ -8,7 +8,8 @@ test('with a pending question and a task thread open at 1440 the header keeps it
   const header = page.getByTestId('home-c-pane-buttons');
   await expect(header).toBeVisible();
   await expect(page.getByTestId('side-chat')).toBeVisible();
-  await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+  await expect(page.getByTestId('chief-stream').getByTestId('inline-question')).toBeVisible();
+  await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
   const column = (await page.getByTestId('home-c').boundingBox())!;
   const title = (await header.getByRole('heading', { level: 1 }).boundingBox())!;
   expect(title.width).toBeGreaterThan(40);

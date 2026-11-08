@@ -203,12 +203,12 @@ function askOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoAsk | undefined {
   if (row.phase === 'needs_input') {
     const pending = pendingWorkerQuestions(deps.db, row.latestBuildId);
     const asked = pending.find((question) => question.escalation !== undefined) ?? pending[0];
-    const first = asked?.questions[0];
-    if (asked !== undefined && first !== undefined) {
+    const only = asked?.questions.length === 1 ? asked.questions[0] : undefined;
+    if (asked !== undefined) {
       return {
-        text: first.question,
+        text: asked.questions.map((question) => question.question).join('\n'),
         requestId: asked.requestId,
-        options: first.options.map((option) => ({
+        options: (only?.multiSelect === true ? [] : (only?.options ?? [])).map((option) => ({
           label: option.label,
           ...(option.description !== undefined && option.description !== ''
             ? { description: option.description }

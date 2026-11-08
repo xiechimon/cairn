@@ -1412,6 +1412,7 @@ export const EN: Record<string, string> = {
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   '{n} 件在进行': '{n} in progress',
   待你决定: 'Needs you',
+  在问你: 'Asking you',
   '待你决定 {n} 件': 'Needs you: {n}',
   都处理完了: 'All caught up',
   'Coordinator 建议：{answer}': 'Coordinator suggests: {answer}',

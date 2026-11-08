@@ -1079,6 +1079,18 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['todos', teamId] });
       },
     }),
+    answerThreadQuestion: useMutation({
+      mutationFn: (input: { todoId: string; requestId: string; answer: string }) =>
+        api.post<{ todoId: string; buildId: string; requestId: string; delivered: string }>(
+          `/api/todos/${input.todoId}/questions/${encodeURIComponent(input.requestId)}/answer`,
+          { answer: input.answer },
+        ),
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: ['messages'] });
+        void qc.invalidateQueries({ queryKey: ['todo'] });
+        void qc.invalidateQueries({ queryKey: ['todos', teamId] });
+      },
+    }),
     messageThread: useMutation({
       mutationFn: (input: { todoId: string; content: string; clientMessageId?: string }) =>
         api.post<ThreadMessageResult>(`/api/todos/${input.todoId}/messages`, {

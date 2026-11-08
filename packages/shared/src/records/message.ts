@@ -259,6 +259,11 @@ export const threadMessageBodySchema = z.object({
 });
 export type ThreadMessageBody = z.infer<typeof threadMessageBodySchema>;
 
+export const threadQuestionAnswerBodySchema = z.object({
+  answer: z.string().trim().min(1).max(20_000),
+});
+export type ThreadQuestionAnswerBody = z.infer<typeof threadQuestionAnswerBodySchema>;
+
 export const threadMessageResultSchema = z.object({
   todoId: recordId,
   conversationId: recordId,

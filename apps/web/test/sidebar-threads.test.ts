@@ -39,8 +39,8 @@ test.each(['confirm', 'review'] as const)('a %s thread lands in needs-you', (pha
   expect(nums(groups.running)).toEqual([1]);
 });
 
-test('an awaiting-reply thread lands in needs-you', () => {
-  const asking = { ...inProject(2, 'building'), awaitingReply: true };
+test('a thread asking you lands in needs-you', () => {
+  const asking = { ...inProject(2, 'needs_input'), waitingOn: { on: 'owner' as const, retryAt: null } };
   expect(nums(groupThreads([asking], null).needsYou)).toEqual([2]);
 });
 

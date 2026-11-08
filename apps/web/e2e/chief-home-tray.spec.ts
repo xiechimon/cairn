@@ -74,11 +74,13 @@ function answerRoute(state: ReturnType<typeof withQuestion>, answered: unknown[]
   };
 }
 
-async function openWithQuestion(page: Page, todos: unknown[] = []) {
+const DOCK = `/app/schedules?chief=${THREAD.id}`;
+
+async function openWithQuestion(page: Page, todos: unknown[] = [], url = '/app') {
   const state = withQuestion(todos);
   const answered: unknown[] = [];
   await mockLive(page, state, answerRoute(state, answered));
-  await page.goto('/app');
+  await page.goto(url);
   return { state, answered };
 }
 
@@ -104,11 +106,11 @@ for (const size of [
     } as (typeof todos)[number];
     const sent: unknown[] = [];
     await mockLive(page, { threads: [THREAD], messages: HISTORY, todos }, (path, route, json) => {
-      if (!/^\/api\/todos\/[^/]+\/messages$/.test(path) || route.request().method() !== 'POST') {
+      if (route.request().method() !== 'POST' || !/^\/api\/todos\/[^/]+\//.test(path)) {
         return undefined;
       }
       sent.push({ path, body: route.request().postDataJSON() });
-      return json({ todoId: 'todo-1', conversationId: 'build-1', delivered: 'steer' }, 201);
+      return json({ todoId: 'todo-1', buildId: 'build-1', requestId: 'ask-split', delivered: 'steer' });
     });
     await page.goto('/app');
     await expect(page.getByTestId('chief-composer-block').getByTestId('needs-you-inbox-row')).toHaveCount(0);
@@ -131,7 +133,9 @@ for (const size of [
     }
     await first.getByRole('button', { name: 'Tenant', exact: true }).click();
     await expect.poll(() => sent.length).toBe(1);
-    expect(sent[0]).toMatchObject({ path: '/api/todos/todo-1/messages', body: { content: 'Tenant' } });
+    expect(sent).toEqual([
+      { path: '/api/todos/todo-1/questions/ask-split/answer', body: { answer: 'Tenant' } },
+    ]);
     await expect(rows).toHaveCount(4);
     await expect(chip.getByTestId('needs-you-count')).toHaveText('4');
     await page.locator('.side-panel').getByRole('button', { name: 'Close' }).click();
@@ -139,6 +143,41 @@ for (const size of [
     await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
   });
 }
+
+test('a one-click answer that fails says so on the row, keeps the options, and a retry goes through', async ({
+  page,
+}) => {
+  const asking = {
+    ...FIVE[0],
+    phase: 'needs_input',
+    waitingOn: { on: 'owner', retryAt: null },
+    ask: {
+      text: 'Split by tenant or by region first?',
+      requestId: 'ask-split',
+      options: [{ label: 'Tenant' }, { label: 'Region' }],
+      defaultAnswer: null,
+    },
+  };
+  let calls = 0;
+  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: [asking] }, (path, route, json) => {
+    if (route.request().method() !== 'POST' || !path.endsWith('/questions/ask-split/answer')) {
+      return undefined;
+    }
+    calls += 1;
+    return calls === 1
+      ? json({ error: 'requestId ask-split is not pending yet' }, 500)
+      : json({ todoId: 'todo-1', buildId: 'build-1', requestId: 'ask-split', delivered: 'steer' });
+  });
+  await page.goto('/app?pane=inbox');
+  const row = page.getByTestId('needs-you-inbox-row');
+  await row.getByTestId('needs-you-inbox-toggle').click();
+  await row.getByRole('button', { name: 'Region', exact: true }).click();
+  await expect(row.getByTestId('needs-you-inbox-error')).toHaveText('Not sent. Try again.');
+  await expect(row.getByRole('button', { name: 'Region', exact: true })).toBeEnabled();
+  await row.getByRole('button', { name: 'Region', exact: true }).click();
+  await expect(row).toHaveCount(0);
+  expect(calls).toBe(2);
+});
 
 test('no needs-you thread and no question means no chip and a plain tab title', async ({ page }) => {
   await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: [TASK] });
@@ -174,22 +213,73 @@ test('a running turn with no question keeps its elapsed timer and working label'
 
 test('option descriptions are printed on the card, not hidden in a tooltip', async ({ page }) => {
   await openWithQuestion(page);
-  const option = page.getByTestId('chief-question-option-0-0');
+  const card = page.getByTestId('chief-stream').getByTestId('inline-question');
+  const option = card.getByTestId('quick-question-option-0');
   await expect(option).toContainText('About 6 minutes');
-  await expect(page.getByTestId('chief-question-option-0-1')).toContainText('Docs only, low risk');
+  await expect(card.getByTestId('quick-question-option-1')).toContainText('Docs only, low risk');
   expect(await option.getAttribute('title')).toBeNull();
+});
+
+for (const size of [
+  { name: 'desktop', width: 1470, height: 900 },
+  { name: 'phone', width: 390, height: 844 },
+]) {
+  test(`on home the Coordinator question waits in the conversation where it was asked, the composer stays free, and one click answers it (${size.name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const { answered } = await openWithQuestion(page);
+    const stream = page.getByTestId('chief-stream');
+    const card = stream.getByTestId('inline-question');
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Merge now or wait for CI?');
+    await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
+    const asked = await stream.getByText('Merge it when it is safe').boundingBox();
+    const cardBox = await card.boundingBox();
+    expect(cardBox!.y).toBeGreaterThan(asked!.y);
+    const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await expect(composer).not.toHaveAttribute('placeholder', /answer/i);
+    const composerBox = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
+    expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(composerBox!.y);
+    await expect(page.getByTestId('home-c').getByTestId('needs-you-count')).toHaveText('1');
+    await card.getByTestId('quick-question-option-0').click();
+    await expect.poll(() => answered.length).toBe(1);
+    expect(answered[0]).toEqual({ answers: [{ header: 'Merge', choices: ['Wait for CI'] }] });
+    await expect(card).toHaveCount(0);
+    await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveCount(0);
+    await expect(page.getByTestId('home-c').getByTestId('needs-you-chip')).toHaveCount(0);
+  });
+}
+
+test('the chip and the sidebar badge count the same things, and the inbox lists the Coordinator question beside the threads', async ({
+  page,
+}) => {
+  const { answered } = await openWithQuestion(page, FIVE.slice(0, 2));
+  const chip = page.getByTestId('home-c').getByTestId('needs-you-chip');
+  await expect(chip.getByTestId('needs-you-count')).toHaveText('3');
+  await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveText('3');
+  await chip.click();
+  const question = page.getByTestId('needs-you-inbox-question');
+  await expect(question).toContainText('Merge now or wait for CI?');
+  await expect(page.getByTestId('needs-you-inbox-row')).toHaveCount(2);
+  await question.getByTestId('needs-you-inbox-toggle').click();
+  await question.getByTestId('quick-question-option-1').click();
+  await expect.poll(() => answered.length).toBe(1);
+  await expect(question).toHaveCount(0);
+  await expect(chip.getByTestId('needs-you-count')).toHaveText('2');
+  await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveText('2');
 });
 
 test('on desktop the question card is capped at 40% of the viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 500 });
-  await openWithQuestion(page);
+  await openWithQuestion(page, [], DOCK);
   const box = await page.getByTestId('chief-question-card').boundingBox();
   expect(box!.height).toBeLessThanOrEqual(500 * 0.4 + 1);
 });
 
 test('on a phone only the question and options show; the controls live under the more menu', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await openWithQuestion(page);
+  await openWithQuestion(page, [], DOCK);
   const card = page.getByTestId('chief-question-card');
   await expect(card.getByTestId('chief-question-text')).toBeVisible();
   await expect(card.getByTestId('chief-question-option-0-0')).toBeVisible();
@@ -203,20 +293,20 @@ test('on a phone only the question and options show; the controls live under the
 });
 
 test('on desktop the more menu stays hidden and the controls show in the header', async ({ page }) => {
-  await openWithQuestion(page);
+  await openWithQuestion(page, [], DOCK);
   const card = page.getByTestId('chief-question-card');
   await expect(card.getByTestId('chief-question-more')).toBeHidden();
   await expect(card.getByTestId('chief-question-dismiss')).toBeVisible();
 });
 
 test('a single question has no progress bar', async ({ page }) => {
-  await openWithQuestion(page);
+  await openWithQuestion(page, [], DOCK);
   await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-prev')).toHaveCount(0);
 });
 
 test('an answered card fades out over 200ms and leaves a one-line summary in the conversation', async ({ page }) => {
-  const { answered } = await openWithQuestion(page);
+  const { answered } = await openWithQuestion(page, [], DOCK);
   await page.evaluate(() => {
     const seen: { animation: string; duration: string }[] = [];
     (window as unknown as { __leaving: typeof seen }).__leaving = seen;

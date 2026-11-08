@@ -17,12 +17,12 @@ test('the home is one Coordinator conversation: serif greeting, the conversation
   await page.goto(home('home-c'));
   const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
   await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
-  await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 3 in progress');
-  await expect(chip(page).getByTestId('needs-you-count')).toHaveText('2');
+  await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 3 in progress');
+  await expect(chip(page).getByTestId('needs-you-count')).toHaveText('3');
+  await expect(page.getByTestId('chief-stream').getByTestId('inline-question')).toBeVisible();
   await expect(page.getByTestId('chief-composer-block').getByTestId('needs-you-inbox-row')).toHaveCount(0);
   await expect(inbox(page)).toHaveCount(0);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question-dock')).toBeVisible();
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Coordinator');
@@ -79,7 +79,7 @@ test('the sidebar lists project names only, and the project chat filters the dec
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}`));
   await expect(page.getByTestId('project-home')).toBeVisible();
   await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
-  await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 2 in progress');
+  await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 2 in progress');
   await chip(page).click();
   await expect(inbox(page)).toContainText('Connect a Claude subscription token');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
@@ -218,7 +218,7 @@ test('the home lands at the newest message, with the needs-you chip in the heade
 test('the sidebar Coordinator badge counts the Needs you items plus the pending question', async ({ page }) => {
   await page.goto(home('home-c'));
   const badge = page.getByRole('complementary').getByTestId('attention-badge');
-  await expect(chip(page).getByTestId('needs-you-count')).toHaveText('2');
+  await expect(chip(page).getByTestId('needs-you-count')).toHaveText('3');
   await expect(badge).toHaveText('3');
   await page.goto('/app/schedules?scenario=home-c');
   await expect(badge).toHaveText('3');

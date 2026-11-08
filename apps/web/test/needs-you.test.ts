@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { needsYouCount, needsYouThreads, pendingQuestions } from '../src/board/needs-you.js';
+import { needsYouThreads, pendingQuestions } from '../src/board/needs-you.js';
 import { todo } from './helpers.js';
 
 const question = (status: 'pending' | 'answered') => ({
@@ -25,7 +25,7 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
     ];
     const stream = [question('pending'), question('answered')];
     expect(needsYouThreads(set).map((row) => row.seqNum).sort()).toEqual([1, 2, 4]);
-    expect(needsYouCount(set)).toBe(3);
+    expect(needsYouThreads(set)).toHaveLength(3);
     expect(pendingQuestions(stream)).toHaveLength(1);
   });
 

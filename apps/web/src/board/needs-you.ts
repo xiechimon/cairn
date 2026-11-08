@@ -30,7 +30,3 @@ export function pendingQuestions(stream: readonly ChiefStreamItem[]): ChiefQuest
     (item): item is ChiefQuestionItem => item.kind === 'question' && item.status === 'pending',
   );
 }
-
-export function needsYouCount(todos: readonly TodoRecord[], pendingQuestionCount = 0): number {
-  return needsYouThreads(todos).length + pendingQuestionCount;
-}

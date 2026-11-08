@@ -147,6 +147,7 @@ test('a thread asking you takes the reply as its answer; an empty reply cannot b
     {
       ...todo('todo-12', 12, 'Fix the orb permission', 'needs_input', 'build-12'),
       waitingOn: { on: 'owner', retryAt: null },
+      ask: { text: 'Keep the old grant?', requestId: 'ask-12', options: [], defaultAnswer: null },
     },
   ]);
   await page.goto('/app');
