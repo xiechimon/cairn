@@ -16,6 +16,7 @@ import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
 import { PhaseTransitionError } from './phase.js';
+import { escalateQuestion } from './question-deadlines.js';
 import { answerTaskQuestion, messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -134,6 +135,17 @@ async function answerQuestion(
   );
 }
 
+function escalate(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
+  return json(
+    escalateQuestion(deps, ctx.teamId, {
+      todoId: str(params, 'todoId'),
+      requestId: str(params, 'requestId'),
+      class: str(params, 'class'),
+      defaultAnswer: tidy(str(params, 'defaultAnswer'), ANSWER_MAX),
+    }),
+  );
+}
+
 function stopThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
   const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
   str(params, 'reason');
@@ -231,7 +243,7 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
       })),
     })),
   }));
-  const waiting = listNeedsYou({ db }, ctx.teamId);
+  const waiting = listNeedsYou({ db }, ctx.teamId, 'coordinator');
   const others = [...waiting.current, ...waiting.stale]
     .filter((entry) => !askingIds.has(entry.todo.id))
     .map((entry) => ({
@@ -259,6 +271,8 @@ export async function executeRouterTool(
       return stopThread(deps, ctx, params);
     case 'answer_question':
       return answerQuestion(deps, ctx, params);
+    case 'escalate_question':
+      return escalate(deps, ctx, params);
     case 'threads':
       return threads(deps.db, ctx, params);
     case 'needs_you':

@@ -73,7 +73,7 @@ function expectRejected(promise: Promise<unknown>, status: number, message: RegE
 }
 
 describe('router tool vocabulary', () => {
-  test('the router tools are a separate six from the base vocabulary', () => {
+  test('the router tools are a separate seven from the base vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS).toHaveLength(47);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) {
@@ -82,7 +82,13 @@ describe('router tool vocabulary', () => {
     for (const read of ['threads', 'needs_you']) {
       expect(CHIEF_ROUTER_TOOLS.find((t) => t.name === read)?.replaySafe).toBe(true);
     }
-    for (const write of ['open_thread', 'message_thread', 'stop_thread', 'answer_question']) {
+    for (const write of [
+      'open_thread',
+      'message_thread',
+      'stop_thread',
+      'answer_question',
+      'escalate_question',
+    ]) {
       expect(CHIEF_ROUTER_TOOLS.find((t) => t.name === write)?.replaySafe).toBeUndefined();
     }
   });
@@ -97,7 +103,7 @@ describe('router tool vocabulary', () => {
       ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
       ...CHIEF_ROUTER_TOOL_NAMES,
     ]);
-    expect(Object.keys(chiefToolDefHashes())).toHaveLength(53);
+    expect(Object.keys(chiefToolDefHashes())).toHaveLength(54);
   });
 });
 

@@ -3,6 +3,7 @@ import {
   type AskUserQuestionContent,
   type MachineAskBody,
   type MachineAskResponse,
+  QUESTION_DEADLINE_MS,
   redactSecrets,
   type TaskDecision,
   THREAD_REPORT_LINE_MAX,
@@ -12,10 +13,7 @@ import { build, message, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import { postThreadReport } from './chief.js';
 import { ASK_PARK_MS } from './chief-questions.js';
-import { notifyTodoPhase } from './notifications.js';
-import { pushWorkerQuestion } from './thread-push.js';
 import { getTodo, type TodoDeps } from './todos.js';
 import {
   answerWorkerQuestionsById,
@@ -38,22 +36,6 @@ function todoOfBuild(deps: TodoDeps, buildId: string): typeof todo.$inferSelect 
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new HttpError(404, `todo ${buildRow.todoId}`);
   return todoRow;
-}
-
-const PUSH_BODY_MAX = 120;
-
-function safeBody(text: string | undefined): string {
-  if (text === undefined || text.trim() === '') return 'needs your decision';
-  const clean = (redactSecrets(text).value as string).replace(/\s+/g, ' ').trim();
-  return clean.length > PUSH_BODY_MAX ? `${clean.slice(0, PUSH_BODY_MAX - 1)}…` : clean;
-}
-
-function questionReportLine(text: string | undefined): string | undefined {
-  const clean = tidyText(redactSecrets(text ?? '').value as string);
-  if (clean === '') return undefined;
-  return clean.length > THREAD_REPORT_LINE_MAX
-    ? `${clean.slice(0, THREAD_REPORT_LINE_MAX - 1)}…`
-    : clean;
 }
 
 function parkedReply(content: AskUserQuestionContent): AskUserQuestionContent {
@@ -92,23 +74,10 @@ function openQuestion(
     status: 'pending',
     questions: body.questions,
     answers: null,
+    deadlineAt: askedAt + QUESTION_DEADLINE_MS,
   };
   if (!writeWorkerQuestion(deps, row.buildId, body.requestId, content, askedAt)) {
     throw new HttpError(409, 'question request id belongs to another message');
-  }
-  const record = getTodo(deps, todoOfBuild(deps, row.buildId).id);
-  if (record !== null) {
-    notifyTodoPhase(deps, record, 'review', safeBody(body.questions[0]?.question));
-    postThreadReport(deps, record, 'needs-you', questionReportLine(body.questions[0]?.question));
-    pushWorkerQuestion(
-      deps,
-      row.buildId,
-      safeBody(
-        body.questions
-          .map((q) => [q.question, ...q.options.map((o) => o.label)].join('\n'))
-          .join('\n'),
-      ),
-    );
   }
   return { content, askedAt };
 }

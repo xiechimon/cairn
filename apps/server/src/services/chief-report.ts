@@ -338,7 +338,7 @@ function ledgerEmpty(ledger: ChiefReportLedger): boolean {
 }
 
 function needsYouFacts(db: Db, teamId: string, threadId: string, now: number) {
-  const query = listNeedsYou({ db }, teamId, now);
+  const query = listNeedsYou({ db }, teamId, 'owner', now);
   const items = [...query.current, ...query.stale];
   const questions = db
     .select({ content: chiefMessage.content })

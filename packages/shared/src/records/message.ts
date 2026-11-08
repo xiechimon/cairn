@@ -305,6 +305,30 @@ export const askUserAnswerSchema = z
   });
 export type AskUserAnswer = z.infer<typeof askUserAnswerSchema>;
 
+export const QUESTION_DEADLINE_MS = 30 * 60_000;
+
+export const OWNER_DECIDES_CLASSES = [
+  'design',
+  'payment',
+  'credential',
+  'intended-behavior',
+] as const;
+export const ESCALATION_CLASSES = [...OWNER_DECIDES_CLASSES, 'other'] as const;
+export const escalationClassSchema = z.enum(ESCALATION_CLASSES);
+export type EscalationClass = z.infer<typeof escalationClassSchema>;
+
+export function ownerDecides(escalationClass: EscalationClass): boolean {
+  return (OWNER_DECIDES_CLASSES as readonly string[]).includes(escalationClass);
+}
+
+export const questionEscalationSchema = z.object({
+  class: escalationClassSchema,
+  defaultAnswer: z.string().nullable(),
+  at: z.number().int(),
+  applyAt: z.number().int().nullable(),
+});
+export type QuestionEscalation = z.infer<typeof questionEscalationSchema>;
+
 export const askUserQuestionContentSchema = z.object({
   kind: z.literal(ASK_USER_QUESTION_KIND),
   requestId: z.string().min(1),
@@ -313,6 +337,9 @@ export const askUserQuestionContentSchema = z.object({
   answers: z.array(askUserAnswerSchema).nullable(),
   cancelReason: z.string().optional(),
   parkedAt: z.number().int().optional(),
+  deadlineAt: z.number().int().optional(),
+  remindedAt: z.number().int().optional(),
+  escalation: questionEscalationSchema.optional(),
   provenance: provenanceSchema.optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;

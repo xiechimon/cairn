@@ -10,7 +10,7 @@ import { todo } from './helpers.js';
 
 describe('the needs-you count and tab title include a pending Coordinator question', () => {
   test('a pending question adds to the thread count', () => {
-    const set = [todo(1, 'confirm'), todo(2, 'failed'), todo(3, 'building')];
+    const set = [todo(1, 'confirm'), todo(2, 'review'), todo(3, 'building')];
     expect(needsYouCount(set)).toBe(2);
     expect(needsYouCount(set, 1)).toBe(3);
     expect(needsYouCount([], 2)).toBe(2);
@@ -29,7 +29,7 @@ describe('the needs-you count and tab title include a pending Coordinator questi
 });
 
 describe('the tray shows at most three items and counts the rest', () => {
-  const many = (n: number) => needsYouThreads(Array.from({ length: n }, (_, i) => todo(i + 1, 'failed')));
+  const many = (n: number) => needsYouThreads(Array.from({ length: n }, (_, i) => todo(i + 1, 'confirm')));
 
   test('pins three and reports the remainder', () => {
     expect(TRAY_PINNED).toBe(3);

@@ -46,6 +46,7 @@ import {
   parseVerifyPromptMeta,
   planVerificationItems,
   projectMergeConfigSchema,
+  QUESTION_DEADLINE_MS,
   REVIEW_ANNOUNCEMENT,
   REVIEW_VERDICT_KIND,
   type RouteOverride,
@@ -3004,6 +3005,7 @@ function askAboutZeroChange(deps: BuildDeps, stepRow: typeof step.$inferSelect):
         },
       ],
       answers: null,
+      deadlineAt: nowMs() + QUESTION_DEADLINE_MS,
     },
     nowMs(),
   );

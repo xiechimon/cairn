@@ -10,6 +10,7 @@ import { PhaseTransitionError } from './phase.js';
 import { projectMergeConfigOf } from './projects.js';
 import { retryIsParked } from './retry-parking.js';
 import { getTodo } from './todos.js';
+import { pendingWorkerQuestions } from './worker-question-store.js';
 
 export const CITATION_CHECK_SOURCE_KIND = 'research-citation-check';
 export const CITATION_PARKED_MARK = 'Citation check parked';
@@ -81,9 +82,19 @@ export function failureAwaitsAutomaticRetry(
   return owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(db, [buildRow.id]));
 }
 
+export type NeedsYouAudience = 'owner' | 'coordinator';
+
+function escalatedQuestion(db: Db, buildId: string | null): boolean {
+  return (
+    buildId !== null &&
+    pendingWorkerQuestions(db, buildId).some((question) => question.escalation !== undefined)
+  );
+}
+
 export function listNeedsYou(
   deps: Pick<BuildDeps, 'db'>,
   teamId: string,
+  audience: NeedsYouAudience,
   now = nowMs(),
 ): NeedsYouQuery {
   const rows = deps.db
@@ -93,7 +104,7 @@ export function listNeedsYou(
       and(
         eq(todo.teamId, teamId),
         isNull(todo.archivedAt),
-        inArray(todo.phase, ['confirm', 'review', 'failed']),
+        inArray(todo.phase, ['needs_input', 'confirm', 'review', 'failed']),
       ),
     )
     .all();
@@ -120,13 +131,16 @@ export function listNeedsYou(
   const entries: { todoId: string; reason: NeedsYouReason; phaseAt: number }[] = [];
   for (const row of rows) {
     let reason: NeedsYouReason | null = null;
-    if (row.phase === 'confirm') reason = 'confirm';
+    if (audience === 'owner' && escalatedQuestion(deps.db, row.latestBuildId)) reason = 'question';
+    else if (row.phase === 'confirm') reason = 'confirm';
     else if (row.phase === 'review') {
       const projectRow = projectById.get(row.projectId);
       const policy =
         projectRow === undefined ? 'autonomous' : projectMergeConfigOf(projectRow).mergePolicy;
-      if (policy === 'human') reason = 'review';
-    } else if (row.phase === 'failed') {
+      if (policy === 'human' && (audience === 'coordinator' || row.output !== 'info')) {
+        reason = 'review';
+      }
+    } else if (row.phase === 'failed' && audience === 'coordinator') {
       const latest = row.latestBuildId === null ? undefined : buildById.get(row.latestBuildId);
       if (!owedAutomaticRetry(latest, scheduledBuildIds)) reason = 'failed';
     }

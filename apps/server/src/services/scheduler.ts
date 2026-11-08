@@ -55,6 +55,7 @@ import { PhaseTransitionError } from './phase.js';
 import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
+import { sweepQuestionDeadlines } from './question-deadlines.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { releaseResearchBeforePlanHolds } from './research-before-plan.js';
 import { planResearchIntake } from './research-intake.js';
@@ -516,6 +517,9 @@ export function createScheduler(
     sweepQuotaWaitSteps(deps, now);
     sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
+    void sweepQuestionDeadlines(deps, now).catch((error: unknown) => {
+      console.warn('question deadline sweep failed', error);
+    });
     const digestTimes = opts.pushDigestTimes ?? [];
     if (digestTimes.length > 0 && !digestSweeping) {
       const due = digestSlotsDue(now, digestTimes, lastDigestRun);

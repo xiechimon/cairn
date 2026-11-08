@@ -1,21 +1,29 @@
 import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
-import { threadStatus } from './thread-copy.js';
 
 export const ACT_ORDER = ['needs-you', 'failed', 'review'] as const;
 
 export function actRank(todo: TodoRecord): number {
   if (todo.phase === 'needs_input' || todo.phase === 'confirm') return 0;
-  if (todo.phase === 'failed') return 1;
-  return 2;
+  return 1;
+}
+
+function waitsOnOwner(todo: TodoRecord): boolean {
+  switch (todo.phase) {
+    case 'confirm':
+      return true;
+    case 'review':
+      return todo.output !== 'info';
+    case 'needs_input':
+      return todo.waitingOn?.on === 'owner';
+    default:
+      return false;
+  }
 }
 
 export function needsYouThreads(todos: readonly TodoRecord[]): TodoRecord[] {
   return todos
-    .filter((todo) => {
-      const status = threadStatus(todo);
-      return (status === 'needs-you' || status === 'failed') && todo.archivedAt == null;
-    })
+    .filter((todo) => todo.archivedAt == null && waitsOnOwner(todo))
     .sort((a, b) => actRank(a) - actRank(b) || b.phaseAt - a.phaseAt);
 }
 

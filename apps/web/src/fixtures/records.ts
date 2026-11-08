@@ -67,7 +67,8 @@ export interface TodoRecord {
   sourceTodo: string | null;
   v: number;
   chiefCreated?: boolean;
-  waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };
+  waitingOn?: { on: 'machine' | 'quota' | 'coordinator' | 'owner'; retryAt: number | null };
+  output?: 'code' | 'info';
   quotaWait?: QuotaWait | null;
   sourceKind?: string | null;
   sourceRef?: string | null;

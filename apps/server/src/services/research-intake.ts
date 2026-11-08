@@ -4,11 +4,13 @@ import {
   RESEARCH_STUCK_SOURCE_KIND,
   researchIntakeQuestion,
 } from '@cairn/shared';
-import { and, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
-import { chief, project, todo } from '../db/schema.js';
+import { and, desc, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm';
+import { build, chief, project, todo } from '../db/schema.js';
 import type { BuildDeps } from './builds.js';
 import { localDay, retryPendingIntakeReports } from './chief-report.js';
+import { type TransitionActor, transitionTodos } from './chief-tools.js';
 import { recentIntakeItems } from './intake-items.js';
+import { CITATION_CHECK_SOURCE_KIND } from './needs-you.js';
 import { planResearchCitationChecks } from './research-citations.js';
 import { releaseResearchReworkHolds } from './research-stuck.js';
 import { openResearchThread } from './research-thread.js';
@@ -63,6 +65,7 @@ export function planResearchIntake(deps: BuildDeps, projectId: string | null, no
     .limit(RESEARCH_INTAKE_THREAD_TITLES_MAX)
     .all()
     .map((row) => row.title);
+  const current = `research-intake:${day}`;
   openResearchThread(deps, {
     teamId,
     projectId,
@@ -72,6 +75,65 @@ export function planResearchIntake(deps: BuildDeps, projectId: string | null, no
       previousItems: recentIntakeItems(db, teamId, now),
     }),
     tier: 2,
-    source: { kind: RESEARCH_INTAKE_SOURCE_KIND, ref: `research-intake:${day}` },
+    source: { kind: RESEARCH_INTAKE_SOURCE_KIND, ref: current },
   });
+  closeSupersededIntakes(deps, teamId, projectId, current);
+}
+
+const UNDELIVERED_PHASES = [
+  'todo',
+  'queued',
+  'planning',
+  'building',
+  'needs_input',
+  'failed',
+] as const;
+const SUPERSEDED_ACTOR: TransitionActor = {
+  kind: 'agent',
+  name: 'Daily intake',
+  stopActor: 'system',
+};
+
+function closeSupersededIntakes(
+  deps: BuildDeps,
+  teamId: string,
+  projectId: string,
+  current: string,
+): void {
+  const stale = deps.db
+    .select({ id: todo.id })
+    .from(todo)
+    .where(
+      and(
+        eq(todo.projectId, projectId),
+        eq(todo.sourceKind, RESEARCH_INTAKE_SOURCE_KIND),
+        ne(todo.sourceRef, current),
+        inArray(todo.phase, [...UNDELIVERED_PHASES]),
+        isNull(todo.archivedAt),
+      ),
+    )
+    .all()
+    .map((row) => row.id);
+  if (stale.length === 0) return;
+  const staleBuilds = deps.db
+    .select({ id: build.id })
+    .from(build)
+    .where(inArray(build.todoId, stale))
+    .all()
+    .map((row) => row.id);
+  const checks = deps.db
+    .select({ id: todo.id, sourceRef: todo.sourceRef })
+    .from(todo)
+    .where(
+      and(
+        eq(todo.teamId, teamId),
+        eq(todo.sourceKind, CITATION_CHECK_SOURCE_KIND),
+        notInArray(todo.phase, ['done', 'closed']),
+        isNull(todo.archivedAt),
+      ),
+    )
+    .all()
+    .filter((row) => staleBuilds.some((buildId) => row.sourceRef?.startsWith(`${buildId}:`)))
+    .map((row) => row.id);
+  transitionTodos(deps, teamId, [...stale, ...checks], 'closed', SUPERSEDED_ACTOR);
 }

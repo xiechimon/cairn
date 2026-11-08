@@ -108,7 +108,7 @@ export const todoRecordSchema = z.object({
   output: todoOutputSchema.default('code'),
   waitingOn: z
     .object({
-      on: z.enum(['machine', 'quota']),
+      on: z.enum(['machine', 'quota', 'coordinator', 'owner']),
       retryAt: epochMs.nullable(),
     })
     .optional(),

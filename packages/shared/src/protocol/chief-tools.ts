@@ -708,6 +708,7 @@ export const CHIEF_ROUTER_TOOL_NAMES = [
   'message_thread',
   'stop_thread',
   'answer_question',
+  'escalate_question',
   'threads',
   'needs_you',
 ] as const;
@@ -756,6 +757,20 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
         answer: str('The answer, at most 20000 characters.'),
       },
       ['todoId', 'requestId', 'answer'],
+    ),
+  },
+  {
+    name: 'escalate_question',
+    description:
+      'Raise one pending question of a thread to the user when the repo rules and earlier decisions do not settle it. class is design, payment, credential or intended-behavior for questions only the user decides (their default is never applied without the user), or other. defaultAnswer is the answer you would give; for class other it is applied by itself after the deadline unless the user answers first.',
+    parameters: obj(
+      {
+        todoId: str('Todo id of the thread.'),
+        requestId: str('The requestId of the pending question.'),
+        class: str('design | payment | credential | intended-behavior | other'),
+        defaultAnswer: str('The answer you recommend; shown to the user.'),
+      },
+      ['todoId', 'requestId', 'class', 'defaultAnswer'],
     ),
   },
   {

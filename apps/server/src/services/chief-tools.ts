@@ -925,7 +925,12 @@ export function transitionTodos(
   const reasons: Record<string, string> = {};
   for (const id of todoIds) {
     const owned = deps.db
-      .select({ id: todo.id, phase: todo.phase, latestBuildId: todo.latestBuildId })
+      .select({
+        id: todo.id,
+        phase: todo.phase,
+        latestBuildId: todo.latestBuildId,
+        output: todo.output,
+      })
       .from(todo)
       .where(and(eq(todo.id, id), eq(todo.teamId, teamId)))
       .get();
@@ -936,7 +941,7 @@ export function transitionTodos(
     if (
       to === 'done' &&
       actor.kind === 'agent' &&
-      (owned.phase === 'review' || owned.phase === 'confirm')
+      ((owned.phase === 'review' && owned.output !== 'info') || owned.phase === 'confirm')
     ) {
       skipped.push(id);
       reasons[id] =

@@ -6,6 +6,7 @@ import type {
   TodoOutputKind,
   TodoRecord,
   TodoSourceKind,
+  TodoWaitingOn,
   UserRecord,
 } from '@cairn/shared';
 import {
@@ -58,7 +59,7 @@ import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 import { buildVerified } from './verified.js';
-import { cancelPendingWorkerQuestions } from './worker-question-store.js';
+import { cancelPendingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -192,10 +193,13 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
   };
 }
 
-function waitingOnOf(
-  deps: Pick<TodoDeps, 'db'>,
-  row: TodoRow,
-): { on: 'machine' | 'quota'; retryAt: number | null } | undefined {
+function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | undefined {
+  if (row.phase === 'needs_input' && row.latestBuildId !== null) {
+    const escalated = pendingWorkerQuestions(deps.db, row.latestBuildId).some(
+      (question) => question.escalation !== undefined,
+    );
+    return { on: escalated ? 'owner' : 'coordinator', retryAt: null };
+  }
   if (!(IN_PROGRESS_PHASES as readonly string[]).includes(row.phase) || row.latestBuildId === null)
     return undefined;
   const pendingSteps = deps.db

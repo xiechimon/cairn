@@ -120,7 +120,7 @@ function buildCount(w: World): number {
 }
 
 function groups(w: World, now = nowMs()) {
-  const listed = listNeedsYou(w.deps, w.s.team.id, now);
+  const listed = listNeedsYou(w.deps, w.s.team.id, 'coordinator', now);
   return {
     current: listed.current.filter((entry) => entry.todo.id === w.todoId),
     stale: listed.stale.filter((entry) => entry.todo.id === w.todoId),

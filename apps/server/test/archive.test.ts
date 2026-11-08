@@ -444,7 +444,7 @@ test('another step polling clears stale stop rows without consuming another live
   expect(s.db.select().from(stopPending).get()).toMatchObject({ stepId: 'live-step' });
 });
 
-test.each(['confirm', 'review', 'failed'] as const)(
+test.each(['confirm', 'review'] as const)(
   'archived %s tasks are excluded from attention and team progress',
   async (phase) => {
     const { s } = world(phase, 'done');

@@ -10,6 +10,7 @@ import {
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
+import { escalateQuestion } from '../src/services/question-deadlines.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { pendingWorkerQuestionIds } from '../src/services/worker-question-store.js';
@@ -54,6 +55,15 @@ function seedTodo(id = 'session-todo') {
   return id;
 }
 
+function escalate(todoId: string) {
+  escalateQuestion(deps(), H.teamId, {
+    todoId,
+    requestId: REQUEST,
+    class: 'design',
+    defaultAnswer: 'JSON',
+  });
+}
+
 function asking(todoId: string): boolean {
   const buildId = getTodo(deps(), todoId)?.latestBuildId;
   return buildId != null && pendingWorkerQuestionIds(H.s.db, buildId).length > 0;
@@ -84,7 +94,7 @@ describe('worker ask_user on a session step', () => {
     return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
   }
 
-  test('the question is stored pending and a needs-you report is written', async () => {
+  test('the question is stored pending and reaches the owner only when the Coordinator escalates it', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
@@ -96,8 +106,7 @@ describe('worker ask_user on a session step', () => {
     );
     expect(settled.status).toBe('pending');
     expect(asking(todoId)).toBe(true);
-    const rows = H.s.db.select().from(message).where(eq(message.id, REQUEST)).all();
-    expect(rows).toHaveLength(1);
+    expect(H.s.db.select().from(message).where(eq(message.id, REQUEST)).all()).toHaveLength(1);
     await askWorkerQuestion(
       deps(),
       claimed,
@@ -105,6 +114,8 @@ describe('worker ask_user on a session step', () => {
       { holdMs: 0 },
     );
     expect(H.s.db.select().from(message).where(eq(message.id, REQUEST)).all()).toHaveLength(1);
+    expect(questionReports()).toHaveLength(0);
+    escalate(todoId);
     expect(questionReports()).toHaveLength(1);
   });
 
@@ -119,6 +130,7 @@ describe('worker ask_user on a session step', () => {
       { requestId: REQUEST, questions: [{ ...QUESTIONS[0]!, question: long }] },
       { holdMs: 0 },
     );
+    escalate(todoId);
     const [report] = questionReports();
     expect(report!.phase).toBe('needs-you');
     expect(report!.todoId).toBe(todoId);
@@ -139,12 +151,13 @@ describe('worker ask_user on a session step', () => {
       },
       { holdMs: 0 },
     );
+    escalate(todoId);
     const [line] = questionReports().map((r) => r.line);
     expect(line).not.toMatch(/[\p{Cc}\p{Cf}]/u);
-    expect(line).toBe('Which export format?');
+    expect(line).toBe('Which export format? Default: JSON');
   });
 
-  test('a short question is the report line verbatim', async () => {
+  test('a short question is the report line verbatim, with the proposed default', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     await askWorkerQuestion(
@@ -153,7 +166,8 @@ describe('worker ask_user on a session step', () => {
       { requestId: REQUEST, questions: QUESTIONS },
       { holdMs: 0 },
     );
-    expect(questionReports().map((r) => r.line)).toEqual(['Which export format?']);
+    escalate(todoId);
+    expect(questionReports().map((r) => r.line)).toEqual(['Which export format? Default: JSON']);
   });
 
   test('the answer delivered through the thread message settles the held ask', async () => {
@@ -512,6 +526,8 @@ describe('worker question hardening', () => {
       },
       { holdMs: 0 },
     );
+    expect(bodies).toHaveLength(0);
+    escalate(todoId);
     spy.mockRestore();
     expect(bodies).toHaveLength(1);
     expect(bodies[0]!.length).toBeLessThanOrEqual(120);

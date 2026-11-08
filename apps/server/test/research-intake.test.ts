@@ -397,6 +397,39 @@ describe('daily intake tick', () => {
     ).toEqual(['research-intake:2026-10-27', 'research-intake:2026-10-28']);
   });
 
+  test('a newer intake closes an older one that never delivered, with its citation check (task stall S11)', async () => {
+    const w = await world();
+    runIntake(w, D1_0630);
+    const older = intakeTodos(w)[0]!;
+    const check = `check-${older.id}`;
+    w.s.db
+      .insert(todo)
+      .values({
+        id: check,
+        teamId: w.s.team.id,
+        projectId: w.projectId,
+        title: 'Check research citations',
+        spec: 'check',
+        phase: 'failed',
+        phaseAt: 1,
+        seqNum: 900,
+        sourceKind: 'research-citation-check',
+        sourceRef: `${older.latestBuildId}:attachment:digest`,
+      })
+      .run();
+    runIntake(w, D2_0630);
+    const phases = Object.fromEntries(
+      w.s.db
+        .select()
+        .from(todo)
+        .all()
+        .map((row) => [row.sourceRef, row.phase]),
+    );
+    expect(phases['research-intake:2026-10-27']).toBe('closed');
+    expect(phases['research-intake:2026-10-28']).not.toBe('closed');
+    expect(phases[`${older.latestBuildId}:attachment:digest`]).toBe('closed');
+  });
+
   test('no session routing rule: a clear error, nothing created, and the scheduler survives', async () => {
     const w = await world();
     w.s.db.delete(routingRule).where(eq(routingRule.use, 'session')).run();

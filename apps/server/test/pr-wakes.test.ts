@@ -233,7 +233,12 @@ function fixture() {
     mock.checks.set(pull.head, [
       { id, name: 'unit', status: 'completed', conclusion: 'failure', summary },
     ]);
-  const steps = () => s.db.select().from(stepTable).all();
+  const steps = () =>
+    s.db
+      .select()
+      .from(stepTable)
+      .all()
+      .filter((row) => row.kind !== 'chief');
   const settle = () => s.db.update(stepTable).set({ status: 'done' }).run();
   const comment = (id: number, author = 'reviewer', body = `fix ${id}`) => {
     mock.comments.push({ id, user: { login: author }, body });
@@ -601,7 +606,9 @@ describe('D109 S3 persistence and poller handoff', () => {
       await watchFor(f.s, f.mock).sweep();
       f.settle();
     }
-    expect(listNeedsYou(f.s.svc, f.s.team.id).current.map((i) => i.todo.id)).toContain(f.t.todoId);
+    expect(
+      listNeedsYou(f.s.svc, f.s.team.id, 'coordinator').current.map((i) => i.todo.id),
+    ).toContain(f.t.todoId);
     await sweepFailedRetries(f.s.svc);
     expect(f.steps()).toHaveLength(3);
   });
@@ -923,7 +930,9 @@ test.each(['done', 'building', 'review', 'failed'] as const)(
     f.s.db.update(buildTable).set({ errorMessage: null }).run();
     f.mock.failing.add(`octo/demo#${f.t.prNumber}`);
     await watchFor(f.s, f.mock).sweep();
-    const item = listNeedsYou(f.s.svc, f.s.team.id).current.find((i) => i.todo.id === f.t.todoId);
+    const item = listNeedsYou(f.s.svc, f.s.team.id, 'coordinator').current.find(
+      (i) => i.todo.id === f.t.todoId,
+    );
     expect(item).toMatchObject({ reason: 'failed' });
     expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('Total wake cap (10)');
     await sweepFailedRetries(f.s.svc);
@@ -992,6 +1001,8 @@ test('a per-kind cap observed during a session survives disabling Auto-fix and s
   f.s.db.update(threadPrTable).set({ autoFix: false }).run();
   f.settle();
   await watchFor(f.s, f.mock).sweep();
-  expect(listNeedsYou(f.s.svc, f.s.team.id).current.map((i) => i.todo.id)).toContain(f.t.todoId);
+  expect(listNeedsYou(f.s.svc, f.s.team.id, 'coordinator').current.map((i) => i.todo.id)).toContain(
+    f.t.todoId,
+  );
   expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('CI fix cap (3 per head)');
 });

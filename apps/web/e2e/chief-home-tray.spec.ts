@@ -17,10 +17,10 @@ const todoIn = (n: number, phase: string, title: string) => ({
 
 const FIVE = [
   todoIn(1, 'confirm', 'Plan the routing split'),
-  todoIn(2, 'failed', 'Fix the orb permission'),
+  todoIn(2, 'review', 'Fix the orb permission'),
   todoIn(3, 'review', 'Fold finished turns'),
   todoIn(4, 'confirm', 'Rename the sidebar groups'),
-  todoIn(5, 'failed', 'Rerun the relay probe'),
+  todoIn(5, 'review', 'Rerun the relay probe'),
 ];
 
 const QUESTION = {
