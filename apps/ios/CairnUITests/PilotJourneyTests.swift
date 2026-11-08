@@ -39,11 +39,12 @@ final class PilotJourneyTests: XCTestCase {
         tokenField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20))
         tokenField.typeText(token)
         app.buttons["sign-in-button"].tap()
-        let notNow = app.buttons["Not Now"]
-        if notNow.waitForExistence(timeout: 3) { notNow.tap() }
 
         let rows = app.descendants(matching: .any).matching(identifier: "inbox-row")
         XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15))
+        let savePassword = app.buttons["Not Now"]
+        if savePassword.waitForExistence(timeout: 5) { savePassword.tap() }
+        XCTAssertTrue(savePassword.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Needs you"].exists)
         XCTAssertEqual(rows.count, 4, "one Coordinator question plus plan-ready, failed and review tasks")
         XCTAssertTrue(rows.element(boundBy: 0).label.contains("Release"))

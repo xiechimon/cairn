@@ -85,11 +85,8 @@ final class AppModel {
         }
     }
 
-    func answer(_ question: PendingQuestion, choices: [String]) async throws {
+    func answer(_ question: PendingQuestion, answers: [QuestionAnswer]) async throws {
         guard let coordinator else { return }
-        let answers = zip(question.ask.questions, choices).map { item, choice in
-            QuestionAnswer(header: item.header, choices: [choice], text: nil)
-        }
         try await client.answer(teamId: team.id, threadId: coordinator.id, requestId: question.ask.requestId, answers: answers)
         try await refresh()
     }

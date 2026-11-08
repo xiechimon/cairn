@@ -48,15 +48,18 @@ final class Session {
 
     private(set) var client: CairnClient?
     private(set) var model: AppModel?
+    private(set) var restoreError: String?
     var serverText: String
+    private let urlSession: URLSession
 
-    init() {
+    init(urlSession: URLSession = .shared) {
+        self.urlSession = urlSession
         if ProcessInfo.processInfo.arguments.contains("-cairn-reset") {
             Self.forget(server: UserDefaults.standard.string(forKey: Self.serverKey))
         }
         serverText = UserDefaults.standard.string(forKey: Self.serverKey) ?? "http://localhost:8787"
         if let url = URL(string: serverText), let token = KeychainToken.read(account: serverText) {
-            client = CairnClient(credentials: Credentials(serverURL: url, token: token))
+            client = CairnClient(credentials: Credentials(serverURL: url, token: token), session: urlSession)
         }
     }
 
@@ -72,7 +75,10 @@ final class Session {
         guard let url = URL(string: trimmed), url.scheme == "http" || url.scheme == "https", url.host() != nil else {
             throw CairnError.badServerURL
         }
-        let candidate = CairnClient(credentials: Credentials(serverURL: url, token: token.trimmingCharacters(in: .whitespacesAndNewlines)))
+        let candidate = CairnClient(
+            credentials: Credentials(serverURL: url, token: token.trimmingCharacters(in: .whitespacesAndNewlines)),
+            session: urlSession
+        )
         guard let team = try await candidate.teams().first else {
             throw CairnError.server(status: 404, message: "This token has no team.")
         }
@@ -83,15 +89,18 @@ final class Session {
         model = AppModel(client: candidate, team: team)
     }
 
-    func restore() async throws {
+    func restore() async {
         guard model == nil, let client else { return }
         do {
             guard let team = try await client.teams().first else {
                 throw CairnError.server(status: 404, message: "This token has no team.")
             }
+            restoreError = nil
             model = AppModel(client: client, team: team)
         } catch CairnError.unauthorized {
             signOut()
+        } catch {
+            restoreError = error.localizedDescription
         }
     }
 
@@ -99,5 +108,6 @@ final class Session {
         KeychainToken.delete(account: serverText)
         client = nil
         model = nil
+        restoreError = nil
     }
 }

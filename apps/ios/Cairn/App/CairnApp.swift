@@ -20,13 +20,52 @@ struct RootView: View {
         if let model = session.model {
             MainTabs(model: model)
         } else if session.isSignedIn {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.canvas.ignoresSafeArea())
-                .task { try? await session.restore() }
+            RestoreView()
         } else {
             SignInView()
         }
+    }
+}
+
+private struct RestoreView: View {
+    @Environment(Session.self) private var session
+    @State private var attempt = 0
+
+    var body: some View {
+        VStack(spacing: 16) {
+            if let error = session.restoreError {
+                CairnMark()
+                    .fill(Color.ink)
+                    .frame(width: 40, height: 40)
+                    .accessibilityHidden(true)
+                Text(error)
+                    .font(.callout)
+                    .foregroundStyle(Color.ink)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("restore-error")
+                Text(session.serverText)
+                    .font(.footnote)
+                    .foregroundStyle(Color.inkMuted)
+                Button {
+                    attempt += 1
+                } label: {
+                    Text("Try again")
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .foregroundStyle(Color.onAccent)
+                }
+                .buttonStyle(.glassProminent)
+                .accessibilityIdentifier("restore-retry")
+                Button("Sign out", role: .destructive) { session.signOut() }
+                    .accessibilityIdentifier("restore-sign-out")
+            } else {
+                ProgressView()
+            }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.canvas.ignoresSafeArea())
+        .task(id: attempt) { await session.restore() }
     }
 }
 

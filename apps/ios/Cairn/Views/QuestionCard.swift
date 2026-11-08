@@ -2,7 +2,7 @@ import SwiftUI
 
 struct QuestionCard: View {
     let question: PendingQuestion
-    let onAnswer: (PendingQuestion, [String]) async throws -> Void
+    let onAnswer: (PendingQuestion, [QuestionAnswer]) async throws -> Void
     @State private var picks: [Int: String] = [:]
     @State private var busy = false
     @State private var error: String?
@@ -28,7 +28,13 @@ struct QuestionCard: View {
                         .font(.body)
                         .foregroundStyle(Color.ink)
                         .fixedSize(horizontal: false, vertical: true)
-                    if question.ask.isPending {
+                    if question.ask.isPending && item.options.isEmpty {
+                        TextField("Your answer", text: binding(for: index), axis: .vertical)
+                            .lineLimit(1...6)
+                            .padding(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.hairline))
+                            .accessibilityIdentifier("answer-text-\(index + 1)")
+                    } else if question.ask.isPending {
                         ForEach(Array(item.options.enumerated()), id: \.offset) { number, option in
                             OptionRow(
                                 number: number + 1,
@@ -56,7 +62,7 @@ struct QuestionCard: View {
                         .foregroundStyle(Color.onAccent)
                 }
                 .buttonStyle(.glassProminent)
-                .disabled(busy || picks.count < question.ask.questions.count)
+                .disabled(busy || question.ask.reply(picks) == nil)
                 .accessibilityIdentifier("answer-button")
             }
         }
@@ -67,10 +73,15 @@ struct QuestionCard: View {
         .accessibilityIdentifier("question-card")
     }
 
+    private func binding(for index: Int) -> Binding<String> {
+        Binding(get: { picks[index] ?? "" }, set: { picks[index] = $0 })
+    }
+
     private func submit() async {
+        guard let answers = question.ask.reply(picks) else { return }
         busy = true
         do {
-            try await onAnswer(question, question.ask.questions.indices.map { picks[$0] ?? "" })
+            try await onAnswer(question, answers)
             error = nil
         } catch {
             self.error = error.localizedDescription

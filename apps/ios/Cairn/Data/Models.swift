@@ -103,6 +103,18 @@ struct AskQuestion: Decodable, Hashable, Sendable {
     let answers: [QuestionAnswer]?
 
     var isPending: Bool { status == "pending" }
+
+    func reply(_ replies: [Int: String]) -> [QuestionAnswer]? {
+        var answers: [QuestionAnswer] = []
+        for (index, item) in questions.enumerated() {
+            let reply = (replies[index] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !reply.isEmpty else { return nil }
+            answers.append(item.options.isEmpty
+                ? QuestionAnswer(header: item.header, choices: nil, text: reply)
+                : QuestionAnswer(header: item.header, choices: [reply], text: nil))
+        }
+        return answers
+    }
 }
 
 struct MessagePart: Decodable, Hashable, Sendable {
@@ -183,6 +195,11 @@ struct ActiveRun: Decodable, Hashable, Sendable {
 struct MessagePage: Decodable, Sendable {
     let messages: [ThreadMessage]
     let activeRun: ActiveRun?
+    let nextCursor: String?
+}
+
+struct TaskMessageResult: Decodable, Sendable {
+    let conversationId: String
 }
 
 struct SendResult: Decodable, Sendable {

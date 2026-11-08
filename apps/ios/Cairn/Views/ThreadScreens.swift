@@ -3,6 +3,7 @@ import SwiftUI
 struct TaskThreadView: View {
     let model: AppModel
     let task: TaskRecord
+    @State private var conversationId: String?
     @State private var messages: [ThreadMessage] = []
     @State private var loaded = false
     @State private var error: String?
@@ -44,11 +45,14 @@ struct TaskThreadView: View {
         .navigationTitle("#\(task.seqNum)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .task { await reload() }
+        .task {
+            conversationId = task.latestBuildId
+            await reload()
+        }
     }
 
     private func reload() async {
-        guard let build = task.latestBuildId else {
+        guard let build = conversationId else {
             loaded = true
             return
         }
@@ -62,7 +66,7 @@ struct TaskThreadView: View {
     }
 
     private func send(_ content: String) async throws {
-        try await model.client.messageTask(taskId: task.id, content: content)
+        conversationId = try await model.client.messageTask(taskId: task.id, content: content).conversationId
         try await model.refresh()
         await reload()
     }
@@ -75,8 +79,8 @@ struct QuestionScreen: View {
 
     var body: some View {
         ScrollView {
-            QuestionCard(question: question) { question, choices in
-                try await model.answer(question, choices: choices)
+            QuestionCard(question: question) { question, answers in
+                try await model.answer(question, answers: answers)
                 dismiss()
             }
             .padding(20)

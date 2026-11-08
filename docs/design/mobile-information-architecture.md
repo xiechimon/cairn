@@ -36,6 +36,8 @@ Account: a toolbar button on Tab 1 opens a sheet (server, sign out).
 
 Brand mark (large spiral), title `Sign in to cairn`, server and token fields, `Sign in` primary button, the hint `Run cairn token on the server machine to print the token.` Errors show one line under the fields: rejected token, unreachable server, invalid address.
 
+On a later launch with a saved token the app restores the session behind a centered progress view. If the server is unreachable, times out or answers 5xx, it shows the brand mark, the error sentence, the server address, `Try again` (primary) and `Sign out`; a rejected token returns to Sign in.
+
 ### Tab 1: Needs you
 
 Order, top to bottom:
@@ -67,11 +69,11 @@ States:
 
 ### Task thread (pushed)
 
-Header: task title (inline title), status word and reason line under it. Body: the spec as the first block, then the conversation. Bottom: the composer `Message this thread`. Empty conversation shows `No messages yet` under the spec. Actions that need server routes not wired on mobile yet (approve plan, retry, merge) do not appear as buttons; the reason line says what is needed.
+Header: task title (inline title), status word and reason line under it. Body: the spec as the first block, then the conversation. Bottom: the composer `Message this thread`. Empty conversation shows `No messages yet` under the spec. A message that starts a replacement build switches the screen to the conversation the server returns. Actions that need server routes not wired on mobile yet (approve plan, retry, merge) do not appear as buttons; the reason line says what is needed.
 
 ### Question (pushed)
 
-The question card: header, question, numbered options with the recommended option marked `Recommended`, and the `Answer` primary button enabled once an option is picked. After answering, the screen shows the chosen option and returns to the inbox.
+The question card: header, question, numbered options with the recommended option marked `Recommended`, or a `Your answer` text field when the question has no options, and the `Answer` primary button enabled once every question has a pick or non-blank text. After answering, the screen shows the chosen option and returns to the inbox.
 
 ### Tab 2: Coordinator
 

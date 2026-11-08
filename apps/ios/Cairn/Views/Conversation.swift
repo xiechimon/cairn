@@ -8,7 +8,7 @@ struct ConversationView<Header: View>: View {
     let error: String?
     let placeholder: String
     let onSend: (String) async throws -> Void
-    let onAnswer: (PendingQuestion, [String]) async throws -> Void
+    let onAnswer: (PendingQuestion, [QuestionAnswer]) async throws -> Void
     @ViewBuilder var header: Header
 
     @State private var draft = ""
@@ -110,7 +110,7 @@ struct ConversationView<Header: View>: View {
 
 private struct MessageView: View {
     let message: ThreadMessage
-    let onAnswer: (PendingQuestion, [String]) async throws -> Void
+    let onAnswer: (PendingQuestion, [QuestionAnswer]) async throws -> Void
 
     var body: some View {
         switch message.content {

@@ -46,8 +46,8 @@ struct CairnClient: Sendable {
         try await get("/api/projects", query: [URLQueryItem(name: "teamId", value: teamId)])
     }
 
-    func messageTask(taskId: String, content: String) async throws {
-        let _: Accepted = try await post("/api/todos/\(taskId)/messages", body: SendBody(content: content))
+    func messageTask(taskId: String, content: String) async throws -> TaskMessageResult {
+        try await post("/api/todos/\(taskId)/messages", body: SendBody(content: content))
     }
 
     func answer(teamId: String, threadId: String, requestId: String, answers: [QuestionAnswer]) async throws {
@@ -58,7 +58,19 @@ struct CairnClient: Sendable {
     }
 
     func messages(threadId: String) async throws -> MessagePage {
-        try await get("/api/conversations/\(threadId)/messages")
+        let path = "/api/conversations/\(threadId)/messages"
+        let latest: MessagePage = try await get(path, query: [URLQueryItem(name: "limit", value: "200")])
+        var messages = latest.messages
+        var cursor = latest.nextCursor
+        while let before = cursor {
+            let older: MessagePage = try await get(path, query: [
+                URLQueryItem(name: "limit", value: "200"),
+                URLQueryItem(name: "before", value: before),
+            ])
+            messages = older.messages + messages
+            cursor = older.nextCursor
+        }
+        return MessagePage(messages: messages, activeRun: latest.activeRun, nextCursor: nil)
     }
 
     func send(threadId: String, content: String) async throws -> SendResult {

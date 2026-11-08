@@ -96,8 +96,8 @@ struct CoordinatorView: View {
         running = true
     }
 
-    private func answer(_ question: PendingQuestion, choices: [String]) async throws {
-        try await model.answer(question, choices: choices)
+    private func answer(_ question: PendingQuestion, answers: [QuestionAnswer]) async throws {
+        try await model.answer(question, answers: answers)
         await reload()
     }
 }
