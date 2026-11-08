@@ -1,9 +1,11 @@
 import { chmod, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { todoRecordSchema } from '@cairn/shared';
+import { acquireGithubCreateSlot } from '@cairn/shared/github-create-gate';
 import type { Hono } from 'hono';
-import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { setGithubCreateGate } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -17,6 +19,10 @@ beforeAll(async () => {
   await mkdir(gateDirectory);
   await chmod(gateDirectory, 0o500);
   vi.stubEnv('CAIRN_HOME', readonlyHome);
+});
+
+beforeEach(() => {
+  setGithubCreateGate(acquireGithubCreateSlot);
 });
 
 afterAll(async () => {
