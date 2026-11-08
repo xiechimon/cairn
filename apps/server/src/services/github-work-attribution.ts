@@ -6,6 +6,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubApiBaseUrl } from '../lib/github-api-base.js';
 import { type AutonomousToken, githubAppBotLogin, githubTokenFetch } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
+import { readTeamAttributionSettings } from './team-attribution-settings.js';
 
 export function humanWorkIdentity(
   db: Db,
@@ -60,6 +61,7 @@ export async function reconcileWorkAttribution(
   const buildRow = deps.db.select().from(build).where(eq(build.id, target.buildId)).get();
   const identity = row ? humanWorkIdentity(deps.db, row, buildRow?.triggerSource) : null;
   if (identity === null) return;
+  const settings = readTeamAttributionSettings(deps.db, target.teamId);
   const fetch = githubTokenFetch(inner, token, target);
   const base = `${githubApiBaseUrl()}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${target.prNumber}`;
   const request = async (path: string, body?: object): Promise<unknown> => {
@@ -80,6 +82,7 @@ export async function reconcileWorkAttribution(
   const bot = githubAppBotLogin(token);
   const ledgerId = `pr-review-request:${target.teamId}:${target.owner}/${target.repo}#${target.prNumber}:${identity.login.toLowerCase()}`;
   if (
+    settings.requestInstructorReview &&
     bot !== null &&
     !deps.db.select({ id: message.id }).from(message).where(eq(message.id, ledgerId)).get()
   ) {
@@ -118,6 +121,7 @@ export async function reconcileWorkAttribution(
         .run();
     }
   }
+  if (!settings.coAuthorTrailer) return;
   const noticeId = `pr-coauthor:${target.teamId}:${target.owner}/${target.repo}#${target.prNumber}:${head}`;
   if (deps.db.select({ id: message.id }).from(message).where(eq(message.id, noticeId)).get())
     return;

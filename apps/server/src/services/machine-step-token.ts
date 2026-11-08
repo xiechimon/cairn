@@ -19,6 +19,7 @@ import {
   profileForStep,
 } from './machine-deps.js';
 import { coordinatorProfile } from './routing-rules.js';
+import { readTeamAttributionSettings } from './team-attribution-settings.js';
 
 export async function stepToken(
   deps: MachineDeps,
@@ -62,7 +63,9 @@ export async function stepToken(
   }
   return {
     coAuthor:
-      todoRow && stepRow?.scheduleId == null
+      todoRow &&
+      stepRow?.scheduleId == null &&
+      readTeamAttributionSettings(deps.db, todoRow.teamId).coAuthorTrailer
         ? humanWorkIdentity(deps.db, todoRow, buildRow?.triggerSource)
         : null,
     provider: toProviderConfig(

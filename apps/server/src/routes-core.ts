@@ -114,6 +114,20 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (body.claudeUsage !== undefined) {
       ctx.db.update(team).set({ claudeUsage: body.claudeUsage }).where(eq(team.id, id)).run();
     }
+    if (body.coAuthorTrailer !== undefined) {
+      ctx.db
+        .update(team)
+        .set({ coAuthorTrailer: body.coAuthorTrailer })
+        .where(eq(team.id, id))
+        .run();
+    }
+    if (body.requestInstructorReview !== undefined) {
+      ctx.db
+        .update(team)
+        .set({ requestInstructorReview: body.requestInstructorReview })
+        .where(eq(team.id, id))
+        .run();
+    }
     if (body.autonomyPaused !== undefined) {
       ctx.db.update(team).set({ autonomyPaused: body.autonomyPaused }).where(eq(team.id, id)).run();
     }

@@ -441,6 +441,12 @@ export const EN: Record<string, string> = {
   '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':
     'Push immediately when a decision is needed; everything else lands in the twice-daily digest — even on the lock screen',
   '首个 PR': 'First PR',
+  人工共同作者署名: 'Human co-author trailers',
+  '团队设置，默认开启。在人工发起的任务提交中添加共同作者署名。':
+    'Team setting, on by default. Credit the human who instructed the work in commit trailers.',
+  邀请任务发起人审阅: 'Request instructor review',
+  '团队设置，默认关闭。在 PR 上邀请人工发起人审阅。':
+    'Team setting, off by default. Request PR review from the human who instructed the work.',
   '首个 PR 社区提示': 'First-PR community prompt',
   '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。':
     'Team setting, off by default. Show a sharing link after the first PR succeeds; you decide whether to post on GitHub.',
