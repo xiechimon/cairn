@@ -36,6 +36,17 @@
   --text-code--line-height: calc(20 / 13);
   --text-caption: var(--type-caption);
   --text-caption--line-height: calc(18 / 12);
+  --text-code-block: calc(0.875rem * var(--type-scale));
+  --text-code-block--line-height: 1.625;
+  --text-code-inline: 0.9em;
+  --text-code-inline--line-height: 1;
+  --text-code-lang: var(--type-caption);
+  --text-code-lang--line-height: calc(17 / 12);
+  --spacing-list-indent: 2em;
+  --spacing-list-item: 0.5em;
+  --spacing-list-step: 0.25em;
+  --spacing-prose-flow: 0.75em;
+  --spacing-list-break: 1.5em;
 }
 
 @layer base {

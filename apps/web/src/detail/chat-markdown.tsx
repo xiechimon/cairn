@@ -508,8 +508,8 @@ function renderParts(blocks: ChatBlock[]): RenderPart[] {
   return parts;
 }
 
-export const MD_LIST = 'm-0 ps-[2em]';
-export const MD_LIST_ITEM = 'mt-[0.25em] ps-[0.5em] first:mt-0 marker:text-(--foreground)';
+export const MD_LIST = 'm-0 ps-list-indent';
+export const MD_LIST_ITEM = 'mt-list-step ps-list-item first:mt-0 marker:text-(--foreground)';
 
 const BULLET_STYLES = ['list-disc', 'list-[circle]', 'list-[square]'] as const;
 const ORDINAL_STYLES = ['list-decimal', 'list-[lower-alpha]', 'list-[lower-roman]'] as const;
@@ -550,7 +550,7 @@ function MarkdownList({
               key={j}
               list={child}
               sameKindRun={child.ordered === list.ordered ? sameKindRun + 1 : 0}
-              className="mt-[0.25em]"
+              className="mt-list-step"
             />
           ))}
         </li>
@@ -560,8 +560,8 @@ function MarkdownList({
 }
 
 function listGap(part: Extract<RenderPart, { kind: 'list' }>): string {
-  if (part.followsList) return 'mt-[1.5em]';
-  return part.index === 0 ? 'mt-0' : 'mt-[0.75em]';
+  if (part.followsList) return 'mt-list-break';
+  return part.index === 0 ? 'mt-0' : 'mt-prose-flow';
 }
 
 const COPIED_MS = 1500;
@@ -581,7 +581,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
     >
       {lang !== undefined && (
         <div
-          className="chat-md-code-lang px-3.5 pt-3.5 font-sans text-caption leading-[17px] text-(--text-secondary)"
+          className="chat-md-code-lang px-3.5 pt-3.5 font-sans text-code-lang text-(--text-secondary)"
           data-testid="md-code-lang"
         >
           {lang}
@@ -603,7 +603,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
       </div>
       <div className="overflow-x-auto overscroll-x-contain">
         <pre
-          className="chat-md-code m-0 p-3.5 font-prose-mono text-[0.875rem] leading-[1.625] whitespace-pre text-(--foreground)"
+          className="chat-md-code m-0 p-3.5 font-prose-mono text-code-block whitespace-pre text-(--foreground)"
           data-lang={lang ?? ''}
           data-testid="md-code"
         >
