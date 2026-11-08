@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS settings: reading col 768, cards at --radius-card 14px no shadow, input 8px/32px', async ({ page }) => {
+test('CDS settings: reading col 768, cards at --radius-card 12px no shadow, input 8px/32px', async ({ page }) => {
   await page.goto('/app/account?scenario=01');
   await page.waitForSelector('[data-testid="page-col"], .settings-card, .account-card');
 
@@ -29,7 +29,7 @@ test('CDS settings: reading col 768, cards at --radius-card 14px no shadow, inpu
     expect(m.colWidth).toBeGreaterThanOrEqual(640);
     expect(m.colWidth).toBeLessThanOrEqual(800);
   }
-  if (m.cardRadius != null) expect(m.cardRadius).toBe('14px');
+  if (m.cardRadius != null) expect(m.cardRadius).toBe('12px');
   if (m.cardShadow != null) {
     // no soft drop shadow — hairline ring alone is OK
     expect(m.cardShadow.includes('8px') || m.cardShadow.includes('16px') || m.cardShadow.includes('24px')).toBeFalsy();
@@ -56,6 +56,6 @@ test('resources empty: Paper EmptyState heading tier, title weight, balanced', a
       balance: cs.textWrap || (cs as CSSStyleDeclaration & { textWrap: string }).textWrap,
     };
   });
-  expect(m.size).toBe('17px');
-  expect(m.weight).toBe('650');
+  expect(m.size).toBe('15px');
+  expect(m.weight).toBe('500');
 });

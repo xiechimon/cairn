@@ -49,7 +49,7 @@ Not captured: toasts and a failed send (no reliable trigger without breaking the
 |---|---|---|---|
 | Families | UI `anthropic-sans`; reading (reply prose, greeting, page titles) `anthropic-serif`; code `anthropic-mono`; CJK falls back to PingFang SC, Microsoft YaHei or Noto Sans CJK SC inside the same stacks (`--font-cjk-serif-fallback`) | Instrument Sans, Source Serif 4, JetBrains Mono; reply prose is sans | Keep the open fonts in the same roles: Instrument Sans UI, Source Serif 4 for reply prose, greeting and page titles, JetBrains Mono for code. Reply prose moves to serif. |
 | Weights in use | 400 (90 text nodes), 435 (97, controls), 600 (12, bold and reply headings), 520 (10, section labels and dialog titles), 500 (3), 360 (greeting) | 450, 500, 600, 650, 700 | Four weights: 400 body, 450 controls, 500 titles and labels, 600 bold. No 650 or 700. |
-| Size and line-height pairs in use (1440 dark, shell, chat and settings) | 14/21 (78), 14/20 (47), 15/21 (35), 12/20, 12/18, 13/19, 13/17, 15/20, 32/38.4 | 14/20, 14/24, 12/16, 13/18, 15/22.5, 20/26, 17/24, 16/22, 26/32 | UI 14/20; rows 14/21; reading and user text 15/21; meta 13/18; caption and section label 12/20; one display size per page. |
+| Size and line-height pairs in use (1440 dark, shell, chat and settings) | 14/21 (78), 14/20 (47), 15/21 (35), 12/20, 12/18, 13/19, 13/17, 15/20, 32/38.4 | 14/20, 14/24, 12/16, 13/18, 15/22.5, 20/26, 17/24, 16/22, 26/32 | UI 14/20; rows 14/21; reading and user text 15/21; meta 13/18; caption 12/18; sidebar section label 12/20; one display size per page. |
 | Page title | serif 24/32, 500 (`Projects`) | 20/26 sans | serif 24/32, 500 |
 | Greeting | serif 32/38.4, weight 360 | Source Serif 26/32, 600, letter-spacing -0.26px | serif 32/38, 400 (lightest open weight), letter-spacing 0 |
 | Section title (settings, dialog) | sans 15/20, 520 | 17/24 | 15/20, 500 |
@@ -113,8 +113,8 @@ Not captured: toasts and a failed send (no reliable trigger without breaking the
 | Item | claude.ai (measured) | cairn now | Rule |
 |---|---|---|---|
 | Palette count, 1440 dark (shell, chat, settings) | 5 text colors, 14 backgrounds; all neutral except the blue switch and focus ring and the clay send button | 6 text colors, 16 backgrounds, green-tinted neutrals plus ochre | neutrals plus ochre and the green dot |
-| Text levels, dark | white 93% primary, 57% secondary, 40% muted | `#e6e8e2`, `#b4bab3`, `#a3aaa4` | white 93 / 57 / 40% |
-| Text levels, light | black 90 / 60 / 47% | `#1d231f`, `#4b534d`, `#5f665f` | black 90 / 60 / 47% |
+| Text levels, dark | white 93% primary, 57% secondary, 40% muted | `#e6e8e2`, `#b4bab3`, `#a3aaa4` | white 93 / 57%; muted text clamps to `#999999`, the lowest value with 4.5:1 on the raised layer (rule A3); 40% only for placeholders and decorative icons |
+| Text levels, light | black 90 / 60 / 47% | `#1d231f`, `#4b534d`, `#5f665f` | black 90 / 60%; muted text clamps to `#6b6b6b` (4.5:1 on `#f2f2f2`); 47% only for placeholders and decorative icons |
 | Hover and selection | hover white 7.5% (dark) or black 5% (light); selected row white 15% or black 10%; segmented track 5% | `rgba(230,232,226,.05)` hover, `.09` active | the claude.ai alphas |
 | Accent | clay `#d97757` on the send button and brand mark only; blue for the switch-on state and focus | ochre for needs-you, green dot for running | ochre stays the one accent (V5); switch-on uses it; no blue |
 | Status | not visible in the mapped pages except a project icon color | ochre, green, rust | keep V5 |
