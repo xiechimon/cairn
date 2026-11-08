@@ -37,7 +37,7 @@ export interface PublishInput {
   tip: string;
   exclude: string[];
   coAuthor: GitIdentity | null;
-  expectedAuthor: GitIdentity | null;
+  expectedAuthor: GitIdentity;
   stagingRef: string;
   remote?: string;
 }
@@ -221,7 +221,7 @@ export async function publishVerifiedCommits(input: PublishInput): Promise<Publi
   const pending = commits.filter((commit) => {
     const made =
       sameIdentity(commit.committer, GITHUB_WEB_COMMITTER) &&
-      (input.expectedAuthor === null || sameIdentity(commit.author, input.expectedAuthor));
+      sameIdentity(commit.author, input.expectedAuthor);
     return !made;
   });
   if (pending.length === 0) return { tip: input.tip, release: async () => {} };
@@ -251,7 +251,7 @@ export async function publishVerifiedCommits(input: PublishInput): Promise<Publi
           parents,
         }),
       );
-      if (input.expectedAuthor !== null && !sameIdentity(created.author, input.expectedAuthor))
+      if (!sameIdentity(created.author, input.expectedAuthor))
         throw new Error(
           `GitHub API commit for ${commit.sha} was authored as ${created.author.name}, expected ${input.expectedAuthor.name}`,
         );

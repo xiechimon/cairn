@@ -157,7 +157,7 @@ export async function publishStepCommits(
     remoteEnv,
   );
   const head = await git(['rev-parse', 'HEAD']);
-  if (input.github === null || input.credential === null) {
+  if (input.github === null || input.credential === null || input.identity === null) {
     await rewriteLocally(git, input.branch, head, input.identity, input.coAuthor);
     return { verified: false, release: nothingToRelease };
   }

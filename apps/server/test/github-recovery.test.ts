@@ -35,6 +35,8 @@ test('recovery publishes one exact revert commit on a named branch and preserves
       name: 'cairnwright[bot]',
       email: '347615582+cairnwright[bot]@users.noreply.github.com',
     };
+    const interrupted = git('commit-tree', `${base}^{tree}`, '-p', base, '-m', 'interrupted');
+    git('update-ref', `refs/cairn/publish/recovery-${bad.slice(0, 12)}`, interrupted);
     const calls: string[] = [];
     const branch = await prepareRecoveryBranch({
       url: dir,
@@ -80,7 +82,9 @@ test('recovery publishes one exact revert commit on a named branch and preserves
       `${bot.name} <${bot.email}>|GitHub <noreply@github.com>`,
     );
     expect(calls.filter((c) => c.startsWith('POST'))).toEqual(['POST /git/commits']);
-    expect(git('for-each-ref', 'refs/cairn')).toBe('');
+    expect(git('for-each-ref', '--format=%(refname)', 'refs/cairn')).toBe(
+      `refs/cairn/publish/recovery-${bad.slice(0, 12)}`,
+    );
     expect(git('show', `${branch}:file`)).toBe('good');
     expect(git('show', `${branch}:later`)).toBe('keep');
     expect(git('rev-list', '--count', `${base}..${branch}`)).toBe('1');
