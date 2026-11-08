@@ -444,7 +444,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
   const stepConversations = new Map<string, string>();
-  const claimAnswerIds = new Map<string, readonly string[]>();
+  const unackedClaimAnswers = new Map<string, readonly string[]>();
   const appliedAnswers = new Map<string, Set<string>>();
   const appliedAnswersOf = (stepId: string): Set<string> => {
     const key = stepConversations.get(stepId) ?? stepId;
@@ -457,23 +457,23 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const trackClaim = (claimed: ClaimedStep): void => {
     stepConversations.set(claimed.step.id, claimed.conversationId);
     if (claimed.answerIds !== undefined && claimed.answerIds.length > 0) {
-      claimAnswerIds.set(claimed.step.id, claimed.answerIds);
+      const applied = appliedAnswersOf(claimed.step.id);
+      for (const id of claimed.answerIds) applied.add(id);
+      unackedClaimAnswers.set(claimed.step.id, claimed.answerIds);
     }
   };
   const forgetClaim = (stepId: string): void => {
     const conversationId = stepConversations.get(stepId);
     stepConversations.delete(stepId);
-    claimAnswerIds.delete(stepId);
+    unackedClaimAnswers.delete(stepId);
     if (conversationId !== undefined && ![...stepConversations.values()].includes(conversationId)) {
       appliedAnswers.delete(conversationId);
     }
   };
   const sessionLive = async (stepId: string): Promise<void> => {
-    const carried = claimAnswerIds.get(stepId);
-    claimAnswerIds.delete(stepId);
+    const carried = unackedClaimAnswers.get(stepId);
+    unackedClaimAnswers.delete(stepId);
     if (carried !== undefined) {
-      const applied = appliedAnswersOf(stepId);
-      for (const id of carried) applied.add(id);
       await client.steerAck?.(stepId, carried).catch((err: unknown) => {
         logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
       });

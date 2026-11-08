@@ -882,6 +882,60 @@ test.each(['transcript', 'sessionContent'] as const)(
   },
 );
 
+test('a steer arriving during orb startup does not re-send answers the instruction already carried', async () => {
+  const api = new FakeMachineApi();
+  api.claimQueue.push({
+    ...CLAIMED,
+    instruction: 'Answer to your question ask-a:\nRepo rule wins.',
+    answerIds: ['ask-a'],
+  });
+  const steers: string[] = [];
+  let connected = false;
+  const goLive = defer();
+  const finish = defer();
+  const provider = new FakeOrbProvider({
+    runner: async (argv, options) => {
+      if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.socketPath;
+      if (!socketPath) throw new Error('Missing relay socket');
+      let relay: RelayMachineApi | undefined;
+      relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath), (frame) => {
+        if (frame.type === 'steer') {
+          steers.push(frame.text);
+          relay?.send({ type: 'steered', id: frame.id });
+        }
+      });
+      await relay.api.heartbeat('s1');
+      connected = true;
+      await goLive.promise;
+      relay.send({ type: 'session', live: true });
+      await finish.promise;
+      relay.close();
+      return { code: 137, stdout: '', stderr: 'stopped after the probe' };
+    },
+  });
+  const { handle } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+  });
+  try {
+    await waitFor(() => connected);
+    api.steerResponse = 'Also keep the tone friendly.';
+    api.steerAnswers = [{ requestId: 'ask-a', text: 'Repo rule wins.' }];
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.calls.includes('steer:s1'));
+    goLive.resolve();
+    await waitFor(() => steers.length === 1);
+    expect(steers).toEqual(['Also keep the tone friendly.']);
+  } finally {
+    goLive.resolve();
+    finish.resolve();
+    await handle.stop();
+    await handle.done;
+  }
+});
+
 test('an orb worker going live acks the answers its claimed prompt carried, through the host path', async () => {
   const api = new FakeMachineApi();
   api.claimQueue.push({
