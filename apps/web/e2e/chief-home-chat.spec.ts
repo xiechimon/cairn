@@ -102,6 +102,15 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     const handoff = stream.getByTestId('chief-handoff');
     await expect(handoff).toContainText('已转给任务');
     await expect(handoff).toContainText('#9');
+    const handoffLine = await handoff.evaluate((el) => ({
+      align: getComputedStyle(el).textAlign,
+      rule: getComputedStyle(el, '::before').content,
+      chips: el.querySelectorAll('.mention-chip').length,
+      leftGap:
+        el.firstElementChild!.getBoundingClientRect().left - el.getBoundingClientRect().left,
+    }));
+    expect(handoffLine).toEqual({ align: 'left', rule: 'none', chips: 0, leftGap: 0 });
+    await expect(handoff.getByRole('link', { name: '#9' })).toHaveAttribute('data-phase', 'building');
     const expand = stream.getByTestId('chief-tools-toggle').first();
     await expand.click();
     await expect(stream.getByTestId('chief-turn-tools').first()).toBeVisible();
