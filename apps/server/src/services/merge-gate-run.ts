@@ -29,8 +29,9 @@ import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
 import { isCorrectionTask, recordCorrectionGuard } from './correction.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
+import { autonomousToken } from './github-autonomous-token.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
-import { teamGithubToken } from './github-connection.js';
+import { userTokenOrNull } from './github-connection.js';
 import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
 import {
   DEFAULT_HARNESS_EVAL_ATTEMPT_TIMEOUT_MS,
@@ -113,9 +114,11 @@ export async function evaluateMergeGate(
   if (repo === null || projectRow === undefined) return null;
   let port = opts.port ?? null;
   if (port === null) {
-    const access = await teamGithubToken(deps, todoRow.teamId);
-    if (!('token' in access)) return null;
-    port = githubGatePort(deps.githubFetch ?? fetch, access.token, repo.owner, repo.repo, 10_000);
+    const token = await autonomousToken(deps, todoRow.teamId, repo);
+    if (token === null) return null;
+    port = githubGatePort(deps.githubFetch ?? fetch, token, repo.owner, repo.repo, 10_000, () =>
+      userTokenOrNull(deps, todoRow.teamId),
+    );
   }
   const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
@@ -124,12 +127,12 @@ export async function evaluateMergeGate(
     cache = newGateReadCache();
     readCaches.set(todoRow.teamId, cache);
   }
-  const markerAccess = await teamGithubToken(deps, todoRow.teamId);
+  const markerToken = await autonomousToken(deps, todoRow.teamId, repo);
   const githubPaused =
-    'token' in markerAccess
+    markerToken !== null
       ? await readGithubAutonomyPause(
           deps.githubFetch ?? fetch,
-          markerAccess.token,
+          markerToken,
           `${repo.owner}/${repo.repo}`,
           cache,
           opts.now ?? nowMs(),
@@ -520,15 +523,15 @@ export async function evaluateMergeGate(
           );
         });
       if (!filed) {
-        const access = await teamGithubToken(deps, todoRow.teamId);
-        if ('token' in access) {
+        const token = await autonomousToken(deps, todoRow.teamId, repo);
+        if (token !== null) {
           const key = ticketDedupeKey({
             category: `merge-gate-mismatch:${buildId}:${head ?? 'none'}`,
             paths: [],
           });
           const created = await githubCreateIssue(
             deps.githubFetch ?? fetch,
-            access.token,
+            token,
             repo.owner,
             repo.repo,
             {

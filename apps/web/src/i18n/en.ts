@@ -441,6 +441,12 @@ export const EN: Record<string, string> = {
   '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':
     'Push immediately when a decision is needed; everything else lands in the twice-daily digest — even on the lock screen',
   '首个 PR': 'First PR',
+  人工共同作者署名: 'Human co-author trailers',
+  '团队设置，默认开启。在人工发起的任务提交中添加共同作者署名。':
+    'Team setting, on by default. Credit the human who instructed the work in commit trailers.',
+  邀请任务发起人审阅: 'Request instructor review',
+  '团队设置，默认关闭。在 PR 上邀请人工发起人审阅。':
+    'Team setting, off by default. Request PR review from the human who instructed the work.',
   '首个 PR 社区提示': 'First-PR community prompt',
   '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。':
     'Team setting, off by default. Show a sharing link after the first PR succeeds; you decide whether to post on GitHub.',
@@ -801,6 +807,7 @@ export const EN: Record<string, string> = {
   // original like any real user data would) ——
   '准备工作区...': 'Preparing workspace...',
   '处理中...': 'Working on it...',
+  '正在连接 {machine}...': 'Connecting to {machine}...',
   '执行中...': 'Running...',
   // #1108 queue rows (pending steps waiting for a machine) + machines page
   // concurrency face.
@@ -1212,6 +1219,7 @@ export const EN: Record<string, string> = {
   '可以继续说，Coordinator 恢复后会按顺序处理…':
     'Keep typing; the Coordinator handles messages in order once it is back…',
   '发出的话会直接插进 Coordinator 这一轮': 'Steer the current reply',
+  '还没开始处理，新发的话会排在这条后面': 'Not started yet. New messages queue behind it',
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——
@@ -1476,6 +1484,12 @@ export const EN: Record<string, string> = {
   '回复 #{seq}…': 'Reply to #{seq}…',
   '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
   'Coordinator 直接对 #{n} 说：{excerpt}': 'The Coordinator told #{n} directly: {excerpt}',
+  '任务 #{n}': 'Task #{n}',
+  '{n} 次追问': '{n#1 follow-up|# follow-ups}',
+  '你：{excerpt}': 'You: {excerpt}',
+  'Coordinator：{excerpt}': 'Coordinator: {excerpt}',
+  展开活动: 'Show activity',
+  收起活动: 'Hide activity',
   '对某个 thread 说': 'Talk to a thread',
   '正在对 #{seq} 说': 'Talking to #{seq}',
   发给谁: 'Send to',
@@ -1643,17 +1657,13 @@ export const EN: Record<string, string> = {
   '与 main 冲突，解决后才会审核': 'Conflicts with main; review waits for a clean merge',
   交给负责人合并: 'Routed to the owner to merge',
   还没有审核: 'No review yet',
-  'head 已移到': 'Head moved to',
   审核结论已过期: 'verdict is stale',
-  '{failed} 个失败 · {passed}/{total} 通过': '{failed} failed · {passed} of {total} passed',
-  '{running} 个运行中 · {passed}/{total} 通过': '{running} running · {passed} of {total} passed',
-  '{passed}/{total} 通过': '{passed} of {total} passed',
+  'CI 未读取': 'CI not read',
+  '{failed} 个失败': '{failed} failed',
+  '{failed} 个失败：{names}': '{failed} failed: {names}',
   检查: 'Checks',
   '评审 head': 'Judged head',
-  审核视角: 'Lenses',
-  阻塞项: 'Blockers',
   解决: 'Resolve',
-  '查看 diff': 'View diff',
   '在 GitHub 打开': 'Open on GitHub',
   新功能发布: 'Feature releases',
   '发布后对所有成员开启，不能在这里关闭。':
@@ -1744,6 +1754,22 @@ export const EN: Record<string, string> = {
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
   'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
+  等待审核: 'Review pending',
+  草稿: 'Draft',
+  '落后于 main': 'Behind main',
+  'GitHub 暂不允许合并': 'GitHub is blocking the merge',
+  '分支落后，更新后才能合并': 'Branch is behind; update it before merging',
+  '审核已通过，GitHub 还不允许合并': 'Review passed, but GitHub does not allow the merge yet',
+  '{n} 分钟前读取，GitHub 可能被限流或延迟':
+    'Last read {n} min ago; GitHub may be rate-limiting or slow',
+  '检查通过 {passed} / {total}': 'Checks passed: {passed} of {total}',
+  'PR #{n} 的菜单': 'Menu for PR #{n}',
+  已复制链接: 'Link copied',
+  显示更多: 'Show more',
+  'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
+  拉取请求: 'Pull requests',
+  'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
+  '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
   '这台机器在 Coordinator 里的角色': "This machine's role for the Coordinator",
   '这台机器上能接任务的执行器，以及它们的登录状态。':
     'The runtimes that can take tasks on this machine, and their sign-in state.',

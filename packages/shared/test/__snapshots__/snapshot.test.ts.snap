@@ -2446,11 +2446,50 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "claudeSubscriptionToken": {
       "type": "string",
     },
+    "coAuthor": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string",
+            },
+            "login": {
+              "type": "string",
+            },
+            "name": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "email",
+            "login",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "git": {
       "anyOf": [
         {
           "additionalProperties": false,
           "properties": {
+            "expiresAt": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
+            "kind": {
+              "enum": [
+                "app",
+                "unattributed",
+              ],
+              "type": "string",
+            },
             "password": {
               "type": "string",
             },
@@ -9634,6 +9673,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
       ],
       "type": "string",
     },
+    "coAuthorTrailer": {
+      "default": true,
+      "type": "boolean",
+    },
     "createdAt": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
@@ -9708,6 +9751,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     "plan": {
       "type": "string",
     },
+    "requestInstructorReview": {
+      "default": false,
+      "type": "boolean",
+    },
   },
   "required": [
     "id",
@@ -9715,6 +9762,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     "createdAt",
     "plan",
     "avatarStyle",
+    "coAuthorTrailer",
+    "requestInstructorReview",
   ],
   "type": "object",
 }

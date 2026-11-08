@@ -3,7 +3,7 @@ import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { readRequiredChecksAt } from './merge-gate/github-facts.js';
 import { requiredChecksReadiness } from './merge-gate/readiness.js';
-import { githubGatePort } from './merge-gate-github.js';
+import { githubGateReadPort } from './merge-gate-github.js';
 
 export async function assertMergeRequiredChecks(
   fetchImpl: FetchLike,
@@ -12,7 +12,7 @@ export async function assertMergeRequiredChecks(
   branch: string,
   head: string,
 ): Promise<void> {
-  const port = githubGatePort(fetchImpl, token, repo.owner, repo.repo, 10_000);
+  const port = githubGateReadPort(fetchImpl, token, repo.owner, repo.repo, 10_000);
   const checks = await readRequiredChecksAt(port, repo, branch, head);
   const blockers: string[] = [];
   requiredChecksReadiness(head, checks, (code, ...detail) => {

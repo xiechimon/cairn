@@ -1,4 +1,8 @@
-import { CHIEF_INPUT_PLACEHOLDER, CHIEF_INPUT_PLACEHOLDER_STEERING } from '@cairn/shared';
+import {
+  CHIEF_INPUT_PLACEHOLDER,
+  CHIEF_INPUT_PLACEHOLDER_QUEUED,
+  CHIEF_INPUT_PLACEHOLDER_STEERING,
+} from '@cairn/shared';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
   type ReactNode,
@@ -72,6 +76,7 @@ import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
+import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
@@ -192,9 +197,11 @@ export function ChiefConversation({
     targetPlaceholder ??
     (chief.outage != null
       ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-      : chief.running === true
-        ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-        : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+      : chief.waitingTurn !== undefined
+        ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+        : chief.running === true
+          ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+          : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
@@ -500,7 +507,7 @@ export function ChiefConversation({
       )}
     </>
   );
-  const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
+  const streamRow = ({ item, i }: GroupedRow) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
       item={item}
@@ -515,7 +522,9 @@ export function ChiefConversation({
       onRewindRequest={requestRewind}
     />
   );
-  const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
+  const keepsOwnRow = (item: ChiefStreamItem) =>
+    item.kind === 'thread-report' && outstandingReports.has(item.id);
+  const renderRows = (list: StreamRow[]) => groupThreadEvents(list, keepsOwnRow).map(streamRow);
   const intro = (
     <>
       {!chief.bound && showBindGate && (

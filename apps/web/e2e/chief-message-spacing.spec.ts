@@ -46,11 +46,19 @@ test('text gaps match Claude.ai (52px after a user message, 36px after a reply) 
   expect(await tools.evaluate((el) => getComputedStyle(el).position)).toBe('absolute');
 });
 
-test('the latest message keeps its actions in the flow', async ({ page }) => {
+test('actions take no height on any message, the latest included', async ({ page }) => {
   await mockHistory(page);
   await page.goto('/app');
-  const latest = page.getByTestId('home-c').getByTestId('chief-msg').last();
-  const tools = latest.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
-  await expect(tools).toBeVisible();
-  expect(await tools.evaluate((el) => getComputedStyle(el).position)).not.toBe('absolute');
+  const messages = page.getByTestId('home-c').getByTestId('chief-msg');
+  await expect(messages).toHaveCount(TEXTS.length);
+  for (const index of [0, 1, TEXTS.length - 1]) {
+    const message = messages.nth(index);
+    const tools = message.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
+    expect(await tools.evaluate((el) => getComputedStyle(el).position)).toBe('absolute');
+    const body = message.locator('[data-testid="chief-bubble"], [data-slot="bubble-content"]');
+    const messageBox = await message.boundingBox();
+    const bodyBox = await body.boundingBox();
+    if (messageBox === null || bodyBox === null) throw new Error('no box');
+    expect(Math.abs(messageBox.height - bodyBox.height), `message ${index}`).toBeLessThanOrEqual(1);
+  }
 });

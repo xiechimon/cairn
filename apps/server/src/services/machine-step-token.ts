@@ -2,14 +2,16 @@ import type { GitCredentials, MachineTokenResponse, ProviderConfig } from '@cair
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, chiefThread, step, todo } from '../db/schema.js';
+import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
   resolveChiefStepCredentials,
   resolveStepCredentials,
 } from './credentials.js';
-import { projectOfTodo } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { githubRepoOfProject, projectOfTodo } from './git.js';
+import { autonomousToken } from './github-autonomous-token.js';
+import { humanWorkIdentity } from './github-work-attribution.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -17,6 +19,7 @@ import {
   profileForStep,
 } from './machine-deps.js';
 import { coordinatorProfile } from './routing-rules.js';
+import { readTeamAttributionSettings } from './team-attribution-settings.js';
 
 export async function stepToken(
   deps: MachineDeps,
@@ -41,13 +44,30 @@ export async function stepToken(
   if (projectRow?.repoKind === 'hosted' && todoRow) {
     git = issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId });
   } else if (projectRow?.repoKind === 'github' && todoRow) {
-    const githubToken = await githubTokenOrNull(deps, todoRow.teamId);
+    const ref = githubRepoOfProject(projectRow);
+    const githubToken =
+      ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref, true, 50 * 60_000);
+    console.info('github step credential', {
+      stepId,
+      kind: githubToken === null ? 'none' : isAppToken(githubToken) ? 'app' : 'unattributed',
+    });
     git =
       githubToken !== null
-        ? { username: GITHUB_ACCESS_TOKEN_USERNAME, password: githubToken }
+        ? {
+            username: GITHUB_ACCESS_TOKEN_USERNAME,
+            password: githubToken,
+            kind: isAppToken(githubToken) ? 'app' : 'unattributed',
+            ...(isAppToken(githubToken) ? { expiresAt: githubAppTokenExpiry(githubToken) } : {}),
+          }
         : null;
   }
   return {
+    coAuthor:
+      todoRow &&
+      stepRow?.scheduleId == null &&
+      readTeamAttributionSettings(deps.db, todoRow.teamId).coAuthorTrailer
+        ? humanWorkIdentity(deps.db, todoRow, buildRow?.triggerSource)
+        : null,
     provider: toProviderConfig(
       bundle.provider,
       stepRow?.fallback?.model?.provider ?? agentRow?.provider,
@@ -103,5 +123,6 @@ function chiefStepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     git: null,
+    coAuthor: null,
   };
 }

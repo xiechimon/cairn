@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PrLink } from '../components/thread/pr-link.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import {
@@ -17,6 +18,7 @@ interface AcceptDialogProps {
   rejectReason?: string | null;
   substantiveChanges?: boolean | null;
   infoOutput?: boolean;
+  pr?: { number: number; url: string };
 }
 
 export function AcceptDialog({
@@ -28,6 +30,7 @@ export function AcceptDialog({
   rejectReason,
   substantiveChanges,
   infoOutput,
+  pr,
 }: AcceptDialogProps) {
   const { t } = useI18n();
   const [merge, setMerge] = useState(true);
@@ -61,6 +64,11 @@ export function AcceptDialog({
         </>
       }
     >
+      {pr !== undefined && (
+        <p data-testid="accept-dialog-pr" className="mb-3 text-meta text-(--text-tertiary)">
+          <PrLink number={pr.number} url={pr.url} />
+        </p>
+      )}
       {skipMerge ? (
         <p className="text-meta text-(--text-tertiary)">
           {infoOutput === true

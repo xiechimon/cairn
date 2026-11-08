@@ -8,6 +8,12 @@ import { RULESETS_NOT_ON_PLAN } from '../services/merge-gate/github-rules.js';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
 import { githubApiBaseUrl, isGithubApiUrl } from './github-api-base.js';
+import {
+  type AutonomousToken,
+  type GithubWriteToken,
+  githubTokenFetch,
+  type UserToken,
+} from './github-token.js';
 
 export type FetchLike = (
   input: string | URL,
@@ -42,10 +48,13 @@ async function readJsonFull(
 ): Promise<{ data: unknown; getHeader: (name: string) => string | null }> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
-      headers,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    res = await githubTokenFetch(fetchImpl, headers.authorization?.replace(/^Bearer /, '') ?? null)(
+      url,
+      {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      },
+    );
   } catch (err) {
     throw mapFetchThrow(url, err);
   }
@@ -140,7 +149,7 @@ async function conditionalGetJson(
 > {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       headers: {
         ...API_HEADERS,
         ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
@@ -246,7 +255,7 @@ export async function githubCompareStatus(
   if (!isFullSha(base) || !isFullSha(head)) return 'invalid';
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/compare/${base}...${head}?per_page=1`;
   try {
-    const res = await fetchImpl(url, {
+    const res = await githubTokenFetch(fetchImpl, token)(url, {
       headers: {
         ...API_HEADERS,
         ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
@@ -484,15 +493,28 @@ export async function githubUserRepos(
   return repos;
 }
 
-export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
+export async function githubUserIdentity(
+  fetchImpl: FetchLike,
+  token: string,
+): Promise<{ login: string; id: number; name: string | null }> {
   const data = (await readJson(fetchImpl, `${githubApiBaseUrl()}/user`, {
     ...API_HEADERS,
     authorization: `Bearer ${token}`,
-  })) as { login?: unknown };
-  if (typeof data.login !== 'string' || data.login === '') {
-    throw new HttpError(502, 'github user response missing login');
+  })) as { login?: unknown; id?: unknown; name?: unknown };
+  if (
+    typeof data.login !== 'string' ||
+    data.login === '' ||
+    typeof data.id !== 'number' ||
+    !Number.isSafeInteger(data.id) ||
+    data.id <= 0
+  ) {
+    throw new HttpError(502, 'github user response missing identity');
   }
-  return data.login;
+  return { login: data.login, id: data.id, name: typeof data.name === 'string' ? data.name : null };
+}
+
+export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
+  return (await githubUserIdentity(fetchImpl, token)).login;
 }
 
 export interface GithubLabel {
@@ -645,7 +667,7 @@ async function getListPage(
 > {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       headers: authHeaders(token),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -918,7 +940,7 @@ async function intakeGet(
 ): Promise<{ status: number; etag: string | null; link: string | null; data: unknown } | null> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       ...(init?.method !== undefined ? { method: init.method } : {}),
       headers: {
         ...authHeaders(token),
@@ -1327,7 +1349,7 @@ async function writeJson(
 ): Promise<unknown> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       method,
       headers: { ...authHeaders(token), 'content-type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1351,7 +1373,7 @@ async function writeJson(
 
 export async function githubCreateIssue(
   fetchImpl: FetchLike,
-  token: string,
+  token: GithubWriteToken,
   owner: string,
   repo: string,
   input: { title: string; body: string; labels?: string[] },
@@ -1386,7 +1408,7 @@ export async function githubCreateIssue(
 
 export async function githubUpdateIssueTitle(
   fetchImpl: FetchLike,
-  token: string,
+  token: GithubWriteToken,
   owner: string,
   repo: string,
   issueNumber: number,
@@ -1398,7 +1420,7 @@ export async function githubUpdateIssueTitle(
 
 export async function githubCloseIssue(
   fetchImpl: FetchLike,
-  token: string,
+  token: GithubWriteToken,
   owner: string,
   repo: string,
   issueNumber: number,
@@ -1426,7 +1448,7 @@ export type GithubMergeResult =
 
 export async function githubMergePull(
   fetchImpl: FetchLike,
-  token: string,
+  token: UserToken,
   owner: string,
   repo: string,
   prNumber: number,
@@ -1435,7 +1457,7 @@ export async function githubMergePull(
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       method: 'PUT',
       headers: { ...authHeaders(token), 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -1487,6 +1509,7 @@ export interface GithubPullPanel {
   baseSha?: string | null;
   baseRef?: string | null;
   headSha: string | null;
+  headRef: string;
   mergeableState: string | null;
   additions: number;
   deletions: number;
@@ -1519,7 +1542,7 @@ export async function githubPullPanel(
     mergeable_state?: unknown;
     additions?: unknown;
     deletions?: unknown;
-    head?: { sha?: unknown } | null;
+    head?: { sha?: unknown; ref?: unknown } | null;
     base?: { sha?: unknown; ref?: unknown } | null;
   };
   if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
@@ -1537,6 +1560,7 @@ export async function githubPullPanel(
       baseSha: optString(raw.base?.sha),
       baseRef: optString(raw.base?.ref),
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      headRef: typeof raw.head?.ref === 'string' ? raw.head.ref : '',
       mergeableState: optString(raw.mergeable_state),
       additions: typeof raw.additions === 'number' ? raw.additions : 0,
       deletions: typeof raw.deletions === 'number' ? raw.deletions : 0,
@@ -1771,7 +1795,7 @@ async function gateRequest(
 ): Promise<GithubRawResult> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       method: req.method,
       headers: {
         ...authHeaders(token),
@@ -1983,7 +2007,7 @@ export async function githubContentsRaw(
 
 export async function githubCreateCommitStatus(
   fetchImpl: FetchLike,
-  token: string,
+  token: AutonomousToken,
   owner: string,
   repo: string,
   sha: string,
@@ -2118,4 +2142,98 @@ export async function exchangeOAuthCode(
     throw new HttpError(502, 'oauth token exchange returned non-json');
   }
   return projectTokenPayload(payload, 'oauth token exchange');
+}
+
+export async function githubGraphqlRead(
+  fetchImpl: FetchLike,
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<unknown> {
+  if (!/^\s*(?:query\b|\{)/.test(query)) throw new Error('GitHub reads require a query');
+  return graphqlRequest(fetchImpl, token, query, variables);
+}
+
+async function graphqlRequest(
+  fetchImpl: FetchLike,
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<unknown> {
+  const url = `${githubApiBaseUrl()}/graphql`;
+  const got = await intakeGet(fetchImpl, url, token, null, {
+    method: 'POST',
+    body: JSON.stringify({ query, variables }),
+  });
+  if (got === null || got.status < 200 || got.status >= 300)
+    throw new HttpError(502, 'GitHub GraphQL unavailable');
+  const root = got.data as { data?: unknown; errors?: unknown } | null;
+  if (!root || typeof root !== 'object')
+    throw new HttpError(502, 'GitHub GraphQL invalid response');
+  if (
+    Array.isArray(root.errors) &&
+    root.errors.some(
+      (entry) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        (entry as { type?: unknown }).type === 'RATE_LIMITED',
+    )
+  )
+    throw new GithubRateLimitedError(url, got.status, null, null);
+  if (root.errors !== undefined || root.data == null)
+    throw new HttpError(502, 'GitHub GraphQL incomplete response');
+  return root.data;
+}
+
+export function githubGraphql(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<unknown> {
+  return graphqlRequest(fetchImpl, token, query, variables);
+}
+
+export async function githubComment(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  body: string,
+): Promise<void> {
+  await writeJson(
+    fetchImpl,
+    'POST',
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/comments`,
+    token,
+    { body },
+  );
+}
+
+export function githubReplyReviewThread(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  threadId: string,
+  body: string,
+): Promise<unknown> {
+  return githubGraphql(
+    fetchImpl,
+    token,
+    'mutation($threadId:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$threadId,body:$body}){comment{id}}}',
+    { threadId, body },
+  );
+}
+
+export function githubResolveReviewThread(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  threadId: string,
+): Promise<unknown> {
+  return githubGraphql(
+    fetchImpl,
+    token,
+    'mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}',
+    { threadId },
+  );
 }

@@ -149,7 +149,7 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
       title: '编写 CONTRIBUTING.md 贡献指南',
       spec,
     })) as { id: string; createdBy: string | null; sourceBuildId: string | null };
-    expect(created.createdBy).toBe(w.coordinatorRouteId);
+    expect(created.createdBy).toBe(w.s.user.id);
     expect(created.sourceBuildId).toBe(`chief-${w.s.user.id}-${w.teamId}`);
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!;
     expect(todoRow.spec).toContain('补充信息（探测得出，非用户确认）：');

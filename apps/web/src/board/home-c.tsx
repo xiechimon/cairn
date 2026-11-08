@@ -25,6 +25,7 @@ import type {
   TodoRecord,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { GitBranch, History, ListLines, Puzzle } from '../icons/index.js';
 import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
@@ -32,7 +33,7 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { needsYouThreads } from './needs-you.js';
 import { NeedsYouTray } from './needs-you-tray.js';
 import { composeRequest } from './open-composer.js';
-import { THREAD_PARAM, threadStatus } from './thread-copy.js';
+import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -48,7 +49,15 @@ export function greetingFor(hour: number): string {
   return GREETINGS.find(([until]) => hour < until)?.[1] ?? '晚上好';
 }
 
-const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
+const STARTERS = [
+  { label: '做个计划', Icon: ListLines },
+  { label: '接一个仓库', Icon: GitBranch },
+  { label: '接着最近的活', Icon: History },
+  { label: '用我的工具', Icon: Puzzle },
+] as const;
+
+const STARTER_CHIP_CLS =
+  'h-9 min-h-8 gap-1.5 rounded-full border border-(--border) bg-transparent px-3 hover:border-(--input) [&_svg]:text-(--text-tertiary)';
 
 export function streamForProject(
   stream: readonly ChiefStreamItem[],
@@ -124,6 +133,7 @@ export function HomeC({
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
+    params.delete(VIEW_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state: location.state });
@@ -234,12 +244,14 @@ export function HomeC({
       {since}
       {projectLinks}
       {entries.length === 0 && (
-        <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
-          {STARTERS.map((label) => (
+        <div data-testid="home-c-starters" className="mt-4 flex flex-wrap gap-2">
+          {STARTERS.map(({ label, Icon }) => (
             <SuggestionChip
               key={label}
+              className={STARTER_CHIP_CLS}
               onClick={() => setPrefill({ text: t(label), key: Date.now() })}
             >
+              <Icon width={16} height={16} />
               {t(label)}
             </SuggestionChip>
           ))}
@@ -326,6 +338,7 @@ export function HomeC({
         <WorkPanel
           pane={pane}
           todos={scoped}
+          projectId={projectId}
           schedules={
             projectId === null
               ? schedules

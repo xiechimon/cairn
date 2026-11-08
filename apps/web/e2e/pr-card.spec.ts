@@ -19,11 +19,8 @@ for (const theme of THEMES) {
       await expect(card).toHaveAttribute('data-stale', '');
       await expect(card.locator('[data-slot="pr-card-state"]')).toHaveText('Needs re-review');
       await expect(card).not.toContainText('Ready to merge');
-      await expect(card).toContainText('a1b2c3d');
-      await expect(card).toContainText('e4f5a6b');
       await card.getByRole('button', { name: 'Details' }).click();
-      await expect(card.getByText('Judged head')).toBeVisible();
-      await expect(card.getByText('a1b2c3d → e4f5a6b')).toBeVisible();
+      await expect(card.getByText(/4f8e2c1 → 9d03b7a/)).toBeVisible();
     });
 
     test('a queued PR shows its position and the merged PR drops the queue', async ({ page }) => {
@@ -34,22 +31,27 @@ for (const theme of THEMES) {
       const merged = cardOf(page, 'Merged');
       await expect(merged.locator('[data-slot="pr-card-state"]')).toHaveText('Merged');
       await expect(merged).not.toContainText('queue');
-      await expect(merged.getByRole('button', { name: 'Resolve' })).toHaveCount(0);
+      await merged.getByRole('button', { name: /Menu for PR/ }).click();
+      await expect(page.getByRole('menuitem', { name: 'Resolve' })).toHaveCount(0);
     });
 
-    test('Resolve shows only for conflicts, failed checks and a blocking review', async ({
+    test('the Resolve menu item shows only for conflicts, failed checks and a blocking review', async ({
       page,
     }) => {
+      test.slow();
       await openGallery(page, theme);
       const withResolve = ['Conflicts', 'Checks failed', 'Review BLOCK'];
       const grid = page.locator('[data-pr-card-case]');
       const total = await grid.count();
       for (let i = 0; i < total; i += 1) {
         const label = (await grid.nth(i).getAttribute('data-pr-card-case')) ?? '';
-        await expect(
-          cardOf(page, label).getByRole('button', { name: 'Resolve' }),
-          label,
-        ).toHaveCount(withResolve.includes(label) ? 1 : 0);
+        await cardOf(page, label).getByRole('button', { name: /Menu for PR/ }).click();
+        await expect(page.getByRole('menuitem', { name: 'Open on GitHub' })).toBeVisible();
+        await expect(page.getByRole('menuitem', { name: 'Resolve' }), label).toHaveCount(
+          withResolve.includes(label) ? 1 : 0,
+        );
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('menu')).toHaveCount(0);
       }
     });
   });
@@ -63,7 +65,8 @@ test('the card keeps inside a 420px column', async ({ page }) => {
   expect(total).toBeGreaterThanOrEqual(10);
   for (let i = 0; i < total; i += 1) {
     const card = cards.nth(i);
-    await card.getByRole('button', { name: 'Details' }).click();
+    const details = card.getByRole('button', { name: 'Details' });
+    if ((await details.count()) > 0) await details.click();
     const overflow = await card.evaluate((el) => ({
       card: el.scrollWidth - el.clientWidth,
       page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -71,4 +74,14 @@ test('the card keeps inside a 420px column', async ({ page }) => {
     expect(overflow.card).toBeLessThanOrEqual(0);
     expect(overflow.page).toBeLessThanOrEqual(0);
   }
+});
+
+test('failing check names live in the expanded area as one muted line, the dot is the only color', async ({ page }) => {
+  await openGallery(page, 'light');
+  const card = cardOf(page, 'Checks failed');
+  await expect(card.locator('[data-slot="pr-card-failures"]')).toHaveCount(0);
+  await card.getByRole('button', { name: 'Details' }).click();
+  await expect(card.locator('[data-slot="pr-card-failures"]')).toHaveText('2 failed: typecheck, web e2e (3)');
+  await expect(card.locator('[data-slot="pr-checks"]')).toHaveAttribute('data-ci', 'failed');
+  await expect(card.getByRole('button', { name: 'Open on GitHub' })).toHaveCount(0);
 });

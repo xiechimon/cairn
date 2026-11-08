@@ -128,8 +128,9 @@ import {
   readBuildChanges,
   repoDirFor,
 } from './git.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
-import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
+import { teamUserToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
@@ -139,7 +140,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
 import { modelsAreIndependent } from './merge-gate/model-identity.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
-import { githubGatePort } from './merge-gate-github.js';
+import { githubGateReadPort } from './merge-gate-github.js';
 import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
@@ -175,6 +176,7 @@ import { blockingWorkerQuestions, cancelPendingWorkerQuestions } from './worker-
 import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
+  githubAppTokenSocket?: string | null | undefined;
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
   db: Db;
   hub: TeamStreamHub;
@@ -1293,7 +1295,7 @@ async function probePullState(
   const repoRef = githubRepoOfProject(projRow);
   if (repoRef === null) return null;
   const { owner, repo } = repoRef;
-  const token = await githubTokenOrNull(deps, teamId);
+  const token = await githubReadToken(deps, teamId, repoRef);
   return githubPullState(deps.githubFetch ?? fetch, token, owner, repo, prNumber, timeoutMs);
 }
 
@@ -2010,11 +2012,11 @@ function persistGateVerdict(
     if (todoRow === undefined) return;
     const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
     if (repo === null) return;
-    const access = await teamGithubToken(deps, todoRow.teamId);
-    if (!('token' in access)) return;
-    const port = githubGatePort(
+    const token = await githubReadToken(deps, todoRow.teamId, repo);
+    if (token === null) return;
+    const port = githubGateReadPort(
       deps.githubFetch ?? fetch,
-      access.token,
+      token,
       repo.owner,
       repo.repo,
       10_000,
@@ -2153,7 +2155,7 @@ async function mergeThroughGithub(
   const hint = gate.failed
     ? '在 GitHub 上合并后再点一次合并：cairn 把卡恢复到审核关口，由对账核对后收尾'
     : 'cairn 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理，例如完成时不勾合并）';
-  const access = await teamGithubToken(deps, gate.todoRow.teamId);
+  const access = await teamUserToken(deps, gate.todoRow.teamId);
   if ('reason' in access) {
     if (access.reason === 'no-secret-box') {
       throw new HttpError(

@@ -1,7 +1,8 @@
 import { cn } from 'cn';
 import { FileDiff, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { useApiMutations } from '../api/hooks.js';
+import { useSearchParams } from 'react-router';
+import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
@@ -21,7 +22,8 @@ import { joinMeta, relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
-import { threadCopy, threadStatus, threadTone } from './thread-copy.js';
+import { threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
+import { ThreadPrPanel } from './thread-pr-panel.js';
 import { ThreadUsageFooter } from './thread-usage-footer.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
@@ -305,7 +307,10 @@ export function SideChat({
   const { t } = useI18n();
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
-  const [chosenView, setView] = useState<ThreadView>('chat');
+  const [searchParams] = useSearchParams();
+  const [chosenView, setView] = useState<ThreadView>(
+    searchParams.get(VIEW_PARAM) === 'changes' ? 'changes' : 'chat',
+  );
   const view = chat.changes.status === 'none' ? 'chat' : chosenView;
   const showsChanges = view === 'changes';
 
@@ -380,6 +385,9 @@ function ReadyThread({
   const [planOpen, setPlanOpen] = useState(false);
   const openPlan = chat.planDoc !== undefined ? () => setPlanOpen(true) : undefined;
   const actions = useThreadActions({ todo, chat, onGone: onClose, onViewPlan: openPlan });
+  const { live, teamId } = useLiveData();
+  const prs = usePrs(teamId, todo.id, live);
+  const prRows = prs.data ?? [];
   return (
     <>
       <Head
@@ -402,6 +410,12 @@ function ReadyThread({
       >
         <StatusLine todo={todo} machineName={chat.machineName} now={now} />
       </Head>
+      <ThreadPrPanel
+        status={prs.status}
+        rows={prRows}
+        onViewChanges={chat.changes.status !== 'none' ? () => onView('changes') : undefined}
+        onRetry={() => void prs.refetch()}
+      />
       <ThreadBody
         chat={chat}
         todo={todo}

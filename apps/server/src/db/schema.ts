@@ -75,6 +75,8 @@ export const team = sqliteTable('team', {
   claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
   avatarStyle: text('avatarStyle'),
   autonomyPaused: bool('autonomyPaused').notNull().default(false),
+  coAuthorTrailer: bool('coAuthorTrailer').notNull().default(true),
+  requestInstructorReview: bool('requestInstructorReview').notNull().default(false),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
   firstPrReportPromptEnabled: bool('firstPrReportPromptEnabled').notNull().default(false),
   firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
@@ -822,7 +824,11 @@ export const threadPr = sqliteTable(
     checksFailed: integer('checksFailed').notNull().default(0),
     checksRunning: integer('checksRunning').notNull().default(0),
     checksTotal: integer('checksTotal').notNull().default(0),
+    checksFailedNames: text('checksFailedNames').notNull().default('[]'),
     head: text('head').notNull().default(''),
+    checksReadFor: text('checksReadFor').notNull().default(''),
+    headRef: text('headRef').notNull().default(''),
+    baseRef: text('baseRef').notNull().default(''),
     verdictResult: text('verdictResult').$type<'pass' | 'block'>(),
     verdictHead: text('verdictHead'),
     autoFix: bool('autoFix').notNull().default(true),
@@ -831,6 +837,7 @@ export const threadPr = sqliteTable(
     dismissed: bool('dismissed').notNull().default(false),
     blockedSince: epochMs('blockedSince'),
     wakeRounds: integer('wakeRounds').notNull().default(0),
+    lastReadAt: epochMs('lastReadAt').notNull().default(0),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
   },
@@ -1067,6 +1074,8 @@ export const composerDraft = sqliteTable(
 );
 
 export const githubConnection = sqliteTable('github_connection', {
+  githubUserId: integer('githubUserId'),
+  githubName: text('githubName'),
   teamId: text('teamId')
     .primaryKey()
     .references(() => team.id, { onDelete: 'cascade' }),

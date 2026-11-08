@@ -179,6 +179,38 @@ export function AccountPage() {
         {live && team !== undefined && (
           <SettingsCard>
             <SettingsRow
+              label={t('人工共同作者署名')}
+              hint={t('团队设置，默认开启。在人工发起的任务提交中添加共同作者署名。')}
+            >
+              <ToggleSwitch
+                aria-label={t('人工共同作者署名')}
+                checked={team.coAuthorTrailer ?? true}
+                disabled={mutations.patchTeam.isPending}
+                onCheckedChange={(coAuthorTrailer) =>
+                  mutations.patchTeam.mutate(
+                    { coAuthorTrailer },
+                    { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+                  )
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={t('邀请任务发起人审阅')}
+              hint={t('团队设置，默认关闭。在 PR 上邀请人工发起人审阅。')}
+            >
+              <ToggleSwitch
+                aria-label={t('邀请任务发起人审阅')}
+                checked={team.requestInstructorReview ?? false}
+                disabled={mutations.patchTeam.isPending}
+                onCheckedChange={(requestInstructorReview) =>
+                  mutations.patchTeam.mutate(
+                    { requestInstructorReview },
+                    { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+                  )
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
               label={t('首个 PR 社区提示')}
               hint={t(
                 '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。',

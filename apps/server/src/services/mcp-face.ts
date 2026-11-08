@@ -28,7 +28,7 @@ import {
 } from './mcp-threads.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
-import { createTodo, listTodos, updateTodo } from './todos.js';
+import { createAutonomousTodo, listTodos, updateAutonomousTodo } from './todos.js';
 
 export interface McpCallerCtx {
   teamId: string;
@@ -137,6 +137,7 @@ export async function executeMcpTool(
     user: deps.user,
     vapidKeys: deps.vapidKeys,
     box: deps.box,
+    githubAppTokenSocket: deps.githubAppTokenSocket,
     oauthClient: deps.oauthClient,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
@@ -221,7 +222,7 @@ export async function executeMcpTool(
       const projectId = str(args, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
       return json(
-        createTodo(svc, {
+        createAutonomousTodo(svc, {
           teamId: ctx.teamId,
           projectId,
           title: str(args, 'title'),
@@ -234,7 +235,7 @@ export async function executeMcpTool(
     case 'update_todo': {
       const todoId = str(args, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
-      const record = updateTodo(svc, todoId, {
+      const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(args, 'title') !== undefined ? { title: optStr(args, 'title') } : {}),
         ...(optStr(args, 'spec') !== undefined ? { spec: optStr(args, 'spec') } : {}),
         ...(args.tagIds !== undefined ? { tagIds: strArrOf(args, 'tagIds') } : {}),

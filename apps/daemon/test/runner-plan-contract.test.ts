@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -26,6 +24,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const TASK = { id: 't1', seqNum: 3, title: '契约探针', spec: '首轮规划要被告知 plan.md 契约。' };
 const TASK_TEXT = buildTaskPromptText(TASK.title, TASK.spec);
@@ -177,7 +176,7 @@ function handle(sessionId: string): AgentSessionHandle {
 }
 
 async function setup(claimed: ClaimedStep, backend: AgentBackend) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-plan-'));
+  const home = testTempDir('cairn-runner-plan-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger } = captureLogger();

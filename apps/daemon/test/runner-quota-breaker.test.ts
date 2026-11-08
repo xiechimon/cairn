@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -19,6 +17,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const QUOTA_402 = '402: {"message":"当前分组额度已用尽，请充值后重试","type":"quota_error"}';
 const CAPACITY_429 =
@@ -203,7 +202,7 @@ function quotaCycles(n: number, message: string): StepEvent[] {
 }
 
 async function runQuotaCase(script: StepEvent[], providerId = 'gw-quota') {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-quota-'));
+  const home = testTempDir('cairn-runner-quota-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

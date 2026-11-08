@@ -15,7 +15,8 @@ import {
   githubListWorkflowRuns,
 } from '../lib/github.js';
 import { githubRepoOfProject } from './git.js';
-import { teamGithubToken } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
+import { teamUserToken } from './github-connection.js';
 import type { GithubIssueFaceDeps } from './github-issues.js';
 import { lookupGithubOverlaps } from './github-overlap.js';
 
@@ -69,7 +70,9 @@ async function openTarget(
   }
   const { owner, repo } = ref;
   const slug = `${owner}/${repo}`;
-  const access = await teamGithubToken(deps, teamId);
+  const preferred = await githubReadToken(deps, teamId, ref);
+  if (preferred !== null) return { owner, repo, slug, token: preferred };
+  const access = await teamUserToken(deps, teamId);
   if ('reason' in access && access.reason === 'token-unreadable') {
     throw new HttpError(
       409,

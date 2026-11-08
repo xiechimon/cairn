@@ -44,7 +44,7 @@ function boot(token: TokenScript) {
         text: async () => JSON.stringify(token.json ?? null),
       };
     }
-    const payload = url.startsWith(REPOS_URL) ? REPOS_PAYLOAD : { login: 'octocat' };
+    const payload = url.startsWith(REPOS_URL) ? REPOS_PAYLOAD : { login: 'octocat', id: 1 };
     return {
       ok: true,
       status: 200,

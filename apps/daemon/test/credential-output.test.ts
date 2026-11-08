@@ -64,3 +64,21 @@ describe('subscription output redaction', () => {
     });
   });
 });
+
+test('rotated App credentials remain redacted across streaming chunk boundaries', async () => {
+  const values = ['old-app-fixture'];
+  const fresh = 'new-installation-fixture';
+  async function* source(): AsyncGenerator<StepEvent> {
+    yield { type: 'text_delta', text: values[0]! };
+    values.push(fresh);
+    yield { type: 'text_delta', text: fresh.slice(0, 7) };
+    yield { type: 'text_delta', text: fresh.slice(7) };
+    yield { type: 'done', usage: [] };
+  }
+  const output: StepEvent[] = [];
+  for await (const event of credentialSafeEvents(source(), () => values)) output.push(event);
+  const text = output
+    .flatMap((event) => (event.type === 'text_delta' ? [event.text] : []))
+    .join('');
+  expect(text).toBe('[REDACTED][REDACTED]');
+});

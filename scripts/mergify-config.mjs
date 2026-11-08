@@ -40,6 +40,7 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '          - base = main',
     '          - "#depends-on > 0"',
     '      - -draft',
+    "      - '#review-threads-unresolved = 0'",
     '      - -label = coordinator-hold',
     '      - or:',
     `          - -head ~= ${batchHeadRe}`,

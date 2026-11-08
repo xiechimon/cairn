@@ -82,3 +82,25 @@ test('the GitHub refresh snapshot keeps the todo attachment columns from the pre
     expect(snapshot.tables.todo.columns).toHaveProperty(name);
   }
 });
+
+test('GitHub attribution migration adds nullable identity fields without changing stored connections', () => {
+  const sqlite = new Database(':memory:');
+  try {
+    const db = drizzle(sqlite);
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(columnNames(sqlite, 'github_connection')).toEqual(
+      expect.arrayContaining(['githubUserId', 'githubName']),
+    );
+    sqlite.prepare("INSERT INTO team (id,name,createdAt) VALUES ('t','team',1)").run();
+    sqlite
+      .prepare(
+        "INSERT INTO github_connection (teamId,login,accessTokenCipher,scope,createdAt) VALUES ('t','human','encrypted','repo',1)",
+      )
+      .run();
+    expect(
+      sqlite.prepare('SELECT githubUserId,githubName,login FROM github_connection').get(),
+    ).toEqual({ githubUserId: null, githubName: null, login: 'human' });
+  } finally {
+    sqlite.close();
+  }
+});
