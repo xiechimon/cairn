@@ -62,7 +62,7 @@ test('agents admin-merge only a PR ian named in chat', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(
     agents,
-    /When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin`, using the merge method `docs\/ops\/agent-bot-identity.md` gives its opener/,
+    /When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin --squash`, whoever opened it,/,
   );
   assert.match(agents, /Without that per-PR authorization, agents never use `--admin`\./);
   const skill = readFileSync(join(ROOT, '.claude/skills/pr-cairn/SKILL.md'), 'utf8');

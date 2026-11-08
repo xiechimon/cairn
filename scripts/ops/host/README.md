@@ -16,10 +16,10 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 |---|---|---|
 | `tools/backup/db-backup.sh` | `cairn-db-backup.service` | Wraps `scripts/ops/backup-server-db.sh`, syncs attachments, pushes both to the rsync remote |
 | `tools/eval-env.sh` | sourced by `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression`, `cairn-review-eval` | Exports the eval relay URL and key without printing them |
-| `tools/app-token/as-bot.sh` | every bot caller below | Runs one `gh` or `git` command with a 1h App installation token in that process only, after `as-bot-policy.mjs` approves it (see below) |
-| `tools/app-token/as-bot-author.sh` | by hand | Sets the bot as git author and committer; no network, no token |
+| `tools/app-token/as-bot.sh` | every bot caller below, and agent sessions | Runs one `gh` or `git` command with a 1h App installation token in that process only, after `as-bot-policy.mjs` approves it (see below). Git runs as `cairnwright[bot]` for author and committer, through `bot-git.mjs` |
+| `tools/app-token/bot-git.mjs` | `as-bot.sh` | `git push` and `git sign <base>` replay every commit the GitHub API did not make through `POST /git/commits`, so each lands authored by the App, committed by GitHub and Verified, with `CAIRN_COAUTHOR` appended; other git commands pass through. It imports `commit-identity.ts` and `commit-identity.json`, which deploy installs from `packages/shared/` |
 | `tools/app-token/token.mjs` | `as-bot.sh` | Mints the installation token from `~/.cairn/cairn-bot.json`; holds no secret and reads the key from the path in that file |
-| `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Rebase-merges a bot-opened PR with the human login after dependency and commit-author checks |
+| `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Leaves a queue-route PR to Mergify; squash-merges an owner-route PR with the human login, pinned to the head whose `review-gate` check passed |
 | `tools/rearm-automerge.sh` | called by `overnight/driver.sh` | Disarms and re-arms auto-merge on bot PRs whose merge state changed |
 | `tools/overnight/driver.sh` | `cairn-overnight.service` | Per-lane loop: rebase, sign, push, open PRs, fix red CI, merge |
 | `tools/overnight/surface-stuck-rebase.sh` | called by `overnight/driver.sh` | When a lane's rebase worker has failed 3 times on one head, labels the PR `stale-pr` and comments the files `git merge-tree` reports as conflicting with main (the issue when there is no PR), once per head, instead of the driver skipping the lane silently |
@@ -45,7 +45,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/weekly/{eval-weekly,learn-eval,memory-regression}.sh`, `baseline-record.mts` | `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression` | Weekly evals; `eval-weekly.sh` here is the older host copy of `scripts/ops/eval-weekly.sh` |
 | `lanes/dispatch-issue.sh` | called by the governor, `main-watch` and `merge-order` scripts | Starts a lane worker for an issue after the gates below |
 | `lanes/{build-prompt,run-worker,test-build-prompt}.sh` | `dispatch-issue.sh` | Render the worker prompt, run the worker, test the prompt renderer |
-| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | Re-sign, rebase, push and regenerate migrations for a lane branch |
+| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | Republish every lane commit through the API (`as-bot.sh git sign`), rebase, push and regenerate migrations for a lane branch |
 | `lanes/{deploy-omarchy,wait-rr}.sh` | by hand | Deploy and wait helpers |
 
 ## Documented behavior covered by tests
@@ -60,7 +60,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 
 **The host still runs its own `as-bot.sh`, which has no allowlist.** The repo copy adds `tools/app-token/as-bot-policy.mjs`; `as-bot.sh` runs it before minting a token and exits 126 with `as-bot: refused: <reason>` on a denied command, so a refused command never gets a token. A later deploy must copy `as-bot.sh`, `as-bot-policy.mjs` and `token.mjs` together. `scripts/ops/secret-reach/broker.mjs` (#2189) scopes the token's permissions and has no command allowlist, so nothing there was reusable; the two layers stack.
 
-Allowed: `gh pr view|list|comment|create|close|update-branch`, `gh pr edit` with only `--add-label`/`--remove-label`, `gh pr merge <pr> --disable-auto` (nothing else; the bot never merges), `gh issue view|list|comment|create|edit|pin`, `gh api` reads with one endpoint and only `--method GET`, `--paginate`, `--jq`, `--template`, `--include`, `--silent`, `--slurp`, `--cache` (fields only with an explicit GET), `git fetch origin` with `-q`, `-f`/`--force`, `--prune`, `--no-tags`, `git commit`, `git rebase <upstream>` with `-q` and `-X theirs|ours`, or `git rebase --continue|--abort|--skip`, `git -C <dir> ...`, and `git push origin <src>:<branch>` where the branch is not `main`/`master`, optionally with `--force-with-lease`, `--no-verify`, `-u`, `-q`.
+Allowed: `gh pr view|list|comment|create|close|update-branch`, `gh pr edit` with only `--add-label`/`--remove-label`, `gh pr merge <pr> --disable-auto` (nothing else; the bot never merges), `gh issue view|list|comment|create|edit|pin`, `gh api` reads with one endpoint and only `--method GET`, `--paginate`, `--jq`, `--template`, `--include`, `--silent`, `--slurp`, `--cache` (fields only with an explicit GET), `git fetch origin` with `-q`, `-f`/`--force`, `--prune`, `--no-tags`, `git commit`, `git sign <full base SHA>`, `git rebase <upstream>` with `-q` and `-X theirs|ours`, or `git rebase --continue|--abort|--skip`, `git -C <dir> ...`, and `git push origin <src>:<branch>` where the branch is not `main`/`master`, optionally with `--force-with-lease`, `--no-verify`, `-u`, `-q`.
 
 Deploy-lag recovery also permits `gh issue close <positive number> -R xiechimon/cairn -c "Caught up: omarchy runs <40 lowercase hex SHA>."`, with `--repo` and `--comment` as equivalent separate flags. No global or duplicate repository flags, URL/zero issue IDs, other messages or extra flags are accepted. `deploy-watch.sh` identifies the issue through the bot author and lag title; failure to close it fails the recovery tick.
 
@@ -79,20 +79,20 @@ Measured with `grep -rn as-bot` over `~/.cairn/tools`, `~/lanes/*.sh` and `~/.co
 | `tools/overnight/driver.sh` | `git push -q --no-verify --force-with-lease origin HEAD:lane/N`, `gh pr create` | allowed |
 | `lanes/finish-branch.sh` | `git push -q --no-verify --force-with-lease origin HEAD:<branch>` | allowed |
 | `lanes/rebase-main.sh` | `git rebase -q origin/main`, `git rebase --continue` | allowed |
-| `lanes/regen-migration.sh` | `git rebase -q -X theirs origin/main`, `git commit -qm ... --no-verify` | allowed |
-| `lanes/sign-commits.sh` | `git commit -q --no-verify --allow-empty -m` | allowed |
+| `lanes/regen-migration.sh` | `git rebase -q -X theirs origin/main`, `git commit -qm ... --no-verify` (both commits) | allowed |
+| `lanes/sign-commits.sh` | `git sign <merge-base SHA>` | allowed |
 | `tools/governor/split-issue.sh` | `gh issue create`, `gh issue comment` | allowed |
 | `tools/governor/block-governor.sh` | `gh issue comment`, `gh pr close` | allowed |
 | `tools/plan/plan-issues.sh` | `gh issue edit --body-file -` | allowed |
-| `tools/merge-order/queue.sh` | `gh pr update-branch --rebase` | allowed |
+| `tools/merge-order/queue.sh` | `gh pr update-branch` for every armed PR that is behind | allowed |
 | `tools/reminders/resume-1727.sh` | `gh issue create`, `gh issue edit --remove-label`, `gh issue comment` | allowed |
 | `~/.cairn/tools/review-gate/retro-review.sh` (not mirrored) | `gh issue create` | allowed |
 | `tools/schedule/issue-schedule.mjs` | `gh issue create|edit|comment|pin` | allowed |
 | `tools/rearm-automerge.sh` | `gh pr merge --disable-auto` | allowed |
 | `tools/weekly/evidence-prune.sh` | `git fetch`, `git commit`, `git push -u origin <branch>`, `gh pr create`, `gh pr comment` (it arms `gh pr merge --squash --auto --match-head-commit <sha>` as the human login, not through `as-bot.sh`) | allowed |
-| `tools/merge-pr.sh` | none: it merges bot-opened PRs with `gh pr merge <n> --rebase --match-head-commit <sha>` as the human login | not through `as-bot.sh` |
+| `tools/merge-pr.sh` | none: it squash-merges owner-route PRs with `gh pr merge <n> --squash --match-head-commit <sha>` as the human login | not through `as-bot.sh` |
 
-Merge decision (C1 session, after the review gate found that a PASS comment can be forged through `gh pr comment`, which the bot may run): the bot never merges. Merge authorization uses the human login (`docs/ops/agent-bot-identity.md`): `merge-pr.sh` rebase-merges bot-opened PRs with plain `gh`, pinned to the head it read before its gate checks; for a lane or protected PR it requires the `review-gate` commit status on that head to be `success` and created by the gate's login (`xiechimon`), never a PR comment, because the bot can post comments, and `evidence-prune.sh` arms its auto-merge with plain `gh`. `as-bot-callers.test.mjs` runs both scripts through the real `as-bot.sh` and policy. The policy has no override switch.
+Merge decision (C1 session, after the review gate found that a PASS comment can be forged through `gh pr comment`, which the bot may run): the bot never merges. Merge authorization uses the human login (`docs/ops/agent-bot-identity.md`): `merge-pr.sh` squash-merges owner-route PRs with plain `gh`, pinned to the head it read before its gate checks; for a lane or protected PR it requires the `review-gate` commit status on that head to be `success` and created by the gate's login (`xiechimon`), never a PR comment, because the bot can post comments, and `evidence-prune.sh` arms its auto-merge with plain `gh`. `as-bot-callers.test.mjs` runs both scripts through the real `as-bot.sh` and policy. The policy has no override switch.
 
 ## Test temp storage (#1954)
 

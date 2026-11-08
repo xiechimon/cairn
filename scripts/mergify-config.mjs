@@ -65,7 +65,7 @@ ${draftChecks.map(passedOrSkipped).join('\n')}
     merge_bot_account: ${mergeBotAccount}`;
   return `queue_rules:
 ${rule('default', `-author = ${botAuthor}`, 'squash')}
-${rule('bot', `author = ${botAuthor}`, 'rebase')}
+${rule('bot', `author = ${botAuthor}`, 'squash')}
 merge_protections_settings:
   auto_merge_conditions: true
 commands_restrictions:

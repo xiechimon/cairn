@@ -31,8 +31,56 @@ test('recovery publishes one exact revert commit on a named branch and preserves
     git('add', 'later');
     git('commit', '-m', 'later');
     const base = git('rev-parse', 'HEAD');
-    const branch = await prepareRecoveryBranch(dir, base, bad, 'token' as AutonomousToken);
+    const bot = {
+      name: 'cairnwright[bot]',
+      email: '347615582+cairnwright[bot]@users.noreply.github.com',
+    };
+    const calls: string[] = [];
+    const branch = await prepareRecoveryBranch({
+      url: dir,
+      base,
+      reverted: bad,
+      token: 'token' as AutonomousToken,
+      identity: bot,
+      api: async (method, path, body) => {
+        calls.push(`${method} ${path}`);
+        const input = body as { tree: string; parents: string[]; message: string } | undefined;
+        if (method === 'POST' && input) {
+          const sha = execFileSync(
+            'git',
+            [
+              'commit-tree',
+              input.tree,
+              ...input.parents.flatMap((p) => ['-p', p]),
+              '-m',
+              input.message,
+            ],
+            {
+              cwd: dir,
+              encoding: 'utf8',
+              env: {
+                ...process.env,
+                GIT_AUTHOR_NAME: bot.name,
+                GIT_AUTHOR_EMAIL: bot.email,
+                GIT_COMMITTER_NAME: 'GitHub',
+                GIT_COMMITTER_EMAIL: 'noreply@github.com',
+              },
+            },
+          ).trim();
+          return { sha, author: bot, verification: { verified: true } };
+        }
+        const ref = path.replace('/git/', '');
+        if (method === 'PATCH') git('update-ref', ref, (body as { sha: string }).sha);
+        if (method === 'DELETE') git('update-ref', '-d', ref);
+        return null;
+      },
+    });
     expect(branch).toBe(`cairn-recovery/${bad.slice(0, 8)}`);
+    expect(git('show', '-s', '--format=%an <%ae>|%cn <%ce>', branch)).toBe(
+      `${bot.name} <${bot.email}>|GitHub <noreply@github.com>`,
+    );
+    expect(calls.filter((c) => c.startsWith('POST'))).toEqual(['POST /git/commits']);
+    expect(git('for-each-ref', 'refs/cairn')).toBe('');
     expect(git('show', `${branch}:file`)).toBe('good');
     expect(git('show', `${branch}:later`)).toBe('keep');
     expect(git('rev-list', '--count', `${base}..${branch}`)).toBe('1');

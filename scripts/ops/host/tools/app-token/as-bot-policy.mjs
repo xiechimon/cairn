@@ -250,8 +250,12 @@ function checkGit(args) {
   if (sub === 'fetch') return checkGitFetch(tail);
   if (sub === 'rebase') return checkGitRebase(tail);
   if (sub === 'commit') return allow;
+  if (sub === 'sign')
+    return tail.length === 1 && /^[0-9a-f]{40}$/.test(tail[0] ?? '')
+      ? allow
+      : deny('git sign takes exactly one full base commit SHA');
   return deny(
-    `git ${sub ?? ''} is not on the as-bot allowlist (allowed: fetch, push, commit, rebase)`,
+    `git ${sub ?? ''} is not on the as-bot allowlist (allowed: fetch, push, commit, rebase, sign)`,
   );
 }
 

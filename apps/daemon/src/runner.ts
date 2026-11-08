@@ -50,6 +50,7 @@ import {
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
   LocalRepoUnreachableError,
+  localCommitIdentity,
   normalizeClaudeResetsAt,
   noVisionSignalOf,
   PLAN_FILE_NAME,
@@ -65,6 +66,7 @@ import {
   stripAnsiEscapes,
   subscriptionKeyOf,
   transcriptPromptRowId,
+  withCoAuthor,
 } from '@cairn/shared';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
@@ -113,7 +115,7 @@ import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImages } from './step-attachments.js';
-import { ensureStepCoauthor } from './step-attribution.js';
+import { stepGithubTarget } from './step-attribution.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
@@ -826,10 +828,11 @@ async function runClaimedStep(
         onAudit: (line) => logger.step(line),
       })
     : null;
-  const stepIdentity: CommitIdentity = {
-    name: claimed.agent?.displayName ?? 'cairn-agent',
-    email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
-  };
+  const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
+  const stepIdentity: CommitIdentity =
+    appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
+  const stepGithub =
+    repo?.kind === 'github' && repo.cloneUrl ? stepGithubTarget(repo.cloneUrl) : null;
   const withStepGit = async (
     operation: (credential: BoundGitCredentials | null) => Promise<void>,
   ) => {
@@ -1935,14 +1938,22 @@ async function runClaimedStep(
 
   const pushStep = (git: WorktreeOps, workspace: PreparedWorkspace) =>
     withStepGit(async (credential) => {
-      await ensureStepCoauthor(
-        workspace.cwd,
-        workspace.branch,
-        headAtStart,
-        tokenRes.coAuthor ?? null,
-        credential,
-      );
-      await git.push(workspace.cwd, workspace.branch, credential);
+      await git.push(workspace.cwd, workspace.branch, credential, {
+        base: headAtStart,
+        identity: appIdentity,
+        coAuthor: tokenRes.coAuthor ?? null,
+        github: stepGithub,
+      });
+      if (stepGithub !== null && credential === null) {
+        logger.step('pushed without GitHub API commits: no step token for this push');
+        transcript.upsert({
+          id: `unverified-push-${stepId}`,
+          role: 'system',
+          content:
+            '本轮推送用的是机器凭据，没有步令牌，提交没有经 GitHub API 重建：它们不是 Verified，commit-author 检查会拦下这张 PR。',
+          createdAt: now(),
+        });
+      }
     });
   let headCommit: string | null = null;
   let branchDrift: { expected: string; actual: string } | null = null;
@@ -1974,9 +1985,7 @@ async function runClaimedStep(
       const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
       const committed = await git.commitAll(
         ws.cwd,
-        tokenRes.coAuthor
-          ? `${commitMessage}\n\nCo-authored-by: ${tokenRes.coAuthor.name} <${tokenRes.coAuthor.email}>`
-          : commitMessage,
+        withCoAuthor(commitMessage, tokenRes.coAuthor ?? null),
         stepIdentity,
       );
       if (claimed.step.kind === 'merge') {
@@ -2030,9 +2039,7 @@ async function runClaimedStep(
           );
         }
       }
-      headCommit = tokenRes.coAuthor
-        ? await git.headCommit(ws.cwd)
-        : (committed.head ?? (await git.headCommit(ws.cwd)));
+      headCommit = await git.headCommit(ws.cwd);
       const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
       if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
         try {

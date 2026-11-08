@@ -5,6 +5,7 @@
 - This repository is public: never commit secrets, credentials, internal addresses, personal information or quota details.
 - Never force push, use `--no-verify`, bypass hooks with `core.hooksPath`, or run `git reset --hard`, `git clean`, `git stash` or `git checkout .`.
 - Stage only your own changes with explicit paths; never use `git add -A` or `git add .`.
+- Agent sessions commit and push only as the App: `~/.cairn/tools/app-token/as-bot.sh git commit ...` and `as-bot.sh git push origin HEAD:<branch>`, and open PRs with `as-bot.sh gh pr create`. Only commits ian types himself carry his identity; the hooks and the `commit-author` check enforce `packages/shared/commit-identity.json`.
 - Confirm lockfile changes with ian before committing `pnpm-lock.yaml`; authorized changes require `CAIRN_ALLOW_LOCKFILE_CHANGE=1`.
 - Do not run postinstall scripts without explicit user authorization; install dependencies with scripts disabled unless authorized.
 - Seam discipline: read the comments in `biome.json` before changing locked imports (`@earendil-works/*`, `@modelcontextprotocol/sdk`, `simple-git`, `isomorphic-git`, `cron-parser`); consume them through thin bridges.
@@ -37,7 +38,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 - Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
 - Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`. Protected-path PRs enter the merge queue with every other green PR. Never merge or arm auto-merge on a PR labelled `coordinator-hold`.
-- ian may admin-merge. When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin`, using the merge method `docs/ops/agent-bot-identity.md` gives its opener (`--squash` for a human-opened PR, `--rebase` for one opened by `app/cairnwright`), once every required check passes on the current head, `review-gate` included, and the PR body has no unchecked task. Without that per-PR authorization, agents never use `--admin`.
+- ian may admin-merge. When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin --squash`, whoever opened it, once every required check passes on the current head, `review-gate` included, and the PR body has no unchecked task. Without that per-PR authorization, agents never use `--admin`.
 - The eval ruler is protected so no PR can edit what judges it: `integration/eval/**`, `.claude/hillclimb/**`, the trajectory exporter, its outcome fields and the pack schema (the eval globs in `packages/shared/merge-gate-paths.json`).
 - Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him, and put `coordinator-hold` on the PR while that decision is pending.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
