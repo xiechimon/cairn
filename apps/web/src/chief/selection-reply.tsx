@@ -1,3 +1,4 @@
+import { Reply } from 'lucide-react';
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../components/ui/button.js';
@@ -22,9 +23,9 @@ interface Target {
 }
 
 const BAR_CLS =
-  'fixed top-0 left-0 z-(--z-dialog) flex items-center rounded-(--radius-control) bg-popover text-popover-foreground shadow-(--shadow-popover) select-none';
+  'fixed top-0 left-0 z-(--z-dialog) flex items-center rounded-lg border border-(--selection-bar-ring) bg-(--selection-bar-bg) text-white shadow-(--shadow-selection-bar) backdrop-blur-sm select-none';
 const BAR_BUTTON_CLS =
-  'h-7 rounded-(--radius-control) px-3 text-ui font-medium text-foreground transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
+  "h-8 gap-1 rounded-lg border-0 px-3 py-1.5 text-ui font-medium text-white transition-none hover:bg-(--selection-bar-hover) hover:text-white dark:hover:bg-(--selection-bar-hover) [&_svg:not([class*='size-'])]:size-4";
 
 function sourceOf(node: Node, container: HTMLElement): HTMLElement | null {
   const element = node instanceof HTMLElement ? node : node.parentElement;
@@ -128,6 +129,7 @@ export function SelectionReply({
       if (event.defaultPrevented || event.isComposing || isEditable(event.target)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
+        containerRef.current?.ownerDocument.getSelection()?.removeAllRanges();
         setTarget(null);
         return;
       }
@@ -138,7 +140,7 @@ export function SelectionReply({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [target, reply]);
+  }, [target, reply, containerRef]);
 
   useLayoutEffect(() => {
     const bar = barRef.current;
@@ -146,7 +148,7 @@ export function SelectionReply({
     if (target === null || bar === null || container === null) return;
     const shownTop = target.range.getBoundingClientRect().top;
     const place = () => {
-      const line = target.range.getClientRects()[0] ?? target.range.getBoundingClientRect();
+      const line = target.range.getBoundingClientRect();
       const bounds = container.getBoundingClientRect();
       const { x, y } = barPosition(
         { left: line.left, width: line.width, top: line.top, bottom: line.bottom },
@@ -193,6 +195,7 @@ export function SelectionReply({
         onClick={reply}
       >
         {t('回复')}
+        <Reply aria-hidden="true" />
       </Button>
     </div>,
     document.body,

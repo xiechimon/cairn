@@ -17,6 +17,25 @@ Question: how does Claude behave after a user selects text inside a message, and
 
 Because nothing was operated, no frame was screen-recorded and no computed style was read from a live element. Sizes below come from the shipped class names resolved against the shipped stylesheet. Which density a given window uses is guess.
 
+## Measured on claude.ai (2026-11-08, owner's signed-in Mac Chrome)
+
+Operated in a new tab, window 1470x668, device pixel ratio 2, computed styles read from the live elements. All rows measured. Captures and the raw numbers: `<scratch-cache>/selection-reply/measured/claude/` (`measured.json`).
+
+| Item | claude.ai chat | Claude Code tab (`claude.ai/code`, dark) |
+|---|---|---|
+| Actions | `Reply` with a 16px reply arrow after the label | `Start a side chat`, divider, `Reply` |
+| Surface | black at 80%, `backdrop-filter: blur(8px)`, 1px border white at 10%, radius 8px, shadow `0 4px 8px` and `0 12px 28px -2px` at 8% (the second layer is black at 24% in dark), pill 83.6x34 | `rgb(48 48 48)`, no blur, radius 8px, 1px inset ring white at 4%, shadow `0 8px 24px` at 32% and `0 2px 6px` at 20%, height 28 |
+| Button | 81.6x32, padding 6px 12px, 14px/20px weight 435, white, gap 4px, hover fill white at 10% with a 150ms colour transition | height 28, padding 0 9px, 14px/20px weight 435, white at 93%; divider 1x14px white at 10% |
+| Placement | centred on the selection rectangle, bottom edge 8px above the selection top; same in dark and on a user message near the top | centred on the first selected line, 8px above it |
+| Messages | assistant and user messages both show the bar | assistant reply measured |
+| Across two messages | the bar element is placed off-screen (x 1546 in a 1470 viewport): nothing visible | not measured |
+| Escape | hides the bar and clears the selection | not measured |
+| Reply | a 120x120 attachment tile (radius 10, padding 12, 11px text at black 60%, left rule, 6-line clamp) appears above the composer and the input takes focus | not pressed: it acts on a live session |
+| Sent message | the text is only the typed reply; the quote is an attachment `excerpt_from_previous_claude_message.txt` whose content is the selected text; the stored attachment has no source message id; the bubble shows the tile above it | not measured |
+| Phone | not measured: resizing the owner's window had no effect, and desktop Chrome cannot produce a touch selection | not measured |
+
+The sections below come from the shipped bundle and are kept for the behaviour the live run could not reach (timing, scroll dismissal, touch).
+
 ## What Claude ships: two different bars
 
 | | claude.ai chat (`SelectionTooltip`, chunk `c79f7d2ef`) | Claude Code session view (`epitaxy`, chunk `cf74bc599`, components `zk` and `Vk`) |
@@ -75,7 +94,7 @@ It belongs to Claude Code's `/btw` feature, not to claude.ai chat. measured (str
 ## The pattern that fits cairn, and why
 
 1. Reply as Claude Code writes it: the quote travels inside the message text as a marked `>` block. The Coordinator and every agent harness already take plain text, so the quote and the source message id reach the model with no schema, migration or prompt-assembly change, and the queue, withdraw, rewind and draft paths carry it unchanged. cairn adds the source message id to the marker (`<!-- reply source=<id> -->`), which Claude Code leaves out and claude.ai keeps on its attachment.
-2. The bar uses the Code view's surface, not the claude.ai pill: cairn rule V3 forbids blur panels, and cairn's popover tokens match the Code bar's surface and ring.
+2. The bar copies the measured claude.ai chat pill (black at 80%, 8px blur, 8px radius, 32px button). Rule V3 now allows blur on this one surface, checked by `apps/web/test/anti-slop-foundations.test.ts` and the e2e spec.
 3. Start a side chat does not map onto cairn's side chat. cairn's side chat (`apps/web/src/board/side-chat.tsx`) is a task thread: another agent with its own context, created by the Coordinator. Claude's side chat is a branch of the same agent that sees the main conversation and writes nothing back. Opening a task thread from a selection would start real work under a different agent; a Coordinator branch in the side panel would be a second side-chat system. Neither fits without an owner decision, so this change ships Reply and the design doc records the side-chat options.
 
 ## Recommendation

@@ -21,11 +21,11 @@ Messages opt in with `data-reply-source="<message id>"` on the assistant `Bubble
 
 ### Bar
 
-- Surface: `bg-popover`, `shadow-(--shadow-popover)` (`--e2`), radius `--radius-control` (8px), no padding. This is the Claude Code bar (popover surface and ring) in cairn tokens; the claude.ai black pill is not used because V3 forbids blur panels.
-- One ghost button `回复`, 28px high, 12px horizontal padding, `text-ui` weight 500. Hover fills the whole button with `--menu-hover`, with `transition-none`: no shadow, no partial band, no delay (V21, ian's hover rules).
-- Position: centred on the first selected line, 8px above it; clamped 12px inside the conversation viewport; below the line when there is less than 12px above. Fixed, moved with `transform` only (A2).
+- Surface: the measured claude.ai pill. `--selection-bar-bg` (black at 80%), `backdrop-blur-sm` (8px), 1px border `--selection-bar-ring` (white at 10%), radius 8px, `--shadow-selection-bar` (the measured two layers per theme). V3 allows blur on this surface only.
+- One button `回复` with the reply arrow after it: 32px high, padding 6px 12px, `text-ui` (14px/20px), gap 4px, white. Hover fills the whole button with white at 10%, with `transition-none` (claude.ai fades over 150ms; cairn's hover rule forbids delayed feedback).
+- Position: centred on the selection rectangle, 8px above it (measured); clamped 12px inside the conversation viewport; below the line when there is less than 12px above. Fixed, moved with `transform` only (A2).
 - Appears 250ms after the selection settles, or on mouse release after a drag. Needs at least 2 characters after trimming, and a selection that starts and ends in the same message.
-- Hidden when: the selection collapses (click elsewhere, typing in the composer); the selection moved more than 100px on scroll; Escape (the selection stays, the failure in claude-code#70556); the last pointer-down was touch or pen (the native selection menu wins, as in Claude Code); the composer is replaced or the drawer is closed.
+- Hidden when: the selection collapses (click elsewhere, typing in the composer); the selection moved more than 100px on scroll; Escape, which also clears the selection, as measured on claude.ai; the last pointer-down was touch or pen (the native selection menu wins, as in Claude Code); the composer is replaced or the drawer is closed.
 - Mouse down on the button does not clear the selection.
 - Keyboard: Enter replies while the bar is up and focus is outside any editable field; the button carries `aria-keyshortcuts="Enter"`; the bar is a `toolbar` named `选中文字的操作`.
 
@@ -49,7 +49,7 @@ Screenshots from `apps/web/e2e/chief-selection-reply.spec.ts` with `CAIRN_E2E_EV
 | Phone width 390 (mouse) | `bar-light-390.png`, `quote-light-390.png` | `bar-dark-390.png`, `quote-dark-390.png` |
 | Phone width 390 (touch) | no bar; native selection menu | same |
 
-No Claude reference shot exists: claude.ai is signed out in the built-in browser and the capture profile stops at a Cloudflare check (research doc).
+Claude reference captures were taken on the owner's Mac Chrome (research doc, Measured). Still different from claude.ai: the staged quote is a block above the input, where claude.ai shows a 120x120 attachment tile; the sent message carries the quote in its text with a source id, where claude.ai sends it as a separate attachment without one.
 
 ## Backend
 

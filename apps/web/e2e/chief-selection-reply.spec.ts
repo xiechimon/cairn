@@ -95,7 +95,7 @@ test.describe('select text in a Coordinator message, then Reply', () => {
     await expect.poll(() => sent.at(-1)).toBe('好');
   });
 
-  test('keyboard: Enter replies, Escape hides the bar and keeps the selection', async ({
+  test('keyboard: Enter replies, Escape hides the bar and clears the selection', async ({
     page,
   }) => {
     await openChat(page);
@@ -105,7 +105,7 @@ test.describe('select text in a Coordinator message, then Reply', () => {
     await expect(bar.getByTestId('selection-reply')).toHaveAttribute('aria-keyshortcuts', 'Enter');
     await page.keyboard.press('Escape');
     await expect(bar).toHaveCount(0);
-    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('同一处');
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('');
 
     await selectIn(page, 'm6', '已经补给它了');
     await expect(bar).toBeVisible();
@@ -162,6 +162,48 @@ test.describe('select text in a Coordinator message, then Reply', () => {
         await selectIn(page, 'm6', '已经补给它了');
         const bar = page.getByTestId('selection-reply-bar');
         await expect(bar).toBeVisible();
+        const measured = await page.evaluate(() => {
+          const pill = document.querySelector<HTMLElement>('[data-testid="selection-reply-bar"]');
+          const button = pill?.querySelector('button');
+          if (!pill || !button) throw new Error('no bar');
+          const p = getComputedStyle(pill);
+          const b = getComputedStyle(button);
+          const pr = pill.getBoundingClientRect();
+          const sr = window.getSelection()?.getRangeAt(0).getBoundingClientRect();
+          const blurred = [...document.querySelectorAll('*')].filter(
+            (el) => getComputedStyle(el).backdropFilter !== 'none',
+          );
+          return {
+            backdrop: p.backdropFilter,
+            background: p.backgroundColor,
+            border: `${p.borderTopWidth} ${p.borderTopStyle} ${p.borderTopColor}`,
+            radius: p.borderRadius,
+            height: pr.height,
+            buttonHeight: button.getBoundingClientRect().height,
+            buttonPadding: b.padding,
+            buttonFont: `${b.fontSize}/${b.lineHeight}`,
+            buttonGap: b.columnGap,
+            gapAbove: sr ? Math.round(sr.top - pr.bottom) : null,
+            centreOffset: sr ? Math.abs(Math.round(pr.left + pr.width / 2 - (sr.left + sr.width / 2))) : null,
+            blurredCount: blurred.length,
+            blurredIsBar: blurred.every((el) => el === pill),
+          };
+        });
+        expect(measured).toEqual({
+          backdrop: 'blur(8px)',
+          background: 'rgba(0, 0, 0, 0.8)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          radius: '8px',
+          height: 34,
+          buttonHeight: 32,
+          buttonPadding: '6px 12px',
+          buttonFont: '14px/20px',
+          buttonGap: '4px',
+          gapAbove: 8,
+          centreOffset: 0,
+          blurredCount: 1,
+          blurredIsBar: true,
+        });
         const box = await bar.boundingBox();
         expect(box).not.toBeNull();
         if (box) {
