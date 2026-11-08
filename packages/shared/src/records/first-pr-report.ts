@@ -27,6 +27,8 @@ export const patchTeamBodySchema = z
   .object({
     firstPrReportPrompt: patchFirstPrReportPromptSchema.optional(),
     autonomyPaused: z.boolean().optional(),
+    coAuthorTrailer: z.boolean().optional(),
+    requestInstructorReview: z.boolean().optional(),
     claudeUsage: claudeUsageSchema.optional(),
     maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   })
@@ -34,6 +36,8 @@ export const patchTeamBodySchema = z
     (body) =>
       body.firstPrReportPrompt !== undefined ||
       body.autonomyPaused !== undefined ||
+      body.coAuthorTrailer !== undefined ||
+      body.requestInstructorReview !== undefined ||
       body.claudeUsage !== undefined ||
       body.maxAutonomousMergesPerDay !== undefined,
     {
