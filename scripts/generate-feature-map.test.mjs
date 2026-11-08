@@ -16,6 +16,7 @@ export const router = createBrowserRouter([
   { path: '/app', element: <BoardPage /> },
   { path: SCHEDULES_HREF, element: <BoardPage /> },
   { path: \`\${SCHEDULES_HREF}/:id\`, element: <BoardPage /> },
+  { path: '/app/settings/:section?', element: <BoardPage /> },
   { path: '*', element: <Navigate to="/app" replace /> },
 ]);
 `;
@@ -33,6 +34,7 @@ const SCHEDULES_TSX = `export function SchedulesPage() {
       <button data-testid="schedule-new" aria-keyshortcuts="Mod+K">{t('新建')}</button>
       <span data-testid={open ? 'schedule-open' : 'schedule-closed'} />
       <span data-testid={\`schedule-row-\${id}\`} />
+      <span data-testid={rule === null ? \`schedule-rule-new-\${use}\` : \`schedule-rule-\${use}\`} />
     </div>
   );
 }
@@ -76,7 +78,10 @@ function baseRegistry() {
         centrality: 3,
         status: 'partial',
         code: { web: ['apps/web/src/App.tsx'] },
-        routes: { web: ['/app', 'settings:account'], server: ['/api/user/me'] },
+        routes: {
+          web: ['/app', '/app/settings/:section?', 'settings:account'],
+          server: ['/api/user/me'],
+        },
         research: { gap: 'nobody compared reference products' },
         frontendDesign: ['docs/design/schedules.md'],
         backendDesign: { na: 'reads the session only' },
@@ -177,7 +182,7 @@ test('a complete registry renders a map that --check accepts', () => {
   assert.match(skill, /1\. `open \/app\/schedules`/);
   assert.match(
     skill,
-    /Test ids in its code: `schedule-closed`, `schedule-new`, `schedule-open`, `schedule-row-\*`/,
+    /Test ids in its code: `schedule-closed`, `schedule-new`, `schedule-open`, `schedule-row-\*`, `schedule-rule-\*`, `schedule-rule-new-\*`/,
   );
   assert.match(skill, /Keyboard shortcuts in its code: `Mod\+K`/);
   assert.match(skill, /`账号` \(Account\)/);
@@ -394,28 +399,54 @@ test('renaming a test id in feature code without regenerating fails --check', ()
   checkFails(root, /feature-map\.md differs from/);
 });
 
-test('reach steps may use concrete ids for parameterized routes and either branch of a conditional test id', () => {
+const BRANCH_STEPS = [
+  'click testid:schedule-open',
+  'click testid:schedule-closed',
+  'click testid:schedule-row-7',
+  'click testid:schedule-rule-new-review',
+  'click testid:schedule-rule-review',
+];
+
+test('reach steps bind route parameters and may use every branch of a conditional test id', () => {
   const registry = baseRegistry();
-  registry.features[0].reach = [
-    'open /app/schedules/42',
-    'click testid:schedule-open',
-    'click testid:schedule-closed',
-    'click testid:schedule-row-7',
-  ];
+  registry.features[0].reach = ['open /app/schedules/<id of a seeded schedule>', ...BRANCH_STEPS];
+  registry.features[1].reach = ['open /app/settings', 'open /app/settings/account'];
   const root = makeFixtureRepo(registry);
   generated(root);
-  assert.equal(run(root, ['--check']).status, 0);
-  checkFails(
-    makeFixtureRepo({
-      ...registry,
-      features: [
-        { ...registry.features[0], reach: ['open /app/schedules/42/edit'] },
-        registry.features[1],
-      ],
-    }),
-    /opens \/app\/schedules\/42\/edit, which is not a web route/,
-  );
+  const result = run(root, ['--check']);
+  assert.equal(result.status, 0, result.stderr);
 });
+
+for (const [step, pattern] of [
+  ['open /app/schedules/:id', /opens a route template; bind the parameter/],
+  ['open /app/settings/:section?', /opens a route template; bind the parameter/],
+  ['open /app/schedules/42/edit', /opens \/app\/schedules\/42\/edit, which is not a web route/],
+]) {
+  test(`a reach step "${step}" is rejected`, () => {
+    const registry = baseRegistry();
+    registry.features[0].reach = [step];
+    checkFails(makeFixtureRepo(registry), pattern);
+  });
+}
+
+for (const [from, to, id] of [
+  ["'schedule-open'", "'schedule-opened'", 'schedule-open'],
+  ["'schedule-closed'", "'schedule-shut'", 'schedule-closed'],
+  ['`schedule-rule-new-', '`schedule-rule-add-', 'schedule-rule-new-review'],
+  [': `schedule-rule-', ': `schedule-policy-', 'schedule-rule-review'],
+]) {
+  test(`renaming the ${id} branch turns --check red`, () => {
+    const registry = baseRegistry();
+    registry.features[0].reach = ['open /app/schedules', ...BRANCH_STEPS];
+    const root = makeFixtureRepo(registry);
+    generated(root);
+    write(root, 'apps/web/src/schedules/page.tsx', SCHEDULES_TSX.replace(from, to));
+    checkFails(
+      root,
+      new RegExp(`targets data-testid ${id}, which no web source sets|feature-map\\.md differs`),
+    );
+  });
+}
 
 for (const [step, pattern] of [
   ['open /app/nowhere', /opens \/app\/nowhere, which is not a web route/],

@@ -548,7 +548,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:side-chat"
       ],
       "verify": [
@@ -599,7 +599,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:composer-card",
         "type a follow-up while the thread runs",
         "click label:停止"
@@ -653,7 +653,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:work-prs"
       ],
       "verify": [
@@ -709,7 +709,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:work-prs",
         "click testid:accept-dialog-pr"
       ],
@@ -761,7 +761,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click label:查看计划",
         "click testid:doc-pane"
       ],
@@ -892,7 +892,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:route-override-orb"
       ],
       "research": [
@@ -1107,7 +1107,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:side-chat"
       ],
       "research": [
@@ -1499,7 +1499,7 @@
       "reach": [
         "open /app/project/new",
         "click testid:github-picker",
-        "open /app/project/:id/settings",
+        "open /app/project/<id of a project listed by the projects API>/settings",
         "click testid:project-instructions-input"
       ],
       "verify": [
@@ -1551,7 +1551,7 @@
         ]
       },
       "reach": [
-        "open /app/project/:id/files",
+        "open /app/project/<id of a project listed by the projects API>/files",
         "click testid:history-message"
       ],
       "verify": [
@@ -1600,9 +1600,9 @@
         ]
       },
       "reach": [
-        "open /app/project/:id",
+        "open /app/project/<id of a project listed by the projects API>",
         "click testid:project-home-links",
-        "open /app/todo/:id",
+        "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:source-issue-retry"
       ],
       "verify": [
@@ -2252,7 +2252,7 @@
         ]
       },
       "reach": [
-        "open /app/settings/:section?",
+        "open /app/settings",
         "click testid:settings-search",
         "press /"
       ],
@@ -2331,7 +2331,7 @@
         ]
       },
       "reach": [
-        "open /app/project/:id"
+        "open /app/project/<id of a project listed by the projects API>"
       ],
       "research": {
         "gap": "no note on serving git over HTTP versus other transports"
@@ -2489,7 +2489,7 @@
         ]
       },
       "reach": [
-        "open /app/project/:id"
+        "open /app/project/<id of a project listed by the projects API>"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/tags.md"

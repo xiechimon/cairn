@@ -161,21 +161,33 @@ function serverRoutes() {
     .map((key) => ({ key, label: `${[...methods.get(key)].sort().join(',')} ${key}` }));
 }
 
+function braceExpression(text, open) {
+  let depth = 0;
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === '{') depth += 1;
+    if (text[index] === '}') depth -= 1;
+    if (depth === 0) return text.slice(open + 1, index);
+  }
+  return '';
+}
+
 function testIdsIn(files) {
   const ids = new Set();
   for (const rel of files) {
     const text = read(rel);
-    for (const match of text.matchAll(/\b(?:data-testid|testId)=(?:"([^"]+)"|\{([^{}]*)\})/g)) {
+    for (const match of text.matchAll(/\b(?:data-testid|testId)=(?:"([^"]+)"|\{)/g)) {
       if (match[1] !== undefined) {
         ids.add(match[1]);
         continue;
       }
-      for (const literal of match[2].matchAll(/'([^'\n]+)'|"([^"\n]+)"/g)) {
-        ids.add(literal[1] ?? literal[2]);
+      const expression = braceExpression(text, match.index + match[0].length - 1);
+      for (const literal of expression.matchAll(/'([^'\n]+)'|"([^"\n]+)"|`([^`]+)`/g)) {
+        ids.add(
+          literal[3] === undefined
+            ? (literal[1] ?? literal[2])
+            : literal[3].replace(/\$\{.*$/s, '*'),
+        );
       }
-    }
-    for (const match of text.matchAll(/\b(?:data-testid|testId)=\{\s*`([^`]+)`/g)) {
-      ids.add(match[1].replace(/\$\{.*$/, '*'));
     }
   }
   return [...ids].sort();
@@ -288,9 +300,13 @@ function validateStep(id, step, facts, errors) {
     return;
   }
   const [, verb, arg] = parsed;
-  if (
+  if (verb === 'open' && /(^|\/):/.test(arg)) {
+    errors.push(
+      `${id}: reach step "${step}" opens a route template; bind the parameter, e.g. /app/todo/<id of a seeded todo>`,
+    );
+  } else if (
     verb === 'open' &&
-    !facts.routes.web.some((route) => route.key === arg || routePattern(route.key).test(arg))
+    !facts.routes.web.some((route) => routePattern(route.key).test(arg))
   ) {
     errors.push(`${id}: reach step "${step}" opens ${arg}, which is not a web route`);
   }
@@ -518,7 +534,7 @@ function renderSkillMap(registry, facts) {
   );
   out.push('');
   out.push(
-    'Use it to turn a vague report or screenshot into exact steps: find the feature by what is on screen (test ids, labels, routes), follow its reach steps on the stack from `vp.mjs launch`, then drive the recipe under `features/` when one is listed. Reach steps use `open <route>`, `settings <section>`, `click testid:<id>`, `click label:<source label>`, `hover ...`, `press <keys>` and `type <text>`; every route, section, test id, label and key in them is checked against the source. A label is the zh source string passed to `t()`; the English UI shows the translation printed next to it.',
+    'Use it to turn a vague report or screenshot into exact steps: find the feature by what is on screen (test ids, labels, routes), follow its reach steps on the stack from `vp.mjs launch`, then drive the recipe under `features/` when one is listed. Reach steps use `open <route>`, `settings <section>`, `click testid:<id>`, `click label:<source label>`, `hover ...`, `press <keys>` and `type <text>`; every route, section, test id, label and key in them is checked against the source. A label is the zh source string passed to `t()`; the English UI shows the translation printed next to it. A `<...>` path segment is a parameter to bind on the launched stack, such as a thread id from `GET /api/todos`; route templates like `:id` are rejected.',
   );
   out.push('');
   out.push(

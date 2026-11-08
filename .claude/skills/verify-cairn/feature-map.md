@@ -2,7 +2,7 @@
 
 > Generated from `feature-map.json` in this directory by `scripts/generate-feature-map.mjs`. Edit the JSON, then run `node scripts/generate-feature-map.mjs`. The `gates` CI job runs it with `--check` and fails when this file drifts from the code.
 
-Use it to turn a vague report or screenshot into exact steps: find the feature by what is on screen (test ids, labels, routes), follow its reach steps on the stack from `vp.mjs launch`, then drive the recipe under `features/` when one is listed. Reach steps use `open <route>`, `settings <section>`, `click testid:<id>`, `click label:<source label>`, `hover ...`, `press <keys>` and `type <text>`; every route, section, test id, label and key in them is checked against the source. A label is the zh source string passed to `t()`; the English UI shows the translation printed next to it.
+Use it to turn a vague report or screenshot into exact steps: find the feature by what is on screen (test ids, labels, routes), follow its reach steps on the stack from `vp.mjs launch`, then drive the recipe under `features/` when one is listed. Reach steps use `open <route>`, `settings <section>`, `click testid:<id>`, `click label:<source label>`, `hover ...`, `press <keys>` and `type <text>`; every route, section, test id, label and key in them is checked against the source. A label is the zh source string passed to `t()`; the English UI shows the translation printed next to it. A `<...>` path segment is a parameter to bind on the launched stack, such as a thread id from `GET /api/todos`; route templates like `:id` are rejected.
 
 Routes, settings paths, keyboard shortcuts and test ids below are extracted from `apps/web/src`, never typed by hand. `Mod` is Cmd on macOS and Ctrl elsewhere; a single letter is a menu key that works while its menu is open.
 
@@ -190,7 +190,7 @@ States: The gate shows why a merge is allowed or blocked; merge permission missi
 
 Reach:
 
-1. `open /app/todo/:id`
+1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:work-prs`
 3. `click testid:accept-dialog-pr`
 
@@ -230,7 +230,7 @@ States: Off by default; when on, a thread runs in its own orb and the route over
 
 Reach:
 
-1. `open /app/todo/:id`
+1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:route-override-orb`
 
 - Web routes: none
@@ -249,7 +249,7 @@ States: A plan waiting for approval with an auto-approve countdown that can be p
 
 Reach:
 
-1. `open /app/todo/:id`
+1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click label:查看计划`
 3. `click testid:doc-pane`
 
@@ -315,7 +315,7 @@ Reach:
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`
 - Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `模型路由` (Model routing); `设置` (Settings) › `模型与账户` (Models & accounts) › `工作路由` (Work routing)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
+- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
@@ -329,7 +329,7 @@ States: While a thread runs, new messages queue as capsules or steer the current
 
 Reach:
 
-1. `open /app/todo/:id`
+1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:composer-card`
 3. `type a follow-up while the thread runs`
 4. `click label:停止`
@@ -370,7 +370,7 @@ States: No PR yet, open with checks running or failing, conflicts, merged, or a 
 
 Reach:
 
-1. `open /app/todo/:id`
+1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:work-prs`
 
 - Web routes: none
@@ -390,7 +390,7 @@ States: Messages stream in with tool and thinking rows; finished, cancelled and 
 
 Reach:
 
-1. `open /app/todo/:id`
+1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:side-chat`
 
 - Web routes: none
@@ -643,7 +643,7 @@ States: The settings window with grouped navigation, a search field reached by s
 
 Reach:
 
-1. `open /app/settings/:section?`
+1. `open /app/settings`
 2. `click testid:settings-search`
 3. `press /`
 
@@ -743,7 +743,7 @@ States: No page; local projects fetch and push through it.
 
 Reach:
 
-1. `open /app/project/:id`
+1. `open /app/project/<id of a project listed by the projects API>`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -761,9 +761,9 @@ States: Not connected, connected with a repository picker, an issue imported as 
 
 Reach:
 
-1. `open /app/project/:id`
+1. `open /app/project/<id of a project listed by the projects API>`
 2. `click testid:project-home-links`
-3. `open /app/todo/:id`
+3. `open /app/todo/<id of a thread listed by the todos API>`
 4. `click testid:source-issue-retry`
 
 - Web routes: none
@@ -822,7 +822,7 @@ States: A file tree with a viewer and a commit history with commit detail; unava
 
 Reach:
 
-1. `open /app/project/:id/files`
+1. `open /app/project/<id of a project listed by the projects API>/files`
 2. `click testid:history-message`
 
 - Web routes: `/app/project/:id/files`
@@ -844,7 +844,7 @@ Reach:
 
 1. `open /app/project/new`
 2. `click testid:github-picker`
-3. `open /app/project/:id/settings`
+3. `open /app/project/<id of a project listed by the projects API>/settings`
 4. `click testid:project-instructions-input`
 
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/new`
@@ -882,7 +882,7 @@ States: Research runs show as transcript rows with cited sources before a retry 
 
 Reach:
 
-1. `open /app/todo/:id`
+1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:side-chat`
 
 - Web routes: none
@@ -1085,7 +1085,7 @@ States: Tags from the fixed vocabulary appear on thread rows.
 
 Reach:
 
-1. `open /app/project/:id`
+1. `open /app/project/<id of a project listed by the projects API>`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
