@@ -306,11 +306,7 @@ export async function sendBuildSteer(
   if (replay !== undefined) return replay;
   const buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
-  if (
-    continuationOptions.human !== true &&
-    deps.steerOptions?.human !== true &&
-    body.queuedMessageId === undefined
-  )
+  if ((continuationOptions.human ?? deps.steerOptions?.human) !== true)
     assertAutomaticRetryAllowed(deps, buildRow.todoId);
   const running = db
     .select()

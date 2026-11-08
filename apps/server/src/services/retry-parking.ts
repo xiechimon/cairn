@@ -21,7 +21,12 @@ export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): vo
   if (row.phase === 'failed') parkFailedBuild(deps, row.latestBuildId);
   const latest = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
   if (latest && retryIsParked(latest.errorMessage ?? '')) {
-    throw new HttpError(409, `${RETRY_PARKED_MARK}: ${latest.errorMessage}`);
+    throw new HttpError(
+      409,
+      latest.errorMessage?.startsWith(RETRY_PARKED_MARK)
+        ? latest.errorMessage
+        : `${RETRY_PARKED_MARK}: ${latest.errorMessage}`,
+    );
   }
 }
 

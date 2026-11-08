@@ -5,7 +5,7 @@
 1. Existing implementation issue #3423; read-only trace #3302 / task #122 is related, not an implementation.
 2. Open matching PRs: none.
 3. Recent merged #3083 supplies the citation attempt cap and parking mechanism. Extend it; do not replace it. #3164 and #3303 migrated citation routing to rules.
-4. Open PRs touching builds, machine-finish-step, needs-you, runner, research-citations: none (2026-11-08 overlap lookup). Expanded lookup for the pi bridge, shared classifier and retry-parking module also found no open overlapping PR. #2864 is related citation-audit prior work, not this implementation.
+4. Open PRs touching builds, machine-finish-step, needs-you, runner, research-citations: none (2026-11-08 overlap lookup). Expanded lookup for the pi bridge, shared classifier and retry-parking module also found no open overlapping PR. #2864 is related citation-audit prior work, not this implementation. After opening #3431, the review expanded the file list to pr-wakes and pr-feedback; another overlap check found no other matching open PR or file overlap, so the same assigned branch and PR are extended.
 
 ## Evidence and assumptions
 
@@ -19,7 +19,7 @@ Rolling-hour non-model failed-build observations (requires an actual failed step
 
 - Stop the daemon session immediately on a terminal model error, retaining its reason; no SDK, network or compatibility retry.
 - Fail model-unavailable worker steps before model fallback; keep Coordinator-only fallback behavior separate.
-- Reuse failed phase / Needs you and persisted build error for parking. Guard dispatch and automatic continuation/restart as well as retry sweeps.
+- Reuse failed phase / Needs you and persisted build error for parking. Guard dispatch and automatic continuation/restart as well as retry sweeps, queued-message drain, and both PR-feedback paths before they clear the error.
 - Add a rolling-hour per-todo failed-build breaker with one persisted deduplicated notice in the task and Coordinator thread.
 - Preserve citation parking and test repeated scheduler ticks against a terminal error.
 - Edge cases: misleading numeric error text, unsupported-model without 404, failure after progress, stale builds, repeated reports, rolling-window boundary, independent todos, restart after process reload, explicit human recovery.

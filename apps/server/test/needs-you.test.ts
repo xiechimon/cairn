@@ -36,6 +36,11 @@ import {
 } from '../src/services/needs-you.js';
 import { parkFailedBuild } from '../src/services/retry-parking.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import {
+  drainTaskMessageQueue,
+  queueTaskMessage,
+  readQueuedMessages,
+} from '../src/services/task-message-queue.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
 
@@ -188,6 +193,35 @@ describe('needs you (#1800)', () => {
         .all()
         .some((notice) => String(notice.content).includes('glm-5.3')),
     ).toBe(true);
+  });
+
+  test('automatic queued-message delivery cannot reopen a parked build after pending peers stop', async () => {
+    const w = openWorld();
+    await queueTaskMessage(w.deps, w.buildId, 'Continue after stop', true);
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'pending-peer',
+        buildId: w.buildId,
+        kind: 'review',
+        status: 'pending',
+        createdAt: nowMs(),
+      })
+      .run();
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    applyStepFailure(w.deps, row, 'model_not_found: glm-5.3');
+    await drainTaskMessageQueue(w.deps, w.buildId);
+    expect(phaseOf(w)).toBe('failed');
+    expect(
+      w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all(),
+    ).toHaveLength(2);
+    const reason = w.s.db
+      .select()
+      .from(buildTable)
+      .where(eq(buildTable.id, w.buildId))
+      .get()?.errorMessage;
+    expect(reason).toContain('Task parked');
+    expect(readQueuedMessages(w.s.db, w.buildId)[0]?.error).toBe(reason);
   });
 
   test('an automatic same-build enqueue cannot bypass model parking', () => {
