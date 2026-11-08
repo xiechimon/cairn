@@ -72,10 +72,24 @@ export function needsGates(paths, testsRead) {
   return hasCode(paths) || paths.some((path) => !path.startsWith('docs/') || testsRead(path));
 }
 
+const FEATURE_REGISTRY = '.claude/skills/verify-cairn/feature-map.json';
+
 export function testsRead(path) {
   const result = spawnSync(
     'git',
-    ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', path, '--', '*.test.ts', '*.test.mjs'],
+    [
+      '-c',
+      'color.ui=never',
+      'grep',
+      '-l',
+      '-F',
+      '-e',
+      path,
+      '--',
+      '*.test.ts',
+      '*.test.mjs',
+      FEATURE_REGISTRY,
+    ],
     { cwd: root, encoding: 'utf8' },
   );
   if (result.status === 1) return false;

@@ -13,8 +13,8 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 | `community/welcome.md` | Discussion categories, where bugs and security reports go, and how to post a first-PR write-up |
 | `pr-review.md` | The PR review process (five-step process + six-section scorecard) |
 | `ops-db-backup.md` | Server DB and attachments backup and recovery (script `scripts/ops/backup-server-db.sh`, the omarchy units, the rrsync receiver on dmit, and drill discipline) |
-| `feature-map.md` | Feature map (living register of current state), mechanically extracted by `scripts/generate-feature-map.mjs` — do not hand-edit; re-run the script to regenerate, add `--check` to verify. Dual-map roles and the daily maintain loop: `ops/feature-map-maintain.md` |
-| `ops/feature-map-maintain.md` | Continuous maintain for the ticket register (`docs/feature-map.md`) and the empirical verify-cairn `features/` map; daily Actions check + issue filing; Cursor Cloud live maintain routine |
+| `feature-map.md` | Feature coverage: every user-facing feature with its research, frontend design and backend design, the gaps grouped into batches, and eval coverage. Generated from `.claude/skills/verify-cairn/feature-map.json` by `scripts/generate-feature-map.mjs`; do not hand-edit |
+| `ops/feature-map-maintain.md` | How the feature registry and the verify-cairn `features/` recipes stay current: the CI check, the daily Actions loop and the live maintain routine |
 | `lessons/` | Free-form notes, one file per kind of mistake, recording causes and safeguards |
 | `agent-dispatch-prompts.md` | Agent dispatch prompt templates (task, scope, and acceptance commands are appended after the matching template), shared by Codex / Grok / pi, all following AGENTS.md |
 | `ops/langfuse.md` | Self-hosted Langfuse v4 on this machine (compose lives in `ops/langfuse/`, not in the product install path) |
