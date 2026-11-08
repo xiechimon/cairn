@@ -67,11 +67,12 @@ export async function testProviderConnection(
   } catch {
     reason = 'The connection test could not finish. Check the connection settings and try again.';
   }
-  const result = { status: reason === null ? 'ok' : 'failed', reason };
-  const scrubbed = providerTestResultSchema.parse(
-    redactSecrets(result, apiKey === null ? [] : [apiKey]).value,
-  );
-  if (scrubbed.reason !== null)
-    scrubbed.reason = scrubbed.reason.replace(/\s+/g, ' ').trim().slice(0, 300);
-  return scrubbed;
+  const scrubbedReason = redactSecrets(reason, apiKey === null ? [] : [apiKey]).value;
+  return providerTestResultSchema.parse({
+    status: redactSecrets(reason === null ? 'ok' : 'failed').value,
+    reason:
+      typeof scrubbedReason === 'string'
+        ? scrubbedReason.replace(/\s+/g, ' ').trim().slice(0, 300)
+        : null,
+  });
 }

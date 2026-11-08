@@ -53,6 +53,8 @@ The third review found that the shared server materializer itself omitted authHe
 
 Final focused verification including the CI-timeout file: 222 tests passed in seven files; verify-dispatch's four cases pass locally. A broader import-graph-related run was attempted but exceeded the shell timeout without a final suite result; do not claim it passed. Lint, typecheck, spec parsing and prepush were rerun successfully. Keep CI ownership until the current head reports.
 
+The next review exposed a redaction/schema interaction: literal credentials equal to status, reason, ok or failed rewrote structural fields. Four new regressions failed with HTTP 500. Reconsidered the output boundary: preserve the fixed schema keys and status enum; pass the status through pattern redaction, and apply stored-key literal redaction only to the reason. The existing server-authored-reason test still proves literal credential removal. All 226 focused tests pass. Lint, typecheck, spec parsing and prepush pass; one combined shell run timed out before spec parsing completed, so those checks were rerun separately. CI on the preceding head passed check and e2e-gate; current-head CI remains the delivery criterion.
+
 ## UI comparison
 
 | State | Reference | Ours | Verdict |

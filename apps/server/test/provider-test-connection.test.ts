@@ -212,6 +212,21 @@ describe('provider connection check', () => {
     expect((await response.text()).includes(KEY)).toBe(false);
   });
 
+  test.each(['status', 'reason', 'ok', 'failed'])(
+    'preserves structural fields when the credential is %s',
+    async (apiKey) => {
+      transport({ status: 200, body: completion() });
+      const s = bootServer();
+      const path = await addProvider(s, { apiKey });
+      expect(await result(s, path)).toEqual({ status: 'ok', reason: null });
+      transport({ status: 401, body: { error: { message: `denied ${apiKey}` } } });
+      const data = await result(s, path);
+      expect(Object.keys(data).sort()).toEqual(['reason', 'status']);
+      expect(data.status).toBe('failed');
+      expect(data.reason).toEqual(expect.any(String));
+    },
+  );
+
   test('redacts literal stored credentials even from server-authored reasons', async () => {
     transport({ status: 401, body: { error: { message: 'denied' } } });
     const s = bootServer();
