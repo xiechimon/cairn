@@ -93,6 +93,10 @@ describe('provider connection check', () => {
     }));
     const s = bootServer();
     const data = await result(s, await addProvider(s));
+    const envelope = (await (
+      await req(s.app, 'GET', `/api/teams/${s.team.id}/providers`)
+    ).json()) as { canTestConnection?: boolean };
+    expect(envelope.canTestConnection).toBe(true);
     expect(data.status).toBe('ok');
     expect(calls).toHaveLength(1);
     expect(calls[0]?.headers.get('authorization') === `Bearer ${KEY}`).toBe(true);
@@ -145,6 +149,10 @@ describe('provider connection check', () => {
     const path = await addProvider(s);
     s.db.run(sql`INSERT INTO user (id, displayName) VALUES ('earlier-user', 'Earlier')`);
     s.db.run(sql`UPDATE user SET rowid = 100000 WHERE id != 'earlier-user'`);
+    const envelope = (await (
+      await req(s.app, 'GET', `/api/teams/${s.team.id}/providers`)
+    ).json()) as { canTestConnection?: boolean };
+    expect(envelope.canTestConnection).toBe(false);
     expect((await req(s.app, 'POST', path, {})).status).toBe(403);
     expect(calls).toHaveLength(0);
   });

@@ -385,7 +385,10 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/providers', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(getProvidersEnvelope(keysvc, teamId));
+    return c.json({
+      ...getProvidersEnvelope(keysvc, teamId),
+      canTestConnection: isOwner(ctx.db, ctx.user.id),
+    });
   });
 
   app.get('/api/teams/:id/model-sources', (c) => {

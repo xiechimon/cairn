@@ -94,6 +94,7 @@ export type StepRow = StepJournalRow;
 export interface ProvidersEnvelope {
   presets: ProviderPreset[];
   providers: ProviderRecord[];
+  canTestConnection?: boolean;
 }
 
 export const useSession = (enabled: boolean) =>

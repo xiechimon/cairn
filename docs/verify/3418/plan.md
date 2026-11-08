@@ -39,6 +39,12 @@ Surface: settings. Goal: test a saved connection without exposing credentials. R
 - pnpm lint, pnpm typecheck, pnpm spec:parse and pnpm prepush passed. The first prepush caught formatting in the test, fixed before rerunning. No lockfile changes are included.
 - Before evidence: the main-based route regression is an in-process server observation, not a second live baseline stack. The original PR's archived before request is available separately; do not claim a new live before capture.
 
+## Review follow-up
+
+Cloud review raised one P2 authorization mismatch: the server refused non-owners but the button remained visible. New owner-capability assertions failed twice in the route tests; two new browser regressions failed with the button still visible for false or missing capability. The providers envelope now exposes canTestConnection from the same isOwner predicate, and the UI hides the action unless it is explicitly true. All four browser cases pass. The 112 focused unit tests still pass, including both owner states. The isolated HTTP/browser probe was relaunched on the changed code and again passed all three API cases and twelve captures.
+
+CI also caught an omitted route-vocabulary registration in wire.test.ts; register the new, user-requested POST as an inferred route without weakening the vocabulary check. Local broader gallery failures did not reproduce in the first CI e2e run. The repository autonomy brake currently blocks pr-evidence before its body checks; do not bypass or clear it.
+
 ## UI comparison
 
 | State | Reference | Ours | Verdict |

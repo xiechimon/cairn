@@ -8,6 +8,20 @@ const RECORD = {
   id: 'prov-relay', createdBy: 'u1', createdAt: 1, updatedAt: 1,
 };
 
+for (const canTestConnection of [false, undefined]) {
+  test(`owner-only check is hidden when capability is ${canTestConnection}`, async ({ page }) => {
+    await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+      if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [RECORD], canTestConnection });
+      if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+      return undefined;
+    });
+    await page.goto('/app/resources/providers');
+    const editor = page.getByTestId('provider-editor');
+    await expect(editor.getByLabel('名称')).toHaveValue('Relay connection');
+    await expect(editor.getByRole('button', { name: '测试', exact: true })).toHaveCount(0);
+  });
+}
+
 test('connection check shows only a status and scrubbed failure details', async ({ page }) => {
   let result = { status: 'ok', reason: null as string | null };
   const posts: string[] = [];
@@ -16,7 +30,7 @@ test('connection check shows only a status and scrubbed failure details', async 
       posts.push(route.request().method());
       return json(result);
     }
-    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [RECORD] });
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [RECORD], canTestConnection: true });
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     return undefined;
   });
@@ -40,7 +54,7 @@ test('pending checks disable repeat clicks and transport errors use safe copy', 
   const held = new Promise<void>((resolve) => { release = resolve; });
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/providers/prov-relay/test') return held.then(() => route.abort());
-    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [RECORD] });
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [RECORD], canTestConnection: true });
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     return undefined;
   });
