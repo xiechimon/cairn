@@ -144,6 +144,7 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
             { header: '备注', text: privateAnswer },
           ],
         },
+        'owner',
       );
       const result = await waiting;
       expect(result.status).toBe(change === 'valid' ? 200 : 401);
@@ -425,6 +426,7 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
             { header: '备注', text: '无' },
           ],
         },
+        'owner',
       );
     }, 30);
     const settled = await holdForQuestion(
@@ -473,6 +475,7 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
           { header: '备注', text: '好' },
         ],
       },
+      'owner',
     );
     cancelPendingQuestions({ db: w.s.db }, w.threadId, '回合已结束');
     const kept = JSON.parse(

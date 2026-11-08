@@ -756,7 +756,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
         requestId: str('The requestId of the pending question.'),
         answer: str('The answer, at most 20000 characters.'),
         ownerMessageId: str(
-          "Id of the user's message in this conversation that gives the answer (find it with search_history). Required when relaying the user's answer to a design, payment, credential or intended-behavior question; that message must come after the escalation.",
+          "Id of the user's message, or of an ask_user question card the user answered, in this conversation that gives the answer (find it with search_history). Required when relaying the user's answer to a design, payment, credential or intended-behavior question; that message must come after the escalation.",
         ),
       },
       ['todoId', 'requestId', 'answer'],

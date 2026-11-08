@@ -1,14 +1,21 @@
-import { DEFAULT_AUTONOMY_SETTINGS, QUESTION_DEADLINE_MS } from '@cairn/shared';
+import { randomUUID } from 'node:crypto';
+import {
+  ASK_USER_QUESTION_KIND,
+  DEFAULT_AUTONOMY_SETTINGS,
+  QUESTION_DEADLINE_MS,
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, message, notification, project, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
 import { buildChiefSystemPrompt, triggerChiefWakes } from '../src/services/chief.js';
+import { answerQuestion } from '../src/services/chief-questions.js';
 import { listNeedsYou } from '../src/services/needs-you.js';
 import { sweepQuestionDeadlines } from '../src/services/question-deadlines.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -96,6 +103,34 @@ function ownerSays(content: string, createdAt: number, role: 'user' | 'assistant
     .values({ id, threadId: H.threadId, role, content, projectId: null, createdAt })
     .run();
   return id;
+}
+
+function askCard() {
+  const requestId = `ask-${randomUUID()}`;
+  H.s.db
+    .insert(chiefMessage)
+    .values({
+      id: requestId,
+      threadId: H.threadId,
+      role: 'assistant',
+      content: JSON.stringify({
+        kind: ASK_USER_QUESTION_KIND,
+        requestId,
+        status: 'pending',
+        questions: [
+          {
+            header: 'Copy',
+            question: 'Which wins for the onboarding copy?',
+            options: [{ label: 'Repo rule' }, { label: 'Brief' }],
+          },
+        ],
+        answers: null,
+      }),
+      projectId: null,
+      createdAt: Date.now(),
+    })
+    .run();
+  return requestId;
 }
 
 function ownerNeedsYou() {
@@ -306,6 +341,87 @@ describe('repo rules beat the brief; only owner classes escalate (task stall S3)
         requestId: REQUEST,
         answer: 'Brief wins.',
         ownerMessageId: early,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId)).toBe('pending');
+  });
+
+  test('an owner-answered Coordinator question card relays an owner-class answer and resumes the worker', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'design',
+      defaultAnswer: 'Repo rule wins.',
+    });
+    const card = askCard();
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/${card}/answer`,
+      { answers: [{ header: 'Copy', choices: ['Brief'] }] },
+    );
+    expect(res.status).toBeLessThan(300);
+    await relay('answer_question', {
+      todoId,
+      requestId: REQUEST,
+      answer: 'Brief wins.',
+      ownerMessageId: card,
+    });
+    expect(questionStatus(buildId)).toBe('answered');
+    expect(getTodo(deps(), todoId)?.decisions).toEqual([
+      expect.objectContaining({ requestId: REQUEST, by: 'person' }),
+    ]);
+  });
+
+  test('a question card the Coordinator answered itself does not authorize an owner-class answer', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'payment',
+      defaultAnswer: 'Stay on the free plan.',
+    });
+    const card = askCard();
+    answerQuestion(
+      { db: H.s.db },
+      { threadId: H.threadId, requestId: card, answers: [{ header: 'Copy', choices: ['Brief'] }] },
+      'agent',
+    );
+    await expect(
+      relay('answer_question', {
+        todoId,
+        requestId: REQUEST,
+        answer: 'Brief wins.',
+        ownerMessageId: card,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId)).toBe('pending');
+  });
+
+  test('a question card the owner answered before the escalation does not authorize it', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    const card = askCard();
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/${card}/answer`,
+      { answers: [{ header: 'Copy', choices: ['Brief'] }] },
+    );
+    expect(res.status).toBeLessThan(300);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'credential',
+      defaultAnswer: 'Use the team key.',
+    });
+    await expect(
+      relay('answer_question', {
+        todoId,
+        requestId: REQUEST,
+        answer: 'Brief wins.',
+        ownerMessageId: card,
       }),
     ).rejects.toMatchObject({ status: 409 });
     expect(questionStatus(buildId)).toBe('pending');

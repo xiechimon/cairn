@@ -13,6 +13,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
+import { askQuestionContentOf } from './chief-questions.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
 import { PhaseTransitionError } from './phase.js';
@@ -130,32 +131,37 @@ async function answerQuestion(
   if (ownerMessageId === undefined) {
     return json(await answerTaskQuestion(deps, ctx.teamId, question, 'coordinator'));
   }
-  const ownerReplyAt = ownerReplyTime(deps.db, ctx, ownerMessageId);
+  const ownerReplyAt = ownerAnswerTime(deps.db, ctx, ownerMessageId);
   return json(await answerTaskQuestion(deps, ctx.teamId, { ...question, ownerReplyAt }, 'person'));
 }
 
-function ownerReplyTime(db: Db, ctx: ChiefToolCtx, messageId: string): number {
-  const reply = db
-    .select({ createdAt: chiefMessage.createdAt })
+function ownerAnswerTime(db: Db, ctx: ChiefToolCtx, ref: string): number {
+  const row = db
+    .select({
+      role: chiefMessage.role,
+      content: chiefMessage.content,
+      createdAt: chiefMessage.createdAt,
+    })
     .from(chiefMessage)
     .innerJoin(chiefThread, eq(chiefMessage.threadId, chiefThread.id))
     .where(
       and(
-        eq(chiefMessage.id, messageId),
+        eq(chiefMessage.id, ref),
         eq(chiefMessage.threadId, ctx.threadId),
-        eq(chiefMessage.role, 'user'),
         eq(chiefThread.userId, ctx.userId),
         eq(chiefThread.teamId, ctx.teamId),
       ),
     )
     .get();
-  if (reply === undefined) {
-    throw new HttpError(
-      409,
-      `ownerMessageId ${messageId} is not a message the user sent in this conversation`,
-    );
+  if (row?.role === 'user') return row.createdAt;
+  const card = row?.role === 'assistant' ? askQuestionContentOf(row.content) : null;
+  if (card?.status === 'answered' && card.answeredBy === 'owner' && card.answeredAt !== undefined) {
+    return card.answeredAt;
   }
-  return reply.createdAt;
+  throw new HttpError(
+    409,
+    `ownerMessageId ${ref} is neither a message the user sent nor a question card the user answered in this conversation`,
+  );
 }
 
 function escalate(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {

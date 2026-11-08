@@ -129,11 +129,16 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     if (!thread || thread.teamId !== teamId) throw notFound(`chief thread ${threadId}`);
     const answers = parseAnswerBody(await jsonBody(c));
     return c.json(
-      answerChiefQuestion(svc, teamId, {
-        threadId,
-        requestId: c.req.param('requestId'),
-        answers,
-      }),
+      answerChiefQuestion(
+        svc,
+        teamId,
+        {
+          threadId,
+          requestId: c.req.param('requestId'),
+          answers,
+        },
+        'owner',
+      ),
     );
   });
 

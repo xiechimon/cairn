@@ -289,11 +289,15 @@ describe('#1791 server auto-confirm after plan step', () => {
       });
       createScheduler(w.s.svc, { tickMs: 15_000 }).tick(Date.now() + 600_000);
       expect(w.todoRow().phase).toBe('confirm');
-      answerQuestion(w.s.svc, {
-        threadId: thread.id,
-        requestId: 'ask-plan-confirm',
-        answers: [{ header: 'Storage', text: 'SQLite' }],
-      });
+      answerQuestion(
+        w.s.svc,
+        {
+          threadId: thread.id,
+          requestId: 'ask-plan-confirm',
+          answers: [{ header: 'Storage', text: 'SQLite' }],
+        },
+        'owner',
+      );
       createScheduler(w.s.svc, { tickMs: 15_000 }).tick(Date.now() + 600_000);
       expect(w.todoRow().phase).toBe('building');
     } finally {

@@ -751,6 +751,7 @@ export function answerChiefQuestion(
   deps: ChiefDeps,
   teamId: string,
   input: { threadId: string; requestId: string; answers: AskUserAnswer[] },
+  by: 'owner' | 'agent',
 ): AskUserQuestionContent {
   const waiting = deps.db
     .select()
@@ -758,7 +759,7 @@ export function answerChiefQuestion(
     .where(and(eq(chiefMessage.id, input.requestId), eq(chiefMessage.threadId, input.threadId)))
     .get();
   if (askQuestionContentOf(waiting?.content)?.parkedAt === undefined) {
-    return answerQuestion(deps, input);
+    return answerQuestion(deps, input, by);
   }
   const threadRow = getChiefThread(deps, input.threadId);
   if (!threadRow) throw new HttpError(404, `chief thread ${input.threadId}`);
@@ -767,7 +768,7 @@ export function answerChiefQuestion(
   const projectId = waiting?.projectId ?? null;
   if (projectId !== null) requireUnarchivedProject(deps.db, projectId);
   return deps.db.transaction(() => {
-    const answered = answerQuestion(deps, input);
+    const answered = answerQuestion(deps, input, by);
     enqueueResumedTurn(deps, teamId, input.threadId, answered, projectId);
     return answered;
   });
