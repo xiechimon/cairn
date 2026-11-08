@@ -20,6 +20,8 @@ const TSNET_HOSTNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
 
 export const tsnetSettingsSchema = z.object({
   enabled: z.boolean(),
+  mode: z.enum(['socket']).optional(),
+  allowedLogins: z.array(z.string().min(1)).optional(),
   binaryPath: z.string().min(1),
   hostname: z.string().regex(TSNET_HOSTNAME_PATTERN),
   uploadLogs: z.boolean(),
@@ -201,7 +203,16 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     authOff,
     host: envStr('HOST') ?? DEFAULT_HOST,
     tsnet: {
-      enabled: envFlag(ENV_VARS.tsnet),
+      enabled: envFlag(ENV_VARS.tsnet) || envStr(ENV_VARS.tsnet) === 'socket',
+      ...(envStr(ENV_VARS.tsnet) === 'socket' ? { mode: 'socket' } : {}),
+      ...(envStr(ENV_VARS.tailscaleUsers) === null
+        ? {}
+        : {
+            allowedLogins: envStr(ENV_VARS.tailscaleUsers)
+              ?.split(',')
+              .map((login) => login.trim())
+              .filter(Boolean),
+          }),
       binaryPath: envStr(ENV_VARS.tsnetBinary) ?? defaultTsnetBinaryPath(home),
       hostname: envStr(ENV_VARS.tsnetHostname) ?? DEFAULT_TSNET_HOSTNAME,
       uploadLogs: envFlag(ENV_VARS.tsnetUploadLogs),
@@ -242,7 +253,7 @@ export function insecureBindWarning(config: ServerConfig): string | null {
 export function ignoredTailscaleUsersWarning(env: NodeJS.ProcessEnv = process.env): string | null {
   const raw = env[ENV_VARS.tailscaleUsers];
   if (raw === undefined || raw.trim() === '') return null;
-  return `${ENV_VARS.tailscaleUsers} is ignored — the Tailscale-User-Login header no longer grants access; sign in with ${ENV_VARS.token} (run \`${BRAND.cliCommandName} token\` on this machine to print it)`;
+  return `${ENV_VARS.tailscaleUsers} applies only to the private tailnet Unix socket when no untagged node owner is known; Tailscale-User-Login on TCP never grants access`;
 }
 
 export function authOffRefusal(config: ServerConfig): string | null {

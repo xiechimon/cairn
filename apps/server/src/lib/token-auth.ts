@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context, Hono } from 'hono';
 import { sha256Hex } from './crypto.js';
+import { tailnetOriginOf, tailnetOwnerIdentityOf } from './tailnet-listener.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -18,7 +19,12 @@ const OWNER_ONLY_PATTERNS = [
 ];
 
 export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
-  if (pathname === '/api/remote/pairing' || pathname.startsWith('/api/remote/devices')) return true;
+  if (
+    pathname === '/api/machine/enroll/confirm' ||
+    pathname === '/api/remote/pairing' ||
+    pathname.startsWith('/api/remote/devices')
+  )
+    return true;
   if (READ_METHODS.has(method.toUpperCase())) return false;
   return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
 }
@@ -32,7 +38,11 @@ export function isOpenRemotePath(pathname: string): boolean {
 function isExempt(pathname: string): boolean {
   if (pathname.includes('%')) return false;
   if (!pathname.startsWith('/api/')) return true;
-  if (pathname === '/api/machine' || pathname.startsWith('/api/machine/')) return true;
+  if (
+    pathname !== '/api/machine/enroll/confirm' &&
+    (pathname === '/api/machine' || pathname.startsWith('/api/machine/'))
+  )
+    return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
   if (isOpenRemotePath(pathname)) return true;
@@ -68,6 +78,7 @@ export interface TokenAuthOptions {
 declare module 'hono' {
   interface ContextVariableMap {
     pairedDeviceId: string;
+    tailnetOwnerLogin: string;
   }
 }
 
@@ -105,6 +116,18 @@ export function registerTokenAuth(
     if (STREAM_PATH_PATTERNS.some((pattern) => pattern.test(pathname))) {
       const queryToken = url.searchParams.get('token');
       if (queryToken !== null && verify(queryToken)) return admit();
+    }
+    const identity = tailnetOwnerIdentityOf(c);
+    if (identity !== null) {
+      if (
+        !READ_METHODS.has(c.req.method.toUpperCase()) &&
+        c.req.header('sec-fetch-site') !== 'same-origin' &&
+        c.req.header('origin') !== tailnetOriginOf(c)
+      ) {
+        return c.json({ error: 'same-origin proof required for Tailscale identity' }, 403);
+      }
+      c.set('tailnetOwnerLogin', identity.login);
+      return next();
     }
     return c.json({ error: 'Unauthorized' }, 401);
   });

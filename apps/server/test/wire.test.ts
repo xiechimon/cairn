@@ -58,6 +58,7 @@ const INFERRED_ROUTES = [
   'DELETE /api/teams/{id}/secrets/{sid}',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
+  'GET /api/remote/identity',
   'GET /api/remote/descriptor',
   'GET /api/remote/routes',
   'POST /api/remote/pairing',

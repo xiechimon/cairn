@@ -28,11 +28,18 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     if (ctx.authToken === null) {
       throw new HttpError(409, 'pairing needs token auth, which is turned off');
     }
+    if (c.get('tailnetOwnerLogin') !== undefined) return;
     const provided = bearerToken(c);
     if (provided === null || !matchesAuthToken(ctx.authToken, provided)) {
       throw new HttpError(403, 'only the owner token can manage pairing');
     }
   };
+
+  app.get('/api/remote/identity', (c) => {
+    c.header('cache-control', 'no-store');
+    const login = c.get('tailnetOwnerLogin');
+    return c.json(login === undefined ? { login: null, via: null } : { login, via: 'tailscale' });
+  });
 
   app.get('/api/remote/descriptor', (c) => {
     const descriptor: RemoteDescriptor = {
