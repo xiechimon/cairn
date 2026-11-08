@@ -75,6 +75,19 @@ describe('classifyStepFailure (#1257 three-bucket classification)', () => {
     expect(classifyStepFailure('input tokens: 404913 exceeds nothing')).toBe('other');
   });
 
+  test.each([
+    'model synthetic/glm-5.3 not found',
+    'unsupported_model: glm-5.3',
+    'unsupported-model: glm-5.3',
+    'unsupported model: glm-5.3',
+    'Model "glm-5.3" is not supported',
+    'model not supported: glm-5.3',
+    'Model "glm-5.3" is not supported by any configured account in this group',
+    '404 model_not_found (quota service status 503)',
+  ])('terminal model rejection takes precedence over misleading diagnostics: %s', (error) => {
+    expect(classifyStepFailure(error)).toBe('model_unavailable');
+  });
+
   test('failure mode 5: bucket order quota > capacity > network', () => {
     expect(
       classifyStepFailure('upstream stream disconnected: connection reset by peer (402 quota)'),

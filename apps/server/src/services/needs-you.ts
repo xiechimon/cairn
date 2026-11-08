@@ -8,6 +8,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, NotFoundError } from './builds.js';
 import { PhaseTransitionError } from './phase.js';
 import { projectMergeConfigOf } from './projects.js';
+import { retryIsParked } from './retry-parking.js';
 import { getTodo } from './todos.js';
 
 export const CITATION_CHECK_SOURCE_KIND = 'research-citation-check';
@@ -38,6 +39,7 @@ const MISSING_CREDENTIALS = [
 ] as const;
 
 export function failureNeedsHuman(errorMessage: string): boolean {
+  if (retryIsParked(errorMessage)) return true;
   if (errorMessage.startsWith('PR Auto-fix needs you:')) return true;
   if (isProviderAuthFailure(errorMessage)) return true;
   if (errorMessage.startsWith(CITATION_PARKED_MARK)) return true;

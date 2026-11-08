@@ -223,6 +223,16 @@ async function runQuotaCase(script: StepEvent[], providerId = 'gw-quota') {
 }
 
 describe('runner quota circuit breaker (#1261)', () => {
+  test.each([
+    '404: {"message":"Model \\"glm-5.3\\" is not supported by any configured account in this group","type":"model_not_found"}',
+    'unsupported model: glm-5.3',
+  ])('stops a rejected model before any SDK retry: %s', async (error) => {
+    const { client, autoRetries } = await runQuotaCase(quotaCycles(4, error));
+    expect(autoRetries).toBe(0);
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+    expect(client.doneBodies[0]?.body.errorMessage).toContain('glm-5.3');
+    expect(client.doneBodies[0]?.body.quotaBlock).toBeUndefined();
+  });
   test('Q1 quota storm: circuit breaks on the first error event — auto_retry never fires once, root cause still reported', async () => {
     const { client, lines, autoRetries } = await runQuotaCase(quotaCycles(10, QUOTA_402));
     expect(autoRetries).toBe(0);

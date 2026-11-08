@@ -16,7 +16,7 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
+import { classifyStepFailure, ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
 import {
   type BuiltinProvider,
   getAllBuiltinModels,
@@ -771,6 +771,14 @@ class PiSessionHandle implements AgentSessionHandle {
     this.events = this.queue.iterable();
     session.subscribe((event) => {
       const raw = event as unknown as AgentSessionEventLike;
+      if (
+        raw.type === 'message_end' &&
+        raw.message?.role === 'assistant' &&
+        raw.message.stopReason === 'error' &&
+        classifyStepFailure(raw.message.errorMessage ?? '') === 'model_unavailable'
+      ) {
+        session.setAutoRetryEnabled(false);
+      }
       if (raw.type === 'compaction_end' && raw.errorMessage) {
         this.onCompactionLog?.(`compaction failed: ${raw.errorMessage}`);
       }
