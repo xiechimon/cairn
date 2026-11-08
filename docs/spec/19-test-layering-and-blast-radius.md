@@ -102,8 +102,6 @@ Conclusion: five of the six already have a different-shaped pacman equivalent, c
 
 When the thread-task template's blast-radius item references this file, the global gesture's single source is `apps/web/src/overlay/gesture-machine.ts`.
 
-Escape close-layer and the Coordinator settings view are computed only in that file's `reduceGesture`. Consumption points dispatch events, do not hold their own booleans, and do not register a second window-level Escape listener. New global gestures add into that file's event table and `bindGestureKeys`.
+⌘J, Escape close-layer, and the chief-drawer open/close next state are computed only in that file's `reduceGesture`. Consumption points dispatch events, do not hold their own open/close booleans, and do not register a second window-level Escape or ⌘J listener. New global gestures add into that file's event table and `bindGestureKeys`.
 
-⌘J is navigation, not state: the one listener in `apps/web/src/chief/chief-root.tsx` sends you to the Coordinator page through `useOpenComposer`. There is no floating Coordinator to open or close; `apps/web/test/no-floating-coordinator.test.ts` guards that.
-
-Page-private chords (⌘K search, C new task, new-task Tab) are not this machine's state.
+Page-private chords (⌘K search, C new task, N inside the drawer, new-task Tab) are not this machine's state. They do not keep a separate copy of the chief open/close state.
