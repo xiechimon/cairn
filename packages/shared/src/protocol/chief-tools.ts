@@ -749,12 +749,15 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'answer_question',
     description:
-      'Answer one pending question of a thread by its requestId (from needs_you or the question wake). The answer is stored as a decision on the task, survives restarts, and resumes the same build and session. A requestId that is not pending on the thread is refused.',
+      "Answer one pending question of a thread by its requestId (from needs_you or the question wake). The answer is stored as a decision on the task, survives restarts, and resumes the same build and session. A requestId that is not pending on the thread is refused. To relay the user's own answer, pass ownerMessageId; a question escalated to the user in an owner class accepts only that.",
     parameters: obj(
       {
         todoId: str('Todo id of the thread.'),
         requestId: str('The requestId of the pending question.'),
         answer: str('The answer, at most 20000 characters.'),
+        ownerMessageId: str(
+          "Id of the user's message in this conversation that gives the answer (find it with search_history). Required when relaying the user's answer to a design, payment, credential or intended-behavior question; that message must come after the escalation.",
+        ),
       },
       ['todoId', 'requestId', 'answer'],
     ),

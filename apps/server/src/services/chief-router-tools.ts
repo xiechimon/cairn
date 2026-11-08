@@ -8,7 +8,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, todo } from '../db/schema.js';
+import { build, chiefMessage, chiefThread, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
@@ -125,14 +125,37 @@ async function answerQuestion(
   if (answer.length > ANSWER_MAX) {
     throw new HttpError(400, `invalid params.answer: at most ${ANSWER_MAX} characters`);
   }
-  return json(
-    await answerTaskQuestion(
-      deps,
-      ctx.teamId,
-      { todoId: str(params, 'todoId'), requestId: str(params, 'requestId'), answer },
-      'coordinator',
-    ),
-  );
+  const question = { todoId: str(params, 'todoId'), requestId: str(params, 'requestId'), answer };
+  const ownerMessageId = optStr(params, 'ownerMessageId');
+  if (ownerMessageId === undefined) {
+    return json(await answerTaskQuestion(deps, ctx.teamId, question, 'coordinator'));
+  }
+  const ownerReplyAt = ownerReplyTime(deps.db, ctx, ownerMessageId);
+  return json(await answerTaskQuestion(deps, ctx.teamId, { ...question, ownerReplyAt }, 'person'));
+}
+
+function ownerReplyTime(db: Db, ctx: ChiefToolCtx, messageId: string): number {
+  const reply = db
+    .select({ createdAt: chiefMessage.createdAt })
+    .from(chiefMessage)
+    .innerJoin(chiefThread, eq(chiefMessage.threadId, chiefThread.id))
+    .where(
+      and(
+        eq(chiefMessage.id, messageId),
+        eq(chiefMessage.threadId, ctx.threadId),
+        eq(chiefMessage.role, 'user'),
+        eq(chiefThread.userId, ctx.userId),
+        eq(chiefThread.teamId, ctx.teamId),
+      ),
+    )
+    .get();
+  if (reply === undefined) {
+    throw new HttpError(
+      409,
+      `ownerMessageId ${messageId} is not a message the user sent in this conversation`,
+    );
+  }
+  return reply.createdAt;
 }
 
 function escalate(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {

@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { inlineSegments } from '../api/mappers.js';
+import { clockTime, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
@@ -233,6 +233,24 @@ function Row({
               )}
             </div>
           ))}
+          {item.status === 'pending' && item.escalation !== undefined && (
+            <div
+              data-testid="transcript-question-escalation"
+              className="flex flex-col gap-0.5 text-meta text-(--text-secondary)"
+            >
+              <div>{t('交给你决定：{class}', { class: item.escalation.class })}</div>
+              <div>
+                {item.escalation.defaultAnswer === null
+                  ? t('没有建议答案')
+                  : t('建议答案：{answer}', { answer: item.escalation.defaultAnswer })}
+              </div>
+              <div>
+                {item.escalation.applyAt === null
+                  ? t('不会自动采用')
+                  : t('{time} 自动采用建议答案', { time: clockTime(item.escalation.applyAt) })}
+              </div>
+            </div>
+          )}
           <div className="text-meta text-(--text-tertiary)">
             {item.status === 'pending'
               ? t('等待你的回复')

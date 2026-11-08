@@ -227,7 +227,7 @@ export interface QuestionAnswerResult {
 export async function answerTaskQuestion(
   deps: BuildDeps,
   teamId: string,
-  input: { todoId: string; requestId: string; answer: string },
+  input: { todoId: string; requestId: string; answer: string; ownerReplyAt?: number },
   by: 'person' | 'coordinator',
 ): Promise<QuestionAnswerResult> {
   const row = deps.db
@@ -248,15 +248,19 @@ export async function answerTaskQuestion(
       `requestId ${input.requestId} is not pending on thread #${row.seqNum}${pending.length > 0 ? `; pending: ${pending.map((q) => q.requestId).join(', ')}` : ''}`,
     );
   }
-  if (
-    by === 'coordinator' &&
-    question.escalation !== undefined &&
-    ownerDecides(question.escalation.class)
-  ) {
-    throw new HttpError(
-      409,
-      `requestId ${input.requestId} is a ${question.escalation.class} question with the user; only the user answers it`,
-    );
+  if (question.escalation !== undefined && ownerDecides(question.escalation.class)) {
+    if (by === 'coordinator') {
+      throw new HttpError(
+        409,
+        `requestId ${input.requestId} is a ${question.escalation.class} question with the user; only the user answers it. Relay the user's answer with ownerMessageId set to their message`,
+      );
+    }
+    if (input.ownerReplyAt !== undefined && input.ownerReplyAt < question.escalation.at) {
+      throw new HttpError(
+        409,
+        `the user message predates the escalation of requestId ${input.requestId}; relay a reply the user sent after it`,
+      );
+    }
   }
   const answer = { todoId: row.id, question, answer: input.answer, by };
   const result = { todoId: row.id, buildId, requestId: input.requestId };
