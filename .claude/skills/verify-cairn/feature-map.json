@@ -149,6 +149,48 @@
       ]
     },
     {
+      "id": "selection-reply",
+      "name": "Selection reply",
+      "summary": "Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.",
+      "states": "Bar above the selection, quote staged above the composer, sent bubble with the quote, no bar on touch selections, light and dark, 1440 and 390 wide.",
+      "centrality": 1,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/chief/selection-reply.tsx",
+          "apps/web/src/chief/selection-reply-model.ts",
+          "apps/web/src/chief/reply-quote-block.tsx"
+        ],
+        "other": [
+          "packages/shared/src/reply-quote.ts"
+        ]
+      },
+      "routes": {
+        "web": [
+          "/app"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "type select two or more characters inside one Coordinator reply",
+        "click testid:selection-reply"
+      ],
+      "research": [
+        "docs/research/selection-reply-2026-11-08.md"
+      ],
+      "frontendDesign": [
+        "docs/design/selection-reply-2026-11-08.md"
+      ],
+      "backendDesign": [
+        "docs/design/selection-reply-2026-11-08.md"
+      ],
+      "evidence": [
+        "apps/web/e2e/chief-selection-reply.spec.ts",
+        "packages/shared/test/reply-quote.test.ts",
+        "apps/web/test/selection-reply-model.test.ts"
+      ]
+    },
+    {
       "id": "coordinator-context",
       "name": "Coordinator context and compaction",
       "summary": "Each Coordinator turn is assembled by the server within a token budget from recent messages, an index of older ones, history tools and ledger facts, so compaction is invisible to the user.",
