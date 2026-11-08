@@ -163,7 +163,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ### Sidebar (Grouped)
 From top to bottom:
-1. **Workspace row**: spiral mark (`public/logo-mark.svg` as a mask, 22px, taking the row ink `ink`) + display brand name at 20px + dropdown arrow; two icon buttons on the right: search (⌘K) and collapse sidebar.
+1. **Workspace row** (claude.ai's titlebar): the collapse toggle (28px button, 18px icon) at the row's left edge, then the brand name as a serif wordmark (Source Serif 4, 20px, weight 500, normal tracking, 20px line height) 4px after it; search (⌘K) is the one icon button on the right. No logo glyph: the spiral marks the Coordinator row below, not the header.
 2. **New-task button**: see "Current shell and board surface" below. It is an action, not a nav item.
 3. **Work nav**: workbench, needs my attention (`accent` count badge on the right), schedules. Active item = `accent` icon.
 4. **Threads by status** (D121 decision 6, rules L1 to L7): three groups under count headers, newest first inside each: `Needs you` (needs-you and failed threads, count in `accent`), `In progress` (running first, then idle, then snoozed), `Done` (folded by default). One 28px line per thread, the title takes the row width. Status is a monochrome `StatusGlyph` in the ink ladder; only a needs-you glyph and its count use `accent`. A failed thread is a muted text tag (`Failed`), not a red icon. Elapsed time shows on running rows only; other rows reveal their age on hover. The running row is lifted (`card` fill, `--e1`); the open row takes the hover fill. The project name lives in the row tooltip, and the list narrows to the active project (Amp scopes its list to a workspace row; t3code prints the project per row, which costs a line).
