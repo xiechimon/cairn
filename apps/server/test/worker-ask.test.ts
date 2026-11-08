@@ -518,8 +518,8 @@ describe('worker question hardening', () => {
 describe('worker ask_user tool dispatch and parked replies', () => {
   test('session steps get ask_user for both repo types, build steps never', () => {
     for (const github of [false, true]) {
-      expect(workerRemoteTools('session', github).map((t) => t.name)).toContain('ask_user');
-      expect(workerRemoteTools('build', github).map((t) => t.name)).not.toContain('ask_user');
+      expect(workerRemoteTools('session', github, true).map((t) => t.name)).toContain('ask_user');
+      expect(workerRemoteTools('build', github, true).map((t) => t.name)).not.toContain('ask_user');
     }
   });
 

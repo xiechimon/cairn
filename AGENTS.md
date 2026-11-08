@@ -91,3 +91,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - `e2e:affected` leases a heavy slot and its port (base 8398, stride 10); `E2E_AFFECTED_PORT` changes the base and explicit `E2E_PORT` overrides it. Inspect any reported port holder before retrying.
 - Run only one Playwright instance per worktree; shared build output and ports are exclusive. Separate worktrees keep their own build outputs.
 - Dev ports default to 5173 and 8787; use `CAIRN_DEV_WEB_PORT` and `CAIRN_DEV_SERVER_PORT` for another stack.
+- Start any server, stack or loop that must outlive one command as a background task through `node scripts/owned-process.mjs -- <command>`; it dies with its owner. Never use `nohup`, `setsid`, `disown` or a trailing `&`; `scripts/spawn-ownership.test.mjs` rejects `detached` or `unref()` children outside the helper.
+- The host's worktree reaper removes a `.claude/worktrees/` tree once its PR is merged or closed at the tree's exact head, the tree is clean and no process uses it; it reports every tree it keeps.
+- Start any server, stack or loop that must outlive one command as a background task through `node scripts/owned-process.mjs -- <command>`; it dies with its owner. Never use `nohup`, `setsid`, `disown` or a trailing `&`; `scripts/spawn-ownership.test.mjs` rejects `detached` or `unref()` children outside the helper.
+- The host's worktree reaper removes a `.claude/worktrees/` tree once its PR is merged or closed at the tree's exact head, the tree is clean and no process uses it; it reports every tree it keeps.

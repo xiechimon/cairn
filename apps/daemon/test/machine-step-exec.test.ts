@@ -7,6 +7,7 @@ import {
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   PLAN_FILE_NAME,
+  WORKER_REMOTE_TOOLS,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
@@ -37,7 +38,7 @@ describe('step execution full chain (02 §5.7 lifecycle lines + journal endpoint
     ]);
     const { handle, lines, paths } = await boot({ api, backend });
     await waitFor(() => api.parked !== null);
-    api.parked?.(CLAIMED);
+    api.parked?.({ ...CLAIMED, remoteTools: [...WORKER_REMOTE_TOOLS] });
     await waitFor(() => api.doneBodies.length === 1);
 
     expect(lines).toContain('claim step=s1');

@@ -84,8 +84,6 @@ export interface ChiefDeepLink {
   onConsumed: () => void;
 }
 
-export const CHIEF_OPEN_STORAGE_KEY = 'cairn.chief-open';
-
 function placeOf(pathname: string, search: string): string {
   const params = new URLSearchParams(search);
   params.delete('chief');
@@ -93,19 +91,7 @@ function placeOf(pathname: string, search: string): string {
   return `${pathname}?${params.toString()}`;
 }
 
-function readStoredChiefOpen(): boolean {
-  try {
-    return localStorage.getItem(CHIEF_OPEN_STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function useChiefSurface(
-  fixture: FixtureSet,
-  deepLink?: ChiefDeepLink,
-  onHome = false,
-): ChiefSurface {
+export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): ChiefSurface {
   const { live, teamId } = useLiveData();
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
@@ -115,29 +101,19 @@ export function useChiefSurface(
   const sendKey = useSendKey();
 
   const chief = fixture.chief;
-  const initialChief: ChiefView =
-    chief?.view ?? (live && readStoredChiefOpen() ? 'drawer' : 'none');
-  getGestureStore(initialChief);
+  getGestureStore(chief?.view ?? 'none');
   const chiefView = useSyncExternalStore(
     (listener) => getGestureStore().subscribe(listener),
     () => getGestureStore().getState().chief,
     () => getGestureStore().getState().chief,
   );
   const setChiefView = useCallback((view: ChiefView) => {
-    const type: GestureEvent['type'] =
-      view === 'none' ? 'chief/minimize' : view === 'settings' ? 'chief/settings' : 'chief/open';
+    const type: GestureEvent['type'] = view === 'settings' ? 'chief/settings' : 'chief/minimize';
     getGestureStore().dispatch({ type });
   }, []);
   useLayoutEffect(() => {
     ensureGestureKeys();
   }, []);
-  const chiefViewOpen = chiefView === 'drawer';
-  useEffect(() => {
-    if (!live || onHome) return;
-    try {
-      localStorage.setItem(CHIEF_OPEN_STORAGE_KEY, chiefView === 'drawer' ? '1' : '0');
-    } catch {}
-  }, [live, onHome, chiefView]);
 
   const { pathname, search } = useLocation();
   const place = placeOf(pathname, search);
@@ -151,20 +127,20 @@ export function useChiefSurface(
     ? (liveThreads.find((thread) => thread.id === linkedThreadId) ??
       globalCoordinatorThread(liveThreads))
     : null;
-  const deepLinkId = deepLink?.threadId ?? null;
-  const onDeepLinkConsumed = deepLink?.onConsumed;
+  const deepLinkId = deepLink.threadId;
+  const onDeepLinkConsumed = deepLink.onConsumed;
   useEffect(() => {
     if (deepLinkId === 'settings') {
       setChiefView('settings');
-      onDeepLinkConsumed?.();
+      onDeepLinkConsumed();
       return;
     }
     if (!live || deepLinkId === null || !chiefThreadsQ.isSuccess) return;
     if (liveThreads.some((thread) => thread.id === deepLinkId)) {
       setLinked({ threadId: deepLinkId, place });
-      if (!onHome) setChiefView('drawer');
+      setChiefView('none');
     }
-    onDeepLinkConsumed?.();
+    onDeepLinkConsumed();
   }, [
     live,
     deepLinkId,
@@ -172,7 +148,6 @@ export function useChiefSurface(
     liveThreads,
     onDeepLinkConsumed,
     setChiefView,
-    onHome,
     place,
   ]);
   const { query: chiefMessagesQ, messages: chiefMessages } = useChiefMessages(
@@ -189,11 +164,7 @@ export function useChiefSurface(
     }),
     [t],
   );
-  useConversationStream(
-    live ? (activeThread?.id ?? undefined) : undefined,
-    live && (chiefViewOpen || onHome),
-    streamHandlers,
-  );
+  useConversationStream(live ? (activeThread?.id ?? undefined) : undefined, live, streamHandlers);
   const activeThreadId = live ? (activeThread?.id ?? null) : null;
   const knownChiefIds = useMemo(() => new Set(chiefMessages.map((m) => m.id)), [chiefMessages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>

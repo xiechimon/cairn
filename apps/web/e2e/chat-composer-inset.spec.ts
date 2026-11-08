@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { type MockState, mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
 
 const STREAM = `/api/conversations/${THREAD.id}/stream`;
 const REPLY = '你想测试什么？可以试着问我一个问题，或让我查机器、技能、任务状态。';
@@ -21,7 +20,6 @@ type Surface = { name: string; scope: (page: Page) => ReturnType<Page['locator']
 
 const SURFACES: Surface[] = [
   { name: 'home', scope: (page) => page.getByTestId('home-c') },
-  { name: 'drawer', scope: (page) => page.locator('.chief-drawer') },
 ];
 
 const VIEWPORTS = [
@@ -47,12 +45,7 @@ async function open(page: Page, surface: Surface, activeAfterSend = false) {
   await page.route('**/api/uploads/upload', (route) =>
     route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 3 } }),
   );
-  if (surface.name === 'home') {
-    await page.goto('/app');
-  } else {
-    await page.goto('/app/schedules');
-    await openChiefWindow(page);
-  }
+  await page.goto('/app');
   const scope = surface.scope(page);
   await expect(scope.getByTestId('chief-body')).toBeVisible();
   await expect(scope.getByText('answer 29', { exact: true })).toBeAttached();

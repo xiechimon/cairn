@@ -70,12 +70,13 @@ node .claude/skills/verify-cairn/scripts/launch.mjs
 # change ports: VERIFY_PORT=8792 VERIFY_WEB_PORT=5274 node <same as above>
 ```
 
-- Starts two detached process groups: `pnpm exec tsx src/index.ts` (server, no-watch form, equivalent to `dev:server` minus watch) + `node node_modules/vite/bin/vite.js --strictPort` (web dev, proxy pointing at our server).
+- Run it as a background task (Claude Code `run_in_background`); it prints `verify stack ready` and then stays in the foreground as the stack's supervisor. It starts `pnpm exec tsx src/index.ts` (server, no-watch form, equivalent to `dev:server` minus watch) and `node node_modules/vite/bin/vite.js --strictPort` (web dev, proxy pointing at our server) through `scripts/owned-process.mjs`: each runs in its own transient systemd user scope on Linux (a process group elsewhere), and a sentinel kills both when launch.mjs, or any process in its parent chain, dies. Stopping the task, ending the session or subagent, `vp.mjs cleanup`, or either process exiting takes the whole stack down; nothing outlives its owner, so there is nothing to forget.
+- Codex and other harnesses without background tasks: run `launch.mjs &`, the drives and `cleanup.mjs` in one command; when that command's shell exits, the stack goes with it.
 - **Every launch clears the run directory = every time a fresh DB** (first boot seeds a single user, no login state needed).
 - **Must `cleanup.mjs` before re-launching**: the old stack's processes still hold `VERIFY_PORT`/`VERIFY_WEB_PORT`, a new launch does not kill them - the readiness probe hits the **old** stack's listener, the newly started processes cannot bind the ports, and the probe drives the previous round's old DB (symptom: the "fresh DB" assertions silently mix in the previous round's state, no error at all; #950 measured it: the previous round's saved charter made this round's empty-state checks all wrong).
 - Readiness judgment: `GET /api/auth/session` 200 (server) + `GET /app` 200 (vite SPA fallback), poll until connected; on timeout auto-print both log tails then kill its own started processes.
 - **Read logs with the Read tool, not Bash `tail`**: this machine's scout-block hook baseline mode blocks `*.log` (any Bash command referencing any .log path gets BLOCKED); launch/the scripts themselves reading via fs are unaffected.
-- Runtime state lands in `VERIFY_RUN_DIR` (default `<repo>/.claude/verify-run/`): `server.pid`, `web.pid`, `server.log`, `web.log`, `ports.json`. A failed launch kills its own started processes, leaves no orphans.
+- Runtime state lands in `VERIFY_RUN_DIR` (default `<repo>/.claude/verify-run/`): `server.pid`, `web.pid`, `server.log`, `web.log`, `ports.json` (with `supervisorPid`, the launch.mjs process). A failed launch kills its own started processes, leaves no orphans.
 
 ## Doctor
 
@@ -220,7 +221,7 @@ Mechanism-class changes (CSS/animation, on-disk/wire format, schema, config pass
 node .../scripts/cleanup.mjs
 ```
 
-Kills by the pid-file group (SIGTERM to 6s grace to SIGKILL), before killing checks the command line contains a `tsx|vite|pnpm` marker (guards stale pids from killing innocent processes); deletes `VERIFY_RUN_DIR` (scratch home + logs); echoes that the evidence directory remains. **Only kills processes recorded in its own pid files, never by process name**. The user's dev stack (8787/5173) and the e2e lane are unaffected.
+Sends SIGTERM to the supervisor recorded in `ports.json` (launch.mjs stops both scopes and exits), then kills by the pid-file group (SIGTERM to 6s grace to SIGKILL) for stacks started before the supervisor existed; before killing checks the command line contains a `tsx|vite|pnpm` marker (guards stale pids from killing innocent processes); deletes `VERIFY_RUN_DIR` (scratch home + logs); echoes that the evidence directory remains. **Only kills processes recorded in its own pid files, never by process name**. The user's dev stack (8787/5173) and the e2e lane are unaffected.
 
 Also **pinned reclamation of residual daemons** (#691): ad-hoc daemons leaked by launch/probe failures are not in the pid file, cleanup scans and reclaims by the dual marker "`cli.ts start` + this stack's `--server http://127.0.0.1:<VERIFY_PORT>`" (SIGTERM graceful stop to survivors upgraded to SIGKILL, re-checking the command line before the upgrade; no-port-pin refuses to sweep and hints). **Hard rule: cleaning residual daemons must never kill by the `cli.ts start` / `tsx` bare shape** - the user's main-checkout dev daemon is exactly `tsx src/cli.ts start -f`, same shape is bound to match (2026-10-02 23:38:17 hard proof #691: a lane used `ps aux | grep "cli.ts start" | kill -9` to clean its own residue, SIGKILLing the user's dev daemon along with it - the daemon died trace-free with zero output, pmset only saw caffeinate ClientDied, pnpm reported ELIFECYCLE exit 1, troubleshooting easily misread as a daemon self-crash).
 
@@ -228,7 +229,7 @@ Also **pinned reclamation of residual daemons** (#691): ad-hoc daemons leaked by
 
 | Script | Role |
 |---|---|
-| `scripts/launch.mjs` | start the isolated stack, write runtime state; self-kill on failure, no orphans |
+| `scripts/launch.mjs` | start the isolated stack and supervise it until cleanup or owner death; self-kill on failure, no orphans |
 | `scripts/doctor.mjs` | read-only health check |
 | `scripts/drive.mjs` | Playwright probe (usage in this doc's Drive section) |
 | `scripts/cleanup.mjs` | reclaim the stack, keep evidence |

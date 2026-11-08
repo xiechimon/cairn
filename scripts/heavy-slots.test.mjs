@@ -86,7 +86,12 @@ const prepushVitestFixture = (dir) => {
   mkdirSync(join(dir, 'tmp'), { recursive: true });
   const repo = join(dir, 'vitest-repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
-  for (const file of ['prepush-vitest.mjs', 'heavy-slots.mjs', 'prepush-known-red.json'])
+  for (const file of [
+    'prepush-vitest.mjs',
+    'heavy-slots.mjs',
+    'owned-process.mjs',
+    'prepush-known-red.json',
+  ])
     copyFileSync(join('scripts', file), join(repo, 'scripts', file));
   const bin = join(dir, 'bin');
   mkdirSync(bin, { recursive: true });

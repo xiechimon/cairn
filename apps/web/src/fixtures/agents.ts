@@ -1,5 +1,4 @@
 import type { SecretRecord } from '@cairn/shared';
-import { CHIEF_EXAMPLES } from './chief.js';
 import { legacyDone, legacyReview, R3_BUILDER, TEAM_ID } from './core.js';
 import type { ChiefContent, FixtureSet, ResourcesContent } from './records.js';
 import { RESOURCES } from './resources.js';
@@ -37,7 +36,7 @@ export const chiefAgentChip: FixtureSet = {
   resources: SECRETS_BASE,
   todos: [legacyReview, legacyDone],
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '验证一下凭证链路…',
@@ -70,7 +69,6 @@ const FAB_AVATAR_CHIEF: ChiefContent = {
   bound: true,
   modelSlot: 'claude-sonnet-5 · 默认',
   threadTitle: '新主题',
-  examples: CHIEF_EXAMPLES,
   agent: { displayName: R3_BUILDER.displayName, avatarUrl: null },
 };
 
