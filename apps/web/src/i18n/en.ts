@@ -1389,6 +1389,8 @@ export const EN: Record<string, string> = {
   看计划: 'Review plan',
   '查看 thread': 'View thread',
   '在问你一个问题。': 'Asked you a question.',
+  '运行它的机器需要更新 cairn，更新后才能收到回答。':
+    'The machine running it needs a cairn update before it can receive the answer.',
   '计划已就绪，批准后开工。': 'Plan ready. Approve to start.',
   '已就绪，等你审阅。': 'Ready for your review.',
   '失败了，打开它重试。': 'Failed. Open it to retry.',

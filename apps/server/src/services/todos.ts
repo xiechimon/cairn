@@ -41,6 +41,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { outdatedAnswerReceiver } from './answers-ack.js';
 import { triggerChiefWakes } from './chief.js';
 import { assertCorrectionDone } from './correction.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
@@ -59,7 +60,11 @@ import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 import { buildVerified } from './verified.js';
-import { cancelPendingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
+import {
+  cancelPendingWorkerQuestions,
+  pendingWorkerQuestions,
+  undeliveredAnswers,
+} from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -194,6 +199,14 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
 }
 
 function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | undefined {
+  if (
+    row.latestBuildId !== null &&
+    (pendingWorkerQuestions(deps.db, row.latestBuildId).length > 0 ||
+      undeliveredAnswers(deps.db, row.latestBuildId).length > 0) &&
+    outdatedAnswerReceiver(deps.db, row.latestBuildId) !== null
+  ) {
+    return { on: 'machine-update', retryAt: null };
+  }
   if ((row.phase === 'needs_input' || row.phase === 'failed') && row.latestBuildId !== null) {
     const escalated = pendingWorkerQuestions(deps.db, row.latestBuildId).some(
       (question) => question.escalation !== undefined,

@@ -22,6 +22,7 @@ import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newMachineToken } from '../lib/keys.js';
+import { declareAnswersAck, machineAcksAnswers } from './answers-ack.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
@@ -60,18 +61,22 @@ export function fetchSteer(
   deps: { db: Db },
   machine: { id: string | null },
   stepId: string,
+  answersAck?: number,
 ): { content: string | null; answers?: SteerAnswer[] } {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow || stepRow.machineId !== machine.id || stepRow.status !== 'claimed') {
     return { content: null };
   }
-  const answers = isChiefConversation(stepRow.buildId)
-    ? []
-    : undeliveredAnswers(db, stepRow.buildId).map((content) => ({
-        requestId: content.requestId,
-        text: answerTextOf(content),
-      }));
+  if (machine.id !== null) declareAnswersAck(db, machine.id, answersAck);
+  const receives = machine.id !== null && machineAcksAnswers(db, machine.id);
+  const answers =
+    isChiefConversation(stepRow.buildId) || !receives
+      ? []
+      : undeliveredAnswers(db, stepRow.buildId).map((content) => ({
+          requestId: content.requestId,
+          text: answerTextOf(content),
+        }));
   const withAnswers = (content: string | null) =>
     answers.length > 0 ? { content, answers } : { content };
   const pending = db

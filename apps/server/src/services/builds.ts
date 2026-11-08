@@ -113,6 +113,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { assertAnswerReceiver } from './answers-ack.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
@@ -405,6 +406,16 @@ export async function sendBuildSteer(
       409,
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
+  }
+  if (
+    running &&
+    (continuationOptions.answer !== undefined ||
+      ((continuationOptions.human ??
+        deps.steerOptions?.human ??
+        body.queuedMessageId !== undefined) &&
+        pendingWorkerQuestions(db, conversationId).length > 0))
+  ) {
+    assertAnswerReceiver(db, conversationId);
   }
   let sent: BuildSteerResult;
   try {

@@ -1,5 +1,6 @@
 import {
   type AgentTodoReport,
+  ANSWERS_ACK_VERSION,
   type ClaimedStep,
   type ClaudeCodeReport,
   type ClaudeRateLimitReport,
@@ -529,7 +530,7 @@ export class MachineClient implements MachineApi {
   async steer(stepId: string): Promise<MachineSteerResponse> {
     return this.request<MachineSteerResponse>(
       'GET',
-      `/api/machine/steer?stepId=${encodeURIComponent(stepId)}`,
+      `/api/machine/steer?stepId=${encodeURIComponent(stepId)}&answersAck=${ANSWERS_ACK_VERSION}`,
       { parse: (raw) => machineSteerResponseSchema.parse(raw) },
     );
   }

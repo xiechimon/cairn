@@ -35,6 +35,7 @@ import {
   todo,
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { acksAnswers, declareAnswersAck } from './answers-ack.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
@@ -393,7 +394,14 @@ async function tryClaim(
   const chiefAhead = claimChiefTurn(deps, machineId, teamId, maxWorkers, earliestWorker);
   if (chiefAhead) return chiefAhead;
 
+  const machineAcksAnswers = acksAnswers(machineRow);
   for (const cand of workerCands) {
+    if (
+      !machineAcksAnswers &&
+      carriedAnswerIds(db, cand.stepRow.buildId, cand.stepRow.prompt ?? '').length > 0
+    ) {
+      continue;
+    }
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
     if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
@@ -664,6 +672,7 @@ export async function claimStep(
   stillAuthorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
   if (signal?.aborted || !stillAuthorized()) return null;
+  declareAnswersAck(deps.db, machineId, body?.answersAck);
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
   if (first) return first;

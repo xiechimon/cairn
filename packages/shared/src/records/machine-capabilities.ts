@@ -25,6 +25,7 @@ export const machineCapabilitiesSchema = z.object({
   computer: z.literal(true).optional(),
   ownComputer: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
+  answersAck: z.number().int().min(1).optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -48,6 +49,11 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(executor.success ? { executor: executor.data } : {}),
     ...(rec.computer === true ? { computer: true as const } : {}),
     ...(rec.ownComputer === true ? { ownComputer: true as const } : {}),
+    ...(typeof rec.answersAck === 'number' &&
+    Number.isInteger(rec.answersAck) &&
+    rec.answersAck >= 1
+      ? { answersAck: rec.answersAck }
+      : {}),
   };
 }
 
