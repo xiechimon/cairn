@@ -4,6 +4,7 @@ import {
   PROVIDER_PRESET_IDS,
   type ProviderApi,
   type ProviderRecord,
+  type ProviderTestResult,
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Server } from 'lucide-react';
@@ -135,7 +136,57 @@ export interface ProviderEditActions {
       apiKey?: string;
     },
   ) => Promise<unknown>;
+  test?: () => Promise<ProviderTestResult>;
   remove?: () => void;
+}
+
+function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
+  const { t } = useI18n();
+  const [pending, setPending] = useState(false);
+  const [outcome, setOutcome] = useState<ProviderTestResult | 'unavailable' | null>(null);
+  const run = async () => {
+    setPending(true);
+    setOutcome(null);
+    try {
+      setOutcome(await onTest());
+    } catch {
+      setOutcome('unavailable');
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <SettingsRow
+      label={t('测试连接')}
+      hint={t('发一个最小请求，不会显示密钥')}
+      className="flex-wrap gap-y-2 py-3"
+    >
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
+        {outcome !== null && (
+          <div className="min-w-0 max-w-full text-meta text-content-secondary">
+            <span role="status" data-testid="provider-test-result">
+              {outcome === 'unavailable'
+                ? t('测试没能跑完，请重试。')
+                : outcome.status === 'ok'
+                  ? t('连接正常')
+                  : t('连接失败，请检查连接设置后重试。')}
+            </span>
+            {outcome !== 'unavailable' && outcome.reason !== null && (
+              <details className="mt-1">
+                <summary className="cursor-pointer">{t('详情')}</summary>
+                <p data-testid="provider-test-reason" className="m-0 max-w-80 break-words">
+                  {outcome.reason}
+                </p>
+              </details>
+            )}
+          </div>
+        )}
+        <Button variant="outline" size="sm" disabled={pending} onClick={() => void run()}>
+          {pending ? t('测试中…') : t('测试')}
+        </Button>
+      </div>
+    </SettingsRow>
+  );
 }
 
 export function TeamProviderEditor({
@@ -203,6 +254,9 @@ export function TeamProviderEditor({
           />
         </SettingsRow>
         {!oauth && <KeyRow onReplace={(apiKey) => fire({ apiKey })} />}
+        {!oauth && actions.test !== undefined && (
+          <TestRow key={JSON.stringify(record)} onTest={actions.test} />
+        )}
       </SettingsCard>
       <ProviderSection title={t('模型列表')} hint={t('这里的模型会出现在模型选择器里')}>
         <SettingsCard>

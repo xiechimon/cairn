@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
+import { OWNED_PROCESS_CLI } from './owned-process.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -9,6 +10,7 @@ const root = resolve(import.meta.dirname, '..');
 export const prepushModules = [
   'scripts/prepush.mjs',
   'scripts/heavy-slots.mjs',
+  'scripts/owned-process.mjs',
   'scripts/english-only-gate.mjs',
   'scripts/journal-newline-gate.mjs',
   'scripts/scrub-git-env.mjs',
@@ -29,6 +31,8 @@ export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/prepush-refuse-main.test.mjs',
   'scripts/heavy-slots.test.mjs',
+  'scripts/owned-process.test.mjs',
+  'scripts/spawn-ownership.test.mjs',
   'scripts/english-only-gate.test.mjs',
   'scripts/journal-newline-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
@@ -157,7 +161,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
             selfTests.some(
               (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
             ) ||
-            /^scripts\/(prepush|heavy-slots|english-only-gate|scrub-git-env|doc-reader-tests)/.test(
+            /^scripts\/(prepush|heavy-slots|owned-process|spawn-ownership|english-only-gate|scrub-git-env|doc-reader-tests)/.test(
               path,
             ),
         )
@@ -182,15 +186,6 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
 
 export const NODE_TEST_TIMEOUT_MS = 300_000;
 const STEP_TIMED_OUT = 124;
-const PROCESS_GROUP_RUNNER = `
-const { spawn } = require('node:child_process');
-const [ms, command, ...args] = process.argv.slice(1);
-const child = spawn(command, args, { stdio: 'inherit', detached: true });
-const killGroup = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch {} };
-const timer = setTimeout(() => { killGroup(); process.exit(${STEP_TIMED_OUT}); }, Number(ms));
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { killGroup(); process.exit(1); });
-child.on('exit', (code) => { clearTimeout(timer); killGroup(); process.exit(code ?? 1); });
-`;
 export const NODE_TEST_STEP_TIMEOUT_MS = 15 * 60_000;
 
 export function runPlan(
@@ -211,9 +206,12 @@ export function runPlan(
       ? spawnSync(
           process.execPath,
           [
-            '-e',
-            PROCESS_GROUP_RUNNER,
+            OWNED_PROCESS_CLI,
+            '--name',
+            'prepush-node-test',
+            '--timeout-ms',
             String(stepTimeoutMs),
+            '--',
             command,
             '--test',
             '--test-force-exit',

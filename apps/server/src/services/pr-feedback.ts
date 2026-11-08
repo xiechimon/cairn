@@ -9,6 +9,7 @@ import { type BuildDeps, enqueueStep } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { publishStepRow } from './quota-wait.js';
+import { retryIsParked } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -152,8 +153,14 @@ export function createPrFeedbackPoller(
                   .from(todo)
                   .where(eq(todo.id, target.todo.id))
                   .get();
+                const currentBuild = deps.db
+                  .select()
+                  .from(build)
+                  .where(eq(build.id, target.build.id))
+                  .get();
                 if (
                   !current ||
+                  retryIsParked(currentBuild?.errorMessage ?? '') ||
                   current.latestBuildId !== target.build.id ||
                   current.archivedAt !== null ||
                   current.phase === 'closed'

@@ -8,7 +8,7 @@ import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig, type TsnetSettings } from '../src/config.js';
 import type { SidecarProcess } from '../src/lib/tsnet-sidecar.js';
-import { startTsnetRemote, tsnetPathsOf } from '../src/services/tsnet-remote.js';
+import { parseLocalStatus, startTsnetRemote, tsnetPathsOf } from '../src/services/tsnet-remote.js';
 import { bootServer } from './helpers.js';
 
 const TOKEN = 'tsnet-remote-token-0123456789abcdef';
@@ -133,6 +133,16 @@ function stubFreshInstall(home: string): void {
 }
 
 describe('config: off unless explicitly enabled, log upload off unless opted in', () => {
+  test('system tailscaled uses the same socket without a sidecar and reads a socket-only allowlist', () => {
+    stubFreshInstall(freshHome());
+    vi.stubEnv(ENV_VARS.tsnet, 'socket');
+    vi.stubEnv(ENV_VARS.tailscaleUsers, ' owner@example.com, second@example.com ');
+    expect(loadConfig().tsnet).toMatchObject({
+      enabled: true,
+      mode: 'socket',
+      allowedLogins: ['owner@example.com', 'second@example.com'],
+    });
+  });
   test('a fresh install has tsnet disabled and log upload off', () => {
     const home = freshHome();
     stubFreshInstall(home);
@@ -213,6 +223,142 @@ describe('default off: no process, no listener, no files', () => {
 });
 
 describe('enabled', () => {
+  test.each(['9007199254740993', '18446744073709551615', '7'])(
+    'preserves LocalAPI numeric UserID %s as its exact profile key',
+    (userId) => {
+      const body = `{"BackendState":"Running","Self":{"UserID":${userId}},"User":{"${userId}":{"LoginName":"owner@example.com"}}}`;
+      expect(parseLocalStatus(body)).toMatchObject({ Self: { UserID: userId } });
+    },
+  );
+  test.each([
+    [
+      'large numeric Self owner',
+      parseLocalStatus(
+        '{"BackendState":"Running","Self":{"UserID":9007199254740993},"User":{"9007199254740993":{"LoginName":"owner@example.com"},"9007199254740992":{"LoginName":"other@example.com"}}}',
+      ),
+      200,
+    ],
+    [
+      'untagged Self owner',
+      {
+        BackendState: 'Running',
+        Self: { UserID: 7, DNSName: 'cairn.tail.example.' },
+        User: { '7': { LoginName: 'owner@example.com' }, '8': { LoginName: 'other@example.com' } },
+      },
+      200,
+    ],
+    [
+      'tagged Self',
+      {
+        BackendState: 'Running',
+        Self: { UserID: 7, Tags: ['tag:server'] },
+        User: { '7': { LoginName: 'owner@example.com' } },
+      },
+      401,
+    ],
+    ['missing profile', { BackendState: 'Running', Self: { UserID: 7 }, User: {} }, 401],
+    [
+      'stopped backend',
+      {
+        BackendState: 'Stopped',
+        Self: { UserID: 7 },
+        User: { '7': { LoginName: 'owner@example.com' } },
+      },
+      401,
+    ],
+  ])('socket-only LocalAPI resolves %s', async (_name, status, expected) => {
+    const home = freshHome();
+    const s = bootServer({ authToken: TOKEN });
+    const remote = await startTsnetRemote({
+      settings: settings(home, { mode: 'socket' }),
+      homeDir: home,
+      app: s.app,
+      authToken: TOKEN,
+      logger: silentLogger,
+      readLocalStatus: async () => status,
+    });
+    if (remote !== null) stoppers.push(() => remote.stop());
+    const actual = await new Promise<number>((resolve, reject) => {
+      const req = request(
+        {
+          socketPath: tsnetPathsOf(home).socketPath,
+          path: '/api/teams',
+          headers: { host: 'cairn.tail.example', 'Tailscale-User-Login': 'owner@example.com' },
+        },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+    expect(actual).toBe(expected);
+  });
+  test('socket-only startup needs no binary, spawns nothing and uses explicit allowlist when LocalAPI is unavailable', async () => {
+    const home = freshHome();
+    const s = bootServer({ authToken: TOKEN });
+    const spawner = fakeSpawner();
+    const remote = await startTsnetRemote({
+      settings: settings(home, { mode: 'socket', allowedLogins: ['owner@example.com'] }),
+      homeDir: home,
+      app: s.app,
+      authToken: TOKEN,
+      logger: silentLogger,
+      spawnProcess: spawner.spawnProcess,
+      readLocalStatus: async () => {
+        throw new Error('LocalAPI unavailable');
+      },
+    });
+    if (remote !== null) stoppers.push(() => remote.stop());
+    expect(remote?.status().state).toBe('ready');
+    expect(spawner.spawned).toHaveLength(0);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request(
+        {
+          socketPath: tsnetPathsOf(home).socketPath,
+          path: '/api/teams',
+          headers: { host: 'cairn.tail.example', 'Tailscale-User-Login': 'owner@example.com' },
+        },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+    expect(status).toBe(200);
+  });
+
+  test('ready owner metadata reaches authentication and is withdrawn on sidecar exit', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { paths, spawner } = await start(home);
+    const statusOf = () =>
+      new Promise<number>((resolve, reject) => {
+        const req = request(
+          {
+            socketPath: paths.socketPath,
+            path: '/api/teams',
+            headers: { host: 'cairn.tail.example', 'Tailscale-User-Login': 'owner@example.com' },
+          },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode ?? 0);
+          },
+        );
+        req.on('error', reject);
+        req.end();
+      });
+    expect(await statusOf()).toBe(401);
+    spawner.spawned[0]?.child.stdout.write(
+      `${JSON.stringify({ type: 'ready', dnsName: 'cairn.tail.example', ownerLogin: 'owner@example.com', selfTagged: false })}\n`,
+    );
+    expect(await statusOf()).toBe(200);
+    spawner.spawned[0]?.child.emit('exit', 1, null);
+    expect(await statusOf()).toBe(401);
+  });
   test('creates a 0700 state area, an owner-only socket and starts the sidecar', async () => {
     const home = freshHome();
     installBinary(home);

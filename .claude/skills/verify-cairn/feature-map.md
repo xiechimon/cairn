@@ -58,8 +58,8 @@ Reach:
 3. `type a request and press Enter`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-follows-agent`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-outage`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `tasks-attention-dot`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
+- Keyboard shortcuts in its code: `Enter`
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-follows-agent`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-outage`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `reply-quote`, `selection-reply`, `selection-reply-bar`, `tasks-attention-dot`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -321,6 +321,26 @@ Reach:
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
 - Evidence: `apps/web/e2e/settings-routing.spec.ts`, `apps/web/e2e/route-override-capabilities.spec.ts`, `apps/server/test/routing-rules.test.ts`
 
+### selection-reply
+
+**Selection reply** (shipped, centrality 1). Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.
+
+States: Bar above the selection, quote staged above the composer, sent bubble with the quote, no bar on touch selections, light and dark, 1440 and 390 wide.
+
+Reach:
+
+1. `open /app`
+2. `type select two or more characters inside one Coordinator reply`
+3. `click testid:selection-reply`
+
+- Web routes: `/app`
+- Keyboard shortcuts in its code: `Enter`
+- Test ids in its code: `composer-reply-quote`, `composer-reply-quote-remove`, `reply-quote`, `selection-reply`, `selection-reply-bar`
+- Research: [docs/research/selection-reply-2026-11-08.md](../../../docs/research/selection-reply-2026-11-08.md)
+- Frontend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
+- Backend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
+- Evidence: `apps/web/e2e/chief-selection-reply.spec.ts`, `packages/shared/test/reply-quote.test.ts`, `apps/web/test/selection-reply-model.test.ts`
+
 ### steer-queue-stop
 
 **Steer, queue and stop** (shipped, centrality 1). The user can steer a running thread, queue messages behind it, stop it, or stop and mark it done.
@@ -569,7 +589,7 @@ Reach:
 - Web routes: none
 - Settings: `设置` (Settings) › `团队与访问` (Team & access) › `远程访问` (Remote access)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-routes-empty`
+- Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-routes-empty`, `tailnet-owner-identity`
 - Research: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md), [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the remote access page, route list and pairing flow have no design
 - Backend design: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md)
