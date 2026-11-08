@@ -208,6 +208,31 @@ export function markAnswersDelivered(
   }
 }
 
+export function ackAnswers(
+  deps: StoreDeps,
+  buildId: string,
+  requestIds: readonly string[],
+  at: number,
+): void {
+  const wanted = new Set(requestIds);
+  markAnswersDelivered(
+    deps,
+    buildId,
+    undeliveredAnswers(deps.db, buildId).filter((content) => wanted.has(content.requestId)),
+    at,
+  );
+}
+
+export function answerTextOf(content: AskUserQuestionContent): string {
+  return [...new Set((content.answers ?? []).map((a) => a.text))].join('\n');
+}
+
+export function carriedAnswerIds(db: Db, buildId: string, instruction: string): string[] {
+  return undeliveredAnswers(db, buildId)
+    .filter((content) => instruction.includes(deliveredAnswerText(content)))
+    .map((content) => content.requestId);
+}
+
 export function deliveredAnswerText(content: AskUserQuestionContent): string {
-  return `Answer to your question ${content.requestId}:\n${[...new Set((content.answers ?? []).map((a) => a.text))].join('\n')}`;
+  return `Answer to your question ${content.requestId}:\n${answerTextOf(content)}`;
 }

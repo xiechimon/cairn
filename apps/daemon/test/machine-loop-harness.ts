@@ -75,6 +75,8 @@ export class FakeMachineApi implements MachineApi {
   }[] = [];
   failClaims = 0;
   steerResponse: string | null = null;
+  steerAnswers: { requestId: string; text: string }[] = [];
+  answerAcks: string[][] = [];
   attachments: Record<string, MachineAttachmentResponse | Error> = {};
   attachmentCalls: string[] = [];
   stopResponse: boolean | null = null;
@@ -196,10 +198,18 @@ export class FakeMachineApi implements MachineApi {
   }
   async steer(stepId: string) {
     this.calls.push(`steer:${stepId}`);
-    return this.steerResponse;
+    if (this.steerResponse === null && this.steerAnswers.length === 0) return null;
+    return {
+      content: this.steerResponse,
+      ...(this.steerAnswers.length > 0 ? { answers: [...this.steerAnswers] } : {}),
+    };
   }
-  async steerAck(stepId: string) {
+  async steerAck(stepId: string, answerIds: readonly string[] = []) {
     this.calls.push(`steer-ack:${stepId}`);
+    if (answerIds.length > 0) {
+      this.answerAcks.push([...answerIds]);
+      this.steerAnswers = this.steerAnswers.filter((a) => !answerIds.includes(a.requestId));
+    }
   }
   async attachment(stepId: string, attachmentId: string): Promise<MachineAttachmentResponse> {
     this.attachmentCalls.push(`${stepId}:${attachmentId}`);

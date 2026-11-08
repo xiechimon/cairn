@@ -364,7 +364,7 @@ describe('ACP spike with a real scripted stdio child', () => {
       const fetchSteer = vi.spyOn(api, 'steer').mockImplementation(async () => {
         const content = pending;
         pending = null;
-        return content;
+        return content === null ? null : { content };
       });
       const ack = vi.spyOn(api, 'steerAck');
       const token = api.token.bind(api);

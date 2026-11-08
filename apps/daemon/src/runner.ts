@@ -137,6 +137,7 @@ export interface RunStepDeps {
   mcpConfigPath: string;
   workspace?: WorktreeOps;
   sessionHandles?: Map<string, AgentSessionHandle>;
+  onSessionLive?: (stepId: string) => void;
   stepImageSupport?: Map<string, boolean | null>;
   stepSteeringSupport?: Map<string, boolean>;
   stepTranscripts?: Map<string, TranscriptBuffer>;
@@ -1575,6 +1576,7 @@ async function runClaimedStep(
     }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     deps.sessionHandles?.set(stepId, handle);
+    deps.onSessionLive?.(stepId);
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });

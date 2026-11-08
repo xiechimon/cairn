@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build, message, project, steerPending, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
-import { claimStep, fetchSteer } from '../src/services/machines.js';
+import { ackSteer, claimStep, fetchSteer } from '../src/services/machines.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -156,6 +156,32 @@ describe('a parked question is its own state and wakes the Coordinator (task sta
   });
 });
 
+async function parkedAB() {
+  const world = await askAndPark(REQUEST_A);
+  await askWorkerQuestion(
+    deps(),
+    world.stepRow,
+    { requestId: REQUEST_B, questions: COPY_QUESTION },
+    { holdMs: 0 },
+  );
+  for (const id of [REQUEST_A, REQUEST_B]) {
+    const stored = H.s.db.select().from(message).where(eq(message.id, id)).get();
+    H.s.db
+      .update(message)
+      .set({ content: { ...(stored?.content as object), parkedAt: Date.now() } })
+      .where(eq(message.id, id))
+      .run();
+  }
+  return world;
+}
+
+function delivered(id: string): number | undefined {
+  const content = H.s.db.select().from(message).where(eq(message.id, id)).get()?.content as
+    | { deliveredAt?: number }
+    | undefined;
+  return content?.deliveredAt;
+}
+
 describe('answers route by request id to the same build and session (task stall S1, S2)', () => {
   test('answer_question resumes the same build id on the same session', async () => {
     const { todoId, buildId, stepRow } = await askAndPark();
@@ -252,47 +278,61 @@ describe('answers route by request id to the same build and session (task stall 
       .where(eq(steerPending.conversationId, buildId))
       .get();
     expect(steer?.stepId).toBe(stepRow.id);
-    expect(steer?.content).toContain('Repo rule wins.');
+    expect(fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id).answers).toEqual([
+      { requestId: REQUEST_A, text: 'Repo rule wins.' },
+    ]);
     expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
   });
 
-  test('two parked answers steered into a claimed step before it fetches either both reach the step, and the fetch marks them delivered', async () => {
-    const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A);
-    await askWorkerQuestion(
-      deps(),
-      stepRow,
-      { requestId: REQUEST_B, questions: COPY_QUESTION },
-      { holdMs: 0 },
-    );
-    for (const id of [REQUEST_A, REQUEST_B]) {
-      const stored = H.s.db.select().from(message).where(eq(message.id, id)).get();
-      H.s.db
-        .update(message)
-        .set({ content: { ...(stored?.content as object), parkedAt: Date.now() } })
-        .where(eq(message.id, id))
-        .run();
-    }
+  test('answers stay undelivered through a pickup until the daemon acks them, and the next pickup re-sends them', async () => {
+    const { todoId, buildId, stepRow } = await parkedAB();
     await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Answer for A.' });
     await relay('answer_question', { todoId, requestId: REQUEST_B, answer: 'Answer for B.' });
-    const steer = H.s.db
-      .select()
-      .from(steerPending)
-      .where(eq(steerPending.conversationId, buildId))
-      .get();
-    expect(steer?.stepId).toBe(stepRow.id);
-    expect(steer?.content).toContain('Answer for A.');
-    expect(steer?.content).toContain('Answer for B.');
+    const machine = { id: stepRow.machineId };
+    const first = fetchSteer(deps(), machine, stepRow.id);
+    expect(first.answers?.map((a) => a.requestId)).toEqual([REQUEST_A, REQUEST_B]);
+    expect(delivered(REQUEST_A)).toBeUndefined();
 
-    const fetched = fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id);
-    expect(fetched.content).toContain('Answer for A.');
-    const delivered = (id: string) => {
-      const content = H.s.db.select().from(message).where(eq(message.id, id)).get()?.content as
-        | { deliveredAt?: number }
-        | undefined;
-      return content?.deliveredAt;
-    };
+    const retry = fetchSteer(deps(), machine, stepRow.id);
+    expect(retry.answers?.map((a) => a.requestId)).toEqual([REQUEST_A, REQUEST_B]);
+
+    ackSteer(deps(), { id: stepRow.machineId, teamId: H.teamId }, stepRow.id, [REQUEST_A]);
     expect(delivered(REQUEST_A)).toBeTypeOf('number');
-    expect(delivered(REQUEST_B)).toBeTypeOf('number');
+    expect(fetchSteer(deps(), machine, stepRow.id).answers?.map((a) => a.requestId)).toEqual([
+      REQUEST_B,
+    ]);
+    expect(buildId).toBeTruthy();
+  });
+
+  test('a repeated ack of the same answer changes nothing', async () => {
+    const { todoId, stepRow } = await parkedAB();
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Answer for A.' });
+    const machine = { id: stepRow.machineId, teamId: H.teamId };
+    ackSteer(deps(), machine, stepRow.id, [REQUEST_A]);
+    const firstAt = delivered(REQUEST_A);
+    const before = H.s.db.select().from(message).where(eq(message.id, REQUEST_A)).get();
+    ackSteer(deps(), machine, stepRow.id, [REQUEST_A, 'ask-unknown']);
+    expect(delivered(REQUEST_A)).toBe(firstAt);
+    expect(H.s.db.select().from(message).where(eq(message.id, REQUEST_A)).get()).toEqual(before);
+  });
+
+  test('when the session is gone before an ack, the resumed step carries the answer and names it for ack', async () => {
+    const machineId = insertMachine(H.s);
+    const { todoId, buildId, stepRow } = await parkedAB();
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Answer for A.' });
+    fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id);
+    await relay('answer_question', { todoId, requestId: REQUEST_B, answer: 'Answer for B.' });
+    completeStep(deps(), stepRow.id, { hasChanges: true });
+    H.s.db.delete(step).where(eq(step.kind, 'chief')).run();
+    await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'Carry on.',
+      clientMessageId: 'c-resume',
+    });
+    const claimed = await claimStep(deps() as never, machineId, H.teamId, 0, 'http://localhost');
+    expect(claimed?.conversationId).toBe(buildId);
+    expect(claimed?.instruction).toContain('Answer for A.');
+    expect(claimed?.answerIds).toEqual(expect.arrayContaining([REQUEST_A]));
+    expect(delivered(REQUEST_A)).toBeUndefined();
   });
 
   test('two pending questions answered A then B resume the session carrying both answers', async () => {

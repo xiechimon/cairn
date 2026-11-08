@@ -30,6 +30,7 @@ import {
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
+  CONTINUE_PROMPTS,
   checkPlanContract,
   conversationBranch,
   DEFAULT_SHIP_ROUTE,
@@ -185,7 +186,6 @@ import {
   blockingWorkerQuestions,
   cancelPendingWorkerQuestions,
   deliveredAnswerText,
-  markAnswersDelivered,
   pendingWorkerQuestions,
   undeliveredAnswers,
   writeWorkerQuestion,
@@ -439,18 +439,17 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      const carried = undeliveredAnswers(db, conversationId);
-      const deliveredAt = running ? null : now;
       if (continuationOptions.answer !== undefined)
-        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, deliveredAt);
-      else if (human) settleWorkerReply(deps, conversationId, body.content, deliveredAt);
-      if (!running) markAnswersDelivered(deps, conversationId, carried, now);
-      const content = [...carried.map(deliveredAnswerText), body.content].join('\n\n');
+        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, null);
+      const answeredNow =
+        continuationOptions.answer !== undefined ||
+        (human && settleWorkerReply(deps, conversationId, body.content, null));
+      const content = answeredNow ? '' : body.content;
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
         role: 'user' as const,
-        content,
+        content: body.content,
         createdAt: now,
       };
       if (targetBuildId !== conversationId) {
@@ -1011,6 +1010,20 @@ export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()):
   return released;
 }
 
+function withUndeliveredAnswers(
+  db: Db,
+  buildId: string,
+  kind: StepRecord['kind'],
+  prompt: string | undefined,
+): string | null {
+  const answers =
+    isBuildStepKind(kind) || kind === 'plan'
+      ? undeliveredAnswers(db, buildId).map(deliveredAnswerText)
+      : [];
+  if (answers.length === 0) return prompt ?? null;
+  return [...answers, prompt ?? CONTINUE_PROMPTS[kind]].filter((part) => part !== '').join('\n\n');
+}
+
 export function enqueueStep(
   deps: BuildDeps,
   buildId: string,
@@ -1033,7 +1046,7 @@ export function enqueueStep(
       kind,
       machineId: null,
       status: 'pending',
-      prompt: prompt ?? null,
+      prompt: withUndeliveredAnswers(deps.db, buildId, kind, prompt),
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
