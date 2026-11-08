@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { createServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, expect, test } from '@playwright/test';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { bootLiveServer, type LiveServer } from './live-server';
 
 let live: LiveServer;
@@ -15,7 +15,7 @@ let origin: string;
 let certificates: string;
 
 test.beforeAll(async () => {
-  certificates = mkdtempSync(join(tmpdir(), 'cairn-cert-'));
+  certificates = makeTestTempDir('owner-cert-');
   const key = join(certificates, 'key.pem');
   const cert = join(certificates, 'cert.pem');
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=cairn.tail.example'], { stdio: 'ignore' });
@@ -41,7 +41,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (proxy !== undefined) await new Promise<void>((resolve) => { proxy.closeAllConnections(); proxy.close(() => resolve()); });
   await live?.dispose();
-  if (certificates !== undefined) rmSync(certificates, { recursive: true, force: true });
+  if (certificates !== undefined) releaseTestTempDir(certificates);
 });
 
 for (const theme of ['light', 'dark'] as const) {
