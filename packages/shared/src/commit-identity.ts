@@ -237,7 +237,7 @@ export async function publishVerifiedCommits(input: PublishInput): Promise<Publi
     });
   };
   try {
-    await input.git(['push', '--no-verify', remote, `${input.tip}:${input.stagingRef}`]);
+    await input.git(['push', remote, `${input.tip}:${input.stagingRef}`]);
     staged = true;
     for (const commit of commits) {
       const parents = commit.parents.map((parent) => replaced.get(parent) ?? parent);

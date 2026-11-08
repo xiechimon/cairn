@@ -323,7 +323,7 @@ describe('verified publish', () => {
     const create = r.calls.indexOf('POST /git/commits');
     expect(push).toBeGreaterThanOrEqual(0);
     expect(push).toBeLessThan(create);
-    expect(r.calls[push]).toContain('--no-verify');
+    expect(r.calls[push]).not.toContain('--no-verify');
   });
 
   test('keeps commits the API already made and touches nothing when there is nothing to replay', async () => {
