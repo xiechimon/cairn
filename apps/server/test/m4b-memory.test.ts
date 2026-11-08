@@ -64,7 +64,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
   test('claim payload = memory trio + attachment read remoteTools (02 section 4.4 + #310/r9 section 3.1 worker-side attachment tools = spec `attachment:` token parse path)', async () => {
     const { s, step } = await world();
     expect(step.remoteTools?.map((t) => t.name)).toEqual(
-      workerRemoteTools('session', false).map((t) => t.name),
+      workerRemoteTools('session', false, true).map((t) => t.name),
     );
     s.dispose();
   });
