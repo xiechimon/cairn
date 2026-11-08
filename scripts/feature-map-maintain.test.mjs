@@ -29,12 +29,15 @@ test('daily workflow files an issue with github.token and no refresh secret', ()
 });
 
 test('parseArgs accepts the maintain flags', () => {
-  assert.deepEqual(parseArgs(['--file-issue', '--dry-run', '--skip-ticket-register']), {
+  assert.deepEqual(parseArgs(['--file-issue', '--dry-run']), {
     fileIssue: true,
     dryRun: true,
-    skipTicketRegister: true,
     help: false,
   });
+});
+
+test('parseArgs rejects the retired ticket-register flag', () => {
+  assert.throws(() => parseArgs(['--skip-ticket-register']), /unknown argument/);
 });
 
 test('parseArgs rejects unknown flags', () => {
@@ -66,7 +69,7 @@ test('checkVerifyFeaturesIndex reports missing README links and dangling links',
 
 test('aggregateChecks and renderReport surface failed ids', () => {
   const aggregated = aggregateChecks([
-    { id: 'ticket-register', ok: true, summary: 'ok', findings: [] },
+    { id: 'feature-map', ok: true, summary: 'ok', findings: [] },
     { id: 'verify-features-index', ok: false, summary: 'gap', findings: ['missing link'] },
   ]);
   assert.equal(aggregated.ok, false);
@@ -91,7 +94,7 @@ test('decideIssueAction comments on an existing open title match', () => {
 test('buildIssueBody carries the maintain marker and dual-map hint', () => {
   const body = buildIssueBody({ report: '# report\n', runUrl: 'https://example.test/run/1' });
   assert.ok(body.startsWith(ISSUE_MARKER));
-  assert.match(body, /docs\/feature-map\.md/);
+  assert.match(body, /verify-cairn\/feature-map\.json/);
   assert.match(body, /verify-cairn\/features/);
   assert.match(body, /https:\/\/example\.test\/run\/1/);
 });
@@ -110,14 +113,15 @@ test('fileMaintainIssue dry-run creates without calling gh writes', () => {
   assert.match(filed.body, new RegExp(ISSUE_MARKER));
 });
 
-test('runMaintain with skip ticket register fails on a broken features index and can dry-file', () => {
+test('runMaintain fails on a broken features index and can dry-file', () => {
   const dir = makeTestTempDir('fm-run-');
   writeFileSync(join(dir, 'README.md'), '# empty index\n');
   writeFileSync(join(dir, 'theme.md'), '# Theme\n');
   const aggregated = runMaintain(
-    { fileIssue: true, dryRun: true, skipTicketRegister: true, help: false },
+    { fileIssue: true, dryRun: true, help: false },
     {
       featuresDir: dir,
+      runFeatureMapCheck: () => ({ id: 'feature-map', ok: true, summary: 'ok', findings: [] }),
       listOpenIssues: () => [{ number: 9, title: ISSUE_TITLE }],
       spawn() {
         throw new Error('unexpected spawn');

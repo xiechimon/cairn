@@ -4,7 +4,19 @@ export const cn = createCn({
   extend: {
     classGroups: {
       'font-size': [
-        { text: ['greeting', 'page', 'heading', 'card-title', 'ui', 'meta', 'code', 'caption'] },
+        {
+          text: [
+            'greeting',
+            'page',
+            'brand',
+            'heading',
+            'card-title',
+            'ui',
+            'meta',
+            'code',
+            'caption',
+          ],
+        },
       ],
     },
   },

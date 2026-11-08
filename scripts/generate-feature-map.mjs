@@ -1,251 +1,476 @@
 #!/usr/bin/env node
 
-// Feature map generator (#894). Writes docs/feature-map.md — the living
-// register of what exists, at which tier, in which state, anchored to which
-// verification artifact. Every cell is extracted; nothing is hand-edited on
-// either side. To change the map, change the rules below and re-run.
-//
-// Row sources (union of ticket numbers, normalized — leading zeros dropped):
-//   1. `#NNN` references inside docs/spec/*.md (the generated doc lives
-//      outside docs/spec/, so the output never feeds back into the input).
-//   2. Numeric directory names under docs/verify/ (landed acceptance evidence).
-//   3. `#NNN` references inside the CI test surface: *.test.ts / *.test.tsx /
-//      *.spec.ts under apps/, packages/, integration/ (skipping node_modules,
-//      dist, coverage, test-results, playwright-report).
-//
-// Title + state come from `gh api repos/<owner>/<repo>/issues?state=all`
-// (paginated; the REST issues endpoint returns PRs too). PR-typed numbers do
-// not become rows — the row set follows the `gh issue list` notion of a
-// ticket; PRs are listed in the gap section instead. Numbers that resolve to
-// nothing land in the gap section as well.
-//
-// Anchors per row: docs/verify/<num>/ when the directory exists, plus every
-// test file that references the number. A row with neither is marked
-// `[未验证]`. Tier and status follow the rule tables rendered into §0 of the
-// doc; the regexes below are the single source for those tables.
-//
-// The output is a pure function of the working tree + GitHub state: no
-// timestamps, no run metadata, all ordering explicit (tickets ascending,
-// paths lexicographic, tiers in TIER_ORDER). Two consecutive runs write
-// byte-identical files.
-//
-// Usage:
-//   node scripts/generate-feature-map.mjs           # regenerate the doc
-//   node scripts/generate-feature-map.mjs --check   # exit 1 if the on-disk doc differs
-//
-// Prereq: `gh` on PATH, authenticated, api.github.com reachable.
-// Exit 0 on success (or a clean --check); exit 1 on any failure. A failed run
-// never writes a partial doc.
-
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { loadRepoEvalCoverage, renderEvalCoverage } from './eval-coverage.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
-const DOC_NAME = 'feature-map.md';
-const DOC_REL = join('docs', DOC_NAME);
-const DOC_PATH = join(REPO_ROOT, DOC_REL);
+const SKILL_REL = '.claude/skills/verify-cairn';
+const REGISTRY_REL = `${SKILL_REL}/feature-map.json`;
+const SKILL_MAP_REL = `${SKILL_REL}/feature-map.md`;
+const DOC_REL = 'docs/feature-map.md';
+const WEB_SRC_REL = 'apps/web/src';
+const APP_REL = `${WEB_SRC_REL}/App.tsx`;
+const SETTINGS_REL = `${WEB_SRC_REL}/settings/settings-page.tsx`;
+const EN_REL = `${WEB_SRC_REL}/i18n/en.ts`;
+const SERVER_SRC_REL = 'apps/server/src';
+const WEB_SKIP = new Set(['design', 'fixtures', 'i18n']);
 
-// Ticket reference: `#` + 2-4 digits, not followed by another hex digit (so a
-// 4-digit hex color literal like `#1234ab`'s prefix never matches, while
-// `#123 ` and `#123）` do).
-const REF_SOURCE = '#(\\d{2,4})(?![0-9a-fA-F])';
-
-const TEST_ROOTS = ['apps', 'packages', 'integration'];
-const TEST_SKIP_DIRS = new Set([
-  'node_modules',
-  'dist',
-  'coverage',
-  'test-results',
-  'playwright-report',
-]);
-const TEST_SUFFIXES = ['.test.ts', '.test.tsx', '.spec.ts'];
-
-// Tier vocabulary and semantics: docs/spec/18-positioning-and-differentiation.md (the `差异化面` tier = the
-// three semantic-axis cores — two hard gates, AI review with teeth, versioned
-// plan documents; the `运行轴` tier = the runtime model — machine × CLI, daemon,
-// self-hosted orchestration; the `通用面` tier = everything else). Classification is a
-// title keyword match, first rule wins, not a semantic judgment — §0.6 of the
-// doc states this limitation.
-const TIER_ORDER = ['Differentiation surface', 'Runtime axis', 'General surface'];
-const TIER_RULES = [
-  [
-    'Differentiation surface',
-    /闸|gate|confirm|review|审核|方案|plan|驳回|reject|revision|verdict|相位|phase/i,
-  ],
-  [
-    'Runtime axis',
-    /机器|machine|daemon|runtime|执行|executor|worktree|自托管|部署|deploy|enroll|claim|亲和|affinity|沙箱|sandbox|编排|orchestrat|会话|session|跨机|钉选|多机|cli|pin/i,
-  ],
+const SLOTS = [
+  ['research', 'Research'],
+  ['frontendDesign', 'Frontend design'],
+  ['backendDesign', 'Backend design'],
 ];
+const STATUSES = ['shipped', 'partial', 'planned'];
+const CENTRALITY = {
+  1: 'Core loop: phase 1 graduation and the three differentiators',
+  2: 'Self-host: phase 2, a stranger installs the app and gets a PR in 10 minutes',
+  3: 'Supporting surfaces used every day',
+  4: 'Later: phase 3 or peripheral',
+};
+const FEATURE_KEYS = new Set([
+  'id',
+  'name',
+  'summary',
+  'states',
+  'centrality',
+  'status',
+  'code',
+  'routes',
+  'reach',
+  'verify',
+  'research',
+  'frontendDesign',
+  'backendDesign',
+  'evidence',
+  'batch',
+]);
+const CODE_KEYS = ['web', 'server', 'daemon', 'other'];
+const ROUTE_KINDS = ['web', 'server'];
+const STEP = /^(open|settings|click|hover|press|type) (.+)$/;
 
-function fail(message) {
-  process.stderr.write(`generate-feature-map: ${message}\n`);
+function fail(lines) {
+  for (const line of [lines].flat()) process.stderr.write(`generate-feature-map: ${line}\n`);
   process.exit(1);
 }
 
-function refMatches(text) {
-  const re = new RegExp(REF_SOURCE, 'g');
-  const nums = new Set();
-  for (const m of text.matchAll(re)) nums.add(String(Number(m[1])));
-  return nums;
+function exists(rel) {
+  return existsSync(join(REPO_ROOT, rel));
 }
 
-function addToIndex(index, num, source) {
-  if (!index.has(num)) index.set(num, new Set());
-  index.get(num).add(source);
+function read(rel) {
+  return readFileSync(join(REPO_ROOT, rel), 'utf8');
 }
 
-// Source 1: spec volume references.
-function collectSpecRefs() {
-  const dir = join(REPO_ROOT, 'docs', 'spec');
-  const refs = new Map();
-  for (const name of readdirSync(dir)
-    .filter((n) => n.endsWith('.md'))
-    .sort()) {
-    const relPath = `docs/spec/${name}`;
-    for (const num of refMatches(readFileSync(join(dir, name), 'utf8'))) {
-      addToIndex(refs, num, relPath);
-    }
+function sourceFiles(rel, out = []) {
+  const abs = join(REPO_ROOT, rel);
+  if (!existsSync(abs)) return out;
+  if (statSync(abs).isFile()) {
+    if (/\.(tsx?|mjs)$/.test(rel)) out.push(rel);
+    return out;
   }
-  return refs;
-}
-
-// Source 2: landed evidence directories.
-function collectVerifyDirs() {
-  const dir = join(REPO_ROOT, 'docs', 'verify');
-  const numeric = new Map();
-  const other = new Map();
-  if (!existsSync(dir)) return { numeric, other };
-  const place = (name, anchor) => {
-    if (/^\d+$/.test(name)) numeric.set(String(Number(name)), anchor);
-    else other.set(name, anchor);
-  };
-  const ledgerPath = join(dir, 'pruned.json');
-  if (existsSync(ledgerPath)) {
-    for (const [name, sha] of Object.entries(JSON.parse(readFileSync(ledgerPath, 'utf8')))) {
-      place(name, `${sha.slice(0, 9)}:docs/verify/${name}/`);
-    }
-  }
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) place(entry.name, `docs/verify/${entry.name}/`);
-  }
-  return {
-    numeric,
-    other: new Map([...other].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
-  };
-}
-
-function walkTestFiles(dir, out) {
-  const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
-    a.name < b.name ? -1 : 1,
-  );
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (TEST_SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
-      walkTestFiles(full, out);
-    } else if (TEST_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) {
-      out.push(full);
-    }
+  for (const name of readdirSync(abs).sort()) {
+    if (WEB_SKIP.has(name) && rel === WEB_SRC_REL) continue;
+    sourceFiles(`${rel}/${name}`, out);
   }
   return out;
 }
 
-// Source 3: the CI test surface (vitest light + integration projects and the
-// playwright e2e specs are exactly these files; see root vitest.config.ts and
-// .github/workflows/ci.yml).
-function collectTestRefs() {
-  const refs = new Map();
-  for (const root of TEST_ROOTS) {
-    const abs = join(REPO_ROOT, root);
-    if (!existsSync(abs)) continue;
-    for (const file of walkTestFiles(abs, [])) {
-      const relPath = relative(REPO_ROOT, file);
-      for (const num of refMatches(readFileSync(file, 'utf8'))) {
-        addToIndex(refs, num, relPath);
+function moduleFile(fromRel, specifier) {
+  const base = join(dirname(fromRel), specifier).replace(/\.js$/, '');
+  return ['.tsx', '.ts'].map((ext) => `${base}${ext}`).find(exists);
+}
+
+function englishTable() {
+  const table = new Map();
+  if (!exists(EN_REL)) return table;
+  for (const match of read(EN_REL).matchAll(
+    /^[ \t]*'?([^'\s:][^':\n]*?)'?:[ \t]*'([^'\n]*)',?$/gm,
+  )) {
+    table.set(match[1], match[2]);
+  }
+  return table;
+}
+
+function settingsSections() {
+  if (!exists(SETTINGS_REL)) return [];
+  const sections = [];
+  let heading = null;
+  const text = read(SETTINGS_REL);
+  for (const match of text.matchAll(
+    /heading:\s*(null|'([^']*)')|\{\s*id:\s*'([a-z0-9-]+)',\s*label:\s*'([^']*)'/g,
+  )) {
+    if (match[1] !== undefined) heading = match[2] ?? null;
+    else sections.push({ id: match[3], label: match[4], heading });
+  }
+  return sections;
+}
+
+function webRoutes(errors) {
+  const routes = new Set();
+  if (exists(APP_REL)) {
+    const app = read(APP_REL);
+    const imports = new Map();
+    for (const match of app.matchAll(/import\s*\{([^}]*)\}\s*from\s*'(\.{1,2}\/[^']+)'/g)) {
+      for (const name of match[1].split(',').map((part) =>
+        part
+          .trim()
+          .split(/\s+as\s+/)
+          .at(-1),
+      )) {
+        if (name) imports.set(name, match[2]);
+      }
+    }
+    const constant = (name) => {
+      const rel = imports.has(name) ? moduleFile(APP_REL, imports.get(name)) : undefined;
+      const found = rel
+        ? read(rel).match(new RegExp(`export const ${name}\\s*=\\s*'([^']*)'`))
+        : null;
+      if (!found) errors.push(`cannot resolve the web route constant ${name} in ${APP_REL}`);
+      return found ? found[1] : `<${name}>`;
+    };
+    for (const match of app.matchAll(/\bpath:\s*(?:'([^']*)'|`([^`]*)`|([A-Za-z_$][\w$]*))/g)) {
+      const path =
+        match[1] ??
+        match[2]?.replace(/\$\{([A-Za-z_$][\w$]*)\}/g, (_, name) => constant(name)) ??
+        constant(match[3]);
+      if (path !== '*') routes.add(path);
+    }
+  }
+  for (const section of settingsSections()) routes.add(`settings:${section.id}`);
+  return [...routes].sort().map((key) => ({ key, label: key }));
+}
+
+function serverRoutes() {
+  const dir = join(REPO_ROOT, SERVER_SRC_REL);
+  if (!existsSync(dir)) return [];
+  const methods = new Map();
+  for (const name of readdirSync(dir).sort()) {
+    if (!/^(app|routes.*)\.ts$/.test(name)) continue;
+    const text = read(`${SERVER_SRC_REL}/${name}`);
+    for (const match of text.matchAll(
+      /\.(get|post|put|patch|delete|all)\(\s*(['`])(\/[^'`]*)\2/g,
+    )) {
+      if (!methods.has(match[3])) methods.set(match[3], new Set());
+      methods.get(match[3]).add(match[1].toUpperCase());
+    }
+  }
+  return [...methods.keys()]
+    .sort()
+    .map((key) => ({ key, label: `${[...methods.get(key)].sort().join(',')} ${key}` }));
+}
+
+function braceExpression(text, open) {
+  let depth = 0;
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === '{') depth += 1;
+    if (text[index] === '}') depth -= 1;
+    if (depth === 0) return text.slice(open + 1, index);
+  }
+  return '';
+}
+
+function testIdsIn(files) {
+  const ids = new Set();
+  for (const rel of files) {
+    const text = read(rel);
+    for (const match of text.matchAll(/\b(?:data-testid|testId)=(?:"([^"]+)"|\{)/g)) {
+      if (match[1] !== undefined) {
+        ids.add(match[1]);
+        continue;
+      }
+      const expression = braceExpression(text, match.index + match[0].length - 1);
+      for (const literal of expression.matchAll(/'([^'\n]+)'|"([^"\n]+)"|`([^`]+)`/g)) {
+        ids.add(
+          literal[3] === undefined
+            ? (literal[1] ?? literal[2])
+            : literal[3].replace(/\$\{.*$/s, '*'),
+        );
       }
     }
   }
-  return refs;
+  return [...ids].sort();
 }
 
-function gh(args) {
-  try {
-    return execFileSync('gh', args, {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
+function routePattern(key) {
+  const source = key
+    .split('/')
+    .map((part) => {
+      if (/^:[\w]+\?$/.test(part)) return '(?:/[^/]+)?';
+      if (/^:[\w]+$/.test(part)) return '/[^/]+';
+      return part ? `/${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}` : '';
+    })
+    .join('');
+  return new RegExp(`^${source || '/'}$`);
+}
+
+function labelsIn(files) {
+  const labels = new Set();
+  for (const rel of files) {
+    for (const match of read(rel).matchAll(/\bt\(\s*'([^'\n]+)'/g)) labels.add(match[1]);
+  }
+  return labels;
+}
+
+function shortcutsIn(files) {
+  const keys = new Set();
+  for (const rel of files) {
+    const text = read(rel);
+    for (const match of text.matchAll(/aria-keyshortcuts="([^"]+)"/g)) keys.add(match[1]);
+    for (const match of text.matchAll(/\bshortcut(?:=|:\s*)["']([^"']+)["']/g)) {
+      keys.add(match[1].toUpperCase());
+    }
+    for (const match of text.matchAll(
+      /(?:metaKey|ctrlKey)[^\n]{0,160}?\.key(?:\.toLowerCase\(\))?\s*===\s*'([a-z0-9])'/g,
+    )) {
+      keys.add(`Mod+${match[1].toUpperCase()}`);
+    }
+  }
+  return [...keys].sort();
+}
+
+function testIdKnown(id, all) {
+  return all.some((known) =>
+    known.endsWith('*') ? id.startsWith(known.slice(0, -1)) : known === id,
+  );
+}
+
+function matches(pattern, key) {
+  return pattern.endsWith('**') ? key.startsWith(pattern.slice(0, -2)) : pattern === key;
+}
+
+function slotKind(value) {
+  if (Array.isArray(value)) return value.length > 0 ? 'links' : 'empty';
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value);
+    if (keys.length !== 1) return 'empty';
+    if (keys[0] === 'gap' && typeof value.gap === 'string' && value.gap.trim()) return 'gap';
+    if (keys[0] === 'na' && typeof value.na === 'string' && value.na.trim()) return 'na';
+  }
+  return 'empty';
+}
+
+function hasGap(feature) {
+  return SLOTS.some(([slot]) => slotKind(feature[slot]) === 'gap');
+}
+
+function gapSlots(registry) {
+  const slots = new Set();
+  for (const feature of registry.features ?? []) {
+    for (const [slot] of SLOTS) {
+      if (slotKind(feature[slot]) === 'gap') slots.add(`${feature.id}:${slot}`);
+    }
+  }
+  return slots;
+}
+
+function collect(registry, errors) {
+  const web = webRoutes(errors);
+  const server = serverRoutes();
+  const appFiles = sourceFiles(WEB_SRC_REL);
+  const perFeature = new Map();
+  for (const feature of registry.features ?? []) {
+    const files = [...new Set((feature.code?.web ?? []).flatMap((rel) => sourceFiles(rel)))];
+    perFeature.set(feature.id, {
+      testIds: testIdsIn(files),
+      shortcuts: shortcutsIn(files),
+      webRoutes: web.filter((route) =>
+        (feature.routes?.web ?? []).some((p) => matches(p, route.key)),
+      ),
     });
-  } catch (err) {
-    const detail = err?.stderr ? String(err.stderr).trim() : String(err?.message);
-    fail(
-      `\`gh ${args[0]} ${args[1] ?? ''}…\` failed: ${detail}\n` +
-        'prereq: gh on PATH, authenticated (gh auth status), api.github.com reachable.',
+  }
+  return {
+    routes: { web, server },
+    sections: settingsSections(),
+    english: englishTable(),
+    testIds: testIdsIn(appFiles),
+    labels: labelsIn(appFiles),
+    shortcuts: shortcutsIn(appFiles),
+    perFeature,
+  };
+}
+
+function validateStep(id, step, facts, errors) {
+  const parsed = STEP.exec(step);
+  if (!parsed) {
+    errors.push(
+      `${id}: reach step "${step}" must start with open, settings, click, hover, press or type`,
     );
+    return;
+  }
+  const [, verb, arg] = parsed;
+  if (verb === 'open' && /(^|\/):/.test(arg)) {
+    errors.push(
+      `${id}: reach step "${step}" opens a route template; bind the parameter, e.g. /app/todo/<id of a seeded todo>`,
+    );
+  } else if (
+    verb === 'open' &&
+    !facts.routes.web.some((route) => routePattern(route.key).test(arg))
+  ) {
+    errors.push(`${id}: reach step "${step}" opens ${arg}, which is not a web route`);
+  }
+  if (verb === 'settings' && !facts.sections.some((section) => section.id === arg)) {
+    errors.push(`${id}: reach step "${step}" names settings section ${arg}, which does not exist`);
+  }
+  if (verb === 'click' || verb === 'hover') {
+    const testId = /^testid:([\w-]+)$/.exec(arg)?.[1];
+    const named = /^label:(.+)$/.exec(arg)?.[1];
+    if (!testId && !named) {
+      errors.push(
+        `${id}: reach step "${step}" must target testid:<id> or label:<t() source string>`,
+      );
+    } else if (testId && !testIdKnown(testId, facts.testIds)) {
+      errors.push(
+        `${id}: reach step "${step}" targets data-testid ${testId}, which no web source sets`,
+      );
+    } else if (named && !facts.labels.has(named)) {
+      errors.push(
+        `${id}: reach step "${step}" targets label ${named}, which no t() call in web source has`,
+      );
+    }
+  }
+  if (verb === 'press' && !facts.shortcuts.includes(arg)) {
+    errors.push(`${id}: reach step "${step}" presses ${arg}, which no web source declares`);
   }
 }
 
-function fetchTickets() {
-  const repo = gh(['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner']).trim();
-  if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) fail(`could not resolve the repo slug (got "${repo}")`);
-  const out = gh([
-    'api',
-    `repos/${repo}/issues?state=all&per_page=100`,
-    '--paginate',
-    '--jq',
-    '.[] | {number, state, state_reason, pr: has("pull_request"), title} | @json',
-  ]);
-  const tickets = new Map();
-  for (const line of out.split('\n')) {
-    if (!line.trim()) continue;
-    let rec;
-    try {
-      rec = JSON.parse(line);
-    } catch {
-      fail(`unparsable line from gh api: ${line.slice(0, 120)}…`);
-    }
-    tickets.set(String(rec.number), rec);
+function validate(registry, facts, base) {
+  const errors = [];
+  if (typeof registry.repo !== 'string' || !/^[^/\s]+\/[^/\s]+$/.test(registry.repo)) {
+    errors.push('repo must be an owner/name slug');
   }
-  if (tickets.size === 0)
-    fail('gh api returned zero issues/PRs; refusing to build a map from an empty fetch');
-  return { repo, tickets };
-}
-
-// CI execution surface: job ids and their named steps, straight from the
-// workflow file. This is where the test-file anchors actually run.
-function collectCiSurface() {
-  const file = join(REPO_ROOT, '.github', 'workflows', 'ci.yml');
-  const jobs = [];
-  if (!existsSync(file)) return jobs;
-  let inJobs = false;
-  let current = null;
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (/^jobs:\s*$/.test(line)) {
-      inJobs = true;
-      continue;
-    }
-    if (!inJobs) continue;
-    if (/^[^\s#]/.test(line)) break; // dedent out of the jobs: block
-    const job = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
-    if (job) {
-      current = { id: job[1], steps: [] };
-      jobs.push(current);
-      continue;
-    }
-    const step = line.match(/^\s+- name: (.+?)\s*$/);
-    if (step && current) current.steps.push(step[1]);
+  const pending = registry.pending ?? {};
+  const batches = registry.batches ?? [];
+  const features = registry.features ?? [];
+  if (!Array.isArray(features) || features.length === 0) {
+    errors.push('features must be a non-empty array');
   }
-  return jobs;
-}
-
-function classifyTier(title) {
-  for (const [tier, re] of TIER_RULES) {
-    if (re.test(title)) return tier;
+  const batchIds = new Set();
+  for (const batch of batches) {
+    if (!batch?.id || !batch.title || !batch.scope) {
+      errors.push('every batch needs id, title and scope');
+    }
+    if (batchIds.has(batch.id)) errors.push(`duplicate batch id ${batch.id}`);
+    batchIds.add(batch.id);
   }
-  return 'General surface';
+  const ids = new Set();
+  const cited = new Set();
+  for (const feature of features) {
+    const id = feature.id;
+    if (typeof id !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(id)) {
+      errors.push(`feature id ${JSON.stringify(id)} must be kebab-case`);
+    }
+    if (ids.has(id)) errors.push(`duplicate feature id ${id}`);
+    ids.add(id);
+    for (const key of Object.keys(feature)) {
+      if (!FEATURE_KEYS.has(key)) errors.push(`${id}: unknown key ${key}`);
+    }
+    for (const key of ['name', 'summary']) {
+      if (typeof feature[key] !== 'string' || !feature[key].trim()) {
+        errors.push(`${id}: ${key} is required`);
+      }
+    }
+    if (!CENTRALITY[feature.centrality]) errors.push(`${id}: centrality must be 1, 2, 3 or 4`);
+    if (!STATUSES.includes(feature.status)) {
+      errors.push(`${id}: status must be one of ${STATUSES.join(', ')}`);
+    }
+    const built = feature.status !== 'planned';
+    const code = feature.code ?? {};
+    for (const key of Object.keys(code)) {
+      if (!CODE_KEYS.includes(key)) errors.push(`${id}: unknown code area ${key}`);
+      for (const rel of code[key] ?? []) {
+        if (!exists(rel)) errors.push(`${id}: code.${key} path ${rel} does not exist`);
+      }
+    }
+    if (built && Object.values(code).flat().length === 0) {
+      errors.push(`${id}: a ${feature.status} feature needs at least one code path`);
+    }
+    if (built && (typeof feature.states !== 'string' || !feature.states.trim())) {
+      errors.push(
+        `${id}: a ${feature.status} feature needs states: one sentence on what the user sees in each state`,
+      );
+    }
+    if (built && (!Array.isArray(feature.reach) || feature.reach.length === 0)) {
+      errors.push(`${id}: a ${feature.status} feature needs reach steps from a fresh page load`);
+    }
+    for (const step of feature.reach ?? []) validateStep(id, step, facts, errors);
+    for (const rel of feature.verify ?? []) {
+      if (!exists(rel)) errors.push(`${id}: verify recipe ${rel} does not exist`);
+    }
+    for (const kind of Object.keys(feature.routes ?? {})) {
+      if (!ROUTE_KINDS.includes(kind)) errors.push(`${id}: unknown route kind ${kind}`);
+    }
+    for (const [slot] of SLOTS) {
+      const kind = slotKind(feature[slot]);
+      if (kind === 'empty') {
+        errors.push(
+          `${id}: ${slot} needs links, or an explicit {"gap": "<what is missing>"} or {"na": "<why it does not apply>"}`,
+        );
+      }
+      if (kind !== 'links') continue;
+      for (const rel of feature[slot]) {
+        cited.add(rel);
+        if (!exists(rel) && !(rel in pending)) {
+          errors.push(
+            `${id}: ${slot} links ${rel}, which does not exist; land it or list it under pending`,
+          );
+        }
+      }
+    }
+    for (const rel of feature.evidence ?? []) {
+      if (!exists(rel)) errors.push(`${id}: evidence path ${rel} does not exist`);
+    }
+    if (feature.status === 'shipped' && (feature.evidence ?? []).length === 0) {
+      errors.push(`${id}: a shipped feature needs at least one evidence path`);
+    }
+    if (hasGap(feature)) {
+      if (!feature.batch) errors.push(`${id}: has gaps, so it needs a batch`);
+      else if (!batchIds.has(feature.batch)) {
+        errors.push(`${id}: batch ${feature.batch} is not defined`);
+      }
+    } else if (feature.batch) {
+      errors.push(`${id}: has no gaps, so it must not carry a batch`);
+    }
+  }
+  for (const batch of batches) {
+    if (!features.some((feature) => feature.batch === batch.id && hasGap(feature))) {
+      errors.push(`batch ${batch.id} holds no feature with a gap; remove it`);
+    }
+  }
+  for (const rel of Object.keys(pending).sort()) {
+    if (!cited.has(rel)) errors.push(`pending note ${rel} is not cited by any feature; remove it`);
+  }
+  for (const kind of ROUTE_KINDS) {
+    for (const route of facts.routes[kind]) {
+      const owned = features.some((feature) =>
+        (feature.routes?.[kind] ?? []).some((p) => matches(p, route.key)),
+      );
+      if (!owned) {
+        errors.push(
+          `${kind} route ${route.label} maps to no feature; add it to a feature's routes.${kind}`,
+        );
+      }
+    }
+    for (const feature of features) {
+      for (const pattern of feature.routes?.[kind] ?? []) {
+        if (!facts.routes[kind].some((route) => matches(pattern, route.key))) {
+          errors.push(`${feature.id}: ${kind} route pattern ${pattern} matches no route`);
+        }
+      }
+    }
+  }
+  if (base) {
+    const inherited = gapSlots(base);
+    for (const slot of [...gapSlots(registry)].sort()) {
+      if (inherited.has(slot)) continue;
+      const [id, name] = slot.split(':');
+      errors.push(
+        `${id}: ${name} is a new gap; link the research or design before adding or changing the feature`,
+      );
+    }
+  }
+  return errors;
 }
 
 function cell(text) {
@@ -255,23 +480,252 @@ function cell(text) {
     .trim();
 }
 
-function byNum(a, b) {
-  return Number(a) - Number(b);
+function linker(fromDirRel, pending) {
+  return (rel) => {
+    const href = relative(fromDirRel, rel) || rel;
+    return `[${rel}](${href})${rel in pending ? ' (not on main)' : ''}`;
+  };
 }
 
-function issueUrl(repo, num) {
-  return `https://github.com/${repo}/issues/${num}`;
+function slotText(value, link) {
+  const kind = slotKind(value);
+  if (kind === 'gap') return `**gap**: ${cell(value.gap)}`;
+  if (kind === 'na') return `n/a: ${cell(value.na)}`;
+  return value.map(link).join(', ');
 }
 
-// ---------------------------------------------------------------------------
-// Collect + join
-// ---------------------------------------------------------------------------
+function slotMark(value, pending) {
+  const kind = slotKind(value);
+  if (kind === 'gap') return 'gap';
+  if (kind === 'na') return 'n/a';
+  return value.every((rel) => rel in pending) ? 'yes (not on main)' : 'yes';
+}
+
+function sortedFeatures(registry) {
+  return [...registry.features].sort(
+    (a, b) => a.centrality - b.centrality || (a.id < b.id ? -1 : 1),
+  );
+}
+
+function label(text, english) {
+  const en = english.get(text);
+  return en && en !== text ? `\`${text}\` (${en})` : `\`${text}\``;
+}
+
+function settingsPath(section, english) {
+  return [english.has('设置') ? '设置' : 'Settings', section.heading, section.label]
+    .filter(Boolean)
+    .map((part) => label(part, english))
+    .join(' › ');
+}
+
+function codeList(values) {
+  return values.length > 0 ? values.map((value) => `\`${value}\``).join(', ') : 'none';
+}
+
+function renderSkillMap(registry, facts) {
+  const pending = registry.pending ?? {};
+  const link = linker(SKILL_REL, pending);
+  const out = [];
+  out.push('# Feature map');
+  out.push('');
+  out.push(
+    '> Generated from `feature-map.json` in this directory by `scripts/generate-feature-map.mjs`. Edit the JSON, then run `node scripts/generate-feature-map.mjs`. The `gates` CI job runs it with `--check` and fails when this file drifts from the code.',
+  );
+  out.push('');
+  out.push(
+    'Use it to turn a vague report or screenshot into exact steps: find the feature by what is on screen (test ids, labels, routes), follow its reach steps on the stack from `vp.mjs launch`, then drive the recipe under `features/` when one is listed. Reach steps use `open <route>`, `settings <section>`, `click testid:<id>`, `click label:<source label>`, `hover ...`, `press <keys>` and `type <text>`; every route, section, test id, label and key in them is checked against the source. A label is the zh source string passed to `t()`; the English UI shows the translation printed next to it. A `<...>` path segment is a parameter to bind on the launched stack, such as a thread id from `GET /api/todos`; route templates like `:id` are rejected.',
+  );
+  out.push('');
+  out.push(
+    'Routes, settings paths, keyboard shortcuts and test ids below are extracted from `apps/web/src`, never typed by hand. `Mod` is Cmd on macOS and Ctrl elsewhere; a single letter is a menu key that works while its menu is open.',
+  );
+  out.push('');
+  out.push('## Settings sections');
+  out.push('');
+  out.push('| Section | Path in the settings window | Feature |');
+  out.push('|---|---|---|');
+  for (const section of facts.sections) {
+    const owner = registry.features.find((f) =>
+      (f.routes?.web ?? []).some((p) => matches(p, `settings:${section.id}`)),
+    );
+    out.push(
+      `| \`${section.id}\` | ${settingsPath(section, facts.english)} | ${owner ? `[${cell(owner.name)}](#${owner.id})` : ''} |`,
+    );
+  }
+  out.push('');
+  out.push('## Features');
+  out.push('');
+  for (const f of sortedFeatures(registry)) {
+    const found = facts.perFeature.get(f.id);
+    out.push(`### ${f.id}`);
+    out.push('');
+    out.push(`**${cell(f.name)}** (${f.status}, centrality ${f.centrality}). ${cell(f.summary)}`);
+    out.push('');
+    if (f.states) out.push(`States: ${cell(f.states)}`);
+    out.push('');
+    const reach = f.reach ?? [];
+    if (reach.length > 0) {
+      out.push('Reach:');
+      out.push('');
+      for (const [index, step] of reach.entries()) out.push(`${index + 1}. \`${step}\``);
+      out.push('');
+    }
+    const settings = facts.sections.filter((section) =>
+      (f.routes?.web ?? []).some((p) => matches(p, `settings:${section.id}`)),
+    );
+    const pages = found.webRoutes.filter((route) => !route.key.startsWith('settings:'));
+    out.push(`- Web routes: ${codeList(pages.map((route) => route.key))}`);
+    if (settings.length > 0) {
+      out.push(`- Settings: ${settings.map((s) => settingsPath(s, facts.english)).join('; ')}`);
+    }
+    out.push(`- Keyboard shortcuts in its code: ${codeList(found.shortcuts)}`);
+    out.push(`- Test ids in its code: ${codeList(found.testIds)}`);
+    const verify = f.verify ?? [];
+    if (verify.length > 0) out.push(`- Verify recipes: ${verify.map(link).join(', ')}`);
+    for (const [slot, name] of SLOTS) out.push(`- ${name}: ${slotText(f[slot], link)}`);
+    out.push(`- Evidence: ${codeList(f.evidence ?? [])}`);
+    out.push('');
+  }
+  return out.join('\n');
+}
+
+function renderDocMap(registry, evalRows) {
+  const pending = registry.pending ?? {};
+  const link = linker('docs', pending);
+  const features = sortedFeatures(registry);
+  const complete = features.filter((f) => !hasGap(f));
+  const out = [];
+  out.push('# Feature map');
+  out.push('');
+  out.push(
+    `> Generated from \`${REGISTRY_REL}\` by \`scripts/generate-feature-map.mjs\`; do not edit. The agent-facing map with entry points, shortcuts and test ids is \`${SKILL_MAP_REL}\`.`,
+  );
+  out.push(
+    '> `node scripts/generate-feature-map.mjs --check` runs in the CI `gates` job. It fails when a web route, settings section or server route maps to no feature, a route pattern matches nothing, a reach step names a route, section, test id or key the source does not have, a research or design slot is empty, a linked path does not exist, a shipped feature has no evidence, a generated file is stale, or the PR adds a gap its base did not have.',
+  );
+  out.push('');
+  out.push('## Rules');
+  out.push('');
+  out.push(
+    '- A feature is a user-facing capability. Each row names its code, routes, reach steps and states, research, frontend design, backend design and the tests that verify it.',
+  );
+  out.push(
+    '- Each of the three slots holds repository links, or `{"gap": "..."}` when the work is missing, or `{"na": "..."}` when the slot does not apply. A gap needs a batch, and a new feature may not add a gap: research and design come first.',
+  );
+  out.push(
+    '- A note that exists but is not on main yet goes under `pending` with where it lives; it counts as a link and renders as `(not on main)`.',
+  );
+  out.push(
+    '- Route patterns match exactly, or by prefix when they end in `**`. Web routes come from `apps/web/src/App.tsx` and the settings sections from `apps/web/src/settings/settings-page.tsx`; server routes are the literal paths registered in `apps/server/src/app.ts` and `apps/server/src/routes*.ts`.',
+  );
+  out.push('- Centrality follows the plan: 1 is the core loop and 4 is later or peripheral.');
+  out.push('');
+  out.push('## Summary');
+  out.push('');
+  out.push('| Item | Count |');
+  out.push('|---|---|');
+  out.push(`| Features | ${features.length} |`);
+  for (const status of STATUSES) {
+    out.push(`| status ${status} | ${features.filter((f) => f.status === status).length} |`);
+  }
+  out.push(
+    `| research, frontend design and backend design all present or not applicable | ${complete.length} |`,
+  );
+  for (const [slot, name] of SLOTS) {
+    out.push(`| ${name} gaps | ${features.filter((f) => slotKind(f[slot]) === 'gap').length} |`);
+  }
+  out.push(`| notes cited but not on main | ${Object.keys(pending).length} |`);
+  out.push('');
+  out.push('## Coverage');
+  out.push('');
+  out.push(
+    '| Feature | Centrality | Status | Research | Frontend design | Backend design | Batch |',
+  );
+  out.push('|---|---|---|---|---|---|---|');
+  for (const f of features) {
+    const marks = SLOTS.map(([slot]) => slotMark(f[slot], pending));
+    out.push(
+      `| [${cell(f.name)}](#${f.id}) | ${f.centrality} | ${f.status} | ${marks.join(' | ')} | ${f.batch ?? ''} |`,
+    );
+  }
+  out.push('');
+  out.push('## Gaps by batch');
+  out.push('');
+  out.push(
+    'Batches are ordered by how central their features are. One agent session researches and designs one batch.',
+  );
+  out.push('');
+  for (const batch of registry.batches ?? []) {
+    out.push(`### ${batch.id} · ${batch.title}`);
+    out.push('');
+    out.push(cell(batch.scope));
+    out.push('');
+    out.push('| Feature | Centrality | Missing |');
+    out.push('|---|---|---|');
+    for (const f of features.filter((feature) => feature.batch === batch.id)) {
+      const missing = SLOTS.filter(([slot]) => slotKind(f[slot]) === 'gap').map(
+        ([slot, name]) => `${name}: ${cell(f[slot].gap)}`,
+      );
+      out.push(`| [${cell(f.name)}](#${f.id}) | ${f.centrality} | ${missing.join('<br>')} |`);
+    }
+    out.push('');
+  }
+  out.push('## Research and design links');
+  out.push('');
+  for (const f of features) {
+    out.push(`### ${f.id}`);
+    out.push('');
+    out.push(`**${cell(f.name)}** (${f.status}). ${cell(f.summary)}`);
+    out.push('');
+    for (const [slot, name] of SLOTS) out.push(`- ${name}: ${slotText(f[slot], link)}`);
+    out.push('');
+  }
+  out.push('## Notes cited but not on main');
+  out.push('');
+  const rows = Object.entries(pending).sort(([a], [b]) => (a < b ? -1 : 1));
+  if (rows.length === 0) {
+    out.push('(None.)');
+  } else {
+    out.push('| Note | Where it is |');
+    out.push('|---|---|');
+    for (const [rel, where] of rows) out.push(`| \`${rel}\` | ${cell(where)} |`);
+  }
+  out.push('');
+  out.push(renderEvalCoverage(evalRows, registry.repo).trimEnd());
+  out.push('');
+  return out.join('\n');
+}
+
+function baseRegistry(sha) {
+  if (!sha) return null;
+  try {
+    const text = execFileSync('git', ['show', `${sha}:${REGISTRY_REL}`], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return JSON.parse(text);
+  } catch (error) {
+    const detail = String(error?.stderr ?? error?.message ?? '');
+    if (/does not exist|exists on disk, but not in/.test(detail)) return null;
+    fail(
+      `cannot read ${REGISTRY_REL} at base ${sha}: ${detail.trim()}; fetch the base commit first`,
+    );
+  }
+}
 
 const mode = process.argv[2];
 if (mode !== undefined && mode !== '--check') {
   fail(`unknown argument "${mode}" (usage: generate-feature-map.mjs [--check])`);
 }
-const checkOnly = mode === '--check';
+
+let registry;
+try {
+  registry = JSON.parse(read(REGISTRY_REL));
+} catch (error) {
+  fail(`cannot read ${REGISTRY_REL}: ${error.message}`);
+}
 
 let coverage;
 try {
@@ -285,337 +739,34 @@ if (coverage.unlisted.length > 0) {
   );
 }
 
-const specRefs = collectSpecRefs();
-const { numeric: verifyNumeric, other: verifyOther } = collectVerifyDirs();
-const testRefs = collectTestRefs();
-const { repo, tickets } = fetchTickets();
-const ciJobs = collectCiSurface();
+const extractionErrors = [];
+const facts = collect(registry, extractionErrors);
+const errors = [
+  ...extractionErrors,
+  ...validate(registry, facts, baseRegistry(process.env.FEATURE_REGISTRY_BASE_SHA)),
+];
+if (errors.length > 0) fail(errors);
 
-const union = [...new Set([...specRefs.keys(), ...verifyNumeric.keys(), ...testRefs.keys()])];
-
-const rows = [];
-const prRefs = [];
-const unresolved = [];
-for (const num of union.sort(byNum)) {
-  const rec = tickets.get(num);
-  const sources = {
-    spec: [...(specRefs.get(num) ?? [])].sort(),
-    tests: [...(testRefs.get(num) ?? [])].sort(),
-    verify: verifyNumeric.has(num),
-  };
-  if (!rec) {
-    unresolved.push({ num, sources });
-    continue;
-  }
-  if (rec.pr) {
-    prRefs.push({ num, rec, sources });
-    continue;
-  }
-  const anchors = [];
-  if (verifyNumeric.has(num)) anchors.push(verifyNumeric.get(num));
-  anchors.push(...sources.tests);
-  const anchored = anchors.length > 0;
-  const status =
-    rec.state === 'closed'
-      ? anchored
-        ? 'Done'
-        : 'Unverified'
-      : anchored
-        ? 'In progress'
-        : 'Not started';
-  rows.push({
-    num,
-    title: rec.title,
-    tier: classifyTier(rec.title),
-    status,
-    anchors,
-    anchored,
-    sources,
-  });
-}
-
-rows.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier) || byNum(a.num, b.num));
-
-// ---------------------------------------------------------------------------
-// Render
-// ---------------------------------------------------------------------------
-
-const out = [];
-out.push('# Feature map (living register of current state)');
-out.push('');
-out.push(
-  '> This register is mechanically extracted by `scripts/generate-feature-map.mjs` — do not hand-edit; changing the rules = changing the script and re-running (#894 established the first-version rules).',
-);
-out.push(
-  '> Regenerate: `node scripts/generate-feature-map.mjs`; verify the on-disk copy against its sources: add `--check`.',
-);
-out.push('> Prereq: `gh` authenticated, api.github.com reachable.');
-out.push(
-  '> Division of labor with volume 03: 03-ROADMAP = the historical register of build order; this register = the living register of current state.',
-);
-out.push(
-  '> Numbering note: this once occupied spec sequence number 22 and was renumbered to 25 after a collision (#952); from #1527 it left the numbered sequence and moved to `docs/feature-map.md` (generated artifacts do not consume hand-written volume numbers).',
-);
-out.push('');
-out.push('## 0. Extraction rules');
-out.push('');
-out.push(
-  'All rules are mechanically re-runnable with no per-line manual editing. The canonical text = the script itself; this section is rendered by the script.',
-);
-out.push('');
-out.push('### 0.1 Rows and columns');
-out.push('');
-out.push(
-  'A row = the union of ticket numbers (three sources, numbers normalized numerically with leading zeros dropped):',
-);
-out.push('');
-out.push(
-  `1. \`${REF_SOURCE}\` references inside \`docs/spec/*.md\` — the negative lookahead excludes hexadecimal color literals;`,
-);
-out.push('2. purely numeric directory names under `docs/verify/` (landed acceptance evidence);');
-out.push(
-  `3. ticket references in the CI test surface (${TEST_SUFFIXES.join(' / ')} under ${TEST_ROOTS.join(' / ')}, skipping ${[...TEST_SKIP_DIRS].sort().join(' / ')}).`,
-);
-out.push('');
-out.push(
-  'Titles and states come from `gh api repos/<owner>/<repo>/issues?state=all` (PRs included). The row set follows the `gh issue list` notion and only includes issues; referenced PR numbers do not become rows (listed in §3.2), and numbers that resolve to nothing land in §3.3.',
-);
-out.push('');
-out.push(
-  'Four columns: Feature = `#ticket` + the issue title verbatim (backtick-quoted, since legacy titles are Chinese); Tier = §0.2; Status = §0.3; Verification anchors = §0.4.',
-);
-out.push('');
-out.push('### 0.2 Tier rules (per volume 18)');
-out.push('');
-out.push(
-  'The tier vocabulary comes from `docs/spec/18-positioning-and-differentiation.md` (`差异化面` / `运行轴` / `通用面`).',
-);
-out.push(
-  'Judgment = title keyword match, first rule in the table wins, and no match = General surface:',
-);
-out.push('');
-out.push('| Tier | Title regex (canonical in the script) |');
-out.push('|---|---|');
-for (const [tier, re] of TIER_RULES) {
-  out.push(`| ${tier} | \`/${re.source}/${re.flags}\` |`);
-}
-out.push('');
-out.push('### 0.3 Status rules');
-out.push('');
-out.push('| issue state | has verification anchor | no verification anchor |');
-out.push('|---|---|---|');
-out.push('| closed | Done | Unverified |');
-out.push('| open | In progress | Not started |');
-out.push('');
-out.push('### 0.4 Verification anchor rules');
-out.push('');
-out.push(
-  '- the directory `docs/verify/<ticket>/` exists → that path becomes an anchor; directories already pruned from the working tree by the weekly cleanup (`docs/verify/pruned.json`) → `<sha>:docs/verify/<ticket>/` becomes an anchor, readable via `git show`;',
-);
-out.push(
-  '- files referencing the ticket in the CI test surface → each path becomes an anchor (these files are executed by the CI jobs in §0.5);',
-);
-out.push(
-  '- neither → the anchor column is marked `[unverified]` and the row enters the §3.1 follow-up list.',
-);
-out.push('');
-out.push('### 0.5 CI execution surface (extracted from `.github/workflows/ci.yml`)');
-out.push('');
-if (ciJobs.length > 0) {
-  out.push('| job | named steps |');
-  out.push('|---|---|');
-  for (const job of ciJobs) {
-    out.push(
-      `| \`${job.id}\` | ${job.steps.map((s) => `\`${cell(s).replace(/`/g, '')}\``).join(' / ')} |`,
-    );
-  }
-} else {
-  out.push('(`.github/workflows/ci.yml` not found.)');
-}
-out.push('');
-out.push('### 0.6 Known limitations (recorded as-is in the first version)');
-out.push('');
-out.push(
-  '1. Reference detection is a line-level regex that does not exclude code fences: a `#NNN` inside a spec code block is also collected as a reference.',
-);
-out.push(
-  '2. Tiers are title keyword matches with no semantic judgment — homonyms are not distinguished (`闸` is both a product hard gate and a CI gate name, and `review` is both AI review and ordinary code review). A wrongly tiered row = rule noise; refining the two §0.2 regexes is follow-up work.',
-);
-out.push(
-  '3. Status does not read `state_reason`: tickets closed as wontfix / not_planned are likewise recorded as "Done".',
-);
-out.push(
-  '4. The Feature column = the issue title verbatim. After a ticket is opened, the behavior may still evolve and the title does not follow.',
-);
-out.push(
-  '5. The row set = tickets referenced by the three sources. Features never ticketed, or ticketed but referenced by neither spec / tests / evidence, are not in this register.',
-);
-out.push(
-  '6. The GitHub data is a snapshot at generation time; when a source changes, re-running updates it (that is how a living register updates). "Two consecutive runs agree" means byte-identical only while the sources are unchanged.',
-);
-out.push('');
-
-// §1 statistics
-const tierCount = new Map(TIER_ORDER.map((t) => [t, 0]));
-const statusCount = new Map([
-  ['Done', 0],
-  ['In progress', 0],
-  ['Not started', 0],
-  ['Unverified', 0],
-]);
-let withVerify = 0;
-let withTests = 0;
-let withBoth = 0;
-let withNone = 0;
-for (const row of rows) {
-  tierCount.set(row.tier, tierCount.get(row.tier) + 1);
-  statusCount.set(row.status, statusCount.get(row.status) + 1);
-  const v = row.sources.verify;
-  const t = row.sources.tests.length > 0;
-  if (v && t) withBoth += 1;
-  else if (v) withVerify += 1;
-  else if (t) withTests += 1;
-  else withNone += 1;
-}
-// Distinct spec files that contributed a reference. Deliberately NOT a count
-// of fetched tickets: that number moves whenever anyone opens any issue, and
-// the doc must only change when a source of the map changes.
-
-out.push('## 1. Statistics');
-out.push('');
-out.push('| Item | Count |');
-out.push('|---|---|');
-out.push(`| Map rows (issues) | ${rows.length} |`);
-for (const tier of TIER_ORDER) {
-  out.push(`| of which ${tier} | ${tierCount.get(tier)} |`);
-}
-for (const status of ['Done', 'In progress', 'Not started', 'Unverified']) {
-  out.push(`| status ${status} | ${statusCount.get(status)} |`);
-}
-out.push(`| anchors = evidence directory + test reference | ${withBoth} |`);
-out.push(`| anchors = evidence directory only | ${withVerify} |`);
-out.push(`| anchors = test reference only | ${withTests} |`);
-out.push(`| no anchor (\`[unverified]\`) | ${withNone} |`);
-out.push(`| referenced PRs (no rows, §3.2) | ${prRefs.length} |`);
-out.push(`| unresolvable ticket numbers (§3.3) | ${unresolved.length} |`);
-out.push(
-  `| evidence directories that are not GitHub ticket numbers (§3.4) | ${verifyOther.size} |`,
-);
-out.push('');
-
-// §2 the map
-out.push('## 2. Feature map');
-out.push('');
-out.push(`Ordering: by tier (${TIER_ORDER.join(' → ')}), tickets ascending within a tier.`);
-out.push('');
-out.push('| Feature | Tier | Status | Verification anchors |');
-out.push('|---|---|---|---|');
-for (const row of rows) {
-  const feature = `[#${row.num}](${issueUrl(repo, row.num)}) \`${cell(row.title).replace(/`/g, '')}\``;
-  const anchor = row.anchored ? row.anchors.map((a) => `\`${a}\``).join('<br>') : '[unverified]';
-  out.push(`| ${feature} | ${row.tier} | ${row.status} | ${anchor} |`);
-}
-out.push('');
-
-// §3 gaps
-out.push('## 3. Rows without anchors and rows that cannot be resolved (follow-up work)');
-out.push('');
-out.push('### 3.1 `[unverified]` rows');
-out.push('');
-out.push(
-  'These rows have neither a `docs/verify/<ticket>/` directory nor a CI-test-surface file referencing the ticket — the feature claim comes from the spec volumes, but there is no verification anchor to point at. Adding an anchor = adding verify evidence or a test reference.',
-);
-out.push('');
-const unverified = rows.filter((r) => !r.anchored);
-if (unverified.length === 0) {
-  out.push('(None.)');
-} else {
-  out.push('| Ticket | Feature | Spec volumes referencing it |');
-  out.push('|---|---|---|');
-  for (const row of unverified) {
-    out.push(
-      `| [#${row.num}](${issueUrl(repo, row.num)}) | \`${cell(row.title).replace(/`/g, '')}\` | ${row.sources.spec.map((s) => `\`${s}\``).join('<br>')} |`,
-    );
-  }
-}
-out.push('');
-out.push('### 3.2 Referenced PRs (no rows)');
-out.push('');
-out.push(
-  'The row-set criterion = issues (§0.1). These PR numbers are referenced by the three sources; their implementations sit under the corresponding issue rows.',
-);
-out.push('');
-if (prRefs.length === 0) {
-  out.push('(None.)');
-} else {
-  out.push('| PR | Title | State | Referenced by |');
-  out.push('|---|---|---|---|');
-  for (const { num, rec, sources } of prRefs) {
-    const src = [];
-    if (sources.spec.length > 0) src.push(`spec ×${sources.spec.length}`);
-    if (sources.tests.length > 0) src.push(`tests ×${sources.tests.length}`);
-    out.push(
-      `| [#${num}](https://github.com/${repo}/pull/${num}) | \`${cell(rec.title).replace(/`/g, '')}\` | ${rec.state === 'closed' ? 'closed' : 'open'} | ${src.join(' + ')} |`,
-    );
-  }
-}
-out.push('');
-out.push('### 3.3 Unresolvable ticket numbers');
-out.push('');
-out.push(
-  'These numbers are referenced by the three sources, but the issue/PR does not exist in this repo (a cross-repo reference, a typo, or a reference to a deleted ticket).',
-);
-out.push('');
-if (unresolved.length === 0) {
-  out.push('(None.)');
-} else {
-  out.push('| Ticket number | Referenced by |');
-  out.push('|---|---|');
-  for (const { num, sources } of unresolved) {
-    const src = [...sources.spec.map((s) => `\`${s}\``)];
-    if (sources.tests.length > 0) src.push(`test surface ×${sources.tests.length}`);
-    if (sources.verify) src.push('`docs/verify/` directory name');
-    out.push(`| #${num} | ${src.join('<br>')} |`);
-  }
-}
-out.push('');
-out.push('### 3.4 Evidence directories that are not GitHub ticket numbers');
-out.push('');
-out.push(
-  'These directory names under `docs/verify/` are not GitHub ticket numbers of this repo (a historical tracker / thread number / variant directory) and cannot be resolved by `gh issue list`; the evidence itself is in the repo and can be looked up.',
-);
-out.push('');
-if (verifyOther.size === 0) {
-  out.push('(None.)');
-} else {
-  out.push('| Directory | Path |');
-  out.push('|---|---|');
-  for (const [name, anchor] of verifyOther) {
-    out.push(`| ${cell(name)} | \`${anchor}\` |`);
-  }
-}
-out.push('');
-out.push(renderEvalCoverage(coverage.rows, repo).trimEnd());
-out.push('');
-
-const content = out.join('\n');
-
-// ---------------------------------------------------------------------------
-// Write / check
-// ---------------------------------------------------------------------------
-
-if (checkOnly) {
-  if (!existsSync(DOC_PATH)) fail(`${DOC_REL} does not exist; run without --check to generate it`);
-  const onDisk = readFileSync(DOC_PATH, 'utf8');
-  if (onDisk !== content) {
+const outputs = [
+  [SKILL_MAP_REL, renderSkillMap(registry, facts)],
+  [DOC_REL, renderDocMap(registry, coverage.rows)],
+];
+if (mode === '--check') {
+  const stale = outputs.filter(([rel, content]) => !exists(rel) || read(rel) !== content);
+  if (stale.length > 0) {
     fail(
-      `${DOC_REL} differs from a fresh extraction; re-run node scripts/generate-feature-map.mjs and commit the result`,
+      stale.map(
+        ([rel]) =>
+          `${rel} differs from ${REGISTRY_REL} and the code; run node scripts/generate-feature-map.mjs and commit the result`,
+      ),
     );
   }
-  process.stdout.write(`${DOC_REL}: up to date with its sources\n`);
-} else {
-  writeFileSync(DOC_PATH, content);
   process.stdout.write(
-    `wrote ${DOC_REL}: ${rows.length} rows (${TIER_ORDER.map((t) => `${t} ${tierCount.get(t)}`).join(' / ')}), [unverified] ${withNone}\n`,
+    `feature map: ${registry.features.length} features, registry, code and maps agree\n`,
+  );
+} else {
+  for (const [rel, content] of outputs) writeFileSync(join(REPO_ROOT, rel), content);
+  process.stdout.write(
+    `wrote ${SKILL_MAP_REL} and ${DOC_REL}: ${registry.features.length} features\n`,
   );
 }

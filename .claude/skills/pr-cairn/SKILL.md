@@ -30,10 +30,10 @@ who did not watch the work. Use this order:
    `## Risk`, separated from the HTML tags by blank lines and closed with
    `</details>`. Keep this block collapsed.
 
-For code changes, the Codex cloud review on the PR head is the other-vendor
-review. Protected or security paths, documentation included, also need
-`/security-review`; other docs-only changes need no code review. After three
-rounds, rethink or hand the PR to ian.
+For code changes, the Codex cloud review on the PR head is the required
+review. Protected paths, documentation included, need it too; other
+docs-only changes need no code review. After three rounds, rethink or hand
+the PR to ian.
 Review links the Codex cloud review on the head SHA, states its verdict and
 lists unfixed findings with reasons. Risk states one-way or two-way
 door, blast radius and whether the owner must merge. Put longer overlap
