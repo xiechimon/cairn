@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 55 |
-| status shipped | 45 |
+| Features | 56 |
+| status shipped | 46 |
 | status partial | 7 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 16 |
+| research, frontend design and backend design all present or not applicable | 17 |
 | Research gaps | 20 |
 | Frontend design gaps | 26 |
 | Backend design gaps | 26 |
@@ -44,6 +44,7 @@
 | [Phone push](#push-notifications) | 1 | shipped | gap | gap | gap | B2 |
 | [Question cards](#questions) | 1 | shipped | gap | yes (not on main) | gap | B2 |
 | [Model and work routing](#routing) | 1 | shipped | yes | yes | yes |  |
+| [Selection reply](#selection-reply) | 1 | shipped | yes | yes | yes |  |
 | [Steer, queue and stop](#steer-queue-stop) | 1 | shipped | gap | gap | gap | B3 |
 | [Machine work protocol](#step-claim) | 1 | shipped | yes | n/a | yes |  |
 | [Thread PR panel and auto-fix](#thread-pr-panel) | 1 | shipped | yes | yes | yes |  |
@@ -333,6 +334,14 @@ Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the 
 - Research: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md)
+
+### selection-reply
+
+**Selection reply** (shipped). Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.
+
+- Research: [docs/research/selection-reply-2026-11-08.md](research/selection-reply-2026-11-08.md)
+- Frontend design: [docs/design/selection-reply-2026-11-08.md](design/selection-reply-2026-11-08.md)
+- Backend design: [docs/design/selection-reply-2026-11-08.md](design/selection-reply-2026-11-08.md)
 
 ### steer-queue-stop
 

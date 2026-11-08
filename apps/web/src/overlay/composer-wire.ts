@@ -101,7 +101,6 @@ export interface ComposerWire {
   setInlineHighlight: (index: number | null) => void;
   inlineListboxId: string;
   inlineListboxRef: RefObject<HTMLDivElement | null>;
-  closeInline: () => void;
   acceptInlineRow: (row: InlineCompletionRow) => void;
   slashOpen: boolean;
   slashQuery: string;
@@ -112,7 +111,6 @@ export interface ComposerWire {
   setSlashHighlight: (index: number | null) => void;
   slashListboxId: string;
   slashListboxRef: RefObject<HTMLDivElement | null>;
-  closeSlash: () => void;
   acceptSlashRow: (row: SlashRow, via: 'enter' | 'tab') => void;
   helpOpen: boolean;
   closeHelp: () => void;
@@ -732,7 +730,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     setInlineHighlight,
     inlineListboxId,
     inlineListboxRef,
-    closeInline,
     acceptInlineRow,
     mentionRegistry: registry,
     slashOpen,
@@ -744,7 +741,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     setSlashHighlight,
     slashListboxId,
     slashListboxRef,
-    closeSlash,
     acceptSlashRow,
     helpOpen,
     closeHelp,

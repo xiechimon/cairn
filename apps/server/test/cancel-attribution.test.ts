@@ -1,7 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build, step, todo } from '../src/db/schema.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import {
+  applyStepFailure,
+  applyStoppedStep,
+  completeStep,
+  enqueueStep,
+} from '../src/services/builds.js';
+import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { req } from './helpers.js';
 
 registerChiefHarness();
@@ -78,6 +84,52 @@ describe('a stop records who stopped the work and why (task stall S8)', () => {
     });
     await relay('cancel_builds', { buildIds: [buildId], reason: 'duplicate of #140' });
     expect(buildStop(buildId)).toMatchObject({ actor: 'coordinator', reason: 'duplicate of #140' });
+  });
+
+  test.each(['plan', 'review', 'verify', 'merge'] as const)(
+    'a %s step that resumes a stopped build clears the stop attribution',
+    async (kind) => {
+      const { todoId, buildId } = await openThread();
+      await relay('stop_thread', { todoId, reason: 'priority: finish #131 first' });
+      expect(buildStop(buildId)).not.toBeNull();
+      enqueueStep(toolDeps(), buildId, kind, H.teamId, undefined, undefined, true);
+      expect(buildStop(buildId)).toBeNull();
+    },
+  );
+
+  test.each([
+    ['completes', (stepId: string) => completeStep(toolDeps(), stepId, { hasChanges: false })],
+    [
+      'fails',
+      (stepId: string) => {
+        const row = H.s.db.select().from(step).where(eq(step.id, stepId)).get();
+        if (!row) throw new Error('step missing');
+        applyStepFailure(toolDeps(), row, 'agent exited with code 1');
+      },
+    ],
+  ] as const)(
+    'a claimed step that %s before the stop lands leaves no stop attribution',
+    async (_label, finish) => {
+      const { todoId, buildId } = await openThread();
+      const stepRow = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get();
+      if (!stepRow) throw new Error('step missing');
+      H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+      H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+      await relay('stop_thread', { todoId, reason: 'priority: finish #131 first' });
+      expect(buildStop(buildId)).not.toBeNull();
+      finish(stepRow.id);
+      expect(buildStop(buildId)).toBeNull();
+    },
+  );
+
+  test('a claimed step the daemon reports stopped keeps the stop attribution', async () => {
+    const { todoId, buildId } = await openThread();
+    const stepRow = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get();
+    if (!stepRow) throw new Error('step missing');
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    await relay('stop_thread', { todoId, reason: 'priority: finish #131 first' });
+    applyStoppedStep(toolDeps(), stepRow.id);
+    expect(buildStop(buildId)).toMatchObject({ actor: 'coordinator' });
   });
 
   test('a stop from the task page records a person as actor', async () => {

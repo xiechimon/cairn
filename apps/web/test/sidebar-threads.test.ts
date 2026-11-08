@@ -31,17 +31,12 @@ test('failed ranks after needs-you but inside the needs-you group', () => {
   expect(nums(groups.running)).toEqual([1]);
 });
 
-test.each(['confirm', 'review'] as const)('a %s thread lands in needs-you', (phase) => {
+test.each(['confirm', 'needs_input', 'review'] as const)('a %s thread lands in needs-you', (phase) => {
   const newerRunning = { ...inProject(1, 'building'), phaseAt: NOW };
   const waiting = { ...inProject(2, phase), phaseAt: NOW - 3_600_000 };
   const groups = groupThreads([newerRunning, waiting], null);
   expect(nums(groups.needsYou)).toEqual([2]);
   expect(nums(groups.running)).toEqual([1]);
-});
-
-test('an awaiting-reply thread lands in needs-you', () => {
-  const asking = { ...inProject(2, 'building'), awaitingReply: true };
-  expect(nums(groupThreads([asking], null).needsYou)).toEqual([2]);
 });
 
 test('every phase classified by threadStatus lands in the matching group', () => {

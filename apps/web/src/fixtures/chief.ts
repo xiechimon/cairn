@@ -1,19 +1,11 @@
 import { legacyDone, legacyReview, MACHINE_NAME, r7 } from './core.js';
 import type {
   ChiefContent,
-  ChiefExample,
   ChiefSettingsTab,
   ChiefStreamItem,
   ChiefThreadRef,
   FixtureSet,
 } from './records.js';
-
-export const CHIEF_EXAMPLES: ChiefExample[] = [
-  { icon: 'user-plus', text: '帮我组建 Agent 团队' },
-  { icon: 'folder', text: '帮我创建一个新项目' },
-  { icon: 'grid', text: '总结一下我所有项目现在的进展' },
-  { icon: 'bars', text: '查一下这个月的 token 用量' },
-];
 
 const CHIEF_DRAFT =
   '我想做一个能在浏览器里直接玩的网页小游戏 （比如贪吃蛇或打砖块）： 单文件 HTML + Canvas， 不用任何构建工具，做完能在项目的文件页直接试玩。请在现有的入门项目里做， 组建 Agent 团队把游戏逻辑、 画面手感、 难度调优拆成并行任务， 然后向我汇报方案， 等我确认后再开始动工。';
@@ -27,10 +19,9 @@ export const chiefGated: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: false,
     threadTitle: '新主题',
-    examples: CHIEF_EXAMPLES,
     draft: CHIEF_DRAFT,
   },
 };
@@ -39,11 +30,10 @@ export const chiefReady: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '新主题',
-    examples: CHIEF_EXAMPLES,
     draft: CHIEF_DRAFT,
   },
 };
@@ -52,7 +42,7 @@ export const chiefStreaming: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '我想做一个能在浏览器里直…',
@@ -94,7 +84,7 @@ export const chiefThread: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '帮 r3-lifecycle 写一份…',
@@ -135,7 +125,7 @@ export const chiefThreadsOpen: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给 r3-lifecycle 做三件小事…',
@@ -202,7 +192,7 @@ export const chiefThreadsLong: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给 r3-lifecycle 做三件小事…',
@@ -219,7 +209,7 @@ export const chiefThreadsLong: FixtureSet = {
 
 const CHIEF_SCROLL_ROWS: ChiefStreamItem[] = Array.from({ length: 40 }, (_, i) =>
   i % 2 === 0
-    ? { kind: 'user', text: `滚动保留探针第 ${i + 1} 条：检查最小化后滚动位置是否存活。` }
+    ? { kind: 'user', text: `滚动保留探针第 ${i + 1} 条：检查滚动位置是否存活。` }
     : {
         kind: 'robot',
         paragraphs: [
@@ -237,7 +227,7 @@ export const chiefScrollLong: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '滚动保留探针…',
@@ -267,7 +257,7 @@ export const chiefMarkdown: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '验证一下凭证链路…',
@@ -294,7 +284,7 @@ export const chiefQuestion: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'drawer',
+    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给贪吃蛇小游戏定难度…',
@@ -352,8 +342,7 @@ export function chiefSettings(tab: ChiefSettingsTab): FixtureSet {
 }
 
 export const chiefDefault: ChiefContent = {
-  view: 'drawer',
+  view: 'none',
   bound: false,
   threadTitle: '新主题',
-  examples: CHIEF_EXAMPLES,
 };

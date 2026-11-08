@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 import { type BuiltSite, buildAndServe } from './demo-server';
-import { openChiefWindow } from './helpers.js';
+import { pressOpenCoordinator } from './helpers.js';
 
 const SITE_URL = 'https://cairn.xmon.me';
 
@@ -193,12 +193,11 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
   expectQuiet(traffic);
 });
 
-test('write: sending to the Coordinator drawer is blocked', async ({ page }) => {
+test('write: sending to the Coordinator is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app/schedules`);
-  await openChiefWindow(page);
-  const chief = page.getByRole('dialog', { name: /Coordinator/ });
-  const input = chief.getByRole('textbox');
+  await pressOpenCoordinator(page);
+  const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await input.fill('把购物车那张票提到最前面');
   await input.press('Enter');
   await expect(toast(page)).toBeVisible();

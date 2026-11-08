@@ -57,9 +57,13 @@ function relay(app: Hono, token: string, stepId: string, params: Record<string, 
 describe('thread_report relay tool', () => {
   test('only session steps carry the tool, for both repo types', () => {
     for (const github of [false, true]) {
-      expect(workerRemoteTools('session', github).map((t) => t.name)).toContain('thread_report');
+      expect(workerRemoteTools('session', github, true).map((t) => t.name)).toContain(
+        'thread_report',
+      );
       for (const kind of ['plan', 'build', 'merge', 'review', 'verify'] as const) {
-        expect(workerRemoteTools(kind, github).map((t) => t.name)).not.toContain('thread_report');
+        expect(workerRemoteTools(kind, github, true).map((t) => t.name)).not.toContain(
+          'thread_report',
+        );
       }
     }
     expect(WORKER_REMOTE_TOOLS.map((t) => t.name)).not.toContain('thread_report');

@@ -81,7 +81,7 @@ Moved from the former `GLOSSARY.md`. Each entry names the canonical UI word and 
 | UI word | English | Definition | Avoid |
 |---|---|---|---|
 | `Coordinator` | Coordinator | The resident orchestration agent, one per user × team: it plans tasks, dispatches builds and talks with people. | `主管`, boss |
-| `Coordinator 面板` | Coordinator panel | The Coordinator's only conversation surface, shaped as a floating window (ADR 0013). | `抽屉`, drawer, `竖板`, `主管` pane (the first three name the retired right-docked panel; code identifiers such as `chief-drawer.tsx` are cleaned up with #1009 A0) |
+| `Coordinator 面板` | Coordinator panel | The Coordinator's only conversation surface: the home route `/app`. There is no floating Coordinator window. | `抽屉`, drawer, `竖板`, `主管` pane, Coordinator window (all name retired surfaces) |
 | `悬浮窗` | Floating window | A floating card window anchored to the bottom right of the content area: no modal, no scrim, resident across pages, open state persisted (closed by default). Follows the Multica floating chat window. | `悬浮卡`, `浮窗`, `浮层` |
 | `常驻` | Resident | How the floating window exists: mounted once in the root layout, not remounted on route change, kept (inert) when closed, open state kept across reloads. | `常开`, `永挂` |
 | `最小化` | Minimize | The floating window's only way to collapse: it returns to the bottom-right FAB and keeps its draft, scroll and thread. It is not a destructive close. | `关闭` (for the floating window), `收起` |
