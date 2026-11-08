@@ -25,6 +25,8 @@ Overlap was checked before editing. Open #3426 owns broader serif application an
 
 ## Reference comparison and acceptance
 
+[Desktop light](sidebar-reference/1440-light.png), [desktop dark](sidebar-reference/1440-dark.png), [phone light](sidebar-reference/390-light.png) and [phone dark](sidebar-reference/390-dark.png) place the reference sidebar on the left and our corresponding real-stack sidebar on the right. Crops exclude unrelated reference-product content.
+
 | State | Reference | Ours | Difference |
 |---|---|---|---|
 | Desktop light | Claude.ai empty composer, listed above | [1440px light](sidebar-compat/1440-light.png) | Compact serif wordmark; our sidebar remains roomier and less dense. |
