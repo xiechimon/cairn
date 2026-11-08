@@ -48,9 +48,13 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
         name: `${config.providerId} key from the claimed Coordinator step`,
         resolve: async ({ credential }) => {
           const key = resolveKey === undefined ? credential?.key : await resolveKey();
-          return key
-            ? { auth: { apiKey: key }, source: 'cairn step token' }
-            : { auth: { apiKey: KEYLESS_PLACEHOLDER }, source: 'no key on the provider' };
+          const resolvedKey = key || KEYLESS_PLACEHOLDER;
+          return {
+            auth: config.authHeader
+              ? { headers: { Authorization: `Bearer ${resolvedKey}` } }
+              : { apiKey: resolvedKey },
+            source: key ? 'cairn step token' : 'no key on the provider',
+          };
         },
       },
     },
