@@ -13,7 +13,7 @@ import { ChevronDown, Trash2 } from '../icons/index.js';
 
 const DIVIDER_CLS = `${STATUS_LINE_CLS} mt-6 mb-3`;
 const TOGGLE_CLS =
-  'h-auto min-h-7 max-w-full gap-2 rounded-none border-0 bg-transparent p-0 text-left text-card-title font-normal whitespace-normal text-(--text-secondary) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent dark:hover:text-(--foreground) aria-expanded:bg-transparent aria-expanded:text-(--foreground) [&_svg]:transition-transform [&_svg]:duration-200 aria-expanded:[&_svg]:rotate-180';
+  'h-auto min-h-7 max-w-full gap-2 border-0 bg-transparent p-0 text-left text-card-title font-normal whitespace-normal text-(--text-secondary) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent dark:hover:text-(--foreground) aria-expanded:bg-transparent aria-expanded:text-(--foreground) [&_svg]:transition-transform [&_svg]:duration-200 aria-expanded:[&_svg]:rotate-180';
 const CARD_CLS =
   'mb-3 flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui leading-6 text-content-secondary';
 const GROUP_CLS = 'grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5';
