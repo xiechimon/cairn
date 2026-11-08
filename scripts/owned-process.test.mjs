@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ownerChain, processInfo, spawnOwned } from './owned-process.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const CLI = join(import.meta.dirname, 'owned-process.mjs');
 const scopeAvailable =
@@ -239,4 +240,58 @@ test('no cairn-owned scope outlives a run, even when its command exits at once',
     encoding: 'utf8',
   }).stdout.trim();
   assert.notEqual(state, 'active');
+});
+
+for (const mode of modes) {
+  test(`${mode}: a nested owned tree whose grandchild ignores SIGTERM dies with the outer owner`, async (t) => {
+    const marker = token();
+    const stubborn = `trap '' TERM; setsid sleep ${marker} & sleep ${marker} & wait`;
+    const outer = started(
+      t,
+      spawn('node', [CLI, '--', 'node', CLI, '--', 'bash', '-c', stubborn], {
+        env: modeEnv(mode),
+        stdio: 'ignore',
+      }),
+    );
+    assert.ok(await waitFor(() => pidsRunning(marker).length === 2), 'nested tree started');
+    outer.kill('SIGTERM');
+    assert.ok(await waitFor(() => pidsRunning(marker).length === 0, 30_000), 'nested tree reaped');
+  });
+}
+
+test('a detached session job stays bound to the session when the helper starts slowly', {
+  skip: process.platform !== 'linux',
+}, async (t) => {
+  const dir = makeTestTempDir('owned-session-');
+  const bin = join(dir, 'bin');
+  mkdirSync(bin);
+  const realRun =
+    spawnSync('bash', ['-c', 'command -v systemd-run'], { encoding: 'utf8' }).stdout.trim() ||
+    '/nonexistent';
+  writeFileSync(join(bin, 'systemd-run'), `#!/bin/sh\nsleep 2\nexec ${realRun} "$@"\n`);
+  chmodSync(join(bin, 'systemd-run'), 0o755);
+  const marker = token();
+  const dispatcher = join(dir, 'dispatch.mjs');
+  writeFileSync(
+    dispatcher,
+    `import { launchOwnedDetached } from ${JSON.stringify(join(import.meta.dirname, 'owned-process.mjs'))};\nlaunchOwnedDetached('sleep', [${JSON.stringify(marker)}]);\n`,
+  );
+  writeFileSync(
+    join(bin, 'claude'),
+    `#!/bin/sh\n${JSON.stringify(process.execPath)} ${JSON.stringify(dispatcher)}\nsleep 600\n`,
+  );
+  chmodSync(join(bin, 'claude'), 0o755);
+  const session = started(
+    t,
+    spawn(join(bin, 'claude'), [], {
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      stdio: 'ignore',
+    }),
+  );
+  assert.ok(
+    await waitFor(() => pidsRunning(marker).length === 1),
+    'job started after the dispatcher exited',
+  );
+  session.kill('SIGKILL');
+  assert.ok(await waitFor(() => pidsRunning(marker).length === 0), 'job died with its session');
 });
