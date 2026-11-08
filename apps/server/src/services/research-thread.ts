@@ -6,7 +6,7 @@ import { HttpError } from '../lib/errors.js';
 import { type BuildDeps, startBuilds } from './builds.js';
 import { recordResearchTier } from './research-citations.js';
 import { routeForStep } from './routing-rules.js';
-import { createTodo } from './todos.js';
+import { createAutonomousTodo } from './todos.js';
 
 export const RESEARCH_AGENT_PROVIDER = 'claude-code';
 
@@ -61,7 +61,7 @@ export function openResearchThread(
   }
   const todoId =
     existing?.id ??
-    createTodo(deps, {
+    createAutonomousTodo(deps, {
       teamId: input.teamId,
       projectId: input.projectId,
       title: input.title,

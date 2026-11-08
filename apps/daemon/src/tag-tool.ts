@@ -7,6 +7,9 @@ export interface CreateTagToolOpts {
   repoDir: string | null;
   cred: BoundGitCredentials | null;
   identity: CommitIdentity;
+  withCredentials?: (
+    operation: (credential: BoundGitCredentials | null) => Promise<void>,
+  ) => Promise<void>;
 }
 
 export function buildCreateTagTool(opts: CreateTagToolOpts): LocalToolDef {
@@ -54,7 +57,10 @@ export function buildCreateTagTool(opts: CreateTagToolOpts): LocalToolDef {
         return err instanceof Error ? err.message : String(err);
       }
       try {
-        await gitPrim.tagPush(opts.repoDir, tag, opts.cred);
+        const repoDir = opts.repoDir;
+        if (opts.withCredentials)
+          await opts.withCredentials((credential) => gitPrim.tagPush(repoDir, tag, credential));
+        else await gitPrim.tagPush(repoDir, tag, opts.cred);
       } catch (err) {
         const text = err instanceof Error ? err.message : String(err);
         return `${text} (tag "${tag}" was created locally but NOT pushed to origin)`;

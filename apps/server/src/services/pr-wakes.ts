@@ -30,6 +30,7 @@ import {
   isCairnIdentity,
 } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
+import type { AutonomousToken } from '../lib/github-token.js';
 import { newRecordId } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
@@ -110,7 +111,7 @@ export function createPrWakes(deps: BuildDeps) {
     pull: GithubPullPanel;
     runs: GithubCheckRun[] | null;
     fetch: FetchLike;
-    token: string;
+    token: AutonomousToken;
     owner: string;
     repo: string;
     now: number;

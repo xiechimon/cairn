@@ -49,6 +49,7 @@ import {
   githubFake as sharedGithubFake,
   type TimelineEvent,
 } from './fakes/github.js';
+import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, req, seedRoute, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
@@ -170,6 +171,7 @@ type GithubFake = ReturnType<typeof githubFake>;
 
 const servers: TestServer[] = [];
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const s of servers.splice(0)) s.dispose();
 });
 
@@ -3329,3 +3331,31 @@ describe('agent labels are no longer a routing signal', () => {
     expect(chiefThreads(w.s)).toHaveLength(1);
   });
 });
+
+test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
+  'issue intake closes through the autonomous identity with App reason %s',
+  async (reason) => {
+    const w = await makeWorld({ list: [1406] });
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const app = stubGithubApp(reason);
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 2103, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    const tally = await w.intake.sweep();
+    expect(tally?.githubIssuesClosed).toBe(1);
+    const writes = w.gh.calls.filter((call) => call.method === 'PATCH');
+    expect(writes).toHaveLength(1);
+    expect(
+      writes.every(
+        (call) => call.headers.authorization === `Bearer ${reason === null ? app : TOKEN}`,
+      ),
+    ).toBe(true);
+    if (reason !== null) {
+      expect(log).toHaveBeenCalledWith(
+        'github write unattributed',
+        expect.objectContaining({ reason, owner: OWNER, repo: 'cairn' }),
+      );
+      expect(JSON.stringify(log.mock.calls).includes(TOKEN)).toBe(false);
+    }
+  },
+);

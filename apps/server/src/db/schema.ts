@@ -1067,6 +1067,8 @@ export const composerDraft = sqliteTable(
 );
 
 export const githubConnection = sqliteTable('github_connection', {
+  githubUserId: integer('githubUserId'),
+  githubName: text('githubName'),
   teamId: text('teamId')
     .primaryKey()
     .references(() => team.id, { onDelete: 'cascade' }),

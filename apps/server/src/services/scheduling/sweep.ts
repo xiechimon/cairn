@@ -20,7 +20,7 @@ import {
 } from '../autonomy-gates.js';
 import type { BuildDeps } from '../builds.js';
 import { githubRepoOfProject } from '../git.js';
-import { teamGithubToken } from '../github-connection.js';
+import { githubReadToken } from '../github-autonomous-token.js';
 import { ISSUE_INTAKE_LABEL } from '../issue-intake.js';
 import { defaultBranchSha, ledgerLines, mergedPulls, openIssues } from './collect.js';
 import { planSchedule } from './plan.js';
@@ -113,11 +113,11 @@ export async function scheduleProject(
   });
   recordAutonomyVerdict(deps.db, row.id, 'scheduling', gate, now);
   if (!gate.ok) return { kind: 'gated', reason: gate.reason };
-  const got = await teamGithubToken(deps, row.teamId);
-  if ('reason' in got) return { kind: 'skipped', reason: got.reason };
-  const sha = await defaultBranchSha(run.githubFetch, got.token, repoRef.owner, repoRef.repo);
+  const token = await githubReadToken(deps, row.teamId, repoRef);
+  if (token === null) return { kind: 'skipped', reason: 'no-github-connection' };
+  const sha = await defaultBranchSha(run.githubFetch, token, repoRef.owner, repoRef.repo);
   if (sha === null) return { kind: 'skipped', reason: 'main-unreadable' };
-  const listed = await openIssues(run.githubFetch, got.token, repoRef.owner, repoRef.repo);
+  const listed = await openIssues(run.githubFetch, token, repoRef.owner, repoRef.repo);
   if ('skipped' in listed) return { kind: 'skipped', reason: listed.skipped };
   const issuesUnchanged = issuesMatchPersistedReport(listed, latestScheduleReport(deps.db, row.id));
   const dormancy = evaluateAutonomyGates({
@@ -134,15 +134,9 @@ export async function scheduleProject(
     recordAutonomyVerdict(deps.db, row.id, 'scheduling', dormancy, now);
     return { kind: 'gated', reason: 'dormant' };
   }
-  const pulls = await mergedPulls(run.githubFetch, got.token, repoRef.owner, repoRef.repo);
+  const pulls = await mergedPulls(run.githubFetch, token, repoRef.owner, repoRef.repo);
   if ('skipped' in pulls) return { kind: 'skipped', reason: pulls.skipped };
-  const specLedger = await ledgerLines(
-    run.githubFetch,
-    got.token,
-    repoRef.owner,
-    repoRef.repo,
-    sha,
-  );
+  const specLedger = await ledgerLines(run.githubFetch, token, repoRef.owner, repoRef.repo, sha);
   recordAutonomyStart(deps.db, row.id, 'scheduling', now, sha);
   const report = scheduleReportSchema.parse({
     ...planSchedule(

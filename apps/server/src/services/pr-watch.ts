@@ -7,11 +7,13 @@ import {
   githubCommitCheckRuns,
   githubPullPanel,
 } from '../lib/github.js';
+import type { AutonomousToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { CI_CLOSED_CONFIRM_MS } from './ci-loop.js';
 import { githubRepoOfProject } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { autonomousToken } from './github-autonomous-token.js';
+import { reconcileWorkAttribution } from './github-work-attribution.js';
 import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
 
@@ -196,7 +198,7 @@ export function createPrWatch(
 
   async function readChecks(
     fetchImpl: FetchLike,
-    token: string,
+    token: AutonomousToken,
     target: Target,
     key: string,
     head: string,
@@ -218,7 +220,7 @@ export function createPrWatch(
 
   async function watchOne(
     fetchImpl: FetchLike,
-    token: string,
+    token: AutonomousToken,
     target: Target,
     now: number,
     tally: PrWatchTally,
@@ -282,6 +284,13 @@ export function createPrWatch(
     if (state === null) return;
     const finished = FINISHED_PR_STATES.includes(state);
     const head = pull.headSha ?? '';
+    if (!finished) {
+      try {
+        await reconcileWorkAttribution(deps, fetchImpl, token, target, head, now);
+      } catch {
+        run.logger?.info({ buildId: target.buildId }, 'PR attribution deferred');
+      }
+    }
     let counted: CheckTally | null = null;
     if (!finished && head !== '') {
       counted = await readChecks(fetchImpl, token, target, key, head, tally);
@@ -393,8 +402,6 @@ export function createPrWatch(
           try {
             tally.pruned += pruneSuperseded(teamId);
             settlePrWakeNotices(deps, teamId);
-            const token = await githubTokenOrNull(deps, teamId);
-            if (token === null) continue;
             const pacing = pacingOf(rates.get(teamId), now);
             tally.pacing = pacing;
             const last = lastReadAt.get(teamId);
@@ -422,6 +429,12 @@ export function createPrWatch(
             }
             for (const target of targets) {
               try {
+                const token = await autonomousToken(
+                  { ...deps, githubFetch: run.githubFetch },
+                  teamId,
+                  target,
+                );
+                if (token === null) continue;
                 await watchOne(fetchImpl, token, target, now, tally);
               } catch (error) {
                 tally.unreadable += 1;

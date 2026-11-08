@@ -50,12 +50,15 @@ export interface GitOps {
 }
 
 export interface GitCredentials {
+  kind?: 'app' | 'unattributed' | undefined;
   username: string;
   password: string;
+  expiresAt?: number;
 }
 
 export interface BoundGitCredentials extends GitCredentials {
   url: string;
+  passwordFile?: string;
 }
 
 export type GitCredentialSource = 'integration' | 'machine';

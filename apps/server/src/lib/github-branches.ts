@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HttpError } from './errors.js';
 import type { FetchLike } from './github.js';
 import { githubApiBaseUrl } from './github-api-base.js';
+import { githubTokenFetch } from './github-token.js';
 
 const repositorySchema = z.object({ default_branch: z.string().min(1).nullable() });
 const branchesSchema = z.array(z.object({ name: z.string().min(1) }));
@@ -15,7 +16,7 @@ export async function githubBranches(
   const base = `${githubApiBaseUrl()}/repos/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.repo)}`;
   const read = async (url: string): Promise<unknown> => {
     try {
-      const response = await fetchImpl(url, {
+      const response = await githubTokenFetch(fetchImpl, token)(url, {
         headers: {
           accept: 'application/vnd.github+json',
           'x-github-api-version': '2022-11-28',

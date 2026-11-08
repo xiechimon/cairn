@@ -25,7 +25,7 @@ import { HttpError, notFound } from '../lib/errors.js';
 import { isSafeRepoPath, lsFilesRecursive, runGit, systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubBranches } from '../lib/github-branches.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
 
 export type ProjectRow = typeof project.$inferSelect;
 
@@ -310,7 +310,7 @@ export async function readBranches(
   const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
   const ref = githubRepoOfProject(row);
   if (row && ref) {
-    const token = await githubTokenOrNull(ctx, row.teamId);
+    const token = await githubReadToken(ctx, row.teamId, ref);
     return githubBranches(ctx.githubFetch ?? fetch, token, ref);
   }
   const dir = await requireRepoReadDir(ctx, projectId);

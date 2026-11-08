@@ -17,7 +17,7 @@ const LOOPBACK_URL_HOSTS = ['127.0.0.1', 'localhost', '[::1]'];
 
 export function runGit(
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string } = {},
 ): Promise<GitRunResult> {
   return new Promise((resolve, reject) => {
     const env = { ...process.env, ...opts.env };
@@ -31,6 +31,7 @@ export function runGit(
       windowsHide: true,
       ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
     });
+    if (opts.input !== undefined) child.stdin.end(opts.input);
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     child.stdout.on('data', (c: Buffer) => stdout.push(c));
@@ -49,7 +50,7 @@ export function runGit(
 
 export async function runGitOk(
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string } = {},
 ): Promise<string> {
   const r = await runGit(args, opts);
   if (r.code === 0) return r.stdout.trim();
@@ -68,7 +69,6 @@ const CREDENTIAL_HELPER =
   '{ test "$p" = "$CAIRN_GIT_CRED_PROTOCOL" || { test "$p" = https && test "$CAIRN_GIT_CRED_PROTOCOL" = http; }; }; then ' +
   `printf 'username=%s\\npassword=%s\\n' "$CAIRN_GIT_CRED_USERNAME" "$CAIRN_GIT_CRED_PASSWORD"; fi; }; f`;
 
-// Empty credential.helper clears stacked helpers (e.g. osxkeychain) so step cred does not persist.
 export function gitCredentialEnv(
   cred: BoundGitCredentials,
   parent: NodeJS.ProcessEnv = process.env,
@@ -86,11 +86,18 @@ export function gitCredentialEnv(
       ? {}
       : {
           [`GIT_CONFIG_KEY_${n + 1}`]: 'credential.helper',
-          [`GIT_CONFIG_VALUE_${n + 1}`]: CREDENTIAL_HELPER,
+          [`GIT_CONFIG_VALUE_${n + 1}`]: cred.passwordFile
+            ? CREDENTIAL_HELPER.replace(
+                '"$CAIRN_GIT_CRED_PASSWORD"',
+                '"$(cat -- "$CAIRN_GIT_CRED_FILE")"',
+              )
+            : CREDENTIAL_HELPER,
           CAIRN_GIT_CRED_PROTOCOL: target.protocol,
           CAIRN_GIT_CRED_HOST: target.host,
           CAIRN_GIT_CRED_USERNAME: cred.username,
-          CAIRN_GIT_CRED_PASSWORD: cred.password,
+          ...(cred.passwordFile
+            ? { CAIRN_GIT_CRED_FILE: cred.passwordFile }
+            : { CAIRN_GIT_CRED_PASSWORD: cred.password }),
         }),
     GIT_TERMINAL_PROMPT: '0',
   };
@@ -157,6 +164,7 @@ export interface GitCredentialFallbackOpts {
   what: string;
   allowMachineFallback: boolean;
   onFallback?: (reason: GitFallbackReason) => void;
+  refresh?: () => Promise<BoundGitCredentials>;
 }
 
 export async function withGitCredentialFallback(
@@ -173,7 +181,18 @@ export async function withGitCredentialFallback(
     return 'integration';
   } catch (err) {
     const first = err instanceof Error ? err.message : String(err);
-    if (err instanceof GitPushHookError || !opts.allowMachineFallback || !isGitAuthFailure(first))
+    if (cred.kind === 'app' && opts.refresh && isGitAuthFailure(first)) {
+      const fresh = await opts.refresh();
+      if (fresh.kind !== 'app') throw new Error('App credential refresh unavailable');
+      await op(fresh);
+      return 'integration';
+    }
+    if (
+      cred.kind === 'app' ||
+      err instanceof GitPushHookError ||
+      !opts.allowMachineFallback ||
+      !isGitAuthFailure(first)
+    )
       throw err;
     opts.onFallback?.(first);
     try {

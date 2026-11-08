@@ -59,6 +59,11 @@ export function runtimeChildEnv(env: NodeJS.ProcessEnv): Record<string, string> 
   const filtered: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined || CLI_EXPORT_KEY.test(key)) continue;
+    if (
+      env.CAIRN_GIT_CRED_FILE &&
+      ['GH_TOKEN', 'GITHUB_TOKEN', 'CAIRN_GIT_CRED_PASSWORD'].includes(key)
+    )
+      continue;
     filtered[key] = value;
   }
   return { ...filtered, OTEL_SDK_DISABLED: 'true' };

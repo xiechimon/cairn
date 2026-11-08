@@ -13,8 +13,9 @@ import {
   githubCreateCommitStatus,
   githubPullRaw,
 } from '../src/lib/github.js';
+import type { AutonomousToken } from '../src/lib/github-token.js';
 
-const TOKEN = 'gho_s4aTransportTestToken0123456789';
+const TOKEN = 'gho_s4aTransportTestToken0123456789' as AutonomousToken;
 const O = 'xiechimon';
 const R = 'cairn';
 const API = `https://api.github.com/repos/${O}/${R}`;
@@ -111,7 +112,7 @@ const ALL: Array<[string, (f: FetchLike, token?: string) => Promise<GithubRawRes
     (f, t = TOKEN) =>
       githubCreateCommitStatus(
         f,
-        t,
+        t as AutonomousToken,
         O,
         R,
         SHA,

@@ -62,6 +62,7 @@ export const serverConfigSchema = z.object({
   claimHoldMs: z.number().int().positive(),
   schedulerTickMs: z.number().int().positive(),
   webDir: z.string().nullable(),
+  githubAppTokenSocket: z.string().min(1).nullable().default(null),
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
   requireToken: z.boolean(),
@@ -190,6 +191,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     claimHoldMs: CLAIM_POLL_INTERVAL_MS,
     schedulerTickMs: 15_000,
     webDir: webDirEnv !== undefined && webDirEnv !== '' ? resolve(webDirEnv) : defaultWebDir(),
+    githubAppTokenSocket: envStr('CAIRN_APP_TOKEN_SOCKET'),
     githubOauth:
       oauthId !== undefined && oauthSecret !== undefined
         ? { clientId: oauthId, clientSecret: oauthSecret }

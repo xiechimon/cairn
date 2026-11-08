@@ -3,10 +3,25 @@ import type { Db } from '../db/client.js';
 import { project, team } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubApiBaseUrl } from '../lib/github-api-base.js';
+import { type GithubWriteToken, githubTokenFetch } from '../lib/github-token.js';
 import { githubRepoOfProject } from './git.js';
-import { type GithubTokenDeps, teamGithubToken } from './github-connection.js';
+import { autonomousToken } from './github-autonomous-token.js';
+import { type GithubTokenDeps, userTokenOrNull } from './github-connection.js';
 import type { GateReadCache } from './merge-gate/github-facts.js';
 
+export function brakeRequest(
+  fetchImpl: FetchLike,
+  token: string,
+  repo: string,
+  path: string,
+): Promise<Awaited<ReturnType<FetchLike>>>;
+export function brakeRequest(
+  fetchImpl: FetchLike,
+  token: GithubWriteToken,
+  repo: string,
+  path: string,
+  payload: Record<string, unknown>,
+): Promise<Awaited<ReturnType<FetchLike>>>;
 export async function brakeRequest(
   fetchImpl: FetchLike,
   token: string,
@@ -14,16 +29,19 @@ export async function brakeRequest(
   path: string,
   payload?: Record<string, unknown>,
 ): Promise<Awaited<ReturnType<FetchLike>>> {
-  const response = await fetchImpl(`${githubApiBaseUrl()}/repos/${repo}/${path}`, {
-    method: payload === undefined ? 'GET' : 'POST',
-    headers: {
-      authorization: `Bearer ${token}`,
-      accept: 'application/vnd.github+json',
-      'content-type': 'application/json',
+  const response = await githubTokenFetch(fetchImpl, token)(
+    `${githubApiBaseUrl()}/repos/${repo}/${path}`,
+    {
+      method: payload === undefined ? 'GET' : 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: 'application/vnd.github+json',
+        'content-type': 'application/json',
+      },
+      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+      signal: AbortSignal.timeout(10_000),
     },
-    ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-    signal: AbortSignal.timeout(10_000),
-  });
+  );
   return response;
 }
 
@@ -51,7 +69,7 @@ async function markerOpen(fetchImpl: FetchLike, token: string, repo: string): Pr
 
 export async function pauseGithubRepo(
   fetchImpl: FetchLike,
-  token: string,
+  token: GithubWriteToken,
   repo: string,
   reason: string,
 ): Promise<void> {
@@ -72,8 +90,21 @@ export async function pauseGithubRepo(
   if (!issue.ok) throw new Error('Autonomy marker creation failed');
 }
 
-export async function pauseTeamGithubRepos(
-  deps: GithubTokenDeps & { db: Db },
+export function pauseTeamGithubRepos(deps: GithubTokenDeps, teamId: string): Promise<void> {
+  return pauseTeamGithubReposAutonomously(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    teamId,
+  );
+}
+
+export async function pauseTeamGithubReposAutonomously(
+  deps: GithubTokenDeps & {
+    db: Db;
+    githubWriteTokenForRepo?: (
+      teamId: string,
+      repo: { owner: string; repo: string },
+    ) => Promise<GithubWriteToken | null>;
+  },
   teamId: string,
 ): Promise<void> {
   deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, teamId)).run();
@@ -89,18 +120,22 @@ export async function pauseTeamGithubRepos(
       }),
   );
   if (repos.size === 0) return;
-  const access = await teamGithubToken(deps, teamId);
-  if (!('token' in access))
-    throw new Error('GitHub connection required to publish the autonomy pause');
   const results = await Promise.allSettled(
-    [...repos].map((repo) =>
-      pauseGithubRepo(
+    [...repos].map(async (repo) => {
+      const [owner, name] = repo.split('/');
+      if (!owner || !name) throw new Error('Invalid GitHub repository');
+      const token = await (
+        deps.githubWriteTokenForRepo ?? ((teamId, ref) => autonomousToken(deps, teamId, ref))
+      )(teamId, { owner, repo: name });
+      if (token === null)
+        throw new Error('GitHub connection required to publish the autonomy pause');
+      return pauseGithubRepo(
         deps.githubFetch ?? fetch,
-        access.token,
+        token,
         repo,
         'Autonomous merging paused through Cairn.',
-      ),
-    ),
+      );
+    }),
   );
   if (results.some((result) => result.status === 'rejected'))
     throw new Error(

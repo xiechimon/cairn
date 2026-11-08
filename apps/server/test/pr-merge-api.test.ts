@@ -22,6 +22,7 @@ import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { type Answer, mergeGithubFake, type PullFake, type Recorded } from './fakes/github.js';
+import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -1756,4 +1757,18 @@ test('#1405 a card closed during the uncached marker read cannot merge', async (
     'illegal phase transition: closed -> done',
   );
   expect(w.fake.puts()).toHaveLength(0);
+});
+
+test('human merge click keeps UserToken when App is available', async () => {
+  const w = makeWorld();
+  stubGithubApp(null);
+  try {
+    const result = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`, {});
+    expect(result.status).toBe(202);
+    const merges = w.fake.requests.filter((call) => call.method === 'PUT');
+    expect(merges).toHaveLength(1);
+    expect(merges.every((call) => call.headers.authorization === `Bearer ${TOKEN}`)).toBe(true);
+  } finally {
+    vi.restoreAllMocks();
+  }
 });

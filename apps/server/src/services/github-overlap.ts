@@ -8,6 +8,7 @@ import {
   githubListPulls,
   githubSearchIssues,
 } from '../lib/github.js';
+import { githubTokenFetch } from '../lib/github-token.js';
 
 export const GITHUB_OVERLAP_BUDGET_MS = 8_000;
 export const GITHUB_OVERLAP_FILE_CONCURRENCY = 8;
@@ -31,6 +32,7 @@ export async function lookupGithubOverlaps(
   const words = [...new Set(terms.map((term) => term.trim()))];
   const query = words.map((term) => `"${term.replace(/["\\]/g, ' ')}"`).join(' OR ');
   const { token, owner, repo, slug } = target;
+  const searchFetch = githubTokenFetch(fetchImpl, token, { owner, repo });
   const item = (entry: GithubOverlapEntry, kind: 'issues' | 'pull') => ({
     number: entry.number,
     title: opts.cleanTitle(entry.title),
@@ -68,7 +70,7 @@ export async function lookupGithubOverlaps(
   const search = async (lookup: string, scope: string, kind: 'issues' | 'pull') => {
     const result = await request(lookup, (timeoutMs) =>
       githubSearchIssues(
-        fetchImpl,
+        searchFetch,
         token,
         `repo:${slug} ${scope} in:title,body ${query}`,
         timeoutMs,

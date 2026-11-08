@@ -10,7 +10,7 @@ import {
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { autonomousToken } from './github-autonomous-token.js';
 import { githubText } from './github-text.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -41,7 +41,10 @@ export async function drainCiCorrections(deps: BuildDeps, githubFetch: FetchLike
     .all();
   for (const event of events) {
     const ref = githubRepoOfProject(projectOfTodo(deps.db, event));
-    const token = await githubTokenOrNull(deps, event.teamId);
+    const token =
+      ref === null
+        ? null
+        : await autonomousToken({ ...deps, githubFetch: githubFetch }, event.teamId, ref);
     if (ref === null || token === null) continue;
     const prompts = deps.db
       .select({ prompt: step.prompt })
