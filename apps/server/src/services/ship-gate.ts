@@ -13,8 +13,8 @@ import { nowMs } from '../lib/ids.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { pauseTeamGithubRepos } from './github-autonomy-brake.js';
-import { teamGithubToken } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
+import { pauseTeamGithubReposAutonomously } from './github-autonomy-brake.js';
 import { localGateFacts } from './local-merge-facts.js';
 import { upsertMessage } from './machine-deps.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
@@ -139,7 +139,7 @@ async function raiseUnjudgedLanding(
   teamId: string,
   reason: string,
 ): Promise<void> {
-  await pauseTeamGithubRepos(deps, teamId).catch(() => undefined);
+  await pauseTeamGithubReposAutonomously(deps, teamId).catch(() => undefined);
   upsertMessage(deps, {
     id: `ship-unjudged-${stepRow.id}`,
     conversationId: stepRow.buildId,
@@ -174,13 +174,13 @@ async function inspectShipLanding(
   }
   const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
   if (repo === null || buildRow.prNumber === null) return { kind: 'ok' };
-  const access = await teamGithubToken(deps, todoRow.teamId);
-  if (!('token' in access)) {
+  const token = await githubReadToken(deps, todoRow.teamId, repo);
+  if (token === null) {
     return { kind: 'unverifiable', reason: 'cannot verify the landing: no GitHub connection' };
   }
   const page = await githubPull(
     deps.githubFetch ?? fetch,
-    access.token,
+    token,
     repo.owner,
     repo.repo,
     buildRow.prNumber,

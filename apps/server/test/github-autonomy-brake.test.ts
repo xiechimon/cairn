@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import type { AutonomousToken } from '../src/lib/github-token.js';
 import { pauseGithubRepo, readGithubAutonomyPause } from '../src/services/github-autonomy-brake.js';
 import { recentRecoveryTarget } from '../src/services/github-recovery.js';
 import { newGateReadCache } from '../src/services/merge-gate/github-facts.js';
@@ -18,8 +19,13 @@ test('marker pause creates the label and issue once, and never closes a marker',
     if (url.endsWith('/issues')) created = true;
     return Response.json({ number: 7 });
   };
-  await pauseGithubRepo(fetchImpl, 'token', 'owner/repo', 'Paused in the product');
-  await pauseGithubRepo(fetchImpl, 'token', 'owner/repo', 'Paused again');
+  await pauseGithubRepo(
+    fetchImpl,
+    'token' as AutonomousToken,
+    'owner/repo',
+    'Paused in the product',
+  );
+  await pauseGithubRepo(fetchImpl, 'token' as AutonomousToken, 'owner/repo', 'Paused again');
   expect(calls.filter((call) => call.method === 'POST')).toEqual([
     expect.objectContaining({
       url: 'https://api.github.com/repos/owner/repo/labels',

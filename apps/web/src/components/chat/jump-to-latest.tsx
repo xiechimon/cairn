@@ -7,7 +7,7 @@ export const FOLLOW_THRESHOLD = 40;
 export const JUMP_THRESHOLD = 120;
 
 const JUMP_BTN_CLS =
-  'absolute bottom-3 inset-s-1/2 size-8 -translate-x-1/2 rounded-full border-0 bg-card text-content-secondary shadow-(--e2) transition-none hover:bg-card hover:text-foreground active:bg-accent active:text-foreground data-[active=false]:pointer-events-none data-[active=false]:opacity-0 data-[active=true]:opacity-100 rtl:translate-x-1/2';
+  'absolute bottom-3 inset-s-1/2 size-9 -translate-x-1/2 rounded-full border-0 bg-card text-content-secondary shadow-(--e2) transition-none hover:bg-card hover:text-foreground active:bg-accent active:text-foreground data-[active=false]:pointer-events-none data-[active=false]:opacity-0 data-[active=true]:opacity-100 rtl:translate-x-1/2';
 
 export function JumpToLatestButton({
   threshold = JUMP_THRESHOLD,

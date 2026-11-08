@@ -15,6 +15,8 @@ export const teamRecordSchema = z.object({
   claudeUsage: claudeUsageSchema.optional(),
   avatarStyle: z.string().nullable(),
   autonomyPaused: z.boolean().optional(),
+  coAuthorTrailer: z.boolean().default(true),
+  requestInstructorReview: z.boolean().default(false),
   maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   firstPrReportPrompt: firstPrReportPromptSchema.optional(),
 });

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b42a3d43-26e1-4c5a-8391-3be1e8c7de64",
+  "id": "1d6806ed-e5f5-4923-a0cc-984b697fb24f",
   "prevId": "36d6b6dd-57df-4951-8fc8-cf932c7c87f1",
   "tables": {
     "agent_memory": {
@@ -2934,6 +2934,20 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "githubUserId": {
+          "name": "githubUserId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "githubName": {
+          "name": "githubName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -5733,40 +5747,8 @@
           "autoincrement": false,
           "default": 0
         },
-        "checksFailedNames": {
-          "name": "checksFailedNames",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
-        },
         "head": {
           "name": "head",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "checksReadFor": {
-          "name": "checksReadFor",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "headRef": {
-          "name": "headRef",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "baseRef": {
-          "name": "baseRef",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -5828,14 +5810,6 @@
         },
         "wakeRounds": {
           "name": "wakeRounds",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "lastReadAt": {
-          "name": "lastReadAt",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

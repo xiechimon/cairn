@@ -55,7 +55,7 @@ import { finishCoordinatorTurn, recordStepUsage } from './coordinator-steps.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { stopStepComputer } from './machine-computer.js';
 import {
@@ -240,7 +240,7 @@ async function finishStepReport(
     const project = todoRow ? projectOfTodo(db, todoRow) : null;
     const repo = project ? githubRepoOfProject(project) : null;
     if (repo !== null && todoRow) {
-      const token = await githubTokenOrNull(deps, todoRow.teamId);
+      const token = await githubReadToken(deps, todoRow.teamId, repo);
       const branch = conversationBranch(stepRow.buildId);
       const pulls = await githubBranchPulls(
         deps.githubFetch ?? fetch,

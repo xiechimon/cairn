@@ -330,6 +330,10 @@ export const machineToolResponseSchema = z.union([
 ]);
 
 export const machineTokenResponseSchema = z.object({
+  coAuthor: z
+    .object({ name: z.string(), email: z.string(), login: z.string() })
+    .nullable()
+    .optional(),
   claudeSubscriptionToken: z.string().optional(),
   provider: providerConfigSchema.nullable(),
   secrets: z.record(z.string(), z.string()),
@@ -337,6 +341,8 @@ export const machineTokenResponseSchema = z.object({
     .object({
       username: z.string(),
       password: z.string(),
+      kind: z.enum(['app', 'unattributed']).optional(),
+      expiresAt: z.number().int().positive().optional(),
     })
     .nullable(),
 });

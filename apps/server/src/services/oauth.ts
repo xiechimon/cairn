@@ -3,7 +3,7 @@ import type { Db } from '../db/client.js';
 import {
   exchangeOAuthCode,
   type FetchLike,
-  githubUserLogin,
+  githubUserIdentity,
   type OAuthTokenExchange,
 } from '../lib/github.js';
 import { newRecordId } from '../lib/ids.js';
@@ -192,9 +192,9 @@ export async function completeOAuthCallback(
       input.code,
     );
     const { accessToken, scope } = tokens;
-    let login: string;
+    let identity: Awaited<ReturnType<typeof githubUserIdentity>>;
     try {
-      login = await githubUserLogin(deps.fetch, accessToken);
+      identity = await githubUserIdentity(deps.fetch, accessToken);
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
       throw new OAuthFlowError(
@@ -208,7 +208,9 @@ export async function completeOAuthCallback(
       { db: deps.db, box: deps.box },
       {
         teamId: entry.teamId,
-        login,
+        login: identity.login,
+        githubUserId: identity.id,
+        githubName: identity.name,
         accessToken,
         scope,
         refreshToken: tokens.refreshToken,

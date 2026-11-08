@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -8,6 +7,7 @@ import type {
   GitCredentials,
   MachineDoneBody,
   MachineStreamEvent,
+  SessionOpts,
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
@@ -21,6 +21,7 @@ import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { WorkspaceManager } from '../src/workspace.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const probeMock = vi.fn();
 vi.mock('../src/github-probe.js', async (importOriginal) => {
@@ -84,7 +85,9 @@ class FakeClient implements MachineApi {
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   transcripts: TranscriptUpload[] = [];
+  sessionUploads: string[] = [];
   git: GitCredentials | null = null;
+  replacement: GitCredentials | null = null;
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -117,7 +120,10 @@ class FakeClient implements MachineApi {
         models: [{ id: 'stub-model', name: 'stub-model' }],
       },
       secrets: {},
-      git: this.git,
+      git:
+        this.calls.filter((call) => call === 'token').length > 1
+          ? (this.replacement ?? this.git)
+          : this.git,
     };
   }
   async skillsManifest() {
@@ -141,6 +147,7 @@ class FakeClient implements MachineApi {
   }
   async putUpload(_url: string, _headers: Record<string, string>, body: TranscriptUpload | string) {
     if (typeof body !== 'string') this.transcripts.push(body);
+    else this.sessionUploads.push(body);
   }
   async done(stepId: string, body: MachineDoneBody) {
     this.doneBodies.push({ stepId, body });
@@ -215,14 +222,23 @@ function fakeWorkspace(opts: {
   return { ws, calls, pushes };
 }
 
-function completingBackend(): AgentBackend {
+function completingBackend(
+  onSession?: (opts: SessionOpts) => void | Promise<void>,
+  echo?: string,
+  sessionFile?: string,
+): AgentBackend {
   return {
     capabilities: PI_CAPABILITIES,
-    async createSession(): Promise<AgentSessionHandle> {
+    async createSession(opts): Promise<AgentSessionHandle> {
+      await onSession?.(opts);
       return {
         sessionId: 'pi-sess-cred',
+        ...(sessionFile ? { sessionFile } : {}),
         events: (async function* () {
-          yield { type: 'text_delta', text: 'ok' } as never;
+          if (echo) {
+            yield { type: 'text_delta', text: echo.slice(0, 5) } as never;
+            yield { type: 'text_delta', text: echo.slice(5) } as never;
+          } else yield { type: 'text_delta', text: 'ok' } as never;
           yield { type: 'done', usage: [] } as never;
         })(),
         async steer() {},
@@ -241,22 +257,32 @@ async function setup(
   opts: {
     git?: GitCredentials | null;
     workspace: ReturnType<typeof fakeWorkspace>;
+    onSession?: (opts: SessionOpts) => void | Promise<void>;
+    echo?: string;
+    sessionText?: string;
+    replacement?: GitCredentials;
+    now?: () => number;
   },
 ) {
   probeMock.mockReset();
   probeMock.mockResolvedValue(null);
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-cred-'));
+  const home = testTempDir('cairn-runner-cred-');
+  const sessionFile = join(home, 'session.jsonl');
+  if (opts.sessionText) writeFileSync(sessionFile, opts.sessionText);
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   client.git = opts.git ?? null;
+  client.replacement = opts.replacement ?? null;
   const journal = new StepJournal(paths.outboxDir);
   mkdirSync(join(home, 'workspaces'), { recursive: true });
   await runStep(
     {
+      ...(opts.now ? { now: opts.now } : {}),
       client,
       journal,
-      backendFor: () => completingBackend(),
+      backendFor: () =>
+        completingBackend(opts.onSession, opts.echo, opts.sessionText ? sessionFile : undefined),
       logger,
       paths,
       workspace: opts.workspace.ws,
@@ -410,4 +436,201 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('machine');
   }, 20_000);
+});
+
+test.each(['github', 'hosted'] as const)(
+  'step shell GitHub credentials are scoped and erased for %s',
+  async (kind) => {
+    let held: SessionOpts['env'];
+    let applied = false;
+    const previous = process.env.GH_TOKEN;
+    const { client, lines, paths } = await setup(
+      claimedStep('build', {
+        kind,
+        cloneUrl: kind === 'github' ? 'https://github.com/o/r.git' : 'http://server/git/t/r',
+      }),
+      {
+        git: GITHUB_TOKEN,
+        workspace: fakeWorkspace({}),
+        echo: GITHUB_TOKEN.password,
+        onSession: (opts) => {
+          held = opts.env;
+          applied =
+            kind === 'github'
+              ? opts.env?.GH_TOKEN === GITHUB_TOKEN.password &&
+                opts.env.GITHUB_TOKEN === GITHUB_TOKEN.password &&
+                opts.env.CAIRN_GIT_CRED_PASSWORD === GITHUB_TOKEN.password
+              : opts.env?.GH_TOKEN === undefined && opts.env?.CAIRN_GIT_CRED_PASSWORD === undefined;
+        },
+      },
+    );
+    expect(applied).toBe(true);
+    expect(held?.GH_TOKEN === undefined).toBe(true);
+    expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
+    expect(process.env.GH_TOKEN === previous).toBe(true);
+    expect(JSON.stringify(transcriptRows(client)).includes(GITHUB_TOKEN.password)).toBe(false);
+    expect(lines.join('\n').includes(GITHUB_TOKEN.password)).toBe(false);
+    for (const file of readdirSync(paths.outboxDir)) {
+      expect(
+        readFileSync(join(paths.outboxDir, file), 'utf8').includes(GITHUB_TOKEN.password),
+      ).toBe(false);
+    }
+  },
+);
+
+test('App git authentication failure never retries with machine user credentials', async () => {
+  const workspace = fakeWorkspace({
+    pushWithToken: async () => {
+      throw new Error(MEA_AUTH_FAILURE);
+    },
+  });
+  const { client } = await setup(
+    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+    { git: { ...GITHUB_TOKEN, kind: 'app' }, workspace },
+  );
+  expect(workspace.pushes).toHaveLength(2);
+  expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
+  expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
+  expect(client.doneBodies[0]?.body.status).toBe('failed');
+});
+
+test.each([undefined, 'app'] as const)(
+  'step shell credentials are erased when backend session creation fails: %s',
+  async (kind) => {
+    let held: SessionOpts['env'];
+    let file: string | undefined;
+    const { client } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      {
+        git: { ...GITHUB_TOKEN, kind },
+        workspace: fakeWorkspace({}),
+        onSession: (opts) => {
+          held = opts.env;
+          file = opts.env?.CAIRN_GIT_CRED_FILE;
+          throw new Error('backend unavailable');
+        },
+      },
+    );
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+    expect(held?.GH_TOKEN === undefined).toBe(true);
+    expect(held?.GITHUB_TOKEN === undefined).toBe(true);
+    expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
+    if (kind === 'app') expect(file !== undefined && !existsSync(file)).toBe(true);
+  },
+);
+
+test.each(['auth', 'age', 'twice'] as const)(
+  'refreshes a long-step App credential once: %s',
+  async (scenario) => {
+    let clock = 1000;
+    let attempts = 0;
+    const replacement = {
+      ...GITHUB_TOKEN,
+      kind: 'app' as const,
+      password: 'refreshed-fixture-value',
+    };
+    const workspace = fakeWorkspace({
+      pushWithToken: async () => {
+        attempts++;
+        if (scenario === 'twice' || (scenario === 'auth' && attempts === 1))
+          throw new Error(`Authentication failed ${replacement.password}`);
+      },
+    });
+    const { client, lines, paths } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      {
+        git: { ...GITHUB_TOKEN, kind: 'app' },
+        replacement,
+        sessionText: `${JSON.stringify({ text: `${GITHUB_TOKEN.password} ${replacement.password}` })}\n`,
+        workspace,
+        now: () => clock,
+        onSession: () => {
+          if (scenario === 'age') clock += 51 * 60000;
+        },
+      },
+    );
+    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
+    for (const file of readdirSync(paths.outboxDir)) {
+      const content = readFileSync(join(paths.outboxDir, file), 'utf8');
+      expect(
+        content.includes(GITHUB_TOKEN.password) || content.includes(replacement.password),
+      ).toBe(false);
+    }
+    expect(client.sessionUploads.length).toBeGreaterThan(0);
+    expect(client.sessionUploads.join('').includes(GITHUB_TOKEN.password)).toBe(false);
+    expect(workspace.pushes).toHaveLength(scenario === 'age' ? 1 : 2);
+    expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
+    expect(client.doneBodies[0]?.body.status).toBe(scenario === 'twice' ? 'failed' : 'success');
+    expect(
+      JSON.stringify([
+        client.doneBodies,
+        client.transcripts,
+        client.sessionUploads,
+        lines,
+      ]).includes(replacement.password),
+    ).toBe(false);
+  },
+);
+
+test('App agent environment uses the step private credential files and cleanup erases them', async () => {
+  let files: string[] = [];
+  let privateEnv = false;
+  const { client } = await setup(
+    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+    {
+      git: { ...GITHUB_TOKEN, kind: 'app', expiresAt: Date.now() + 3600000 },
+      workspace: fakeWorkspace({}),
+      onSession: (opts) => {
+        files = [
+          opts.env?.CAIRN_GIT_CRED_FILE ?? '',
+          join(opts.env?.GH_CONFIG_DIR ?? '', 'hosts.yml'),
+        ];
+        privateEnv =
+          opts.env?.GH_TOKEN === undefined &&
+          opts.env?.GITHUB_TOKEN === undefined &&
+          opts.env?.CAIRN_GIT_CRED_PASSWORD === undefined &&
+          files.every((file) => existsSync(file));
+      },
+    },
+  );
+  expect(privateEnv).toBe(true);
+  expect(files.every((file) => !existsSync(file))).toBe(true);
+  expect(client.doneBodies[0]?.body.status).toBe('success');
+});
+
+test('running App step refreshes the shell files and redacts both generations', async () => {
+  vi.useFakeTimers();
+  try {
+    const replacement = {
+      ...GITHUB_TOKEN,
+      kind: 'app' as const,
+      password: 'fixture-rotated-app',
+      expiresAt: Date.now() + 120 * 60000,
+    };
+    let replaced = false;
+    const { client, lines } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      {
+        git: { ...GITHUB_TOKEN, kind: 'app', expiresAt: Date.now() + 3600000 },
+        replacement,
+        workspace: fakeWorkspace({}),
+        echo: `${GITHUB_TOKEN.password} ${replacement.password}`,
+        onSession: async (opts) => {
+          const file = opts.env?.CAIRN_GIT_CRED_FILE ?? '';
+          await vi.advanceTimersByTimeAsync(46 * 60000);
+          replaced = existsSync(file) && readFileSync(file, 'utf8') === replacement.password;
+        },
+      },
+    );
+    expect(replaced).toBe(true);
+    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    const output = JSON.stringify([client.transcripts, client.doneBodies, lines]);
+    expect(output.includes(GITHUB_TOKEN.password) || output.includes(replacement.password)).toBe(
+      false,
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });

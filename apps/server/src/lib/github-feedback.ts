@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { HttpError } from './errors.js';
 import type { FetchLike } from './github.js';
 import { githubApiBaseUrl } from './github-api-base.js';
+import { githubTokenFetch } from './github-token.js';
 
 const feedbackSchema = z.object({
   id: z.number().int().positive(),
@@ -48,15 +49,18 @@ export async function githubPrFeedback(
   ] as const) {
     for (let page = 1; ; page += 1) {
       if (page > 10) throw new HttpError(502, 'GitHub feedback pagination incomplete');
-      const response = await fetchImpl(`${base}/${path}?per_page=100&page=${page}`, {
-        headers: {
-          accept: 'application/vnd.github+json',
-          'x-github-api-version': '2022-11-28',
-          'user-agent': 'cairn-server',
-          authorization: `Bearer ${token}`,
+      const response = await githubTokenFetch(fetchImpl, token)(
+        `${base}/${path}?per_page=100&page=${page}`,
+        {
+          headers: {
+            accept: 'application/vnd.github+json',
+            'x-github-api-version': '2022-11-28',
+            'user-agent': 'cairn-server',
+            authorization: `Bearer ${token}`,
+          },
+          signal: AbortSignal.timeout(15_000),
         },
-        signal: AbortSignal.timeout(15_000),
-      });
+      );
       if (!response.ok) throw new HttpError(502, 'GitHub feedback unavailable');
       const rows = z.array(feedbackSchema).parse(await response.json());
       for (const row of rows) {

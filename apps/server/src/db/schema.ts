@@ -75,6 +75,8 @@ export const team = sqliteTable('team', {
   claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
   avatarStyle: text('avatarStyle'),
   autonomyPaused: bool('autonomyPaused').notNull().default(false),
+  coAuthorTrailer: bool('coAuthorTrailer').notNull().default(true),
+  requestInstructorReview: bool('requestInstructorReview').notNull().default(false),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
   firstPrReportPromptEnabled: bool('firstPrReportPromptEnabled').notNull().default(false),
   firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
@@ -1072,6 +1074,8 @@ export const composerDraft = sqliteTable(
 );
 
 export const githubConnection = sqliteTable('github_connection', {
+  githubUserId: integer('githubUserId'),
+  githubName: text('githubName'),
   teamId: text('teamId')
     .primaryKey()
     .references(() => team.id, { onDelete: 'cascade' }),

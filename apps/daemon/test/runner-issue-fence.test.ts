@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   type AgentBackend,
@@ -21,6 +19,7 @@ import type { DaemonLogger } from '../src/log.js';
 import { buildTaskPrompt, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { FakeMachineApi, fakeBackend } from './machine-loop-harness.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const HEAD = '【GitHub issue 原文 · octo/alpha#7】';
 const FOOT = '【GitHub issue 原文结束 · octo/alpha#7】';
@@ -98,7 +97,7 @@ async function deliver(
   images: readonly unknown[];
   home: string;
 }> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-issue-fence-'));
+  const home = testTempDir('cairn-issue-fence-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { backend: base, created } = fakeBackend([{ type: 'done', usage: [] }]);

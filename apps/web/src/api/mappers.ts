@@ -133,6 +133,18 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
     : { label: '排队中：等空闲机器（前面 {ahead} 个）', vars: { ahead } };
 }
 
+function connectingLine(queue: NonNullable<StepRow['queue']>): {
+  label: string;
+  vars?: Record<string, string | number>;
+  detail?: { label: string; vars: Record<string, string | number> };
+} {
+  const full = queueLabel(queue);
+  if (queue.hold != null || queue.blocked != null) return full;
+  return queue.waitingFor != null
+    ? { label: '正在连接 {machine}...', vars: { machine: queue.waitingFor.name }, detail: full }
+    : { label: '处理中...', detail: full };
+}
+
 function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
   label: string;
   vars: Record<string, string | number>;
@@ -1374,6 +1386,7 @@ function collectChiefStream(
       }
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
+    if (m.role === 'user' && pendingState === undefined) eventTurn = false;
     if (pendingState !== undefined) {
       const text = textOfContent(m.content).trim();
       pendingById.set(m.id, {
@@ -1595,16 +1608,12 @@ export function mapChief(
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
-        const asked = collected?.items.find(
-          (item) => item.kind === 'user' && item.id !== undefined && item.id === turnQueue.stepId,
-        );
-        if (asked?.kind === 'user' && asked.id !== undefined)
-          waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
-        const queued = queueLabel(turnQueue);
+        const queued = connectingLine(turnQueue);
         chiefStream.push({
           kind: 'streaming',
           label: queued.label,
-          labelVars: queued.vars,
+          ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
+          ...(queued.detail !== undefined ? { labelDetail: queued.detail } : {}),
         });
       } else {
         const actLabel = opts.activity != null ? activityLabel(opts.activity) : null;
@@ -1618,6 +1627,15 @@ export function mapChief(
         });
       }
     }
+  }
+  const waitingQueue =
+    running && collected?.eventTurn !== true ? (active?.turnQueue ?? null) : null;
+  if (waitingQueue != null) {
+    const asked = collected?.items.find(
+      (item) => item.kind === 'user' && item.id !== undefined && item.id === waitingQueue.stepId,
+    );
+    if (asked?.kind === 'user' && asked.id !== undefined)
+      waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
   }
   chiefStream.push(...(collected?.pending ?? []));
   return {

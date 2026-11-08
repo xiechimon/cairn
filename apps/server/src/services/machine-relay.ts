@@ -36,7 +36,7 @@ import {
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
-import { updateTodo, writebackSelfIssueTitle } from './todos.js';
+import { updateAutonomousTodo, writebackSelfIssueTitle } from './todos.js';
 import { askWorkerQuestion, recordThreadReportLine } from './worker-questions.js';
 
 export async function machineAsk(
@@ -122,6 +122,7 @@ export async function executeRelayToolCall(
       hub: deps.hub,
       machineHub: deps.machineHub,
       box: deps.box,
+      githubAppTokenSocket: deps.githubAppTokenSocket,
       user: deps.user,
       vapidKeys: deps.vapidKeys,
       reposDir: deps.reposDir,
@@ -247,7 +248,7 @@ async function setTaskMeta(
     if (tagId === null) throw new HttpError(400, `tag ${tagName} not seeded in project`);
     tagIds = [tagId];
   }
-  const record = updateTodo(
+  const record = updateAutonomousTodo(
     {
       db: deps.db,
       hub: deps.hub,
@@ -307,9 +308,10 @@ async function setTaskMetaGithubForm(
     user: deps.user,
     vapidKeys: deps.vapidKeys,
     box: deps.box,
+    githubAppTokenSocket: deps.githubAppTokenSocket,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const record = updateTodo(todoDeps, todoRow.id, {
+  const record = updateAutonomousTodo(todoDeps, todoRow.id, {
     ...(title !== undefined ? { title } : {}),
     ...(tagIds !== undefined ? { tagIds } : {}),
   });

@@ -1,9 +1,9 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { readSessionJsonlForUpload } from '../src/session-jsonl.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function capture(): { lines: string[]; log: (msg: string) => void } {
   const lines: string[] = [];
@@ -23,20 +23,20 @@ describe('readSessionJsonlForUpload（#1512）', () => {
 
   test('failure mode 2: file missing → null + log', () => {
     const { lines, log } = capture();
-    const missing = join(tmpdir(), `cairn-session-missing-${Date.now()}.jsonl`);
+    const missing = join(testTempDir('daemon-cwd-'), `cairn-session-missing-${Date.now()}.jsonl`);
     expect(readSessionJsonlForUpload(missing, log)).toBeNull();
     expect(lines.some((l) => l.includes('missing') && l.includes(missing))).toBe(true);
   });
 
   test('failure mode 3: read failure → null + log', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-unreadable-'));
+    const dir = testTempDir('cairn-session-unreadable-');
     const { lines, log } = capture();
     expect(readSessionJsonlForUpload(dir, log)).toBeNull();
     expect(lines.some((l) => l.includes('read failed'))).toBe(true);
   });
 
   test('failure mode 4: over the cap → skipped + log, not truncated', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-oversize-'));
+    const dir = testTempDir('cairn-session-oversize-');
     const file = join(dir, 'session.jsonl');
     writeFileSync(file, 'x'.repeat(40));
     const { lines, log } = capture();
@@ -45,7 +45,7 @@ describe('readSessionJsonlForUpload（#1512）', () => {
   });
 
   test('failure mode 5: under the cap → returned as-is', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-ok-'));
+    const dir = testTempDir('cairn-session-ok-');
     const file = join(dir, 'session.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';
     writeFileSync(file, body);

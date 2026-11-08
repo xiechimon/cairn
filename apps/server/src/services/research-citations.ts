@@ -19,7 +19,7 @@ import {
   failureNeedsHuman,
 } from './needs-you.js';
 import { routeForStep } from './routing-rules.js';
-import { createTodo } from './todos.js';
+import { createAutonomousTodo } from './todos.js';
 
 const TIER_MARKER_KIND = 'research-tier';
 const CHECKS_PER_TICK = 5;
@@ -297,7 +297,7 @@ export function openCitationCheck(
   ].join('\n');
   const row =
     existing ??
-    createTodo(deps, {
+    createAutonomousTodo(deps, {
       teamId: source.teamId,
       projectId: source.projectId,
       title: 'Check research citations',

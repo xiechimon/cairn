@@ -36,7 +36,7 @@ import {
 import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+import { autonomousToken } from './github-autonomous-token.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
 import { githubText } from './github-text.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
@@ -513,7 +513,11 @@ export function createCiPoller(
       tally.reviewSkipped += 1;
       return;
     }
-    const token = await githubTokenOrNull(deps, target.teamId);
+    const token = await autonomousToken(
+      { ...deps, githubFetch: run.githubFetch },
+      target.teamId,
+      target,
+    );
     const entry = pullCache.get(key) ?? null;
     let pull: GithubPull | null;
     let readAt = now;
@@ -826,7 +830,11 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
-    const grindToken = await githubTokenOrNull(deps, target.teamId);
+    const grindToken = await autonomousToken(
+      { ...deps, githubFetch: run.githubFetch },
+      target.teamId,
+      target,
+    );
     if (grindToken === null) recordGrindAnonRead(now);
     const pullEntry = grindPullCache.get(key) ?? null;
     const pullPage = await githubPull(

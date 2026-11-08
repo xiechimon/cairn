@@ -123,7 +123,11 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
       cloneUrl: 'https://github.com/octo/alpha.git',
     });
     const { git } = await w.tokenOf(claimed.step.id);
-    expect(git).toEqual({ username: GITHUB_ACCESS_TOKEN_USERNAME, password: GH_TOKEN });
+    expect(git).toEqual({
+      username: GITHUB_ACCESS_TOKEN_USERNAME,
+      password: GH_TOKEN,
+      kind: 'unattributed',
+    });
     const gitKeys = w.s.db.select().from(apiKeyTable).where(eq(apiKeyTable.gitAccess, true)).all();
     expect(gitKeys).toHaveLength(0);
   });
@@ -184,7 +188,11 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
     );
     const claimed = await w.claim();
     const { git } = await w.tokenOf(claimed.step.id);
-    expect(git).toEqual({ username: GITHUB_ACCESS_TOKEN_USERNAME, password: refreshed });
+    expect(git).toEqual({
+      username: GITHUB_ACCESS_TOKEN_USERNAME,
+      password: refreshed,
+      kind: 'unattributed',
+    });
     expect(refreshBodies).toHaveLength(1);
     expect(refreshBodies[0]).toContain('refresh_token=ghr_first');
     const row = w.s.db.select().from(githubConnection).get();

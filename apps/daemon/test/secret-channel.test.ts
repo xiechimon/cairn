@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -19,6 +17,7 @@ import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { GET_SECRET_TOOL_NAME } from '../src/secret-channel.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const SECRET_NAME = 'STRIPE_API_KEY';
 const SECRET_VALUE = 'sk_live_stripe_per_step';
@@ -175,7 +174,7 @@ function probingBackend(probe: Probe): AgentBackend {
 }
 
 async function setup(kind: ClaimedStep['step']['kind'], secrets: Record<string, string>) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-secret-channel-'));
+  const home = testTempDir('cairn-secret-channel-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

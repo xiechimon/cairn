@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -9,6 +8,7 @@ import {
 } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { runTokenCommand } from '../src/token-command.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const homes: string[] = [];
 afterEach(() => {
@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 function scratchHome(): string {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-token-cmd-'));
+  const home = testTempDir('cairn-token-cmd-');
   homes.push(home);
   return home;
 }
