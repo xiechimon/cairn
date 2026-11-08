@@ -45,10 +45,10 @@ colors-dark:
   rule: 'rgb(255 255 255 / 0.1)'
   divider: 'rgb(255 255 255 / 0.1)'
   ink: '#efefef'
-  ink-2: '#9c9c9c'
+  ink-2: '#a6a6a6'
   ink-3: '#999999'
   ink-4: '#757575'         # decorative icons only, never text
-  icon: '#9c9c9c'
+  icon: '#a6a6a6'
   accent: '#ebb550'        # ochre brightened; text on it is dark ochre, not white
   primary: '#efefef'       # primary button is the ink in dark
   on-primary: '#191919'
@@ -387,7 +387,7 @@ Read `DESIGN-RULES.md` (next to this file) first: it holds the short checkable r
 ```text
 Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: direction A, Cairn. Stone paper, dense, calm. Light (.light): canvas #e6e7e1 → sheet #f6f6f2 → card #fdfdfb, ink #1d231f. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow.
-- Dark (:root default): neutral layers from claude.ai: sheet #191919 → canvas (sidebar) #1f1f1f → popover #303030; hover, selection and hairlines are white alphas. Ink #efefef / #9c9c9c / #999999. Accent #ebb550 with dark ochre text on it; it is also the focus ring. Running #82b46f. All tokens live in src/styles/shadcn.css.
+- Dark (:root default): neutral layers from claude.ai: sheet #191919 → canvas (sidebar) #1f1f1f → popover #303030; hover, selection and hairlines are white alphas. Ink #efefef / #a6a6a6 / #999999. Accent #ebb550 with dark ochre text on it; it is also the focus ring. Running #82b46f. All tokens live in src/styles/shadcn.css.
 - Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges, plus the focus ring, a switch that is on and the enabled send button; green (running) = a working or online dot; rust = failure. Everything else is neutral ink.
 - Type: three families only. Source Serif 4 (font-serif, 600) for the Coordinator greeting and page titles; Instrument Sans for everything else, at 650 (font-heading font-title) for the brand, section and column headings, pane and dialog titles; JetBrains Mono for code, times, ids. Chinese falls back to Songti SC under the serif and PingFang SC under the sans. Sizes only 26/20/17/15/14/13/12 through text-greeting / text-page / text-heading / text-card-title / text-ui / text-meta and text-code / text-caption; body weight 450, row titles 600, display titles 650.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).

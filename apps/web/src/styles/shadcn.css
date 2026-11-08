@@ -163,7 +163,7 @@
   --secondary: #262626;
   --secondary-foreground: #efefef;
   --muted: #262626;
-  --muted-foreground: #9c9c9c;
+  --muted-foreground: #a6a6a6;
   --accent: #262626;
   --accent-foreground: #efefef;
   --destructive: #f09a88;
@@ -173,7 +173,7 @@
   --sidebar-hover: rgb(255 255 255 / 0.075);
   --sidebar-active: rgb(255 255 255 / 0.15);
   --surface-tertiary: #2a2a2a;
-  --text-secondary: #9c9c9c;
+  --text-secondary: #a6a6a6;
   --text-tertiary: #999999;
   --text-dim: #757575;
   --icon: var(--text-secondary);
