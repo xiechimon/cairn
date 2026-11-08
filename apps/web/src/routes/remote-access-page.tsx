@@ -1,7 +1,10 @@
 import { type PairingCodeResponse, pairingLink } from '@cairn/shared';
+import { useQuery } from '@tanstack/react-query';
 import { Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { useAuth } from '../api/auth.js';
+import { api } from '../api/client.js';
 import { useRemoteDevices, useRemoteMutations, useRemoteRoutes } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -99,6 +102,14 @@ export function RemoteAccessPage() {
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
   const { live } = useLiveData();
+  const auth = useAuth();
+  const identityQ = useQuery({
+    queryKey: ['remoteIdentity', auth.generation],
+    queryFn: () =>
+      api.get<{ login: string | null; via: 'tailscale' | null }>('/api/remote/identity'),
+    enabled: live,
+    refetchInterval: 30_000,
+  });
   const routesQ = useRemoteRoutes(live);
   const devicesQ = useRemoteDevices(live);
   const mutations = useRemoteMutations();
@@ -134,6 +145,16 @@ export function RemoteAccessPage() {
         ) : null
       }
     >
+      {identityQ.isSuccess &&
+        identityQ.data.via === 'tailscale' &&
+        identityQ.data.login !== null && (
+          <p
+            className="m-0 mt-3 text-meta break-all text-content-tertiary"
+            data-testid="tailnet-owner-identity"
+          >
+            {t('已通过 Tailscale 登录为 {login}', { login: identityQ.data.login })}
+          </p>
+        )}
       {pairingBlocked && (
         <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
           {t(
