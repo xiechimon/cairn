@@ -1438,6 +1438,8 @@ export async function applyBuildStepAction(
     const prClosed: 'merged' | 'closed' | null =
       reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
     if (reworkTarget !== null && prClosed === null) {
+      const currentTarget = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
+      if (currentTarget) assertParkedBuildIdle(deps, currentTarget);
       const now = nowMs();
       const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
       recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);

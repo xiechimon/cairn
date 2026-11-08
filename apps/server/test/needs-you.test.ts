@@ -321,6 +321,45 @@ describe('needs you (#1800)', () => {
     },
   );
 
+  test('human recovery checks the actual older PR build before reusing it', async () => {
+    const w = openWorld();
+    w.s.db.update(buildTable).set({ prNumber: 42 }).where(eq(buildTable.id, w.buildId)).run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'older-pr-sibling',
+        buildId: w.buildId,
+        kind: 'session',
+        status: 'claimed',
+        createdAt: nowMs(),
+      })
+      .run();
+    const first = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    applyStepFailure(w.deps, first, 'model_not_found: glm-5.3');
+    const [next] = startBuilds(w.deps, {
+      projectId: w.projectId,
+      todoIds: [w.todoId],
+      triggerSource: 'user',
+    });
+    const nextStep = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, next!.id)).get()!;
+    applyStepFailure(w.deps, nextStep, 'model_not_found: glm-5.3');
+    await expect(
+      applyBuildStepAction(
+        w.deps,
+        next!.id,
+        { action: 'restart', feedback: 'Routing repaired', clientMessageId: 'older-pr-retry' },
+        'Owner',
+        'person',
+      ),
+    ).rejects.toThrow(/active steps/i);
+    expect(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.latestBuildId,
+    ).toBe(next!.id);
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
+    ).toContain('Task parked');
+  });
+
   test('an automatic same-build enqueue cannot bypass model parking', () => {
     const w = openWorld();
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
