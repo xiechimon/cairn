@@ -508,6 +508,17 @@ svg.lucide {
   stroke-width: 1.75;
 }
 
+html:not(.light)
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"]
+  ):is(:focus, [data-popup-open], [data-open])
+  [data-slot="dropdown-menu-shortcut"] {
+  color: var(--foreground);
+}
+
 :is([data-slot="message-scroller"], [data-trace-card], [data-slot="trace"], .chat-interactions)
   :is(button, a, [role="button"]),
 .chat-interaction {
