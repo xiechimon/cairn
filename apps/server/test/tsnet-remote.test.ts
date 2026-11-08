@@ -8,7 +8,7 @@ import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig, type TsnetSettings } from '../src/config.js';
 import type { SidecarProcess } from '../src/lib/tsnet-sidecar.js';
-import { startTsnetRemote, tsnetPathsOf } from '../src/services/tsnet-remote.js';
+import { parseLocalStatus, startTsnetRemote, tsnetPathsOf } from '../src/services/tsnet-remote.js';
 import { bootServer } from './helpers.js';
 
 const TOKEN = 'tsnet-remote-token-0123456789abcdef';
@@ -223,7 +223,21 @@ describe('default off: no process, no listener, no files', () => {
 });
 
 describe('enabled', () => {
+  test.each(['9007199254740993', '18446744073709551615', '7'])(
+    'preserves LocalAPI numeric UserID %s as its exact profile key',
+    (userId) => {
+      const body = `{"BackendState":"Running","Self":{"UserID":${userId}},"User":{"${userId}":{"LoginName":"owner@example.com"}}}`;
+      expect(parseLocalStatus(body)).toMatchObject({ Self: { UserID: userId } });
+    },
+  );
   test.each([
+    [
+      'large numeric Self owner',
+      parseLocalStatus(
+        '{"BackendState":"Running","Self":{"UserID":9007199254740993},"User":{"9007199254740993":{"LoginName":"owner@example.com"},"9007199254740992":{"LoginName":"other@example.com"}}}',
+      ),
+      200,
+    ],
     [
       'untagged Self owner',
       {

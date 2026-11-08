@@ -109,6 +109,12 @@ const localStatusSchema = z.object({
   TailscaleIPs: z.array(z.string()).optional(),
 });
 
+export function parseLocalStatus(body: string): unknown {
+  return JSON.parse(body, (key: string, value: unknown, context?: { source?: string }): unknown =>
+    key === 'UserID' && typeof value === 'number' ? context?.source : value,
+  );
+}
+
 function readSystemStatus(): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const socketPath =
@@ -133,7 +139,7 @@ function readSystemStatus(): Promise<unknown> {
         res.on('end', () => {
           try {
             if (res.statusCode !== 200) throw new Error('LocalAPI status unavailable');
-            resolve(JSON.parse(body));
+            resolve(parseLocalStatus(body));
           } catch (error) {
             reject(error);
           }
