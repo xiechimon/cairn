@@ -70,6 +70,7 @@ import {
 } from './chief-outage-banner.js';
 import { ChiefQuestionDock, useAnswerKey, useQuestionDockVisible } from './chief-question-dock.js';
 import { serverDraftBinding } from './composer-binding.js';
+import { composerMode } from './composer-mode.js';
 import {
   ComposerSurface,
   type ComposerSurfaceHandle,
@@ -212,8 +213,13 @@ export function ChiefConversation({
   const answerKey = useAnswerKey();
   const [threadOverride, setThreadOverride] = useState(false);
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
-  const threadOwned = threadOverride || replyQuote !== null;
-  const answerActive = answerHere && answerKey !== null && !threadOwned;
+  const mode = composerMode({
+    answerHere,
+    questionPending: answerKey !== null,
+    threadClaimed: threadOverride,
+    quoteStaged: replyQuote !== null,
+  });
+  const answerActive = mode === 'answer';
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -761,7 +767,7 @@ export function ChiefConversation({
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
         {tray}
-        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOwned} />
+        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={mode === 'thread'} />
         {composerReplacement ?? (
           <>
             {composerError != null && (
