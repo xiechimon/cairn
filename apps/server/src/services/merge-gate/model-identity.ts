@@ -22,18 +22,14 @@ export function modelsAreIndependent(authorModel: string, reviewerModel: string)
   return authorVendor !== reviewerVendor;
 }
 
-export function independenceVendorDetail(authorModel: string, reviewerModel: string): string[] {
-  if (modelsAreIndependent(authorModel, reviewerModel)) return [];
-  const authorVendor = modelVendor(authorModel);
-  const reviewerVendor = modelVendor(reviewerModel);
-  const detail: string[] = [];
-  if (authorVendor !== null && authorVendor === reviewerVendor) {
-    detail.push(`reviewer shares author vendor ${authorVendor}`);
-  }
-  if (authorVendor === null) detail.push('author vendor unknown');
-  if (reviewerVendor === null) detail.push('reviewer vendor unknown');
-  if (authorVendor !== null && reviewerVendor === null) {
-    detail.push(`author vendor ${authorVendor}`);
-  }
-  return detail;
+const CODE_REVIEW_VENDOR = 'OpenAI';
+
+export function isCodexReviewModel(reviewerModel: string): boolean {
+  return modelVendor(reviewerModel) === CODE_REVIEW_VENDOR;
+}
+
+export function codexReviewDetail(reviewerModel: string): string[] {
+  const vendor = modelVendor(reviewerModel);
+  if (vendor === null) return ['reviewer vendor unknown'];
+  return vendor === CODE_REVIEW_VENDOR ? [] : [`reviewer vendor ${vendor} is not Codex`];
 }
