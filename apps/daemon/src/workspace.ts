@@ -48,12 +48,15 @@ const SETUP_DRIFT_FILE = 'cairn-setup-drift.json';
 
 type PathFingerprints = Record<string, string>;
 
-function fingerprint(cwd: string, path: string): string {
+async function worktreeFingerprint(cwd: string, path: string): Promise<string> {
   const full = join(cwd, path);
   if (!existsSync(full) && !isDanglingLink(full)) return 'absent';
   const stat = lstatSync(full);
   if (stat.isSymbolicLink()) return `link:${readlinkSync(full)}`;
-  if (stat.isDirectory()) return 'dir';
+  if (stat.isDirectory()) {
+    const head = existsSync(join(full, '.git')) ? await gitPrim.head(full) : null;
+    return `dir:${head ?? 'none'}`;
+  }
   return `file:${createHash('sha256').update(readFileSync(full)).digest('hex')}`;
 }
 
@@ -65,8 +68,18 @@ function isDanglingLink(full: string): boolean {
   }
 }
 
-function fingerprintsOf(cwd: string, paths: readonly string[]): PathFingerprints {
-  return Object.fromEntries(paths.map((path) => [path, fingerprint(cwd, path)]));
+async function fingerprintsOf(cwd: string, paths: readonly string[]): Promise<PathFingerprints> {
+  const index = await gitPrim.indexEntries(cwd, paths);
+  const entries = await Promise.all(
+    paths.map(
+      async (path) =>
+        [
+          path,
+          `${await worktreeFingerprint(cwd, path)}|index:${index.get(path) ?? 'absent'}`,
+        ] as const,
+    ),
+  );
+  return Object.fromEntries(entries);
 }
 
 function readSetupDrift(file: string): PathFingerprints {
@@ -377,12 +390,12 @@ export class WorkspaceManager implements WorktreeOps {
   }
 
   private async recordingSetupDrift<T>(cwd: string, run: () => Promise<T>): Promise<T> {
-    const before = fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd));
+    const before = await fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd));
     try {
       return await run();
     } finally {
       if (existsSync(cwd)) {
-        const after = fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd));
+        const after = await fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd));
         const file = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
         const drift = readSetupDrift(file);
         for (const path of new Set([...Object.keys(before), ...Object.keys(after)])) {
@@ -405,20 +418,17 @@ export class WorkspaceManager implements WorktreeOps {
     const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
     const drift = readSetupDrift(driftFile);
     const dirty = await gitPrim.dirtyPaths(cwd);
-    const current = fingerprintsOf(cwd, dirty);
-    const staged = new Set(await gitPrim.stagedPaths(cwd));
+    const current = await fingerprintsOf(cwd, dirty);
     const setupDrift = dirty.filter(
-      (path) => !staged.has(path) && drift[path] !== undefined && drift[path] === current[path],
+      (path) => drift[path] !== undefined && drift[path] === current[path],
     );
     const driftSet = new Set(setupDrift);
     await gitPrim.addPaths(
       cwd,
       dirty.filter((path) => !driftSet.has(path)),
     );
-    writeFileSync(
-      driftFile,
-      JSON.stringify(Object.fromEntries(setupDrift.map((path) => [path, drift[path]]))),
-    );
+    await gitPrim.unstagePaths(cwd, setupDrift);
+    writeFileSync(driftFile, JSON.stringify(await fingerprintsOf(cwd, setupDrift)));
     for (const path of setupDrift) {
       this.logger.workspace(`workspace setup drift left out of the commit: ${path}`);
     }

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const SCENARIO = '/app/schedules?scenario=chief-agent-chip';
+const SCENARIO = '/app?scenario=chief-agent-chip';
 
 function stubDicebear(page: Page) {
   return page.route('**/api.dicebear.com/**', (route) =>
@@ -15,9 +15,7 @@ test.describe('Coordinator replies carry no identity row (D122)', () => {
   test.beforeEach(async ({ page }) => {
     await stubDicebear(page);
     await page.goto(SCENARIO);
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
-    await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    await expect(page.getByTestId('home-c')).toBeVisible();
   });
 
   test('no avatar or agent-name link sits above a Coordinator reply', async ({ page }) => {
@@ -33,9 +31,9 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
     await stubDicebear(page);
   });
 
-  test('F-E5: drawer-face agent mention chips stay lazy spans', async ({ page }) => {
+  test('F-E5: Coordinator agent mention chips stay lazy spans', async ({ page }) => {
     await page.goto(SCENARIO);
-    await expect(page.locator('.chief-drawer')).toBeVisible();
+    await expect(page.getByTestId('home-c')).toBeVisible();
     const chip = page.getByTestId('chief-stream').locator('.mention-chip--agent');
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveText('r5-scribe');
@@ -55,7 +53,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
   test('F-E7: skill/project/machine mentions stay lazy spans (literal negative cases)', async ({ page }) => {
     await page.goto(SCENARIO);
-    await expect(page.locator('.chief-drawer')).toBeVisible();
+    await expect(page.getByTestId('home-c')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
     for (const kind of ['skill', 'project', 'machine'] as const) {
       const chip = stream.locator(`.mention-chip--${kind}`);
@@ -76,8 +74,8 @@ test.describe('lazy face zero change (#741 negative case)', () => {
     page,
   }) => {
     await stubDicebear(page);
-    await page.goto('/app/schedules?scenario=114');
-    await expect(page.locator('.chief-drawer')).toBeVisible();
+    await page.goto('/app?scenario=114');
+    await expect(page.getByTestId('home-c')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
     await expect(stream.getByTestId('chief-msg').locator('> svg')).toHaveCount(0);

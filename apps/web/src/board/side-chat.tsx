@@ -4,7 +4,6 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { useChiefRoot } from '../chief/chief-root.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
@@ -18,6 +17,7 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
@@ -95,7 +95,7 @@ function SourceLine({
   const { t } = useI18n();
   const { teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
-  const { openChiefThread } = useChiefRoot();
+  const openChiefThread = useOpenCoordinatorThread();
   return (
     <SourceIssueLine
       todo={wire}

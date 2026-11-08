@@ -138,6 +138,66 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
     expect(result.setupDrift).toEqual(['pnpm-lock.yaml']);
   }, 60_000);
 
+  test('a path the setup hook also staged is still setup drift and stays out of the commit', async () => {
+    await seedRepo(userRepo, 'git add pnpm-lock.yaml\n');
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const prepared = await ws.prepare(prepareInput());
+    writeFileSync(join(prepared.cwd, 'feature.txt'), 'agent work\n');
+
+    const result = await ws.commitAll(prepared.cwd, 'build: feature', IDENTITY);
+
+    expect(await committedPaths(prepared.cwd)).toEqual(['feature.txt']);
+    expect(result.setupDrift).toContain('pnpm-lock.yaml');
+    expect(readFileSync(join(prepared.cwd, 'pnpm-lock.yaml'), 'utf8')).toContain('setup-drift');
+
+    writeFileSync(join(prepared.cwd, 'second.txt'), 'more agent work\n');
+    const again = await ws.commitAll(prepared.cwd, 'build: second', IDENTITY);
+    expect(await committedPaths(prepared.cwd)).toEqual(['second.txt']);
+    expect(again.setupDrift).toContain('pnpm-lock.yaml');
+  }, 60_000);
+
+  test('a submodule the agent moved after setup moved it is the agent change and is committed', async () => {
+    const sub = join(userRepo, '..', 'sub-repo');
+    await runGit(['init', '-b', 'main', sub]);
+    const commits: string[] = [];
+    for (const body of ['one', 'two', 'three']) {
+      writeFileSync(join(sub, 'a.txt'), `${body}\n`);
+      await git(sub, ['add', 'a.txt']);
+      await git(sub, ['commit', '-m', body]);
+      commits.push(await git(sub, ['rev-parse', 'HEAD']));
+    }
+    await git(sub, ['checkout', '-q', commits[0] ?? '']);
+    await seedRepo(
+      userRepo,
+      'git -c protocol.file.allow=always submodule update --init -q vendor/sub\ngit -C vendor/sub checkout -q main\n',
+    );
+    await git(userRepo, [
+      '-c',
+      'protocol.file.allow=always',
+      'submodule',
+      'add',
+      '-q',
+      sub,
+      'vendor/sub',
+    ]);
+    await git(userRepo, ['commit', '-m', 'add submodule']);
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const prepared = await ws.prepare(prepareInput());
+    const submodule = join(prepared.cwd, 'vendor/sub');
+    expect(await git(submodule, ['rev-parse', 'HEAD'])).toBe(commits[2]);
+
+    writeFileSync(join(prepared.cwd, 'feature.txt'), 'agent work\n');
+    const first = await ws.commitAll(prepared.cwd, 'build: feature', IDENTITY);
+    expect(await committedPaths(prepared.cwd)).toEqual(['feature.txt']);
+    expect(first.setupDrift).toContain('vendor/sub');
+
+    await git(submodule, ['checkout', '-q', commits[1] ?? '']);
+    const result = await ws.commitAll(prepared.cwd, 'build: pin submodule', IDENTITY);
+
+    expect(await committedPaths(prepared.cwd)).toContain('vendor/sub');
+    expect(result.setupDrift).not.toContain('vendor/sub');
+  }, 60_000);
+
   test('the commit runs its hooks inside the repository hook budget, and a timeout says so', async () => {
     await seedRepo(
       userRepo,

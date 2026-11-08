@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openChiefWindow } from './helpers.js';
 
 const FLEET = 'scenario=providers-fleet';
 
@@ -137,21 +136,4 @@ test('phone: the list comes first, a section opens full screen with a way back',
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
-});
-
-test('opening settings leaves the Coordinator window as it was', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=11');
-  await openChiefWindow(page);
-  await expect(page.locator('.chief-drawer')).toBeVisible();
-  await page.getByTestId('sidebar-settings').click();
-  await expect(settings(page)).toBeVisible();
-  await settings(page).getByRole('button', { name: '关闭设置' }).click();
-  await expect(page).toHaveURL(/\/app\/schedules\?scenario=11$/);
-  await expect(page.locator('.chief-drawer')).toBeVisible();
-
-  await page.getByTestId('sidebar-settings').click();
-  await settings(page).getByRole('heading', { name: '账号' }).first().click();
-  await page.keyboard.press('Escape');
-  await expect(settings(page)).toHaveCount(0);
-  await expect(page.locator('.chief-drawer')).toBeVisible();
 });

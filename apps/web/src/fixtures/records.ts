@@ -505,11 +505,6 @@ export interface RevisionStep {
   };
 }
 
-export interface ChiefExample {
-  icon: 'user-plus' | 'folder' | 'grid' | 'bars';
-  text: string;
-}
-
 export interface ChiefSegment {
   text: string;
   code?: boolean;
@@ -619,7 +614,7 @@ export interface ModelOption {
 }
 
 export interface ChiefContent {
-  view: 'drawer' | 'settings' | 'none';
+  view: 'settings' | 'none';
   tab?: ChiefSettingsTab;
   bound: boolean;
   modelSlot?: string;
@@ -628,7 +623,6 @@ export interface ChiefContent {
   threadTitle: string;
   threadId?: string;
   threads?: ChiefThreadRef[];
-  examples?: ChiefExample[];
   draft?: string;
   stream?: ChiefStreamItem[];
   streamAt?: number[];

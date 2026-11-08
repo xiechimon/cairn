@@ -237,6 +237,10 @@ function recordStop(db: Db, buildId: string, by: StopAttribution): void {
     .run();
 }
 
+function clearStop(db: Db, buildId: string): void {
+  db.update(build).set({ stop: null }).where(eq(build.id, buildId)).run();
+}
+
 function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
   const record = toBuildRecord(row);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
@@ -1017,8 +1021,9 @@ export function enqueueStep(
       createdAt,
     })
     .run();
+  clearStop(deps.db, buildId);
   if (isBuildStepKind(kind)) {
-    deps.db.update(build).set({ reportLine: null, stop: null }).where(eq(build.id, buildId)).run();
+    deps.db.update(build).set({ reportLine: null }).where(eq(build.id, buildId)).run();
   }
   deps.machineHub?.wake(teamId);
   deps.convHub?.publishStep(buildId, {
@@ -2520,6 +2525,7 @@ export function applyStepFailure(
     applyStoppedStep(deps, stepRow.id);
     return;
   }
+  clearStop(db, stepRow.buildId);
   releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
@@ -3030,6 +3036,7 @@ export function completeStep(
     applyStoppedStep(deps, stepId);
     return;
   }
+  clearStop(deps.db, stepRow.buildId);
   if (settleParkedStep(deps, stepRow, { status: 'success' })) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) {

@@ -64,7 +64,7 @@ test('a working agent shows a pulse under the last line; finished rows stay stil
 });
 
 test('the unbound chief reply carries no face and no avatar column', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=114');
+  await page.goto('/app?scenario=114');
   const reply = page.getByTestId('chief-stream').getByTestId('chief-msg');
   await expect(reply.first()).toBeVisible();
   await expect(reply.locator('> svg')).toHaveCount(0);
@@ -74,7 +74,7 @@ test('the unbound chief reply carries no face and no avatar column', async ({ pa
 test('the Coordinator pulses under the reply it is still typing, finished ones carry none', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=chief-md');
+  await page.goto('/app?scenario=chief-md');
   const replies = page.getByTestId('chief-stream').getByTestId('chief-msg');
   await expect(replies.last().getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
   await expect(replies.first().getByTestId('live-pulse')).toHaveCount(0);

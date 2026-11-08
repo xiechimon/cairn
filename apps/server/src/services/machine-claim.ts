@@ -88,6 +88,7 @@ import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { recordStepRoute, routedModelRunsOn } from './step-route.js';
 import { listProjectTagVocab } from './tags.js';
+import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
 
@@ -551,8 +552,9 @@ async function tryClaim(
         : repoRef;
     const workerMcp = claimMcpSlugs(machineRow.latestCliVersion, agentRow.mcpServers);
     const isGithubProject = projectRow?.repoKind === 'github';
+    const namesTask = stepNamesTask(db, cand.stepRow);
     const taskMeta =
-      isGithubProject && projectRow
+      isGithubProject && namesTask && projectRow
         ? {
             titleFinal: cand.todoRow.sourceKind === 'github-issue',
             vocab: listProjectTagVocab(db, projectRow.id),
@@ -615,7 +617,7 @@ async function tryClaim(
         injectedSkills: skillInjection.hits.map((h) => h.id),
         tools: [...agentRow.tools],
       },
-      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject),
+      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
@@ -623,9 +625,15 @@ async function tryClaim(
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
 }
 
-export function workerRemoteTools(kind: StepKind, isGithubProject: boolean): RemoteToolDef[] {
+export function workerRemoteTools(
+  kind: StepKind,
+  isGithubProject: boolean,
+  namesTask: boolean,
+): RemoteToolDef[] {
   const base = (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
-    (tool) => kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name),
+    (tool) =>
+      (kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name)) &&
+      (namesTask || tool.name !== 'set_task_meta'),
   );
   return kind === 'session'
     ? [...base, WORKER_ASK_USER_TOOL, WORKER_THREAD_REPORT_TOOL]

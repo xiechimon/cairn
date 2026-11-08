@@ -1,6 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -73,13 +72,11 @@ async function stubServerDraft(page: Page, seed?: string): Promise<ServerDraft> 
 async function openChiefComposer(page: Page, server?: { seed?: string }) {
   await stubBoot(page);
   const store = server === undefined ? null : await stubServerDraft(page, server.seed);
-  await page.goto('/app/schedules');
-
-  await openChiefWindow(page);
+  await page.goto('/app');
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
-  return { drawer: page.locator('.chief-drawer'), input, store };
+  return { input, store };
 }
 
 const storedDraft = (page: Page) => page.evaluate((key) => localStorage.getItem(key), DRAFT_KEY);
@@ -154,25 +151,18 @@ test('live face: a rejected send keeps the draft in the box and in storage (#631
   await expect(input).toHaveValue(DRAFT);
 });
 
-test('live face: minimize and SPA route switches keep the draft (D6 zero regression)', async ({
-  page,
-}) => {
-
-  const { drawer, input } = await openChiefComposer(page);
+test('live face: route switches keep the draft (D6 zero regression)', async ({ page }) => {
+  const { input } = await openChiefComposer(page);
   await input.fill(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
-
-  await drawer.getByRole('button', { name: '最小化' }).click();
-  await expect(drawer).toBeHidden();
-  await openChiefWindow(page);
-  await expect(input).toBeVisible();
-  await expect(input).toHaveValue(DRAFT);
 
   await page.getByTestId('sidebar-settings').click();
   await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '技能' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/skills/);
   await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '关闭设置' }).click();
+  await expect(page).toHaveURL(/\/app$/);
   await expect(input).toHaveValue(DRAFT);
+  await page.goto('/app/schedules');
   await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue(DRAFT);
@@ -185,13 +175,12 @@ test('fixture face: zero writes, zero reads (A0 S11 shape)', async ({ page }) =>
     ([key, value]) => localStorage.setItem(key, value),
     [DRAFT_KEY, 'SEEDED-BY-TEST'],
   );
-  await page.goto('/app/schedules?scenario=111');
+  await page.goto('/app?scenario=111');
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
 
   await expect(input).not.toHaveValue('SEEDED-BY-TEST');
-  await expect(input).toHaveValue(/我想做一个能在浏览器里直接玩的网页小游戏/);
-  await expect(input).toHaveAttribute('readonly', '');
+  await input.fill('fixture typing');
   await expect.poll(() => storedDraft(page)).toBe('SEEDED-BY-TEST');
   await evidenceShot(page, 'fixture-face-storage-untouched.png');
 });
@@ -209,7 +198,6 @@ test('live face: the draft is saved to the server and a fresh device restores it
 
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await openChiefWindow(page);
   await expect(input).toHaveValue(DRAFT);
   await evidenceShot(page, 'server-draft-restored-on-fresh-device.png');
 });
@@ -218,7 +206,6 @@ test('live face: a draft stored by another device appears on open (D110)', async
   const { input } = await openChiefComposer(page, {
     seed: '![shot.png](attachment:team-1/att-1.png)\n来自另一台设备的草稿',
   });
-  await openChiefWindow(page);
   await expect(input).toHaveValue(/来自另一台设备的草稿/);
   await evidenceShot(page, 'server-draft-from-other-device.png');
 });

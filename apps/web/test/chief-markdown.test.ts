@@ -376,7 +376,6 @@ describe('mapChief in-flight presence tail row (#739 F1/F2/F4/F6)', () => {
   test('F6 new-topic view (activeThreadId null) → no stream, presence row leaves no residue', () => {
     const content = mapChief(ENV, opts({ phase: 'chief' }, '', null));
     expect(content.stream).toBeUndefined();
-    expect(content.examples).toBeDefined();
   });
 });
 
@@ -437,7 +436,7 @@ describe('mapChiefStream user-row markdown slot (#742 F-D1..D5)', () => {
   test('F-D5 the render chain has zero dangerouslySetInnerHTML (the parser produces React nodes, static pin)', () => {
     const web = resolve(import.meta.dirname, '..');
     const chain = [
-      'src/chief/chief-drawer.tsx',
+      'src/chief/chief-conversation.tsx',
       'src/detail/chat-markdown.tsx',
       'src/detail/segments.tsx',
       'src/api/mappers.ts',

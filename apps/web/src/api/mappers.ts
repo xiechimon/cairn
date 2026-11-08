@@ -1322,13 +1322,6 @@ export function askQuestionOfContent(content: unknown): {
   };
 }
 
-const CHIEF_HERO_EXAMPLES = [
-  { icon: 'user-plus' as const, text: '帮我组建 Agent 团队' },
-  { icon: 'folder' as const, text: '帮我创建一个新项目' },
-  { icon: 'grid' as const, text: '总结一下我所有项目现在的进展' },
-  { icon: 'bars' as const, text: '查一下这个月的 token 用量' },
-];
-
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
 function chiefUserText(raw: string): string {
@@ -1638,7 +1631,7 @@ export function mapChief(
   }
   chiefStream.push(...(collected?.pending ?? []));
   return {
-    view: 'drawer',
+    view: 'none',
     bound,
     ...(bound && env.agentActor
       ? {
@@ -1661,9 +1654,7 @@ export function mapChief(
           })),
         }
       : {}),
-    ...(active === null
-      ? { examples: CHIEF_HERO_EXAMPLES }
-      : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
+    ...(active === null ? {} : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
     ...(running ? { running: true } : {}),
     ...(opts.activity?.phase === 'tool' && opts.activity.tool != null
       ? { runningTool: opts.activity.tool }
