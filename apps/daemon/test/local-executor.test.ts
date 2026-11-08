@@ -214,8 +214,8 @@ describe('per-step credential argv discipline (spec 12 G2-T2: capturing fork+exe
     await gitPrim.fetch(cloneDir, PROBE_CRED);
     await runGit(['checkout', '-b', conversationBranch(CONV_A)], { cwd: cloneDir });
     writeFileSync(join(cloneDir, 'work.txt'), 'x\n');
-    await gitPrim.addAll(cloneDir);
-    await gitPrim.commit(cloneDir, 'work', IDENTITY);
+    await gitPrim.addPaths(cloneDir, ['work.txt']);
+    await gitPrim.commit(cloneDir, 'work', IDENTITY, 30_000);
     await gitPrim.push(cloneDir, conversationBranch(CONV_A), PROBE_CRED);
 
     const argv = readFileSync(argvLog, 'utf8');

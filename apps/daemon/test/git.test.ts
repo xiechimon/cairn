@@ -767,7 +767,7 @@ describe('runGit — signal termination is not success (#1329)', () => {
 
   test('runGitOk throws on signal termination, the error wording names the signal', async () => {
     await expect(runGitOk(['hash-object', '--stdin'], STDIN_BLOCKED)).rejects.toThrow(
-      'failed (signal SIGTERM)',
+      'failed (signal SIGTERM, timed out after 200 ms)',
     );
   });
 });
@@ -1201,3 +1201,55 @@ describe('#2047 configured push mappings cannot change the requested destination
     expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(seed);
   }, 30_000);
 });
+
+function hookedRepo(hookBody: string): string {
+  const dir = testTempDir('cairn-commit-hook-');
+  gitOk(dir, ['init', '-q', '-b', 'main']);
+  gitOk(dir, ['config', 'user.email', 't@example.com']);
+  gitOk(dir, ['config', 'user.name', 't']);
+  commitFile(dir, 'seed.txt', 'seed\n');
+  const hook = join(dir, '.git', 'hooks', 'pre-commit');
+  writeFileSync(hook, hookBody);
+  chmodSync(hook, 0o755);
+  writeFileSync(join(dir, 'work.txt'), 'agent work\n');
+  gitOk(dir, ['add', 'work.txt']);
+  return dir;
+}
+
+describe('commit failures carry the real signal, timeout and hook output (task stall S6)', () => {
+  test('a commit whose hook outlives the budget reports the signal and the timeout, not (null)', async () => {
+    const dir = hookedRepo('#!/bin/sh\necho checks passed\nexec sleep 30\n');
+    const failure = await gitPrim.commit(dir, 'work', IDENTITY_FOR_HOOKS, 500).then(
+      () => null,
+      (err: unknown) => (err instanceof Error ? err.message : String(err)),
+    );
+    expect(failure).not.toBeNull();
+    expect(failure).not.toContain('(null)');
+    expect(failure).toContain('signal SIGTERM');
+    expect(failure).toContain('timed out after 500 ms');
+    expect(failure).toContain('checks passed');
+  }, 20_000);
+
+  test('a hook rejection reports the exit code and the hook stderr tail', async () => {
+    const dir = hookedRepo(
+      `#!/bin/sh\n${Array.from({ length: 80 }, (_, i) => `echo noise-${i} >&2`).join('\n')}\necho lint/style/useTemplate at fixtures.ts:12 >&2\nexit 1\n`,
+    );
+    const failure = await gitPrim.commit(dir, 'work', IDENTITY_FOR_HOOKS, 10_000).then(
+      () => null,
+      (err: unknown) => (err instanceof Error ? err.message : String(err)),
+    );
+    expect(failure).toMatch(/^git commit failed \(exit 1\): /);
+    expect(failure).toContain('lint/style/useTemplate at fixtures.ts:12');
+    expect(failure).not.toContain('noise-0\n');
+    expect(failure).not.toContain('timed out');
+  }, 20_000);
+
+  test('runGitOk reports a timeout kill the same way', async () => {
+    const dir = hookedRepo('#!/bin/sh\nexec sleep 30\n');
+    await expect(runGitOk(['commit', '-m', 'work'], { cwd: dir, timeoutMs: 400 })).rejects.toThrow(
+      /git commit failed \(signal SIGTERM, timed out after 400 ms\)/,
+    );
+  }, 20_000);
+});
+
+const IDENTITY_FOR_HOOKS = { name: 't', email: 't@example.com' };

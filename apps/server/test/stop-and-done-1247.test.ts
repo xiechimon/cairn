@@ -69,7 +69,7 @@ describe('#1247 stop-and-done', () => {
   test('prepareStopForDone keeps the pending phase for the caller to then write done', async () => {
     const s = bootServer();
     const { todoId, stepId } = await seedBuildingWithPendingStep(s);
-    const prep = prepareStopForDone(s.svc, todoId);
+    const prep = prepareStopForDone(s.svc, todoId, { actor: 'person', reason: 'test stop' });
     expect(prep.state).toBe('ready');
     expect(s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.status).toBe(
       'stopped',

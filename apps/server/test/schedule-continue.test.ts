@@ -354,11 +354,18 @@ test.each(['pending-stop', 'acknowledged-stop', 'exit-stop'] as const)(
     await s.scheduler.tick(s.due);
     expect(s.stored()?.nextRunAt).toBeNull();
     const fired = s.db.select().from(step).all().at(-1)!;
-    if (ending === 'pending-stop') builds.requestStop(s.svc, s.buildId, { discard: true });
+    if (ending === 'pending-stop')
+      builds.requestStop(
+        s.svc,
+        s.buildId,
+        { discard: true },
+        { actor: 'person', reason: 'test stop' },
+      );
     else if (ending === 'acknowledged-stop') {
       s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, fired.id)).run();
       builds.applyStoppedStep(s.svc, fired.id);
-    } else builds.stopActiveStepsAfterExit(s.svc, s.todoId);
+    } else
+      builds.stopActiveStepsAfterExit(s.svc, s.todoId, { actor: 'person', reason: 'test stop' });
     expect(s.stored()).toMatchObject({
       nextRunAt: null,
       lastRunStatus: 'stopped',

@@ -246,7 +246,7 @@ describe('router tools', () => {
       seedSessionRoute(H.s);
       const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
       const opened = (await relay('open_thread', { todoId: id })) as { buildId: string };
-      await relay('stop_thread', { todoId: id });
+      await relay('stop_thread', { todoId: id, reason: 'test stop' });
       await relay('message_thread', { todoId: id, content: 'Try a smaller export.' });
       const resumed = H.s.db.select().from(todo).where(eq(todo.id, id)).get();
       expect(resumed?.latestBuildId).not.toBe(opened.buildId);
@@ -445,7 +445,9 @@ describe('router tools', () => {
       const { todoId, buildId } = await openThread();
       const claimed = claimSession(buildId);
       const signal = vi.spyOn(H.s.machineHub, 'stopSignal');
-      const out = (await relay('stop_thread', { todoId })) as { stopped: string };
+      const out = (await relay('stop_thread', { todoId, reason: 'test stop' })) as {
+        stopped: string;
+      };
       expect(out.stopped).toBe('delegated');
       expect(signal).toHaveBeenCalledWith(H.teamId, claimed.id);
       expect(H.s.db.select().from(stopPending).all()).toHaveLength(1);
@@ -453,7 +455,9 @@ describe('router tools', () => {
 
     test('a queued step is stopped at once', async () => {
       const { todoId, buildId } = await openThread();
-      const out = (await relay('stop_thread', { todoId })) as { stopped: string };
+      const out = (await relay('stop_thread', { todoId, reason: 'test stop' })) as {
+        stopped: string;
+      };
       expect(out.stopped).toBe('stopped');
       expect(H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!.status).toBe(
         'stopped',
@@ -462,7 +466,7 @@ describe('router tools', () => {
 
     test('a thread stopped before its first run is resumed by message_thread', async () => {
       const { todoId, buildId } = await openThread();
-      await relay('stop_thread', { todoId });
+      await relay('stop_thread', { todoId, reason: 'test stop' });
       const stopped = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
       expect(stopped.phase).toBe('todo');
       expect(stopped.latestBuildId).toBe(buildId);
@@ -495,7 +499,7 @@ describe('router tools', () => {
 
     test('a thread stopped before its first run is reopened by open_thread', async () => {
       const { todoId, buildId } = await openThread();
-      await relay('stop_thread', { todoId });
+      await relay('stop_thread', { todoId, reason: 'test stop' });
       const out = (await relay('open_thread', { todoId })) as { buildId: string };
       expect(out.buildId).not.toBe(buildId);
       const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
@@ -517,7 +521,11 @@ describe('router tools', () => {
 
     test('rejects an unstarted thread and another team', async () => {
       const unstarted = seedTodo();
-      await expectRejected(relay('stop_thread', { todoId: unstarted }), 409, /not started/);
+      await expectRejected(
+        relay('stop_thread', { todoId: unstarted, reason: 'test stop' }),
+        409,
+        /not started/,
+      );
       H.s.db.insert(team).values({ id: 'other-team', name: 'Other', createdAt: 1 }).run();
       H.s.db.insert(project).values({ id: 'other-project', name: 'p', teamId: 'other-team' }).run();
       const foreign = seedTodo({
@@ -525,7 +533,11 @@ describe('router tools', () => {
         projectId: 'other-project',
         latestBuildId: 'foreign-build',
       });
-      await expectRejected(relay('stop_thread', { todoId: foreign }), 404, /todo/);
+      await expectRejected(
+        relay('stop_thread', { todoId: foreign, reason: 'test stop' }),
+        404,
+        /todo/,
+      );
     });
   });
 
