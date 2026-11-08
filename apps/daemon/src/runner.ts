@@ -1739,7 +1739,13 @@ async function runClaimedStep(
               const failureKind = lastErrorWasProcessCrash
                 ? 'other'
                 : classifyAgentFailure(ev.error.message);
-              if (failureKind === 'quota' || failureKind === 'capacity') {
+              if (
+                !lastErrorWasProcessCrash &&
+                classifyStepFailure(ev.error.message) === 'model_unavailable'
+              ) {
+                logger.step(`model unavailable: ${modelKey} — stopping session without retry`);
+                await handle.stop();
+              } else if (failureKind === 'quota' || failureKind === 'capacity') {
                 if (quotaTrip === null) {
                   quotaTrip = {
                     kind: failureKind,
@@ -1790,11 +1796,14 @@ async function runClaimedStep(
           default:
             break;
         }
+        if (classifyStepFailure(lastModelError ?? '') === 'model_unavailable') break;
       }
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }
     stop.detach();
+    if (classifyStepFailure(lastModelError ?? '') === 'model_unavailable')
+      lastError = lastModelError;
     {
       const failureText = lastModelError ?? lastError;
       const stopPending = stop.request !== null;
@@ -1816,6 +1825,7 @@ async function runClaimedStep(
         continue;
       }
     }
+    if (classifyStepFailure(lastModelError ?? lastError ?? '') === 'model_unavailable') break;
     if (pass === 0 && !sawProgress && quotaTrip === null) {
       const failureText = lastModelError ?? lastError;
       if (

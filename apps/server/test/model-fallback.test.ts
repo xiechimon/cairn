@@ -82,6 +82,7 @@ function insertProvider(s: TestServer, providerId: string): void {
 
 async function setupWorld(
   fallbackModels: { provider: string; modelId: string }[] | null = DEFAULT_FALLBACKS,
+  modelId = 'model-a',
 ): Promise<World> {
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: 3_600_000 });
   disposables.push(() => s.dispose());
@@ -101,7 +102,7 @@ async function setupWorld(
     .run();
   seedRoute(s, 'session', {
     provider: 'relay-a',
-    modelId: 'model-a',
+    modelId,
     fallbackModels,
     machineId: machineRow.id,
   });
@@ -507,9 +508,29 @@ describe('model fallback chain (#1493)', () => {
     });
   });
 
-  test('X10: model 404 and auth failure also switch', async () => {
+  test('model rejection parks instead of using the configured fallback chain', async () => {
+    const w = await setupWorld(DEFAULT_FALLBACKS, 'glm-5.3');
+    const buildId = await startBuild(w);
+    const c = await claim(w);
+    await done(w, c.stepId, {
+      status: 'failed',
+      errorMessage:
+        '404: {"message":"Model \\"glm-5.3\\" is not supported by any configured account in this group","type":"model_not_found"}',
+    });
+    expect(stepRow(w, c.stepId).status).toBe('failed');
+    expect(stepRow(w, c.stepId).fallback).toBeNull();
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()?.errorMessage,
+    ).toContain('glm-5.3');
+    const next = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+      cred: w.token,
+      body: {},
+    });
+    expect(((await next.json()) as { step: unknown }).step).toBeNull();
+  });
+
+  test('X10: auth failure still switches', async () => {
     for (const errorMessage of [
-      'POST /v1/messages 404 model_not_found',
       'Error: 401 {"type":"error","error":{"type":"authentication_error"}}',
     ]) {
       const w = await setupWorld();

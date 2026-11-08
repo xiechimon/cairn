@@ -151,6 +151,7 @@ import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
+import { assertAutomaticRetryAllowed, parkFailedBuild, retryIsParked } from './retry-parking.js';
 import { policyForStep, profileForStep, routeForStep } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import {
@@ -305,6 +306,12 @@ export async function sendBuildSteer(
   if (replay !== undefined) return replay;
   const buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
+  if (
+    continuationOptions.human !== true &&
+    deps.steerOptions?.human !== true &&
+    body.queuedMessageId === undefined
+  )
+    assertAutomaticRetryAllowed(deps, buildRow.todoId);
   const running = db
     .select()
     .from(step)
@@ -954,6 +961,9 @@ export function enqueueStep(
   freshSession?: boolean,
   byPerson?: boolean,
 ): StepRecord {
+  const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (byPerson !== true && current && retryIsParked(current.errorMessage ?? ''))
+    throw new HttpError(409, current.errorMessage ?? 'Task parked');
   const id = newRecordId();
   const createdAt = nowMs();
   deps.db
@@ -1079,6 +1089,7 @@ export function startBuilds(
             .where(eq(build.id, todoRecord.latestBuildId))
             .get();
     if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
+    if (triggerSource !== 'user') assertAutomaticRetryAllowed(deps, todoId);
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
   }
   const created: BuildRecord[] = [];
@@ -1404,6 +1415,7 @@ export async function applyBuildStepAction(
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
+  if (origin === 'automatic') assertAutomaticRetryAllowed(deps, row.todoId);
 
   if (body.action === 'restart') {
     if (todoRecord.phase !== 'failed') {
@@ -2448,7 +2460,13 @@ export function applyStepFailure(
     blocked: false,
     report: report ?? reportedVerdictHeads(failedStep, { commit: failedStep.checkpointCommit }),
   });
-  if (todoRow && todoRow.archivedAt === null && canTransitionPhase(todoRow.phase, 'failed')) {
+  parkFailedBuild(deps, buildRow.id);
+  if (
+    todoRow &&
+    todoRow.latestBuildId === buildRow.id &&
+    todoRow.archivedAt === null &&
+    canTransitionPhase(todoRow.phase, 'failed')
+  ) {
     setTodoPhase(deps, todoRow.id, 'failed');
   }
 }
