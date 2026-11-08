@@ -1413,6 +1413,7 @@ export const EN: Record<string, string> = {
   '{n} 件在进行': '{n} in progress',
   待你决定: 'Needs you',
   在问你: 'Asking you',
+  '或者自己写…': 'Or write your own…',
   '待你决定 {n} 件': 'Needs you: {n}',
   都处理完了: 'All caught up',
   'Coordinator 建议：{answer}': 'Coordinator suggests: {answer}',

@@ -150,6 +150,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/todos/{id}/messages',
     note: 'body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)',
   },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/questions/{requestId}/answer',
+    note: 'body {answer}; the owner answers one pending worker question by its request id: every question in that request is settled with the text, no other request is touched, and an archived project refuses it (409)',
+  },
   { method: 'POST', path: '/api/projects/{id}/archive', note: 'sets project.archivedAt' },
   { method: 'POST', path: '/api/projects/{id}/unarchive', note: 'clears project.archivedAt' },
   { method: 'GET', path: '/api/builds/{id}' },

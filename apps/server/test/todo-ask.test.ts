@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, message, step, todo } from '../src/db/schema.js';
+import { build, message, project, step, todo } from '../src/db/schema.js';
 import { completeStep, startBuilds } from '../src/services/builds.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -199,5 +199,17 @@ describe('a request with several questions offers no one-click options', () => {
       options: [],
       defaultAnswer: null,
     });
+  });
+});
+
+describe('an answer never lands in an archived project', () => {
+  test('answering from a stale inbox after the project was archived is refused and the question stays pending', async () => {
+    const { todoId, buildId } = await escalatedQuestion();
+    H.s.db.update(project).set({ archivedAt: Date.now() }).where(eq(project.id, H.projectId)).run();
+    const res = await req(H.s.app, 'POST', `/api/todos/${todoId}/questions/${REQUEST}/answer`, {
+      answer: 'Three',
+    });
+    expect(res.status).toBe(409);
+    expect(statusOf(buildId, REQUEST)?.status).toBe('pending');
   });
 });

@@ -172,18 +172,36 @@ test('a refused submit for any other reason keeps the card and the draft and say
   await expect(dock.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('free text answers inline', async ({ page }) => {
+for (const where of ['conversation', 'inbox'] as const) {
+  test(`your own words answer the Coordinator question from the ${where}`, async ({ page }) => {
+    const answered: { path: string; body: unknown }[] = [];
+    const state = structuredClone(ONE);
+    await mockLive(page, state, answerRoute(state, answered));
+    await page.goto(where === 'inbox' ? '/app?pane=inbox' : '/app');
+    const scope =
+      where === 'inbox'
+        ? page.getByTestId('needs-you-inbox-question')
+        : page.getByTestId('chief-stream').getByTestId('inline-question');
+    if (where === 'inbox') await scope.getByTestId('needs-you-inbox-toggle').click();
+    await scope.getByTestId('quick-question-own').fill('Use the metered key this once');
+    await scope.getByTestId('quick-question-own').press('Enter');
+    await expect
+      .poll(() => answered.map((row) => row.body))
+      .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
+    await expect(scope).toHaveCount(0);
+  });
+}
+
+test('a request with several questions takes your own words for each step on home', async ({ page }) => {
   const answered: { path: string; body: unknown }[] = [];
-  const state = structuredClone(ONE);
-  await mockLive(page, state, answerRoute(state, answered));
-  await page.goto(DOCK);
-  const dock = page.getByTestId('chief-question-dock');
-  await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
-  await page.getByTestId('chief-question-primary').click();
-  await expect
-    .poll(() => answered.map((row) => row.body))
-    .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
-  await expect(dock).toHaveCount(0);
+  const state = structuredClone(MIXED);
+  await mockLive(page, state, answerRoute(state as typeof TWO, answered));
+  await page.goto('/app');
+  const card = page.getByTestId('chief-stream').getByTestId('inline-question').first();
+  await card.getByTestId('chief-question-own-0').fill('Sepia');
+  await card.getByTestId('chief-question-next').click();
+  await expect(card.getByTestId('chief-question-text')).toHaveText('Which sections?');
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('');
 });
 
 test('the sidebar Coordinator badge counts pending questions and leads home, where each one waits in the conversation', async ({
@@ -198,31 +216,6 @@ test('the sidebar Coordinator badge counts pending questions and leads home, whe
   await expect(page.getByTestId('chief-stream').getByTestId('inline-question')).toHaveCount(2);
   await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
   await expect(page.getByTestId('home-c').getByTestId('needs-you-count')).toHaveText('2');
-});
-
-test('stepping keeps a typed draft, and a failed submit keeps it too', async ({ page }) => {
-  let fail = true;
-  await mockLive(page, structuredClone(TWO), (path, route, json) => {
-    if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
-    if (fail) {
-      fail = false;
-      return json({ error: 'boom' }, 500);
-    }
-    return json({});
-  });
-  await page.goto(DOCK);
-  const composer = page.getByTestId('chief-composer-input');
-  await composer.fill('Keep this text');
-  await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
-  await expect(composer).toHaveValue('');
-  await page.getByTestId('chief-question-prev').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
-  await expect(composer).toHaveValue('Keep this text');
-  await page.getByTestId('chief-question-primary').click();
-  await expect(page.getByTestId('chief-question-error')).toBeVisible();
-  await expect(composer).toHaveValue('Keep this text');
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
 });
 
 test('digits pick an option while nothing is being typed, and stay text in a non-empty composer', async ({
@@ -615,19 +608,3 @@ for (const size of [
   });
 }
 
-test('each pending request keeps its own composer draft when moving A, B, A, B', async ({ page }) => {
-  await mockLive(page, structuredClone(TWO));
-  await page.goto(DOCK);
-  const composer = page.getByTestId('chief-composer-input');
-  await composer.fill('draft for A');
-  await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
-  await expect(composer).toHaveValue('');
-  await composer.fill('draft for B');
-  await page.getByTestId('chief-question-prev').click();
-  await expect(composer).toHaveValue('draft for A');
-  await page.getByTestId('chief-question-next').click();
-  await expect(composer).toHaveValue('draft for B');
-  await page.getByTestId('chief-question-prev').click();
-  await expect(composer).toHaveValue('draft for A');
-});

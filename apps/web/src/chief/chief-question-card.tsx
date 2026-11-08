@@ -51,6 +51,7 @@ export type ChiefQuestionItem = Extract<ChiefStreamItem, { kind: 'question' }>;
 export interface ChiefQuestionCardProps {
   item: ChiefQuestionItem;
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
+  ownAnswer?: boolean;
   onCancel?: (requestId: string) => void;
   numberKeys?: boolean;
   draftKey?: string;
@@ -194,6 +195,7 @@ export function ChiefQuestionCard({
   pager,
   bound = false,
   ownFooter = false,
+  ownAnswer = false,
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
@@ -258,7 +260,7 @@ export function ChiefQuestionCard({
   ): QuestionDraft | undefined => {
     if (stored === undefined || prompt === undefined) return stored;
     if (stored.kind === 'text') return { kind: 'text', value: text };
-    if (!bound || text.trim() === '') return stored;
+    if (!(bound || ownAnswer) || text.trim() === '') return stored;
     if (prompt.multiSelect === true) return { ...stored, other: true, otherText: text };
     return { kind: 'choices', picked: [], other: true, otherText: text };
   };
@@ -602,6 +604,18 @@ export function ChiefQuestionCard({
                     </Button>
                   );
                 })}
+                {ownAnswer && !bound && (
+                  <div className="px-2 pt-1">
+                    <Input
+                      data-testid={`chief-question-own-${step}`}
+                      className={FORM_CONTROL_CLS}
+                      placeholder={t('或者自己写…')}
+                      value={textAt(step)}
+                      disabled={!pending}
+                      onChange={(e) => setTextAt(step, e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -322,36 +322,42 @@
     },
     {
       "id": "needs-you",
-      "name": "Needs-you tray",
-      "summary": "Questions, failures, pending approvals and reviews that wait on the user, shown as at most three cards above the composer.",
-      "states": "Up to three cards above the composer for questions, failures, approvals and reviews; empty when nothing waits, with a count when there are more.",
+      "name": "Needs-you inbox",
+      "summary": "Everything that waits on the user (escalated thread questions, plan approvals, reviews and the Coordinator's own question) in one side inbox behind a title chip, each answerable inline; the Coordinator question also sits in the conversation where it was asked.",
+      "states": "Chip hidden when nothing waits; chip and sidebar badge share one count; rows show the real question, one-click options, a reply box, an inline failure with retry, and leave once answered.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/needs-you.ts",
-          "apps/web/src/board/needs-you-tray.tsx",
-          "apps/web/src/board/needs-you-thread-card.tsx"
+          "apps/web/src/board/needs-you-inbox.tsx",
+          "apps/web/src/board/needs-you-store.ts",
+          "apps/web/src/board/thread-reply-send.ts",
+          "apps/web/src/chief/quick-question.tsx"
         ],
         "server": [
-          "apps/server/src/services/needs-you.ts"
+          "apps/server/src/services/needs-you.ts",
+          "apps/server/src/services/todos.ts",
+          "apps/server/src/services/thread-message.ts"
         ]
       },
       "routes": {
         "server": [
-          "/api/needs-you"
+          "/api/needs-you",
+          "/api/todos/:id/questions/:requestId/answer"
         ]
       },
       "reach": [
         "open /app",
-        "click testid:needs-you"
+        "click testid:needs-you-chip"
       ],
       "research": [
         "docs/research/link-roundup-2026-11-01.md",
-        "docs/research/ui-ux-audit-2026-11-06.md"
+        "docs/research/ui-ux-audit-2026-11-06.md",
+        "docs/research/needs-you-surface-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "D121 decided the tray, but no design or approved screenshot set shows its states"
+        "gap": "the inbox follows the measured claude.ai Threads row in docs/research/needs-you-surface-2026-11-08.md, but no approved screenshot set shows its states"
       },
       "backendDesign": {
         "gap": "no design for which records enter the tray, their order and when they leave"
@@ -433,7 +439,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:needs-you"
+        "click testid:needs-you-chip"
       ],
       "research": {
         "gap": "no prior-art note on agent notifications and push delivery"

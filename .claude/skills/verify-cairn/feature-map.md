@@ -59,7 +59,7 @@ Reach:
 
 - Web routes: `/app`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-examples`, `chief-fallback-banner`, `chief-fallback-dot`, `chief-fallback-note`, `chief-follows-agent`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-model-row`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-outage`, `chief-project-chip`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `tasks-attention-dot`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-examples`, `chief-fallback-banner`, `chief-fallback-dot`, `chief-fallback-note`, `chief-follows-agent`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-model-row`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-outage`, `chief-project-chip`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-own-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `inline-question`, `quick-question`, `quick-question-error`, `quick-question-option-*`, `quick-question-own`, `quick-question-own-send`, `quick-question-text`, `tasks-attention-dot`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -205,20 +205,20 @@ Reach:
 
 ### needs-you
 
-**Needs-you tray** (shipped, centrality 1). Questions, failures, pending approvals and reviews that wait on the user, shown as at most three cards above the composer.
+**Needs-you inbox** (shipped, centrality 1). Everything that waits on the user (escalated thread questions, plan approvals, reviews and the Coordinator's own question) in one side inbox behind a title chip, each answerable inline; the Coordinator question also sits in the conversation where it was asked.
 
-States: Up to three cards above the composer for questions, failures, approvals and reviews; empty when nothing waits, with a count when there are more.
+States: Chip hidden when nothing waits; chip and sidebar badge share one count; rows show the real question, one-click options, a reply box, an inline failure with retry, and leave once answered.
 
 Reach:
 
 1. `open /app`
-2. `click testid:needs-you`
+2. `click testid:needs-you-chip`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `needs-you`, `needs-you-count`
-- Research: [docs/research/link-roundup-2026-11-01.md](../../../docs/research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
-- Frontend design: **gap**: D121 decided the tray, but no design or approved screenshot set shows its states
+- Test ids in its code: `inline-question`, `needs-you-chip`, `needs-you-count`, `needs-you-inbox`, `needs-you-inbox-answer`, `needs-you-inbox-ask`, `needs-you-inbox-error`, `needs-you-inbox-question`, `needs-you-inbox-row`, `needs-you-inbox-toggle`, `quick-question`, `quick-question-error`, `quick-question-option-*`, `quick-question-own`, `quick-question-own-send`, `quick-question-text`
+- Research: [docs/research/link-roundup-2026-11-01.md](../../../docs/research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main), [docs/research/needs-you-surface-2026-11-08.md](../../../docs/research/needs-you-surface-2026-11-08.md)
+- Frontend design: **gap**: the inbox follows the measured claude.ai Threads row in docs/research/needs-you-surface-2026-11-08.md, but no approved screenshot set shows its states
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
 - Evidence: `apps/web/e2e/chief-home-needs-you.spec.ts`, `apps/web/e2e/chief-home-tray.spec.ts`, `apps/server/test/needs-you.test.ts`
 
@@ -271,7 +271,7 @@ States: Off, asking for permission, or on for this device; a notification opens 
 Reach:
 
 1. `open /app`
-2. `click testid:needs-you`
+2. `click testid:needs-you-chip`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -294,7 +294,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`
+- Test ids in its code: `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-own-*`, `chief-question-position`, `chief-question-prev`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`
 - Research: **gap**: the Codex CLI and t3code question patterns behind D85 and D119 were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](../../../docs/design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
 - Backend design: **gap**: no design for the question lifecycle: parking, late answers, cancel and resume

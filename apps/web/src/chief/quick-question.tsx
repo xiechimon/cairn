@@ -1,7 +1,8 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChiefQuestionCard, recommendedFirst } from './chief-question-card.js';
 import { useOptionalChiefRoot } from './chief-root.js';
@@ -58,6 +59,7 @@ export function QuickQuestion({
         <ChiefQuestionCard
           item={request.item}
           draftKey={key}
+          ownAnswer
           onAnswer={(input) => answer(input.answers)}
         />
         {error !== null && (
@@ -105,6 +107,10 @@ export function QuickQuestion({
           </Button>
         ))}
       </div>
+      <OwnAnswer
+        disabled={submitting}
+        onSend={(text) => answer([{ header: question.header, choices: [text] }])}
+      />
       {error !== null && (
         <p
           role="status"
@@ -133,5 +139,42 @@ export function InlineCoordinatorQuestion({ request }: { request: OriginChiefQue
       </p>
       <QuickQuestion request={request} />
     </section>
+  );
+}
+
+function OwnAnswer({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
+  const { t } = useI18n();
+  const [text, setText] = useState('');
+  const send = () => {
+    const value = text.trim();
+    if (value === '' || disabled) return;
+    onSend(value);
+  };
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        data-testid="quick-question-own"
+        className="h-8 text-ui"
+        placeholder={t('或者自己写…')}
+        value={text}
+        disabled={disabled}
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            send();
+          }
+        }}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        data-testid="quick-question-own-send"
+        disabled={disabled || text.trim() === ''}
+        onClick={send}
+      >
+        {t('发送')}
+      </Button>
+    </div>
   );
 }

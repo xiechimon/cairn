@@ -239,6 +239,7 @@ export async function answerTaskQuestion(
     .where(and(eq(todo.id, input.todoId), eq(todo.teamId, teamId)))
     .get();
   if (!row) throw new HttpError(404, `todo ${input.todoId}`);
+  assertProjectWritable(deps.db, row.teamId, row.projectId);
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }

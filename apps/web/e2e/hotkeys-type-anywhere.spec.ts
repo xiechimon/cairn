@@ -81,20 +81,17 @@ async function mockPendingQuestion(page: Page) {
   });
 }
 
-test('a pending question card takes digits when nothing is focused and leaves a typed composer alone', async ({
+test('with a Coordinator question waiting in the conversation, digits typed anywhere go to the composer and never answer it', async ({
   page,
 }) => {
   await mockPendingQuestion(page);
   await page.goto('/app');
   const composer = homeComposer(page);
-  const option = page.getByTestId('chief-question-option-0-0');
-  await expect(option).toBeVisible();
+  const card = page.getByTestId('chief-stream').getByTestId('inline-question');
+  await expect(card).toBeVisible();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('1');
-  await expect(option).toHaveAttribute('aria-pressed', 'true');
-  await expect(composer).toHaveValue('');
-  await composer.fill('draft');
-  await page.keyboard.press('2');
-  await expect(composer).toHaveValue('draft2');
-  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
+  await expect(composer).toHaveValue('1');
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
 });
