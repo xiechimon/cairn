@@ -3005,9 +3005,22 @@ function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {
     .orderBy(desc(message.createdAt))
     .all();
   for (const row of rows) {
-    if (typeof row.content === 'string' && row.content.trim() !== '') return row.content.trim();
+    const text = spokenText(row.content).trim();
+    if (text !== '') return text;
   }
   return null;
+}
+
+function spokenText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .flatMap((block: unknown) => {
+      if (block === null || typeof block !== 'object') return [];
+      const { type, text } = block as { type?: unknown; text?: unknown };
+      return type === 'text' && typeof text === 'string' ? [text] : [];
+    })
+    .join('\n');
 }
 
 function askAboutZeroChange(deps: BuildDeps, stepRow: typeof step.$inferSelect): void {
