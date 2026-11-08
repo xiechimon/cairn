@@ -89,6 +89,28 @@ describe('Coordinator repository reads', () => {
         }),
       ) as Docs;
     expect((await read()).files[0]?.content).toBe('export const spawn = true;\n');
+    writeFileSync(join(dir, 'scripts/owned-process.mjs'), 'updated upstream source\n');
+    expect((await runGit(['add', 'scripts/owned-process.mjs'], { cwd: dir })).code).toBe(0);
+    expect(
+      (
+        await runGit(
+          [
+            '-c',
+            'user.name=Fixture',
+            '-c',
+            'user.email=fixture@example.test',
+            'commit',
+            '-m',
+            'upstream',
+          ],
+          { cwd: dir },
+        )
+      ).code,
+    ).toBe(0);
+    expect(
+      (await runGit(['fetch', dir, 'main:refs/remotes/origin/main'], { cwd: cache })).code,
+    ).toBe(0);
+    expect((await read()).files[0]?.content).toBe('updated upstream source\n');
     expect(
       (
         await runGit(['remote', 'set-url', 'origin', 'https://github.com/other/project.git'], {

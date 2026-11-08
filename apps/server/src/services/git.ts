@@ -328,7 +328,25 @@ export async function readFile(
     throw new HttpError(403, 'credential file access denied');
   }
   const dir = await requireRepoReadDir(ctx, projectId);
-  const ref = refParam ?? 'HEAD';
+  let ref = refParam ?? 'HEAD';
+  if (
+    refParam === undefined &&
+    ctx.workspacesDir !== undefined &&
+    dir === join(ctx.workspacesDir, projectId, 'repo')
+  ) {
+    const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+    if (row?.baseBranch != null) {
+      ref = `refs/remotes/origin/${row.baseBranch}`;
+    } else {
+      const head = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
+        cwd: dir,
+        timeoutMs: 15000,
+      });
+      if (head.code !== 0)
+        throw new HttpError(409, 'project repository cache has no default remote branch');
+      ref = head.stdout.toString('utf8').trim();
+    }
+  }
   const commit = await resolveCommitOr404(dir, ref);
   const file = await systemGitOps.readFileAt(dir, commit, path);
   if (file === null) throw notFound(`file ${path} at ref ${ref}`);
