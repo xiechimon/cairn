@@ -10,7 +10,11 @@ import {
   tokenValue,
   type UserToken,
 } from '../src/lib/github-token.js';
-import { appGithubFetch, appTokenOrNull } from '../src/services/github-app-token.js';
+import {
+  appCommitIdentity,
+  appGithubFetch,
+  appTokenOrNull,
+} from '../src/services/github-app-token.js';
 import * as connection from '../src/services/github-connection.js';
 
 const repo = { owner: 'octo', repo: 'alpha' };
@@ -370,4 +374,48 @@ test('step minimum validity forces the mint to replace a near-expiry cached inst
   vi.spyOn(Date, 'now').mockReturnValue(clock + 45 * 60000);
   expect(await appTokenOrNull(deps, repo, false, 50 * 60000)).not.toBeNull();
   expect(refreshes).toEqual([false, true]);
+});
+
+test('the software commit identity is the App bot user, looked up once per slug', async () => {
+  const { deps } = await mint();
+  const fetch = vi.fn(async (input: string | URL) =>
+    String(input).includes('/installation/repositories')
+      ? installed()
+      : Response.json({ login: 'cairnwright[bot]', id: 347615582, type: 'Bot' }),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const identity = {
+    name: 'cairnwright[bot]',
+    email: '347615582+cairnwright[bot]@users.noreply.github.com',
+  };
+  expect(await appCommitIdentity(deps)).toEqual(identity);
+  expect(await appCommitIdentity(deps)).toEqual(identity);
+  expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([
+    'https://api.github.com/installation/repositories?per_page=100&page=1',
+    'https://api.github.com/users/cairnwright%5Bbot%5D',
+  ]);
+});
+
+test('without an App there is no software identity, and a configured App that fails is an error', async () => {
+  expect(await appCommitIdentity({ config: { githubAppTokenSocket: null } })).toBeNull();
+  await expect(
+    appCommitIdentity({ config: { githubAppTokenSocket: '/missing/app.sock' } }),
+  ).rejects.toThrow();
+  const { deps } = await mint({
+    payload: {
+      token: 'x',
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      installationId: 1,
+      appSlug: 'other-app',
+    },
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL) =>
+      String(input).includes('/installation/repositories')
+        ? installed()
+        : Response.json({ login: 'someone-else', id: 1, type: 'User' }),
+    ),
+  );
+  await expect(appCommitIdentity(deps)).rejects.toThrow(/other-app\[bot\]/);
 });

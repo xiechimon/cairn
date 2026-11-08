@@ -494,6 +494,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/autonomy-brake.test.mjs scripts/autonomy-brake-workflow.test.mjs
 
+      - name: Commit identity allowlist and hooks (#2289)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/commit-identity.test.mjs
+
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs

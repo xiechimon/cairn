@@ -1,9 +1,11 @@
 import {
   conversationBranch,
   type LocalMergeReport,
+  localCommitIdentity,
   localMergeCommandSchema,
   parseGithubIssueSourceRef,
   parseLocalMergeInstruction,
+  withCoAuthor,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, step, stopPending, todo } from '../db/schema.js';
@@ -12,11 +14,14 @@ import { nowMs } from '../lib/ids.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { type BuildDeps, completeStep, enqueueStep } from './builds.js';
 import { triggerChiefWakes } from './chief.js';
+import { softwareCommitIdentity } from './github-autonomous-token.js';
+import { humanWorkIdentity } from './github-work-attribution.js';
 import { localGateFacts } from './local-merge-facts.js';
 import type { MachineDeps } from './machine-deps.js';
 import { publishStepStatus, upsertMessage } from './machine-deps.js';
 import type { mergeReadiness } from './merge-gate/readiness.js';
 import { notifyTodoPhase } from './notifications.js';
+import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { getTodo, setTodoPhase } from './todos.js';
 
 export async function enqueueLocalMerge(
@@ -58,6 +63,9 @@ export async function enqueueLocalMerge(
   if (JSON.stringify(required) !== JSON.stringify(config.localChecks) || required.length === 0)
     throw conflict('Local required checks differ from the judged configuration');
   const source = todoRow.sourceRef ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
+  const coAuthor = readTeamAttributionSettings(deps.db, todoRow.teamId).coAuthorTrailer
+    ? humanWorkIdentity(deps.db, todoRow, buildRow.triggerSource)
+    : null;
   const command = localMergeCommandSchema.parse({
     projectId: todoRow.projectId,
     buildId,
@@ -67,11 +75,13 @@ export async function enqueueLocalMerge(
     judgedPatchDigest: readiness.patchDigest,
     workBranch: conversationBranch(buildId),
     localChecks: required,
-    message:
+    message: withCoAuthor(
       source === null
         ? todoRow.title
         : `${todoRow.title}\n\nCloses ${source.owner}/${source.repo}#${source.issueNumber}`,
-    identity: { name: deps.user.displayName, email: 'cairn@localhost' },
+      coAuthor,
+    ),
+    identity: (await softwareCommitIdentity(deps)) ?? localCommitIdentity(deps.user.displayName),
   });
   deps.db.transaction(() => {
     claimAutonomousMerge(deps.db, buildId);
