@@ -38,6 +38,7 @@ function formatElapsed(seconds: number, t: TFunc): string {
 
 const ROW_BASE = 'chat-row flex items-start';
 const AGENT_ROW = 'chat-row chat-row--agent flex flex-col items-start';
+const AGENT_TEXT_WIDTH = 'max-w-[min(68ch,100%)]';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
@@ -303,7 +304,7 @@ function Row({
         <>
           <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
             <span
-              className="chat-text -mt-px max-w-[68ch] min-w-0 voice-response text-card-title break-words text-(--foreground)"
+              className={`chat-text -mt-px ${AGENT_TEXT_WIDTH} min-w-0 voice-response text-card-title break-words text-(--foreground)`}
               data-testid="agent-text"
             >
               {item.markdown != null ? (
@@ -329,7 +330,7 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 voice-response text-card-title break-words text-(--foreground)"
+            className={`chat-text -mt-px ${AGENT_TEXT_WIDTH} min-w-0 voice-response text-card-title break-words text-(--foreground)`}
             data-testid="info-report"
           >
             <ChatMarkdown text={item.markdown} />
@@ -339,14 +340,16 @@ function Row({
     case 'thinking':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)">
+          <span
+            className={`chat-text -mt-px ${AGENT_TEXT_WIDTH} min-w-0 text-card-title break-words text-(--foreground)`}
+          >
             <ThinkingRow text={item.text} />
           </span>
         </div>
       );
     case 'agent-todo':
       return (
-        <div className="mt-3.5 max-w-[68ch]" data-testid="agent-todo">
+        <div className={`mt-3.5 ${AGENT_TEXT_WIDTH}`} data-testid="agent-todo">
           <TaskCard
             items={item.items.map((it) => ({
               state: it.state,
@@ -445,7 +448,7 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+            className={`chat-text -mt-px ${AGENT_TEXT_WIDTH} min-w-0 text-card-title break-words text-(--foreground)`}
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -529,7 +532,7 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+            className={`chat-text -mt-px ${AGENT_TEXT_WIDTH} min-w-0 text-card-title break-words text-(--foreground)`}
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -587,7 +590,7 @@ function FailRow({
   return (
     <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
       <span
-        className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
+        className={`chat-text -mt-px ${AGENT_TEXT_WIDTH} min-w-0 text-card-title break-words text-(--foreground)`}
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>

@@ -169,3 +169,27 @@ test('Coordinator status events are the same left-aligned status line, clear of 
   expect(style.lineHeight).toBe('21px');
   expect(style.minHeight).toBe('28px');
 });
+
+test('a wide code line in an agent reply stays inside the transcript row on a phone viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(DONE);
+  const reply = page
+    .locator('[data-row="agent"]')
+    .filter({ hasText: 'git merge origin/main' })
+    .first();
+  await expect(reply).toBeVisible();
+  const edges = await reply.evaluate((row) => {
+    const text = row.querySelector('[data-testid="agent-text"]') as HTMLElement;
+    const pre = document.createElement('pre');
+    pre.style.whiteSpace = 'pre';
+    pre.textContent = 'x'.repeat(400);
+    text.appendChild(pre);
+    return {
+      textRight: text.getBoundingClientRect().right,
+      rowRight: row.getBoundingClientRect().right,
+    };
+  });
+  expect(edges.textRight).toBeLessThanOrEqual(edges.rowRight + 0.5);
+});
