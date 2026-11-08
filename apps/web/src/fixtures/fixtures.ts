@@ -20,6 +20,7 @@ export {
   sidebarUnread,
 } from './board.js';
 export {
+  chiefCode,
   chiefDefault,
   chiefGated,
   chiefMarkdown,

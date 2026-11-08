@@ -1,5 +1,5 @@
 import { AGENT_TODO_LINE_RE, AGENT_TODO_MARKER_STATES, type AgentTodoState } from '@cairn/shared';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
 import type { DocSegment } from '../fixtures/records.js';
@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/provider.js';
 import { Check, Copy } from '../icons/index.js';
 import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 import { AttachmentPreview } from '../overlay/attachment-preview.js';
+import { type CodeToken, highlightCode } from './code-highlight.js';
 import { Segments } from './segments.js';
 
 export type TableAlign = 'left' | 'center' | 'right' | null;
@@ -566,9 +567,31 @@ function listGap(part: Extract<RenderPart, { kind: 'list' }>): string {
 
 const COPIED_MS = 1500;
 
+function useCodeTokens(text: string, lang: string | undefined): CodeToken[][] | null {
+  const [highlighted, setHighlighted] = useState<{
+    text: string;
+    lang: string;
+    lines: CodeToken[][];
+  } | null>(null);
+  useEffect(() => {
+    if (lang === undefined) return;
+    let live = true;
+    void highlightCode(text, lang).then((lines) => {
+      if (live && lines !== null) setHighlighted({ text, lang, lines });
+    });
+    return () => {
+      live = false;
+    };
+  }, [text, lang]);
+  return highlighted !== null && highlighted.text === text && highlighted.lang === lang
+    ? highlighted.lines
+    : null;
+}
+
 function CodeBlock({ lang, text }: { lang?: string; text: string }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const lines = useCodeTokens(text, lang);
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
@@ -607,7 +630,22 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
           data-lang={lang ?? ''}
           data-testid="md-code"
         >
-          {text}
+          {lines === null
+            ? text
+            : lines.map((line, row) => (
+                <Fragment key={row}>
+                  {row > 0 && '\n'}
+                  {line.map((token, col) =>
+                    token.color === undefined ? (
+                      token.content
+                    ) : (
+                      <span key={col} style={{ color: token.color }}>
+                        {token.content}
+                      </span>
+                    ),
+                  )}
+                </Fragment>
+              ))}
         </pre>
       </div>
     </div>

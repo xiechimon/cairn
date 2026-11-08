@@ -2,6 +2,30 @@ import { expect, type Page, test } from '@playwright/test';
 
 const CHIEF_MD = '/app?scenario=chief-md';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
+const CHIEF_CODE = '/app?scenario=chief-code';
+
+const CLAUDE_PYTHON_COLORS = {
+  light: {
+    def: 'rgb(129, 0, 194)',
+    load_records: 'rgb(0, 81, 194)',
+    path: 'rgb(184, 79, 5)',
+    dict: 'rgb(179, 74, 0)',
+    '"utf-8"': 'rgb(0, 128, 0)',
+    '# utf-8 only': 'rgb(110, 118, 135)',
+    '10': 'rgb(0, 128, 128)',
+    None: 'rgb(0, 128, 128)',
+  },
+  dark: {
+    def: 'rgb(204, 123, 244)',
+    load_records: 'rgb(112, 184, 255)',
+    path: 'rgb(247, 171, 95)',
+    dict: 'rgb(251, 173, 96)',
+    '"utf-8"': 'rgb(155, 233, 99)',
+    '# utf-8 only': 'rgb(129, 136, 152)',
+    '10': 'rgb(94, 237, 237)',
+    None: 'rgb(94, 237, 237)',
+  },
+} as const;
 
 async function openChiefReply(page: Page) {
   await page.goto(CHIEF_MD);
@@ -193,3 +217,17 @@ test('a wide code line in an agent reply stays inside the transcript row on a ph
   });
   expect(edges.textRight).toBeLessThanOrEqual(edges.rowRight + 0.5);
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`python code block tokens take claude.ai's ${theme} syntax colors`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await page.goto(CHIEF_CODE);
+    const code = page.getByTestId('home-c').getByTestId('md-code');
+    await expect(code).toHaveAttribute('data-lang', 'python');
+    await expect(code).toContainText('def load_records(path: Path) -> list[dict]:');
+    for (const [token, color] of Object.entries(CLAUDE_PYTHON_COLORS[theme])) {
+      const span = code.locator('span').getByText(token, { exact: true }).first();
+      await expect(span, token).toHaveCSS('color', color);
+    }
+  });
+}
