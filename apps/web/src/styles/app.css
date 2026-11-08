@@ -353,6 +353,11 @@
   font-weight: var(--voice-response-weight);
 }
 
+@utility agent-measure {
+  width: 100%;
+  max-width: 68ch;
+}
+
 @utility pe-chief-launcher {
   padding-inline-end: var(--chief-launcher-clearance);
 }
