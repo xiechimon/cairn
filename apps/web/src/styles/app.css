@@ -17,6 +17,8 @@
   --font-serif: var(--font-source-serif);
   --text-page: var(--type-page);
   --text-page--line-height: calc(32 / 24);
+  --text-brand: var(--type-brand);
+  --text-brand--line-height: 1;
   --text-greeting: var(--type-greeting);
   --text-greeting--line-height: calc(38 / 32);
   --font-weight-title: var(--title-weight);

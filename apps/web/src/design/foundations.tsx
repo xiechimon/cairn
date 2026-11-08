@@ -95,9 +95,9 @@ const TYPE = [
   },
   {
     name: 'Brand',
-    cls: 'voice-title text-page leading-none',
+    cls: 'voice-title text-brand',
     sample: 'Cairn',
-    token: '--type-page',
+    token: '--type-brand',
     weight: 500,
   },
   {
