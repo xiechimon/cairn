@@ -1,0 +1,57 @@
+name: Cairn
+options:
+  bundleIdPrefix: dev.cairn
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Cairn:
+    type: application
+    platform: iOS
+    sources:
+      - path: Cairn
+    info:
+      path: Cairn/Info.plist
+      properties:
+        CFBundleDisplayName: Cairn
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.cairn.ios
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+  CairnUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: CairnUITests
+    dependencies:
+      - target: Cairn
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.cairn.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Cairn
+schemes:
+  Cairn:
+    build:
+      targets:
+        Cairn: all
+        CairnUITests: [test]
+    test:
+      targets:
+        - CairnUITests
