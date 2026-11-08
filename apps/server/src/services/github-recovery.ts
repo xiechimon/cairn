@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   type GitIdentity,
-  githubNoreplyEmail,
+  localCommitIdentity,
   type PublishApi,
   publishVerifiedCommits,
 } from '@cairn/shared';
@@ -24,10 +24,11 @@ export async function prepareRecoveryBranch(input: {
   base: string;
   reverted: string;
   token: AutonomousToken;
-  identity: GitIdentity;
+  identity: GitIdentity | null;
   api: PublishApi;
 }): Promise<string> {
-  const { url, base, reverted, token, identity } = input;
+  const { url, base, reverted, token } = input;
+  const identity = input.identity ?? localCommitIdentity('Cairn');
   if (!isFullSha(base) || !isFullSha(reverted)) throw new Error('Recovery requires full SHAs');
   const dir = await mkdtemp(join(tmpdir(), 'cairn-recovery-'));
   const branch = `cairn-recovery/${reverted.slice(0, 8)}`;
@@ -62,15 +63,18 @@ export async function prepareRecoveryBranch(input: {
       '-m',
       `Revert autonomous merge ${reverted.slice(0, 8)}\n\nThis reverts commit ${reverted}.`,
     );
-    const published = await publishVerifiedCommits({
-      git: (args) => git(...args),
-      api: input.api,
-      tip: local,
-      exclude: [base],
-      coAuthor: null,
-      expectedAuthor: identity,
-      stagingRef: `refs/cairn/publish/recovery-${reverted.slice(0, 12)}-${randomBytes(6).toString('hex')}`,
-    });
+    const published =
+      input.identity === null
+        ? { tip: local, release: async () => {} }
+        : await publishVerifiedCommits({
+            git: (args) => git(...args),
+            api: input.api,
+            tip: local,
+            exclude: [base],
+            coAuthor: null,
+            expectedAuthor: input.identity,
+            stagingRef: `refs/cairn/publish/recovery-${reverted.slice(0, 12)}-${randomBytes(6).toString('hex')}`,
+          });
     try {
       await git('push', 'origin', `${published.tip}:refs/heads/${branch}`);
     } finally {
@@ -84,23 +88,12 @@ export async function prepareRecoveryBranch(input: {
 
 async function recoveryIdentity(
   deps: BuildDeps,
-  fetchImpl: FetchLike,
   token: AutonomousToken,
-): Promise<GitIdentity> {
-  if (isAppToken(token)) {
-    const identity = await softwareCommitIdentity(deps);
-    if (identity === null) throw new Error('Recovery App identity unavailable');
-    return identity;
-  }
-  const response = await githubTokenFetch(fetchImpl, token)(`${githubApiBaseUrl()}/user`, {
-    headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json' },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) throw new Error('Recovery token owner unavailable');
-  const user = (await response.json()) as { login?: unknown; id?: unknown };
-  if (typeof user.login !== 'string' || typeof user.id !== 'number')
-    throw new Error('Recovery token owner unreadable');
-  return { name: user.login, email: githubNoreplyEmail({ login: user.login, id: user.id }) };
+): Promise<GitIdentity | null> {
+  if (!isAppToken(token)) return null;
+  const identity = await softwareCommitIdentity(deps);
+  if (identity === null) throw new Error('Recovery App identity unavailable');
+  return identity;
 }
 
 function recoveryApi(fetchImpl: FetchLike, token: AutonomousToken, repo: string): PublishApi {
@@ -268,7 +261,7 @@ export async function recoverRedAutonomousMain(
         base: main,
         reverted,
         token,
-        identity: await recoveryIdentity(deps, fetchImpl, token),
+        identity: await recoveryIdentity(deps, token),
         api: recoveryApi(fetchImpl, token, repo),
       });
     else if (!ref.ok) continue;

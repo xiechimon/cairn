@@ -95,6 +95,43 @@ test('recovery publishes one exact revert commit on a named branch and preserves
   }
 });
 
+test('recovery with only a user token never publishes the revert as that user', async () => {
+  const dir = makeTestTempDir('server-recovery-user-');
+  try {
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim();
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Test');
+    git('config', 'user.email', 'test@example.com');
+    writeFileSync(join(dir, 'file'), 'good\n');
+    git('add', 'file');
+    git('commit', '-m', 'green');
+    writeFileSync(join(dir, 'file'), 'bad\n');
+    git('add', 'file');
+    git('commit', '-m', 'bad');
+    const bad = git('rev-parse', 'HEAD');
+    const calls: string[] = [];
+    const branch = await prepareRecoveryBranch({
+      url: dir,
+      base: bad,
+      reverted: bad,
+      token: 'token' as AutonomousToken,
+      identity: null,
+      api: async (method, path) => {
+        calls.push(`${method} ${path}`);
+        return null;
+      },
+    });
+    expect(calls).toEqual([]);
+    expect(git('show', '-s', '--format=%an <%ae>|%cn <%ce>', branch)).toBe(
+      'Cairn <cairn@localhost>|Cairn <cairn@localhost>',
+    );
+    expect(git('show', `${branch}:file`)).toBe('good');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
   'CI polling recovery uses the autonomous identity with App reason %s',
   async (reason) => {

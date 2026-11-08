@@ -144,7 +144,9 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
   try {
     process.exitCode = await main(process.argv.slice(2));
   } catch (error) {
-    console.error(`bot-git: ${error instanceof Error ? error.message : String(error)}`);
+    const cause = error instanceof Error && error.cause instanceof Error ? error.cause : null;
+    const detail = cause ? ` (${cause.code ?? cause.name}: ${cause.message})` : '';
+    console.error(`bot-git: ${error instanceof Error ? error.message : String(error)}${detail}`);
     process.exitCode = 1;
   }
 }
