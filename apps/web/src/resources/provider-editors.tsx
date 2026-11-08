@@ -254,7 +254,9 @@ export function TeamProviderEditor({
           />
         </SettingsRow>
         {!oauth && <KeyRow onReplace={(apiKey) => fire({ apiKey })} />}
-        {!oauth && actions.test !== undefined && <TestRow onTest={actions.test} />}
+        {!oauth && actions.test !== undefined && (
+          <TestRow key={JSON.stringify(record)} onTest={actions.test} />
+        )}
       </SettingsCard>
       <ProviderSection title={t('模型列表')} hint={t('这里的模型会出现在模型选择器里')}>
         <SettingsCard>

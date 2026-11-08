@@ -49,6 +49,41 @@ test('connection check shows only a status and scrubbed failure details', async 
   await expect(outcome).not.toContainText('small-model');
 });
 
+for (const pending of [false, true]) {
+  test(`editing connection settings invalidates a ${pending ? 'pending' : 'completed'} check`, async ({ page }) => {
+    let record = { ...RECORD };
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+      if (path === '/api/teams/t1/providers/prov-relay/test') return (pending ? held : Promise.resolve()).then(() => json({ status: 'ok', reason: null }));
+      if (path === '/api/teams/t1/providers/prov-relay' && route.request().method() === 'PATCH') {
+        record = { ...record, ...route.request().postDataJSON(), updatedAt: 2 };
+        return json(record);
+      }
+      if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [record], canTestConnection: true });
+      if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+      return undefined;
+    });
+    await page.goto('/app/resources/providers');
+    const editor = page.getByTestId('provider-editor');
+    await editor.getByRole('button', { name: '测试', exact: true }).click();
+    if (pending) await expect(editor.getByRole('button', { name: '测试中…', exact: true })).toBeDisabled();
+    else await expect(editor.getByTestId('provider-test-result')).toHaveText('连接正常');
+    const saved = page.waitForResponse((response) => response.request().method() === 'PATCH' && response.url().endsWith('/providers/prov-relay'));
+    await editor.getByLabel('地址', { exact: true }).fill('https://new-gateway.example.invalid/v1');
+    await editor.getByLabel('地址', { exact: true }).press('Tab');
+    await saved;
+    await expect(editor.getByRole('button', { name: '测试', exact: true })).toBeEnabled();
+    if (pending) {
+      const finished = page.waitForResponse((response) => response.url().endsWith('/providers/prov-relay/test'));
+      release?.();
+      await finished;
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    }
+    await expect(editor.getByTestId('provider-test-result')).toHaveCount(0);
+  });
+}
+
 test('pending checks disable repeat clicks and transport errors use safe copy', async ({ page }) => {
   let release: (() => void) | undefined;
   const held = new Promise<void>((resolve) => { release = resolve; });

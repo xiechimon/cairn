@@ -45,6 +45,8 @@ Cloud review raised one P2 authorization mismatch: the server refused non-owners
 
 CI also caught an omitted route-vocabulary registration in wire.test.ts; register the new, user-requested POST as an inferred route without weakening the vocabulary check. Local broader gallery failures did not reproduce in the first CI e2e run. The repository autonomy brake currently blocks pr-evidence before its body checks; do not bypass or clear it.
 
+The second cloud review found two P2 instances in separate classes: paired-device credentials inherited the database owner's capability, and a completed or in-flight check survived saved configuration edits. A real paired-device enrollment test reproduced true capability on a credential whose POST is forbidden; a false capability now also requires no pairedDeviceId. Browser negative controls reproduced both stale completed status and in-flight status; the check row is now keyed by the serialized saved provider record, including its key-rotation update timestamp. A configuration update remounts the row, invalidating both old state and late results. Final focused run: 217 tests across six related files, six browser cases, lint, typecheck, spec parsing and prepush all passed.
+
 ## UI comparison
 
 | State | Reference | Ours | Verdict |

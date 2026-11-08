@@ -24,6 +24,7 @@ import type { AppContext } from './context.js';
 import { machine, provider, routingRule, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
   createApiKeyBodySchema,
   jsonBody,
@@ -387,7 +388,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     return c.json({
       ...getProvidersEnvelope(keysvc, teamId),
-      canTestConnection: isOwner(ctx.db, ctx.user.id),
+      canTestConnection: pairedDeviceIdOf(c) === null && isOwner(ctx.db, ctx.user.id),
     });
   });
 
