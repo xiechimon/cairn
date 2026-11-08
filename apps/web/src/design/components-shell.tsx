@@ -10,7 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
-import { SpiralMark } from '../chief/chief-fab-icon.js';
+import { BrandGlyph } from '../components/brand-glyph.js';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
@@ -189,7 +189,7 @@ export function ProjectsSection() {
               {
                 id: 'coordinator',
                 label: 'Coordinator',
-                icon: <SpiralMark busy={false} className="size-5" />,
+                icon: <BrandGlyph className="size-5" />,
               },
               { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-4.5" /> },
             ]}
