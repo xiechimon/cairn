@@ -31,12 +31,16 @@ function questionText(question: AskUserQuestionContent): string {
   );
 }
 
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, Math.max(0, max - 1))}…` : text;
+}
+
 function snippetOf(question: AskUserQuestionContent, defaultAnswer: string | null): string {
-  const text =
+  const tail =
     defaultAnswer === null
-      ? `${questionText(question)} (no default: the Coordinator did not answer)`
-      : `${questionText(question)} Default: ${tidyText(redactSecrets(defaultAnswer).value as string)}`;
-  return text.length > SNIPPET_MAX ? `${text.slice(0, SNIPPET_MAX - 1)}…` : text;
+      ? ' (no default: the Coordinator did not answer)'
+      : ` Default: ${clip(tidyText(redactSecrets(defaultAnswer).value as string), SNIPPET_MAX / 2)}`;
+  return `${clip(questionText(question), SNIPPET_MAX - tail.length)}${tail}`;
 }
 
 function createdAtOf(deps: BuildDeps, buildId: string, requestId: string): number {

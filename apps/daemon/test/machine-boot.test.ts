@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { ANSWERS_ACK_VERSION } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
@@ -55,12 +56,14 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
       skills: ['verify-cairn'],
       executor: 'host',
       codexLogin: { state: 'absent' },
+      answersAck: ANSWERS_ACK_VERSION,
     });
     expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
       mcpServers: ['figma'],
       skills: ['verify-cairn'],
       executor: 'host',
       codexLogin: { state: 'absent' },
+      answersAck: ANSWERS_ACK_VERSION,
     });
     await handle.stop();
     await handle.done;

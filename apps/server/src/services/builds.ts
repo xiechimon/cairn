@@ -30,6 +30,7 @@ import {
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
+  CONTINUE_PROMPTS,
   checkPlanContract,
   conversationBranch,
   DEFAULT_SHIP_ROUTE,
@@ -59,6 +60,7 @@ import {
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
+  withCoAuthor,
   withRetryLessons,
 } from '@cairn/shared';
 import {
@@ -111,6 +113,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { assertAnswerReceiver } from './answers-ack.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
@@ -137,6 +140,7 @@ import { githubReadToken } from './github-autonomous-token.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { teamUserToken } from './github-connection.js';
 import { githubText } from './github-text.js';
+import { humanWorkIdentity } from './github-work-attribution.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
@@ -170,6 +174,7 @@ import {
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
+import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import {
   abandonsQuestions,
   childrenOfTodo,
@@ -182,7 +187,9 @@ import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 import {
   blockingWorkerQuestions,
   cancelPendingWorkerQuestions,
+  deliveredAnswerText,
   pendingWorkerQuestions,
+  undeliveredAnswers,
   writeWorkerQuestion,
 } from './worker-question-store.js';
 import {
@@ -400,6 +407,16 @@ export async function sendBuildSteer(
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
   }
+  if (
+    running &&
+    (continuationOptions.answer !== undefined ||
+      ((continuationOptions.human ??
+        deps.steerOptions?.human ??
+        body.queuedMessageId !== undefined) &&
+        pendingWorkerQuestions(db, conversationId).length > 0))
+  ) {
+    assertAnswerReceiver(db, conversationId);
+  }
   let sent: BuildSteerResult;
   try {
     sent = db.transaction((): BuildSteerResult => {
@@ -412,7 +429,7 @@ export async function sendBuildSteer(
         }
         if (
           wake.createdBy.startsWith('worker:') &&
-          ['confirm', 'review'].includes(todoRow?.phase ?? '')
+          ['confirm', 'needs_input', 'review'].includes(todoRow?.phase ?? '')
         ) {
           throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
         }
@@ -435,8 +452,11 @@ export async function sendBuildSteer(
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
       if (continuationOptions.answer !== undefined)
-        settleQuestionAnswer(deps, conversationId, continuationOptions.answer);
-      else if (human) settleWorkerReply(deps, conversationId, body.content);
+        settleQuestionAnswer(deps, conversationId, continuationOptions.answer, null);
+      const answeredNow =
+        continuationOptions.answer !== undefined ||
+        (human && settleWorkerReply(deps, conversationId, body.content, null));
+      const content = answeredNow ? '' : body.content;
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
@@ -473,10 +493,10 @@ export async function sendBuildSteer(
       if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
       if (running) {
         db.insert(steerPending)
-          .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
+          .values({ conversationId, stepId: running.id, content, createdAt: now })
           .onConflictDoUpdate({
             target: steerPending.conversationId,
-            set: { stepId: running.id, content: body.content, createdAt: now },
+            set: { stepId: running.id, content, createdAt: now },
           })
           .run();
       }
@@ -519,7 +539,7 @@ export async function sendBuildSteer(
                 ? 'session'
                 : 'build',
             todoRow.teamId,
-            body.content,
+            content,
             false,
             human && !continuationOptions.schedule,
           );
@@ -1002,6 +1022,20 @@ export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()):
   return released;
 }
 
+function withUndeliveredAnswers(
+  db: Db,
+  buildId: string,
+  kind: StepRecord['kind'],
+  prompt: string | undefined,
+): string | null {
+  const answers =
+    isBuildStepKind(kind) || kind === 'plan'
+      ? undeliveredAnswers(db, buildId).map(deliveredAnswerText)
+      : [];
+  if (answers.length === 0) return prompt ?? null;
+  return [...answers, prompt ?? CONTINUE_PROMPTS[kind]].filter((part) => part !== '').join('\n\n');
+}
+
 export function enqueueStep(
   deps: BuildDeps,
   buildId: string,
@@ -1024,7 +1058,7 @@ export function enqueueStep(
       kind,
       machineId: null,
       status: 'pending',
-      prompt: prompt ?? null,
+      prompt: withUndeliveredAnswers(deps.db, buildId, kind, prompt),
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
@@ -2328,18 +2362,6 @@ async function mergeThroughGithub(
       });
       return { delegated: true };
     }
-    if (
-      repoRef.owner.toLowerCase() === 'xiechimon' &&
-      repoRef.repo.toLowerCase() === 'cairn' &&
-      (pull.openerType !== 'User' ||
-        !pull.openerLogin?.trim() ||
-        pull.openerLogin.toLowerCase().endsWith('[bot]'))
-    ) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} cannot be squash merged by cairn: xiechimon/cairn requires a verified human opener. Return bot-opened PRs to the dispatcher for identity preparation and rebase via ~/.cairn/tools/merge-pr.sh; restore missing opener identity before retrying.`,
-      );
-    }
     const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
     if (checkpoint === null || !isFullSha(checkpoint)) {
       throw new HttpError(
@@ -2368,7 +2390,12 @@ async function mergeThroughGithub(
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
       commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
-      commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
+      commitMessage: withCoAuthor(
+        closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
+        readTeamAttributionSettings(deps.db, before.todoRow.teamId).coAuthorTrailer
+          ? humanWorkIdentity(deps.db, before.todoRow, row.triggerSource)
+          : null,
+      ),
     });
     if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')
       settleAutonomousMerge(deps.db, row.id, result.kind === 'merged' ? 'merged' : 'refused');

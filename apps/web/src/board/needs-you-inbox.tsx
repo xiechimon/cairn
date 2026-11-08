@@ -128,8 +128,9 @@ function ThreadEntry({
   const pr = usePrs(teamId, undefined, live).data?.find((row) => row.threadId === todo.id);
   const [picking, setPicking] = useState<string | null>(null);
   const [pickFailed, setPickFailed] = useState(false);
-  const options = todo.ask?.options ?? [];
-  const suggested = todo.ask?.defaultAnswer ?? null;
+  const updating = todo.waitingOn?.on === 'machine-update';
+  const options = updating ? [] : (todo.ask?.options ?? []);
+  const suggested = updating ? null : (todo.ask?.defaultAnswer ?? null);
   const answer = async (text: string) => {
     await send(text);
     answeredThreads.mark(todo);
@@ -147,7 +148,7 @@ function ThreadEntry({
       testId="needs-you-inbox-row"
       tone={threadTone(todo)}
       title={todo.title}
-      ask={todo.ask?.text ?? t(threadCopy(todo).reason)}
+      ask={updating ? t(threadCopy(todo).reason) : (todo.ask?.text ?? t(threadCopy(todo).reason))}
       open={open}
       onToggle={onToggle}
       trailing={
@@ -200,7 +201,7 @@ function ThreadEntry({
           {t('Coordinator 建议：{answer}', { answer: suggested })}
         </p>
       )}
-      {delivery !== null ? (
+      {delivery !== null && !updating ? (
         <ThreadReply seq={todo.seqNum} delivery={delivery} onSend={answer} autoFocus />
       ) : (
         <Button variant="outline" size="sm" className="self-start" onClick={onOpenThread}>

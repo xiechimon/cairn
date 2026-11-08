@@ -110,21 +110,28 @@ export async function askWorkerQuestion(
   }
 }
 
-export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string): void {
+export function settleWorkerReply(
+  deps: TodoDeps,
+  buildId: string,
+  text: string,
+  deliveredAt: number | null,
+): boolean {
   const todoRow = todoOfBuild(deps, buildId);
   const pending = pendingWorkerQuestions(deps.db, buildId);
-  if (pending.length === 0) return;
+  if (pending.length === 0) return false;
   answerWorkerQuestionsById(
     deps,
     buildId,
     pending.map((question) => question.requestId),
     text,
+    deliveredAt,
   );
   recordDecisions(
     deps,
     todoRow.id,
     pending.map((question) => ({ question, answer: text, by: 'person' as const })),
   );
+  return true;
 }
 
 export interface QuestionAnswer {
@@ -134,12 +141,17 @@ export interface QuestionAnswer {
   by: TaskDecision['by'];
 }
 
-export function settleQuestionAnswer(deps: TodoDeps, buildId: string, input: QuestionAnswer): void {
+export function settleQuestionAnswer(
+  deps: TodoDeps,
+  buildId: string,
+  input: QuestionAnswer,
+  deliveredAt: number | null,
+): void {
   const current = readWorkerQuestion(deps.db, buildId, input.question.requestId);
   if (current?.status !== 'pending') {
     throw new HttpError(409, `requestId ${input.question.requestId} is no longer pending`);
   }
-  answerWorkerQuestionsById(deps, buildId, [input.question.requestId], input.answer);
+  answerWorkerQuestionsById(deps, buildId, [input.question.requestId], input.answer, deliveredAt);
   recordDecisions(deps, input.todoId, [
     { question: input.question, answer: input.answer, by: input.by },
   ]);

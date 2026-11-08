@@ -21,25 +21,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Test author policy on trusted main code
-        if: github.event_name == 'push'
-        run: node --test scripts/commit-author.test.mjs scripts/commit-author-policy.test.mjs scripts/commit-author-recovery.test.mjs
-      - name: Commit authors never use the bot account
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Every commit is the App or ian, on a branch of this repository
         env:
           BEFORE_SHA: ${{ github.event.before }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ -n "$BASE_SHA" ]; then
-            range="$BASE_SHA..HEAD"
-          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
-            range="$BEFORE_SHA..HEAD"
-          else
-            range="HEAD^!"
-          fi
-          offending=$(git log --format='%H %an <%ae>' "$range" | grep -F 'cairnwright[bot]' || true)
-          git log --format='author: %an <%ae>' "$range"
-          if [ -n "$offending" ]; then
-            echo "$offending"
-            echo "::error::every commit in $range must be authored without cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh). This check reads commit authors, so it cannot see the author a squash merge will write; read the author of the main commit after merging."
-            exit 1
-          fi
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: node scripts/commit-identity.mjs ci

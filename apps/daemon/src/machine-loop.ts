@@ -9,6 +9,7 @@ import type {
   MachineCapabilities,
 } from '@cairn/shared';
 import {
+  ANSWERS_ACK_VERSION,
   CLAIM_BACKOFF_CAP_MS,
   CLAIM_POLL_INTERVAL_MS,
   type ClaudeLogin,
@@ -235,6 +236,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     executor: orbProvider.kind,
     ...(orbComputer ? { computer: true as const } : {}),
     ...(hostComputer ? { ownComputer: true as const } : {}),
+    answersAck: ANSWERS_ACK_VERSION,
   });
 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
@@ -443,6 +445,42 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const stepImageSupport = new Map<string, boolean | null>();
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
+  const stepConversations = new Map<string, string>();
+  const unackedClaimAnswers = new Map<string, readonly string[]>();
+  const appliedAnswers = new Map<string, Set<string>>();
+  const appliedAnswersOf = (stepId: string): Set<string> => {
+    const key = stepConversations.get(stepId) ?? stepId;
+    const existing = appliedAnswers.get(key);
+    if (existing !== undefined) return existing;
+    const created = new Set<string>();
+    appliedAnswers.set(key, created);
+    return created;
+  };
+  const trackClaim = (claimed: ClaimedStep): void => {
+    stepConversations.set(claimed.step.id, claimed.conversationId);
+    if (claimed.answerIds !== undefined && claimed.answerIds.length > 0) {
+      const applied = appliedAnswersOf(claimed.step.id);
+      for (const id of claimed.answerIds) applied.add(id);
+      unackedClaimAnswers.set(claimed.step.id, claimed.answerIds);
+    }
+  };
+  const forgetClaim = (stepId: string): void => {
+    const conversationId = stepConversations.get(stepId);
+    stepConversations.delete(stepId);
+    unackedClaimAnswers.delete(stepId);
+    if (conversationId !== undefined && ![...stepConversations.values()].includes(conversationId)) {
+      appliedAnswers.delete(conversationId);
+    }
+  };
+  const sessionLive = async (stepId: string): Promise<void> => {
+    const carried = unackedClaimAnswers.get(stepId);
+    unackedClaimAnswers.delete(stepId);
+    if (carried !== undefined) {
+      await client.steerAck?.(stepId, carried).catch((err: unknown) => {
+        logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
+  };
   const stops = new StepStops();
   const inFlightChief = new Set<string>();
   const workerSlots = new Map<string, number>();
@@ -588,7 +626,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             ...(stillPriorSession ? { priorMachineId } : {}),
           },
         };
-        await runOrbStep(orbs, stepDeps(), claimed, {
+        await runTrackedStep(claimed, {
           resume: { sessionId: entry.sessionId, prompt: entry.prompt },
           running: 1,
           ...(entry.stopRequest != null ? { stopRequest: entry.stopRequest } : {}),
@@ -605,7 +643,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
 
   const streamCtrl = new AbortController();
-  const deliverSteer = async (stepId: string): Promise<void> => {
+  const steerChains = new Map<string, Promise<void>>();
+  const deliverSteer = (stepId: string): Promise<void> => {
+    const next = (steerChains.get(stepId) ?? Promise.resolve()).then(() => deliverSteerNow(stepId));
+    steerChains.set(stepId, next);
+    void next.finally(() => {
+      if (steerChains.get(stepId) === next) steerChains.delete(stepId);
+    });
+    return next;
+  };
+  const deliverSteerNow = async (stepId: string): Promise<void> => {
     if (stepSteeringSupport.get(stepId) === false) {
       logger.step(`steer left queued (backend does not support steering) step=${stepId}`);
       return;
@@ -616,8 +663,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
-      const content = await client.steer(stepId);
-      if (content === null) return;
+      const fetched = await client.steer(stepId);
+      const answers = fetched?.answers ?? [];
+      const applied = appliedAnswersOf(stepId);
+      const fresh = answers.filter((answer) => !applied.has(answer.requestId));
+      const content = [
+        ...fresh.map((answer) => `Answer to your question ${answer.requestId}:\n${answer.text}`),
+        ...(fetched?.content ? [fetched.content] : []),
+      ].join('\n\n');
+      const answerIds = answers.map((answer) => answer.requestId);
+      if (content === '') {
+        if (answerIds.length > 0) await client.steerAck?.(stepId, answerIds);
+        return;
+      }
       let deliveryText = content;
       let images: DeliveredImage[] | undefined;
       try {
@@ -657,7 +715,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         return;
       }
       await live.steer(deliveryText, images);
-      await client.steerAck?.(stepId);
+      for (const id of answerIds) applied.add(id);
+      await client.steerAck?.(stepId, answerIds);
       logger.step(`steer delivered step=${stepId}`);
     } catch (err) {
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -732,6 +791,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const claimCtrl = new AbortController();
   const claimTimeoutMs = opts.claimTimeoutMs ?? CLAIM_POLL_INTERVAL_MS + 15_000;
 
+  function runTrackedStep(
+    claimed: ClaimedStep,
+    options: Parameters<typeof runOrbStep>[3],
+  ): Promise<void> {
+    trackClaim(claimed);
+    return runOrbStep(orbs, stepDeps(), claimed, options).finally(() =>
+      forgetClaim(claimed.step.id),
+    );
+  }
+
   function stepDeps() {
     return {
       client,
@@ -745,6 +814,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
       sessionHandles,
+      onSessionLive: (stepId: string) => {
+        void sessionLive(stepId);
+      },
       stepImageSupport,
       stepSteeringSupport,
       stepTranscripts,
@@ -775,7 +847,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       try {
         step = await client.claim(
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
-          { maxWorkers: localCap },
+          { maxWorkers: localCap, answersAck: ANSWERS_ACK_VERSION },
         );
         backoff = backoffBase;
       } catch (err) {
@@ -796,7 +868,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       }
       if (step.step.kind === 'chief') inFlightChief.add(stepId);
       const stepEnv = step.step.kind === 'chief' ? undefined : workerEnv(stepId);
-      const launched = runOrbStep(orbs, stepDeps(), step, {
+      const launched = runTrackedStep(step, {
         running: inFlight.size + 1,
         ...(stepEnv !== undefined ? { env: stepEnv } : {}),
       })

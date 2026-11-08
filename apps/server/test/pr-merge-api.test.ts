@@ -234,15 +234,15 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     { login: '', type: 'User' },
     { login: 123, type: 'User' },
     { login: 'octo', type: 'Unknown' },
-  ])('#2127 refuses unsafe or unknown Cairn PR opener %j without mutations', async (opener) => {
-    const w = makeWorld({ githubRepo: 'Xiechimon/CAIRN', pull: { opener }, pendingVerify: true });
-    const beforeSteps = w.steps();
-    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: expect.stringContaining('merge-pr.sh') });
-    expect(w.fake.puts()).toEqual([]);
-    expect(w.steps()).toEqual(beforeSteps);
-    expectUntouched(w);
+  ])('#2289 squash-merges a Cairn PR whatever its opener %j', async (opener) => {
+    const w = makeWorld({ githubRepo: 'Xiechimon/CAIRN', pull: { opener } });
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(JSON.parse(w.fake.puts()[0]?.body ?? 'null')).toMatchObject({
+      sha: CP,
+      merge_method: 'squash',
+    });
+    expect(w.phase()).toBe('done');
   });
 
   test.each([

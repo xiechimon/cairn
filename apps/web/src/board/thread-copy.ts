@@ -13,6 +13,7 @@ const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
 };
 
 export function threadStatus(todo: TodoRecord): ThreadStatus {
+  if (todo.waitingOn?.on === 'machine-update') return 'needs-you';
   switch (todo.phase) {
     case 'queued':
     case 'planning':
@@ -55,6 +56,12 @@ export interface ThreadCopy {
 }
 
 export function threadCopy(todo: TodoRecord): ThreadCopy {
+  if (todo.waitingOn?.on === 'machine-update') {
+    return {
+      state: STATUS_WORDS.needsYou,
+      reason: '运行它的机器需要更新 cairn，更新后才能收到回答。',
+    };
+  }
   if (todo.quotaWait != null) {
     return {
       state: STATUS_WORDS.running,

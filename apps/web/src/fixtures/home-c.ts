@@ -203,6 +203,11 @@ export const HOME_INBOX_THREADS: TodoRecord[] = [
     defaultAnswer: null,
   }),
   {
+    ...homeTodo('inbox-update', 2317, '中继探针在 omarchy 上重跑', 'building', PROJECT_ID),
+    waitingOn: { on: 'machine-update', retryAt: null },
+    phaseAt: r7(20, 30) - 2 * 3_600_000,
+  },
+  {
     ...homeTodo('inbox-confirm', 2316, '把输入框拆成两个文件', 'confirm', PROJECT_ID),
     phaseAt: r7(20, 30) - 3 * 3_600_000,
     ask: {

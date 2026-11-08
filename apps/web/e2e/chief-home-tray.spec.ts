@@ -179,6 +179,27 @@ test('a one-click answer that fails says so on the row, keeps the options, and a
   expect(calls).toBe(2);
 });
 
+test('a thread whose machine must update cairn waits on you in the inbox and in the one count', async ({
+  page,
+}) => {
+  const stuck = {
+    ...todoIn(9, 'building', 'Rerun the relay probe on omarchy'),
+    waitingOn: { on: 'machine-update', retryAt: null },
+  };
+  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: [stuck, FIVE[0]] });
+  await page.goto('/app');
+  const chip = page.getByTestId('home-c').getByTestId('needs-you-chip');
+  await expect(chip.getByTestId('needs-you-count')).toHaveText('2');
+  await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveText('2');
+  await chip.click();
+  const row = page.getByTestId('needs-you-inbox-row').filter({ hasText: 'Rerun the relay probe on omarchy' });
+  await expect(row.getByTestId('needs-you-inbox-ask')).toHaveText(
+    'The machine running it needs a cairn update before it can receive the answer.',
+  );
+  await row.getByTestId('needs-you-inbox-toggle').click();
+  await expect(row.getByRole('textbox')).toHaveCount(0);
+});
+
 test('no needs-you thread and no question means no chip and a plain tab title', async ({ page }) => {
   await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: [TASK] });
   await page.goto('/app');

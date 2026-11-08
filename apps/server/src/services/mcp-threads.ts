@@ -380,11 +380,15 @@ export async function executeThreadMcpTool(
           input.projectId !== undefined
         )
           throw new HttpError(400, 'Answer a Coordinator question with requestId and answers only');
-        return answerQuestion(deps, {
-          threadId: input.threadId,
-          requestId: input.requestId,
-          answers: input.answers,
-        });
+        return answerQuestion(
+          deps,
+          {
+            threadId: input.threadId,
+            requestId: input.requestId,
+            answers: input.answers,
+          },
+          'agent',
+        );
       }
       if (input.content === undefined) throw new HttpError(400, 'Thread reply requires content');
       if (input.projectId !== undefined) requireProject(db, teamId, input.projectId);

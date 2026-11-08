@@ -4,7 +4,7 @@ import {
   type AskUserQuestionContent,
   askUserQuestionContentSchema,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { message } from '../db/schema.js';
 import type { ConversationStreamHub } from './events.js';
@@ -113,6 +113,7 @@ export function answerWorkerQuestionsById(
   buildId: string,
   ids: string[],
   text: string,
+  deliveredAt: number | null,
 ): void {
   for (const id of ids) {
     const row = deps.db
@@ -131,7 +132,12 @@ export function answerWorkerQuestionsById(
       deps,
       buildId,
       id,
-      { ...rest, status: 'answered', answers },
+      {
+        ...rest,
+        status: 'answered',
+        answers,
+        ...(deliveredAt === null ? {} : { deliveredAt }),
+      },
       row.createdAt,
     );
   }
@@ -159,4 +165,74 @@ export function cancelPendingWorkerQuestions(
       row.createdAt,
     );
   }
+}
+
+export function undeliveredAnswers(db: Db, buildId: string): AskUserQuestionContent[] {
+  return db
+    .select()
+    .from(message)
+    .where(eq(message.conversationId, buildId))
+    .orderBy(asc(message.createdAt))
+    .all()
+    .flatMap((row) => {
+      const content = contentOf(row.content);
+      return content !== null &&
+        content.status === 'answered' &&
+        content.answers !== null &&
+        content.deliveredAt === undefined
+        ? [content]
+        : [];
+    });
+}
+
+export function markAnswersDelivered(
+  deps: StoreDeps,
+  buildId: string,
+  answered: readonly AskUserQuestionContent[],
+  at: number,
+): void {
+  for (const content of answered) {
+    const row = deps.db
+      .select({ createdAt: message.createdAt })
+      .from(message)
+      .where(and(eq(message.id, content.requestId), eq(message.conversationId, buildId)))
+      .get();
+    if (row === undefined) continue;
+    updateWorkerQuestion(
+      deps,
+      buildId,
+      content.requestId,
+      { ...content, deliveredAt: at },
+      row.createdAt,
+    );
+  }
+}
+
+export function ackAnswers(
+  deps: StoreDeps,
+  buildId: string,
+  requestIds: readonly string[],
+  at: number,
+): void {
+  const wanted = new Set(requestIds);
+  markAnswersDelivered(
+    deps,
+    buildId,
+    undeliveredAnswers(deps.db, buildId).filter((content) => wanted.has(content.requestId)),
+    at,
+  );
+}
+
+export function answerTextOf(content: AskUserQuestionContent): string {
+  return [...new Set((content.answers ?? []).map((a) => a.text))].join('\n');
+}
+
+export function carriedAnswerIds(db: Db, buildId: string, instruction: string): string[] {
+  return undeliveredAnswers(db, buildId)
+    .filter((content) => instruction.includes(deliveredAnswerText(content)))
+    .map((content) => content.requestId);
+}
+
+export function deliveredAnswerText(content: AskUserQuestionContent): string {
+  return `Answer to your question ${content.requestId}:\n${answerTextOf(content)}`;
 }

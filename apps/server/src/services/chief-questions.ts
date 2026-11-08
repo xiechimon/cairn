@@ -217,6 +217,7 @@ export async function holdForQuestion(
 export function answerQuestion(
   deps: ChiefQuestionDeps,
   input: { threadId: string; requestId: string; answers: AskUserAnswer[] },
+  by: 'owner' | 'agent',
 ): AskUserQuestionContent {
   const content = readQuestion(deps.db, input.threadId, input.requestId);
   if (content === null) throw new HttpError(404, `question ${input.requestId}`);
@@ -259,7 +260,13 @@ export function answerQuestion(
     }
     return { header: question.header, choices: answer.choices };
   });
-  const next: AskUserQuestionContent = { ...content, status: 'answered', answers: validated };
+  const next: AskUserQuestionContent = {
+    ...content,
+    status: 'answered',
+    answers: validated,
+    answeredAt: nowMs(),
+    answeredBy: by,
+  };
   writeQuestion(deps.db, input.threadId, input.requestId, next, nowMs());
   publishRow(deps, input.threadId, input.requestId);
   return next;

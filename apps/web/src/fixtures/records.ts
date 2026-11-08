@@ -68,7 +68,10 @@ export interface TodoRecord {
   sourceTodo: string | null;
   v: number;
   chiefCreated?: boolean;
-  waitingOn?: { on: 'machine' | 'quota' | 'coordinator' | 'owner'; retryAt: number | null };
+  waitingOn?: {
+    on: 'machine' | 'machine-update' | 'quota' | 'coordinator' | 'owner';
+    retryAt: number | null;
+  };
   ask?: TodoAsk;
   output?: 'code' | 'info';
   quotaWait?: QuotaWait | null;
@@ -344,6 +347,12 @@ export type WorkStep =
       seconds: number | null;
     };
 
+export interface QuestionEscalationView {
+  class: string;
+  defaultAnswer: string | null;
+  applyAt: number | null;
+}
+
 export type TranscriptItem =
   | { kind: 'run'; at?: string; machine?: string; cancelled?: boolean }
   | {
@@ -400,6 +409,7 @@ export type TranscriptItem =
         multiSelect?: boolean;
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
+      escalation?: QuestionEscalationView;
     }
   | {
       kind: 'review';

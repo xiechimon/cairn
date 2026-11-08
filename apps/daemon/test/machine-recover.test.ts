@@ -242,4 +242,54 @@ describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
     await handle.stop();
     await handle.done;
   });
+
+  test('a recovered claim acks the answers its prompt carried once the session is live', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [
+      { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
+    ];
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'fresh-answers',
+          events: (async function* () {
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer() {},
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new SessionNotResumableError('pi-sess-1');
+      },
+    };
+    const claimed: ClaimedStep = {
+      ...CLAIMED,
+      instruction: 'Answer to your question ask-a:\nRepo rule wins.',
+      answerIds: ['ask-a'],
+    };
+    const { handle } = await boot({
+      api,
+      backend,
+      seedJournal: (paths) => {
+        const journal = new StepJournal(paths.outboxDir);
+        journal.claim({
+          stepId: 's1',
+          buildId: 'conv-1',
+          kind: 'plan',
+          conversationId: 'conv-1',
+          sessionAction: 'new',
+          sessionId: null,
+          prompt: 'Answer to your question ask-a:\nRepo rule wins.',
+          claimed,
+        });
+      },
+    });
+    await waitFor(() => api.answerAcks.length === 1);
+    expect(api.answerAcks).toEqual([['ask-a']]);
+    await handle.stop();
+    await handle.done;
+  });
 });

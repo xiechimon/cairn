@@ -16,6 +16,7 @@ import {
   type BoundGitCredentials,
   BRIEF_MARKER_BEGIN,
   BRIEF_RECONCILE_FILENAMES,
+  type CommitIdentity,
   conversationBranch,
   type GitCredentialSource,
   LOCAL_ERROR_REASON_COPY,
@@ -23,6 +24,7 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
+  type PushPublication,
   READONLY_EXPORT_MARKER,
   ReadOnlyWorkspaceError,
   RemoteBranchDivergedError,
@@ -38,6 +40,7 @@ import {
   withGitNetRetries,
 } from './git.js';
 import type { DaemonLogger } from './log.js';
+import { attributeStepCommits } from './step-attribution.js';
 import {
   runWorkspaceHook,
   WorkspaceHookError,
@@ -412,7 +415,7 @@ export class WorkspaceManager implements WorktreeOps {
   async commitAll(
     cwd: string,
     message: string,
-    identity: { name: string; email: string },
+    identity: CommitIdentity,
   ): Promise<{ committed: boolean; head: string | null; setupDrift: string[] }> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
     const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
@@ -450,8 +453,14 @@ export class WorkspaceManager implements WorktreeOps {
     ]);
   }
 
-  async push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void> {
+  async push(
+    cwd: string,
+    branch: string,
+    credentials: BoundGitCredentials | null,
+    publication: PushPublication,
+  ): Promise<void> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
+    await attributeStepCommits({ ...publication, dir: cwd, branch, credential: credentials });
     await withGitNetRetries(() =>
       gitPrim.push(cwd, branch, credentials, (local, remote) =>
         this.logger.workspace(

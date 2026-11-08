@@ -393,3 +393,163 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     await handle.done;
   });
 });
+
+describe('answers reach the agent once and are acked only after a successful steer (task stall S1)', () => {
+  function flakyBackend(steered: string[], failFirst: boolean) {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let failures = failFirst ? 1 : 0;
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'pi-sess-answers',
+          events: (async function* () {
+            yield { type: 'text_delta', text: 'waiting' } as StepEvent;
+            await gate;
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer(text: string) {
+            if (failures > 0) {
+              failures -= 1;
+              throw new Error('session refused the steer');
+            }
+            steered.push(text);
+          },
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+    };
+    return { backend, release };
+  }
+
+  test('a failed live.steer leaves the answer unacked, and the next pickup delivers and acks it', async () => {
+    const api = new FakeMachineApi();
+    api.steerAnswers = [{ requestId: 'ask-a', text: 'Repo rule wins.' }];
+    const steered: string[] = [];
+    const { backend, release } = flakyBackend(steered, true);
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => lines.some((l) => l.includes('steer delivery failed')));
+    expect(api.answerAcks).toEqual([]);
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.answerAcks.length === 1);
+    expect(steered).toEqual(['Answer to your question ask-a:\nRepo rule wins.']);
+    expect(api.answerAcks).toEqual([['ask-a']]);
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('an answer the session already applied is acked again but never steered twice', async () => {
+    const api = new FakeMachineApi();
+    api.steerAnswers = [{ requestId: 'ask-a', text: 'Repo rule wins.' }];
+    const steered: string[] = [];
+    const { backend, release } = flakyBackend(steered, false);
+    const ackOnce = api.steerAck.bind(api);
+    let dropAck = true;
+    api.steerAck = async (stepId: string, answerIds: readonly string[] = []) => {
+      if (dropAck && answerIds.length > 0) {
+        dropAck = false;
+        throw new Error('ack lost');
+      }
+      await ackOnce(stepId, answerIds);
+    };
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => steered.length === 1);
+    await waitFor(() => lines.some((l) => l.includes('steer delivery failed')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.answerAcks.length === 1);
+    expect(steered).toHaveLength(1);
+    expect(api.answerAcks).toEqual([['ask-a']]);
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('two steer events that arrive together deliver an unacked answer once', async () => {
+    const api = new FakeMachineApi();
+    api.steerAnswers = [{ requestId: 'ask-a', text: 'Repo rule wins.' }];
+    const steered: string[] = [];
+    let releaseSteer: () => void = () => {};
+    const steerGate = new Promise<void>((r) => {
+      releaseSteer = r;
+    });
+    let releaseRun: () => void = () => {};
+    const runGate = new Promise<void>((r) => {
+      releaseRun = r;
+    });
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'pi-sess-concurrent',
+          events: (async function* () {
+            yield { type: 'text_delta', text: 'waiting' } as StepEvent;
+            await runGate;
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer(text: string) {
+            await steerGate;
+            steered.push(text);
+          },
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+    };
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.calls.filter((c) => c === 'steer:s1').length >= 1);
+    releaseSteer();
+    await waitFor(() => api.calls.filter((c) => c === 'steer:s1').length === 2);
+    await waitFor(() => api.answerAcks.length === 1);
+    expect(steered).toEqual(['Answer to your question ask-a:\nRepo rule wins.']);
+    releaseRun();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('answers the resumed prompt carried are acked once the session is live', async () => {
+    const api = new FakeMachineApi();
+    const steered: string[] = [];
+    const { backend, release } = flakyBackend(steered, false);
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.({
+      ...CLAIMED,
+      instruction: 'Answer to your question ask-a:\nRepo rule wins.',
+      answerIds: ['ask-a'],
+    });
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    await waitFor(() => api.answerAcks.length === 1);
+    expect(api.answerAcks).toEqual([['ask-a']]);
+    api.steerAnswers = [{ requestId: 'ask-a', text: 'Repo rule wins.' }];
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.answerAcks.length === 2);
+    expect(steered).toEqual([]);
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+});

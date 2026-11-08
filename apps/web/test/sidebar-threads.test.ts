@@ -116,3 +116,10 @@ test('threads of an archived project show only when that project is selected', (
   expect(nums(visibleTodos(rows, archived, 'p1'))).toEqual([1]);
   expect(nums(visibleTodos(rows, archived, 'p2'))).toEqual([1, 2]);
 });
+
+test('a thread whose machine must update cairn sits in needs-you, not in progress', () => {
+  const stuck = { ...inProject(3, 'building'), waitingOn: { on: 'machine-update' as const, retryAt: null } };
+  const groups = groupThreads([stuck], null);
+  expect(nums(groups.needsYou)).toEqual([3]);
+  expect(groups.running).toHaveLength(0);
+});

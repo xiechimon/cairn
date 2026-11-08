@@ -1,14 +1,21 @@
-import { QUESTION_DEADLINE_MS } from '@cairn/shared';
+import { randomUUID } from 'node:crypto';
+import {
+  ASK_USER_QUESTION_KIND,
+  DEFAULT_AUTONOMY_SETTINGS,
+  QUESTION_DEADLINE_MS,
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { message, notification, step, todo } from '../src/db/schema.js';
+import { chiefMessage, message, notification, project, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
-import { buildChiefSystemPrompt } from '../src/services/chief.js';
+import { buildChiefSystemPrompt, triggerChiefWakes } from '../src/services/chief.js';
+import { answerQuestion } from '../src/services/chief-questions.js';
 import { listNeedsYou } from '../src/services/needs-you.js';
 import { sweepQuestionDeadlines } from '../src/services/question-deadlines.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -89,6 +96,43 @@ function ownerNotifications(todoId: string) {
     .filter((row) => row.entityId === todoId);
 }
 
+function ownerSays(content: string, createdAt: number, role: 'user' | 'assistant' = 'user') {
+  const id = `owner-${Math.random().toString(36).slice(2, 10)}`;
+  H.s.db
+    .insert(chiefMessage)
+    .values({ id, threadId: H.threadId, role, content, projectId: null, createdAt })
+    .run();
+  return id;
+}
+
+function askCard() {
+  const requestId = `ask-${randomUUID()}`;
+  H.s.db
+    .insert(chiefMessage)
+    .values({
+      id: requestId,
+      threadId: H.threadId,
+      role: 'assistant',
+      content: JSON.stringify({
+        kind: ASK_USER_QUESTION_KIND,
+        requestId,
+        status: 'pending',
+        questions: [
+          {
+            header: 'Copy',
+            question: 'Which wins for the onboarding copy?',
+            options: [{ label: 'Repo rule' }, { label: 'Brief' }],
+          },
+        ],
+        answers: null,
+      }),
+      projectId: null,
+      createdAt: Date.now(),
+    })
+    .run();
+  return requestId;
+}
+
 function ownerNeedsYou() {
   const query = listNeedsYou({ db: H.s.db }, H.teamId, 'owner');
   return [...query.current, ...query.stale].map((entry) => entry.todo.id);
@@ -128,6 +172,70 @@ describe('a parked question goes to the Coordinator, not the owner (task stall S
   });
 });
 
+describe('a research report the owner no longer accepts goes to the Coordinator (task stall S11)', () => {
+  test('an unwatched info thread reaching review in a human-policy project wakes the Coordinator to accept it', () => {
+    H.s.db
+      .update(project)
+      .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const todoId = `todo-${Math.random().toString(36).slice(2, 8)}`;
+    H.s.db
+      .insert(todo)
+      .values({
+        id: todoId,
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: 'Survey the queue libraries',
+        spec: 'Compare three.',
+        phase: 'review',
+        phaseAt: 1,
+        seqNum: 141,
+        output: 'info',
+      })
+      .run();
+    const record = getTodo(deps(), todoId);
+    if (record === null) throw new Error('todo missing');
+    triggerChiefWakes(toolDeps(), record, 'review');
+    const wakes = H.s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((row) => row.kind === 'chief' && row.prompt?.includes('#141') === true);
+    expect(wakes).toHaveLength(1);
+    expect(wakes[0]?.prompt).toContain('complete_todos');
+    expect(wakes[0]?.prompt).toMatch(/\nGate todo=\S+ build=\S* phase=review attempt=0$/);
+    expect(ownerNeedsYou()).not.toContain(todoId);
+  });
+});
+
+describe('an escalation keeps the default answer exactly as proposed', () => {
+  test('a multiline default is stored with its newlines and indentation', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    const defaultAnswer = 'Use this config:\n  retries: 3\n  backoff: exponential';
+    await relay('escalate_question', { todoId, requestId: REQUEST, class: 'other', defaultAnswer });
+    const stored = H.s.db
+      .select()
+      .from(message)
+      .where(and(eq(message.id, REQUEST), eq(message.conversationId, buildId)))
+      .get()?.content as { escalation?: { defaultAnswer: string | null } } | undefined;
+    expect(stored?.escalation?.defaultAnswer).toBe(defaultAnswer);
+  });
+
+  test('an oversized default is refused instead of truncated', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await expect(
+      relay('escalate_question', {
+        todoId,
+        requestId: REQUEST,
+        class: 'other',
+        defaultAnswer: 'x'.repeat(20_001),
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(questionStatus(buildId)).toBe('pending');
+  });
+});
+
 describe('repo rules beat the brief; only owner classes escalate (task stall S3)', () => {
   test('the Coordinator prompt resolves conflicts by repo rule and names the four owner classes', () => {
     const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
@@ -152,6 +260,191 @@ describe('repo rules beat the brief; only owner classes escalate (task stall S3)
     const notices = ownerNotifications(todoId);
     expect(notices).toHaveLength(1);
     expect(notices[0]?.snippet).toContain('Repo rule wins; rewrite the string.');
+  });
+
+  test('an escalated question on a failed thread marks the thread as waiting on the owner', async () => {
+    const { todoId } = await parkedQuestion();
+    H.s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, todoId)).run();
+    expect(getTodo(deps(), todoId)?.waitingOn).toBeUndefined();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'payment',
+      defaultAnswer: 'Stay on the free plan.',
+    });
+    expect(getTodo(deps(), todoId)?.waitingOn).toEqual({ on: 'owner', retryAt: null });
+    expect(ownerNeedsYou()).toContain(todoId);
+  });
+
+  test('a long question never pushes the proposed default out of the owner notice', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    const stored = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get();
+    const content = stored?.content as { questions: { question: string }[] };
+    H.s.db
+      .update(message)
+      .set({
+        content: {
+          ...content,
+          questions: [{ ...content.questions[0], question: `${'Which wins? '.repeat(20)}` }],
+        },
+      })
+      .where(and(eq(message.id, REQUEST), eq(message.conversationId, buildId)))
+      .run();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'other',
+      defaultAnswer: 'Repo rule wins.',
+    });
+    expect(ownerNotifications(todoId)[0]?.snippet).toContain('Default: Repo rule wins.');
+  });
+
+  test('the owner answering an owner-class question in the Coordinator chat resumes the thread as the owner decision', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'design',
+      defaultAnswer: 'Repo rule wins.',
+    });
+    const ownerMessageId = ownerSays('Go with the brief this time.', Date.now() + 1);
+    await relay('answer_question', {
+      todoId,
+      requestId: REQUEST,
+      answer: 'Brief wins.',
+      ownerMessageId,
+    });
+    expect(questionStatus(buildId)).toBe('answered');
+    expect(getTodo(deps(), todoId)?.decisions).toEqual([
+      expect.objectContaining({ requestId: REQUEST, answer: 'Brief wins.', by: 'person' }),
+    ]);
+    const resumed = H.s.db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, buildId), eq(step.status, 'pending')))
+      .all();
+    expect(resumed).toHaveLength(1);
+  });
+
+  test('an owner message from before the escalation does not authorize an owner-class answer', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    const early = ownerSays('Brief wins.', Date.now() - 60_000);
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'payment',
+      defaultAnswer: 'Stay on the free plan.',
+    });
+    await expect(
+      relay('answer_question', {
+        todoId,
+        requestId: REQUEST,
+        answer: 'Brief wins.',
+        ownerMessageId: early,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId)).toBe('pending');
+  });
+
+  test('an owner-answered Coordinator question card relays an owner-class answer and resumes the worker', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'design',
+      defaultAnswer: 'Repo rule wins.',
+    });
+    const card = askCard();
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/${card}/answer`,
+      { answers: [{ header: 'Copy', choices: ['Brief'] }] },
+    );
+    expect(res.status).toBeLessThan(300);
+    await relay('answer_question', {
+      todoId,
+      requestId: REQUEST,
+      answer: 'Brief wins.',
+      ownerMessageId: card,
+    });
+    expect(questionStatus(buildId)).toBe('answered');
+    expect(getTodo(deps(), todoId)?.decisions).toEqual([
+      expect.objectContaining({ requestId: REQUEST, by: 'person' }),
+    ]);
+  });
+
+  test('a question card the Coordinator answered itself does not authorize an owner-class answer', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'payment',
+      defaultAnswer: 'Stay on the free plan.',
+    });
+    const card = askCard();
+    answerQuestion(
+      { db: H.s.db },
+      { threadId: H.threadId, requestId: card, answers: [{ header: 'Copy', choices: ['Brief'] }] },
+      'agent',
+    );
+    await expect(
+      relay('answer_question', {
+        todoId,
+        requestId: REQUEST,
+        answer: 'Brief wins.',
+        ownerMessageId: card,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId)).toBe('pending');
+  });
+
+  test('a question card the owner answered before the escalation does not authorize it', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    const card = askCard();
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/${card}/answer`,
+      { answers: [{ header: 'Copy', choices: ['Brief'] }] },
+    );
+    expect(res.status).toBeLessThan(300);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'credential',
+      defaultAnswer: 'Use the team key.',
+    });
+    await expect(
+      relay('answer_question', {
+        todoId,
+        requestId: REQUEST,
+        answer: 'Brief wins.',
+        ownerMessageId: card,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId)).toBe('pending');
+  });
+
+  test('an assistant message cannot stand in for the owner', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'credential',
+      defaultAnswer: 'Use the team key.',
+    });
+    const fake = ownerSays('Use the team key.', Date.now() + 1, 'assistant');
+    await expect(
+      relay('answer_question', {
+        todoId,
+        requestId: REQUEST,
+        answer: 'Use the team key.',
+        ownerMessageId: fake,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId)).toBe('pending');
   });
 
   test('an escalated owner-class question leaves the Coordinator queue and refuses a Coordinator answer', async () => {

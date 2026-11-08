@@ -8,12 +8,14 @@ function actRank(todo: TodoRecord): number {
 }
 
 function waitsOnOwner(todo: TodoRecord): boolean {
+  if (todo.waitingOn?.on === 'machine-update') return true;
   switch (todo.phase) {
     case 'confirm':
       return true;
     case 'review':
       return todo.output !== 'info';
     case 'needs_input':
+    case 'failed':
       return todo.waitingOn?.on === 'owner';
     default:
       return false;

@@ -62,11 +62,12 @@ describe('direct thread messages in the Coordinator conversation', () => {
 
 describe('how an inbox reply reaches its thread', () => {
   test.each([
-    ['needs_input', null],
+    ['needs_input', 'steer'],
     ['confirm', 'revision'],
     ['review', 'revision'],
     ['failed', 'restart'],
     ['building', 'steer'],
+    ['needs_input', 'steer'],
     ['done', 'steer'],
     ['queued', null],
     ['todo', null],

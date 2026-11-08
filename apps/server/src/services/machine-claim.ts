@@ -23,6 +23,7 @@ import {
   WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import {
   build,
   chief,
@@ -34,6 +35,7 @@ import {
   todo,
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { acksAnswers, declareAnswersAck } from './answers-ack.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
@@ -91,6 +93,7 @@ import { listProjectTagVocab } from './tags.js';
 import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
+import { carriedAnswerIds } from './worker-question-store.js';
 
 function workerSkillInjection(
   deps: MachineDeps,
@@ -159,6 +162,16 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .all()
     .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
+}
+
+function answerIdsOf(
+  db: Db,
+  buildId: string,
+  instruction: string | null,
+): { answerIds?: string[] } {
+  if (instruction === null) return {};
+  const ids = carriedAnswerIds(db, buildId, instruction);
+  return ids.length > 0 ? { answerIds: ids } : {};
 }
 
 export function serverTakesTurn(
@@ -381,7 +394,14 @@ async function tryClaim(
   const chiefAhead = claimChiefTurn(deps, machineId, teamId, maxWorkers, earliestWorker);
   if (chiefAhead) return chiefAhead;
 
+  const machineAcksAnswers = acksAnswers(machineRow);
   for (const cand of workerCands) {
+    if (
+      !machineAcksAnswers &&
+      carriedAnswerIds(db, cand.stepRow.buildId, cand.stepRow.prompt ?? '').length > 0
+    ) {
+      continue;
+    }
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
     if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
@@ -582,6 +602,7 @@ async function tryClaim(
       ...(localMerge !== null ? { localMerge } : {}),
       session,
       ...(instruction !== null ? { instruction } : {}),
+      ...answerIdsOf(db, cand.stepRow.buildId, instruction),
       todo: {
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,
@@ -651,6 +672,7 @@ export async function claimStep(
   stillAuthorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
   if (signal?.aborted || !stillAuthorized()) return null;
+  declareAnswersAck(deps.db, machineId, body?.answersAck);
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
   if (first) return first;

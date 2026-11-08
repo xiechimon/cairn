@@ -1,8 +1,9 @@
+import { ANSWERS_ACK_VERSION } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, message, steerPending, step, todo } from '../src/db/schema.js';
+import { build, machine, message, project, steerPending, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
-import { claimStep } from '../src/services/machines.js';
+import { ackSteer, claimStep, fetchSteer } from '../src/services/machines.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -50,13 +51,33 @@ function seedTodo(over: Partial<typeof todo.$inferInsert> = {}) {
   return id;
 }
 
-function startSession() {
+function daemonMachine(answersAck: boolean): string {
+  const machineId = insertMachine(H.s);
+  H.s.db
+    .update(machine)
+    .set({
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        ...(answersAck ? { answersAck: ANSWERS_ACK_VERSION } : {}),
+      },
+    })
+    .where(eq(machine.id, machineId))
+    .run();
+  return machineId;
+}
+
+function startSession(answersAck = true) {
   const todoId = seedTodo();
   const [started] = startBuilds(deps(), { projectId: H.projectId, todoIds: [todoId] });
   const buildId = started!.id;
   const stepRow = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
   H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
-  H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+  H.s.db
+    .update(step)
+    .set({ status: 'claimed', machineId: daemonMachine(answersAck) })
+    .where(eq(step.id, stepRow.id))
+    .run();
   return {
     todoId,
     buildId,
@@ -64,8 +85,8 @@ function startSession() {
   };
 }
 
-async function askAndPark(requestId = REQUEST_A) {
-  const world = startSession();
+async function askAndPark(requestId = REQUEST_A, answersAck = true) {
+  const world = startSession(answersAck);
   await askWorkerQuestion(
     deps(),
     world.stepRow,
@@ -155,6 +176,32 @@ describe('a parked question is its own state and wakes the Coordinator (task sta
     expect(phaseOf(todoId)).toBe('review');
   });
 });
+
+async function parkedAB() {
+  const world = await askAndPark(REQUEST_A);
+  await askWorkerQuestion(
+    deps(),
+    world.stepRow,
+    { requestId: REQUEST_B, questions: COPY_QUESTION },
+    { holdMs: 0 },
+  );
+  for (const id of [REQUEST_A, REQUEST_B]) {
+    const stored = H.s.db.select().from(message).where(eq(message.id, id)).get();
+    H.s.db
+      .update(message)
+      .set({ content: { ...(stored?.content as object), parkedAt: Date.now() } })
+      .where(eq(message.id, id))
+      .run();
+  }
+  return world;
+}
+
+function delivered(id: string): number | undefined {
+  const content = H.s.db.select().from(message).where(eq(message.id, id)).get()?.content as
+    | { deliveredAt?: number }
+    | undefined;
+  return content?.deliveredAt;
+}
 
 describe('answers route by request id to the same build and session (task stall S1, S2)', () => {
   test('answer_question resumes the same build id on the same session', async () => {
@@ -252,9 +299,169 @@ describe('answers route by request id to the same build and session (task stall 
       .where(eq(steerPending.conversationId, buildId))
       .get();
     expect(steer?.stepId).toBe(stepRow.id);
-    expect(steer?.content).toContain('Repo rule wins.');
+    expect(
+      fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id, ANSWERS_ACK_VERSION).answers,
+    ).toEqual([{ requestId: REQUEST_A, text: 'Repo rule wins.' }]);
     expect(questionStatus(buildId, REQUEST_A)).toBe('answered');
   });
+
+  test('a daemon without answer acks gets no answer: the question stays pending and the task shows the machine needs an update', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A, false);
+    const stored = H.s.db.select().from(message).where(eq(message.id, REQUEST_A)).get();
+    H.s.db
+      .update(message)
+      .set({ content: { ...(stored?.content as object), parkedAt: Date.now() } })
+      .where(eq(message.id, REQUEST_A))
+      .run();
+    await expect(
+      relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringMatching(/needs a cairn update/),
+    });
+    await expect(
+      messageThreadAsUser(deps(), H.teamId, todoId, {
+        content: 'Repo rule wins.',
+        clientMessageId: 'c-old-daemon',
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+    expect(getTodo(deps(), todoId)?.waitingOn).toEqual({ on: 'machine-update', retryAt: null });
+    expect(fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id).answers).toBeUndefined();
+  });
+
+  test('a resumed step carrying answers is handed only to a daemon that acks answers', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A);
+    endStep(stepRow.id);
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' });
+    H.s.db.delete(step).where(eq(step.kind, 'chief')).run();
+    const old = daemonMachine(false);
+    expect(await claimStep(deps() as never, old, H.teamId, 0, 'http://localhost')).toBeNull();
+    const current = daemonMachine(false);
+    const claimed = await claimStep(
+      deps() as never,
+      current,
+      H.teamId,
+      0,
+      'http://localhost',
+      undefined,
+      {
+        answersAck: ANSWERS_ACK_VERSION,
+      },
+    );
+    expect(claimed?.conversationId).toBe(buildId);
+    expect(claimed?.answerIds).toEqual([REQUEST_A]);
+  });
+
+  test('answers stay undelivered through a pickup until the daemon acks them, and the next pickup re-sends them', async () => {
+    const { todoId, buildId, stepRow } = await parkedAB();
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Answer for A.' });
+    await relay('answer_question', { todoId, requestId: REQUEST_B, answer: 'Answer for B.' });
+    const machine = { id: stepRow.machineId };
+    const first = fetchSteer(deps(), machine, stepRow.id, ANSWERS_ACK_VERSION);
+    expect(first.answers?.map((a) => a.requestId)).toEqual([REQUEST_A, REQUEST_B]);
+    expect(delivered(REQUEST_A)).toBeUndefined();
+
+    const retry = fetchSteer(deps(), machine, stepRow.id, ANSWERS_ACK_VERSION);
+    expect(retry.answers?.map((a) => a.requestId)).toEqual([REQUEST_A, REQUEST_B]);
+
+    ackSteer(deps(), { id: stepRow.machineId, teamId: H.teamId }, stepRow.id, [REQUEST_A]);
+    expect(delivered(REQUEST_A)).toBeTypeOf('number');
+    expect(
+      fetchSteer(deps(), machine, stepRow.id, ANSWERS_ACK_VERSION).answers?.map((a) => a.requestId),
+    ).toEqual([REQUEST_B]);
+    expect(buildId).toBeTruthy();
+  });
+
+  test('a repeated ack of the same answer changes nothing', async () => {
+    const { todoId, stepRow } = await parkedAB();
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Answer for A.' });
+    const machine = { id: stepRow.machineId, teamId: H.teamId };
+    ackSteer(deps(), machine, stepRow.id, [REQUEST_A]);
+    const firstAt = delivered(REQUEST_A);
+    const before = H.s.db.select().from(message).where(eq(message.id, REQUEST_A)).get();
+    ackSteer(deps(), machine, stepRow.id, [REQUEST_A, 'ask-unknown']);
+    expect(delivered(REQUEST_A)).toBe(firstAt);
+    expect(H.s.db.select().from(message).where(eq(message.id, REQUEST_A)).get()).toEqual(before);
+  });
+
+  test('when the session is gone before an ack, the resumed step carries the answer and names it for ack', async () => {
+    const machineId = daemonMachine(true);
+    const { todoId, buildId, stepRow } = await parkedAB();
+    await relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Answer for A.' });
+    fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id, ANSWERS_ACK_VERSION);
+    await relay('answer_question', { todoId, requestId: REQUEST_B, answer: 'Answer for B.' });
+    completeStep(deps(), stepRow.id, { hasChanges: true });
+    H.s.db.delete(step).where(eq(step.kind, 'chief')).run();
+    await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'Carry on.',
+      clientMessageId: 'c-resume',
+    });
+    const claimed = await claimStep(
+      deps() as never,
+      machineId,
+      H.teamId,
+      0,
+      'http://localhost',
+      undefined,
+      { answersAck: ANSWERS_ACK_VERSION },
+    );
+    expect(claimed?.conversationId).toBe(buildId);
+    expect(claimed?.instruction).toContain('Answer for A.');
+    expect(claimed?.answerIds).toEqual(expect.arrayContaining([REQUEST_A]));
+    expect(delivered(REQUEST_A)).toBeUndefined();
+  });
+
+  test('two pending questions answered A then B resume the session carrying both answers', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark(REQUEST_A);
+    await askWorkerQuestion(
+      deps(),
+      stepRow,
+      { requestId: REQUEST_B, questions: COPY_QUESTION },
+      { holdMs: 0 },
+    );
+    endStep(stepRow.id);
+    const first = (await relay('answer_question', {
+      todoId,
+      requestId: REQUEST_A,
+      answer: 'Answer for A: repo rule.',
+    })) as { delivered: string };
+    expect(first.delivered).toBe('waiting-other-questions');
+    await relay('answer_question', {
+      todoId,
+      requestId: REQUEST_B,
+      answer: 'Answer for B: brief.',
+    });
+    const resumed = sessionSteps(buildId).filter((row) => row.status === 'pending');
+    expect(resumed).toHaveLength(1);
+    expect(resumed[0]?.prompt).toContain('Answer for A: repo rule.');
+    expect(resumed[0]?.prompt).toContain('Answer for B: brief.');
+  });
+
+  test.each(['task', 'project'] as const)(
+    'an answer to a question on an archived %s is refused and settles nothing',
+    async (archived) => {
+      const { todoId, buildId, stepRow } = await askAndPark();
+      endStep(stepRow.id);
+      if (archived === 'task') {
+        H.s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, todoId)).run();
+      } else {
+        H.s.db
+          .update(project)
+          .set({ archivedAt: Date.now() })
+          .where(eq(project.id, H.projectId))
+          .run();
+      }
+      await expect(
+        relay('answer_question', { todoId, requestId: REQUEST_A, answer: 'Repo rule wins.' }),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+      expect(getTodo(deps(), todoId)?.decisions ?? []).toEqual([]);
+      if (archived === 'project') {
+        H.s.db.update(project).set({ archivedAt: null }).where(eq(project.id, H.projectId)).run();
+      }
+    },
+  );
 
   test('the Coordinator cannot answer a parked question by free text: message_thread points it at answer_question', async () => {
     const { todoId, stepRow } = await askAndPark();

@@ -36,6 +36,41 @@ test('worker question rows reach the task transcript', () => {
   );
 });
 
+test('an escalated worker question carries its class, the full default answer and the apply time to the card', () => {
+  const longDefault = `Keep the free plan. ${'Explain the limits to the team. '.repeat(10)}`;
+  const items = mapTranscript({
+    messages: [
+      {
+        id: 'ask-12345678',
+        role: 'assistant',
+        content: {
+          ...QUESTION,
+          escalation: {
+            class: 'other',
+            defaultAnswer: longDefault,
+            at: NOW,
+            applyAt: NOW + 1_800_000,
+          },
+        },
+        createdAt: NOW,
+      },
+    ],
+    steps: [],
+    plans: [],
+    build: null,
+    todo: todo(1, 'needs_input'),
+    machineName: null,
+    userName: 'u',
+    liveText: '',
+  });
+  expect(items).toContainEqual(
+    expect.objectContaining({
+      kind: 'question',
+      escalation: { class: 'other', defaultAnswer: longDefault, applyAt: NOW + 1_800_000 },
+    }),
+  );
+});
+
 function wire() {
   return {
     ...todo(1, 'needs_input'),

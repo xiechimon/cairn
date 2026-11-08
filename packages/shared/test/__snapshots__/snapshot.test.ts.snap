@@ -106,6 +106,13 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         },
       ],
     },
+    "answerIds": {
+      "items": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "type": "array",
+    },
     "chief": {
       "additionalProperties": false,
       "properties": {
@@ -641,6 +648,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "answersAck": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer",
+    },
     "maxWorkers": {
       "maximum": 9007199254740991,
       "minimum": 1,
@@ -765,6 +777,13 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                   "type": "null",
                 },
               ],
+            },
+            "answerIds": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
             },
             "chief": {
               "additionalProperties": false,
@@ -2469,6 +2488,29 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "name",
             "email",
             "login",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "commitIdentity": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string",
+            },
+            "name": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "email",
           ],
           "type": "object",
         },
@@ -6224,6 +6266,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "on": {
                   "enum": [
                     "machine",
+                    "machine-update",
                     "quota",
                     "coordinator",
                     "owner",
@@ -8808,6 +8851,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "answersAck": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
             "codexLogin": {
               "additionalProperties": false,
               "properties": {
@@ -10366,6 +10414,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "on": {
           "enum": [
             "machine",
+            "machine-update",
             "quota",
             "coordinator",
             "owner",

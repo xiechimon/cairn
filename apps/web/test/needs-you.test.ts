@@ -33,6 +33,12 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
     expect(pendingQuestions(stream)).toHaveLength(1);
   });
 
+  test('a failed thread whose question was escalated waits on the owner, not the Coordinator', () => {
+    const escalated = { ...todo(3, 'failed'), waitingOn: { on: 'owner' as const, retryAt: null } };
+    expect(needsYouThreads([escalated]).map((row) => row.seqNum)).toEqual([3]);
+    expect(inProgressThreads([escalated])).toEqual([]);
+  });
+
   test('a thread the Coordinator now owns stays visible as in progress instead of dropping out of every group', () => {
     const set = [
       todo(1, 'confirm'),
@@ -59,5 +65,17 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
   test('orders confirm and escalated questions first, then review', () => {
     const order = needsYouThreads([todo(1, 'review'), todo(2, 'failed'), todo(3, 'confirm')]);
     expect(order.map((row) => row.seqNum)).toEqual([3, 1]);
+  });
+});
+
+describe('a thread whose machine must update cairn waits on you', () => {
+  test('it is listed and counted as needs-you in any phase, and not as in progress', () => {
+    const stuck = {
+      ...todo(1, 'building'),
+      waitingOn: { on: 'machine-update' as const, retryAt: null },
+    };
+    const running = todo(2, 'building');
+    expect(needsYouThreads([stuck, running]).map((row) => row.seqNum)).toEqual([1]);
+    expect(inProgressThreads([stuck, running]).map((row) => row.seqNum)).toEqual([2]);
   });
 });

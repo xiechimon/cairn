@@ -69,6 +69,7 @@ import type {
   PlanDiffContent,
   PlanVersion,
   ProjectCommitRow,
+  QuestionEscalationView,
   ReviewFinding,
   RunHistoryRow,
   SkillRow,
@@ -662,6 +663,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           status: ask.status,
           questions: ask.questions,
           answers: ask.answers,
+          ...(ask.escalation !== undefined ? { escalation: ask.escalation } : {}),
         },
       });
       continue;
@@ -1298,6 +1300,7 @@ export function askQuestionOfContent(content: unknown): {
     multiSelect?: boolean;
   }[];
   answers: { header: string; choices?: string[]; text?: string }[] | null;
+  escalation?: QuestionEscalationView;
 } | null {
   let parsed: unknown = content;
   if (typeof content === 'string') {
@@ -1321,6 +1324,15 @@ export function askQuestionOfContent(content: unknown): {
     status: row.data.status,
     questions: row.data.questions,
     answers: row.data.answers,
+    ...(row.data.escalation !== undefined
+      ? {
+          escalation: {
+            class: row.data.escalation.class,
+            defaultAnswer: row.data.escalation.defaultAnswer,
+            applyAt: row.data.escalation.applyAt,
+          },
+        }
+      : {}),
   };
 }
 

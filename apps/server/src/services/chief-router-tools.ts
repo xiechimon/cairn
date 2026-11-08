@@ -8,11 +8,12 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, todo } from '../db/schema.js';
+import { build, chiefMessage, chiefThread, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
+import { askQuestionContentOf } from './chief-questions.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
 import { PhaseTransitionError } from './phase.js';
@@ -125,23 +126,55 @@ async function answerQuestion(
   if (answer.length > ANSWER_MAX) {
     throw new HttpError(400, `invalid params.answer: at most ${ANSWER_MAX} characters`);
   }
-  return json(
-    await answerTaskQuestion(
-      deps,
-      ctx.teamId,
-      { todoId: str(params, 'todoId'), requestId: str(params, 'requestId'), answer },
-      'coordinator',
-    ),
+  const question = { todoId: str(params, 'todoId'), requestId: str(params, 'requestId'), answer };
+  const ownerMessageId = optStr(params, 'ownerMessageId');
+  if (ownerMessageId === undefined) {
+    return json(await answerTaskQuestion(deps, ctx.teamId, question, 'coordinator'));
+  }
+  const ownerReplyAt = ownerAnswerTime(deps.db, ctx, ownerMessageId);
+  return json(await answerTaskQuestion(deps, ctx.teamId, { ...question, ownerReplyAt }, 'person'));
+}
+
+function ownerAnswerTime(db: Db, ctx: ChiefToolCtx, ref: string): number {
+  const row = db
+    .select({
+      role: chiefMessage.role,
+      content: chiefMessage.content,
+      createdAt: chiefMessage.createdAt,
+    })
+    .from(chiefMessage)
+    .innerJoin(chiefThread, eq(chiefMessage.threadId, chiefThread.id))
+    .where(
+      and(
+        eq(chiefMessage.id, ref),
+        eq(chiefMessage.threadId, ctx.threadId),
+        eq(chiefThread.userId, ctx.userId),
+        eq(chiefThread.teamId, ctx.teamId),
+      ),
+    )
+    .get();
+  if (row?.role === 'user') return row.createdAt;
+  const card = row?.role === 'assistant' ? askQuestionContentOf(row.content) : null;
+  if (card?.status === 'answered' && card.answeredBy === 'owner' && card.answeredAt !== undefined) {
+    return card.answeredAt;
+  }
+  throw new HttpError(
+    409,
+    `ownerMessageId ${ref} is neither a message the user sent nor a question card the user answered in this conversation`,
   );
 }
 
 function escalate(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
+  const defaultAnswer = str(params, 'defaultAnswer');
+  if (defaultAnswer.length > ANSWER_MAX) {
+    throw new HttpError(400, `invalid params.defaultAnswer: at most ${ANSWER_MAX} characters`);
+  }
   return json(
     escalateQuestion(deps, ctx.teamId, {
       todoId: str(params, 'todoId'),
       requestId: str(params, 'requestId'),
       class: str(params, 'class'),
-      defaultAnswer: tidy(str(params, 'defaultAnswer'), ANSWER_MAX),
+      defaultAnswer,
     }),
   );
 }

@@ -345,6 +345,9 @@ export const askUserQuestionContentSchema = z.object({
   deadlineAt: z.number().int().optional(),
   remindedAt: z.number().int().optional(),
   escalation: questionEscalationSchema.optional(),
+  answeredAt: z.number().int().optional(),
+  answeredBy: z.enum(['owner', 'agent']).optional(),
+  deliveredAt: z.number().int().optional(),
   provenance: provenanceSchema.optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;
