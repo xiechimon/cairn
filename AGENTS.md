@@ -52,6 +52,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Read files in full before editing, and check consumers before moving or renaming paths. Ask before removing intentional functionality or changing intended behavior.
 - Do not write code comments; express intent through naming and code structure. Only English documentation of a public API or external behavior the code cannot show (browser/platform bugs or third-party quirks) is allowed. Delete other legacy comments when touched.
 - Use top-level imports only, avoid unexplained `any`, and inline one-line helpers with a single call site. Verify external package APIs against the installed version's types and source.
+- Every user-facing feature has a row in `.claude/skills/verify-cairn/feature-map.json` with reach steps, states, research, frontend design and backend design. A new route, settings section or page needs a row whose research and designs exist first; run `node scripts/generate-feature-map.mjs` after changing routes, test ids or shortcuts.
 - Use real e2e for complex features; follow `docs/spec/19-test-layering-and-blast-radius.md` for test scope.
 - Run related tests by hand during development: `pnpm exec vitest run --changed` and `pnpm --filter @cairn/web e2e:affected`. The full suites run in CI; avoid routine full local e2e runs.
 - After code changes, run `pnpm lint`, `pnpm typecheck` and `pnpm spec:parse`; also run `pnpm spec:parse` after resolving e2e conflicts. Do not run `pnpm build` before committing.

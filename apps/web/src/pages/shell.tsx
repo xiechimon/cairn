@@ -108,9 +108,7 @@ export function PageShell({
                   <ChevronLeft width={16} height={16} />
                 </Link>
               )}
-              <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
-                {title}
-              </h1>
+              <h1 className="min-w-0 truncate voice-title text-page text-foreground">{title}</h1>
               {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
               <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
             </header>
