@@ -57,7 +57,7 @@ export function TextureSection() {
           <FilterSwitch value={artFilter} onChange={setArtFilter} />
           <SpiralArt filter={artFilter} className="h-96 w-full max-w-120">
             <div className="flex h-96 flex-col justify-end p-6">
-              <p className="m-0 font-serif text-greeting text-foreground">
+              <p className="m-0 voice-greeting text-greeting text-foreground">
                 Agents that bring back
                 <br />
                 <i>only what needs you.</i>
@@ -101,9 +101,7 @@ export function TextureSection() {
             <div className="relative h-48">
               <DriftField active={running} filter={fieldFilter} />
               <div className="absolute bottom-6 left-8">
-                <p className="m-0 font-serif text-page font-semibold text-foreground">
-                  Morning, ian.
-                </p>
+                <p className="m-0 voice-title text-page text-foreground">Morning, ian.</p>
                 <p className="m-0 mt-1 text-ui text-content-secondary">
                   2 threads running, 3 merged since last night, 1 needs you
                 </p>

@@ -24,7 +24,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Feature-map maintain (ticket register + verify-cairn index)
+      - name: Feature-map maintain (feature registry + verify-cairn index)
         run: |
           set +e
           node scripts/feature-map-maintain.mjs --file-issue | tee maintain-report.md
