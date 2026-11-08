@@ -53,7 +53,7 @@ function stamp() {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-function runNode(script, env) {
+function runNode(script, env, readyLine) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [script], {
       cwd: REPO,
@@ -64,6 +64,7 @@ function runNode(script, env) {
     let stderr = '';
     child.stdout.on('data', (buf) => {
       stdout += buf.toString();
+      if (readyLine && stdout.includes(readyLine)) resolve({ stdout, stderr });
     });
     child.stderr.on('data', (buf) => {
       stderr += buf.toString();
@@ -116,7 +117,7 @@ try {
   delete env.all_proxy;
 
   console.log('launch');
-  await runNode(LAUNCH, env);
+  await runNode(LAUNCH, env, 'verify stack ready');
   launched = true;
 
   const runDir = env.VERIFY_RUN_DIR ?? join(REPO, '.claude', 'verify-run');

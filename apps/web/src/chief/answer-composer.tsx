@@ -19,8 +19,6 @@ export interface AnswerComposerProps {
   answerKey: string;
   active: boolean;
   attached: boolean;
-  home: boolean;
-  open: boolean;
   invalid: boolean;
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
@@ -37,8 +35,6 @@ export function AnswerComposer({
   answerKey,
   active,
   attached,
-  home,
-  open,
   invalid,
   onAttachment,
   composerRef,
@@ -103,8 +99,6 @@ export function AnswerComposer({
       onFocusLeave={onFocusLeave}
       placeholder={t('输入你自己的回答，或留空使用选中的选项')}
       invalid={invalid}
-      home={home}
-      open={open}
       composerRef={composerRef}
       above={above}
       tools={tools}

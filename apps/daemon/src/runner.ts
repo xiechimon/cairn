@@ -282,9 +282,11 @@ export function composeTaskMetaInstruction(currentTitle: string, meta?: TaskMeta
 }
 
 function taskMetaOpts(
-  todo: ClaimedStep['todo'],
+  claimed: Pick<ClaimedStep, 'todo' | 'remoteTools'>,
 ): { taskMeta: { currentTitle: string; meta?: TaskMetaForm } } | undefined {
+  const { todo } = claimed;
   if (!todo) return undefined;
+  if (!claimed.remoteTools?.some((tool) => tool.name === 'set_task_meta')) return undefined;
   if (todo.meta?.titleFinal === true || isIssueSourcedTask(todo)) return undefined;
   return {
     taskMeta: {
@@ -770,7 +772,7 @@ async function runClaimedStep(
     isChief && claimed.chief
       ? claimed.chief.systemPrompt
       : composeWorkerSystemPrompt(agent.description, agent.memories, {
-          ...taskMetaOpts(claimed.todo),
+          ...taskMetaOpts(claimed),
           attachments: true,
           ...(claimed.project !== undefined ? { project: claimed.project } : {}),
         });

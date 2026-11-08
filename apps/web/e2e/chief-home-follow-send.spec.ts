@@ -1,7 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { mockLive, type Row, THREAD, toolRow } from './chief-home-mock';
 import { evidenceJson, evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
 
 const historyOf = (total: number): Row[] =>
   Array.from({ length: total }, (_, i) => ({
@@ -189,31 +188,6 @@ test('scrolling up stops following, and the jump button resumes it', async ({ pa
   await expect(home(page).getByText(paragraph(5).trim(), { exact: false })).toBeAttached();
   await expect.poll(() => gapToBottom(page)).toBeGreaterThanOrEqual(parkedAfterJump);
   await expect(jump).toHaveAttribute('data-active', 'true');
-});
-
-test('the drawer follows a send and its streaming growth too', async ({ page }) => {
-  await mockSlowSend(page);
-  await page.goto('/app/schedules');
-  await openChiefWindow(page);
-  const drawer = page.locator('.chief-drawer');
-  await expect(drawer).toBeVisible();
-  const body = drawer.getByTestId('chief-body');
-  const gap = () => body.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight);
-  await expect(drawer.getByText('answer 249', { exact: true })).toBeInViewport();
-  await body.evaluate((node) => {
-    node.scrollTop = node.scrollHeight - node.clientHeight - 600;
-  });
-  const input = drawer.getByTestId('chief-composer-input');
-  await input.fill('drawer send');
-  await input.press('Enter');
-  await expect(drawer.getByTestId('chief-stream').getByText('drawer send', { exact: true })).toBeInViewport();
-  await expect
-    .poll(() => page.evaluate((u) => window.__es.some((es) => es.url.includes(u)), streamUrl))
-    .toBe(true);
-  for (let n = 0; n < 5; n++) {
-    await emit(page, { type: 'text_delta', text: `${paragraph(n)}\n\n` });
-    await expect.poll(gap).toBeLessThanOrEqual(2);
-  }
 });
 
 for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-light'] as const) {

@@ -137,21 +137,10 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('one ring per edge on the rendered surfaces', async ({ page }) => {
-      const edgeRing = await (async () => {
-        await page.goto('/app/schedules?scenario=01');
-        await page.waitForSelector('.board-sidebar');
-        return slot(page, 'edge-ring');
-      })();
-
       await page.goto('/app?scenario=notify-banner');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
       expect(banner.endsWith(await slot(page, 'e1'))).toBe(true);
-
-      await page.goto('/app/schedules?scenario=111');
-      const drawer = await surfaceShadow(page, '.chief-drawer');
-      expect(rings(drawer)).toBe(1);
-      expect(drawer).toContain(edgeRing);
 
       // the composer keeps its inset ring, and only that ring
       await page.goto(`${DETAIL}?scenario=16`);

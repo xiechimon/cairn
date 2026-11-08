@@ -150,7 +150,8 @@ test('the sidebar Coordinator badge counts pending questions and opens the card 
   await page.goto('/app/schedules');
   const badge = page.getByRole('complementary').getByTestId('attention-badge');
   await expect(badge).toHaveText('2');
-  await expect(page.getByTestId('chief-question-dock')).toBeHidden();
+  await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
   await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await expect(page.getByTestId('chief-question-dock').getByTestId('chief-question-card')).toBeVisible();
@@ -255,7 +256,7 @@ const LONG = {
 };
 
 for (const size of [
-  { name: '600px drawer', width: 1440, height: 900 },
+  { name: '1440 desktop', width: 1440, height: 900 },
   { name: '375px phone', width: 375, height: 667 },
 ]) {
   test(`a long question scrolls inside its card and keeps the composer and send button reachable (${size.name})`, async ({
@@ -263,18 +264,18 @@ for (const size of [
   }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     await mockLive(page, structuredClone(LONG));
-    await page.goto('/app/schedules?chief=chief-home');
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
-    const dock = drawer.getByTestId('chief-question-dock');
+    await page.goto('/app?chief=chief-home');
+    const coordinator = page.getByTestId('home-c');
+    await expect(coordinator).toBeVisible();
+    const dock = coordinator.getByTestId('chief-question-dock');
     await expect(dock.getByTestId('chief-question-card')).toBeVisible();
-    const input = drawer.getByTestId('chief-composer-input');
+    const input = coordinator.getByTestId('chief-composer-input');
     await expect(input).toBeVisible();
-    const send = drawer.getByTestId('chief-question-primary');
+    const send = coordinator.getByTestId('chief-question-primary');
     await expect(send).toBeVisible();
     await dock.getByTestId('chief-question-option-0-0').click();
     await send.click({ trial: true });
-    const frame = await drawer.boundingBox();
+    const frame = await coordinator.boundingBox();
     const sendBox = await send.boundingBox();
     const dockBox = await dock.boundingBox();
     const inputBox = await input.boundingBox();
@@ -451,7 +452,7 @@ for (const locale of ['zh', 'en'] as const) {
   for (const size of [
     { name: '320px phone', width: 320, height: 640 },
     { name: '375px phone', width: 375, height: 667 },
-    { name: 'desktop drawer', width: 1440, height: 900 },
+    { name: '1440 desktop', width: 1440, height: 900 },
   ]) {
     test(`nothing in the card or composer overflows or is clipped (${locale}, ${size.name}, 6 long options)`, async ({
       page,
@@ -459,11 +460,11 @@ for (const locale of ['zh', 'en'] as const) {
       await page.addInitScript((value) => localStorage.setItem('cairn-locale', value), locale);
       await page.setViewportSize({ width: size.width, height: size.height });
       await mockLive(page, structuredClone(LONG));
-      await page.goto('/app/schedules?chief=chief-home');
-      const drawer = page.locator('.chief-drawer');
-      await expect(drawer.getByTestId('chief-question-card')).toBeVisible();
-      await expect(drawer.getByTestId('chief-composer-input')).toBeVisible();
-      const defects = await drawer.evaluate((root) => {
+      await page.goto('/app?chief=chief-home');
+      const coordinator = page.getByTestId('home-c');
+      await expect(coordinator.getByTestId('chief-question-card')).toBeVisible();
+      await expect(coordinator.getByTestId('chief-composer-input')).toBeVisible();
+      const defects = await coordinator.evaluate((root) => {
         const found: string[] = [];
         const scopes = [
           root.querySelector('[data-testid="chief-question-card"]'),
@@ -504,25 +505,24 @@ for (const locale of ['zh', 'en'] as const) {
         return found;
       });
       expect(defects).toEqual([]);
-      const dock = drawer.getByTestId('chief-question-dock');
+      const dock = coordinator.getByTestId('chief-question-dock');
       await expect(
         dock.getByTestId(size.width <= 640 ? 'chief-question-more' : 'chief-question-dismiss'),
       ).toBeInViewport({ ratio: 1 });
-      await expect(drawer.getByTestId('chief-question-primary')).toBeInViewport({ ratio: 1 });
+      await expect(coordinator.getByTestId('chief-question-primary')).toBeInViewport({ ratio: 1 });
     });
   }
 }
 
 for (const size of [
   { name: '1440 home', url: '/app', width: 1440, height: 900 },
-  { name: '380px drawer', url: '/app/schedules?chief=chief-home', width: 1440, height: 900 },
   { name: '375px phone', url: '/app', width: 375, height: 667 },
 ]) {
   test(`the card is as wide as the composer and fused to its top (${size.name})`, async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     await mockLive(page, structuredClone(TWO));
     await page.goto(size.url);
-    const scope = size.name === '380px drawer' ? page.locator('.chief-drawer') : page;
+    const scope = page.getByTestId('home-c');
     const card = scope.getByTestId('chief-question-card');
     const composer = scope.locator('.chief-composer');
     await expect(card).toBeVisible();
@@ -606,8 +606,8 @@ const VERY_LONG = {
 };
 
 for (const size of [
-  { name: 'drawer', url: '/app/schedules?chief=chief-home', width: 1440, height: 900 },
-  { name: '375px phone', url: '/app/schedules?chief=chief-home', width: 375, height: 667 },
+  { name: '1440 desktop', url: '/app?chief=chief-home', width: 1440, height: 900 },
+  { name: '375px phone', url: '/app?chief=chief-home', width: 375, height: 667 },
 ]) {
   test(`a very long header and prompt scroll inside the card and keep dismiss and submit clickable (${size.name})`, async ({
     page,
@@ -615,14 +615,14 @@ for (const size of [
     await page.setViewportSize({ width: size.width, height: size.height });
     await mockLive(page, structuredClone(VERY_LONG));
     await page.goto(size.url);
-    const drawer = page.locator('.chief-drawer');
-    const card = drawer.getByTestId('chief-question-card');
+    const coordinator = page.getByTestId('home-c');
+    const card = coordinator.getByTestId('chief-question-card');
     await expect(card).toBeVisible();
     await expect.poll(async () => (await card.boundingBox())!.height).toBeLessThanOrEqual(size.height * 0.4 + 1);
-    await drawer.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
-    await drawer.getByTestId('chief-question-option-0-0').click();
+    await coordinator.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
+    await coordinator.getByTestId('chief-question-option-0-0').click();
     const dismiss = card.getByTestId(size.width <= 640 ? 'chief-question-more' : 'chief-question-dismiss');
-    const submit = drawer.getByTestId('chief-question-primary');
+    const submit = coordinator.getByTestId('chief-question-primary');
     await expect(dismiss).toBeInViewport({ ratio: 1 });
     await expect(submit).toBeInViewport({ ratio: 1 });
     await dismiss.click({ trial: true });

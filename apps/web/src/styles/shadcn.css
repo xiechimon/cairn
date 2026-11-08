@@ -55,7 +55,6 @@
   --dur-reveal: 120ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --z-docked: 10;
   --z-floating: 15;
@@ -97,7 +96,6 @@
   --radius-tile: 10px;
   --radius-bubble: 12px;
   --radius-control: 8px;
-  --radius-window: 18px;
   --e1: 0 0 0 1px var(--border);
   --e2: var(--shadow-floating), inset 0 0 0 1px var(--elevated-ring);
   --e3: var(--shadow-dialog), 0 0 0 1px var(--dialog-ring);
@@ -147,6 +145,11 @@
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.32);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.24);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.07), 0 6px 16px rgb(0 0 0 / 0.24);
+  --selection-bar-bg: rgb(0 0 0 / 0.8);
+  --selection-bar-ring: rgb(255 255 255 / 0.1);
+  --selection-bar-hover: rgb(255 255 255 / 0.1);
+  --selection-bar-ink: rgb(255 255 255);
+  --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(0 0 0 / 0.24);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
   --shadow-composer:
     0 4px 20px rgb(0 0 0 / 0.075), inset 0 0 0 var(--hairline) rgb(255 255 255 / 0.08);
@@ -269,6 +272,11 @@
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.1);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.1);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.04), 0 6px 16px rgb(0 0 0 / 0.1);
+  --selection-bar-bg: rgb(0 0 0 / 0.8);
+  --selection-bar-ring: rgb(255 255 255 / 0.1);
+  --selection-bar-hover: rgb(255 255 255 / 0.1);
+  --selection-bar-ink: rgb(255 255 255);
+  --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(11 11 11 / 0.08);
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
   --shadow-composer: 0 4px 20px rgb(0 0 0 / 0.035), inset 0 0 0 var(--hairline) rgb(0 0 0 / 0.1);
   --shadow-composer-hover: var(--shadow-composer);

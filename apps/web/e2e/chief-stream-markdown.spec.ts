@@ -167,14 +167,10 @@ async function chiefStream(page: Page) {
   };
 }
 
-async function settledDrawer(drawer: Locator) {
-  await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-}
-
-test.describe('chief drawer markdown face (fixture, #650)', () => {
+test.describe('Coordinator markdown face (fixture, #650)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app/schedules?scenario=chief-md');
-    await expect(page.locator('.chief-drawer')).toBeVisible();
+    await page.goto('/app?scenario=chief-md');
+    await expect(page.getByTestId('home-c')).toBeVisible();
   });
 
   test('F-R24: unbound chief reply rows carry no face; the page has zero dashed-face glyphs', async ({
@@ -236,7 +232,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(page).toHaveURL(/[?&]thread=r3-legacy-1/);
   });
 
-  test('F-R4/R5: typing rows have no foot; final rows keep the foot (copy + done 44s)', async ({ page }) => {
+  test('F-R4/R5: typing rows have no foot; final rows keep the copy foot without an elapsed label', async ({ page }) => {
 
     const msgs = page.getByTestId('chief-stream').getByTestId('chief-msg');
 
@@ -245,14 +241,14 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     const final = msgs.nth(1);
     const finalFoot = final.getByTestId('chief-msg-foot');
     await expect(finalFoot.getByRole('button', { name: '复制' })).toBeVisible();
-    await expect(finalFoot).toContainText('完成 44s');
+    await expect(finalFoot).not.toContainText('完成');
 
     const typing = msgs.nth(2);
     await expect(typing.getByTestId('chief-msg-foot')).toHaveCount(0);
     await expect(typing.locator('strong')).toHaveText('relay 通道');
   });
 
-  test('F-R6/R8: user row is the gradient bubble with no avatar, drawer body scrollable', async ({ page }) => {
+  test('F-R6/R8: user row is the gradient bubble with no avatar, chat body scrollable', async ({ page }) => {
     const userRow = page.getByTestId('chief-stream').getByTestId('chief-msg').first();
 
     await expect(userRow.locator('img')).toHaveCount(0);
@@ -268,11 +264,11 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
   test('F-R9: frozen capture face r5 114 does not drift — segment arrays walk the original .chief-para/.chief-bullet paths', async ({
     page,
   }) => {
-    await page.goto('/app/schedules?scenario=114');
-    await expect(page.locator('.chief-drawer')).toBeVisible();
+    await page.goto('/app?scenario=114');
+    await expect(page.getByTestId('home-c')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
-    await expect(stream.locator('p').first()).toContainText('已创建并派工');
+    await expect(stream.getByTestId('chief-msg').locator('p').first()).toContainText('已创建并派工');
     await expect(stream.locator('.chat-para, .chat-md-item, .chat-md-code')).toHaveCount(0);
 
     await expect(stream.getByTestId('chief-chip-todo')).toHaveCount(1);
@@ -285,16 +281,16 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await stubEventSource(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, { final: true });
-    await page.goto('/app/schedules?chief=chief-bbb');
+    await page.goto('/app?chief=chief-bbb');
 
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
-    await expect(drawer.getByTestId('chief-msg').last()).toBeVisible();
-    await expect(drawer.getByRole('link', { name: 'r5-scribe' })).toHaveCount(0);
+    const coordinator = page.getByTestId('home-c');
+    await expect(coordinator).toBeVisible();
+    await expect(coordinator.getByTestId('chief-msg').last()).toBeVisible();
+    await expect(coordinator.getByRole('link', { name: 'r5-scribe' })).toHaveCount(0);
   });
 });
 
-test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => {
+test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
   const MD_USER =
     '派 [#16](todo:t16) 去处理，**优先** 检查；prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面';
@@ -313,18 +309,17 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
         { id: 'm9', role: 'assistant', content: '三件都办完。', createdAt: 9 },
       ],
     });
-    await page.goto('/app/schedules?chief=chief-bbb');
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
-    await settledDrawer(drawer);
-    return drawer;
+    await page.goto('/app?chief=chief-bbb');
+    const coordinator = page.getByTestId('home-c');
+    await expect(coordinator).toBeVisible();
+    return coordinator;
   }
 
   test('F-R14: user bubbles share the parser — todo chips become clickable anchors, bold becomes strong, negatives stay literal', async ({
     page,
   }) => {
-    const drawer = await boot(page);
-    const bubble = drawer.getByTestId('chief-bubble').first();
+    const coordinator = await boot(page);
+    const bubble = coordinator.getByTestId('chief-bubble').first();
 
     await expect(bubble).toHaveAttribute('data-md', '');
 
@@ -349,8 +344,8 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     page,
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-    const drawer = await boot(page);
-    const firstUser = drawer.getByTestId('chief-msg').first();
+    const coordinator = await boot(page);
+    const firstUser = coordinator.getByTestId('chief-msg').first();
     const tools = firstUser.getByTestId('chief-msg-tools');
     await expect(tools.getByRole('button')).toHaveCount(2);
     await expect(tools.getByRole('button', { name: '恢复到此处' })).toBeVisible();
@@ -363,9 +358,9 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
   test('F-R23: row ids thread through — live row Items carry the source chief_message id (messageId), order = storage order', async ({
     page,
   }) => {
-    const drawer = await boot(page);
+    const coordinator = await boot(page);
 
-    const items = drawer.locator('[data-slot="message-scroller-item"]');
+    const items = coordinator.locator('[data-slot="message-scroller-item"]');
     await expect(items).toHaveCount(4);
     await expect(items.nth(0)).toHaveAttribute('data-message-id', 'm1');
     await expect(items.nth(1)).toHaveAttribute('data-message-id', 'm2');
@@ -376,9 +371,9 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
   test('F-R16: single-paragraph plain-text bubble geometry does not drift (one-line pill); multi-block bubble first/last block margin trimming works', async ({
     page,
   }) => {
-    const drawer = await boot(page);
+    const coordinator = await boot(page);
 
-    const plain = drawer.getByTestId('chief-bubble').filter({ hasText: PLAIN_USER });
+    const plain = coordinator.getByTestId('chief-bubble').filter({ hasText: PLAIN_USER });
     const geo = await plain.evaluate((el) => {
       const r = el.getBoundingClientRect();
       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
@@ -387,7 +382,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     expect(geo.h).toBeLessThanOrEqual(38);
     expect(geo.font).toBe('15px');
 
-    const fence = drawer.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
+    const fence = coordinator.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
     const pre = fence.getByTestId('md-code-block');
     await expect(pre).toBeVisible();
     const margins = await pre.evaluate((el) => ({
@@ -401,8 +396,8 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
   test('F-R17: fixture capture face user bubbles zero drift — bare paths stay literal (no --md class, no chat-md blocks)', async ({
     page,
   }) => {
-    await page.goto('/app/schedules?scenario=chief-md');
-    await expect(page.locator('.chief-drawer')).toBeVisible();
+    await page.goto('/app?scenario=chief-md');
+    await expect(page.getByTestId('home-c')).toBeVisible();
     const bubble = page.getByTestId('chief-stream').getByTestId('chief-bubble');
     await expect(bubble).toHaveCount(1);
     await expect(bubble).toHaveText('验证一下凭证链路，然后给我一份报告');
@@ -444,12 +439,12 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app/schedules?chief=chief-bbb');
+    await page.goto('/app?chief=chief-bbb');
 
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
+    const coordinator = page.getByTestId('home-c');
+    await expect(coordinator).toBeVisible();
 
-    const thinking = drawer.locator('.chief-msg', { hasText: '先把凭证面捋一遍' });
+    const thinking = coordinator.locator('.chief-msg', { hasText: '先把凭证面捋一遍' });
     await expect(thinking).toHaveCount(1);
 
     await expect
@@ -478,11 +473,11 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await thinking.getByRole('button', { name: '展开思考' }).click();
     await expect(thinking.locator('pre')).toHaveText('先把凭证面捋一遍');
 
-    await expect(drawer.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
-    const live = drawer.getByTestId('chief-msg').last();
+    await expect(coordinator.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
+    const live = coordinator.getByTestId('chief-msg').last();
     await live.getByRole('button', { name: '展开实时步骤' }).click();
     await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*todo_write/);
-    await expect(drawer.getByText('todo_write')).toHaveCount(1);
+    await expect(coordinator.getByText('todo_write')).toHaveCount(1);
   });
 
   test('F-R20: the in-flight call carries the concrete command (not a bare tool name)', async ({ page }) => {
@@ -508,10 +503,10 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app/schedules?chief=chief-bbb');
+    await page.goto('/app?chief=chief-bbb');
 
-    const drawer = page.locator('.chief-drawer');
-    const live = drawer.getByTestId('chief-msg').last();
+    const coordinator = page.getByTestId('home-c');
+    const live = coordinator.getByTestId('chief-msg').last();
     await live.getByRole('button', { name: '展开实时步骤' }).click();
     await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*Bash ls -la/);
   });
@@ -564,12 +559,12 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       messages: [USER_ROW, ...segRows],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app/schedules?chief=chief-bbb');
+    await page.goto('/app?chief=chief-bbb');
 
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
+    const coordinator = page.getByTestId('home-c');
+    await expect(coordinator).toBeVisible();
 
-    const rows = drawer.locator('.chief-msg, [data-testid="chief-msg"]');
+    const rows = coordinator.locator('.chief-msg, [data-testid="chief-msg"]');
     const expectFolded = async () => {
       await expect(rows).toHaveCount(5);
       await expect(rows.nth(0)).toContainText('派一下凭证链路验证');
@@ -582,13 +577,13 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       await expect(fold).toHaveCount(1);
       await fold.click();
       await expect(rows.nth(3).getByTestId('chief-turn-tools')).toContainText('todo_write');
-      await expect(drawer.getByText('todo_write')).toHaveCount(1);
+      await expect(coordinator.getByText('todo_write')).toHaveCount(1);
       await expect(rows.filter({ hasText: '正在调用' })).toHaveCount(0);
     };
     await expectFolded();
 
     state.activeRun = null;
-    await page.goto('/app/schedules?chief=chief-bbb');
+    await page.goto('/app?chief=chief-bbb');
     await expectFolded();
   });
 
@@ -621,15 +616,15 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await stubEventSource(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, state);
-    await page.goto('/app/schedules?chief=chief-bbb');
+    await page.goto('/app?chief=chief-bbb');
 
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
+    const coordinator = page.getByTestId('home-c');
+    await expect(coordinator).toBeVisible();
     for (const [text, tag] of [
       [LONG_CJK, 'CJK 长预览'],
       [LONG_LATIN, '拉丁长预览'],
     ] as const) {
-      const row = drawer.locator('.chief-msg', { hasText: text.slice(0, 16) });
+      const row = coordinator.locator('.chief-msg', { hasText: text.slice(0, 16) });
       await expect(row, tag).toHaveCount(1);
       const btn = row.getByRole('button', { name: '展开思考' });
       const m = await btn.evaluate((el) => {

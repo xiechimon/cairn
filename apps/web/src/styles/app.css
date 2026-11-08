@@ -330,15 +330,6 @@
   z-index: var(--z-modal-scrim);
 }
 
-@layer base {
-  .chief-drawer[hidden] {
-    /* biome-ignore lint/complexity/noImportantStyles: tailwind preflight `[hidden] { display: none !important }` wins over the base layer, so the park state must counter it with !important */
-    display: flex !important;
-    visibility: hidden;
-    opacity: 0;
-  }
-}
-
 @supports (corner-shape: superellipse(1.5)) {
   .board-notify-banner {
     corner-shape: superellipse(1.5);
@@ -519,10 +510,6 @@
 
   body:has(.side-panel) .app-menu-trigger {
     display: none;
-  }
-  .chief-drawer {
-    right: max(0.5rem, env(safe-area-inset-right));
-    bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 }
 

@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
+import { stubCoordinatorChief } from './helpers.js';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -491,29 +491,29 @@ async function openChief(page: Page, art: TestArt) {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: [] });
   });
+  await stubCoordinatorChief(page, TEAM_ID, USER.id);
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   await membersLoaded;
 
-  await openChiefWindow(page);
-  const drawer = page.locator('.chief-drawer');
-  await expect(drawer).toBeVisible();
+  const coordinator = page.getByTestId('home-c');
+  await expect(coordinator).toBeVisible();
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
-  return { drawer, input };
+  return { coordinator, input };
 }
 
 test('chief face: placeholder → settled chip → preview', async ({ page }) => {
   const deferred = await deferUploads(page);
   const art: TestArt = { b64: PNG_1PX };
-  const { drawer, input } = await openChief(page, art);
+  const { coordinator, input } = await openChief(page, art);
   art.b64 = await renderTestCard(page);
 
   await pastePng(page, '[data-testid="chief-composer-input"]', art.b64);
 
-  const strip = drawer.getByRole('status', { name: '附件' });
+  const strip = coordinator.getByRole('status', { name: '附件' });
   await expect(strip).toBeVisible();
   await expect(strip.getByTestId('attachment-pending')).toBeVisible();
   await evidenceShot(page, 'strip-chief-placeholder.png');
