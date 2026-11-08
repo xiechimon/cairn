@@ -1,7 +1,7 @@
 # Multi-machine MCP inventory: research and design draft
 
 Date: 2026-11-08
-Status: Draft; discovery research started, UI direction awaiting owner selection; not implemented.
+Status: Draft; owner selected server-first grouping; three regression tests reproduce current gaps; implementation pending.
 
 ## Scope and assumptions
 
@@ -17,6 +17,15 @@ Executed `node scripts/github-overlap.mjs --repo xiechimon/cairn --term MCP --te
 4. File overlap: explicitly empty for the three candidate paths. This is not clearance for additional paths: rerun with the complete file list before implementation and before opening a PR.
 
 No new ticket or PR has been created. The existing issue has not yet been updated.
+
+Rechecked before rework on 2026-11-09:
+
+1. MCP searches still identify #3476 as the same request; no replacement ticket is needed.
+2. Open MCP PR #3463 remains unrelated. The candidate machine-capability, MCP resource and research paths have no open-PR overlap: explicitly empty.
+3. Recent merged #2662 and #2652 remain the relevant grant and fail-closed boundaries; no same-intent implementation was identified.
+4. A separate TOML/dependency-path check found open #3473, head `feat/chat-markdown-polish`, touching `pnpm-lock.yaml`. Its intent is chat formatting, not MCP discovery. Proceed on this branch without taking its changes; reconcile only the authorized parser dependency lockfile delta. Other candidate parser-test and daemon-package paths have no overlap.
+
+The full-file overlap check must still be repeated as implementation paths become final.
 
 ## Findings and sources
 
@@ -88,7 +97,7 @@ Desktop · one source unreadable
   filesystem · pi · user · missing
 ```
 
-This prioritizes per-machine inspection but makes comparison a second action. Both directions use the same metadata and comparison selector. The design skill requires the owner's direction selection before feature code; no selection is recorded yet.
+This prioritizes per-machine inspection but makes comparison a second action. Both directions use the same metadata and comparison selector. The owner selected direction A in the rework response: group by server and expand to inspect each machine. Direction B is rejected; do not ask for layout selection again.
 
 ### Required state coverage
 
@@ -127,8 +136,17 @@ Reference selection, reference shots, real-component page draft and feature-regi
 | Read-only static discovery, not connection probing | Proposed | Avoid command execution, network access and authentication side effects |
 | No endpoint or command display | Proposed | Those strings can contain secret values |
 | Preserve session grants and dispatch eligibility | Chosen | Inventory is not execution authorization |
-| UI direction A or B | Awaiting owner selection | Required by the design workflow for a new settings/resource feature |
+| UI direction A | Chosen by owner | Group by server; expand to inspect each machine; stack rows at 390px |
+| Codex TOML parser dependency | Awaiting lockfile authorization | No TOML parser is installed or declared in daemon dependencies; prefer a maintained parser over a partial custom grammar |
 
 ## Execution evidence
 
-Only repository inspection, overlap queries and public/package-documentation research have run. No behavior changed; no tests, commits, pushes or PR creation have run. No claim of completed discovery coverage or proven confidentiality is made.
+The initial research draft was committed and pushed as `fb1e8e764`; its English-only gate and prepush passed. No PR was created.
+
+Rework checks:
+
+- `pnpm view smol-toml version engines license --json`: version 1.9.1, Node >=18, BSD-3-Clause. `pnpm view smol-toml@1.9.1 description repository dependencies dist.unpackedSize --json` reports the squirrelchat/smol-toml repository, no declared dependencies and an unpacked size of 140039 bytes. Package APIs and source are not yet inspected; no dependency has been installed.
+- `pnpm exec biome format --write apps/daemon/test/mcp-inventory.test.ts`: passed.
+- `pnpm exec vitest run apps/daemon/test/mcp-inventory.test.ts`: three tests failed before behavior changes, as intended. The first two demonstrate absent per-runtime inventory and absent failure coverage; the third demonstrates that a credential-shaped object key escapes through the existing legacy slug report. Its assertion reports a boolean only, not the fabricated credential.
+
+The new regression tests remain local and uncommitted while the parser decision is pending. No production behavior changed and no real configuration or credential was read. No claim of completed discovery coverage, passing regression tests, or proven confidentiality is made.
