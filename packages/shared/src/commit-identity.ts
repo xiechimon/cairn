@@ -231,7 +231,10 @@ export async function publishVerifiedCommits(input: PublishInput): Promise<Publi
     if (!staged) return;
     staged = false;
     await input.git(['update-ref', '-d', input.stagingRef]);
-    await input.api('DELETE', apiRef);
+    await input.api('DELETE', apiRef).catch((error: unknown) => {
+      if (!(error instanceof TypeError)) throw error;
+      return input.api('DELETE', apiRef);
+    });
   };
   try {
     await input.git(['push', '--no-verify', remote, `${input.tip}:${input.stagingRef}`]);
