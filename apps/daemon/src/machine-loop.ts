@@ -624,7 +624,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             ...(stillPriorSession ? { priorMachineId } : {}),
           },
         };
-        await runOrbStep(orbs, stepDeps(), claimed, {
+        await runTrackedStep(claimed, {
           resume: { sessionId: entry.sessionId, prompt: entry.prompt },
           running: 1,
           ...(entry.stopRequest != null ? { stopRequest: entry.stopRequest } : {}),
@@ -641,7 +641,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
 
   const streamCtrl = new AbortController();
-  const deliverSteer = async (stepId: string): Promise<void> => {
+  const steerChains = new Map<string, Promise<void>>();
+  const deliverSteer = (stepId: string): Promise<void> => {
+    const next = (steerChains.get(stepId) ?? Promise.resolve()).then(() => deliverSteerNow(stepId));
+    steerChains.set(stepId, next);
+    void next.finally(() => {
+      if (steerChains.get(stepId) === next) steerChains.delete(stepId);
+    });
+    return next;
+  };
+  const deliverSteerNow = async (stepId: string): Promise<void> => {
     if (stepSteeringSupport.get(stepId) === false) {
       logger.step(`steer left queued (backend does not support steering) step=${stepId}`);
       return;
@@ -780,6 +789,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const claimCtrl = new AbortController();
   const claimTimeoutMs = opts.claimTimeoutMs ?? CLAIM_POLL_INTERVAL_MS + 15_000;
 
+  function runTrackedStep(
+    claimed: ClaimedStep,
+    options: Parameters<typeof runOrbStep>[3],
+  ): Promise<void> {
+    trackClaim(claimed);
+    return runOrbStep(orbs, stepDeps(), claimed, options).finally(() =>
+      forgetClaim(claimed.step.id),
+    );
+  }
+
   function stepDeps() {
     return {
       client,
@@ -846,9 +865,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         continue;
       }
       if (step.step.kind === 'chief') inFlightChief.add(stepId);
-      trackClaim(step);
       const stepEnv = step.step.kind === 'chief' ? undefined : workerEnv(stepId);
-      const launched = runOrbStep(orbs, stepDeps(), step, {
+      const launched = runTrackedStep(step, {
         running: inFlight.size + 1,
         ...(stepEnv !== undefined ? { env: stepEnv } : {}),
       })
@@ -863,7 +881,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           inFlight.delete(stepId);
           inFlightChief.delete(stepId);
           workerSlots.delete(stepId);
-          forgetClaim(stepId);
         });
       inFlight.set(stepId, launched);
     }

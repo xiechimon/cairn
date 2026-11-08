@@ -194,6 +194,7 @@ export async function runOrbStep(
               if (ready) {
                 for (const waiter of waiting) waiter.resolve();
                 waiting.clear();
+                deps.onSessionLive?.(stepId);
               }
               return;
             }

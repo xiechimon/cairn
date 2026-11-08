@@ -881,3 +881,37 @@ test.each(['transcript', 'sessionContent'] as const)(
     }
   },
 );
+
+test('an orb worker going live acks the answers its claimed prompt carried, through the host path', async () => {
+  const api = new FakeMachineApi();
+  api.claimQueue.push({
+    ...CLAIMED,
+    instruction: 'Answer to your question ask-a:\nRepo rule wins.',
+    answerIds: ['ask-a'],
+  });
+  const provider = new FakeOrbProvider({
+    runner: async (argv, options) => {
+      if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.socketPath;
+      if (!socketPath) throw new Error('Missing relay socket');
+      const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
+      await relay.api.heartbeat('s1');
+      relay.send({ type: 'session', live: true });
+      await waitFor(() => api.answerAcks.length === 1);
+      relay.close();
+      return { code: 137, stdout: '', stderr: 'stopped after the probe' };
+    },
+  });
+  const { handle } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+  });
+  try {
+    await waitFor(() => api.answerAcks.length === 1);
+    expect(api.answerAcks).toEqual([['ask-a']]);
+  } finally {
+    await handle.stop();
+    await handle.done;
+  }
+});
