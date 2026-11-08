@@ -46,7 +46,7 @@ async function edgeContract(page: Page, selector: string) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`notify banner rides the same edge ring + card-tier shadow (${theme})`, async ({
+  test(`notify banner rides the same edge ring and no drop shadow (${theme})`, async ({
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
@@ -55,9 +55,9 @@ for (const theme of ['light', 'dark'] as const) {
     const banner = await edgeContract(page, '.board-notify-banner');
 
     expect(banner.border).toBe('0px');
-    expect(banner.radius).toBe('14px');
+    expect(banner.radius).toBe('12px');
     expect(banner.shadow.endsWith(`${banner.borderColor} 0px 0px 0px 1px`)).toBe(true);
-    expect(banner.shadow).toContain(banner.cardShadow);
+    expect(banner.shadow).not.toContain(banner.cardShadow);
   });
 
   test(`sidebar sits on canvas beside the sheet, no seam of its own (${theme})`, async ({ page }) => {

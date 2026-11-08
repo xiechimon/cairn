@@ -36,6 +36,7 @@ import { productionHarnessEvalConfig } from '../src/services/harness-eval-produc
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { VapidKeys } from '../src/services/push.js';
 import { setTodoPhase } from '../src/services/todos.js';
+import { rejectingGithubFetch } from './network-guard.js';
 
 export interface LegacyWorldIds {
   userId: string;
@@ -145,7 +146,7 @@ export function bootServer(
       ...(opts.providerTestTimeoutMs === undefined
         ? {}
         : { providerTestTimeoutMs: opts.providerTestTimeoutMs }),
-      ...(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {}),
+      githubFetch: opts.githubFetch ?? rejectingGithubFetch,
       ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
       ...(opts.skillImportFetch !== undefined ? { skillImportFetch: opts.skillImportFetch } : {}),
       ...(opts.skillImportTimeoutMs !== undefined

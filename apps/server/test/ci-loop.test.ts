@@ -115,6 +115,10 @@ class CheckRunsMock {
       this.otherRequests.push(url);
       return Promise.resolve(res(200, '"list"', []));
     }
+    if (url.includes('/issues?state=open&labels=autonomy-paused')) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"marker"', []));
+    }
     if (/\/rules\/branches\//.test(url)) {
       this.otherRequests.push(url);
       return Promise.resolve(res(200, '"r"', []));
@@ -279,7 +283,10 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
     pullState: opts.pullState,
     branch: conversationBranch(buildId),
   });
-  const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: mock.fetch });
+  const poller = createCiPoller(
+    { ...s.svc, box: s.secretBox, githubFetch: mock.fetch },
+    { githubFetch: mock.fetch },
+  );
   return {
     s,
     teamId,
@@ -1202,21 +1209,17 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
     );
     const created: { title: string; body: string; labels: string[] }[] = [];
-    const poller = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
-      {
-        githubFetch: (input, init) => {
-          if (String(input).includes('/issues')) {
-            if (init?.method === 'POST') {
-              created.push(JSON.parse(init.body ?? '{}'));
-              return Promise.resolve(res(201, '', { number: 200 }));
-            }
-            return Promise.resolve(res(200, '', []));
-          }
-          return w.mock.fetch(input, init);
-        },
-      },
-    );
+    const githubFetch: FetchLike = (input, init) => {
+      if (String(input).includes('/issues')) {
+        if (init?.method === 'POST') {
+          created.push(JSON.parse(init.body ?? '{}'));
+          return Promise.resolve(res(201, '', { number: 200 }));
+        }
+        return Promise.resolve(res(200, '', []));
+      }
+      return w.mock.fetch(input, init);
+    };
+    const poller = createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch });
     await poller.sweep();
     expect(created).toHaveLength(expected);
     if (expected) {
@@ -1249,6 +1252,8 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       { phase: 'todo' },
     );
     const githubFetch: FetchLike = (input, init) => {
+      if (String(input).includes('/issues?state=open&labels=autonomy-paused'))
+        return w.mock.fetch(input, init);
       if (String(input).includes('/issues')) {
         if (!available) return Promise.resolve(res(503, '', {}));
         if (init?.method === 'POST') {
@@ -1274,10 +1279,10 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
         return extra.mock.fetch(input, init);
       return w.mock.fetch(input, init);
     };
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
     expect(w.todoRow().phase).toBe('review');
     available = true;
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
     expect(writes).toBe(1);
     expect(w.todoRow().phase).toBe('review');
     w.s.db
@@ -1300,7 +1305,7 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       })
       .run();
     w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, extra.todoId)).run();
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
     expect(writes).toBe(2);
     expect(lists).toBe(3);
   });
@@ -1445,7 +1450,10 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
         w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.prUrl,
       ).toBe(`https://github.com/octo/demo/pull/${w.prNumber}`);
       expect(w.todoRow().phase).toBe('building');
-      await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+      await createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox, githubFetch },
+        { githubFetch },
+      ).sweep();
       expect(w.fixRoundSteps()).toHaveLength(1);
       expect(w.fixRoundSteps()[0]?.prompt).toContain('lint');
     },

@@ -1,10 +1,15 @@
 import { chmod, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, expect, test, vi } from 'vitest';
+import { acquireGithubCreateSlot } from '@cairn/shared/github-create-gate';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HttpError } from '../src/lib/errors.js';
-import { githubCreateIssue } from '../src/lib/github.js';
+import { githubCreateIssue, setGithubCreateGate } from '../src/lib/github.js';
 import type { AutonomousToken } from '../src/lib/github-token.js';
+
+beforeEach(() => {
+  setGithubCreateGate(acquireGithubCreateSlot);
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
