@@ -480,6 +480,56 @@ describe('answers reach the agent once and are acked only after a successful ste
     await handle.done;
   });
 
+  test('two steer events that arrive together deliver an unacked answer once', async () => {
+    const api = new FakeMachineApi();
+    api.steerAnswers = [{ requestId: 'ask-a', text: 'Repo rule wins.' }];
+    const steered: string[] = [];
+    let releaseSteer: () => void = () => {};
+    const steerGate = new Promise<void>((r) => {
+      releaseSteer = r;
+    });
+    let releaseRun: () => void = () => {};
+    const runGate = new Promise<void>((r) => {
+      releaseRun = r;
+    });
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'pi-sess-concurrent',
+          events: (async function* () {
+            yield { type: 'text_delta', text: 'waiting' } as StepEvent;
+            await runGate;
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer(text: string) {
+            await steerGate;
+            steered.push(text);
+          },
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+    };
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.calls.filter((c) => c === 'steer:s1').length >= 1);
+    releaseSteer();
+    await waitFor(() => api.calls.filter((c) => c === 'steer:s1').length === 2);
+    await waitFor(() => api.answerAcks.length === 1);
+    expect(steered).toEqual(['Answer to your question ask-a:\nRepo rule wins.']);
+    releaseRun();
+    await handle.stop();
+    await handle.done;
+  });
+
   test('answers the resumed prompt carried are acked once the session is live', async () => {
     const api = new FakeMachineApi();
     const steered: string[] = [];
