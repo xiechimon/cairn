@@ -154,6 +154,43 @@ describe('repo rules beat the brief; only owner classes escalate (task stall S3)
     expect(notices[0]?.snippet).toContain('Repo rule wins; rewrite the string.');
   });
 
+  test('an escalated question on a failed thread marks the thread as waiting on the owner', async () => {
+    const { todoId } = await parkedQuestion();
+    H.s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, todoId)).run();
+    expect(getTodo(deps(), todoId)?.waitingOn).toBeUndefined();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'payment',
+      defaultAnswer: 'Stay on the free plan.',
+    });
+    expect(getTodo(deps(), todoId)?.waitingOn).toEqual({ on: 'owner', retryAt: null });
+    expect(ownerNeedsYou()).toContain(todoId);
+  });
+
+  test('a long question never pushes the proposed default out of the owner notice', async () => {
+    const { todoId, buildId } = await parkedQuestion();
+    const stored = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get();
+    const content = stored?.content as { questions: { question: string }[] };
+    H.s.db
+      .update(message)
+      .set({
+        content: {
+          ...content,
+          questions: [{ ...content.questions[0], question: `${'Which wins? '.repeat(20)}` }],
+        },
+      })
+      .where(and(eq(message.id, REQUEST), eq(message.conversationId, buildId)))
+      .run();
+    await relay('escalate_question', {
+      todoId,
+      requestId: REQUEST,
+      class: 'other',
+      defaultAnswer: 'Repo rule wins.',
+    });
+    expect(ownerNotifications(todoId)[0]?.snippet).toContain('Default: Repo rule wins.');
+  });
+
   test('an escalated owner-class question leaves the Coordinator queue and refuses a Coordinator answer', async () => {
     const { todoId, buildId } = await parkedQuestion();
     await relay('escalate_question', {

@@ -16,6 +16,7 @@ function waitsOnOwner(todo: TodoRecord): boolean {
     case 'review':
       return todo.output !== 'info';
     case 'needs_input':
+    case 'failed':
       return todo.waitingOn?.on === 'owner';
     default:
       return false;

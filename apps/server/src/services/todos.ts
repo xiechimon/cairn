@@ -194,11 +194,12 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
 }
 
 function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | undefined {
-  if (row.phase === 'needs_input' && row.latestBuildId !== null) {
+  if ((row.phase === 'needs_input' || row.phase === 'failed') && row.latestBuildId !== null) {
     const escalated = pendingWorkerQuestions(deps.db, row.latestBuildId).some(
       (question) => question.escalation !== undefined,
     );
-    return { on: escalated ? 'owner' : 'coordinator', retryAt: null };
+    if (escalated) return { on: 'owner', retryAt: null };
+    if (row.phase === 'needs_input') return { on: 'coordinator', retryAt: null };
   }
   if (!(IN_PROGRESS_PHASES as readonly string[]).includes(row.phase) || row.latestBuildId === null)
     return undefined;

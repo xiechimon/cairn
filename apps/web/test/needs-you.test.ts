@@ -34,6 +34,12 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
     expect(pendingQuestions(stream)).toHaveLength(1);
   });
 
+  test('a failed thread whose question was escalated waits on the owner, not the Coordinator', () => {
+    const escalated = { ...todo(3, 'failed'), waitingOn: { on: 'owner' as const, retryAt: null } };
+    expect(needsYouThreads([escalated]).map((row) => row.seqNum)).toEqual([3]);
+    expect(inProgressThreads([escalated])).toEqual([]);
+  });
+
   test('a thread the Coordinator now owns stays visible as in progress instead of dropping out of every group', () => {
     const set = [
       todo(1, 'confirm'),
