@@ -174,3 +174,36 @@ test('gallery menu: composing text does not fire a row', async ({ page }) => {
   await expect(menu).toBeVisible();
   await expect(page.getByText('Last picked: Delete')).toHaveCount(0);
 });
+
+test('a highlighted dark menu row keeps its shortcut hint at 4.5:1', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'dark'));
+  await openMoreMenu(page);
+  const row = moreMenu(page).getByRole('menuitem').first();
+  await row.hover();
+  await row.focus();
+  const hint = row.locator('[data-slot="dropdown-menu-shortcut"]');
+  const colors = await row.evaluate((el) => {
+    const toRgba = (css: string): [number, number, number, number] => {
+      const ctx = document.createElement('canvas').getContext('2d');
+      if (ctx === null) throw new Error('no 2d context');
+      ctx.fillStyle = css;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      return [r as number, g as number, b as number, (a as number) / 255];
+    };
+    const under = toRgba(getComputedStyle(el.parentElement as Element).backgroundColor);
+    const overlay = toRgba(getComputedStyle(el).backgroundColor);
+    const mix = (i: 0 | 1 | 2) => overlay[i] * overlay[3] + under[i] * (1 - overlay[3]);
+    const hintEl = el.querySelector('[data-slot="dropdown-menu-shortcut"]') as Element;
+    return { bg: [mix(0), mix(1), mix(2)], fg: toRgba(getComputedStyle(hintEl).color).slice(0, 3) };
+  });
+  await expect(hint).toBeVisible();
+  const channel = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = ([r, g, b]: number[]) =>
+    0.2126 * channel(r as number) + 0.7152 * channel(g as number) + 0.0722 * channel(b as number);
+  const [hi, lo] = [lum(colors.fg), lum(colors.bg)].sort((x, y) => (y as number) - (x as number));
+  expect(((hi as number) + 0.05) / ((lo as number) + 0.05)).toBeGreaterThanOrEqual(4.5);
+});

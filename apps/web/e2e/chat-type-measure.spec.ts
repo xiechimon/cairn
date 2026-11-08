@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 15px (text-card-title) on the unitless 1.5 type line height', async ({
+test('chat body reads at 15px (text-card-title) on the 21/15 type line height', async ({
   page,
 }) => {
   await page.goto(DONE);
@@ -20,8 +20,8 @@ test('chat body reads at 15px (text-card-title) on the unitless 1.5 type line he
     return { ...before, scaled };
   });
   expect(cs.fontSize).toBe('15px');
-  expect(cs.lineHeight).toBe('22.5px');
-  expect(cs.scaled).toBe('30px');
+  expect(cs.lineHeight).toBe('21px');
+  expect(cs.scaled).toBe('28px');
 });
 
 test('68ch measure cap binds the body text and the centered note', async ({ page }) => {
@@ -118,8 +118,8 @@ test('bubble / footer keep their own geometry, replies carry no avatar column', 
       userFooterAlign: getComputedStyle(userFooter).justifyContent,
     };
   });
-  expect(geo.bubbleH).toBeGreaterThanOrEqual(38);
-  expect(geo.bubbleH).toBeLessThanOrEqual(39);
+  expect(geo.bubbleH).toBeGreaterThanOrEqual(37);
+  expect(geo.bubbleH).toBeLessThanOrEqual(38);
   expect(geo.bubbleFont).toBe('15px');
   expect(geo.avatars).toBe(0);
   expect(geo.footerPad).toBe('0px');

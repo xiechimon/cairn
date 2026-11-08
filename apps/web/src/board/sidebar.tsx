@@ -89,23 +89,8 @@ function readProjectsCollapsed(storage: Storage | null): boolean {
 const ICON = 'size-4.5 flex-none';
 const STROKE = 1.75;
 
-export function BrandMark({ className = 'size-4' }: { className?: string }) {
-  return (
-    <span
-      data-testid="brand-mark"
-      aria-hidden="true"
-      className={`sidebar-brand-mark block flex-none ${className}`}
-      style={{
-        backgroundColor: 'currentColor',
-        WebkitMask: 'url("/logo-mark.svg") center / 100% no-repeat',
-        mask: 'url("/logo-mark.svg") center / 100% no-repeat',
-      }}
-    />
-  );
-}
-
 const FOCUS =
-  'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2';
+  'outline-none focus-visible:[outline:var(--focus-width)_solid_var(--focus-ring)] focus-visible:outline-offset-0';
 
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
@@ -351,11 +336,18 @@ export function BoardSidebar({
     >
       <div
         data-testid="team-row"
-        className="sidebar-team-row flex h-11 flex-none items-center gap-0.5 text-foreground"
+        className="sidebar-team-row flex h-11 flex-none items-center text-foreground"
       >
-        <span className="sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 px-2 text-foreground">
-          <BrandMark className="size-5.5" />
-          <span className="truncate font-heading text-page font-title">{BRAND.manifestName}</span>
+        <Button
+          variant="ghost"
+          className={`sidebar-team-collapse ${ICON_BTN}`}
+          aria-label={t('收起侧边栏')}
+          onClick={onToggle}
+        >
+          <PanelLeft className={ICON} strokeWidth={STROKE} />
+        </Button>
+        <span className="sidebar-team-name ml-1 min-w-0 flex-1 truncate font-serif text-page leading-none font-medium tracking-normal text-foreground">
+          {BRAND.manifestName}
         </span>
         <Tooltip>
           <TooltipTrigger
@@ -374,14 +366,6 @@ export function BoardSidebar({
             <Kbd>⌘K</Kbd>
           </TooltipContent>
         </Tooltip>
-        <Button
-          variant="ghost"
-          className={`sidebar-team-collapse ${ICON_BTN}`}
-          aria-label={t('收起侧边栏')}
-          onClick={onToggle}
-        >
-          <PanelLeft className="size-4" strokeWidth={STROKE} />
-        </Button>
       </div>
 
       <div className="mt-2 flex flex-none flex-col gap-px">
