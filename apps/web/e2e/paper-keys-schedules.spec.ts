@@ -36,7 +36,7 @@ for (const [name, url] of [
     await light(page, url);
     const cards = page.locator('[data-testid="page-col"] .settings-card');
     await expect(cards).toHaveCount(1);
-    await expect(cards).toHaveCSS('border-top-left-radius', '14px');
+    await expect(cards).toHaveCSS('border-top-left-radius', '12px');
     const heights = await cards.evaluate((el) =>
       [...el.children].map((row) => row.getBoundingClientRect().height),
     );

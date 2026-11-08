@@ -2,79 +2,79 @@ import { expect, type Page, test } from '@playwright/test';
 
 const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
   dark: {
-    canvas: '#141715',
-    background: '#1b1f1c',
-    foreground: '#e6e8e2',
-    card: '#222723',
-    'card-foreground': '#e6e8e2',
-    popover: '#262b27',
-    'popover-foreground': '#e6e8e2',
-    primary: '#e6e8e2',
-    'primary-foreground': '#161a17',
-    secondary: '#2a302b',
-    'secondary-foreground': '#e6e8e2',
-    muted: '#2a302b',
-    'muted-foreground': '#b4bab3',
-    accent: '#2a302b',
-    'accent-foreground': '#e6e8e2',
+    canvas: '#1f1f1f',
+    background: '#191919',
+    foreground: '#efefef',
+    card: '#202020',
+    'card-foreground': '#efefef',
+    popover: '#303030',
+    'popover-foreground': '#efefef',
+    primary: '#efefef',
+    'primary-foreground': '#191919',
+    secondary: '#262626',
+    'secondary-foreground': '#efefef',
+    muted: '#262626',
+    'muted-foreground': '#a6a6a6',
+    accent: '#262626',
+    'accent-foreground': '#efefef',
     destructive: '#f09a88',
-    border: '#353b36',
-    input: '#6b726c',
-    ring: '#9cc78b',
-    'text-secondary': '#b4bab3',
-    'text-tertiary': '#a3aaa4',
+    input: '#6b6b6b',
+    ring: '#ebb550',
+    'text-secondary': '#a6a6a6',
+    'text-tertiary': '#999999',
     'card-button': '#ebb550',
-    'focus-ring': '#9cc78b',
+    'focus-ring': '#ebb550',
     'spot-text-on-tint': '#f2cf86',
     running: '#82b46f',
     'running-text': '#9cc78b',
     'running-bar': '#6fa35c',
-    'running-track': '#2e3430',
+    'running-track': '#2a2a2a',
     'accent-hover': '#33290f',
   },
   light: {
-    canvas: '#e6e7e1',
-    background: '#f6f6f2',
-    foreground: '#1d231f',
-    card: '#fdfdfb',
-    'card-foreground': '#1d231f',
-    popover: '#fdfdfb',
-    'popover-foreground': '#1d231f',
-    primary: '#233127',
-    'primary-foreground': '#f4f6f1',
-    secondary: '#eceee8',
-    'secondary-foreground': '#1d231f',
-    muted: '#eceee8',
-    'muted-foreground': '#4b534d',
-    accent: '#eceee8',
-    'accent-foreground': '#1d231f',
+    canvas: '#fafafa',
+    background: '#ffffff',
+    foreground: '#1a1a1a',
+    card: '#f7f7f7',
+    'card-foreground': '#1a1a1a',
+    popover: '#ffffff',
+    'popover-foreground': '#1a1a1a',
+    primary: '#1a1a1a',
+    'primary-foreground': '#ffffff',
+    secondary: '#f2f2f2',
+    'secondary-foreground': '#1a1a1a',
+    muted: '#f2f2f2',
+    'muted-foreground': '#666666',
+    accent: '#f2f2f2',
+    'accent-foreground': '#1a1a1a',
     destructive: '#a33a2a',
-    border: '#dcdfd7',
-    input: '#ccd0c7',
-    ring: '#3f6c35',
-    'text-secondary': '#4b534d',
-    'text-tertiary': '#5f665f',
+    input: '#c7c7c7',
+    ring: '#9a6500',
+    'text-secondary': '#666666',
+    'text-tertiary': '#6b6b6b',
     'card-button': '#9a6500',
-    'focus-ring': '#3f6c35',
+    'focus-ring': '#9a6500',
     'spot-text-on-tint': '#6e4900',
     running: '#5f8f4f',
     'running-text': '#3f6c35',
     'running-bar': '#55833f',
-    'running-track': '#e1e3dc',
+    'running-track': '#ebebeb',
     'accent-hover': '#f7ecd2',
   },
 };
 
 const FROZEN_RGB: Record<'dark' | 'light', Record<string, string>> = {
   dark: {
-    'sidebar-hover': 'rgb(230 232 226 / 0.05)',
-    'sidebar-active': 'rgb(230 232 226 / 0.09)',
+    'sidebar-hover': 'rgb(255 255 255 / 0.075)',
+    'sidebar-active': 'rgb(255 255 255 / 0.15)',
     'dialog-backdrop': 'rgb(0 0 0 / 0.5)',
+    border: 'rgb(255 255 255 / 0.1)',
   },
   light: {
-    'sidebar-hover': '#dcded7',
-    'sidebar-active': '#d2d6cc',
-    'dialog-backdrop': 'rgb(29 35 31 / 0.28)',
+    'sidebar-hover': 'rgb(0 0 0 / 0.05)',
+    'sidebar-active': 'rgb(0 0 0 / 0.1)',
+    'dialog-backdrop': 'rgb(0 0 0 / 0.4)',
+    border: 'rgb(0 0 0 / 0.1)',
   },
 };
 
@@ -118,12 +118,12 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForSelector('.board-sidebar');
 
     const pairs: Array<[string, string]> = [
-      ['canvas', theme === 'light' ? '#e6e7e1' : '#141715'],
+      ['canvas', theme === 'light' ? '#fafafa' : '#1f1f1f'],
       ['surface-1', 'var(--canvas)'],
       ['accent-hover', theme === 'light' ? '#f7ecd2' : '#33290f'],
-      ['dialog-surface', 'var(--background)'],
-      ['menu-hover', theme === 'light' ? 'rgb(29 35 31 / 0.1)' : 'rgb(230 232 226 / 0.1)'],
-      ['hover-1', 'color-mix(in oklab, var(--foreground) 5%, transparent)'],
+      ['dialog-surface', theme === 'light' ? 'var(--background)' : 'var(--canvas)'],
+      ['menu-hover', theme === 'light' ? 'rgb(0 0 0 / 0.05)' : 'rgb(255 255 255 / 0.075)'],
+      ['hover-1', 'var(--sidebar-hover)'],
       ['border-soft', 'color-mix(in oklab, var(--foreground) 9%, transparent)'],
       ['ring-inset-highlight', 'color-mix(in oklab, var(--foreground) 10%, transparent)'],
     ];
@@ -155,11 +155,11 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
     };
   });
   expect(vals.composer).toBe('14px');
-  expect(vals.bubble).toBe('14px');
+  expect(vals.bubble).toBe('12px');
   expect(vals.sidebar).toBe('248px');
   expect(vals.chat).toBe('768px');
-  expect(vals.edge).toBe('18px');
-  expect(vals.card).toBe('14px');
+  expect(vals.edge).toBe('12px');
+  expect(vals.card).toBe('12px');
   expect(vals.cdsMd).toBe('6px');
   expect(vals.shadcnMd.length).toBeGreaterThan(0);
   expect(vals.expo.replace(/0\./g, '.')).toBe('cubic-bezier(.16, 1, .3, 1)');

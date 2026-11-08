@@ -104,7 +104,14 @@ export function SettingsNav({
                 <item.Icon aria-hidden className="size-4 flex-none" strokeWidth={1.75} />
                 <span className="min-w-0 flex-auto truncate">{item.label}</span>
                 {item.badge !== undefined && (
-                  <span className="text-caption text-content-secondary">{item.badge}</span>
+                  <span
+                    className={cn(
+                      'text-caption',
+                      current === item.id ? 'text-foreground' : 'text-content-secondary',
+                    )}
+                  >
+                    {item.badge}
+                  </span>
                 )}
               </Link>
             ))}

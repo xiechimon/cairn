@@ -81,7 +81,7 @@ function expectGlobalOutline(info: FocusInfo) {
   expect(info.focusVisible).toBe(true);
   expect(info.outlineStyle).toBe('solid');
   expect(info.outlineWidth).toBe('2px');
-  expect(info.outlineOffset).toBe('2px');
+  expect(info.outlineOffset).toBe('0px');
   expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
   expect(info.boxShadow).not.toContain('0px 0px 0px 3px');
   expect(info.borderTopColor).not.toBe(hexToRgb(info.ringColor));
@@ -242,7 +242,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expect(info.focusVisible).toBe(true);
     expect(info.outlineStyle).toBe('solid');
     expect(info.outlineWidth).toBe('2px');
-    expect(info.outlineOffset).toBe('2px');
+    expect(info.outlineOffset).toBe('0px');
     expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
     expect(info.boxShadow).not.toContain('0px 0px 0px 3px');
   });

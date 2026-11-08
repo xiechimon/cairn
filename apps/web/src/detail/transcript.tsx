@@ -291,7 +291,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
             <span
-              className={`chat-bubble min-w-0 bg-(--bubble-base) max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground) ${
+              className={`chat-bubble min-w-0 bubble-gradient max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
