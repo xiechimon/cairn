@@ -13,11 +13,8 @@ const DISTINCT_ROLES_SHARING_A_VALUE = [
   ],
   ['--accent', '--muted', '--secondary'],
   ['--muted-foreground', '--text-secondary'],
-  ['--ring', '--running-text'],
   ['--running-track', '--surface-tertiary'],
-  ['--icon', '--text-tertiary'],
   ['--qr-light', '--switch-thumb', '--text-on-veil'],
-  ['--running-bar', '--switch-on'],
 ].map((group) => group.join(' '));
 
 function hexTokens(block: string): Map<string, string> {

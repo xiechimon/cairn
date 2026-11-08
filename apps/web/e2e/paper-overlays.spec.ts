@@ -54,7 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto(SECRETS);
       return resolveColor(page, 'var(--dialog-backdrop)');
     })();
-    if (theme === 'light') expect(want).toBe('rgba(29, 35, 31, 0.28)');
+    if (theme === 'light') expect(want).toBe('rgba(0, 0, 0, 0.4)');
 
     await openFromTopbar(page, SECRETS, '添加密钥');
     const overlay = page.locator('[data-slot="dialog-overlay"]');
@@ -94,13 +94,13 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
   await evidenceShot(page, 'delete-confirm-s.png');
 });
 
-test('dialog face: sheet surface, 18px corners, 17px sans title, 28px close', async ({ page }) => {
+test('dialog face: sheet surface, 12px corners, 15px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
-  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f6f6f2'));
-  await expect(dialog).toHaveCSS('border-top-left-radius', '18px');
+  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#ffffff'));
+  await expect(dialog).toHaveCSS('border-top-left-radius', '12px');
   const title = dialog.getByTestId('dialog-head').getByText('添加密钥');
-  await expect(title).toHaveCSS('font-size', '17px');
+  await expect(title).toHaveCSS('font-size', '15px');
   const close = dialog.getByRole('button', { name: '关闭' });
   const box = await close.boundingBox();
   expect(box?.width).toBe(28);
@@ -157,7 +157,7 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
   expect(overflow).toBe(true);
 });
 
-test('Paper menu: 32px rows, 14px text, 15px icons, 12px panel corners, 4px padding', async ({
+test('Paper menu: 32px rows, 14px text, 15px icons, 14px panel corners, 4px padding', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
@@ -166,9 +166,9 @@ test('Paper menu: 32px rows, 14px text, 15px icons, 12px panel corners, 4px padd
   const menu = page.locator('.more-menu');
   await expect(menu).toBeVisible();
   await settle(menu);
-  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '14px');
   await expect(menu).toHaveCSS('padding-top', '4px');
-  await expect(menu).toHaveCSS('background-color', 'rgb(253, 253, 251)');
+  await expect(menu).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 
   const rows = menu.getByRole('menuitem');
   const count = await rows.count();
@@ -199,7 +199,7 @@ test('provider picker: grouped rows, search hides empty groups', async ({ page }
   await expect(dialog.getByRole('group', { name: '订阅登录' }).locator('[data-preset-id]')).toHaveCount(2);
   const codex = dialog.locator('[data-preset-id="openai-codex"]');
   await expect(codex).toBeDisabled();
-  await expect(codex).toHaveCSS('color', await resolveColor(page, '#5f665f'));
+  await expect(codex).toHaveCSS('color', await resolveColor(page, '#6b6b6b'));
   await evidenceShot(page, 'provider-picker.png');
 
   await dialog.getByLabel('搜索服务商...').fill('cloudflare');

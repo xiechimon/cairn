@@ -46,7 +46,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect.soft(lines.color).not.toMatch(/transparent|rgba\([^)]*, 0\)/);
       expect.soft(lines.color).not.toBe(lines.cardBackground);
       expect.soft(lines.color).not.toBe(lines.panelBackground);
-      expect.soft(lines.radius).toBe('14px');
+      expect.soft(lines.radius).toBe('12px');
       expect.soft(lines.dividerWidth).toBe('1px');
       expect.soft(lines.dividerColor).toBe(lines.color);
       expect.soft(lines.dividerStyle).toBe('solid');
