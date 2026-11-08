@@ -406,15 +406,15 @@ export class WorkspaceManager implements WorktreeOps {
     const drift = readSetupDrift(driftFile);
     const dirty = await gitPrim.dirtyPaths(cwd);
     const current = fingerprintsOf(cwd, dirty);
+    const staged = new Set(await gitPrim.stagedPaths(cwd));
     const setupDrift = dirty.filter(
-      (path) => drift[path] !== undefined && drift[path] === current[path],
+      (path) => !staged.has(path) && drift[path] !== undefined && drift[path] === current[path],
     );
     const driftSet = new Set(setupDrift);
     await gitPrim.addPaths(
       cwd,
       dirty.filter((path) => !driftSet.has(path)),
     );
-    await gitPrim.unstagePaths(cwd, setupDrift);
     writeFileSync(
       driftFile,
       JSON.stringify(Object.fromEntries(setupDrift.map((path) => [path, drift[path]]))),

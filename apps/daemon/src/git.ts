@@ -516,6 +516,14 @@ export const gitPrim = {
       .map((entry) => entry.slice(3));
   },
 
+  async stagedPaths(dir: string): Promise<string[]> {
+    const out = await runGitOk(['diff', '--cached', '--name-only', '-z', '--no-renames'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    return out.split('\0').filter((path) => path !== '');
+  },
+
   async gitPath(dir: string, name: string): Promise<string> {
     const path = await runGitOk(['rev-parse', '--path-format=absolute', '--git-path', name], {
       cwd: dir,
@@ -527,16 +535,6 @@ export const gitPrim = {
   async addPaths(dir: string, paths: readonly string[]): Promise<void> {
     for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
       await runGitOk(['add', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)], {
-        cwd: dir,
-        env: { GIT_LITERAL_PATHSPECS: '1' },
-        timeoutMs: META_TIMEOUT_MS,
-      });
-    }
-  },
-
-  async unstagePaths(dir: string, paths: readonly string[]): Promise<void> {
-    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
-      await runGitOk(['reset', '-q', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)], {
         cwd: dir,
         env: { GIT_LITERAL_PATHSPECS: '1' },
         timeoutMs: META_TIMEOUT_MS,

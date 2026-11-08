@@ -122,16 +122,20 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
     expect(result.setupDrift).toEqual(['.setup-cache/state']);
   }, 60_000);
 
-  test('drift the agent staged by hand is unstaged before the commit', async () => {
+  test('a setup path the agent staged by hand is the agent choice and is committed', async () => {
     await seedRepo(userRepo);
     const ws = new WorkspaceManager({ logger: quietLogger() });
     const prepared = await ws.prepare(prepareInput());
     writeFileSync(join(prepared.cwd, 'feature.txt'), 'agent work\n');
-    await git(prepared.cwd, ['add', '--all']);
+    await git(prepared.cwd, ['add', '.setup-cache/state']);
 
-    await ws.commitAll(prepared.cwd, 'build: feature', IDENTITY);
+    const result = await ws.commitAll(prepared.cwd, 'build: feature', IDENTITY);
 
-    expect(await committedPaths(prepared.cwd)).toEqual(['feature.txt']);
+    expect((await committedPaths(prepared.cwd)).sort()).toEqual([
+      '.setup-cache/state',
+      'feature.txt',
+    ]);
+    expect(result.setupDrift).toEqual(['pnpm-lock.yaml']);
   }, 60_000);
 
   test('the commit runs its hooks inside the repository hook budget, and a timeout says so', async () => {
