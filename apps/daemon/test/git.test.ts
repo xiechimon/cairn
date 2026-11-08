@@ -1253,3 +1253,19 @@ describe('commit failures carry the real signal, timeout and hook output (task s
 });
 
 const IDENTITY_FOR_HOOKS = { name: 't', email: 't@example.com' };
+
+describe('a timed-out git resolves even when a descendant escapes the kill and holds its pipes', () => {
+  test.skipIf(process.platform !== 'linux')(
+    'a hook child in its own session keeps stdout open, runGit still settles after the grace',
+    async () => {
+      const dir = hookedRepo('#!/bin/sh\necho checks passed\nsetsid sleep 12 &\nexec sleep 30\n');
+      const started = Date.now();
+      const result = await runGit(['commit', '-m', 'work'], { cwd: dir, timeoutMs: 400 });
+      expect(Date.now() - started).toBeLessThan(8_000);
+      expect(result.timedOut).toBe(true);
+      expect(result.code).toBeNull();
+      expect(result.stdout + result.stderr).toContain('checks passed');
+    },
+    20_000,
+  );
+});
