@@ -134,8 +134,8 @@ test('4. brief-card recipe = framed content box (1px border / rounded-lg / surfa
 
   expect(cs.radius).toBe('8px');
 
-  expect(cs.bg).toBe('rgb(42, 48, 43)');
-  expect(cs.borderColor).toBe('rgb(53, 59, 54)');
+  expect(cs.bg).toBe('rgb(38, 38, 38)');
+  expect(cs.borderColor).toBe('rgba(255, 255, 255, 0.1)');
   expect(cs.fontSize).toBe('15px');
 });
 

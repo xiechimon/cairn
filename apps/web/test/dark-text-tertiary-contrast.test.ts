@@ -10,6 +10,21 @@ function hex(name: string): string {
   return match[1];
 }
 
+function translucentOver(name: string, base: string): string {
+  const match = new RegExp(`${name}:\\s*rgb\\((\\d+) (\\d+) (\\d+) / ([\\d.]+)\\)`).exec(dark);
+  if (match == null) throw new Error(`missing ${name}`);
+  const alpha = Number(match[4]);
+  const channels = [1, 3, 5].map((i, n) => {
+    const under = Number.parseInt(base.slice(i, i + 2), 16);
+    return Math.round(Number(match[n + 1]) * alpha + under * (1 - alpha));
+  });
+  return `#${channels.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function surfaceColor(name: string): string {
+  return name === '--border' ? translucentOver(name, hex('--background')) : hex(name);
+}
+
 function luminance(color: string): number {
   const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => {
     const v = Number.parseInt(color.slice(i, i + 2), 16) / 255;
@@ -26,6 +41,6 @@ function contrast(a: string, b: string): number {
 it.each(['--background', '--surface-tertiary', '--accent', '--border'])(
   'dark tertiary text reaches 4.5:1 on %s',
   (surface) => {
-    expect(contrast(hex('--text-tertiary'), hex(surface))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(hex('--text-tertiary'), surfaceColor(surface))).toBeGreaterThanOrEqual(4.5);
   },
 );

@@ -57,8 +57,8 @@ for (const theme of ['light', 'dark'] as const) {
 
     const title = win.getByRole('heading', { name: 'Coordinator', level: 2 });
     await expect(title, 'W1').toHaveCSS('font-family', display);
-    await expect(title, 'W1').toHaveCSS('font-size', '17px');
-    await expect(title, 'W1').toHaveCSS('font-weight', '650');
+    await expect(title, 'W1').toHaveCSS('font-size', '15px');
+    await expect(title, 'W1').toHaveCSS('font-weight', '500');
     const winBox = await win.boundingBox();
     const titleBox = await title.boundingBox();
     expect((titleBox?.x ?? 0) - (winBox?.x ?? 0), 'W1').toBeCloseTo(16, 0);
@@ -73,7 +73,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const hero = win.getByRole('heading', { name: '选择一个主题开始' });
     await expect(hero, 'W3').toHaveCSS('font-family', display);
-    await expect(hero, 'W3').toHaveCSS('font-size', '17px');
+    await expect(hero, 'W3').toHaveCSS('font-size', '15px');
     const example = win.getByTestId('chief-examples').getByRole('button').first();
     await expect(example, 'W3').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
     await expect(example, 'W3').toHaveCSS('background-color', card);
@@ -106,7 +106,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const heading = page.getByRole('heading', { name: 'Coordinator 设置' });
     await expect(heading, 'S1').toHaveCSS('font-family', serif);
-    await expect(heading, 'S1').toHaveCSS('font-size', '20px');
+    await expect(heading, 'S1').toHaveCSS('font-size', '24px');
     const bar = page.getByTestId('chief-settings-topbar');
     expect((await bar.boundingBox())?.height, 'S1').toBe(56);
     await expect(bar, 'S1').toHaveCSS('border-bottom-width', '1px');
@@ -169,7 +169,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const pending = win.locator('[data-testid="chief-question-card"][data-status="pending"]');
     await pending.scrollIntoViewIfNeeded();
-    await expect(pending, 'Q1').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
+    await expect(pending, 'Q1').toHaveCSS('border-top-left-radius', await token(page, '--radius-composer'));
     await expect(pending, 'Q1').toHaveCSS('background-color', card);
     const waiting = pending.getByTestId('chief-question-status');
     await expect(waiting, 'Q1').toHaveClass(/sr-only/);

@@ -33,6 +33,14 @@ export type FetchLike = (
 
 const FETCH_TIMEOUT_MS = 15_000;
 
+export type GithubCreateGate = () => Promise<unknown>;
+
+let githubCreateGate: GithubCreateGate = acquireGithubCreateSlot;
+
+export function setGithubCreateGate(gate: GithubCreateGate): void {
+  githubCreateGate = gate;
+}
+
 const API_HEADERS = {
   accept: 'application/vnd.github+json',
   'x-github-api-version': '2022-11-28',
@@ -1382,7 +1390,7 @@ export async function githubCreateIssue(
   let data: Record<string, unknown>;
   for (let attempt = 0; ; attempt++) {
     try {
-      await acquireGithubCreateSlot();
+      await githubCreateGate();
     } catch (error) {
       if (error instanceof GithubCreateGateNotWritableError)
         throw new HttpError(503, error.message);

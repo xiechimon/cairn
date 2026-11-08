@@ -302,7 +302,7 @@ export function isImageAttachmentKey(key: string): boolean {
 }
 
 export const SPEC_CHIP =
-  'inline-flex max-w-full items-center rounded-(--cds-radius-md) border border-(--border) bg-(--muted) px-2 py-1 text-meta text-(--text-secondary) no-underline transition-[color,border-color] duration-(--dur-fast) ease-(--ease-standard) hover:border-(--input) hover:text-(--foreground)';
+  'inline-flex max-w-full items-center rounded-(--cds-radius-md) border border-(--border) bg-(--muted) px-2 py-1 font-sans font-normal text-meta text-(--text-secondary) no-underline transition-[color,border-color] duration-(--dur-fast) ease-(--ease-standard) hover:border-(--input) hover:text-(--foreground)';
 export const SPEC_CHIP_IMAGE =
   'border-none bg-transparent p-0.5 hover:bg-transparent dark:hover:bg-transparent';
 export const SPEC_CHIP_IMG = 'block max-h-40 max-w-full rounded-(--cds-radius-sm)';
@@ -388,7 +388,7 @@ function TaskIcon({ state }: { state: TaskState }) {
 export function TaskCard({ items }: { items: TaskItem[] }) {
   return (
     <ul
-      className="my-2 flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 shadow-sm"
+      className="my-2 flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 font-sans font-normal shadow-sm"
       data-testid="md-tasks"
     >
       {items.map((item, i) => (

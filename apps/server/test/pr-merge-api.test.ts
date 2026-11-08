@@ -158,7 +158,7 @@ function makeWorld(opts: WorldOpts = {}): World {
     );
   }
   const deps: BuildDeps = { ...s.svc, box: s.secretBox, githubFetch: fake.fetch };
-  const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: fake.fetch });
+  const poller = createCiPoller(deps, { githubFetch: fake.fetch });
   const messages = () =>
     s.db.select().from(messageTable).where(eq(messageTable.conversationId, buildId)).all();
   return {
@@ -198,6 +198,18 @@ async function refusal(p: Promise<unknown>): Promise<HttpError> {
     throw err;
   }
   throw new Error('expected requestMerge to refuse');
+}
+
+const MERGE_GATE_READS_201 = [
+  'GET /repos/octo/demo/issues?state=open&labels=autonomy-paused&per_page=100&page=1',
+  'GET /repos/octo/demo/pulls/201',
+];
+
+function sweptRequests(w: World, before: number): string[] {
+  return w.fake.requests.slice(before).map((r) => {
+    const url = new URL(r.url);
+    return `${r.method} ${url.pathname}${url.search}`;
+  });
 }
 
 const PLAIN_BODY = 'Merged by cairn.';
@@ -1088,7 +1100,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
 
   test('[2b-D16] the reconcile sweeps while the PUT is in flight and the PR reads merged → it neither reads nor writes', async () => {
     const w = makeWorld();
-    let swept = 0;
+    let swept: string[] = [];
     w.fake.onPut = async () => {
       w.fake.onPut = null;
       const pull = w.fake.pulls[201] as PullFake;
@@ -1097,26 +1109,28 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       pull.mergedBy = 'octo';
       const before = w.fake.requests.length;
       await w.sweep();
-      swept = w.fake.requests.length - before;
+      swept = sweptRequests(w, before);
     };
     await requestMerge(w.deps, w.buildId);
-    expect(swept).toBe(0);
+    expect(swept).toEqual(MERGE_GATE_READS_201);
     expect(w.systemRows()).toEqual([MERGED_ROW, DONE_ROW]);
     expect(w.phase()).toBe('done');
   });
 
   test('[2b-D28] the reconcile sweeps while the PR read is in flight → it neither reads nor writes', async () => {
     const w = makeWorld();
-    let swept = -1;
+    let swept: string[] | null = null;
     w.fake.onGet = async () => {
       w.fake.onGet = null;
       const before = w.fake.requests.length;
       await w.sweep();
-      swept = w.fake.requests.length - before;
+      swept = sweptRequests(w, before);
     };
     await requestMerge(w.deps, w.buildId);
-    expect(swept).toBe(0);
-    expect(w.fake.gets()).toHaveLength(1);
+    expect(swept).toEqual(MERGE_GATE_READS_201);
+    expect(w.fake.gets()).toHaveLength(
+      1 + MERGE_GATE_READS_201.filter((r) => r.includes('/pulls/')).length,
+    );
   });
 
   test('[2b-D17a] the card is closed while the PR read is in flight → refused at the re-read; no PUT', async () => {

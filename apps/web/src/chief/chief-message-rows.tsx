@@ -71,21 +71,21 @@ const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
 const USER_ROW_CLS = 'mt-6';
 const EVENT_ROW_CLS = 'mt-6';
-const REPLY_ROW_CLS = 'mt-9';
+const REPLY_ROW_CLS = 'mt-11';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
 const BUBBLE_USER_CLS =
-  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title [overflow-wrap:anywhere] text-(--foreground)';
-const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
+  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bubble-gradient px-3 py-2 text-card-title [overflow-wrap:anywhere] text-(--foreground)';
+const BUBBLE_ROBOT_CLS = 'w-full border-0 voice-response text-card-title';
 const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
 const MARKER_CONTENT_CLS = 'max-w-[85%]';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
 const CHIP_INLINE_CLS =
-  'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] text-meta';
+  'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] font-sans text-meta';
 
 function segmentsText(segments: ChiefSegment[]): string {
   return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.agent ?? s.text ?? ''))).join('');

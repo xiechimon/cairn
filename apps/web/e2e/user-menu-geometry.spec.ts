@@ -73,7 +73,7 @@ async function geometry(surface: Locator, item: string) {
 
 for (const theme of ['light', 'dark'] as const) {
   for (const { locale, language } of LOCALES) {
-    test(`language select: padded list, pill rows concentric with the popup (${theme}, ${locale})`, async ({
+    test(`language select: padded list, 8px pill rows inside the popup (${theme}, ${locale})`, async ({
       page,
     }) => {
       await seed(page, locale, theme);
@@ -88,14 +88,14 @@ for (const theme of ['light', 'dark'] as const) {
       expect(g.clipped).toBe(false);
       expect(g.pad).toBeGreaterThan(0);
       expect(g.radii).toHaveLength(2);
-      for (const radius of g.radii) expect(radius).toBe(g.outer - g.pad);
+      for (const radius of g.radii) expect(radius).toBe(8);
       expect(g.gapLeft).toBeCloseTo(g.pad, 0);
       expect(g.gapBottom).toBeCloseTo(g.padBottom, 0);
     });
   }
 }
 
-test('menu tokens: --radius-menu-item resolves to --radius-popover minus --menu-pad', async ({
+test('menu tokens: --radius-menu-item is a fixed 8px inside the padded popover', async ({
   page,
 }) => {
   await page.goto(BOARD);
@@ -116,5 +116,6 @@ test('menu tokens: --radius-menu-item resolves to --radius-popover minus --menu-
     return out;
   });
   expect(t.pad).toBeGreaterThan(0);
-  expect(t.item).toBe(t.outer - t.pad);
+  expect(t.item).toBe(8);
+  expect(t.item).toBeLessThan(t.outer);
 });

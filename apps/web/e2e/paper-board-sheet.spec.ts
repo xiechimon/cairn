@@ -44,7 +44,7 @@ for (const theme of ['light', 'dark'] as const) {
       const left = (rail ? 40 : 248) + 8;
       expect(home.box).toEqual({ x: left, y: 8, w: 1440 - left - 8, h: 900 - 16 });
       expect(home).toEqual(pages);
-      expect(home.radius).toBe('14px');
+      expect(home.radius).toBe('12px');
       expect(home.shadow).toBe('none');
       expect(home.selfShadow).toBe('none');
       expect(home.sidebarBorderRightW).toBe('0px');

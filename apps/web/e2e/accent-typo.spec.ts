@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`font baseline: body 450, var font really loaded (${theme})`, async ({
+  test(`font baseline: body 400, var font really loaded (${theme})`, async ({
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
@@ -15,7 +15,7 @@ for (const theme of ['light', 'dark'] as const) {
       };
     });
     expect(m.bodyFontLoaded).toBe(true);
-    expect(m.bodyWeight).toBe('450');
+    expect(m.bodyWeight).toBe('400');
   });
 
   test(`empty-state headline rides the Paper EmptyState title tier (${theme})`, async ({
@@ -26,42 +26,52 @@ for (const theme of ['light', 'dark'] as const) {
     const w = await page.evaluate(
       () => getComputedStyle(document.querySelector('.sched-empty h2')!).fontWeight,
     );
-    expect(w).toBe('650');
+    expect(w).toBe('500');
   });
 
-  test(`sidebar header carries the Cairn pixel mark + name (${theme})`, async ({ page }) => {
+  test(`sidebar header is the toggle then the serif wordmark, no logo (${theme})`, async ({
+    page,
+  }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/schedules?scenario=01');
 
-    const m = await page.evaluate(() => {
+    const m = await page.evaluate(async () => {
+      await document.fonts.ready;
       const row = document.querySelector('.sidebar-team-row');
-      const mark = row?.querySelector('.sidebar-brand-mark');
+      const toggle = row?.querySelector('.sidebar-team-collapse');
       const name = row?.querySelector('.sidebar-team-name');
-      if (!row || !mark || !name) throw new Error('sidebar brand head missing');
-      const ms = getComputedStyle(mark);
-      const r = mark.getBoundingClientRect();
+      if (!row || !toggle || !name) throw new Error('sidebar head missing');
+      const cs = getComputedStyle(name);
+      const t = toggle.getBoundingClientRect();
+      const icon = toggle.querySelector('svg')!.getBoundingClientRect();
+      const n = name.getBoundingClientRect();
       return {
-        maskImage: ms.getPropertyValue('mask-image') || ms.getPropertyValue('-webkit-mask-image'),
-        maskSize: ms.getPropertyValue('mask-size') || ms.getPropertyValue('-webkit-mask-size'),
-        markPaint: ms.backgroundColor,
-        rowInk: getComputedStyle(row).color,
-        markText: mark.textContent,
-        markBox: { w: r.width, h: r.height },
+        marks: row.querySelectorAll('[data-testid="brand-mark"], .sidebar-brand-mark').length,
+        family: cs.fontFamily,
+        serifLoaded: document.fonts.check('500 20px "sourceSerif4"'),
+        size: cs.fontSize,
+        weight: cs.fontWeight,
+        tracking: cs.letterSpacing,
+        lineHeight: cs.lineHeight,
         nameText: name.textContent,
         nameHref: name.getAttribute('href'),
+        toggle: { x: t.x - row.getBoundingClientRect().x, w: t.width, h: t.height },
+        icon: { w: icon.width, h: icon.height },
+        gap: n.x - t.right,
       };
     });
-    expect(m.maskImage).toContain('/logo-mark.svg');
-    // A one-value mask-size means `<value> auto`. Chrome for Testing 153
-    // serializes it as `100% auto`, Chromium 141 as `100%` (#1427).
-    const maskSize = m.maskSize.trim().split(/\s+/);
-    expect(maskSize.length === 1 ? [...maskSize, 'auto'] : maskSize).toEqual(['100%', 'auto']);
-    expect(m.markPaint).toBe(m.rowInk);
-    expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
-    expect(m.markText).toBe('');
-    expect(m.markBox).toEqual({ w: 22, h: 22 });
-    expect(m.nameText).toContain('Cairn');
+    expect(m.marks).toBe(0);
+    expect(m.family).toContain('sourceSerif4');
+    expect(m.serifLoaded).toBe(true);
+    expect(m.size).toBe('20px');
+    expect(m.weight).toBe('500');
+    expect(m.tracking).toBe('normal');
+    expect(m.lineHeight).toBe('20px');
+    expect(m.nameText).toBe('Cairn');
     expect(m.nameHref).toBeNull();
+    expect(m.toggle).toEqual({ x: 0, w: 28, h: 28 });
+    expect(m.icon).toEqual({ w: 18, h: 18 });
+    expect(m.gap).toBe(4);
   });
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {
@@ -181,7 +191,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(ring.style).toBe('solid');
     expect(ring.w).toBe('2px');
-    expect(ring.color).toBe(theme === 'dark' ? 'rgb(156, 199, 139)' : 'rgb(63, 108, 53)');
+    expect(ring.color).toBe(theme === 'dark' ? 'rgb(235, 181, 80)' : 'rgb(154, 101, 0)');
   });
 }
 
@@ -238,7 +248,7 @@ for (const theme of ['light', 'dark'] as const) {
     const card = await resolveToken(page, '--card');
 
     expect(destructive).toBe(theme === 'dark' ? 'rgb(240, 154, 136)' : 'rgb(163, 58, 42)');
-    expect(card).toBe(theme === 'dark' ? 'rgb(34, 39, 35)' : 'rgb(253, 253, 251)');
+    expect(card).toBe(theme === 'dark' ? 'rgb(32, 32, 32)' : 'rgb(247, 247, 247)');
     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
   });
 
