@@ -22,6 +22,7 @@ import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
+import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
@@ -147,6 +148,7 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
+    loopbackOwner: loopbackOwnerFor(config),
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },
