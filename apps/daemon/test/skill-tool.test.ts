@@ -1,26 +1,23 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { buildSkillLoadTool } from '../src/skill-tool.js';
+import { testTempDir } from './test-temp-dir.js';
 
 describe('Skill tool (#1299 pi custom tool)', () => {
   test('hit → returns the full SKILL.md text + invoke log', async () => {
     const invocations: string[] = [];
+    const skillFile = join(testTempDir('skill-tool-'), 'SKILL.md');
+    writeFileSync(skillFile, '# Test Skill\n\nBody content.\n', 'utf8');
     const tool = buildSkillLoadTool({
-      skillFileMap: new Map([['test-skill', '/tmp/test-skill/SKILL.md']]),
+      skillFileMap: new Map([['test-skill', skillFile]]),
       onInvoke: (name) => invocations.push(name),
     });
 
-    const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
-    mkdirSync('/tmp/test-skill', { recursive: true });
-    writeFileSync('/tmp/test-skill/SKILL.md', '# Test Skill\n\nBody content.\n', 'utf8');
-
-    try {
-      const result = await tool.execute({ skill: 'test-skill' });
-      expect(result).toContain('# Test Skill');
-      expect(result).toContain('Body content');
-      expect(invocations).toEqual(['test-skill']);
-    } finally {
-      rmSync('/tmp/test-skill', { recursive: true, force: true });
-    }
+    const result = await tool.execute({ skill: 'test-skill' });
+    expect(result).toContain('# Test Skill');
+    expect(result).toContain('Body content');
+    expect(invocations).toEqual(['test-skill']);
   });
 
   test('unknown name → error text, no invoke recorded', async () => {

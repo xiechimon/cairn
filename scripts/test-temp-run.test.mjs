@@ -193,3 +193,46 @@ setInterval(() => {}, 1000);`;
     await exited;
   }
 });
+
+test('runtime caches are owned cleanup rather than helper allocation leaks', () => {
+  const run = fixture(`import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+for (const name of ['tsx-' + process.getuid(), 'node-compile-cache', 'a'.repeat(21), 'cairn-emulate-npm-cache']) {
+  fs.mkdirSync(path.join(os.tmpdir(), name), { recursive: true });
+}
+console.log('TEMP:' + JSON.stringify({ home: process.env.CAIRN_TEST_TEMP_ROOT, runId: process.env.CAIRN_TEST_RUN_ID }));`);
+  try {
+    assert.equal(run.result.status, 0, run.result.stderr);
+    assert.equal(existsSync(run.allocation.home), false);
+  } finally {
+    run.cleanup();
+  }
+});
+
+test('an interrupted nested runtime root remains owned by its supervising run', () => {
+  const run =
+    fixture(`import { createTempEnvironment } from ${JSON.stringify(new URL('../packages/shared/src/node/temp-environment.ts', import.meta.url).href)};
+console.log('TEMP:' + JSON.stringify({ home: process.env.CAIRN_TEST_TEMP_ROOT, runId: process.env.CAIRN_TEST_RUN_ID }));
+createTempEnvironment();`);
+  try {
+    assert.equal(run.result.status, 0, run.result.stderr);
+    assert.equal(existsSync(run.allocation.home), false);
+  } finally {
+    run.cleanup();
+  }
+});
+
+test('nested runtime ownership survives a child TMPDIR override', () => {
+  const run =
+    fixture(`import { createTempEnvironment } from ${JSON.stringify(new URL('../packages/shared/src/node/temp-environment.ts', import.meta.url).href)};
+console.log('TEMP:' + JSON.stringify({ home: process.env.CAIRN_TEST_TEMP_ROOT, runId: process.env.CAIRN_TEST_RUN_ID }));
+process.env.TMPDIR = process.env.CAIRN_TEST_TEMP_ROOT;
+createTempEnvironment();`);
+  try {
+    assert.equal(run.result.status, 0, run.result.stderr);
+    assert.equal(existsSync(run.allocation.home), false);
+  } finally {
+    run.cleanup();
+  }
+});
