@@ -191,7 +191,7 @@ test('only the newest needs-you report of a thread offers a reply', async ({ pag
   await expect(replyAfter('Which export format?')).toHaveCount(0);
 });
 
-test('a thread-message marker names the sender', async ({ page }) => {
+test('user relay markers stay hidden while Coordinator messages remain visible', async ({ page }) => {
   const marker = (by: 'user' | 'coordinator', excerpt: string, createdAt: number) => ({
     id: `msg-${by}`,
     role: 'system',
@@ -218,15 +218,10 @@ test('a thread-message marker names the sender', async ({ page }) => {
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  const row = stream.getByTestId('thread-activity');
-  await expect(row.getByTestId('thread-activity-summary')).toHaveText('任务 #9 · 2 次追问');
-  await expect(row.getByRole('link')).toHaveCount(1);
-  await expect(row.getByRole('link')).toHaveText('#9');
-  await expect(row.getByTestId('thread-activity-event')).toHaveCount(0);
-  await row.getByTestId('thread-activity-toggle').click();
-  const events = row.getByTestId('thread-activity-event');
-  await expect(events).toHaveText(['你：JSON please', 'Coordinator：Use CSV instead']);
-  await expect(row.getByRole('link')).toHaveCount(1);
+  await expect(stream.getByTestId('thread-activity')).toHaveCount(0);
+  await expect(stream.getByTestId('thread-message-marker')).toHaveText('Coordinator 直接对 #9 说：Use CSV instead');
+  await expect(stream).not.toContainText('JSON please');
+  await expect(stream.getByTestId('chief-bubble')).toHaveText('Add an export');
 });
 
 test('events about one thread coalesce, repeated statuses dedupe, another thread breaks the group', async ({
@@ -246,7 +241,7 @@ test('events about one thread coalesce, repeated statuses dedupe, another thread
   const message = (id: string, createdAt: number, thread?: { todoId: string; seqNum: number }) =>
     event(
       id,
-      { kind: 'thread-message', excerpt: id, delivered: 'steer', conversationId: 'build-1', by: 'user' },
+      { kind: 'thread-message', excerpt: id, delivered: 'steer', conversationId: 'build-1', by: 'coordinator' },
       createdAt,
       thread,
     );
@@ -271,7 +266,7 @@ test('events about one thread coalesce, repeated statuses dedupe, another thread
   await expect(group.getByTestId('thread-activity-summary')).toHaveText(`任务 #9 · 2 次追问 · 审阅中`);
   await group.getByTestId('thread-activity-toggle').click();
   await expect(group.getByTestId('thread-activity-event')).toHaveCount(3);
-  await expect(stream.getByTestId('thread-message-marker')).toHaveText('你直接对 #3 说：elsewhere');
+  await expect(stream.getByTestId('thread-message-marker')).toHaveText('Coordinator 直接对 #3 说：elsewhere');
   const box = await group.getByTestId('thread-activity-summary').boundingBox();
   const chat = await stream.boundingBox();
   if (box === null || chat === null) throw new Error('no box');
