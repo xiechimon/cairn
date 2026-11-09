@@ -224,8 +224,8 @@
     {
       "id": "memory",
       "name": "Memory",
-      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.",
-      "states": "Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete.",
+      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.",
+      "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned D123 replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -253,7 +253,8 @@
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",
         "docs/research/research-loop-plan.md",
-        "docs/research/memory-2026-11-08.md"
+        "docs/research/memory-2026-11-08.md",
+        "docs/research/memory-inplace-edit-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/design/memory-inplace-edit.md"
