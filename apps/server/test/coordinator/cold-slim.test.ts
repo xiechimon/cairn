@@ -227,7 +227,7 @@ describe('selectColdMessageWindow', () => {
     expect(users.at(-1)).toContain('[history id: user-abc]');
   });
 
-  it('drops pure tool-call assistants and their tool results from the cold window', () => {
+  it('drops historical pure tool-call assistants and their tool results', () => {
     const pureTool: Message = {
       role: 'assistant',
       content: [{ type: 'toolCall', id: 'c1', name: 'bash', arguments: { command: 'ls' } }],
@@ -259,6 +259,44 @@ describe('selectColdMessageWindow', () => {
       'u0',
       'current',
     ]);
+  });
+
+  it('keeps pure tool-call assistants and results from the active cold turn', () => {
+    const pureTool: Message = {
+      role: 'assistant',
+      content: [{ type: 'toolCall', id: 'c2', name: 'bash', arguments: { command: 'pwd' } }],
+      api: 'anthropic-messages',
+      provider: 'anthropic',
+      model: 'm',
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'toolUse',
+      timestamp: 5,
+    };
+    const messages: Message[] = [
+      user('u0', 1),
+      assistant('a0', 2),
+      user('current', 3),
+      pureTool,
+      tool('bash', ' /tmp', 6),
+    ];
+    const out = selectColdMessageWindow(messages, 8);
+    expect(
+      out.some((message) => message.role === 'assistant' && isPureToolCallAssistant(message)),
+    ).toBe(true);
+    expect(out.some((message) => message.role === 'toolResult')).toBe(true);
+    expect(
+      out
+        .filter((message) => message.role === 'user')
+        .map(userText)
+        .at(-1),
+    ).toBe('current');
   });
 });
 
