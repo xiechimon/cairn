@@ -10,8 +10,10 @@ import type {
   SessionOpts,
   ToolCallRecord,
   TranscriptUpload,
+  WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
+import { GIT_CREDENTIAL_ROW_KIND, systemRowOf } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { gitPrim } from '../src/git.js';
@@ -173,6 +175,7 @@ function fakeWorkspace(opts: {
   credentialSource?: 'integration' | 'machine';
   currentBranch?: string | null;
   commitsAhead?: string[];
+  hooks?: WorkspaceHookNoteData[];
 }) {
   const calls: string[] = [];
   const pushes: { branch: string; cred: GitCredentials | null }[] = [];
@@ -187,6 +190,7 @@ function fakeWorkspace(opts: {
         branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
         reused: false,
+        ...(opts.hooks !== undefined ? { hooks: opts.hooks } : {}),
         ...(opts.credentialSource !== undefined ? { credentialSource: opts.credentialSource } : {}),
       };
     },
@@ -263,6 +267,7 @@ async function setup(
     echo?: string;
     sessionText?: string;
     replacement?: GitCredentials;
+    hookNotes?: WorkspaceHookNoteData[];
     now?: () => number;
   },
 ) {
@@ -293,6 +298,7 @@ async function setup(
       heartbeatIntervalMs: 60_000,
     },
     claimed,
+    { hookNotes: opts.hookNotes },
   );
   return { client, lines, paths };
 }
@@ -319,7 +325,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(client.doneBodies[0]!.body.status).toBe('success');
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(row?.role).toBe('system');
-    expect(String(row?.content)).toContain('machine');
+    expect(systemRowOf(row?.content)).toEqual({ kind: GIT_CREDENTIAL_ROW_KIND, source: 'machine' });
     const allText = `${JSON.stringify(transcriptRows(client))}\n${lines.join('\n')}`;
     expect(allText).not.toContain(GITHUB_TOKEN.password);
     expect(lines.some((l) => l.includes('machine credentials'))).toBe(true);
@@ -363,7 +369,10 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     );
     expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED }]);
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(String(row?.content)).toContain('integration');
+    expect(systemRowOf(row?.content)).toEqual({
+      kind: GIT_CREDENTIAL_ROW_KIND,
+      source: 'integration',
+    });
     expect(client.doneBodies[0]!.body.status).toBe('success');
   }, 20_000);
 
@@ -388,7 +397,10 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(msg).toContain('machine credentials');
     expect(msg).toContain('could not read Username');
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(String(row?.content)).toContain('integration');
+    expect(systemRowOf(row?.content)).toEqual({
+      kind: GIT_CREDENTIAL_ROW_KIND,
+      source: 'integration',
+    });
     expect(`${msg}\n${JSON.stringify(transcriptRows(client))}`).not.toContain(
       GITHUB_TOKEN.password,
     );
@@ -441,7 +453,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(workspace.pushes).toHaveLength(0);
     expect(client.doneBodies[0]!.body.status).toBe('success');
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(String(row?.content)).toContain('machine');
+    expect(systemRowOf(row?.content)).toEqual({ kind: GIT_CREDENTIAL_ROW_KIND, source: 'machine' });
   }, 20_000);
 });
 
@@ -639,5 +651,47 @@ test('running App step refreshes the shell files and redacts both generations', 
     expect(vi.getTimerCount()).toBe(0);
   } finally {
     vi.useRealTimers();
+  }
+});
+
+test.each(
+  ['workspace', 'orb'].flatMap((source) =>
+    (['quote', 'backslash', 'tab'] as const).map((caseName) => [source, caseName] as const),
+  ),
+)('hook credentials are redacted before serialization: %s / %s', async (source, caseName) => {
+  const delimiter = { quote: 34, backslash: 92, tab: 9 }[caseName];
+  const password = `fixture-${String.fromCharCode(delimiter)}-credential-value`;
+  const output = `before ${password} after\n`;
+  const hook: WorkspaceHookNoteData = {
+    name: 'setup',
+    status: 'ok',
+    exitCode: 0,
+    ms: 50,
+    output,
+    totalChars: output.length + 17,
+  };
+  let persisted: TranscriptUpload['messages'] = [];
+  const { client } = await setup(
+    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+    {
+      git: { ...GITHUB_TOKEN, password },
+      workspace: fakeWorkspace(source === 'workspace' ? { hooks: [hook] } : {}),
+      ...(source === 'orb' ? { hookNotes: [hook] } : {}),
+      onSession: (session) => {
+        persisted = JSON.parse(
+          readFileSync(join(session.cwd, '..', '..', 'outbox', 'step-s1.transcript.json'), 'utf8'),
+        ) as TranscriptUpload['messages'];
+      },
+    },
+  );
+  expect(client.doneBodies[0]?.body.status).toBe('success');
+  for (const messages of [persisted, transcriptRows(client)]) {
+    const hooks = messages
+      .map((row) => systemRowOf(row.content))
+      .filter((row) => row?.kind === 'workspace-hook');
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0]?.name).toBe('setup');
+    expect.soft(hooks[0]?.output === 'before [REDACTED] after').toBe(true);
+    expect(hooks[0]?.omittedChars).toBe(17);
   }
 });

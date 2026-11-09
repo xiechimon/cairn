@@ -1,6 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AgentBackend, MachineDoneBody, SessionOpts } from '@cairn/shared';
+import {
+  type AgentBackend,
+  type MachineDoneBody,
+  type SessionOpts,
+  systemRowOf,
+  WORKSPACE_HOOK_ROW_KIND,
+} from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { StepJournal, TranscriptBuffer } from '../src/journal.js';
 import { RelayMachineApi } from '../src/orb/relay.js';
@@ -186,7 +192,12 @@ test('idle stop notes reach the completed step transcript', async () => {
   try {
     await waitFor(() => rows.some((row) => row.includes('orb: stopped')));
     expect(api.doneBodies[0]?.body.status).toBe('success');
-    expect(rows.some((row) => row.includes('.agents/setup hook ok'))).toBe(true);
+    expect(
+      rows.some((row) => {
+        const parsed = systemRowOf(JSON.parse(row));
+        return parsed?.kind === WORKSPACE_HOOK_ROW_KIND && parsed.status === 'ok';
+      }),
+    ).toBe(true);
     expect(readdirSync(paths.outboxDir).filter((name) => name.startsWith('step-s1.'))).toEqual([]);
   } finally {
     await handle.stop();
