@@ -68,7 +68,7 @@ import {
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
-import { ownerOf } from './owner.js';
+import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -946,7 +946,7 @@ export function transitionTodos(
       to === 'done' &&
       actor.kind === 'agent' &&
       (owned.phase === 'review' || owned.phase === 'confirm') &&
-      ownerOf(deps.db, owned) !== 'coordinator'
+      !coordinatorAcceptsReview(ownershipOf(deps.db, owned))
     ) {
       skipped.push(id);
       reasons[id] =

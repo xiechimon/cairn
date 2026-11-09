@@ -413,6 +413,16 @@ describe('the Coordinator can act on what it owns (#3512)', () => {
     expect(out.transitioned.includes(w.todoId)).toBe(c.done);
     expect(getTodo(w.deps, w.todoId)?.phase).toBe(c.done ? 'done' : 'review');
   });
+
+  test('a code review that is Coordinator-owned only through a question still needs the person', async () => {
+    const w = openWorld({ phase: 'building', policy: 'human' });
+    await ask(w, 'ask-0000000d');
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
+    expect(ownerNow(w)).toBe('coordinator');
+    const out = transitionTodos(w.deps, w.s.team.id, [w.todoId], 'done', coordinator);
+    expect(out.transitioned).toEqual([]);
+    expect(getTodo(w.deps, w.todoId)?.phase).toBe('review');
+  });
 });
 
 describe('ownership is derived in one place (#3512)', () => {

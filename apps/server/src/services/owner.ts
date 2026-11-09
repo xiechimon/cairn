@@ -96,6 +96,10 @@ export function ownerOf(db: Db, row: TodoRow): TodoOwner {
   return ownershipOf(db, row)?.owner ?? null;
 }
 
+export function coordinatorAcceptsReview(ownership: Ownership | null): boolean {
+  return ownership?.owner === 'coordinator' && ownership.reason === 'review';
+}
+
 const PUSH_TITLE: Record<NeedsYouReason, string> = {
   confirm: '方案已就绪',
   review: '构建待审核',
