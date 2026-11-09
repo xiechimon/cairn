@@ -4,12 +4,13 @@ import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { attachment } from '../src/db/schema.js';
+import { attachment, todo } from '../src/db/schema.js';
 import { signAttachmentGrant } from '../src/lib/attachments-token.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES } from '../src/services/attachment-gc.js';
 import { uploadFile } from '../src/services/attachments.js';
+import { executeChiefTool, executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { bootServer, postProject, req } from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
@@ -677,7 +678,6 @@ describe('attachments — chief-tools / mcp-face tool', () => {
         'text/markdown',
         new TextEncoder().encode('hello'),
       );
-      const { executeChiefTool } = await import('../src/services/chief-tools.js');
       const text = await executeChiefTool(
         {
           db: s.db,
@@ -710,12 +710,11 @@ describe('attachments — chief-tools / mcp-face tool', () => {
     }
   });
 
-  test('chief-tools attachment image/* → base64', async () => {
+  test.each(['id', 'key'] as const)('chief-tools image by %s → base64', async (reference) => {
     const s = bootServer();
     try {
       const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
-      const { id } = await uploadOne(s, 'tiny.png', 'image/png', bytes);
-      const { executeChiefTool } = await import('../src/services/chief-tools.js');
+      const uploaded = await uploadOne(s, 'tiny.png', 'image/png', bytes);
       const text = await executeChiefTool(
         {
           db: s.db,
@@ -735,7 +734,7 @@ describe('attachments — chief-tools / mcp-face tool', () => {
           conversationId: 'conv-x',
         },
         'attachment',
-        { attachmentId: id },
+        { attachmentId: uploaded[reference] },
       );
       const out = JSON.parse(text);
       expect(out.encoding).toBe('base64');
@@ -748,7 +747,6 @@ describe('attachments — chief-tools / mcp-face tool', () => {
   test('chief-tools attachment unknown id -> throws 404', async () => {
     const s = bootServer();
     try {
-      const { executeChiefTool } = await import('../src/services/chief-tools.js');
       await expect(
         executeChiefTool(
           {
@@ -799,7 +797,6 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
         new TextEncoder().encode('hello'),
       );
       const todoId = await todoCiting(s, id, 'md');
-      const { executeWorkerMemoryTool } = await import('../src/services/chief-tools.js');
       const text = await executeWorkerMemoryTool(
         s.db,
         {
@@ -825,13 +822,13 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
     }
   });
 
-  test('worker attachment image/* → base64', async () => {
+  test.each(['id', 'key'] as const)('worker image by authorized %s → base64', async (reference) => {
     const s = bootServer();
     try {
       const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
-      const { id } = await uploadOne(s, 'tiny.png', 'image/png', bytes);
+      const uploaded = await uploadOne(s, 'tiny.png', 'image/png', bytes);
+      const { id } = uploaded;
       const todoId = await todoCiting(s, id, 'png');
-      const { executeWorkerMemoryTool } = await import('../src/services/chief-tools.js');
       const text = await executeWorkerMemoryTool(
         s.db,
         {
@@ -844,7 +841,7 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
           attachmentsDir: s.attachmentsDir,
         },
         'attachment',
-        { attachmentId: id },
+        { attachmentId: uploaded[reference] },
       );
       const out = JSON.parse(text);
       expect(out.encoding).toBe('base64');
@@ -854,10 +851,48 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
     }
   });
 
+  test.each(['id', 'key'] as const)(
+    'third-party spec text does not authorize an image by %s',
+    async (reference) => {
+      const s = bootServer();
+      try {
+        const uploaded = await uploadOne(
+          s,
+          'tiny.png',
+          'image/png',
+          new Uint8Array([137, 80, 78, 71]),
+        );
+        const todoId = await todoCiting(s, 'different-owner-upload', 'png');
+        s.db
+          .update(todo)
+          .set({ spec: `![shot.png](attachment:${uploaded.key})` })
+          .where(eq(todo.id, todoId))
+          .run();
+        await expect(
+          executeWorkerMemoryTool(
+            s.db,
+            {
+              teamId: s.team.id,
+              agentId: 'a',
+              sourceName: null,
+              todoId,
+              projectId: 'p',
+              buildId: 'b',
+              attachmentsDir: s.attachmentsDir,
+            },
+            'attachment',
+            { attachmentId: uploaded[reference] },
+          ),
+        ).rejects.toMatchObject({ status: 404 });
+      } finally {
+        s.dispose();
+      }
+    },
+  );
+
   test('worker attachment unknown id -> throws 404', async () => {
     const s = bootServer();
     try {
-      const { executeWorkerMemoryTool } = await import('../src/services/chief-tools.js');
       await expect(
         executeWorkerMemoryTool(
           s.db,
@@ -884,7 +919,6 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
     const sB = bootServer();
     try {
       const { id } = await uploadOne(sA, 'spec.md', 'text/markdown', new TextEncoder().encode('x'));
-      const { executeWorkerMemoryTool } = await import('../src/services/chief-tools.js');
       await expect(
         executeWorkerMemoryTool(
           sB.db,
