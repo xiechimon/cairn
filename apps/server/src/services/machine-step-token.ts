@@ -124,6 +124,7 @@ function chiefStepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     git: null,
+    commitIdentity: softwareCommitIdentity(deps),
     coAuthor: null,
   };
 }

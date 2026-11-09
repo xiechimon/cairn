@@ -27,6 +27,7 @@ import { githubUserRepos } from './lib/github.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
   createApiKeyBodySchema,
+  githubAppOf,
   jsonBody,
   patchSecretBodySchema,
   requestOrigin,
@@ -564,6 +565,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const access = await teamGithubToken(
       {
+        ...githubAppOf(ctx),
         db: ctx.db,
         box: ctx.secretBox,
         githubFetch: ctx.githubFetch,
