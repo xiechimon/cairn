@@ -12,7 +12,7 @@ const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.j
 };
 
 test.each(['fresh', 'upgrade'])(
-  '%s database adds split policy and team pause while retaining existing data',
+  '%s database adds split policy while retaining existing data',
   (mode) => {
     const directory = makeTestTempDir('cairn-split-policy-');
     const sqlite = new Database(join(directory, 'db.sqlite'));
@@ -44,18 +44,14 @@ test.each(['fresh', 'upgrade'])(
           "INSERT INTO project (id, teamId, name) VALUES ('retained-project', 'retained', 'Retained project')",
         );
       }
-      expect(
-        sqlite.prepare("SELECT name, autonomyPaused FROM team WHERE id = 'retained'").get(),
-      ).toEqual({ name: 'Retained', autonomyPaused: 0 });
+      expect(sqlite.prepare("SELECT name FROM team WHERE id = 'retained'").get()).toEqual({
+        name: 'Retained',
+      });
       expect(
         sqlite.prepare("SELECT name, splitPolicy FROM project WHERE id = 'retained-project'").get(),
       ).toEqual({ name: 'Retained project', splitPolicy: 'human' });
-      sqlite.exec("UPDATE team SET autonomyPaused = 1 WHERE id = 'retained'");
       sqlite.exec("UPDATE project SET splitPolicy = 'shadow' WHERE id = 'retained-project'");
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-      expect(sqlite.prepare("SELECT autonomyPaused FROM team WHERE id = 'retained'").get()).toEqual(
-        { autonomyPaused: 1 },
-      );
       expect(
         sqlite.prepare("SELECT splitPolicy FROM project WHERE id = 'retained-project'").get(),
       ).toEqual({ splitPolicy: 'shadow' });

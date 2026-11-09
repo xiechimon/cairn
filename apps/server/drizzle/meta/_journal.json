@@ -859,8 +859,15 @@
     {
       "idx": 126,
       "version": "6",
-      "when": 1794194001836,
-      "tag": "0126_task_issue_sync",
+      "when": 1794192748183,
+      "tag": "0126_autonomy_pause_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "6",
+      "when": 1794196526139,
+      "tag": "0127_task_issue_sync",
       "breakpoints": true
     }
   ]

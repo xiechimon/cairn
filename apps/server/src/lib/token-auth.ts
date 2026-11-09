@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context, Hono } from 'hono';
 import { sha256Hex } from './crypto.js';
+import { type LoopbackOwner, loopbackOwnerOriginOf } from './loopback-owner.js';
 import { tailnetOriginOf, tailnetOwnerIdentityOf } from './tailnet-listener.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -12,6 +13,7 @@ const STREAM_PATH_PATTERNS = [
 ];
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const AMBIENT_FETCH_SITES = new Set(['same-origin', 'none']);
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|feishu)(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
@@ -73,13 +75,38 @@ export function isLoopbackPeer(c: Context): boolean {
 
 export interface TokenAuthOptions {
   resolveDeviceId?: (provided: string) => string | null;
+  loopbackOwner?: LoopbackOwner | null;
 }
+
+export type OwnerIdentity = { via: 'tailscale'; login: string } | { via: 'loopback' };
 
 declare module 'hono' {
   interface ContextVariableMap {
     pairedDeviceId: string;
-    tailnetOwnerLogin: string;
+    ownerIdentity: OwnerIdentity;
   }
+}
+
+interface AmbientOwner {
+  identity: OwnerIdentity;
+  origin: string | null;
+}
+
+function ambientOwnerOf(c: Context, loopbackOwner: LoopbackOwner | null): AmbientOwner | null {
+  const tailnet = tailnetOwnerIdentityOf(c);
+  if (tailnet !== null) {
+    return { identity: { via: 'tailscale', login: tailnet.login }, origin: tailnetOriginOf(c) };
+  }
+  if (loopbackOwner === null || !isLoopbackPeer(c)) return null;
+  const origin = loopbackOwnerOriginOf(c, loopbackOwner);
+  return origin === null ? null : { identity: { via: 'loopback' }, origin };
+}
+
+function provesSameOrigin(c: Context, origin: string | null): boolean {
+  const site = c.req.header('sec-fetch-site');
+  if (site !== undefined && !AMBIENT_FETCH_SITES.has(site)) return false;
+  if (READ_METHODS.has(c.req.method.toUpperCase())) return true;
+  return site === 'same-origin' || (origin !== null && c.req.header('origin') === origin);
 }
 
 export function pairedDeviceIdOf(c: Context): string | null {
@@ -93,6 +120,7 @@ export function registerTokenAuth(
 ): void {
   if (token === null) return;
   const verifyOwner = makeVerifier(token);
+  const loopbackOwner = options.loopbackOwner ?? null;
   app.use('*', async (c, next) => {
     const verify = (provided: string): boolean => {
       if (verifyOwner(provided)) return true;
@@ -117,16 +145,12 @@ export function registerTokenAuth(
       const queryToken = url.searchParams.get('token');
       if (queryToken !== null && verify(queryToken)) return admit();
     }
-    const identity = tailnetOwnerIdentityOf(c);
-    if (identity !== null) {
-      if (
-        !READ_METHODS.has(c.req.method.toUpperCase()) &&
-        c.req.header('sec-fetch-site') !== 'same-origin' &&
-        c.req.header('origin') !== tailnetOriginOf(c)
-      ) {
-        return c.json({ error: 'same-origin proof required for Tailscale identity' }, 403);
+    const ambient = ambientOwnerOf(c, loopbackOwner);
+    if (ambient !== null) {
+      if (!provesSameOrigin(c, ambient.origin)) {
+        return c.json({ error: 'same-origin proof required for ambient owner identity' }, 403);
       }
-      c.set('tailnetOwnerLogin', identity.login);
+      c.set('ownerIdentity', ambient.identity);
       return next();
     }
     return c.json({ error: 'Unauthorized' }, 401);

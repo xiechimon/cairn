@@ -3,6 +3,7 @@ import type { GitIdentity, TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { FetchLike } from './lib/github.js';
+import type { LoopbackOwner } from './lib/loopback-owner.js';
 import type { KeySecretBox } from './lib/secret-box.js';
 import type { SidecarStatus } from './lib/tsnet-sidecar.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
@@ -61,6 +62,7 @@ export interface AppContext {
   providerTestTimeoutMs?: number;
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
+  loopbackOwner?: LoopbackOwner | null;
   mcpConfigPath: string;
   logger?: Logger;
 }

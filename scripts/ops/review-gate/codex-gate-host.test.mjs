@@ -202,7 +202,7 @@ test('an unresolved P1 thread fails the check with its URL', () => {
   assert.match(body.output.summary, /discussion_rP1/);
 });
 
-test('a failing gate on a queued PR posts one extra comment for the dequeue', () => {
+test('a failing gate on a queued PR posts no Mergify command and leaves removal to the queue conditions', () => {
   const world = {
     comments: [stateComment(SHA, 'completed')],
     threads: [thread('P1')],
@@ -211,20 +211,19 @@ test('a failing gate on a queued PR posts one extra comment for the dequeue', ()
   const plain = run(world);
   const queued = run({ ...world, pr: { ...basePr, labels: [{ name: 'queued' }] } });
   assert.equal(queued.body(queued.checkWrites[0]).conclusion, 'failure');
-  assert.equal(queued.commentPosts.length, plain.commentPosts.length + 1);
+  assert.equal(queued.commentPosts.length, plain.commentPosts.length);
+  assert.ok(queued.commentPosts.every((call) => !/@mergifyio/.test(queued.body(call).body)));
 });
 
-test('a queued PR whose review inputs cannot be loaded is dequeued', () => {
+test('a queued PR whose review inputs cannot be loaded fails the check without commenting', () => {
   const out = run({
     pr: { ...basePr, labels: [{ name: 'queued' }] },
     files: [],
     checkRuns: [ownRun()],
   });
   assert.equal(out.body(out.checkWrites[0]).output.title, 'Cannot determine the review inputs');
-  assert.deepEqual(
-    out.commentPosts.map((call) => out.body(call).body),
-    ['@mergifyio dequeue'],
-  );
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.deepEqual(out.commentPosts, []);
 });
 
 test('a forged state comment from another author is ignored', () => {

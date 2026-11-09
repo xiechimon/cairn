@@ -16,7 +16,7 @@ test('existing active self-issue tasks are recorded open, so the first sweep nev
   const dir = makeTestTempDir('task-issue-sync-migration-');
   dirs.push(dir);
   const sqlite = new Database(join(dir, 'cairn.db'));
-  migrateUpTo(sqlite, dir, '0125_build_stop');
+  migrateUpTo(sqlite, dir, '0126_autonomy_pause_entries');
   sqlite.exec(`
     INSERT INTO team (id, name, createdAt) VALUES ('t', 'T', 1);
     INSERT INTO project (id, name, teamId, repoKind, githubRepo) VALUES ('p', 'P', 't', 'github', 'octo/demo');

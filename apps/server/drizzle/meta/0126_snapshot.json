@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8e63c61c-1280-485f-9da1-275912cce618",
+  "id": "52883c25-095d-40e7-86de-77eb6149a5d8",
   "prevId": "99c2f431-9828-4e8f-8bf2-05e2fef62030",
   "tables": {
     "agent_memory": {
@@ -422,6 +422,117 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "autonomy_pause": {
+      "name": "autonomy_pause",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "markers": {
+          "name": "markers",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "publishError": {
+          "name": "publishError",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "openedAt": {
+          "name": "openedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "resolvedAt": {
+          "name": "resolvedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolvedBy": {
+          "name": "resolvedBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "requestKey": {
+          "name": "requestKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "autonomy_pause_team_resolved_idx": {
+          "name": "autonomy_pause_team_resolved_idx",
+          "columns": [
+            "teamId",
+            "resolvedAt"
+          ],
+          "isUnique": false
+        },
+        "autonomy_pause_team_request_key_idx": {
+          "name": "autonomy_pause_team_request_key_idx",
+          "columns": [
+            "teamId",
+            "requestKey"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "autonomy_pause_teamId_team_id_fk": {
+          "name": "autonomy_pause_teamId_team_id_fk",
+          "tableFrom": "autonomy_pause",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -5524,65 +5635,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "task_issue_close": {
-      "name": "task_issue_close",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "teamId": {
-          "name": "teamId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sourceRef": {
-          "name": "sourceRef",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "comment": {
-          "name": "comment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "task_issue_close_teamId_team_id_fk": {
-          "name": "task_issue_close_teamId_team_id_fk",
-          "tableFrom": "task_issue_close",
-          "tableTo": "team",
-          "columnsFrom": [
-            "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "team": {
       "name": "team",
       "columns": {
@@ -5629,14 +5681,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "autonomyPaused": {
-          "name": "autonomyPaused",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         },
         "coAuthorTrailer": {
           "name": "coAuthorTrailer",
@@ -6202,20 +6246,6 @@
         },
         "sourceRef": {
           "name": "sourceRef",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "issueState": {
-          "name": "issueState",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "supersededBy": {
-          "name": "supersededBy",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
