@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -22,6 +22,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { type RunStepOptions, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { StepStops } from '../src/step-stops.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
@@ -175,16 +176,15 @@ class FakeClient implements MachineApi {
 
 interface WorkspaceOptions {
   rewindError?: string;
-  rewindFailures?: number;
   uploadFailure?: 'reject' | 'unbound';
   head?: string | null;
   reused?: boolean;
   run?: RunStepOptions;
   workspace?: WorktreeOps;
+  stops?: StepStops;
 }
 
 function fakeWorkspace(cwd: string, calls: string[], opts: WorkspaceOptions = {}): WorktreeOps {
-  let restoreAttempts = 0;
   return {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
@@ -212,22 +212,12 @@ function fakeWorkspace(cwd: string, calls: string[], opts: WorkspaceOptions = {}
       calls.push('headCommit');
       return opts.head === undefined ? 'abc123' : opts.head;
     },
-    async captureCheckpoint() {
-      const commit = opts.head === undefined ? 'abc123' : opts.head;
-      return commit === null
-        ? null
-        : { commit, branch: 'cairn/conv-conv-1', refs: {}, headReflog: [] };
-    },
     async countAhead() {
       return 1;
     },
     async restoreCheckpoint(_cwd, commit) {
       calls.push(`restoreCheckpoint:${commit}`);
-      if (
-        opts.rewindError !== undefined &&
-        ++restoreAttempts <= (opts.rewindFailures ?? Number.POSITIVE_INFINITY)
-      )
-        throw new Error(opts.rewindError);
+      if (opts.rewindError !== undefined) throw new Error(opts.rewindError);
     },
     async cleanupOrphans() {
       return [];
@@ -293,6 +283,23 @@ async function setupWithBackend(
   const home = testTempDir('cairn-runner-review-');
   const checkoutCwd = join(home, 'review-checkout');
   const paths = statePaths(home, join(home, 'workspaces'));
+  if (
+    !opts.workspace &&
+    claimed.instruction?.includes('"evidence":"attachments"') &&
+    opts.head !== null
+  ) {
+    await runGitOk(['init', '--initial-branch=main', checkoutCwd]);
+    await runGitOk(['commit', '--allow-empty', '-m', 'delivery'], {
+      cwd: checkoutCwd,
+      env: commitEnv({ name: 'test-agent', email: 'test@example.com' }),
+    });
+    const head = await runGitOk(['rev-parse', 'HEAD'], { cwd: checkoutCwd });
+    opts = { ...opts, head };
+    const meta = JSON.parse(claimed.instruction);
+    if (meta.expectedHeadSha === 'abc123') {
+      claimed = { ...claimed, instruction: JSON.stringify({ ...meta, expectedHeadSha: head }) };
+    }
+  }
   const calls: string[] = [];
   const client = new FakeClient(opts.uploadFailure);
   client.calls = calls;
@@ -307,6 +314,7 @@ async function setupWithBackend(
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
+    stops: opts.stops,
   };
   await runStep(deps, claimed, opts.run);
   return { client, calls, captured, checkoutCwd };
@@ -509,296 +517,198 @@ describe('out-of-tree verify execution', () => {
     }),
   };
 
-  test('attachments verify restores the start checkpoint, never commits or pushes, and reports the start head', async () => {
-    const { calls, client } = await setup(verify, { reused: false });
-    expect(calls).toContain('restoreCheckpoint:abc123');
-    expect(calls).not.toContain('commitAll');
-    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
-    expect(client.doneBodies[0]?.body).toMatchObject({ commit: 'abc123', hasChanges: false });
-  });
-
   test.each([
-    '',
-    '.cairn-verify/',
-    '.*',
-    'tracked',
-    'switched-branch',
-    'detached-head',
-    'starting-detached',
-    'refs-and-index',
-    'concurrent-inspection',
-    'deleted-starting-branch',
-  ])('real worktree restores verification state (case=%s)', async (ignore) => {
-    const root = testTempDir('cairn-verify-worktree-');
-    const origin = join(root, 'origin.git');
-    const seed = join(root, 'seed');
+    'commit',
+    'branch-create',
+    'branch-delete',
+    'branch-reset',
+    'stash',
+    'push',
+    'delivery-commit',
+    'agent-error',
+    'open-error',
+    'stop',
+    'stop-discard',
+  ])('disposable verification preserves the step repository (%s)', async (action) => {
+    const root = testTempDir('cairn-verify-clone-');
+    const source = join(root, 'source');
     const env = commitEnv({ name: 'test-agent', email: 'test@example.com' });
-    await runGitOk(['init', '--bare', '--initial-branch=main', origin]);
-    await runGitOk(['clone', origin, seed]);
-    writeFileSync(join(seed, 'delivery.txt'), 'delivered\n');
-    writeFileSync(join(seed, '.gitignore'), `${ignore}\n`);
-    if (ignore === 'tracked') {
-      mkdirSync(join(seed, '.cairn-verify'));
-      writeFileSync(join(seed, '.cairn-verify/keep.txt'), 'original scratch\n');
-      await runGitOk(['add', '.cairn-verify/keep.txt'], { cwd: seed });
-    }
-    await runGitOk(['add', '-f', 'delivery.txt', '.gitignore'], { cwd: seed });
-    await runGitOk(['commit', '-m', 'seed'], { cwd: seed, env });
-    await runGitOk(['push', 'origin', 'main'], { cwd: seed });
-    const startHead = (await runGitOk(['rev-parse', 'HEAD'], { cwd: seed })).trim();
+    await runGitOk(['init', '--initial-branch=main', source]);
+    writeFileSync(join(source, 'delivery.txt'), 'initial\n');
+    await runGitOk(['add', 'delivery.txt'], { cwd: source });
+    await runGitOk(['commit', '-m', 'initial'], { cwd: source, env });
+    const previous = await runGitOk(['rev-parse', 'HEAD'], { cwd: source });
+    writeFileSync(join(source, 'delivery.txt'), 'delivered\n');
+    await runGitOk(['commit', '-am', 'delivery'], { cwd: source, env });
+    const delivery = await runGitOk(['rev-parse', 'HEAD'], { cwd: source });
+    await runGitOk(['branch', 'existing-user'], { cwd: source });
+    writeFileSync(join(source, 'delivery.txt'), 'user stash\n');
+    await runGitOk(['stash', 'push', '-m', 'user stash'], { cwd: source, env });
+    mkdirSync(join(source, '.cairn-verify/1'), { recursive: true });
+    writeFileSync(join(source, '.cairn-verify/1/keep.txt'), 'user scratch');
+    writeFileSync(join(source, 'delivery.txt'), 'user staged\n');
+    await runGitOk(['add', 'delivery.txt'], { cwd: source });
+    writeFileSync(join(source, 'delivery.txt'), 'user unstaged\n');
+    const snapshot = async () => ({
+      refs: await runGitOk(['for-each-ref', '--format=%(refname) %(objectname)'], { cwd: source }),
+      head: await runGitOk(['rev-parse', 'HEAD'], { cwd: source }),
+      branch: await runGitOk(['symbolic-ref', 'HEAD'], { cwd: source }),
+      status: await runGitOk(['status', '--porcelain=v1'], { cwd: source }),
+      index: await runGitOk(['diff', '--cached'], { cwd: source }),
+      content: readFileSync(join(source, 'delivery.txt'), 'utf8'),
+    });
+    const before = await snapshot();
+    const calls: string[] = [];
     const workspace = new WorkspaceManager({ logger: captureLogger() });
-    const prepare = workspace.prepare.bind(workspace);
-    let originalBranch = '';
-    let originalRefs = '';
-    let originalStash = '';
-    let concurrentRef: string | null = null;
-    workspace.prepare = async (input) => {
-      const prepared = await prepare(input);
-      originalBranch = prepared.branch;
-      if (ignore === 'starting-detached')
-        await runGitOk(['checkout', '--detach', 'HEAD'], { cwd: prepared.cwd });
-      if (ignore === 'refs-and-index') {
-        await runGitOk(['branch', 'existing-user', 'HEAD'], { cwd: prepared.cwd });
-        writeFileSync(join(prepared.cwd, 'delivery.txt'), 'pre-existing stash\n');
-        await runGitOk(['stash', 'push', '-m', 'pre-existing stash'], { cwd: prepared.cwd, env });
-        originalStash = await runGitOk(['reflog', 'show', '--format=%H', 'refs/stash'], {
-          cwd: prepared.cwd,
-        });
-      }
-      originalRefs = await runGitOk(
-        ['for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads'],
-        { cwd: prepared.cwd },
-      );
-      return prepared;
-    };
+    workspace.prepare = fakeWorkspace(source, calls, { head: delivery, reused: false }).prepare;
     let checkout = '';
-    let agentHead: string | null = null;
-    const claim: ClaimedStep = {
+    const headCommit = workspace.headCommit.bind(workspace);
+    workspace.headCommit = async (cwd) => {
+      if (cwd !== source) checkout = cwd;
+      return headCommit(cwd);
+    };
+    const expectedHead = action === 'delivery-commit' ? previous : delivery;
+    const stops = new StepStops();
+    let initialHead = '';
+    let initialBranch = '';
+    const claim = {
       ...verify,
-      project: { id: 'p1', name: 'demo', repo: { kind: 'hosted', cloneUrl: origin } },
       instruction: JSON.stringify({
         kind: 'verify',
-        expectedHeadSha: startHead,
+        expectedHeadSha: expectedHead,
         evidence: 'attachments',
         evidenceDirectory: '.cairn-verify/1/',
       }),
-      remoteTools: [{ name: 'attach_file', description: 'Attach verification evidence' }],
+      remoteTools: [{ name: 'attach_file', description: 'Attach evidence' }],
     };
-    const { client } = await setupWithBackend(claim, { workspace }, (captured) => ({
-      ...capturingBackend(captured),
-      async createSession(opts) {
-        checkout = opts.cwd;
-        expect(opts.prompt).not.toContain('工作分支注记');
-        mkdirSync(join(checkout, '.cairn-verify/1'), { recursive: true });
-        writeFileSync(join(checkout, '.cairn-verify/1/proof.txt'), 'checked delivery\n');
-        await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/1/proof.txt' });
-        writeFileSync(join(checkout, 'delivery.txt'), 'agent modification\n');
-        await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
-        await runGitOk(['commit', '-m', 'unwanted verifier commit'], { cwd: checkout, env });
-        agentHead = await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout });
-        if (
-          ignore === 'switched-branch' ||
-          ignore === 'starting-detached' ||
-          ignore === 'deleted-starting-branch'
-        )
-          await runGitOk(
-            ['checkout', '-b', ignore === 'starting-detached' ? 'null' : 'verifier-inspection'],
-            { cwd: checkout },
-          );
-        if (ignore === 'deleted-starting-branch')
-          await runGitOk(['branch', '-D', originalBranch], { cwd: checkout });
-        if (ignore === 'detached-head')
-          await runGitOk(['checkout', '--detach', 'HEAD'], { cwd: checkout });
-        if (ignore === 'concurrent-inspection') {
-          const peer = join(root, 'peer');
-          await runGitOk(['worktree', 'add', '-b', 'concurrent-other', peer, startHead], {
-            cwd: checkout,
-          });
-          writeFileSync(join(peer, 'delivery.txt'), 'concurrent delivery\n');
-          await runGitOk(['add', 'delivery.txt'], { cwd: peer });
-          await runGitOk(['commit', '-m', 'concurrent delivery'], { cwd: peer, env });
-          concurrentRef = await runGitOk(['rev-parse', 'HEAD'], { cwd: peer });
-          await runGitOk(['worktree', 'remove', peer], { cwd: checkout });
-          await runGitOk(['checkout', 'concurrent-other'], { cwd: checkout });
-        }
-        if (ignore === 'refs-and-index') {
-          await runGitOk(['branch', 'verifier-one', 'HEAD'], { cwd: checkout });
-          await runGitOk(['branch', 'verifier-two', 'HEAD'], { cwd: checkout });
-          await runGitOk(['branch', 'concurrent-other', startHead], { cwd: checkout });
-          await runGitOk(['checkout', 'existing-user'], { cwd: checkout });
-          writeFileSync(join(checkout, 'delivery.txt'), 'verifier changed another branch\n');
-          await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
-          await runGitOk(['commit', '-m', 'unwanted verifier branch commit'], {
-            cwd: checkout,
-            env,
-          });
-          writeFileSync(join(checkout, 'delivery.txt'), 'staged verifier residue\n');
-          await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
-        }
-        await expect(
-          runGitOk(['push', 'origin', 'HEAD:refs/heads/escaped-verification'], {
-            cwd: checkout,
-            env: opts.env,
-          }),
-        ).rejects.toThrow('cairn-readonly-workspace-denied');
-        return {
-          sessionId: 'verify-real-git',
-          events: (async function* () {
-            yield {
-              type: 'message_end',
-              message: {
-                role: 'assistant',
-                content: JSON.stringify({
-                  passed: true,
-                  conclusion: 'Checked delivery',
-                  evidence: [{ path: '.cairn-verify/1/proof.txt' }],
-                }),
-              },
-            } as const;
-            yield { type: 'done', usage: [] } as const;
-          })(),
-          async steer() {},
-          async stop() {},
-          usage: () => [],
-        };
+    const { client } = await setupWithBackend(
+      claim,
+      {
+        workspace,
+        stops,
       },
-    }));
-    const runtime = {
-      startHead,
-      agentHead,
-      finalHead: await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout }),
-      finalBranch: await runGitOk(['branch', '--show-current'], { cwd: checkout }),
-      localRefs: await runGitOk(
-        ['for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads'],
-        { cwd: checkout },
-      ),
-      delivery: readFileSync(join(checkout, 'delivery.txt'), 'utf8'),
-      scratchPresent: existsSync(join(checkout, '.cairn-verify')),
-      worktreeStatus: await runGitOk(['status', '--porcelain'], { cwd: checkout }),
-      originHeads: await runGitOk(['show-ref', '--heads'], { cwd: origin }),
-      uploads: client.attachments.map((attachment) => ({
-        fileName: attachment.fileName,
-        content: Buffer.from(String(attachment.contentBase64), 'base64').toString('utf8'),
-      })),
-      done: client.doneBodies[0]?.body,
-    };
+      (captured) => ({
+        ...capturingBackend(captured),
+        async createSession(opts) {
+          checkout = opts.cwd;
+          initialHead = await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout });
+          initialBranch = await runGitOk(['branch', '--show-current'], { cwd: checkout });
+          expect(readFileSync(join(checkout, 'delivery.txt'), 'utf8')).toBe(
+            action === 'delivery-commit' ? 'initial\n' : 'delivered\n',
+          );
+          if (action === 'open-error') throw new Error('session could not start');
+          mkdirSync(join(checkout, '.cairn-verify/1'), { recursive: true });
+          writeFileSync(join(checkout, '.cairn-verify/1/proof.txt'), 'checked delivery\n');
+          await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/1/proof.txt' });
+          if (action === 'commit') {
+            writeFileSync(join(checkout, 'delivery.txt'), 'verifier commit\n');
+            await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
+            await runGitOk(['commit', '-m', 'verifier commit'], { cwd: checkout, env });
+          }
+          if (action === 'branch-create')
+            await runGitOk(['branch', 'verifier-branch'], { cwd: checkout });
+          if (action === 'branch-delete' || action === 'branch-reset') {
+            await runGitOk(['branch', '-f', 'existing-user', delivery], { cwd: checkout });
+            if (action === 'branch-delete')
+              await runGitOk(['branch', '-D', 'existing-user'], { cwd: checkout });
+            else {
+              await runGitOk(['checkout', 'existing-user'], { cwd: checkout });
+              await runGitOk(['reset', '--hard', previous], { cwd: checkout });
+            }
+          }
+          if (action === 'stash') {
+            writeFileSync(join(checkout, 'delivery.txt'), 'verifier stash\n');
+            await runGitOk(['stash', 'push', '-m', 'verifier stash'], { cwd: checkout, env });
+          }
+          if (action === 'push')
+            await expect(
+              runGitOk(['push', source, 'HEAD:refs/heads/escaped'], {
+                cwd: checkout,
+                env: opts.env,
+              }),
+            ).rejects.toThrow('cairn-readonly-workspace-denied');
+          return {
+            sessionId: 'verify-real-git',
+            events: (async function* () {
+              if (action.startsWith('stop')) {
+                writeFileSync(join(checkout, 'delivery.txt'), 'stopped verifier writes\n');
+                await stops.get(claim.step.id)!.deliver({ discard: action === 'stop-discard' });
+                return;
+              }
+              if (action === 'agent-error') {
+                yield {
+                  type: 'error',
+                  error: { message: 'verification failed', retryable: false },
+                } as const;
+                return;
+              }
+              yield {
+                type: 'message_end',
+                message: {
+                  role: 'assistant',
+                  content: JSON.stringify({
+                    passed: true,
+                    conclusion: 'Checked delivery',
+                    evidence: [{ path: '.cairn-verify/1/proof.txt' }],
+                  }),
+                },
+              } as const;
+              yield { type: 'done', usage: [] } as const;
+            })(),
+            async steer() {},
+            async stop() {},
+            usage: () => [],
+          };
+        },
+      }),
+    );
+    const after = await snapshot();
     const evidenceDirectory = process.env.VERIFY_EVIDENCE_DIR;
     if (evidenceDirectory !== undefined) {
       mkdirSync(evidenceDirectory, { recursive: true });
       writeFileSync(
-        join(evidenceDirectory, 'daemon-runtime.json'),
-        JSON.stringify(runtime, null, 2),
+        join(evidenceDirectory, `clone-${action}.json`),
+        JSON.stringify(
+          {
+            action,
+            before,
+            after,
+            expectedHead,
+            initialHead,
+            initialBranch,
+            cloneRemoved: checkout !== '' && !existsSync(dirname(checkout)),
+            uploads: client.attachments,
+            done: client.doneBodies[0]?.body,
+          },
+          null,
+          2,
+        ),
       );
-      if (!['', '.cairn-verify/', '.*', 'tracked'].includes(ignore))
-        writeFileSync(
-          join(evidenceDirectory, `branch-state-${ignore}.json`),
-          JSON.stringify(runtime, null, 2),
-        );
     }
-    expect(client.attachments).toEqual([
-      {
-        fileName: 'proof.txt',
-        contentBase64: Buffer.from('checked delivery\n').toString('base64'),
-      },
-    ]);
-    expect(runtime.delivery).toBe('delivered\n');
-    expect(runtime.scratchPresent).toBe(ignore === 'tracked');
-    expect(existsSync(join(checkout, '.cairn-verify/1/proof.txt'))).toBe(false);
-    if (ignore === 'tracked')
-      expect(readFileSync(join(checkout, '.cairn-verify/keep.txt'), 'utf8')).toBe(
-        'original scratch\n',
-      );
-    expect(runtime.finalHead).toBe(startHead);
-    expect(runtime.finalBranch).toBe(ignore === 'starting-detached' ? '' : originalBranch);
-    const expectedRefs = originalRefs.split('\n');
-    if (concurrentRef !== null) expectedRefs.push(`refs/heads/concurrent-other ${concurrentRef}`);
-    if (ignore === 'refs-and-index') {
-      expectedRefs.push(`refs/heads/concurrent-other ${startHead}`);
-      expect(
-        await runGitOk(['reflog', 'show', '--format=%H', 'refs/stash'], { cwd: checkout }),
-      ).toBe(originalStash);
-    }
-    expect(runtime.localRefs.split('\n').sort()).toEqual(expectedRefs.sort());
-    expect(await runGitOk(['diff', '--cached', '--name-only'], { cwd: checkout })).toBe('');
-    expect(runtime.worktreeStatus).toBe('');
-    expect(runtime.originHeads).toBe(`${startHead} refs/heads/main`);
-    expect(client.doneBodies[0]?.body, client.doneBodies[0]?.body.errorMessage).toMatchObject({
-      status: 'success',
-      commit: startHead,
-      hasChanges: false,
-      verifyVerdict: { passed: true },
-    });
-  });
-
-  test('attachments verify fails closed when restoring its checkpoint fails', async () => {
-    const { calls, client } = await setup(verify, { rewindError: 'restore failed' });
-    expect(calls).not.toContain('commitAll');
-    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-  });
-
-  test('attachments verify cannot start an agent without a restorable head', async () => {
-    const { calls, client, captured } = await setup(verify, { head: null, reused: false });
-    expect(captured).toHaveLength(0);
-    expect(calls).not.toContain('commitAll');
-    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-  });
-
-  test('attachments verify rewinds after an agent error and reports the original head', async () => {
-    const { calls, client } = await setupWithBackend(verify, { reused: false }, (captured) =>
-      scriptedBackend(captured, [
-        { type: 'error', error: { message: 'verification failed', retryable: false } },
-      ]),
-    );
-    expect(calls).toContain('restoreCheckpoint:abc123');
-    expect(calls).not.toContain('commitAll');
-    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
+    expect(after).toEqual(before);
+    expect(readFileSync(join(source, '.cairn-verify/1/keep.txt'), 'utf8')).toBe('user scratch');
+    expect(checkout).not.toBe('');
+    expect(checkout).not.toBe(source);
+    expect(existsSync(dirname(checkout))).toBe(false);
+    expect(initialHead).toBe(expectedHead);
+    expect(initialBranch).toBe('');
+    expect(client.attachments).toHaveLength(action === 'open-error' ? 0 : 1);
+    expect(calls.some((call) => /^(restoreCheckpoint|commitAll|push):?/.test(call))).toBe(false);
     expect(client.doneBodies[0]?.body).toMatchObject({
-      status: 'failed',
-      commit: 'abc123',
-      hasChanges: false,
+      status: action.startsWith('stop')
+        ? 'stopped'
+        : action.endsWith('error')
+          ? 'failed'
+          : 'success',
+      ...(action === 'open-error' ? {} : { commit: expectedHead, hasChanges: false }),
     });
+    if (!action.includes('error') && !action.startsWith('stop'))
+      expect(client.doneBodies[0]?.body.verifyVerdict?.passed).toBe(true);
   });
 
-  test('attachments verify rewinds even when opening the session throws', async () => {
-    const { calls, client } = await setupWithBackend(verify, { reused: false }, (captured) => ({
-      ...capturingBackend(captured),
-      async createSession() {
-        throw new Error('session could not start');
-      },
-    }));
-    expect(calls).toContain('restoreCheckpoint:abc123');
-    expect(calls).not.toContain('commitAll');
-    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-  });
-
-  test.each([false, true])(
-    'attachments verify rewinds on stop with discard=%s',
-    async (discard) => {
-      const { calls, client } = await setup(verify, {
-        reused: false,
-        run: { stopRequest: { discard } },
-      });
-      expect(calls).toContain('restoreCheckpoint:abc123');
-      expect(calls).not.toContain('commitAll');
-      expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
-      expect(client.doneBodies[0]?.body).toMatchObject({
-        status: 'stopped',
-        commit: 'abc123',
-        hasChanges: false,
-      });
-    },
-  );
-
-  test('final cleanup retries a transient checkpoint restore failure', async () => {
-    const { calls, client } = await setup(verify, {
-      rewindError: 'transient restore failure',
-      rewindFailures: 1,
-      reused: false,
-    });
-    expect(calls.filter((call) => call === 'restoreCheckpoint:abc123')).toHaveLength(2);
+  test('attachments verify cannot start an agent without a delivery head', async () => {
+    const { client, captured } = await setup(verify, { head: null, reused: false });
+    expect(captured).toHaveLength(0);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
   });
 

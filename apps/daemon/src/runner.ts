@@ -23,7 +23,6 @@ import type {
   SkillInjectionFacts,
   TranscriptUpload,
   WorkspaceHookNoteData,
-  WorktreeCheckpoint,
   WorktreeOps,
 } from '@cairn/shared';
 import {
@@ -89,6 +88,7 @@ import {
   piWorktreeSkillDirs,
   type SkillsCatalogOpts,
 } from './backend/skills.js';
+import { createVerificationClone } from './backend/verification-clone.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
@@ -790,50 +790,20 @@ async function runClaimedStep(
       return;
     }
   }
-  const cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
+  let cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
   if (!ws) mkdirSync(cwd, { recursive: true });
 
   const stepStartMs = Date.now();
   let headAtStart: string | null = null;
-  let verificationCheckpoint: WorktreeCheckpoint | null = null;
   if (ws !== null && ws.readonly !== true && deps.workspace) {
     try {
-      if (attachmentVerify) {
-        verificationCheckpoint = (await deps.workspace.captureCheckpoint?.(ws.cwd)) ?? null;
-        headAtStart = verificationCheckpoint?.commit ?? null;
-      } else {
-        headAtStart = await deps.workspace.headCommit(ws.cwd);
-      }
+      headAtStart = await deps.workspace.headCommit(ws.cwd);
     } catch {
       headAtStart = null;
     }
   }
 
   const uploadedVerifyEvidence = new Set<string>();
-  let verifyRewound = false;
-  let verifyRewindError: string | null = null;
-  const rewindAttachmentVerify = async (): Promise<string | null> => {
-    if (!attachmentVerify) return null;
-    if (verifyRewound) return verifyRewindError;
-    if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
-      verifyRewindError = 'Verify start checkpoint unavailable';
-      return verifyRewindError;
-    }
-    try {
-      rmSync(join(ws.cwd, '.cairn-verify'), { recursive: true, force: true });
-      await deps.workspace.restoreCheckpoint(
-        ws.cwd,
-        headAtStart,
-        verificationCheckpoint ?? undefined,
-      );
-      verifyRewound = true;
-      verifyRewindError = null;
-    } catch (error) {
-      verifyRewindError = error instanceof Error ? error.message : String(error);
-      logger.step(`verify rewind failed: ${verifyRewindError}`);
-    }
-    return verifyRewindError;
-  };
   if (attachmentVerify) {
     if (
       verifyEvidenceDirectory === undefined ||
@@ -843,12 +813,27 @@ async function runClaimedStep(
       return;
     }
     if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
-      await failStep(deps, heartbeat, stepId, 'Verify start checkpoint unavailable');
+      await failStep(deps, heartbeat, stepId, 'Verify delivery commit unavailable');
       return;
     }
-    stepCleanups.push(async () => {
-      await rewindAttachmentVerify();
-    });
+    try {
+      const clone = await createVerificationClone(
+        ws.cwd,
+        verifyMeta?.expectedHeadSha ?? headAtStart,
+      );
+      stepCleanups.push(clone.cleanup);
+      cwd = clone.cwd;
+      ws = { ...ws, cwd, reused: false };
+      headAtStart = await deps.workspace.headCommit(cwd);
+    } catch (error) {
+      await failStep(
+        deps,
+        heartbeat,
+        stepId,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
   }
 
   const systemPrompt =
@@ -1202,6 +1187,7 @@ async function runClaimedStep(
     deps.workspace &&
     claimed.session.action === 'new' &&
     !isReview &&
+    !attachmentVerify &&
     ws.reused &&
     headAtStart !== null
   ) {
@@ -1645,14 +1631,8 @@ async function runClaimedStep(
       if (await retryWithoutImages(message)) continue;
       flushDeltas();
       flushThinking();
-      const rewindFailure = await rewindAttachmentVerify();
       clearCredentials(creds);
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        rewindFailure === null ? message : `${message}; verify rewind failed: ${rewindFailure}`,
-      );
+      await failStep(deps, heartbeat, stepId, message);
       return;
     }
     logger.raw(continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
@@ -2005,7 +1985,7 @@ async function runClaimedStep(
   if (!sawDone && handle !== null) usage = handle.usage();
 
   const rewindToStepStart = async (): Promise<string | null> => {
-    if (attachmentVerify) return rewindAttachmentVerify();
+    if (attachmentVerify) return null;
     if (ws?.readonly === true) return null;
     if (ws === null || !deps.workspace || headAtStart === null) return '步起点 commit 不可得';
     try {
@@ -2024,17 +2004,14 @@ async function runClaimedStep(
     }
   }
 
-  if (checkout || attachmentVerify) {
+  if (checkout) {
     const failed = await rewindToStepStart();
     if (failed !== null) {
-      if (attachmentVerify) lastError = `Verify checkpoint restore failed: ${failed}`;
-      logger.step(`${attachmentVerify ? 'verify' : 'review'} rewind failed: ${failed}`);
+      logger.step(`review rewind failed: ${failed}`);
       transcript.upsert({
-        id: `${attachmentVerify ? 'verify' : 'review'}-rewind-${stepId}`,
+        id: `review-rewind-${stepId}`,
         role: 'system',
-        content: attachmentVerify
-          ? `Verification checkout could not restore its start checkpoint: ${failed}. Evidence may remain in the worktree; this verification failed.`
-          : `审核检出未能回退到本轮起点（${failed}）——本轮审核对工作区的写入可能残留，合并前请确认工作区状态`,
+        content: `审核检出未能回退到本轮起点（${failed}）——本轮审核对工作区的写入可能残留，合并前请确认工作区状态`,
         createdAt: now(),
       });
     }

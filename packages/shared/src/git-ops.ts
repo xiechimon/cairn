@@ -107,13 +107,6 @@ export interface OrphanCleanupInput {
   activeConversationIds: Iterable<string>;
 }
 
-export interface WorktreeCheckpoint {
-  commit: string;
-  branch: string | null;
-  refs: Record<string, string>;
-  headReflog: string[];
-}
-
 export interface WorktreeOps {
   prepare(input: WorktreePrepareInput): Promise<PreparedWorkspace>;
   commitAll(
@@ -138,8 +131,7 @@ export interface WorktreeOps {
   currentBranch?(cwd: string): Promise<string | null>;
   branchesWithNewCommits?(cwd: string, baseCommit: string, sinceMs: number): Promise<string[]>;
   diffAgainstDefault?(cwd: string, defaultBranch: string): Promise<string>;
-  captureCheckpoint?(cwd: string): Promise<WorktreeCheckpoint | null>;
-  restoreCheckpoint(cwd: string, commit: string, checkpoint?: WorktreeCheckpoint): Promise<void>;
+  restoreCheckpoint(cwd: string, commit: string): Promise<void>;
   cleanupOrphans(input: OrphanCleanupInput): Promise<string[]>;
   briefMarkerInRef?(cwd: string, ref: string): Promise<string[]>;
 }

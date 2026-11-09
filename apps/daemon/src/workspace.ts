@@ -31,14 +31,9 @@ import {
   RemoteBranchDivergedError,
   WORKSPACE_HOOK_TIMEOUT_MS,
   type WorkspaceHookNoteData,
-  type WorktreeCheckpoint,
   type WorktreeOps,
   type WorktreePrepareInput,
 } from '@cairn/shared';
-import {
-  captureWorktreeCheckpoint,
-  restoreWorktreeCheckpoint,
-} from './backend/worktree-checkpoint.js';
 import {
   GIT_NET_RETRY_DELAYS_MS,
   gitPrim,
@@ -534,16 +529,9 @@ export class WorkspaceManager implements WorktreeOps {
     return gitPrim.diffAgainstRemoteDefault(cwd, defaultBranch);
   }
 
-  async captureCheckpoint(cwd: string): Promise<WorktreeCheckpoint> {
-    return captureWorktreeCheckpoint(cwd);
-  }
-
-  async restoreCheckpoint(
-    cwd: string,
-    commit: string,
-    checkpoint?: WorktreeCheckpoint,
-  ): Promise<void> {
-    await restoreWorktreeCheckpoint(cwd, commit, checkpoint);
+  async restoreCheckpoint(cwd: string, commit: string): Promise<void> {
+    await gitPrim.resetHard(cwd, commit);
+    await gitPrim.cleanFd(cwd);
     this.logger.workspace('Worktree restored');
   }
 
