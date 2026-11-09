@@ -50,6 +50,7 @@ export interface ProviderBinding {
 export interface ServerTurn {
   claimed: ClaimedStep;
   volatileText: string | null;
+  coldSlim?: { cold: boolean; summaryHint?: string | null } | null;
   router: ProviderBinding;
   summary: ProviderBinding;
 }
@@ -201,6 +202,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
             conversationGate: current.gate,
             volatile: current.volatile,
             volatileText: turn.volatileText,
+            coldSlim: turn.coldSlim ?? null,
           },
           claimed,
         );

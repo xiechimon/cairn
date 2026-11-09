@@ -9,11 +9,13 @@ import {
   transcriptPromptRowId,
   withHistoryMarker,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import {
   chief,
   chiefMessage,
+  chiefSummary,
   chiefThread,
+  chiefTurnUsage,
   coordinatorConversation,
   coordinatorEntry,
   step,
@@ -34,6 +36,7 @@ import {
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { createMemoryFlush } from './memory-flush.js';
+import { isColdResume, resolveCacheRetentionTier, retentionMsFor } from './runtime/cold-slim.js';
 import { reportCompactionFailure, setFailureSink } from './runtime/failure-report.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
@@ -322,7 +325,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const claimedPayload = (
     row: StepRow,
     providers: CoordinatorProviders,
-  ): { claimed: ClaimedStep; volatileText: string | null } | null => {
+  ): {
+    claimed: ClaimedStep;
+    volatileText: string | null;
+    coldSlim: { cold: boolean; summaryHint: string | null };
+  } | null => {
     const threadRow = db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
     if (threadRow === undefined) return null;
     const chiefRow = db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
@@ -339,11 +346,40 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       });
     }
     const volatileParts = context.sections;
+    const lastUsage = db
+      .select()
+      .from(chiefTurnUsage)
+      .where(eq(chiefTurnUsage.threadId, row.buildId))
+      .orderBy(desc(chiefTurnUsage.createdAt))
+      .get();
+    const retentionMs = retentionMsFor(
+      resolveCacheRetentionTier(),
+      lastUsage?.model ?? `${providers.router.provider}/${providers.router.modelId}`,
+    );
+    const cold = isColdResume({
+      now: nowMs(),
+      lastUsage:
+        lastUsage === undefined
+          ? null
+          : {
+              createdAt: lastUsage.createdAt,
+              cacheRead: lastUsage.cacheRead,
+              input: lastUsage.input,
+              contextTokens: lastUsage.contextTokens,
+              model: lastUsage.model,
+            },
+      retentionMs,
+    });
+    const summaryHint =
+      db.select().from(chiefSummary).where(eq(chiefSummary.threadId, row.buildId)).get()?.summary ??
+      null;
     logger.info(
       {
         threadId: row.buildId,
         stepId: row.id,
         projectId: stepScopeProjectId(row),
+        coldResume: cold,
+        cacheRetentionMs: retentionMs,
         ...context.memoryTrace,
       },
       'coordinator memory injected',
@@ -380,6 +416,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         remoteTools: [...chiefRemoteTools()],
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
+      coldSlim: { cold, summaryHint },
     };
   };
 
@@ -401,6 +438,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       await runtime.runTurn({
         claimed: payload.claimed,
         volatileText: payload.volatileText,
+        coldSlim: payload.coldSlim,
         router: binding(teamId, providers.router),
         summary: binding(teamId, providers.summary),
       });
