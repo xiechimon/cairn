@@ -172,6 +172,7 @@ export const todo = sqliteTable(
     decisions: json<TaskDecision[]>('decisions').notNull().default(sql`'[]'`),
     lastNotifiedOwner: text('lastNotifiedOwner').default('none'),
     lastNotifiedWork: text('lastNotifiedWork').default(''),
+    coordinatorTurn: json<CoordinatorTurn>('coordinatorTurn'),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
@@ -700,6 +701,8 @@ export const pushDigestItem = sqliteTable('push_digest_item', {
   href: text('href').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export type CoordinatorTurn = { stepId: string; workKey: string };
 
 type HarnessEvalAttemptState = 'claimed' | 'dispatched' | 'dispatch_uncertain' | 'terminal';
 type HarnessEvalAttemptOutcome =

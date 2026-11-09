@@ -6,7 +6,8 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, gateState, message, project, todo } from '../db/schema.js';
+import { build, gateState, message, project, step, todo } from '../db/schema.js';
+import { nowMs } from '../lib/ids.js';
 import { planAwaitsAutoConfirm } from './builds.js';
 import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
@@ -21,8 +22,13 @@ type TodoRow = typeof todo.$inferSelect;
 export type CoordinatorReason = 'question' | 'failed' | 'review';
 
 export type Ownership =
-  | { owner: 'owner'; reason: NeedsYouReason; workKey: string }
+  | { owner: 'owner'; reason: Exclude<NeedsYouReason, 'handoff'>; workKey: string }
+  | { owner: 'owner'; reason: 'handoff'; from: CoordinatorReason; workKey: string }
   | { owner: 'coordinator'; reason: CoordinatorReason; workKey: string };
+
+export const COORDINATOR_TURN_DEADLINE_MS = 30 * 60 * 1000;
+
+const ENDED_STEP = new Set(['done', 'failed', 'stopped']);
 
 export interface OwnerDeps extends ChiefDeps {
   vapidKeys?: VapidKeys | null;
@@ -92,7 +98,31 @@ function failedOwnership(db: Db, row: TodoRow): Ownership | null {
   return { owner: 'coordinator', reason: 'failed', workKey: `failed:${phaseWork(row)}` };
 }
 
-export function ownershipOf(db: Db, row: TodoRow): Ownership | null {
+function coordinatorTurnEnded(db: Db, row: TodoRow, workKey: string, now: number): boolean {
+  const turn = row.coordinatorTurn;
+  if (turn === null || turn.workKey !== workKey) return false;
+  const wake = db
+    .select({ status: step.status, createdAt: step.createdAt })
+    .from(step)
+    .where(eq(step.id, turn.stepId))
+    .get();
+  if (wake === undefined) return true;
+  return ENDED_STEP.has(wake.status) || now - wake.createdAt >= COORDINATOR_TURN_DEADLINE_MS;
+}
+
+export function ownershipOf(db: Db, row: TodoRow, now = nowMs()): Ownership | null {
+  const ownership = workOwnership(db, row);
+  if (ownership?.owner !== 'coordinator') return ownership;
+  if (!coordinatorTurnEnded(db, row, ownership.workKey, now)) return ownership;
+  return {
+    owner: 'owner',
+    reason: 'handoff',
+    from: ownership.reason,
+    workKey: ownership.workKey,
+  };
+}
+
+function workOwnership(db: Db, row: TodoRow): Ownership | null {
   if (row.archivedAt !== null || row.phase === 'done' || row.phase === 'closed') return null;
   const pending = row.latestBuildId === null ? [] : pendingQuestionIds(db, row.latestBuildId);
   if (pending.length > 0) {
@@ -133,13 +163,16 @@ export function sectionOf(
 }
 
 export function coordinatorAcceptsReview(ownership: Ownership | null): boolean {
-  return ownership?.owner === 'coordinator' && ownership.reason === 'review';
+  if (ownership === null) return false;
+  if (ownership.reason === 'handoff') return ownership.from === 'review';
+  return ownership.owner === 'coordinator' && ownership.reason === 'review';
 }
 
 const PUSH_TITLE: Record<NeedsYouReason, string> = {
   question: '需要你决定',
   confirm: '方案已就绪',
   review: '构建待审核',
+  handoff: '协调者交给你处理',
 };
 
 function notifyOwner(deps: OwnerDeps, row: TodoRow, reason: NeedsYouReason): void {
@@ -183,8 +216,17 @@ function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
     if (record !== null) deps.hub.publishTodoDoc(record.teamId, record);
   }
   if (ownership === null) return;
-  if (ownership.owner === 'owner') notifyOwner(deps, row, ownership.reason);
-  else enqueueOwnershipWake(deps, row, ownership.reason);
+  if (ownership.owner === 'owner') {
+    notifyOwner(deps, row, ownership.reason);
+    return;
+  }
+  const stepId = enqueueOwnershipWake(deps, row, ownership.reason);
+  if (stepId === null) return;
+  deps.db
+    .update(todo)
+    .set({ coordinatorTurn: { stepId, workKey: ownership.workKey } })
+    .where(eq(todo.id, row.id))
+    .run();
 }
 
 export function seedOwnerCheckpoints(db: Db): number {

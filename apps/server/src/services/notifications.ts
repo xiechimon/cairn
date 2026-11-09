@@ -110,6 +110,7 @@ const OWNERSHIP_NOTIFICATION_TYPE = {
   question: 'build_review',
   confirm: 'plan_ready',
   review: 'build_review',
+  handoff: 'build_review',
 } as const satisfies Record<NeedsYouReason, NotificationRecord['type']>;
 
 export function notifyOwnership(
