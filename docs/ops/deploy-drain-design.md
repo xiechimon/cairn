@@ -15,6 +15,7 @@ The lease has an opaque deployment owner, an expiration, and explicit accepting/
 | Path | Expected transition and proof |
 | --- | --- |
 | Server-only artifact change | Accepting throughout; no daemon stop; same live step heartbeats and completes after server restart. |
+| First rollout from the old runner | Stage the target runner outside the checkout before entering its policy; never invoke the old idle gate. |
 | Daemon/shared/dependency artifact change | Accepting to draining; suppress all new machine claims before counting running work. |
 | Pending long poll or async claim preparation | Recheck the lease at the existing final authorization/transaction boundary; never commit a new claim after pause. |
 | Existing running daemon step | Heartbeats, tools, uploads and completion remain enabled; no machine configuration changes. |
@@ -28,12 +29,15 @@ The lease has an opaque deployment owner, an expiration, and explicit accepting/
 
 Use the existing deploy lock to serialize attempts. A drain deadline bounds the attempt, not an infinitely running step: timeout must resume rather than kill healthy work. The continuous-traffic regression uses finite active work and an infinite pending queue; pausing claims must let it deploy before the deadline. Classify artifact impact conservatively, covering shared code, dependencies and bundling configuration. An older server without the lease endpoint refuses daemon-affecting deployments. The first release introducing lease support is server-only and preserves the daemon; bootstrap therefore needs no drain. If restart survival cannot be demonstrated, server-only changes also require draining and bootstrap must be re-reviewed.
 
+The deployed watcher cannot bootstrap its own replacement: its existing runner blocks before checkout. Use `scripts/ops/bootstrap-deploy.sh <green-main-sha>` from the reviewed source to stage that target's runner under the deployment state directory, then execute it. The staged runner applies the normal ancestry, green-check, autonomy, hold, artifact-classification, snapshot and rollback checks. Bootstrap changes only which version of that runner starts; it does not bypass deployment policy or add another drain mechanism. If the full diff includes daemon changes and the endpoint is absent, it still refuses; first prepare a genuinely server-only release relative to the deployed daemon.
+
 ## 5. Decisions and validation
 
 | Decision | Reason | Reversal |
 | --- | --- | --- |
 | Durable server DB lease | Coordinator approved; survives the deploy-induced restart. | Release the lease and revert its consumers. |
 | Server-only bootstrap | Coordinator approved; keep the existing daemon running. | Revert the server commit without replacing the daemon. |
+| Stage the bootstrap runner first | Codex round 1 found that the old entry point otherwise starves before loading the fix. | Remove the bootstrap launcher after every supported host has upgraded. |
 | Separate pause from enabledRuntimes | Runtime eligibility is user configuration, not deployment state. | Revert deployment lease implementation. |
 | Retain operator hold | Explicit maintenance exclusion has a different purpose from accidental idle starvation. | Existing hold removal procedure. |
 | Stop on deadline | No safe guarantee exists for unbounded work without checkpoints. | A later reviewed checkpoint design. |

@@ -275,7 +275,7 @@ classify_runtime() {
   while IFS= read -r path; do
     case "$path" in
       *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
-      apps/server/* | apps/web/* | integration/test/* | docs/* | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs) ;;
+      apps/server/* | apps/web/* | integration/test/* | docs/* | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
       *) RUNTIME=daemon ;;
     esac
   done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")

@@ -2,6 +2,20 @@
 
 `cairn-self-deploy.timer` runs `scripts/ops/deploy-watch.sh` every minute. The watcher finds the newest first-parent main commit after the deployed one whose required checks (`check`, `pack-smoke`, `e2e-gate`) are all green and runs `scripts/ops/deploy-self.sh <sha>` for it. Both scripts copy themselves into the state directory before running, because the deploy switches the checkout they live in.
 
+For the first upgrade from the idle-gated runner, stage the reviewed bootstrap launcher before running a deploy. The old timer cannot load this fix by itself because it waits for idle before checkout. Set `TARGET_SHA` to a full green main SHA whose diff from the deployed revision is server-only, then run:
+
+```sh
+CAIRN_CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
+CAIRN_DEPLOY_STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
+export CAIRN_CHECKOUT CAIRN_DEPLOY_STATE
+git -C "$CAIRN_CHECKOUT" fetch origin main
+mkdir -p "$CAIRN_DEPLOY_STATE"
+git -C "$CAIRN_CHECKOUT" show "$TARGET_SHA:scripts/ops/bootstrap-deploy.sh" >"$CAIRN_DEPLOY_STATE/bootstrap-deploy.sh"
+bash "$CAIRN_DEPLOY_STATE/bootstrap-deploy.sh" "$TARGET_SHA"
+```
+
+The launcher stages the target's runner outside the checkout before execution. That runner still enforces all normal checks and takes the existing deploy lock; the timer can remain enabled. A daemon-affecting bootstrap against a server without lease support refuses rather than interrupting work. After this server-only upgrade, the normal watcher uses the new bounded-drain implementation.
+
 `deploy-self.sh` refuses (exit 2) a SHA that is not on `origin/main`, lacks a green required check, or arrives while an `autonomy-paused` issue is open. It also refuses one that changes the `allowBuilds` block of `pnpm-workspace.yaml`, an install or prepare script in any `package.json`, `.pnpmfile.*` or `.npmrc`; deploy those by hand after review. It waits (exit 75, retried on the next tick) while `~/.local/state/cairn-deploy/hold` exists. Server-only changes preserve both daemons and do not wait for idle steps. Daemon-affecting changes first require `GET /api/server/deploy/lease` to succeed; an older server without that endpoint refuses them, so lease support must first arrive in a server-only release. Shared code, dependency manifests and unknown runtime paths count as daemon-affecting. A run of an orb trial, or anything else that must not see a restart, writes one line naming itself into that hold file and removes it when done.
 
 After rehearsal and build, a daemon-affecting deploy acquires a durable singleton `deploy_lease` row through the owner-only lease endpoint. The row holds its UUID owner, `draining` status and one-hour expiration; all machine claim entry paths recheck it, including pending long polls and the final claim transaction. Existing steps can heartbeat and finish. The deploy waits at most `CAIRN_DEPLOY_STEP_WAIT_SECONDS` (default 1800, maximum 1800) for claimed machine steps to finish, then replaces services. Timeout exits 75 with `starved: steps never idle`, leaves running steps intact, and resumes claims. EXIT cleanup releases only its owned DB row and reads it back even when the HTTP server failed; interrupted ownership is retained in `lease-owner` for recovery, and expiration prevents an abandoned permanent pause. A resume verification failure exits 3. Runtime eligibility settings never change.

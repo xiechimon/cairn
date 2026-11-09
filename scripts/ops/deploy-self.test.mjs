@@ -17,6 +17,7 @@ import { makeTestTempDir } from '../test-tmpdir.mjs';
 
 const DEPLOY = join(import.meta.dirname, 'deploy-self.sh');
 const WATCH = join(import.meta.dirname, 'deploy-watch.sh');
+const BOOTSTRAP = join(import.meta.dirname, 'bootstrap-deploy.sh');
 const SYSTEM_PATH = '/usr/bin:/bin';
 
 function git(cwd, ...args) {
@@ -994,6 +995,48 @@ test('server-only deploys under continuous active work without stopping either d
   assert.ok(Date.now() - started < 10_000);
   assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
   assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('bootstrap stages the target runner before the deployed idle gate can starve the first rollout', () => {
+  const f = fixture({
+    claimed: 1,
+    heartbeatAgeMs: 0,
+    seedFiles: {
+      'scripts/ops/deploy-self.sh': '#!/bin/bash\necho "busy: 1 step running" >&2\nexit 75\n',
+    },
+  });
+  const target = pushTarget(f, 'server-only bootstrap', {
+    files: {
+      'marker.txt': 'previous\n',
+      'scripts/ops/deploy-self.sh': readFileSync(DEPLOY, 'utf8'),
+    },
+  });
+  writeFileSync(join(f.fake, 'lease-unsupported'), '');
+  const old = f.run(join(f.checkout, 'scripts/ops/deploy-self.sh'), [target]);
+  assert.equal(old.status, 75, old.stderr);
+  const result = f.run(BOOTSTRAP, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.ok(!readdirSync(f.state).some((name) => name.startsWith('deploy-bootstrap.')));
+});
+
+test('bootstrap retains the green-check and old-server dispatch gates', () => {
+  for (const blocked of ['checks', 'daemon']) {
+    const f = fixture({ claimed: 1 });
+    const target = pushTarget(f, 'bootstrap', {
+      files: { 'scripts/ops/deploy-self.sh': readFileSync(DEPLOY, 'utf8') },
+    });
+    if (blocked === 'checks') writeFileSync(join(f.fake, `checks-${target}`), 'check\tfailure\n');
+    else writeFileSync(join(f.fake, 'lease-unsupported'), '');
+    const result = f.run(BOOTSTRAP, [target]);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, blocked === 'checks' ? /required check/ : /lease endpoint/);
+    assert.equal(f.log('systemctl.log'), '');
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+    assert.ok(!readdirSync(f.state).some((name) => name.startsWith('deploy-bootstrap.')));
+  }
 });
 
 for (const failure of [false, true]) {
