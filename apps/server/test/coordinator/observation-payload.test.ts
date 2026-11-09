@@ -1,6 +1,12 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
+import {
+  fauxAssistantMessage,
+  fauxProvider,
+  fauxToolCall,
+  getSystemMessageText,
+  type Message,
+} from '@earendil-works/pi-ai';
 import { afterEach, expect, test, vi } from 'vitest';
 import { boot, world } from './runner-world.js';
 
@@ -38,10 +44,13 @@ test('SDK observations contain owner input, reply, and each actual generation re
     tokensPerSecond: 1e9,
   });
   faux.setResponses(
-    Array(4).fill((context: { messages: { role: string; content: unknown }[] }) => {
+    Array(4).fill((context: { messages: Message[] }) => {
       requests.push(
         structuredClone(
-          context.messages.map((message) => ({ role: message.role, content: message.content })),
+          context.messages.map((message) => ({
+            role: message.role,
+            content: message.role === 'system' ? getSystemMessageText(message) : message.content,
+          })),
         ),
       );
       return context.messages.at(-1)?.role === 'toolResult'

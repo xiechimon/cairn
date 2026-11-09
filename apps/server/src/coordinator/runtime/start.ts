@@ -57,25 +57,23 @@ export async function startRuntime(config: RuntimeConfig, api: MachineApi) {
         return body;
       }
       threads.set(claimed.step.id, claimed.chief?.threadId ?? '');
-      try {
-        return await runCoordinatorTurn(
-          {
-            harness,
-            models,
-            api,
-            context,
-            heartbeatMs: config.heartbeatMs,
-            now: Date.now,
-            gate,
-            onModel: (ref) => {
-              active = ref;
-            },
+      return runCoordinatorTurn(
+        {
+          harness,
+          models,
+          api,
+          context,
+          heartbeatMs: config.heartbeatMs,
+          now: Date.now,
+          gate,
+          onModel: (ref) => {
+            active = ref;
           },
-          claimed,
-        );
-      } finally {
+        },
+        claimed,
+      ).finally(() => {
         threads.delete(claimed.step.id);
-      }
+      });
     },
     close: () => harnesses.close(),
   };

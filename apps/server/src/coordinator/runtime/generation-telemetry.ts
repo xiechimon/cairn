@@ -4,6 +4,7 @@ import {
   observationAttributes,
   otelErrorMessage,
 } from '@cairn/shared';
+import { getSystemMessageText } from '@earendil-works/pi-ai';
 import { defineExtension, GenerationTask, hook } from '@earendil-works/pi-durable';
 import { emitCoordinatorTurnSpans } from '../../runtime-otel.js';
 
@@ -21,7 +22,11 @@ export function generationTelemetryExtension(
             requests.set(
               String(api.taskId),
               observationAttributes({
-                input: request.messages.map(({ role, content }) => ({ role, content })),
+                input: request.messages.map((message) => ({
+                  role: message.role,
+                  content:
+                    message.role === 'system' ? getSystemMessageText(message) : message.content,
+                })),
               }),
             );
           } catch {
