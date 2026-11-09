@@ -1439,6 +1439,7 @@ export const EN: Record<string, string> = {
   规则与策略: 'Rules & policies',
   正在加载规则与策略: 'Loading rules & policies',
   规则与策略没能加载: 'Rules & policies did not load',
+  打开工作路由: 'Open work routing',
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
