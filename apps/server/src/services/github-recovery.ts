@@ -6,7 +6,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { autonomousMergeAdmission, build, project, team, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
 import { type FetchLike, githubPull, isFullSha } from '../lib/github.js';
-import { type AutonomousToken, isAppToken } from '../lib/github-token.js';
+import type { AutonomousToken } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
@@ -59,13 +59,6 @@ export async function prepareRecoveryBranch(input: {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}
-
-async function recoveryIdentity(deps: BuildDeps, token: AutonomousToken): Promise<GitIdentity> {
-  if (!isAppToken(token)) return localCommitIdentity('Cairn');
-  const identity = await softwareCommitIdentity(deps);
-  if (identity === null) throw new Error('Recovery App identity unavailable');
-  return identity;
 }
 
 export async function recentRecoveryTarget(
@@ -213,7 +206,7 @@ export async function recoverRedAutonomousMain(
         base: main,
         reverted,
         token,
-        identity: await recoveryIdentity(deps, token),
+        identity: softwareCommitIdentity(deps) ?? localCommitIdentity('Cairn'),
       });
     else if (!ref.ok) continue;
     const opened = await brakeRequest(fetchImpl, token, repo, 'pulls', {

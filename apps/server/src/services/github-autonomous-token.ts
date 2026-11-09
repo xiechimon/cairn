@@ -1,6 +1,7 @@
+import type { GitIdentity } from '@cairn/shared';
 import type { AppToken, AppTokenReason, AutonomousToken, UserToken } from '../lib/github-token.js';
 import { unattributed } from '../lib/github-token.js';
-import { appCommitIdentity, appTokenOrNull } from './github-app-token.js';
+import { appTokenOrNull } from './github-app-token.js';
 import { type GithubTokenDeps, userTokenOrNull } from './github-connection.js';
 
 export async function autonomousToken(
@@ -55,12 +56,6 @@ export async function githubReadToken(
   );
 }
 
-export function softwareCommitIdentity(deps: GithubTokenDeps) {
-  return appCommitIdentity({
-    config: {
-      githubAppTokenSocket:
-        deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket,
-    },
-    ...(deps.githubFetch ? { fetchImpl: deps.githubFetch } : {}),
-  });
+export function softwareCommitIdentity(deps: GithubTokenDeps): GitIdentity | null {
+  return deps.githubAppIdentity ?? null;
 }

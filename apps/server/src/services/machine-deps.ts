@@ -1,4 +1,4 @@
-import type { SecretBox, StepRecord, UserRecord } from '@cairn/shared';
+import type { GitIdentity, SecretBox, StepRecord, UserRecord } from '@cairn/shared';
 import { isChiefConversationId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -19,6 +19,7 @@ export function isChiefConversation(id: string): boolean {
 
 export interface MachineDeps {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   db: Db;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;
