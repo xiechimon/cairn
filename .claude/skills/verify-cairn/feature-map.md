@@ -294,7 +294,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`
+- Test ids in its code: `chief-composer-block`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`
 - Research: **gap**: the Codex CLI and t3code question patterns behind D85 and D119 were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](../../../docs/design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
 - Backend design: **gap**: no design for the question lifecycle: parking, late answers, cancel and resume
