@@ -264,6 +264,49 @@ test('a forged inherited lease from an unrelated live process still queues', asy
   assert.equal(existsSync(join(root, 'started')), false);
 });
 
+test('a descendant reuses a live lease held by container PID 1', {
+  skip: process.platform !== 'linux',
+}, async (t) => {
+  const { root, start, writeOwner } = fixture(t);
+  const probe = join(root, 'init.sock');
+  const server = createServer((connection) => connection.end());
+  await new Promise((done) => server.listen(probe, done));
+  t.after(() => server.close());
+  writeOwner({ pid: 1, cwd: root, probe });
+  writeFileSync(
+    join(root, 'init-ancestry.mjs'),
+    `
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const read = fs.readFileSync;
+fs.readFileSync = (path, ...args) => {
+  const text = read(path, ...args);
+  if (path !== '/proc/' + process.pid + '/stat') return text;
+  return text.replace(/^(.*\\) \\S+ )\\d+/, (_, prefix) => prefix + '1');
+};
+syncBuiltinESMExports();
+`,
+  );
+  const run = start(
+    [
+      'exec',
+      'node',
+      '--import=./init-ancestry.mjs',
+      '--input-type=module',
+      '-e',
+      `
+import assert from 'node:assert/strict';
+import { acquireSlot } from './scripts/heavy-slots.mjs';
+const lease = await acquireSlot({ wait: false });
+assert.equal(lease?.owner, 1);
+lease.release();
+`,
+    ],
+    { CAIRN_HEAVY_SLOT: '1', CAIRN_HEAVY_SLOT_OWNER: '1' },
+  );
+  assert.equal(await run.done, 0, run.output);
+});
+
 test('admission helper selects every e2e spec when it changes', () => {
   const result = selectSpecs({
     paths: ['scripts/test-admission.mjs'],
