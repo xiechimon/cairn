@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -103,23 +103,104 @@ test('one line past 3000 non-generated lines fails and names the largest files f
   );
 });
 
-test('the CLI cap mode exits 1 above the cap and prints the top contributors', () => {
+const FAKE_GH = `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const input = args.includes('--input') ? fs.readFileSync(0, 'utf8') : null;
+fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, input }) + '\\n');
+const world = JSON.parse(fs.readFileSync(process.env.FAKE_WORLD, 'utf8'));
+const joined = args.join(' ');
+const out = (value) => process.stdout.write(JSON.stringify(value));
+const files = /pulls\\/(\\d+)\\/files/.exec(joined);
+const one = /api repos\\/o\\/r\\/pulls\\/(\\d+)$/.exec(joined);
+const labels = /api repos\\/o\\/r\\/issues\\/(\\d+)\\/labels$/.exec(joined);
+if (files) out([world.files[files[1]]]);
+else if (one) out(world.pulls.find((pull) => String(pull.number) === one[1]));
+else if (joined.includes('pulls?state=open')) out([world.pulls]);
+else if (labels && !args.includes('--method')) out(world.labels[labels[1]] ?? []);
+else out({});
+`;
+
+function runReport(world, args) {
   const dir = makeTestTempDir('pr-size-');
-  const pages = join(dir, 'files.json');
-  writeFileSync(
-    pages,
-    JSON.stringify([[f('apps/server/src/big.ts', 3001), f('pnpm-lock.yaml', 50000)]]),
-  );
-  const over = spawnSync(process.execPath, [script, 'cap', pages], { encoding: 'utf8' });
-  writeFileSync(pages, JSON.stringify([[f('apps/server/src/big.ts', 3000)]]));
-  const under = spawnSync(process.execPath, [script, 'cap', pages], { encoding: 'utf8' });
+  const bin = join(dir, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'gh'), FAKE_GH);
+  chmodSync(join(bin, 'gh'), 0o755);
+  const log = join(dir, 'calls.log');
+  writeFileSync(join(dir, 'world.json'), JSON.stringify({ labels: {}, ...world }));
+  writeFileSync(log, '');
+  const result = spawnSync(process.execPath, [script, 'report', 'o/r', ...args], {
+    encoding: 'utf8',
+    env: { PATH: `${bin}:${process.env.PATH}`, FAKE_WORLD: join(dir, 'world.json'), FAKE_LOG: log },
+  });
+  const calls = readFileSync(log, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
   releaseTestTempDir(dir);
-  assert.equal(over.status, 1, over.stderr);
-  assert.match(over.stdout, /3001 non-generated changed lines exceed the 3000-line cap/);
-  assert.match(over.stdout, /3001 +apps\/server\/src\/big\.ts/);
-  assert.doesNotMatch(over.stdout, /\d +pnpm-lock\.yaml/);
-  assert.equal(under.status, 0, under.stderr);
-  assert.match(under.stdout, /3000 non-generated changed lines \(cap 3000\)/);
+  const checks = calls
+    .filter((call) => call.args.join(' ').includes('check-runs'))
+    .map((call) => JSON.parse(call.input));
+  return { result, calls, checks };
+}
+
+const pull = (number, sha, ref = `feature/${number}`) => ({
+  number,
+  state: 'open',
+  head: { sha: sha.repeat(40), ref },
+});
+
+test('report publishes a pr-size check run on the PR head that fails above the cap and names the largest files', () => {
+  const out = runReport(
+    {
+      pulls: [pull(7, 'a')],
+      files: { 7: [f('apps/server/src/big.ts', 3001), f('pnpm-lock.yaml', 50000)] },
+    },
+    ['7'],
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.checks.length, 1);
+  const [check] = out.checks;
+  assert.equal(check.name, 'pr-size');
+  assert.equal(check.head_sha, 'a'.repeat(40));
+  assert.equal(check.status, 'completed');
+  assert.equal(check.conclusion, 'failure');
+  assert.match(check.output.title, /3001 changed lines exceed the 3000-line cap/);
+  assert.match(check.output.summary, /\| 3001 \| `apps\/server\/src\/big\.ts` \|/);
+  assert.doesNotMatch(check.output.summary, /\| \d+ \| `pnpm-lock\.yaml`/);
+});
+
+test('report without a PR number publishes the check on every open PR head and skips merge-queue drafts', () => {
+  const out = runReport(
+    {
+      pulls: [pull(7, 'a'), pull(8, 'b'), pull(9, 'c', 'mergify/merge-queue/123')],
+      files: { 7: [f('apps/web/src/a.ts', 3000)], 8: [f('apps/web/src/b.ts', 10)] },
+    },
+    [],
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.deepEqual(
+    out.checks.map((check) => [check.head_sha[0], check.conclusion]),
+    [
+      ['a', 'success'],
+      ['b', 'success'],
+    ],
+  );
+});
+
+test('report keeps the size label in step with the count', () => {
+  const out = runReport(
+    {
+      pulls: [pull(7, 'a')],
+      files: { 7: [f('apps/web/src/a.ts', 50)] },
+      labels: { 7: [{ name: 'size:XS' }] },
+    },
+    ['7'],
+  );
+  const text = out.calls.map((call) => call.args.join(' '));
+  assert.ok(text.some((line) => /DELETE repos\/o\/r\/issues\/7\/labels\/size%3AXS/.test(line)));
+  assert.ok(text.some((line) => /label create size:M --repo o\/r/.test(line)));
 });
 
 test('the size label leaves out the same generated paths the cap does', () => {
