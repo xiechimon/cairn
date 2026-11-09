@@ -1,0 +1,64 @@
+✖ foreign namespace slot stays live through its socket (1207.058471ms)
+✖ foreign namespace ticket stays live through its socket (425.50855ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1711.788973
+
+✖ failing tests:
+
+test at scripts/test-admission.test.mjs:337:3
+✖ foreign namespace slot stays live through its socket (1207.058471ms)
+  AssertionError [ERR_ASSERTION]: live foreign owner was reclaimed
+  [heavy-slots] acquired slot 1/1
+
+   RUN  v5.0.1 /tmp/ct-8a56bebd-heavy-admission-gc0GDF
+
+
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+     Start at  00:27:26
+     Duration  207ms (transform 47%, worker 32%, import 17%, tests 5%)
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:105:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:348:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:337:3
+✖ foreign namespace ticket stays live through its socket (425.50855ms)
+  AssertionError [ERR_ASSERTION]: live foreign owner was reclaimed
+  [heavy-slots] acquired slot 1/1
+
+   RUN  v5.0.1 /tmp/ct-8a56bebd-heavy-admission-SRiR5O
+
+
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+     Start at  00:27:27
+     Duration  106ms (transform 56%, import 24%, worker 13%, tests 7%)
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:105:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:348:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
