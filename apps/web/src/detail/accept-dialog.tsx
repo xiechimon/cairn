@@ -15,6 +15,7 @@ interface AcceptDialogProps {
   onConfirm?: (merge: boolean) => void;
   confirming?: boolean;
   mergeLocked?: boolean;
+  mergeByDefault?: boolean;
   rejectReason?: string | null;
   substantiveChanges?: boolean | null;
   infoOutput?: boolean;
@@ -27,16 +28,17 @@ export function AcceptDialog({
   onConfirm,
   confirming,
   mergeLocked,
+  mergeByDefault = true,
   rejectReason,
   substantiveChanges,
   infoOutput,
   pr,
 }: AcceptDialogProps) {
   const { t } = useI18n();
-  const [merge, setMerge] = useState(true);
+  const [merge, setMerge] = useState(mergeByDefault);
   useEffect(() => {
-    if (open === true) setMerge(true);
-  }, [open]);
+    if (open === true) setMerge(mergeByDefault);
+  }, [open, mergeByDefault]);
   const locked = mergeLocked === true;
   const skipMerge = infoOutput === true || (substantiveChanges === false && !locked);
   const mergeChecked = locked || merge;
