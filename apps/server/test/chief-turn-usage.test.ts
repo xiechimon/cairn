@@ -1,6 +1,6 @@
 import type { MachineDoneBody } from '@cairn/shared';
 import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { SHORT_RETENTION_MS } from '../src/coordinator/runtime/cold-slim.js';
 import {
@@ -16,6 +16,7 @@ import {
 import { getChiefEnvelope } from '../src/services/chief.js';
 import {
   DEFAULT_CONTEXT_WINDOW,
+  lastContextBearingTurnUsage,
   setCoordinatorServerContextEnabled,
 } from '../src/services/coordinator-context.js';
 import { finishStep } from '../src/services/machines.js';
@@ -401,6 +402,45 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 5_000,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+  });
+
+  test('flag on: cold-resume and the meter share the context-bearing model after a multi-model turn', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-multi-cold');
+    await finishStep(deps(), machineId, 'turn-multi-cold', {
+      status: 'success',
+      usage: [
+        usage('stub-gw/stub-model', 1000, 800, { contextTokens: 5_000 }),
+        usage('stub-gw/other-model', 50, 0),
+      ],
+    });
+    const stubRow = turnRows().find(
+      (r) => r.stepId === 'turn-multi-cold' && r.model === 'stub-gw/stub-model',
+    );
+    expect(stubRow).toBeDefined();
+    H.s.db
+      .update(chiefTurnUsage)
+      .set({ createdAt: (stubRow?.createdAt ?? 0) + 10 })
+      .where(
+        and(
+          eq(chiefTurnUsage.stepId, 'turn-multi-cold'),
+          eq(chiefTurnUsage.model, 'stub-gw/other-model'),
+        ),
+      )
+      .run();
+    const rows = turnRows().filter((r) => r.stepId === 'turn-multi-cold');
+    const newestByCreatedAt = [...rows].sort((a, b) => b.createdAt - a.createdAt)[0];
+    expect(newestByCreatedAt?.model).toBe('stub-gw/other-model');
+    const shared = lastContextBearingTurnUsage(H.s.db, H.threadId);
+    expect(shared).toMatchObject({
+      model: 'stub-gw/stub-model',
+      contextTokens: 5_000,
+      stepId: 'turn-multi-cold',
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 5_000,
+      resume: 'warm',
     });
   });
 

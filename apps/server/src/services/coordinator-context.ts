@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, type SQL } from 'drizzle-orm';
 import {
   type ContextResume,
   contextResumeOf,
@@ -66,6 +66,57 @@ function activeRouterModel(db: Db, teamId: string): string | null {
   return `${providerId}/${modelId}`;
 }
 
+export type ContextBearingTurnUsage = {
+  stepId: string;
+  threadId: string;
+  model: string;
+  createdAt: number;
+  cacheRead: number;
+  input: number;
+  contextTokens: number;
+};
+
+function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTurnUsage | null {
+  const latest = db
+    .select({ stepId: chiefTurnUsage.stepId })
+    .from(chiefTurnUsage)
+    .where(scope)
+    .orderBy(desc(chiefTurnUsage.createdAt))
+    .get();
+  if (latest == null) return null;
+  const last = db
+    .select({
+      contextTokens: chiefTurnUsage.contextTokens,
+      model: chiefTurnUsage.model,
+      createdAt: chiefTurnUsage.createdAt,
+      cacheRead: chiefTurnUsage.cacheRead,
+      input: chiefTurnUsage.input,
+      threadId: chiefTurnUsage.threadId,
+      stepId: chiefTurnUsage.stepId,
+    })
+    .from(chiefTurnUsage)
+    .where(and(eq(chiefTurnUsage.stepId, latest.stepId), isNotNull(chiefTurnUsage.contextTokens)))
+    .orderBy(desc(chiefTurnUsage.createdAt))
+    .get();
+  if (last?.contextTokens == null) return null;
+  return {
+    stepId: last.stepId,
+    threadId: last.threadId,
+    model: last.model,
+    createdAt: last.createdAt,
+    cacheRead: last.cacheRead,
+    input: last.input,
+    contextTokens: last.contextTokens,
+  };
+}
+
+export function lastContextBearingTurnUsage(
+  db: Db,
+  threadId: string,
+): ContextBearingTurnUsage | null {
+  return lastContextBearingTurnUsageWhere(db, eq(chiefTurnUsage.threadId, threadId));
+}
+
 export function lastTurnContext(
   db: Db,
   chiefRow: { id: string; teamId: string },
@@ -94,28 +145,8 @@ export function lastTurnContext(
             .from(chiefThread)
             .where(eq(chiefThread.chiefId, chiefRow.id)),
         );
-  const latest = db
-    .select({ stepId: chiefTurnUsage.stepId })
-    .from(chiefTurnUsage)
-    .where(scope)
-    .orderBy(desc(chiefTurnUsage.createdAt))
-    .get();
-  if (latest == null) return null;
-  const last = db
-    .select({
-      tokens: chiefTurnUsage.contextTokens,
-      model: chiefTurnUsage.model,
-      createdAt: chiefTurnUsage.createdAt,
-      cacheRead: chiefTurnUsage.cacheRead,
-      input: chiefTurnUsage.input,
-      threadId: chiefTurnUsage.threadId,
-      stepId: chiefTurnUsage.stepId,
-    })
-    .from(chiefTurnUsage)
-    .where(and(eq(chiefTurnUsage.stepId, latest.stepId), isNotNull(chiefTurnUsage.contextTokens)))
-    .orderBy(desc(chiefTurnUsage.createdAt))
-    .get();
-  if (last?.tokens == null) return null;
+  const last = lastContextBearingTurnUsageWhere(db, scope);
+  if (last == null) return null;
   const retentionMs = retentionMsFor(resolveCacheRetentionTier(), last.model);
   const coldSlim =
     db
@@ -134,7 +165,7 @@ export function lastTurnContext(
       createdAt: last.createdAt,
       cacheRead: last.cacheRead,
       input: last.input,
-      contextTokens: last.tokens,
+      contextTokens: last.contextTokens,
       model: last.model,
     },
     lastColdSlimAt,
@@ -149,7 +180,7 @@ export function lastTurnContext(
     lastColdSlimAt,
   });
   return {
-    tokens: last.tokens,
+    tokens: last.contextTokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
     resume,
     ...(resumeExpiresAt !== null ? { resumeExpiresAt } : {}),
