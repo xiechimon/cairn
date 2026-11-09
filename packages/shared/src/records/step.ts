@@ -54,6 +54,20 @@ export const quotaWaitSchema = z.object({
 });
 export type QuotaWait = z.infer<typeof quotaWaitSchema>;
 
+const promptRound = z.number().int().min(1);
+
+export const stepPromptOriginSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('ci-fix'),
+    trigger: z.enum(['ci-checks', 'pre-push']),
+    round: promptRound,
+    roundsMax: promptRound,
+  }),
+  z.object({ kind: z.literal('merge-conflict'), round: promptRound, roundsMax: promptRound }),
+  z.object({ kind: z.literal('rework') }),
+]);
+export type StepPromptOrigin = z.infer<typeof stepPromptOriginSchema>;
+
 export const stepJournalRowSchema = stepRecordSchema.extend({
   status: stepStatusSchema,
   checkpointCommit: recordId.nullable(),
@@ -81,6 +95,7 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
   skillInjection: skillInjectionSchema.nullable(),
   blockerHandoff: blockerHandoffSchema.optional(),
   quotaWait: quotaWaitSchema.optional(),
+  promptOrigin: stepPromptOriginSchema.optional(),
 });
 export type StepJournalRow = z.infer<typeof stepJournalRowSchema>;
 

@@ -557,6 +557,9 @@ async function finishStepReport(
         stepRow.kind,
         worker.todoRow.teamId,
         `${prompt}\n\n${outcome.pushHookOutput}\n\nFix the hook failures and push the same branch ${conversationBranch(stepRow.buildId)}. Do not create another branch or PR, bypass hooks, or merge the PR.`,
+        undefined,
+        undefined,
+        { kind: 'ci-fix', trigger: 'pre-push', round: rounds + 1, roundsMax: CI_FIX_ROUNDS_MAX },
       );
     }
     publishStepStatus(deps, stepId);
