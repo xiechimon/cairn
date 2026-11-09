@@ -162,6 +162,22 @@ describe('H5 web presentation layer: delivery sections do not turn task text int
     expect(stripBlockerHandoff(TASK)).toBe(TASK);
   });
 
+  test('prompts sent before later decisions stay task-prompt once more decisions are recorded', () => {
+    const decisions = [
+      { requestId: 'ask-1', question: 'Which wins?', answer: 'Repo rule' },
+      { requestId: 'ask-2', question: 'Which file?', answer: 'README' },
+    ];
+    const withLater = { ...task, decisions };
+    expect(classifyUserText(buildTaskPromptText(task.title, task.spec), withLater)).toBe(
+      'task-prompt',
+    );
+    const first = buildTaskPromptText(
+      task.title,
+      specWithDecisions(task.spec, decisions.slice(0, 1)),
+    );
+    expect(classifyUserText(first, withLater)).toBe('task-prompt');
+  });
+
   test('a first prompt carrying the task decisions -> task-prompt', () => {
     const decisions = [{ requestId: 'ask-1', question: 'Which wins?', answer: 'Repo rule' }];
     const decided = buildTaskPromptText(task.title, specWithDecisions(task.spec, decisions));

@@ -550,10 +550,20 @@ export function classifyUserText(
   } & TaskSource,
 ): UserTextKind {
   const text = stripBlockerHandoff(rawText);
-  const spec = specWithDecisions(task.spec, task.decisions ?? []);
-  const raw = buildTaskPromptText(task.title, spec).trim();
-  const delivered = buildTaskPromptText(task.title, spec, task).trim();
-  const taskTexts = delivered === raw ? [raw] : [delivered, raw];
+  const decisions = task.decisions ?? [];
+  const taskTexts = [
+    ...new Set(
+      decisions
+        .map((_, index) =>
+          specWithDecisions(task.spec, decisions.slice(0, decisions.length - index)),
+        )
+        .concat(task.spec)
+        .flatMap((spec) => [
+          buildTaskPromptText(task.title, spec, task).trim(),
+          buildTaskPromptText(task.title, spec).trim(),
+        ]),
+    ),
+  ];
   for (const taskText of taskTexts) {
     if (text === taskText) return 'task-prompt';
     if (stripTaskDeliveryNotes(text) === taskText) return 'task-prompt';
