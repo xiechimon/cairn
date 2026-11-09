@@ -1,5 +1,6 @@
 import {
   type ClaimedStep,
+  contextTokensOf,
   estimateTokens,
   type MachineDoneBody,
   type ModelUsage,
@@ -38,6 +39,7 @@ export interface TurnDeps {
   volatile?: VolatileContext;
   volatileText?: string | null;
   coldSlim?: ColdSlimPlan | null;
+  beforeDone?: () => void;
   onModel?: (ref: ModelRef) => void;
 }
 
@@ -48,7 +50,7 @@ function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): M
     output: 0,
     cacheRead: 0,
     cacheWrite: 0,
-    contextTokens: answer.usage.input + answer.usage.cacheRead + answer.usage.cacheWrite,
+    contextTokens: contextTokensOf(answer.usage),
   };
   for (const entry of entries) {
     const message = entry.model?.[0];
@@ -98,6 +100,7 @@ export async function runCoordinatorTurn(
   const stepId = claimed.step.id;
   let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
+    if (body.status === 'success') deps.beforeDone?.();
     await api.done(stepId, body, observation);
     return body;
   };

@@ -15,7 +15,6 @@ import {
   chiefMessage,
   chiefSummary,
   chiefThread,
-  chiefTurnUsage,
   coordinatorConversation,
   coordinatorEntry,
   step,
@@ -23,6 +22,7 @@ import {
 import { nowMs } from '../lib/ids.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
+import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
@@ -355,12 +355,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       });
     }
     const volatileParts = context.sections;
-    const lastUsage = db
-      .select()
-      .from(chiefTurnUsage)
-      .where(eq(chiefTurnUsage.threadId, row.buildId))
-      .orderBy(desc(chiefTurnUsage.createdAt))
-      .get();
+    const lastUsage = lastTurnUsageForColdResume(db, row.buildId);
     const routerModel = `${providers.router.provider}/${providers.router.modelId}`;
     const retentionMs = retentionMsFor(
       resolveCacheRetentionTier(),
@@ -369,7 +364,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const cold = isColdResume({
       now: nowMs(),
       lastUsage:
-        lastUsage === undefined
+        lastUsage === null
           ? null
           : {
               createdAt: lastUsage.createdAt,
@@ -550,20 +545,24 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         claimed: payload.claimed,
         volatileText: payload.volatileText,
         coldSlim,
+        ...(coldSlim.cold
+          ? {
+              beforeDone: () => {
+                const at = nowMs();
+                db.update(coordinatorConversation)
+                  .set({
+                    lastColdSlimAt: at,
+                    lastColdSlimStepId: row.id,
+                    updatedAt: at,
+                  })
+                  .where(eq(coordinatorConversation.threadId, row.buildId))
+                  .run();
+              },
+            }
+          : {}),
         router: binding(teamId, providers.router),
         summary: binding(teamId, providers.summary),
       });
-      if (coldSlim.cold) {
-        const at = nowMs();
-        db.update(coordinatorConversation)
-          .set({
-            lastColdSlimAt: at,
-            lastColdSlimStepId: row.id,
-            updatedAt: at,
-          })
-          .where(eq(coordinatorConversation.threadId, row.buildId))
-          .run();
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const scrubbed = scrubProviderError({ db, box: machine.box }, teamId, keyed, message);

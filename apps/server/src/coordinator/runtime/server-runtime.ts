@@ -51,6 +51,7 @@ export interface ServerTurn {
   claimed: ClaimedStep;
   volatileText: string | null;
   coldSlim?: { cold: boolean; summaryHint?: string | null } | null;
+  beforeDone?: () => void;
   router: ProviderBinding;
   summary: ProviderBinding;
 }
@@ -203,6 +204,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
             volatile: current.volatile,
             volatileText: turn.volatileText,
             coldSlim: turn.coldSlim ?? null,
+            ...(turn.beforeDone === undefined ? {} : { beforeDone: turn.beforeDone }),
           },
           claimed,
         );

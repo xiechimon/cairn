@@ -553,6 +553,7 @@ export function ChiefConversation({
               onStop={stopTurn}
               running={chief.running === true}
               turnElapsed={turnElapsed}
+              threadId={chief.threadId ?? null}
             />
             {answerKey !== null && (
               <AnswerComposer
@@ -572,6 +573,7 @@ export function ChiefConversation({
                 tools={answerActive ? composerTools : null}
                 running={chief.running === true}
                 turnElapsed={turnElapsed}
+                threadId={chief.threadId ?? null}
               />
             )}
           </>

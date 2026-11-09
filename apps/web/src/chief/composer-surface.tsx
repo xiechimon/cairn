@@ -1,5 +1,7 @@
 import { cn } from 'cn';
 import { type ReactNode, type Ref, useCallback, useImperativeHandle } from 'react';
+import { useChief } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
 import { formatClock } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
@@ -13,6 +15,12 @@ import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import type { ComposerBinding } from './composer-binding.js';
+import {
+  ContextMeterRing,
+  contextPercentOf,
+  contextResumeOf,
+  MOCK_CONTEXT_PERCENT,
+} from './context-meter-ring.js';
 
 export const TOOL_BTN_CLS =
   "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
@@ -60,6 +68,7 @@ export interface ComposerSurfaceProps {
   onStop?: (() => void) | undefined;
   running: boolean;
   turnElapsed: number | null;
+  threadId?: string | null;
   handleRef?: Ref<ComposerSurfaceHandle>;
 }
 
@@ -86,9 +95,14 @@ export function ComposerSurface({
   onStop,
   running,
   turnElapsed,
+  threadId = null,
   handleRef,
 }: ComposerSurfaceProps) {
   const { t } = useI18n();
+  const { live, teamId } = useLiveData();
+  const chiefQ = useChief(teamId, live, threadId);
+  const contextPercent = contextPercentOf(chiefQ.data?.context);
+  const contextResume = contextResumeOf(chiefQ.data?.context);
   const wire = useComposerWire({
     editable,
     draft: binding.draft,
@@ -286,6 +300,13 @@ export function ComposerSurface({
         >
           <Plus width={16} height={16} />
         </IconTooltip>
+        {(!live || contextPercent != null) && (
+          <ContextMeterRing
+            percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
+            mock={contextPercent == null}
+            resume={contextResume}
+          />
+        )}
         {tools}
         {running && turnElapsed != null && (
           <span
