@@ -348,14 +348,9 @@ export const machineAskResponseSchema = z.object({
 });
 export type MachineAskResponse = z.infer<typeof machineAskResponseSchema>;
 
-export function buildReworkReuseNote(input: {
-  prNumber: number | null;
-  prUrl: string | null;
-  failureReason: string | null;
-}): string {
+export function buildReworkReuseNote(input: { prNumber: number | null }): string {
   const pr = input.prNumber !== null ? `，更新原 PR #${input.prNumber}` : '';
-  const reason = input.failureReason !== null ? `上一轮失败原因：${input.failureReason}。` : '';
-  return `返工回到本分支继续${pr}。${reason}`;
+  return `返工回到本分支继续${pr}。`;
 }
 
 export function buildReworkNewBranchNote(input: {

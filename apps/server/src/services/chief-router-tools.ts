@@ -218,7 +218,11 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
         kind: ownership.reason,
         line: lineOf(row.latestBuildId),
       };
-      if (ownership.reason !== 'question') return [item];
+      if (
+        ownership.reason !== 'question' &&
+        !(ownership.reason === 'handoff' && ownership.from === 'question')
+      )
+        return [item];
       return [
         {
           ...item,

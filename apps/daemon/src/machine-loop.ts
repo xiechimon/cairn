@@ -23,6 +23,7 @@ import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
+import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';
 import {
   type ClaudeCodeAuthProbe,
   probeClaudeCodeAuth,
@@ -441,6 +442,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(opts.orphanTtlMs !== undefined ? { orphanTtlMs: opts.orphanTtlMs } : {}),
     ...(opts.hookTimeoutMs !== undefined ? { hookTimeoutMs: opts.hookTimeoutMs } : {}),
   });
+  await backfillRepositoryCaches(config.workspacesDir, (message) => logger.workspace(message));
   const sessionHandles = new Map<string, AgentSessionHandle>();
   const stepImageSupport = new Map<string, boolean | null>();
   const stepSteeringSupport = new Map<string, boolean>();

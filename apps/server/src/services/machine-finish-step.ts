@@ -1,4 +1,4 @@
-import type { MachineDoneBody } from '@cairn/shared';
+import type { DocumentDiffFile, MachineDoneBody } from '@cairn/shared';
 import {
   assertSkillInjection,
   buildSecondPrWarningNote,
@@ -27,7 +27,7 @@ import {
   stopPending,
   todo,
 } from '../db/schema.js';
-import { conflict } from '../lib/errors.js';
+import { conflict, HttpError } from '../lib/errors.js';
 import { githubBranchPulls } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
@@ -232,6 +232,14 @@ async function finishStepReport(
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
+  let changeFiles: DocumentDiffFile[] | undefined;
+  if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
+    try {
+      changeFiles = parseUnifiedDiff(body.changesDiff);
+    } catch {
+      throw new HttpError(400, 'invalid changesDiff: malformed unified diff');
+    }
+  }
   revokeStepGitCredential(deps, stepId);
   if (isBuildStepKind(stepRow.kind)) {
     const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
@@ -331,12 +339,13 @@ async function finishStepReport(
       sets.prUrl = body.prUrl;
       sets.prNumber = body.prNumber;
     }
-    if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
-      const files = parseUnifiedDiff(body.changesDiff);
+    if (changeFiles !== undefined) {
       sets.changes =
-        files.length === 0 && diffTextNamesAFile(body.changesDiff)
-          ? { files, changed: true }
-          : files;
+        changeFiles.length === 0 &&
+        body.changesDiff !== undefined &&
+        diffTextNamesAFile(body.changesDiff)
+          ? { files: changeFiles, changed: true }
+          : changeFiles;
     }
     if (Object.keys(sets).length > 0) {
       const updated = db.update(build).set(sets).where(eq(build.id, stepRow.buildId)).run();
@@ -548,6 +557,9 @@ async function finishStepReport(
         stepRow.kind,
         worker.todoRow.teamId,
         `${prompt}\n\n${outcome.pushHookOutput}\n\nFix the hook failures and push the same branch ${conversationBranch(stepRow.buildId)}. Do not create another branch or PR, bypass hooks, or merge the PR.`,
+        undefined,
+        undefined,
+        { kind: 'ci-fix', trigger: 'pre-push', round: rounds + 1, roundsMax: CI_FIX_ROUNDS_MAX },
       );
     }
     publishStepStatus(deps, stepId);

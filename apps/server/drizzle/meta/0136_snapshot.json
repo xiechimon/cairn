@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b2232e95-df50-4c40-b8c9-0b4476d55c87",
-  "prevId": "81a8be48-dab9-429a-935b-ff282906030c",
+  "id": "275a608b-c6dc-4a7c-b483-75f6aa264f38",
+  "prevId": "0d5845d6-00c4-4e8f-818f-952b6921f214",
   "tables": {
     "agent_memory": {
       "name": "agent_memory",
@@ -881,6 +881,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "evidenceStore": {
+          "name": "evidenceStore",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },
@@ -3990,6 +3997,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "evidenceStore": {
+          "name": "evidenceStore",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'attachments'"
         }
       },
       "indexes": {},
@@ -5358,13 +5373,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "ownerMessageIds": {
-          "name": "ownerMessageIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -6344,6 +6352,13 @@
           "autoincrement": false,
           "default": "''"
         },
+        "coordinatorTurn": {
+          "name": "coordinatorTurn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",
           "type": "text",
@@ -6359,13 +6374,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
-        },
-        "request": {
-          "name": "request",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {

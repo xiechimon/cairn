@@ -1121,37 +1121,6 @@
         }
       }
     },
-    "project-files-drill": {
-      "recipe": "features/project-files-drill.md",
-      "cases": {
-        "folder-drill": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1097-folder-drill.mjs",
-          "args": [],
-          "needs": [
-            "stack"
-          ],
-          "status": "current",
-          "purpose": "Project Files folder drill-down for hosted and local repos: tree?path= REST values, breadcrumbs, same-name files kept apart, 3-level nesting, and no file read sent on a folder click.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
-        }
-      }
-    },
-    "project-files-local": {
-      "recipe": "features/project-files-local.md",
-      "cases": {
-        "local-files": {
-          "script": "docs/verify/1030/drive-1030-local-files.mjs",
-          "args": [],
-          "needs": [
-            "stack"
-          ],
-          "status": "stale",
-          "note": "Project history controls were retired in #3479; this probe still asserts their presence. The remaining files surface is being retired next.",
-          "purpose": "Local project Files tab opens on a git worktree with a non-main default branch, hosted repos show no regression, and an unreachable local path degrades to a readable message with an API 404 and reason=not_found.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
-        }
-      }
-    },
     "project-identity": {
       "recipe": null,
       "cases": {

@@ -24,6 +24,7 @@ export * from './protocol/index.js';
 export * from './records/index.js';
 export * from './remote-access.js';
 export * from './reply-quote.js';
+export * from './repo-ref.js';
 export * from './review-findings.js';
 export * from './scheduler.js';
 export * from './search-syntax.js';

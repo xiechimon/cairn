@@ -7,22 +7,6 @@ test('feedback route is gone — old URL redirects to the home', async ({ page }
   await expect(page.locator('[data-route="feedback"]')).toHaveCount(0);
 });
 
-test('project files pane: no export button, static branch chip, no history segment', async ({
-  page,
-}) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24');
-
-  await expect(page.locator('.prj-files-share')).toHaveCount(0);
-
-  const chip = page.locator('.prj-branch-chip');
-  await expect(chip).toBeVisible();
-  await expect(chip).toContainText('main');
-  expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
-
-  await expect(page.locator('.prj-files-seg-tab')).toHaveCount(0);
-  await expect(page.locator('.prj-file-row').first()).toBeVisible();
-});
-
 test('schedules empty state drops the `查看文档` button; `新建定时` really opens and saves (#149, #1037)', async ({
   page,
 }) => {
@@ -294,7 +278,7 @@ test('todo-phase `开始` fires orchestration directly — no start dialog (#640
 });
 
 test('project task rows and cards are real links that open the todo detail (#318, #2531)', async ({ page }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
   const row = page.locator('.prj-task-row').first();
   await expect(row).toBeVisible();
 
@@ -306,7 +290,7 @@ test('project task rows and cards are real links that open the todo detail (#318
   await row.click();
   await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
 
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
   await page.locator('.prj-tasks-view-btn').nth(1).click();
   const card = page.locator('.prj-task-card').first();
   await expect(card).toBeVisible();

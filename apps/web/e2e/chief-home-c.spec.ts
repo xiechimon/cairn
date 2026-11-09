@@ -2,22 +2,21 @@ import { expect, type Page, test } from '@playwright/test';
 
 const PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
 const home = (scenario: string, query = '') => `/app?scenario=${scenario}${query}`;
-const needsYou = (page: Page) => page.getByTestId('needs-you');
 const composer = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-test('the home is one Coordinator conversation: serif greeting, a pinned decision, the conversation and the composer, with no in-progress pill', async ({
+test('the home is one Coordinator conversation: serif greeting, the conversation with task cards, and the composer, with no in-progress pill', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
   const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
   await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
   await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 3 in progress');
-  await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(3);
-  await expect(needsYou(page)).not.toContainText('relay-186 cannot run glm-5.3-flash');
+  await expect(page.getByTestId('needs-you')).toHaveCount(0);
+  await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(2);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question-dock')).toBeVisible();
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
@@ -37,27 +36,9 @@ test('the removed surfaces are gone: thread switcher, task panel, digest and per
   await expect(page.getByTestId('task-panel-toggle')).toHaveCount(0);
   await expect(page.getByTestId('home-sections')).toHaveCount(0);
   await expect(page.getByTestId('chief-brief')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-thread-row')).toHaveCount(0);
+  await expect(page.locator('[data-slot="sidebar-thread-row"]')).toHaveCount(0);
   await expect(page.getByTestId('group-archived')).toHaveCount(0);
   await expect(page.locator('.chief-fab')).toHaveCount(0);
-});
-
-test('Needs you lists worker threads by who acts next, a failed thread in its own tone', async ({
-  page,
-}) => {
-  await page.goto(home('home-c'));
-  const items = needsYou(page).locator('[data-slot="needs-you-item"]');
-  await expect(items).toHaveCount(3);
-  await expect(needsYou(page).getByRole('button', { name: '1 more' })).toHaveCount(0);
-  const cards = needsYou(page).locator('[data-slot="thread-card"]');
-  await expect(cards).toHaveCount(3);
-  await expect(cards.nth(0)).toContainText('Connect a Claude subscription token');
-  await expect(cards.nth(0)).toHaveAttribute('data-tone', 'waiting');
-  await expect(cards.nth(1)).toContainText('Rerun the relay probe');
-  await expect(items.nth(1)).toHaveAttribute('data-status', 'failed');
-  await expect(cards.nth(1)).toHaveAttribute('data-tone', 'failed');
-  await expect(cards.nth(2)).toContainText('Fold finished turns');
-  await expect(cards.nth(2)).toHaveAttribute('data-tone', 'review');
 });
 
 test('the Tasks panel lists running threads and a running row opens its thread', async ({
@@ -71,7 +52,7 @@ test('the Tasks panel lists running threads and a running row opens its thread',
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
 });
 
-test('the sidebar lists project names only, and the project chat filters the decisions and the conversation', async ({
+test('the sidebar lists project names only, and the project chat filters the task cards and the conversation', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -82,7 +63,9 @@ test('the sidebar lists project names only, and the project chat filters the dec
   await expect(page.getByTestId('project-home')).toBeVisible();
   await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
   await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 2 in progress');
-  await expect(needsYou(page)).toContainText('Connect a Claude subscription token');
+  const cards = page.getByTestId('chief-stream').locator('[data-slot="task-card"]');
+  await expect(cards).toHaveCount(1);
+  await expect(cards).toContainText('Fold finished turns into purpose and duration');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('chief-stream')).toContainText('Fold finished turns before review');
   await expect(composer(page)).toHaveAttribute('placeholder', /in cairn|Type your own answer/);
@@ -98,7 +81,7 @@ test('a project link lands on that project home', async ({ page }) => {
 test('a first run greets and offers starters, with nothing pinned', async ({ page }) => {
   await page.goto(home('home-c-empty'));
   await expect(page.getByTestId('home-c-hero').getByRole('heading', { level: 2 })).toBeVisible();
-  await expect(needsYou(page)).toHaveCount(0);
+  await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('home-c-since')).not.toContainText('waiting on you');
   await expect(page.getByTestId('home-c-since')).not.toContainText('in progress');
   await page.getByTestId('home-c-starters').getByRole('button', { name: 'Make a plan' }).click();
@@ -189,11 +172,12 @@ test('a failed conversation load shows Retry instead of the greeting, with no co
   await expect(composer(page)).toBeVisible();
 });
 
-test('a project chat links to that project home, files and settings', async ({ page }) => {
+test('a project chat links to that project home, tasks and settings', async ({ page }) => {
   await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
   const links = page.getByTestId('home-c-project-links');
-  await links.getByRole('link', { name: 'Files' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/files`));
+  await expect(links.getByRole('link', { name: 'Files' })).toHaveCount(0);
+  await links.getByRole('link', { name: 'Tasks' }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/tasks`));
   await page.goBack();
   await links.getByRole('link', { name: 'Project settings' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/settings`));
@@ -204,27 +188,23 @@ test('a project chat links to that project home, files and settings', async ({ p
   await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
 });
 
-test('the home lands at the newest message, with the needs-you tray pinned above the composer', async ({
+test('the home lands at the newest message', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
   const rows = page.getByTestId('chief-stream').locator('[data-slot="message-scroller-item"]');
   await expect(rows.last()).toBeInViewport();
-  await page.getByTestId('home-c').getByTestId('chief-body').evaluate((node) => {
-    node.scrollTop = 0;
-  });
-  await expect(needsYou(page).getByRole('heading', { name: 'Needs you' })).toBeInViewport();
-  await expect(needsYou(page).locator('[data-slot="needs-you-item"]').first()).toBeInViewport();
 });
 
-test('the sidebar Coordinator badge counts the Needs you items plus the pending question', async ({ page }) => {
+test('the tab title carries the Tasks count on every page and the sidebar carries no count', async ({
+  page,
+}) => {
   await page.goto(home('home-c'));
-  const badge = page.getByRole('complementary').getByTestId('attention-badge');
-  const needsYouCount = await needsYou(page).getByTestId('needs-you-count').textContent();
-  expect(needsYouCount).toBe('3');
-  await expect(badge).toHaveText('4');
+  await expect(page.getByTestId('tasks-badge')).toHaveText('3');
+  await expect(page).toHaveTitle('(3) Cairn');
+  await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveCount(0);
   await page.goto('/app/schedules?scenario=home-c');
-  await expect(badge).toHaveText('4');
+  await expect(page).toHaveTitle('(3) Cairn');
 });
 
 test('the earlier-messages divider shows only when the conversation reports earlier messages', async ({

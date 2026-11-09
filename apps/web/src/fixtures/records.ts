@@ -17,6 +17,7 @@ import {
   type QuotaWait,
   type SecretRecord,
   type SkillFact,
+  type StepPromptOrigin,
   type TagRecord,
   type ThreadMessageContent,
   type ThreadReportContent,
@@ -171,8 +172,6 @@ export interface ScheduleRecord {
 
 export interface ProjectContent {
   name: string;
-  branch: string;
-  files: string[];
   repoName: string;
   hosted: boolean;
   repoKind?: ProjectRepoKind;
@@ -180,7 +179,6 @@ export interface ProjectContent {
   description: string | null;
   icon?: ProjectIcon;
   color?: ProjectColor;
-  fileContents?: Record<string, string>;
 }
 
 export interface TeamAgentCard {
@@ -233,7 +231,6 @@ export interface FixtureSet {
   schedules?: ScheduleRecord[];
   scheduleForm?: 'hourly' | 'daily' | 'weekly' | 'once';
   project?: ProjectContent;
-  projectTab?: 'tasks' | 'files';
   team?: TeamContent;
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;
@@ -307,7 +304,9 @@ export interface ResourcesContent {
 
 export interface DocSegment {
   text: string;
-  style?: 'code' | 'link' | 'mention' | 'strong';
+  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor';
+  href?: string;
+  strong?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;
 }
@@ -317,12 +316,18 @@ export interface DocBlock {
   segments: DocSegment[];
 }
 
+export interface FailFacts {
+  files: number | null;
+  commits: string[];
+  pr: number | null;
+}
+
 export type WorkStep =
   | { kind: 'think'; id: string; text: string; seconds: number | null }
   | {
       kind: 'call';
       id: string;
-      action: 'read' | 'search' | 'run' | 'edit' | 'tool';
+      action: 'read' | 'search' | 'run' | 'edit' | 'tool' | 'setup';
       label: string;
       target?: string;
       description?: string;
@@ -334,6 +339,7 @@ export type WorkStep =
       running: boolean;
       unfinished: boolean;
       cancelled?: boolean;
+      localized?: boolean;
       seconds: number | null;
     };
 
@@ -380,7 +386,16 @@ export type TranscriptItem =
   | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
   | { kind: 'automation-completed'; id: string }
   | { kind: 'chief' }
-  | { kind: 'fail'; title: string; body: string; createdAt?: number }
+  | { kind: 'step-prompt'; id: string; origin: StepPromptOrigin; raw: string }
+  | {
+      kind: 'fail';
+      title: string;
+      body: string;
+      raw?: string;
+      facts?: FailFacts;
+      id?: string;
+      createdAt?: number;
+    }
   | {
       kind: 'question';
       id: string;
@@ -515,6 +530,14 @@ export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
+  | {
+      kind: 'task-card';
+      todoId: string;
+      id: string;
+      projectId: string | null;
+      seq: number | null;
+      title: string | null;
+    }
   | {
       kind: 'question';
       id?: string;

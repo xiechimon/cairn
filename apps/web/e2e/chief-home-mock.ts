@@ -59,6 +59,17 @@ export const TASK = {
   sourceTodo: null,
   v: 1,
 };
+export const taskEntry = (over: Record<string, unknown>) => ({
+  ...TASK,
+  createdBy: USER.id,
+  ownerId: USER.id,
+  sourceBuildId: null,
+  sourceKind: null,
+  sourceRef: null,
+  ...over,
+  kind: 'todo',
+});
+
 export const PROJECT = {
   id: 'proj-1',
   name: 'cairn',
@@ -111,6 +122,31 @@ export interface MockState {
 }
 
 type Json = (body: unknown, status?: number) => Promise<void>;
+
+function pendingQuestionEntries(messages: Row[]) {
+  return messages.flatMap((row) => {
+    if (typeof row.content !== 'string' || !row.content.startsWith('{')) return [];
+    const content = JSON.parse(row.content) as {
+      kind?: string;
+      requestId: string;
+      status: string;
+      questions: { header: string }[];
+    };
+    if (content.kind !== 'ask_user_question' || content.status !== 'pending') return [];
+    return [
+      {
+        kind: 'question',
+        requestId: content.requestId,
+        threadId: THREAD.id,
+        projectId: null,
+        title: content.questions[0]?.header ?? '',
+        section: 'needs_input',
+        createdAt: row.createdAt,
+        content,
+      },
+    ];
+  });
+}
 
 export async function mockLive(
   page: Page,
@@ -198,7 +234,7 @@ export async function mockLive(
       return json({ messages: [], nextCursor: null });
     }
     if (p === '/api/todos') return json(state.todos ?? [TASK]);
-    if (p === '/api/tasks') return json({ entries: state.tasks ?? [] });
+    if (p === '/api/tasks') return json({ entries: [...(state.tasks ?? []), ...pendingQuestionEntries(state.messages)] });
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);
     if (p === '/api/teams/t1/providers') return json({ presets: [], providers: [READY_PROVIDER] });

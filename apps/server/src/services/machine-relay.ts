@@ -163,6 +163,7 @@ export async function executeRelayToolCall(
       user: deps.user,
       vapidKeys: deps.vapidKeys,
       reposDir: deps.reposDir,
+      workspacesDir: deps.workspacesDir,
       attachmentsDir: deps.attachmentsDir,
       skillsDir: deps.skillsDir,
       ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),

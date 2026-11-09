@@ -11,11 +11,15 @@ export const prepushModules = [
   'scripts/heavy-slots.mjs',
   'scripts/owned-process.mjs',
   'scripts/english-only-gate.mjs',
+  'scripts/public-content-gate.mjs',
+  'scripts/public-content-allowlist.json',
   'scripts/journal-newline-gate.mjs',
   'scripts/scrub-git-env.mjs',
 ];
 
 export const ciOnlyScripts = {
+  'scripts/migration-main-gate.mjs':
+    'compares committed PR additions against freshly fetched main; local uncommitted migrations are outside HEAD',
   'scripts/css-mechanism-gate.mjs': 'greps the apps/web/dist build the CI e2e step writes',
 };
 
@@ -34,6 +38,7 @@ export const selfTests = [
   'scripts/owned-process.test.mjs',
   'scripts/spawn-ownership.test.mjs',
   'scripts/english-only-gate.test.mjs',
+  'scripts/public-content-gate.test.mjs',
   'scripts/journal-newline-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
   'scripts/epic-done.test.mjs',
@@ -121,15 +126,17 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   const advisory = [['node', 'scripts/ui-dead-class-gate.mjs', '--compile']];
   if (mode === 'advisory') return advisory;
   const language = ['node', 'scripts/english-only-gate.mjs'];
+  const publicContent = ['node', 'scripts/public-content-gate.mjs'];
   const codePaths = paths.filter((path) => hasCode([path]));
   const docPaths = paths.filter(isDocument);
   if (codePaths.length === 0 && !forceFull) {
-    const checks = [language];
+    const checks = [language, publicContent];
     checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
     return checks;
   }
   const required = [
     language,
+    publicContent,
     ['node', 'scripts/journal-newline-gate.mjs'],
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
@@ -161,7 +168,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
             selfTests.some(
               (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
             ) ||
-            /^scripts\/(prepush|heavy-slots|owned-process|spawn-ownership|english-only-gate|scrub-git-env|doc-reader-tests)/.test(
+            /^scripts\/(prepush|heavy-slots|owned-process|spawn-ownership|english-only-gate|public-content|scrub-git-env|doc-reader-tests)/.test(
               path,
             ),
         )

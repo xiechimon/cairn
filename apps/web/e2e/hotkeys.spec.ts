@@ -3,7 +3,7 @@ import { pressAndExpect } from './helpers.js';
 
 const SCHEDULES = '/app/schedules?scenario=01';
 
-const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b&tab=tasks';
+const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=r2-24b';
 
 const MACHINE_DETAIL = '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const AUTHORIZE = '/app/machines/authorize';

@@ -11,6 +11,7 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
 import { Command } from 'commander';
+import { shutdownDaemonOtel } from './backend/otel.js';
 import { HostComputerProvider } from './computer/host.js';
 import { runOrbComputerAgent } from './computer/orb-agent.js';
 import {
@@ -86,7 +87,11 @@ export async function runForeground(opts: StartOptions): Promise<void> {
   };
   process.on('SIGTERM', () => onSignal('SIGTERM'));
   process.on('SIGINT', () => onSignal('SIGINT'));
-  await handle.done;
+  try {
+    await handle.done;
+  } finally {
+    await shutdownDaemonOtel();
+  }
 }
 
 export function buildProgram(): Command {

@@ -17,8 +17,6 @@ const TICKET_NAMED = new Set([
   'drive-1010-select.mjs',
   'drive-1035-zoom-fit.mjs',
   'drive-1050-claude-bin.mjs',
-  'drive-1097-folder-drill.mjs',
-  'drive-1102-commit-detail.mjs',
   'drive-1136-stale-sweep.mjs',
   'drive-1137-webhook-tracer.mjs',
   'drive-1170-skill-import.mjs',
@@ -41,7 +39,6 @@ const TICKET_NAMED = new Set([
   'drive-953-sealed.mjs',
 ]);
 const TICKET_ARCHIVED = new Set([
-  'drive-1030-local-files.mjs',
   'drive-1009-a0-live.mjs',
   'drive-1025-plan-first-round.mjs',
   'drive-1031-account-controls.mjs',

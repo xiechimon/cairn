@@ -93,6 +93,7 @@ export interface ChiefToolDeps {
   vapidKeys?: VapidKeys | null;
   convHub?: ConversationStreamHub;
   reposDir: string;
+  workspacesDir?: string | undefined;
   attachmentsDir: string;
   skillsDir: string;
   mcpConfigPath?: string;
@@ -260,6 +261,10 @@ function requireUnarchivedTargets(db: Db, teamId: string, name: string, params: 
 }
 
 const DOCS_MAX_PATHS = 24;
+const DOCS_MAX_FILE_BYTES = 64 * 1024;
+const DOCS_MAX_RESPONSE_BYTES = 128 * 1024;
+const DOCS_MAX_JSON_EXPANSION = 6;
+const DOCS_FILE_METADATA_RESERVE_BYTES = 2048;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
@@ -423,17 +428,76 @@ export async function executeChiefTool(
       const files: Record<string, unknown>[] = [];
       for (const p of capped) {
         try {
-          const f = await readFile({ db, reposDir: deps.reposDir }, projectId, p, ref);
-          files.push({ path: f.path, ref: f.ref, encoding: f.encoding, content: f.content });
+          const segments = p.toLowerCase().split(/[\\/]/);
+          if (
+            segments.some((segment) =>
+              /^(?:\.git|\.ssh|\.aws|\.gnupg|\.env(?:\..*)?|\.npmrc|\.pypirc|credentials(?:\.json)?|id_rsa|id_ed25519)$/.test(
+                segment,
+              ),
+            ) ||
+            /\.(?:pem|key|p12|pfx)$/i.test(p)
+          ) {
+            throw new HttpError(403, 'credential file access denied');
+          }
+          const f = await readFile(
+            { db, reposDir: deps.reposDir, workspacesDir: deps.workspacesDir },
+            projectId,
+            p,
+            ref,
+            {
+              defaultBranch: true,
+              maxBytes: Math.max(
+                0,
+                Math.min(
+                  DOCS_MAX_FILE_BYTES,
+                  Math.floor(
+                    (DOCS_MAX_RESPONSE_BYTES -
+                      Buffer.byteLength(
+                        json({ projectId, name: row.name, files, omitted: paths.length }),
+                      ) -
+                      DOCS_FILE_METADATA_RESERVE_BYTES) /
+                      DOCS_MAX_JSON_EXPANSION,
+                  ),
+                ),
+              ),
+            },
+          );
+          files.push({
+            path: f.path,
+            ref: f.ref,
+            commit: f.commit,
+            encoding: f.encoding,
+            content: f.content,
+          });
         } catch (err) {
-          files.push({ path: p, error: err instanceof Error ? err.message : String(err) });
+          files.push({
+            path: p.slice(0, 512),
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 1024),
+          });
+        }
+        if (
+          Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
+          DOCS_MAX_RESPONSE_BYTES
+        ) {
+          files.pop();
+          files.push({
+            path: p.slice(0, 512),
+            error: 'repository document response limit exceeded',
+          });
+          if (
+            Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
+            DOCS_MAX_RESPONSE_BYTES
+          ) {
+            files.pop();
+            break;
+          }
         }
       }
       return json({
         projectId,
         name: row.name,
         files,
-        ...(paths.length > capped.length ? { omitted: paths.length - capped.length } : {}),
+        ...(paths.length > files.length ? { omitted: paths.length - files.length } : {}),
       });
     }
     case 'usage': {

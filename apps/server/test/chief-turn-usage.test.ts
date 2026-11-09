@@ -274,6 +274,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
       tokens: 23_456,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
+      resume: 'warm',
     });
   });
 
@@ -313,6 +314,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
       tokens: 110,
       contextWindow: 200_000,
+      resume: 'warm',
     });
     claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
     await finishStep(deps(), machineId, 'turn-fallback', {
@@ -322,6 +324,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
       tokens: 120,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
+      resume: 'warm',
     });
   });
 });
