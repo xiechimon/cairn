@@ -108,7 +108,7 @@ function ActionRow({ step, compact }: { step: ActionStep; compact: boolean }) {
           />
           {open && (
             <RowDetail>
-              <p className="m-0 text-meta leading-5 text-(--text-secondary) italic">{step.text}</p>
+              <p className="m-0 text-meta leading-5 text-(--text-secondary)">{step.text}</p>
             </RowDetail>
           )}
         </div>

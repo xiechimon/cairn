@@ -76,7 +76,7 @@
     {
       "id": "B11",
       "title": "Peripheral surfaces",
-      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
+      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
     },
     {
       "id": "B12",
@@ -2447,46 +2447,6 @@
         "apps/server/test/deploy-lease.test.ts",
         "integration/test/deploy-server-restart.test.ts",
         "scripts/ops/deploy-self.test.mjs"
-      ],
-      "batch": "B11"
-    },
-    {
-      "id": "feature-releases",
-      "name": "Feature flags and releases",
-      "summary": "Per-user feature flags and the account page list where the owner releases them.",
-      "states": "A list of flags in the account settings with a release action for the owner.",
-      "centrality": 4,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/routes/feature-releases.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-flags.ts",
-          "apps/server/src/services/feature-flags.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/flags",
-          "/api/flags/:key/release"
-        ]
-      },
-      "reach": [
-        "settings account"
-      ],
-      "research": {
-        "gap": "no note on per-user flags for a single-user product"
-      },
-      "frontendDesign": {
-        "gap": "the releases list has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for flag defaults and release"
-      },
-      "evidence": [
-        "apps/web/e2e/account-feature-releases.spec.ts",
-        "apps/server/test/feature-flags.test.ts"
       ],
       "batch": "B11"
     },

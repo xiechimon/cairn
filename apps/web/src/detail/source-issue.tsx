@@ -76,7 +76,7 @@ export function SourceIssueLine({
       <span className="flex-none">{echo.state === 'open' ? t('打开') : t('已关闭')}</span>
       <span className="truncate">{echo.title}</span>
       {mismatch && (
-        <span className="flex-none text-(--text-tertiary) italic" data-testid="source-issue-drift">
+        <span className="flex-none text-(--text-tertiary)" data-testid="source-issue-drift">
           {t('与本地标题不一致')}
         </span>
       )}

@@ -77,7 +77,6 @@
   ],
   "account": [
     "apps/web/src/routes/account-page.tsx",
-    "apps/web/src/routes/feature-releases.tsx",
     "apps/web/src/settings/"
   ],
   "first-run-home": [

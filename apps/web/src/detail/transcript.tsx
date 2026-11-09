@@ -387,7 +387,7 @@ function Row({
                   >
                     {s.denied
                       ? t('✕ skill: {n}（已挡下）', { n: s.name })
-                      : t('▶ skill: {n}', { n: s.name })}
+                      : t('skill: {n}', { n: s.name })}
                   </span>
                 ))}
                 <LiveSignal at={item.signalAt} className="[overflow-wrap:anywhere]" />

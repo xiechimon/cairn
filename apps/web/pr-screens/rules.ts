@@ -184,6 +184,67 @@ return [...found.values()];
 `,
 );
 
+const V22 = staticRule(
+  'V22',
+  `
+const found = new Map();
+for (const el of document.querySelectorAll('body *')) {
+  if (!visible(el) || ![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== '')) continue;
+  const s = getComputedStyle(el);
+  if (s.textTransform === 'uppercase') found.set(keyOf(el) + ':case', { key: keyOf(el) + ':case', text: 'uppercase text on ' + keyOf(el) });
+  if (s.letterSpacing !== 'normal' && parseFloat(s.letterSpacing) !== 0) found.set(keyOf(el) + ':tracking', { key: keyOf(el) + ':tracking', text: 'letter-spacing ' + s.letterSpacing + ' on ' + keyOf(el) + ', not normal' });
+}
+return [...found.values()];
+`,
+);
+
+const V23 = staticRule(
+  'V23',
+  `
+const found = new Map();
+for (const el of document.querySelectorAll('body *')) {
+  if (!visible(el) || ![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== '')) continue;
+  const s = getComputedStyle(el);
+  if (Number(s.fontWeight) >= 800) found.set(keyOf(el) + ':weight', { key: keyOf(el) + ':weight', text: 'font-weight ' + s.fontWeight + ' on ' + keyOf(el) });
+  if (s.fontStyle === 'italic' && !el.closest('em, i, cite, blockquote, dfn, var')) found.set(keyOf(el) + ':italic', { key: keyOf(el) + ':italic', text: 'italic chrome text on ' + keyOf(el) });
+}
+return [...found.values()];
+`,
+);
+
+const V24 = staticRule(
+  'V24',
+  `
+const LAYOUT = ['all', 'width', 'height', 'top', 'left', 'right', 'bottom', 'inset', 'margin', 'padding'];
+const found = new Map();
+for (const el of document.querySelectorAll('body *')) {
+  if (!visible(el)) continue;
+  const s = getComputedStyle(el);
+  const durations = s.transitionDuration.split(',').map((d) => parseFloat(d));
+  s.transitionProperty.split(',').map((p) => p.trim()).forEach((prop, i) => {
+    if (!LAYOUT.some((name) => prop === name || prop.startsWith(name + '-')) || !(durations[i % durations.length] > 0)) return;
+    const key = keyOf(el) + ':' + prop;
+    found.set(key, { key, text: 'transition on "' + prop + '" for ' + keyOf(el) + '; transition color, background, border, opacity or transform' });
+  });
+}
+return [...found.values()];
+`,
+);
+
+const T4 = staticRule(
+  'T4',
+  `
+const found = new Map();
+for (const el of document.querySelectorAll('button, [role="button"], [role="tab"], [role="menuitem"], a, h1, h2, h3, h4, label, th')) {
+  if (!visible(el)) continue;
+  const text = el.textContent.trim();
+  if (text === '' || text.length > 40) continue;
+  if (/[.。!！]$/.test(text) && !/(\\.\\.\\.|…)$/.test(text)) found.set(keyOf(el) + ':' + text, { key: keyOf(el) + ':' + text, text: 'label "' + text + '" on ' + keyOf(el) + ' ends in punctuation' });
+}
+return [...found.values()];
+`,
+);
+
 const T1 = staticRule(
   'T1',
   `
@@ -273,7 +334,7 @@ const R1: Rule = async (page) => {
   return widths.scroll > widths.inner ? [finding('R1', 'scrollWidth', `scrollWidth ${widths.scroll} > ${widths.inner} at 390px`)] : [];
 };
 
-export const RULES: Record<string, Rule> = { C1, C2, C3, C4, C5, C7, C11, V2, V3, V4, V8, T1, A1, A2, R1 };
+export const RULES: Record<string, Rule> = { C1, C2, C3, C4, C5, C7, C11, V2, V3, V4, V8, V22, V23, V24, T1, T4, A1, A2, R1 };
 export const RULE_IDS = Object.keys(RULES);
 
 export async function runRules(page: Page, only: string[] = RULE_IDS): Promise<Finding[]> {

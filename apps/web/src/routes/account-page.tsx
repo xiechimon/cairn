@@ -33,7 +33,6 @@ import {
   unsubscribeDevicePush,
 } from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
-import { FeatureReleases } from './feature-releases.js';
 
 export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
@@ -229,7 +228,6 @@ export function AccountPage() {
             </SettingsRow>
           </SettingsCard>
         )}
-        {live && <FeatureReleases />}
       </div>
     </PageShell>
   );

@@ -15,7 +15,6 @@ for (const width of [1440, 390]) {
         const path = new URL(route.request().url()).pathname;
         if (path === '/api/teams') return route.fulfill({ json: [{ id: 'team-1', name: 'Team', plan: 'free', createdAt: 0 }] });
         if (path === '/api/user/me' || path === '/api/auth/session') return route.fulfill({ json: { id: 'user-1', displayName: 'Owner', avatarUrl: null, type: 'user' } });
-        if (path === '/api/flags') return route.fulfill({ json: { flags: [] } });
         if (path.endsWith('/chief')) return route.fulfill({ status: 404, json: { error: 'Coordinator not configured' } });
         return route.fulfill({ json: [] });
       });

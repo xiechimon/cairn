@@ -15,14 +15,14 @@
 
 | Item | Count |
 |---|---|
-| Features | 54 |
-| status shipped | 45 |
+| Features | 53 |
+| status shipped | 44 |
 | status partial | 7 |
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 17 |
-| Research gaps | 17 |
-| Frontend design gaps | 24 |
-| Backend design gaps | 23 |
+| Research gaps | 16 |
+| Frontend design gaps | 23 |
+| Backend design gaps | 22 |
 | notes cited but not on main | 20 |
 
 ## Coverage
@@ -80,7 +80,6 @@
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
 | [Sidebar and thread list](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
-| [Feature flags and releases](#feature-releases) | 4 | shipped | gap | gap | gap | B11 |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
 | [Thread tags](#thread-tags) | 4 | shipped | gap | yes | yes | B11 |
 
@@ -191,14 +190,13 @@ Who can do what and with which credentials: the secrets page, API keys with gran
 
 ### B11 · Peripheral surfaces
 
-Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
+Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
 
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository |
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
 | [Server backup and deploy status](#server-status) | 3 | Frontend design: the banners have no design |
-| [Feature flags and releases](#feature-releases) | 4 | Research: no note on per-user flags for a single-user product<br>Frontend design: the releases list has no design<br>Backend design: no design for flag defaults and release |
 | [Thread tags](#thread-tags) | 4 | Research: no note on whether tags still earn their place after D58 |
 
 ### B12 · Phase 3: iOS app
@@ -618,14 +616,6 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](spec/14-skills-execution-surface-injection.md)
-
-### feature-releases
-
-**Feature flags and releases** (shipped). Per-user feature flags and the account page list where the owner releases them.
-
-- Research: **gap**: no note on per-user flags for a single-user product
-- Frontend design: **gap**: the releases list has no design
-- Backend design: **gap**: no design for flag defaults and release
 
 ### ios-app
 
