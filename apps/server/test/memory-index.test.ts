@@ -10,6 +10,12 @@ import {
   MEMORY_VERSION_RETENTION_MS,
   purgeExpiredMemoryVersions,
 } from '../src/services/memory.js';
+import {
+  applyMemoryPass,
+  MEMORY_PASS_STALE_MS,
+  memoryPassDue,
+  memoryPassSection,
+} from '../src/services/memory-consolidation.js';
 
 const TEAM = 'team-1';
 const AGENT = 'agent-1';
@@ -155,5 +161,75 @@ describe('version retention', () => {
         .get()
         ?.history.map((entry) => entry.content),
     ).toEqual(['v2', 'v3']);
+  });
+});
+
+describe('legacy weekly pass with MEMORY.md documents', () => {
+  test('never expires or merges a stale document even when a queued pass names its id', () => {
+    const db = openMemoryDb();
+    const content = '- release：Squash merges only.\n- review：Attach proof.';
+    const document = insert(db, { title: MEMORY_INDEX_TITLE, content });
+    const fact = insert(db, { content: 'Squash only.' });
+    const scope = { agentId: AGENT, teamId: TEAM };
+    const out = applyMemoryPass(
+      db,
+      scope,
+      {
+        merge: [
+          { keep: document, drop: [fact], content: 'Squash only.' },
+          { keep: fact, drop: [document], content: 'Squash merges only.' },
+        ],
+        expire: [document],
+      },
+      MEMORY_PASS_STALE_MS + 10_000,
+    );
+    expect(out).toEqual({ merged: 0, expired: 0, skipped: 3 });
+    expect(valid(db)).toHaveLength(2);
+    expect(valid(db).find((row) => row.id === document)?.content).toBe(content);
+  });
+
+  test('a stale document cannot be expired by a queued legacy pass', () => {
+    const db = openMemoryDb();
+    const content = '- release：Squash only.\n- review：Attach proof.';
+    const document = insert(db, { title: MEMORY_INDEX_TITLE, content });
+    expect(
+      applyMemoryPass(
+        db,
+        { agentId: AGENT, teamId: TEAM },
+        { expire: [document] },
+        MEMORY_PASS_STALE_MS + 10_000,
+      ),
+    ).toEqual({ merged: 0, expired: 0, skipped: 1 });
+    expect(valid(db).find((row) => row.id === document)?.content).toBe(content);
+  });
+
+  test('document facts and scopes never count toward the legacy pass minimum', () => {
+    const db = openMemoryDb();
+    const document = insert(db, {
+      title: MEMORY_INDEX_TITLE,
+      content: '- a：one\n- b：two\n- c：three\n- d：four',
+    });
+    const due = () => memoryPassDue(db, 'chief', TEAM, AGENT, 10_000);
+    expect(due()).toBe(false);
+    for (const projectId of ['p1', 'p2', 'p3']) {
+      insert(db, { title: MEMORY_INDEX_TITLE, projectId });
+    }
+    expect(due()).toBe(false);
+    expect(memoryPassSection(db, 'chief', TEAM, AGENT)).not.toContain(document);
+    for (const title of ['a', 'b', 'c']) insert(db, { title });
+    expect(due()).toBe(false);
+    insert(db, { title: 'd' });
+    expect(due()).toBe(true);
+  });
+
+  test('folds preserve the most recent injection time through subsequent folds', () => {
+    const db = openMemoryDb();
+    insert(db, { lastInjectedAt: 4_000 });
+    insert(db, { lastInjectedAt: 8_000 });
+    foldMemoryIndexes(db, 10_000);
+    expect(indexOf(db, null)[0]?.lastInjectedAt).toBe(8_000);
+    insert(db, { lastInjectedAt: null });
+    foldMemoryIndexes(db, 20_000);
+    expect(indexOf(db, null)[0]?.lastInjectedAt).toBe(8_000);
   });
 });

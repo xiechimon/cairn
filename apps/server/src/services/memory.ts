@@ -521,6 +521,9 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs()): voi
     for (const group of groups.values()) {
       const [head] = group;
       if (head === undefined || (group.length === 1 && head.title === MEMORY_INDEX_TITLE)) continue;
+      const injectedAt = group.flatMap((row) =>
+        row.lastInjectedAt === null ? [] : [row.lastInjectedAt],
+      );
       const lines: string[] = [];
       for (const row of group) {
         if (row.title === MEMORY_INDEX_TITLE) {
@@ -555,7 +558,7 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs()): voi
           history: [],
           invalidAt: null,
           supersededBy: null,
-          lastInjectedAt: null,
+          lastInjectedAt: injectedAt.length === 0 ? null : Math.max(...injectedAt),
           createdAt: head.createdAt,
           updatedAt: Math.max(...group.map((row) => row.updatedAt)),
         })
