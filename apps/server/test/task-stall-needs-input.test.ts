@@ -155,6 +155,19 @@ describe('a parked question is its own phase and wakes the Coordinator', () => {
     expect(coordinatorSteps().at(-1)?.prompt).toContain('should the banned string stay?');
   });
 
+  test('a zero-change step that ends with its own pending question asks nothing more, and its answer resumes the build', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark();
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+    const out = (await relay('answer_question', {
+      todoId,
+      requestId: REQUEST_A,
+      answer: 'Repo rule wins.',
+    })) as { delivered: string };
+    expect(out.delivered).toBe('new-turn');
+  });
+
   test('a build asks the zero-change question once: a second zero-change step after the answer goes to review', async () => {
     const { todoId, buildId, stepRow } = startSession();
     endStep(stepRow.id, { hasChanges: false });

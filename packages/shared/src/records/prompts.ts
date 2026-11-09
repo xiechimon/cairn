@@ -75,9 +75,9 @@ export function buildTaskPromptText(title: string, spec: string, source?: TaskSo
   return isIssueSourcedTask(source) ? fenceIssueText(source?.sourceRef, text) : text;
 }
 
-const DECISIONS_NOTE_HEAD =
-  'Decisions already made on this task. They override the brief where the two conflict; do not ask them again:';
-const DECISIONS_NOTE_TAIL = 'End of decisions.';
+const DECISIONS_BLOCK_OPEN =
+  '[cairn task decisions: they override the brief where the two conflict; do not ask them again]';
+const DECISIONS_BLOCK_CLOSE = '[end of cairn task decisions]';
 
 export function appendDecisionsNote(
   prompt: string,
@@ -87,16 +87,16 @@ export function appendDecisionsNote(
   const lines = decisions.map(
     (d) => `- Question (${d.requestId}): ${d.question}\n  Decision: ${d.answer}`,
   );
-  const note = [DECISIONS_NOTE_HEAD, ...lines, DECISIONS_NOTE_TAIL].join('\n');
-  return prompt === '' ? note : `${prompt}\n\n${note}`;
+  const block = [DECISIONS_BLOCK_OPEN, ...lines, DECISIONS_BLOCK_CLOSE].join('\n');
+  return prompt === '' ? block : `${prompt}\n\n${block}`;
 }
 
-function stripDecisionsNote(text: string): string {
-  const idx = text.lastIndexOf(`\n\n${DECISIONS_NOTE_HEAD}`);
-  if (idx === -1) return text;
-  return wrappedBy(text.slice(idx + 2), DECISIONS_NOTE_HEAD, DECISIONS_NOTE_TAIL)
-    ? text.slice(0, idx)
-    : text;
+function stripDecisionsBlock(text: string): string {
+  const open = text.indexOf(`\n\n${DECISIONS_BLOCK_OPEN}\n`);
+  if (open === -1) return text;
+  const close = text.lastIndexOf(`\n${DECISIONS_BLOCK_CLOSE}`);
+  if (close < open) return text;
+  return `${text.slice(0, open)}${text.slice(close + 1 + DECISIONS_BLOCK_CLOSE.length)}`;
 }
 
 export const TRANSCRIPT_PROMPT_ROW_ID_PREFIX = 'user-';
@@ -424,6 +424,10 @@ const BLOCKER_HANDOFF_CLOSE_PREFIX = `${BLOCKER_HANDOFF_OPEN}结束`;
 export const BLOCKER_HANDOFF_CLOSE = `${BLOCKER_HANDOFF_CLOSE_PREFIX}】`;
 const QUOTED_LINE = /^>( |$)/;
 
+function stripDeliverySections(text: string): string {
+  return stripDecisionsBlock(stripBlockerHandoff(text));
+}
+
 export function stripBlockerHandoff(text: string): string {
   const lines = text.split('\n');
   const open = lines.findIndex(
@@ -454,7 +458,7 @@ function stripTaskDeliveryNotes(text: string): string {
         : wrappedBy(cur.slice(reportIdx + 1), REPORT_NOTE_HEAD, REPORT_NOTE_TAIL)
           ? cur.slice(0, reportIdx)
           : cur;
-    const next = stripDecisionsNote(stripConfirmedPlanNote(stripWorkBranchNote(withoutReport)));
+    const next = stripConfirmedPlanNote(stripWorkBranchNote(withoutReport));
     if (next === cur) return cur;
     cur = next;
   }
@@ -559,7 +563,7 @@ export function classifyUserText(
   rawText: string,
   task: { title: string; spec: string } & TaskSource,
 ): UserTextKind {
-  const text = stripBlockerHandoff(rawText);
+  const text = stripDeliverySections(rawText);
   const raw = buildTaskPromptText(task.title, task.spec).trim();
   const delivered = buildTaskPromptText(task.title, task.spec, task).trim();
   const taskTexts = delivered === raw ? [raw] : [delivered, raw];
