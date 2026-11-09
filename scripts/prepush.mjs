@@ -18,6 +18,8 @@ export const prepushModules = [
 ];
 
 export const ciOnlyScripts = {
+  'scripts/migration-main-gate.mjs':
+    'compares committed PR additions against freshly fetched main; local uncommitted migrations are outside HEAD',
   'scripts/css-mechanism-gate.mjs': 'greps the apps/web/dist build the CI e2e step writes',
 };
 
