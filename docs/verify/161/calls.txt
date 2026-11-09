@@ -1,0 +1,22 @@
+$ curl -s -X GET 'http://127.0.0.1:8917/api/teams/tiWGWYWCCRiWmoZnIgkXY/feishu'
+HTTP 200
+{"configured":false,"appId":null,"openId":null,"cairnOrigin":null}
+
+$ curl -s -X GET 'http://127.0.0.1:8916/api/teams/zjlQQUuaIvLPtIRsq2Ljj/feishu'
+HTTP 404
+{"error":"Not found"}
+rows before: []
+rows after:  []
+
+$ curl -s -X PUT 'http://127.0.0.1:8916/api/teams/zjlQQUuaIvLPtIRsq2Ljj/feishu' -H 'content-type: application/json' -d '{}'
+HTTP 404
+{"error":"Not found"}
+
+$ curl -s -X DELETE 'http://127.0.0.1:8916/api/teams/zjlQQUuaIvLPtIRsq2Ljj/feishu'
+HTTP 404
+{"error":"Not found"}
+
+$ curl -s -X GET 'http://127.0.0.1:8916/api/teams/zjlQQUuaIvLPtIRsq2Ljj/notifications'
+HTTP 200
+{"unreadThreadIds":[]}
+
