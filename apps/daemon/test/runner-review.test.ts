@@ -170,7 +170,7 @@ function fakeWorkspace(calls: string[], opts: { rewindError?: string } = {}): Wo
     },
     async commitAll() {
       calls.push('commitAll');
-      return { committed: true, head: 'abc123' };
+      return { committed: true, head: 'abc123', setupDrift: [] };
     },
     async push(_cwd, branch) {
       calls.push(`push:${branch}`);

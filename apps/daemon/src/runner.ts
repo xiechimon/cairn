@@ -1974,8 +1974,16 @@ async function runClaimedStep(
         withCoAuthor(commitMessage, tokenRes.coAuthor ?? null),
         stepIdentity,
       );
+      if (committed.setupDrift.length > 0) {
+        transcript.upsert({
+          id: `setup-drift-${stepId}`,
+          role: 'system',
+          content: `Workspace setup changed ${committed.setupDrift.join(', ')}; these changes were left out of the commit because the agent did not make them.`,
+          createdAt: now(),
+        });
+      }
       if (claimed.step.kind === 'merge') {
-        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch);
+        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, creds.git);
         transcript.upsert({
           id: `merge-${stepId}`,
           role: 'system',

@@ -173,7 +173,7 @@ function fakeWorkspace(cwd: string, opts: FakeOpts) {
       };
     },
     async commitAll() {
-      return { committed: false, head: 'def456' };
+      return { committed: false, head: 'def456', setupDrift: [] };
     },
     async push() {},
     async mergeDefaultBranch() {

@@ -111,7 +111,7 @@ function makeWorld(opts: {
   return { s, teamId, todoId, buildId, stepId, machineId, base };
 }
 
-const chiefActor = { kind: 'agent' as const, name: '总管' };
+const chiefActor = { kind: 'agent' as const, name: '总管', stopActor: 'coordinator' as const };
 const chiefDepsOf = (w: World) => ({ ...w.s.svc, box: w.s.secretBox }) as unknown as ChiefToolDeps;
 const stepStatus = (w: World) =>
   w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!.status;
@@ -191,7 +191,9 @@ describe('#1445 lost-contact sweep does not spare steps of already-closed cards'
 describe('#1445 closing a card cancels an in-flight stop-and-done reservation', () => {
   test('closing while a done reservation is in flight: after the report lands the card is still closed', async () => {
     const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
-    expect(prepareStopForDone(w.s.svc, w.todoId)).toEqual({ state: 'stopping' });
+    expect(prepareStopForDone(w.s.svc, w.todoId, { actor: 'person', reason: 'test stop' })).toEqual(
+      { state: 'stopping' },
+    );
     const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'closed' });
     expect(res.status).toBe(200);
     applyStoppedStep(w.s.svc, w.stepId);
@@ -320,6 +322,7 @@ describe('#1451 marking an in-progress card done also stops active steps', () =>
       {
         kind: 'user',
         name: '我',
+        stopActor: 'person',
       },
     );
     expect(out.transitioned).toEqual([completed.todoId]);
