@@ -1533,6 +1533,7 @@
       "code": {
         "web": [
           "apps/web/src/pages/project-new-page.tsx",
+          "apps/web/src/pages/project-page.tsx",
           "apps/web/src/pages/project-settings-page.tsx",
           "apps/web/src/board/project-home.tsx"
         ],
@@ -1545,6 +1546,7 @@
         "web": [
           "/app/project/new",
           "/app/project/:id",
+          "/app/project/:id/tasks",
           "/app/project/:id/settings"
         ],
         "server": [
@@ -1553,6 +1555,11 @@
           "/api/projects/:id/${action}",
           "/api/projects/:id/autonomy",
           "/api/projects/:id/branches",
+          "/api/projects/:id/file",
+          "/api/projects/:id/files",
+          "/api/projects/:id/tree",
+          "/api/projects/:id/commits",
+          "/api/projects/:id/commits/:sha",
           "/api/fs/list",
           "/api/fs/pick"
         ]
@@ -1560,6 +1567,7 @@
       "reach": [
         "open /app/project/new",
         "click testid:github-picker",
+        "open /app/project/<id of a project listed by the projects API>/tasks",
         "open /app/project/<id of a project listed by the projects API>/settings",
         "click testid:project-instructions-input"
       ],
@@ -1569,7 +1577,8 @@
         ".claude/skills/verify-cairn/features/local-repo-api.md"
       ],
       "research": [
-        "docs/research/project-coordinators.md"
+        "docs/research/project-coordinators.md",
+        "docs/research/project-files-retirement-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md",
@@ -1583,55 +1592,6 @@
         "apps/web/e2e/project-settings-autonomy.spec.ts",
         "apps/server/test/project-delete.test.ts"
       ]
-    },
-    {
-      "id": "project-files",
-      "name": "Project files",
-      "summary": "The remaining project file tree and viewer, pending retirement in #3479.",
-      "states": "A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.",
-      "centrality": 3,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/pages/project-page.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-projects.ts"
-        ]
-      },
-      "routes": {
-        "web": [
-          "/app/project/:id/files"
-        ],
-        "server": [
-          "/api/projects/:id/file",
-          "/api/projects/:id/files",
-          "/api/projects/:id/tree",
-          "/api/projects/:id/commits",
-          "/api/projects/:id/commits/:sha"
-        ]
-      },
-      "reach": [
-        "open /app/project/<id of a project listed by the projects API>/files"
-      ],
-      "verify": [
-        ".claude/skills/verify-cairn/features/project-files-drill.md",
-        ".claude/skills/verify-cairn/features/project-files-local.md"
-      ],
-      "research": [
-        "docs/research/project-files-retirement-2026-11-09.md"
-      ],
-      "frontendDesign": {
-        "gap": "the files tab has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for reading files and commits from local and hosted repos"
-      },
-      "evidence": [
-        "apps/web/e2e/project-files-tree.spec.ts",
-        "apps/web/e2e/project-commit-detail.spec.ts"
-      ],
-      "batch": "B8"
     },
     {
       "id": "github",
