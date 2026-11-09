@@ -29,6 +29,15 @@ async function bindRepo(kind: 'github' | 'local' | 'hosted') {
     const result = await runGit(args, { cwd: dir });
     expect(result.code, result.stderr).toBe(0);
   }
+  if (kind === 'github') {
+    expect(
+      (
+        await runGit(['remote', 'add', 'origin', 'https://github.com/fixture/repository.git'], {
+          cwd: dir,
+        })
+      ).code,
+    ).toBe(0);
+  }
   H.s.db
     .update(project)
     .set({
@@ -117,7 +126,15 @@ describe('Coordinator repository reads', () => {
       (await runGit(['fetch', dir, 'main:refs/remotes/origin/main'], { cwd: cache })).code,
     ).toBe(0);
     expect((await read()).files[0]?.content).toBe('updated upstream source\n');
+    expect((await read('HEAD')).files[0]?.content).toBe('export const spawn = true;\n');
     expect((await read('main')).files[0]?.content).toBe('updated upstream source\n');
+    expect((await read('refs/heads/main')).files[0]?.content).toBe('updated upstream source\n');
+    const originalCommit = (await runGit(['rev-parse', 'HEAD'], { cwd: cache })).stdout
+      .toString()
+      .trim();
+    expect((await runGit(['tag', 'main', originalCommit], { cwd: cache })).code).toBe(0);
+    expect((await read('main')).files[0]?.content).toBe('export const spawn = true;\n');
+    expect((await read('refs/tags/main')).files[0]?.content).toBe('export const spawn = true;\n');
     expect((await read('refs/heads/main')).files[0]?.content).toBe('updated upstream source\n');
     expect(
       (
@@ -128,6 +145,26 @@ describe('Coordinator repository reads', () => {
     ).toBe(0);
     expect((await read()).files[0]?.content).toBeUndefined();
     expect((await read()).files[0]?.error).toMatch(/repository.*mismatch/i);
+  });
+
+  test('github local binding refuses missing and mismatched origin identity', async () => {
+    const dir = await bindRepo('github');
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.content).toBeDefined();
+    expect(
+      (
+        await runGit(['remote', 'set-url', 'origin', 'https://github.com/other/repository.git'], {
+          cwd: dir,
+        })
+      ).code,
+    ).toBe(0);
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]).toMatchObject({
+      error: expect.stringMatching(/identity mismatch/),
+    });
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.content).toBeUndefined();
+    expect((await runGit(['remote', 'remove', 'origin'], { cwd: dir })).code).toBe(0);
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toMatch(
+      /identity mismatch/,
+    );
   });
 
   test('uses the persisted daemon CLI root, including changes after server startup', async () => {

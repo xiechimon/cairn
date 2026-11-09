@@ -208,6 +208,22 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
 
 export { isGithubRepoRef } from '@cairn/shared';
 
+async function requireGithubRepoIdentity(dir: string, ref: GithubRepoRef): Promise<void> {
+  const origin = await runGit(['config', '--local', '--get', 'remote.origin.url'], {
+    cwd: dir,
+    timeoutMs: 15000,
+  });
+  const slug = origin.stdout
+    .toString('utf8')
+    .trim()
+    .match(
+      /^(?:https:\/\/github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?\/?$/,
+    )?.[1];
+  if (origin.code !== 0 || slug?.toLowerCase() !== `${ref.owner}/${ref.repo}`.toLowerCase()) {
+    throw new HttpError(409, 'project repository identity mismatch');
+  }
+}
+
 export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promise<string> {
   const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
   if (!row) throw notFound(`project ${projectId}`);
@@ -224,17 +240,7 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
       const expected = join(realpathSync(ctx.workspacesDir), row.id, 'repo');
       if (realpathSync(cache) !== expected)
         throw new HttpError(403, 'project repository cache escapes its root');
-      const origin = await runGit(['config', '--local', '--get', 'remote.origin.url'], {
-        cwd: cache,
-        timeoutMs: 15000,
-      });
-      const url = origin.stdout.toString('utf8').trim();
-      const slug = url.match(
-        /^(?:https:\/\/github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?\/?$/,
-      )?.[1];
-      if (origin.code !== 0 || slug?.toLowerCase() !== `${ref.owner}/${ref.repo}`.toLowerCase()) {
-        throw new HttpError(409, 'project repository cache identity mismatch');
-      }
+      await requireGithubRepoIdentity(cache, ref);
       return cache;
     }
   }
@@ -257,6 +263,11 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
         `local repo path is not a git repository: ${row.localPath}`,
         'not_git',
       );
+    }
+    if (row.repoKind === 'github') {
+      const ref = githubRepoOfProject(row);
+      if (ref === null) throw new HttpError(409, 'invalid GitHub repository binding');
+      await requireGithubRepoIdentity(row.localPath, ref);
     }
     return row.localPath;
   }
@@ -324,7 +335,15 @@ export async function readFile(
     if (refParam !== undefined) {
       const branch = refParam.replace(/^refs\/heads\//, '');
       const remoteRef = `refs/remotes/origin/${branch}`;
-      if (await systemGitOps.resolveCommit(dir, remoteRef)) ref = remoteRef;
+      const explicitBranch = refParam.startsWith('refs/heads/');
+      const shortName = !refParam.startsWith('refs/') && refParam !== 'HEAD';
+      const tag = shortName ? await systemGitOps.resolveCommit(dir, `refs/tags/${refParam}`) : null;
+      if (
+        (explicitBranch || (shortName && tag === null)) &&
+        (await systemGitOps.resolveCommit(dir, remoteRef))
+      ) {
+        ref = remoteRef;
+      }
     } else if (row?.baseBranch != null) {
       ref = `refs/remotes/origin/${row.baseBranch}`;
     } else {
