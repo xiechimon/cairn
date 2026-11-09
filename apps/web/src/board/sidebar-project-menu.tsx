@@ -98,7 +98,7 @@ export function SidebarProjectMenu({
             <Button
               variant="ghost"
               size="icon-xs"
-              className="size-5.5"
+              className="size-5.5 pointer-coarse:size-11"
               aria-label={t('{name} 的菜单', { name })}
             />
           }

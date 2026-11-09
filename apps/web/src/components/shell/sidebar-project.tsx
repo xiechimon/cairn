@@ -113,7 +113,7 @@ export function SidebarProjectGroupHeader({
       data-testid="project-group-header"
       aria-expanded={expanded}
       onClick={onToggle}
-      className="mt-3 h-6 w-full cursor-pointer justify-start gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent"
+      className="mt-3 h-6 w-full cursor-pointer justify-start pointer-coarse:h-11 gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent"
     >
       <span className="min-w-0 truncate">{name}</span>
       <ChevronDown

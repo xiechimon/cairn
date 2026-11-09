@@ -311,7 +311,14 @@ export function BoardSidebar({
             listed.map((row) => {
               const href = projectHref(row.id);
               return (
-                <Link key={row.id} {...railLink(href, activeProject === row.id, row.name)}>
+                <Link
+                  key={row.id}
+                  {...railLink(
+                    href,
+                    activeProject === row.id,
+                    waiting.has(row.id) ? t('{name}：有任务在等你', { name: row.name }) : row.name,
+                  )}
+                >
                   <ProjectGlyph name={row.name} icon={row.icon} />
                   {waiting.has(row.id) && (
                     <span

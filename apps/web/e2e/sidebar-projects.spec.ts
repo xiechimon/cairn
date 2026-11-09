@@ -142,3 +142,30 @@ test('Move to group files a project under a new group, then back out', async ({ 
     { id: 'proj-2', body: { group: null } },
   ]);
 });
+
+test('the collapsed rail names a waiting project with its status', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
+  await open(
+    page,
+    [PROJECT, project('proj-2', 'dogfood-sandbox')],
+    [task('t-rev', 'proj-1', 'Review the relay', 'review', 'ready_for_review')],
+  );
+  await expect(sidebar(page).getByRole('link', { name: 'cairn：有任务在等你' })).toBeVisible();
+  await expect(sidebar(page).getByRole('link', { name: 'dogfood-sandbox', exact: true })).toBeVisible();
+});
+
+test.describe('on a touch screen', () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+
+  test('group headers and project menus in the drawer are 44px touch targets', async ({ page }) => {
+    await open(page, [PROJECT, project('proj-3', 'site', { group: 'Side' })]);
+    await page.getByRole('button', { name: '展开侧边栏' }).click();
+    const header = groupHeaders(page).filter({ hasText: 'Side' });
+    await expect(header).toBeVisible();
+    expect((await header.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const menu = page.getByRole('button', { name: 'cairn 的菜单' });
+    await expect(menu).toBeVisible();
+    const box = (await menu.boundingBox())!;
+    expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
+  });
+});
