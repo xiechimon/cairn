@@ -1540,7 +1540,6 @@ export const EN: Record<string, string> = {
   没有匹配的设置: 'No matching settings',
   只影响这台设备: 'Applies to this device only',
   模型与账户: 'Models & accounts',
-  工作路由: 'Work routing',
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
   '还没有路由规则。': 'No routing rules yet.',
