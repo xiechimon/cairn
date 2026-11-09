@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3488e262-c2ee-484a-87e5-eb12aa162838",
+  "id": "834e16bb-1f98-4986-aa07-afdf2234a986",
   "prevId": "c28e4306-06ba-4f37-98eb-456ec1632725",
   "tables": {
     "agent_memory": {
@@ -5635,6 +5635,65 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "task_issue_close": {
+      "name": "task_issue_close",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sourceRef": {
+          "name": "sourceRef",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "comment": {
+          "name": "comment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "task_issue_close_teamId_team_id_fk": {
+          "name": "task_issue_close_teamId_team_id_fk",
+          "tableFrom": "task_issue_close",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "team": {
       "name": "team",
       "columns": {
@@ -6251,6 +6310,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "issueState": {
+          "name": "issueState",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "supersededBy": {
+          "name": "supersededBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "output": {
           "name": "output",
           "type": "text",
@@ -6266,22 +6339,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
-        },
-        "lastNotifiedOwner": {
-          "name": "lastNotifiedOwner",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "'none'"
-        },
-        "lastNotifiedWork": {
-          "name": "lastNotifiedWork",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "''"
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

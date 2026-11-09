@@ -153,6 +153,7 @@ import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planHasOpenDecisions } from './plan-decisions.js';
+import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
@@ -2207,18 +2208,6 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
   return { todoRow, failed };
 }
 
-function closingLine(todoRow: TodoRow, repoRef: GithubRepoRef): string | null {
-  if (todoRow.sourceKind !== 'github-issue' && todoRow.sourceKind !== 'github-issue-self') {
-    return null;
-  }
-  const issue = todoRow.sourceRef === null ? null : parseGithubIssueSourceRef(todoRow.sourceRef);
-  if (issue === null) return null;
-  const sameRepo =
-    issue.owner.toLowerCase() === repoRef.owner.toLowerCase() &&
-    issue.repo.toLowerCase() === repoRef.repo.toLowerCase();
-  return sameRepo ? `closes #${issue.issueNumber}` : null;
-}
-
 const CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*\S*\d/i;
 
 const PLAIN_MERGE_BODY = 'Merged by cairn.';
@@ -2346,13 +2335,27 @@ async function mergeThroughGithub(
       throw new HttpError(409, 'autonomy-paused: GitHub autonomy marker is open or unreadable');
     }
     await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
+    const closing = apiMergeGate(deps, row);
+    await ensurePullClosesTaskIssue(
+      fetchImpl,
+      token,
+      repoRef,
+      prNumber,
+      closing.todoRow,
+      pull.body,
+    ).catch((error: unknown) => {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} 的描述里补不上关闭本任务 issue 的那一行（${error instanceof Error ? githubText(error.message) : '未知错误'}），没有发起合并：稍后再试。`,
+      );
+    });
     apiMergeGate(deps, row);
     claimAutonomousMerge(deps.db, row.id);
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
       commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
       commitMessage: withCoAuthor(
-        closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
+        PLAIN_MERGE_BODY,
         readTeamAttributionSettings(deps.db, before.todoRow.teamId).coAuthorTrailer
           ? humanWorkIdentity(deps.db, before.todoRow, row.triggerSource)
           : null,

@@ -436,6 +436,7 @@ export interface PullFake {
   mergedAt?: string;
   authorAssociation?: string;
   opener?: unknown;
+  body?: string;
 }
 
 export interface Recorded {
@@ -511,6 +512,10 @@ class MergeState {
 
   gets = () => this.requests.filter((r) => r.method === 'GET' && /\/pulls\/\d+$/.test(r.url));
   puts = () => this.requests.filter((r) => r.method === 'PUT');
+  bodyEdits = () =>
+    this.requests
+      .filter((r) => r.method === 'PATCH' && /\/pulls\/\d+$/.test(r.url))
+      .map((r) => (JSON.parse(r.body ?? '{}') as { body: string }).body);
 
   readonly handle: NonNullable<GithubFakeOptions['handle']> = async (input, init) => {
     const url = String(input);
@@ -550,6 +555,11 @@ class MergeState {
     }
     if (url.includes('/check-runs')) return answer(404, '{}');
     const m = url.match(/\/pulls\/(\d+)$/);
+    const edited = m === null ? undefined : this.pulls[Number(m[1])];
+    if (edited !== undefined && method === 'PATCH') {
+      edited.body = (JSON.parse(init?.body ?? '{}') as { body: string }).body;
+      return answer(200, JSON.stringify({ number: Number(m?.[1]), body: edited.body }));
+    }
     if (m === null || method !== 'GET') return answer(404, '{}');
     await this.onGet?.();
     const g = this.getAnswer;
@@ -566,6 +576,7 @@ class MergeState {
         number: n,
         state: p.state,
         merged: p.merged,
+        body: p.body ?? '## What\n\nThe change.',
         ...(p.title === null ? {} : { title: p.title ?? PR_TITLE }),
         author_association: p.authorAssociation ?? 'OWNER',
         user: p.opener === undefined ? { login: 'octo', type: 'User' } : p.opener,

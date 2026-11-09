@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   issue_comment:
     types: [created, edited]
+  pull_request_review_comment:
+    types: [created, edited]
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:

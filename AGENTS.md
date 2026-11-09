@@ -62,7 +62,15 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
 - Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate, and that review on the PR head is the required review. Fix confirmed findings, and record unfixed findings with reasons in Risk.
 - Protected paths require Codex cloud code review on the PR head. Canonical security surfaces are covered by that review: no separate security approval is required while the 2026-11-06 ruling holds. Docs-only changes outside protected paths skip code review.
-- After three review rounds, rethink the approach or hand the PR to ian.
+- Keep each PR to one self-contained change: aim for under 400 changed lines outside generated files and split anything past 1000 before review. The `pr-size` check fails a PR above 3000 changed lines outside `GENERATED_PATHS` in `scripts/pr-size.mjs`. Measured on 81 merged PRs: median open-to-merge is 18 minutes under 200 lines and 434 minutes over 3000.
+- Branch every PR from `origin/main`. Do not open a PR whose base is another open PR's branch: dependent work waits until its base merges, then branches from the updated `main`. Until then, keep it on a local branch.
+- Design first for a change to persisted state, a wire or step protocol, or concurrency: write a one-page design (states, transitions, every path that reads or writes the state, the behavior on each failure) and get it reviewed by the coordinator before writing code.
+- Before code for a state or lifecycle feature (delivery, retry, pause, identity, attribution), list every path that reads or writes that state and the expected behavior on each, put the list in the PR body, and write one test per row. A review finding on such a PR is usually a missed row.
+- When a review finding arrives, name its bug class, search the whole PR diff and every entry path the change touches for other instances, and fix all of them in the same push. Reply on the thread with the class and the sites you changed, then resolve it.
+- Push once per review round: collect every open finding on the head, fix or answer each, and push one commit. Do not push between findings.
+- P0/P1 findings must be fixed. A P2/P3 finding that is real but outside this PR's change is answered, not fixed: open an issue for it or reuse an existing one that tracks it, reply `valid, out of scope for this PR, tracked in #N` with that issue's number, and resolve the thread. A finding that is not a defect is answered with the reason and resolved. `review-gate` fails a deferred P0/P1 and a deferral whose `#N` is not an issue in this repository.
+- After the third review round with findings still open, stop pushing fixes. cairn stops auto-fix wakes, posts the finding classes on the PR and asks Codex for one focused pass over the whole diff; hand the PR to the coordinator, who splits it, accepts the answers or allows one final push.
+- Never post Mergify commands (`@mergifyio queue`, `@mergifyio dequeue` or any other); the queue conditions drive the queue. A green PR enters the queue by itself; if it has not within 10 minutes, read the `Mergify Merge Queue` check run, fix the unmet condition it lists, and report it.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
 - Decisions are recorded in the owner's plan decision table, not as ADRs.
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR when it already covers the request.
@@ -77,12 +85,12 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Apply never overwrites content it does not manage, never resolves a conflict by recency, and reads the file back after writing.
 - Any machine-level manifest or apply path touches `apps/server/src/routes-machine.ts` or `apps/server/src/services/machine*.ts`, which are owner-routed.
 
-## Review guidelines
+## Code Review Rules
 
 - Review only what the PR changes. Report a defect on a line the PR did not add or modify only when the PR's change makes it reachable or worse; otherwise leave it for the nightly scan, which files old-code problems as issues.
 - On a later review of the same PR, read only the commits pushed since the last review and do not repeat a finding that is already raised or resolved.
-- Name the bug class of each finding and list every instance of it in the diff, so one push fixes the class instead of one line per round.
-- Use P0 or P1 only for a defect that breaks behavior, loses data or opens a security hole. Ordinary code-review P2/P3 findings do not block; canonical security surfaces require zero unresolved security findings at every severity.
+- Name the bug class of each finding and list every instance of it in the diff in one comment, so one push fixes the class instead of one line per round. When a later commit adds another instance of a class already raised on this PR, add it to that class's thread instead of opening a new one.
+- Use P0 or P1 only for a defect that breaks behavior, loses data or opens a security hole. P0/P1 findings fail `review-gate` until fixed. P2/P3 findings do not fail `review-gate`, but every review thread must be fixed or answered and resolved before the PR leaves draft and enters the queue (`#review-threads-unresolved = 0`); a real P2/P3 outside this PR's change may be answered `valid, out of scope for this PR, tracked in #N` with a real issue. Canonical security surfaces require zero unresolved security findings at every severity.
 
 ## Worktrees and ports
 

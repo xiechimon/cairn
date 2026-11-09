@@ -411,8 +411,15 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'close_todos',
-    description: 'Close todos as shelved (phase → closed).',
-    parameters: obj({ todoIds: idArr('Todo ids to close.') }, ['todoIds']),
+    description:
+      'Close todos as shelved (phase → closed). Each closed todo closes its own GitHub issue as not planned. Set supersededBy when another todo replaces them: the closing comment links that todo’s issue.',
+    parameters: obj(
+      {
+        todoIds: idArr('Todo ids to close.'),
+        supersededBy: str('Optional id of the todo that replaces the closed ones.'),
+      },
+      ['todoIds'],
+    ),
   },
   {
     name: 'reopen_todos',

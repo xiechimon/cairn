@@ -46,11 +46,14 @@ interface PullSpec {
   additions?: number;
   deletions?: number;
   base?: string;
+  labels?: string[];
 }
 
 interface RunSpec {
   id?: number;
   summary?: string;
+  title?: string;
+  completedAt?: string;
   name: string;
   status: string;
   conclusion: string | null;
@@ -69,6 +72,7 @@ class GithubMock {
   requests: string[] = [];
   authorizations: string[] = [];
   notModified = 0;
+  threads: 'none' | 'failing' | null = null;
   fetch = vi.fn((input: string | URL, init?: { headers?: Record<string, string> }) => {
     const url = String(input);
     this.requests.push(url);
@@ -101,6 +105,29 @@ class GithubMock {
         text: () => Promise.resolve(JSON.stringify(body)),
       });
     };
+    if (url.endsWith('/graphql') && this.threads !== null) {
+      if (this.threads === 'failing') return send(502, { message: 'bad gateway' });
+      const spec = [...this.pulls.values()][0];
+      return send(200, {
+        data: {
+          repository: {
+            label: { id: 'LABEL_node' },
+            pullRequest: {
+              timelineItems: { nodes: [] },
+              id: 'PR_node',
+              state: 'OPEN',
+              isDraft: spec?.draft ?? false,
+              headRefOid: spec?.head ?? HEAD_A,
+              labels: {
+                nodes: (spec?.labels ?? []).map((name) => ({ name })),
+                pageInfo: { hasNextPage: false },
+              },
+              reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+            },
+          },
+        },
+      });
+    }
     const pull = /\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/.exec(url);
     if (pull) {
       const key = `${(pull[1] ?? '').toLowerCase()}#${pull[2]}`;
@@ -115,6 +142,7 @@ class GithubMock {
         mergeable_state: spec.mergeable ?? 'clean',
         additions: spec.additions ?? 12,
         deletions: spec.deletions ?? 3,
+        labels: (spec.labels ?? []).map((name) => ({ name })),
         head: { sha: spec.head ?? HEAD_A, ref: this.branch, repo: { id: 1 } },
         base: {
           sha: spec.base ?? 'c'.repeat(40),
@@ -128,7 +156,8 @@ class GithubMock {
       return send(200, {
         check_runs: (this.checks.get(runs[1] ?? '') ?? []).map((r) => ({
           ...r,
-          output: { title: null, summary: r.summary ?? null },
+          completed_at: r.completedAt ?? null,
+          output: { title: r.title ?? null, summary: r.summary ?? null },
         })),
       });
     }
@@ -227,7 +256,11 @@ function fixture() {
   const mock = new GithubMock();
   const t = seedThread(s);
   mock.branch = conversationBranch(t.buildId);
-  const pull = { head: HEAD_A, base: 'c'.repeat(40), mergeable: 'clean' };
+  const pull: PullSpec & { head: string; base: string } = {
+    head: HEAD_A,
+    base: 'c'.repeat(40),
+    mergeable: 'clean',
+  };
   mock.pulls.set(`octo/demo#${t.prNumber}`, pull);
   mock.checks.set(pull.base, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
   const fail = (id: number, summary = 'broken') =>
@@ -994,4 +1027,159 @@ test('a per-kind cap observed during a session survives disabling Auto-fix and s
   await watchFor(f.s, f.mock).sweep();
   expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
   expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('CI fix cap (3 per head)');
+});
+
+describe('a green PR waiting for queue conditions wakes its owner with what is unmet', () => {
+  const T0 = Date.parse('2026-11-09T02:00:00Z');
+  const minutes = (n: number) => T0 + n * 60_000;
+  const waiting = (summary: string): RunSpec => ({
+    name: 'Mergify Merge Queue',
+    status: 'completed',
+    conclusion: 'neutral',
+    title: 'Waiting for queue conditions to match',
+    summary,
+  });
+  const unmet = [
+    '### Queue entry conditions',
+    '',
+    '- [ ] any of [🔀 queue conditions]:',
+    '  - [ ] all of [📌 queue conditions of queue rule `bot`]:',
+    '    - [ ] `check-success = pr-size`',
+    '    - [X] `-draft`',
+    '    - [X] `#files <= 80`',
+    '    - [X] any of:',
+    '      - [X] `check-success = check`',
+    '      - [ ] `check-skipped = check`',
+  ].join('\n');
+  const green = (f: ReturnType<typeof fixture>, summary = unmet, extra: RunSpec[] = []) => {
+    f.mock.threads ??= 'none';
+    f.mock.checks.set(f.pull.head, [
+      {
+        name: 'unit',
+        status: 'completed',
+        conclusion: 'success',
+        completedAt: new Date(T0).toISOString(),
+      },
+      {
+        name: 'e2e',
+        status: 'completed',
+        conclusion: 'skipped',
+        completedAt: new Date(minutes(-5)).toISOString(),
+      },
+      waiting(summary),
+      ...extra,
+    ]);
+  };
+  const prompts = (f: ReturnType<typeof fixture>) => f.steps().map((s) => s.prompt ?? '');
+
+  test('ten minutes after the last check turned green, one wake lists only the unmet conditions', async () => {
+    const f = fixture();
+    green(f);
+    await watchFor(f.s, f.mock).sweep(minutes(9));
+    expect(f.steps()).toHaveLength(0);
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    expect(f.steps()).toHaveLength(1);
+    const [prompt] = prompts(f);
+    expect(prompt).toContain('[queue-wait]');
+    expect(prompt).toContain('check-success = pr-size');
+    expect(prompt).not.toContain('-draft');
+    expect(prompt).not.toContain('#files <= 80');
+    expect(prompt).not.toContain('check-skipped = check');
+    f.settle();
+    await watchFor(f.s, f.mock).sweep(minutes(20));
+    expect(f.steps()).toHaveLength(1);
+  });
+
+  test('a changed list of unmet conditions on the same head wakes again', async () => {
+    const f = fixture();
+    green(f);
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    f.settle();
+    green(f, unmet.replace('pr-size', 'merge-route'));
+    await watchFor(f.s, f.mock).sweep(minutes(12));
+    expect(f.steps()).toHaveLength(2);
+    expect(prompts(f)[1]).toContain('check-success = merge-route');
+  });
+
+  test('an unreadable review-findings snapshot is unknown, so no queue wake fires', async () => {
+    const f = fixture();
+    green(f);
+    f.mock.threads = 'failing';
+    await watchFor(f.s, f.mock).sweep(minutes(30));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(0);
+    f.mock.threads = 'none';
+    await watchFor(f.s, f.mock).sweep(minutes(31));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(1);
+  });
+
+  test('a superseded failed attempt of a check does not hide a green rerun', async () => {
+    const f = fixture();
+    green(f, unmet, [
+      {
+        id: 1,
+        name: 'unit',
+        status: 'completed',
+        conclusion: 'failure',
+        completedAt: new Date(minutes(-20)).toISOString(),
+      },
+    ]);
+    const runs = f.mock.checks.get(f.pull.head) ?? [];
+    for (const run of runs) if (run.name === 'unit' && run.conclusion === 'success') run.id = 2;
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(1);
+  });
+
+  test.each([
+    [
+      'a pending check',
+      (f: ReturnType<typeof fixture>) =>
+        green(f, unmet, [{ name: 'gates', status: 'in_progress', conclusion: null }]),
+    ],
+    [
+      'a draft PR',
+      (f: ReturnType<typeof fixture>) => {
+        green(f);
+        f.pull.draft = true;
+      },
+    ],
+    [
+      'coordinator-hold',
+      (f: ReturnType<typeof fixture>) => {
+        green(f);
+        f.pull.labels = ['coordinator-hold'];
+      },
+    ],
+    [
+      'a queued PR',
+      (f: ReturnType<typeof fixture>) =>
+        f.mock.checks.set(f.pull.head, [
+          {
+            name: 'unit',
+            status: 'completed',
+            conclusion: 'success',
+            completedAt: new Date(T0).toISOString(),
+          },
+          {
+            name: 'Mergify Merge Queue',
+            status: 'in_progress',
+            conclusion: null,
+            title: 'Running merge queue checks',
+            summary: unmet,
+          },
+        ]),
+    ],
+    [
+      'a check without a completion time',
+      (f: ReturnType<typeof fixture>) =>
+        f.mock.checks.set(f.pull.head, [
+          { name: 'unit', status: 'completed', conclusion: 'success' },
+          waiting(unmet),
+        ]),
+    ],
+  ])('no queue wake with %s', async (_name, arrange) => {
+    const f = fixture();
+    arrange(f);
+    await watchFor(f.s, f.mock).sweep(minutes(30));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(0);
+  });
 });
