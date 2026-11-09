@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { chmodSync, existsSync, mkdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createTempEnvironment } from '../../../packages/shared/src/node/temp-environment.ts';
@@ -38,12 +46,14 @@ test('reclaims only Vitest-shaped nanoids older than six hours, never symlink ss
   const { root, options } = fixture();
   const old = directory(root, 'a'.repeat(21), 6 * hours + 1);
   const boundary = directory(root, 'b'.repeat(21), 6 * hours);
+  const fractionalCutoff = (now - 6 * hours) / 1000 - 0.000001;
+  utimesSync(boundary, fractionalCutoff, fractionalCutoff);
   const fresh = directory(root, 'c'.repeat(21), 3 * hours);
   const unrelated = directory(root, 'd'.repeat(21), 7 * hours, false);
   const linked = directory(root, 'e'.repeat(21), 7 * hours, false);
   symlinkSync(join(old, 'ssr'), join(linked, 'ssr'));
   utimesSync(linked, 0, 0);
-  runGuard(options);
+  runGuard({ ...options, now: lstatSync(boundary).mtimeMs + 6 * hours });
   assert.equal(existsSync(old), false);
   for (const path of [boundary, fresh, unrelated, linked])
     assert.equal(existsSync(path), true, path);
