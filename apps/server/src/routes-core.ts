@@ -21,7 +21,11 @@ import { readBackupHealth } from './services/backup-status.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
-import { pauseTeamGithubRepos } from './services/github-autonomy-brake.js';
+import {
+  openAutonomyPauses,
+  pauseTeamGithubRepos,
+  resumeAutonomyPauses,
+} from './services/github-autonomy-brake.js';
 import { getModelRouting } from './services/model-routing.js';
 import {
   listUnreadEntityIds,
@@ -68,7 +72,12 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(
       row === undefined
         ? []
-        : [{ ...toTeamRecord(row), firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, row.id) }],
+        : [
+            {
+              ...toTeamRecord(row, openAutonomyPauses(ctx.db, row.id)),
+              firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, row.id),
+            },
+          ],
     );
   });
 
@@ -128,9 +137,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
         .where(eq(team.id, id))
         .run();
     }
-    if (body.autonomyPaused !== undefined) {
-      ctx.db.update(team).set({ autonomyPaused: body.autonomyPaused }).where(eq(team.id, id)).run();
-    }
+    if (body.autonomyPaused === false) resumeAutonomyPauses(ctx.db, id);
     if (body.autonomyPaused === true) {
       await pauseTeamGithubRepos(
         {
@@ -154,7 +161,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const row = ctx.db.select().from(team).where(eq(team.id, id)).get();
     return c.json({
       ...ctx.team,
-      ...(row === undefined ? {} : toTeamRecord(row)),
+      ...(row === undefined ? {} : toTeamRecord(row, openAutonomyPauses(ctx.db, id))),
       firstPrReportPrompt: prompt,
     });
   });

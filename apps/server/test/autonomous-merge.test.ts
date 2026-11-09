@@ -28,7 +28,7 @@ import {
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { projectMergeConfigOf, updateProjectMergeConfig } from '../src/services/projects.js';
-import { bootServer } from './helpers.js';
+import { bootServer, pauseTeamForTest } from './helpers.js';
 
 const disposals: (() => void)[] = [];
 afterEach(() => {
@@ -112,7 +112,7 @@ test('human policy creates no autonomous record and does not spend capacity', ()
     .update(project)
     .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
     .run();
-  s.db.update(team).set({ autonomyPaused: true }).run();
+  pauseTeamForTest(s.db, s.team.id);
   claimAutonomousMerge(s.db, 'a');
   expect(s.db.select().from(message).all()).toHaveLength(0);
   expect(autonomousMergePolicy(s.db, s.team.id, { ...config, mergePolicy: 'human' })).toEqual({
@@ -145,7 +145,7 @@ test('a queued local reservation is rechecked without counting its own slot twic
   expect(autonomousMergePolicy(s.db, s.team.id, config, Date.now(), 'a').dailyCapReached).toBe(
     false,
   );
-  s.db.update(team).set({ autonomyPaused: true }).run();
+  pauseTeamForTest(s.db, s.team.id);
   expect(autonomousMergePolicy(s.db, s.team.id, config, Date.now(), 'a').autonomyPaused).toBe(true);
 });
 
