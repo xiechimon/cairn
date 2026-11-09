@@ -158,9 +158,7 @@ const startHolder = (env, { wait = true, lingerMs = 60_000 } = {}) =>
       '--input-type=module',
       '-e',
       `
-import { existsSync } from 'node:fs';
 import { acquireSlot } from ${JSON.stringify(moduleUrl)};
-while (process.env.START_GATE && !existsSync(process.env.START_GATE)) {}
 const lease = await acquireSlot({ env: process.env, wait: ${wait} });
 console.log(lease ? 'SLOT ' + lease.slot : 'NONE');
 setTimeout(() => process.exit(0), ${lingerMs});
@@ -168,6 +166,65 @@ setTimeout(() => process.exit(0), ${lingerMs});
     ],
     { env },
   );
+
+async function contest(env, staggerLast = false) {
+  const racers = Array.from({ length: 8 }, () => {
+    const child = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { acquireSlot } from ${JSON.stringify(moduleUrl)};
+process.on('message', async (message) => {
+  if (message === 'finish') process.exit(0);
+  if (message === 'claim') {
+    const lease = await acquireSlot({ env: process.env, wait: false });
+    process.send(lease ? 'SLOT ' + lease.slot : 'NONE');
+  }
+});
+process.send('ready');`,
+      ],
+      { env, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
+    );
+    children.add(child);
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    const exited = new Promise((resolve) => child.once('close', resolve));
+    const ready = new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', (code) => reject(new Error(`Contender exited early: ${code}: ${stderr}`)));
+      child.once('message', resolve);
+    });
+    const result = ready.then(
+      () =>
+        new Promise((resolve, reject) => {
+          child.once('message', resolve);
+          child.once('exit', (code) =>
+            reject(new Error(`Contender exited before result: ${code}: ${stderr}`)),
+          );
+        }),
+    );
+    return { child, ready, result, exited };
+  });
+  try {
+    await Promise.all(racers.map((racer) => racer.ready));
+    const first = staggerLast ? racers.slice(0, -1) : racers;
+    for (const racer of first) racer.child.send('claim');
+    if (staggerLast) {
+      await Promise.all(first.map((racer) => racer.result));
+      racers.at(-1).child.send('claim');
+    }
+    return await Promise.all(racers.map((racer) => racer.result));
+  } finally {
+    for (const racer of racers) {
+      if (racer.child.connected) racer.child.send('finish');
+    }
+    await Promise.all(racers.map((racer) => racer.exited));
+    for (const racer of racers) children.delete(racer.child);
+  }
+}
 
 test('an overridden TMPDIR on macOS does not move the shared lock directory', () => {
   const failed = () => ({ status: 71, stdout: '' });
@@ -399,21 +456,14 @@ test('simultaneous grabs for the last slot: exactly one wins, every round', asyn
   const { dir, env, cleanup } = sandbox(1);
   try {
     for (let round = 0; round < 6; round++) {
-      const gate = join(dir, `go-${round}`);
       const roundEnv = {
         ...env,
         CAIRN_HEAVY_SLOTS_DIR: join(dir, `locks-${round}`),
-        START_GATE: gate,
       };
-      const racers = Array.from({ length: 8 }, () =>
-        startHolder(roundEnv, { wait: false, lingerMs: 1_500 }),
-      );
-      await sleep(1_000);
-      writeFileSync(gate, '');
-      await Promise.all(racers.map((racer) => racer.exited));
-      const winners = racers.filter((racer) => /SLOT 1/.test(racer.out));
-      const losers = racers.filter((racer) => /NONE/.test(racer.out));
-      assert.equal(winners.length, 1, `round ${round}: ${racers.map((r) => r.out).join('|')}`);
+      const results = await contest(roundEnv, round === 0);
+      const winners = results.filter((result) => result === 'SLOT 1');
+      const losers = results.filter((result) => result === 'NONE');
+      assert.equal(winners.length, 1, `round ${round}: ${results.join('|')}`);
       assert.equal(losers.length, 7, `round ${round}`);
     }
   } finally {
@@ -426,7 +476,6 @@ test('simultaneous reclaim of one dead holder: exactly one process inherits the 
   try {
     for (let round = 0; round < 6; round++) {
       const locks = join(dir, `locks-${round}`);
-      const gate = join(dir, `go-${round}`);
       mkdirSync(locks, { recursive: true });
       const dead = spawnSync(
         process.execPath,
@@ -436,19 +485,14 @@ test('simultaneous reclaim of one dead holder: exactly one process inherits the 
         },
       ).stdout;
       writeFileSync(join(locks, 'slot-1.lock'), JSON.stringify({ pid: Number(dead) }));
-      const roundEnv = { ...env, CAIRN_HEAVY_SLOTS_DIR: locks, START_GATE: gate };
-      const racers = Array.from({ length: 8 }, () =>
-        startHolder(roundEnv, { wait: false, lingerMs: 1_500 }),
-      );
-      await sleep(1_000);
-      writeFileSync(gate, '');
-      await Promise.all(racers.map((racer) => racer.exited));
-      const winners = racers.filter((racer) => /SLOT 1/.test(racer.out));
+      const roundEnv = { ...env, CAIRN_HEAVY_SLOTS_DIR: locks };
+      const results = await contest(roundEnv, round === 0);
       assert.equal(
-        winners.length,
+        results.filter((result) => result === 'SLOT 1').length,
         1,
-        `round ${round}: ${racers.map((r) => r.out + r.err).join('|')}`,
+        `round ${round}: ${results.join('|')}`,
       );
+      assert.equal(results.filter((result) => result === 'NONE').length, 7);
     }
   } finally {
     cleanup();
