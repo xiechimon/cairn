@@ -1078,7 +1078,7 @@ async function runClaimedStep(
         ? `orb-hook-${index}-${stepId}`
         : `hook-${hook.name}-${stepId}`,
       role: 'system',
-      content: workspaceHookRowContent(hook, output),
+      content: workspaceHookRowContent(hook, redact(output)),
       createdAt: now(),
     });
   }
