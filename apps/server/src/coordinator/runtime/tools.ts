@@ -5,6 +5,7 @@ import {
   type MachineAskBody,
   type RemoteToolDef,
 } from '@cairn/shared';
+import type { ImageContent } from '@earendil-works/pi-ai';
 import { defineExtension, defineTool, type ToolRegistration } from '@earendil-works/pi-durable';
 import type { MachineApi } from './machine-api.js';
 
@@ -137,6 +138,21 @@ export function coordinatorTool(
       }
       try {
         const text = await channel.relayTool(stepId, def.name, params);
+        if (def.name === 'attachment') {
+          const attachment = JSON.parse(text) as {
+            mimeType: string;
+            encoding: string;
+            content: string;
+          };
+          if (attachment.mimeType.startsWith('image/') && attachment.encoding === 'base64') {
+            const image: ImageContent = {
+              type: 'image',
+              data: attachment.content,
+              mimeType: attachment.mimeType,
+            };
+            return { output: [image] };
+          }
+        }
         return { output: [{ type: 'text', text }] };
       } catch (error) {
         if (error instanceof ShutdownInterrupt) throw error;

@@ -94,6 +94,48 @@ describe('coordinator tools', () => {
     await harness.close(ctx);
   });
 
+  it('feeds attachment image bytes to the model as image content without text truncation', async () => {
+    const data = Buffer.alloc(COORDINATOR_TOOL_OUTPUT_MAX_BYTES * 2, 1).toString('base64');
+    const { coordinatorModels, seenResults } = toolThenAnswer('attachment', {
+      attachmentId: 'team/image.png',
+    });
+    const api = fakeMachineApi();
+    api.relayTool = async () =>
+      JSON.stringify({
+        id: 'image',
+        fileName: 'image.png',
+        mimeType: 'image/png',
+        sizeBytes: data.length,
+        encoding: 'base64',
+        content: data,
+      });
+    const gate = createStepGate();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [coordinatorToolsExtension(api, gate)],
+    });
+    try {
+      await runCoordinatorTurn(
+        {
+          harness,
+          models: coordinatorModels,
+          api,
+          context: ctx,
+          heartbeatMs: 1000,
+          now: () => 1,
+          gate,
+        },
+        chiefStep('step-image', 'Describe the attached image'),
+      );
+      const image = (
+        JSON.parse(seenResults[0]!) as { type: string; data?: string; mimeType?: string }[]
+      ).find((block) => block.type === 'image');
+      expect(image?.mimeType).toBe('image/png');
+      expect(image?.data === data).toBe(true);
+    } finally {
+      await harness.close(ctx);
+    }
+  });
+
   it('turns a relay failure into an error result instead of failing the turn', async () => {
     const { coordinatorModels, seenResults } = toolThenAnswer('todos', {});
     const api = fakeMachineApi();
