@@ -208,6 +208,52 @@ describe('coldWindowStartFromRows', () => {
   });
 });
 
+describe('idle → miss → slim', () => {
+  it('cuts a fat residual to summary + recent exchanges after TTL cold', () => {
+    const fat: Message[] = [];
+    for (let i = 0; i < 40; i++) {
+      fat.push(user(`turn-${i} ${'body '.repeat(200)}`));
+      fat.push(assistant(`reply-${i}`));
+      fat.push(tool('tour', 'LOG '.repeat(800), i + 1));
+      fat.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: `shot-${i}` },
+          { type: 'image', data: 'x'.repeat(4_000), mimeType: 'image/png' },
+        ],
+        timestamp: i + 1,
+      });
+    }
+    fat.push(user('[wake:timer] stale wake noise'));
+    fat.push(user('what did we leave open?'));
+    const before = JSON.stringify(fat).length;
+    expect(
+      isColdResume({
+        now: SHORT_RETENTION_MS + 1,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: {
+          createdAt: 0,
+          cacheRead: 0,
+          input: COLD_CACHE_MISS_MIN_TOKENS,
+          contextTokens: before,
+          model: 'anthropic/claude',
+        },
+      }),
+    ).toBe(true);
+    const slim = projectColdMessages(fat, { summaryHint: 'queued billing fix; tour done' });
+    const after = JSON.stringify(slim).length;
+    const users = slim.filter((message) => message.role === 'user').map(userText);
+    expect(users.some((text) => text.includes('<summary>'))).toBe(true);
+    expect(users.some((text) => text.includes('wake'))).toBe(false);
+    expect(users.at(-1)).toBe('what did we leave open?');
+    expect(users.filter((text) => !text.includes('<summary>')).length).toBeLessThanOrEqual(
+      COLD_RECENT_EXCHANGES,
+    );
+    expect(after * 4).toBeLessThan(before);
+    expect(after).toBeLessThan(80_000);
+  });
+});
+
 function toolResultChars(message: Message): string {
   if (message.role !== 'toolResult') return '';
   return message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n');
