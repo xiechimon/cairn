@@ -486,7 +486,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       >;
       expect(body.commit_message).toBe(PLAIN_BODY);
       expect(w.fake.bodyEdits()).toEqual(
-        line === null ? [] : [`## What\n\nThe change.\n\n${line}\n`],
+        line === null ? [] : [`${line}\n\n## What\n\nThe change.`],
       );
       const order = w.fake.requests
         .map((r) => r.method)
@@ -598,7 +598,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         .run();
     };
     await requestMerge(w.deps, w.buildId);
-    expect(w.fake.bodyEdits()).toEqual(['## What\n\nThe change.\n\nCloses #88\n']);
+    expect(w.fake.bodyEdits()).toEqual(['Closes #88\n\n## What\n\nThe change.']);
   });
 
   test('[2b-D42] no closing line → commit_message is still sent (cairn’s own line), so the repository default (the PR body) is not used', async () => {

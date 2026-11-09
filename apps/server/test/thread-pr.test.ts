@@ -1043,7 +1043,7 @@ describe('F8 GET /api/prs', () => {
 });
 
 describe('F8 the PR body carries a closing keyword for the task issue', () => {
-  test('a self-issue task PR without the keyword gets one Closes line appended, once', async () => {
+  test('a self-issue task PR without the keyword gets one Closes line at the top, once', async () => {
     const s = boot();
     const mock = new GithubMock();
     seedThread(s, {
@@ -1056,7 +1056,7 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
     await watch.sweep(1_000);
     await watch.sweep(70_000);
     expect(mock.bodyEdits).toEqual([
-      { key: 'octo/demo#1010', body: '## What\n\nRefs #7 and #770, fixes #7700.\n\nCloses #77\n' },
+      { key: 'octo/demo#1010', body: 'Closes #77\n\n## What\n\nRefs #7 and #770, fixes #7700.' },
     ]);
   });
 
@@ -1074,8 +1074,8 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
     mock.pulls.set('octo/demo#1015', { body: 'rewritten' });
     await watch.sweep(70_000);
     expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([
-      'first\n\nCloses #78\n',
-      'rewritten\n\nCloses #78\n',
+      'Closes #78\n\nfirst',
+      'Closes #78\n\nrewritten',
     ]);
   });
 
@@ -1101,7 +1101,7 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
     ['a fenced code block', '```\nCloses #77\n```'],
     ['an HTML comment', '<!-- Closes #77 -->'],
     ['an inline code span', 'run `closes #77` later'],
-  ])('a keyword only inside %s does not count, so the line is appended', async (_name, inert) => {
+  ])('a keyword only inside %s does not count, so the line is added', async (_name, inert) => {
     const s = boot();
     const mock = new GithubMock();
     seedThread(s, {
@@ -1111,10 +1111,10 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
     });
     mock.pulls.set('octo/demo#1025', { body: inert });
     await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`${inert}\n\nCloses #77\n`]);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`Closes #77\n\n${inert}`]);
   });
 
-  test('the edit appends to the body as it is now, not to the body the sweep read earlier', async () => {
+  test('the edit builds on the body as it is now, not on the body the sweep read earlier', async () => {
     const s = boot();
     const mock = new GithubMock();
     seedThread(s, {
@@ -1133,7 +1133,26 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
       return inner!(input, init);
     });
     await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['edited meanwhile\n\nCloses #79\n']);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['Closes #79\n\nedited meanwhile']);
+  });
+
+  test.each([
+    ['an unclosed fence', '## What\n\n```text\nlog output'],
+    ['an unclosed HTML comment', '## What\n\n<!-- note'],
+  ])('a body ending in %s converges after one edit', async (_name, open) => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1029,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#81',
+    });
+    mock.pulls.set('octo/demo#1029', { body: open });
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    await watch.sweep(70_000);
+    await watch.sweep(140_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`Closes #81\n\n${open}`]);
   });
 
   test('an imported issue from the same repo is closed the same way', async () => {
@@ -1142,7 +1161,7 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
     seedThread(s, { prNumber: 1030, sourceKind: 'github-issue', sourceRef: 'github:octo/demo#5' });
     mock.pulls.set('octo/demo#1030', { body: 'x' });
     await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['x\n\nCloses #5\n']);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['Closes #5\n\nx']);
   });
 
   test.each([

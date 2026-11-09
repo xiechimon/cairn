@@ -41,8 +41,8 @@ export async function ensurePullClosesTaskIssue(
   if (page?.pull == null) throw new Error(`PR #${prNumber} body unreadable`);
   const current = page.pull.body;
   if (closesIssue(current, issueNumber, repo)) return null;
-  const kept = current.trimEnd();
-  const next = `${kept}${kept === '' ? '' : '\n\n'}Closes #${issueNumber}\n`;
+  const kept = current.trimStart();
+  const next = `Closes #${issueNumber}${kept === '' ? '\n' : `\n\n${kept}`}`;
   await githubUpdatePullBody(fetchImpl, token, repo.owner, repo.repo, prNumber, next);
   return next;
 }
