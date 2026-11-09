@@ -1,0 +1,54 @@
+{
+  "status": 200,
+  "sections": [
+    null,
+    "needs_input",
+    "up_next",
+    "resolved",
+    "ready_for_review",
+    "working"
+  ],
+  "questionFirst": true,
+  "entries": [
+    {
+      "kind": "question",
+      "section": "needs_input",
+      "id": "evidence-question"
+    },
+    {
+      "kind": "todo",
+      "section": null,
+      "id": "evidence-abandoned"
+    },
+    {
+      "kind": "todo",
+      "section": "needs_input",
+      "id": "evidence-confirm"
+    },
+    {
+      "kind": "todo",
+      "section": null,
+      "id": "evidence-old"
+    },
+    {
+      "kind": "todo",
+      "section": "up_next",
+      "id": "evidence-open"
+    },
+    {
+      "kind": "todo",
+      "section": "resolved",
+      "id": "evidence-resolved"
+    },
+    {
+      "kind": "todo",
+      "section": "ready_for_review",
+      "id": "evidence-review"
+    },
+    {
+      "kind": "todo",
+      "section": "working",
+      "id": "evidence-working"
+    }
+  ]
+}

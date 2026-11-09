@@ -5,29 +5,29 @@ Already up to date
 . prepare$ husky
 . prepare: .git can't be found
 . prepare: Done
-Done in 539ms using pnpm v12.5.1
+Done in 661ms using pnpm v12.5.1
 
  RUN  v5.0.1 <main-baseline>
 
- ❯ |@xiechimon/cairn| test/tasks.test.ts (87 tests | 87 failed) 360ms
+ ❯ |@xiechimon/cairn| test/tasks.test.ts (87 tests | 87 failed) 629ms
    ❯ sectionOf first-match table (84)
-     × todo/null/undefined archived=false age=0 4ms
+     × todo/null/undefined archived=false age=0 7ms
      × todo/null/undefined archived=false age=604800000 1ms
-     × todo/null/undefined archived=false age=604800001 0ms
-     × todo/null/undefined archived=true age=0 0ms
-     × todo/null/undefined archived=true age=604800000 0ms
-     × todo/null/undefined archived=true age=604800001 0ms
+     × todo/null/undefined archived=false age=604800001 1ms
+     × todo/null/undefined archived=true age=0 1ms
+     × todo/null/undefined archived=true age=604800000 1ms
+     × todo/null/undefined archived=true age=604800001 1ms
      × queued/null/undefined archived=false age=0 0ms
      × queued/null/undefined archived=false age=604800000 0ms
-     × queued/null/undefined archived=false age=604800001 0ms
-     × queued/null/undefined archived=true age=0 0ms
+     × queued/null/undefined archived=false age=604800001 1ms
+     × queued/null/undefined archived=true age=0 1ms
      × queued/null/undefined archived=true age=604800000 0ms
      × queued/null/undefined archived=true age=604800001 0ms
      × planning/null/undefined archived=false age=0 0ms
      × planning/null/undefined archived=false age=604800000 0ms
      × planning/null/undefined archived=false age=604800001 0ms
-     × planning/null/undefined archived=true age=0 0ms
-     × planning/null/undefined archived=true age=604800000 0ms
+     × planning/null/undefined archived=true age=0 1ms
+     × planning/null/undefined archived=true age=604800000 1ms
      × planning/null/undefined archived=true age=604800001 0ms
      × building/null/undefined archived=false age=0 0ms
      × building/null/undefined archived=false age=604800000 0ms
@@ -47,7 +47,7 @@ Done in 539ms using pnpm v12.5.1
      × failed/coordinator/failed archived=true age=0 0ms
      × failed/coordinator/failed archived=true age=604800000 0ms
      × failed/coordinator/failed archived=true age=604800001 0ms
-     × review/coordinator/review archived=false age=0 0ms
+     × review/coordinator/review archived=false age=0 1ms
      × review/coordinator/review archived=false age=604800000 0ms
      × review/coordinator/review archived=false age=604800001 0ms
      × review/coordinator/review archived=true age=0 0ms
@@ -56,11 +56,11 @@ Done in 539ms using pnpm v12.5.1
      × review/null/undefined archived=false age=0 0ms
      × review/null/undefined archived=false age=604800000 0ms
      × review/null/undefined archived=false age=604800001 0ms
-     × review/null/undefined archived=true age=0 0ms
-     × review/null/undefined archived=true age=604800000 0ms
+     × review/null/undefined archived=true age=0 1ms
+     × review/null/undefined archived=true age=604800000 1ms
      × review/null/undefined archived=true age=604800001 0ms
      × confirm/owner/confirm archived=false age=0 0ms
-     × confirm/owner/confirm archived=false age=604800000 0ms
+     × confirm/owner/confirm archived=false age=604800000 1ms
      × confirm/owner/confirm archived=false age=604800001 0ms
      × confirm/owner/confirm archived=true age=0 0ms
      × confirm/owner/confirm archived=true age=604800000 0ms
@@ -69,35 +69,35 @@ Done in 539ms using pnpm v12.5.1
      × building/owner/question archived=false age=604800000 0ms
      × building/owner/question archived=false age=604800001 0ms
      × building/owner/question archived=true age=0 0ms
-     × building/owner/question archived=true age=604800000 0ms
-     × building/owner/question archived=true age=604800001 0ms
+     × building/owner/question archived=true age=604800000 2ms
+     × building/owner/question archived=true age=604800001 1ms
      × todo/owner/question archived=false age=0 0ms
      × todo/owner/question archived=false age=604800000 0ms
      × todo/owner/question archived=false age=604800001 0ms
-     × todo/owner/question archived=true age=0 0ms
-     × todo/owner/question archived=true age=604800000 0ms
-     × todo/owner/question archived=true age=604800001 0ms
+     × todo/owner/question archived=true age=0 4ms
+     × todo/owner/question archived=true age=604800000 2ms
+     × todo/owner/question archived=true age=604800001 1ms
      × review/owner/review archived=false age=0 0ms
      × review/owner/review archived=false age=604800000 0ms
-     × review/owner/review archived=false age=604800001 0ms
+     × review/owner/review archived=false age=604800001 1ms
      × review/owner/review archived=true age=0 0ms
-     × review/owner/review archived=true age=604800000 0ms
+     × review/owner/review archived=true age=604800000 2ms
      × review/owner/review archived=true age=604800001 0ms
      × done/null/undefined archived=false age=0 0ms
-     × done/null/undefined archived=false age=604800000 0ms
+     × done/null/undefined archived=false age=604800000 2ms
      × done/null/undefined archived=false age=604800001 0ms
      × done/null/undefined archived=true age=0 0ms
      × done/null/undefined archived=true age=604800000 0ms
      × done/null/undefined archived=true age=604800001 0ms
-     × closed/null/undefined archived=false age=0 0ms
-     × closed/null/undefined archived=false age=604800000 0ms
+     × closed/null/undefined archived=false age=0 1ms
+     × closed/null/undefined archived=false age=604800000 1ms
      × closed/null/undefined archived=false age=604800001 0ms
      × closed/null/undefined archived=true age=0 0ms
      × closed/null/undefined archived=true age=604800000 0ms
      × closed/null/undefined archived=true age=604800001 0ms
-   × every todo read derives section from current ownership, without reconciliation or notification 144ms
-   × one Tasks read includes open rows and recently archived rows; section uses phaseAt, not archive time 76ms
-   × Tasks scopes both sources to the team and lists parked pending standalone questions until answered or cancelled 112ms
+   × every todo read derives section from current ownership, without reconciliation or notification 245ms
+   × one Tasks read includes open rows and recently archived rows; section uses phaseAt, not archive time 131ms
+   × Tasks scopes both sources to the team and lists parked pending standalone questions until answered or cancelled 193ms
 
 ⎯⎯⎯⎯⎯⎯ Failed Tests 87 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -197,7 +197,7 @@ TypeError: sectionOf is not a function
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/87]⎯
 
  FAIL  |@xiechimon/cairn| test/tasks.test.ts > every todo read derives section from current ownership, without reconciliation or notification
-AssertionError: expected { id: 'awNZ17waA33tjzf_XoPxH', …(28) } to match object { owner: null, section: 'up_next' }
+AssertionError: expected { id: '4d0CNHsT9cEQOhujKz0KR', …(28) } to match object { owner: null, section: 'up_next' }
 (28 matching properties omitted from actual)
 
 - Expected
@@ -232,8 +232,8 @@ AssertionError: expected 404 to be 200 // Object.is equality
     132|   const response = await req(s.app, 'GET', `/api/tasks?teamId=${s.team…
     133|   expect(response.status).toBe(200);
        |                           ^
-    134|   const body = (await response.json()) as {
-    135|     todos: { id: string; section: string | null }[];
+    134|   const body = (await response.json()) as TasksQuery;
+    135|   expect(body).not.toHaveProperty('todos');
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/87]⎯
 
@@ -246,24 +246,24 @@ AssertionError: expected 404 to be 200 // Object.is equality
 - 200
 + 404
 
- ❯ read test/tasks.test.ts:176:29
-    174|   const read = async (teamId: string) => {
-    175|     const response = await req(s.app, 'GET', `/api/tasks?teamId=${team…
-    176|     expect(response.status).toBe(200);
+ ❯ read test/tasks.test.ts:178:29
+    176|   const read = async (teamId: string) => {
+    177|     const response = await req(s.app, 'GET', `/api/tasks?teamId=${team…
+    178|     expect(response.status).toBe(200);
        |                             ^
-    177|     return response.json();
-    178|   };
- ❯ test/tasks.test.ts:179:10
+    179|     const body = (await response.json()) as TasksQuery;
+    180|     expect(Array.isArray(body.entries)).toBe(true);
+ ❯ test/tasks.test.ts:186:10
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/87]⎯
 
 
  Test Files  1 failed (1)
       Tests  87 failed (87)
-   Start at  00:02:22
-   Duration  5.50s (transform 71%, import 21%, tests 7%, setup 1%)
+   Start at  00:06:45
+   Duration  7.33s (transform 68%, import 22%, tests 9%, setup 1%)
 
-  Transform  |@xiechimon/cairn| transforming modules took 3.66s · 71% of tracked time, re-done on every run
+  Transform  |@xiechimon/cairn| transforming modules took 4.59s · 68% of tracked time, re-done on every run
              persist transforms across runs with fsModuleCache: true
              learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
 
