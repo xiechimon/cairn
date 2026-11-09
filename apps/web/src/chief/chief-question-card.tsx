@@ -74,8 +74,10 @@ const NUM_CLS =
   'grid size-5 shrink-0 place-items-center rounded-(--cds-radius-sm) border text-caption leading-none font-semibold';
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
-const ATTACHED_CARD_CLS =
-  '@container relative flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) border border-b-0 border-border bg-card shadow-(--e1)';
+const DOCK_CARD_CLS =
+  '@container relative z-1 flex max-h-[40dvh] min-h-0 flex-col overflow-hidden bg-card';
+const ATTACHED_CARD_CLS = `${DOCK_CARD_CLS} rounded-t-(--radius-composer) shadow-(--shadow-composer-cap) group-has-[.chief-composer:focus-within]/composer:shadow-(--shadow-composer-cap-focus)`;
+const DETACHED_CARD_CLS = `${DOCK_CARD_CLS} rounded-(--radius-composer) shadow-[inset_0_0_0_var(--hairline)_var(--composer-ring)]`;
 const OPTION_ROW_CLS =
   'h-auto w-full items-start justify-start gap-2.5 whitespace-normal rounded-md px-2 py-1.5 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
@@ -122,7 +124,7 @@ type Question = ChiefQuestionItem['questions'][number];
 function digitsReachCard(target: HTMLElement): boolean {
   if (target.isContentEditable) return false;
   if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-compose-target'))
-    return target.value === '';
+    return target.hasAttribute('data-question-answer') && target.value === '';
   return !/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 }
 
@@ -218,29 +220,36 @@ export function ChiefQuestionCard({
   const toggleCollapsed = () => questionDockState.toggleCollapsed(item.requestId);
 
   useLayoutEffect(() => {
-    if (
-      !pending ||
-      collapsed ||
-      !numberKeys ||
-      question === undefined ||
-      question.options.length === 0
-    )
-      return;
+    if (!pending || collapsed || question === undefined || question.options.length === 0) return;
     const max = question.options.length;
     const handler = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (cardRef.current?.checkVisibility() !== true) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.keyCode === 229) return;
+      const card = cardRef.current;
+      if (card?.checkVisibility() !== true) return;
       const target = e.target;
-      if (target instanceof HTMLElement && !digitsReachCard(target)) return;
-      const n = Number.parseInt(e.key, 10);
-      if (!Number.isInteger(n) || n < 1 || n > max) return;
+      if (!(target instanceof HTMLElement) || !digitsReachCard(target)) return;
+      const inCard = card.contains(target);
+      const inAnswer =
+        bound &&
+        target.hasAttribute('data-question-answer') &&
+        target.closest('[data-testid="chief-composer-block"]')?.contains(card) === true;
+      if (!inCard && !inAnswer && !numberKeys) return;
+      if (
+        !inCard &&
+        target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
+      )
+        return;
+      if (!/^[1-9]$/.test(e.key)) return;
+      const n = Number(e.key);
+      if (n > max) return;
       e.preventDefault();
+      if (e.repeat) return;
       if (question.multiSelect !== true) setTextAt(step, '');
       setDrafts((prev) => applyQuestionPick(prev, step, question, n - 1));
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [pending, collapsed, numberKeys, bound, step, question]);
+  }, [pending, collapsed, numberKeys, bound, step, question, drafts]);
 
   const [localTexts, setLocalTexts] = useState<Record<number, string>>({});
   const textAt = (index: number): string =>
@@ -414,7 +423,7 @@ export function ChiefQuestionCard({
       data-testid="chief-question-card"
       data-status={item.status}
       data-collapsed={collapsed ? '' : undefined}
-      className={ATTACHED_CARD_CLS}
+      className={bound ? ATTACHED_CARD_CLS : DETACHED_CARD_CLS}
     >
       <div
         className={`flex flex-none items-center gap-1 px-3.5 pt-2 pb-1${collapsed ? '' : ' max-[640px]:absolute max-[640px]:top-0.5 max-[640px]:right-1 max-[640px]:z-10 max-[640px]:p-0'}`}

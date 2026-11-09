@@ -15,7 +15,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
-import { message, plan as planTable, todo, tokenUsage } from './db/schema.js';
+import { chiefMessage, message, plan as planTable, todo, tokenUsage } from './db/schema.js';
 import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -37,7 +37,6 @@ import {
   startBuilds,
 } from './services/builds.js';
 import { getChiefThread } from './services/chief.js';
-import { chiefMessagePage } from './services/coordinator.js';
 import { createSerialConnection } from './services/events.js';
 import {
   projectOfTodo,
@@ -47,6 +46,7 @@ import {
 } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { readMergeGateState } from './services/merge-gate-run.js';
+import { newestMessagePage } from './services/message-page.js';
 import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { holdSecondRejectionRework } from './services/research-stuck.js';
@@ -89,11 +89,11 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/conversations/:id/messages', (c) => {
     const conversationId = c.req.param('id');
+    const query = parseWith(conversationMessagesQuerySchema, c.req.query(), 'query');
     if (isChiefConversation(conversationId)) {
       const thread = getChiefThread(svc, conversationId);
       if (!thread) throw notFound(`conversation ${conversationId}`);
-      const query = parseWith(conversationMessagesQuerySchema, c.req.query(), 'query');
-      const page = chiefMessagePage(svc, conversationId, query);
+      const page = newestMessagePage(ctx.db, chiefMessage, conversationId, query);
       return c.json({
         messages: page.messages.map((r) => ({
           id: r.id,
@@ -108,13 +108,9 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         nextCursor: page.hasEarlier ? (page.messages[0]?.id ?? null) : null,
       });
     }
-    const rows = ctx.db
-      .select()
-      .from(message)
-      .where(eq(message.conversationId, conversationId))
-      .all();
+    const page = newestMessagePage(ctx.db, message, conversationId, query);
     return c.json({
-      messages: rows.map((r) => ({
+      messages: page.messages.map((r) => ({
         id: r.id,
         role: r.role,
         content: r.content,
@@ -126,7 +122,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       steerPending: readSteerPending(ctx.db, conversationId),
       queuedMessages: readQueuedMessages(ctx.db, conversationId),
       activeRun: null,
-      nextCursor: null,
+      nextCursor: page.hasEarlier ? (page.messages[0]?.id ?? null) : null,
     });
   });
 

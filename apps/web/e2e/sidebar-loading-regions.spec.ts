@@ -4,7 +4,7 @@ import { mockLive, THREAD } from './chief-home-mock';
 const DELAY_MS = 5000;
 
 const CONCLUSIONS = [
-  '请先为 Coordinator 选择一个 Agent',
+  '请先在工作路由里配置 Coordinator',
   '没有在进行的任务',
   '还没有完成的工作',
   '尚无机器',

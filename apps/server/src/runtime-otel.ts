@@ -164,12 +164,7 @@ export function emitRuntimeStepSpan(
             }
           : {
               ...langfuseEnvironmentAttributes(environment),
-              ...(buildRow
-                ? {
-                    [LANGFUSE_ATTR.sessionId]: buildRow.todoId,
-                    [LANGFUSE_ATTR.genericSessionId]: buildRow.todoId,
-                  }
-                : {}),
+              ...(buildRow ? { [LANGFUSE_ATTR.sessionId]: buildRow.todoId } : {}),
             }),
       }),
       ...status,

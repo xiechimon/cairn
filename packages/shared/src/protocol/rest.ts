@@ -16,6 +16,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/machines' },
   { method: 'GET', path: '/api/computers', note: 'the team computers (D75 P8a)' },
   {
+    method: 'POST',
+    path: '/api/computers',
+    note: 'D75: ensure a stopped private computer for a capable machine and set browserEnabled',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/computers/{id}',
+    note: 'D75: enable or disable browser tools on a computer',
+  },
+  {
     method: 'GET',
     path: '/api/computers/{id}/commands',
     query: ['limit'],
@@ -138,6 +148,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: '02 §9.3 在册不设计；触发条件 = 04 册附录 B',
   },
   { method: 'GET', path: '/api/todos', query: ['teamId'] },
+  { method: 'GET', path: '/api/tasks', query: ['teamId'] },
   { method: 'GET', path: '/api/todos/{id}' },
   {
     method: 'POST',
