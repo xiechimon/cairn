@@ -263,7 +263,7 @@ describe('in-product merge gate', () => {
       expect(review).toBeDefined();
       s.db
         .update(step)
-        .set({ status: 'done', claimedAt: 1, finishedAt: 2 })
+        .set({ status: 'done', finishedAt: 2 })
         .where(eq(step.id, review?.id ?? ''))
         .run();
       const statuses: { sha: string; state: string; description: string }[] = [];
@@ -342,7 +342,7 @@ describe('in-product merge gate', () => {
       s.db
         .insert(message)
         .values({
-          id: 'msg-assistant-raw',
+          id: `msg-${review?.id}-1`,
           conversationId: buildId,
           role: 'assistant',
           content: [
@@ -354,7 +354,7 @@ describe('in-product merge gate', () => {
             '',
             'VERDICT: pass',
           ].join('\n'),
-          createdAt: 2,
+          createdAt: 3,
         })
         .run();
       const bound = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
@@ -417,7 +417,7 @@ describe('in-product merge gate', () => {
     },
   );
 
-  test('the gate run records the latest review step output only, not the whole build transcript', async () => {
+  test('the gate run records the latest review step output only, whatever the machine clock says', async () => {
     const { s, buildId, stepId } = await world();
     completeStep(s.svc, stepId, { hasChanges: true });
     const review = s.db
@@ -435,11 +435,11 @@ describe('in-product merge gate', () => {
       .insert(message)
       .values(
         Array.from({ length: 300 }, (_, i) => ({
-          id: `msg-build-${i}`,
+          id: `msg-${stepId}-${i + 1}`,
           conversationId: buildId,
           role: 'assistant' as const,
           content: `implementation output ${i} ${'x'.repeat(1_000)}`,
-          createdAt: 2 + i,
+          createdAt: 12_000 + i,
         })),
       )
       .run();
@@ -447,18 +447,18 @@ describe('in-product merge gate', () => {
       .insert(message)
       .values([
         {
-          id: 'msg-earlier-review',
+          id: 'msg-earlier-review-1',
           conversationId: buildId,
           role: 'assistant',
           content: 'VERDICT: block',
-          createdAt: 5_000,
+          createdAt: 15_000,
         },
         {
-          id: 'msg-latest-review',
+          id: `msg-${review?.id}-1`,
           conversationId: buildId,
           role: 'assistant',
           content: 'No blocking findings.\n\nVERDICT: pass',
-          createdAt: 15_000,
+          createdAt: 90_000,
         },
       ])
       .run();
