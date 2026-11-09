@@ -80,6 +80,7 @@ describe('ContextMeterRing', () => {
   test('falls back to the mock fill when percent is omitted', () => {
     const html = renderRing();
     expect(html).toContain('data-testid="composer-context-meter"');
+    expect(html).toContain('pointer-coarse:size-11');
     expect(html).toContain('data-mock=""');
     expect(html).toContain(`data-percent="${MOCK_CONTEXT_PERCENT}"`);
     expect(html).not.toContain('data-resume');

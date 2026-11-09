@@ -1,5 +1,6 @@
 import {
   type ClaimedStep,
+  contextTokensOf,
   estimateTokens,
   type MachineDoneBody,
   type ModelUsage,
@@ -49,7 +50,7 @@ function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): M
     output: 0,
     cacheRead: 0,
     cacheWrite: 0,
-    contextTokens: answer.usage.input + answer.usage.cacheRead + answer.usage.cacheWrite,
+    contextTokens: contextTokensOf(answer.usage),
   };
   for (const entry of entries) {
     const message = entry.model?.[0];

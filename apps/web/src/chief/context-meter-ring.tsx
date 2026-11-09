@@ -15,7 +15,7 @@ const CONTEXT_RESUME_SHORT: Record<ContextResumeState, string> = {
 };
 
 const METER_BTN_CLS =
-  "size-7 cursor-default rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
+  "size-7 pointer-coarse:size-11 cursor-default rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
 
 const VIEW = 24;
 const STROKE = 3;
