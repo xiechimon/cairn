@@ -15,7 +15,7 @@ import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
 import { type AppToken, type AutonomousToken, registerAppToken } from '../src/lib/github-token.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
-import { createPrWakes } from '../src/services/pr-wakes.js';
+import { CAP_REVIEW_FOCUS, createPrWakes, focusedCodexReview } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import {
   answerPendingWorkerQuestions,
@@ -95,9 +95,25 @@ function fixture() {
     apply: true,
     error: '',
     page: false,
+    commentFailures: 0,
   };
   const queries: string[] = [];
+  const posted: string[] = [];
   const fetch = vi.fn<FetchLike>(async (url, init) => {
+    if (init?.body && /\/issues\/3377\/comments$/.test(String(url))) {
+      if (state.commentFailures > 0) {
+        state.commentFailures -= 1;
+        throw new Error('response lost');
+      }
+      posted.push((JSON.parse(init.body) as { body: string }).body);
+      return {
+        ok: true,
+        status: 201,
+        headers: { get: () => null },
+        json: async () => ({ id: posted.length }),
+        text: async () => '',
+      };
+    }
     if (!init?.body)
       return {
         ok: true,
@@ -249,7 +265,7 @@ function fixture() {
       },
       runs: [],
     });
-  return { s, state, queries, fetch, row, reconcile, wake };
+  return { s, state, queries, posted, fetch, row, reconcile, wake };
 }
 
 test.each(['P2', 'P3'])(
@@ -387,6 +403,59 @@ test.each([true, false])(
     );
   },
 );
+
+test('the findings wake asks for whole-class fixes in one push, P0/P1 fixed, and P2/P3 deferral only with a new issue', () => {
+  const prompt = buildReviewFindingsPrompt({ prNumber: 1, round: 2, findings: [] });
+  expect(prompt).toContain('缺陷类别');
+  expect(prompt).toContain('只推送一次');
+  expect(prompt).toContain('P0/P1 必须修复');
+  expect(prompt).toContain('`valid, out of scope for this PR, tracked in #N`');
+  expect(prompt).toContain('先新建 issue');
+  expect(prompt).not.toContain('@mergifyio');
+});
+
+test('the review round cap stops wakes, lists every finding class raised, and asks Codex once for a focused full-diff pass', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 2 }, createdAt: 1 })
+    .run();
+  await f.wake();
+  expect(f.s.db.select().from(step).all()).toHaveLength(1);
+  expect(f.posted).toEqual([]);
+  f.s.db.update(step).set({ status: 'done' }).run();
+  f.state.findingId = 'RT_2';
+  f.state.body = '**<sub><sub>![P2 Badge](badge)</sub></sub>** Retry path skips the @owner check';
+  await f.wake();
+  await f.wake();
+  expect(f.s.db.select().from(step).all()).toHaveLength(1);
+  expect(f.posted).toHaveLength(1);
+  const [comment] = f.posted;
+  expect(comment).toContain('- Fix this');
+  expect(comment).toContain('- Retry path skips the @\u200bowner check');
+  expect(comment?.split('\n').at(-1)).toBe(focusedCodexReview(CAP_REVIEW_FOCUS));
+  expect(comment?.match(/@codex/g)).toHaveLength(1);
+  f.state.head = 'def';
+  f.s.db.update(threadPr).set({ head: 'def' }).where(eq(threadPr.id, 'pr')).run();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a failed cap comment is retried on the next poll and then posted once', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.state.commentFailures = 1;
+  await f.wake();
+  expect(f.posted).toEqual([]);
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
 
 test('autoFix off still holds, notifies and later releases', async () => {
   const f = fixture();

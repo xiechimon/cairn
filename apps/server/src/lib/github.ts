@@ -1521,6 +1521,7 @@ export interface GithubPullPanel {
   mergeableState: string | null;
   additions: number;
   deletions: number;
+  labels?: string[];
 }
 
 export interface GithubPullPanelPage {
@@ -1550,6 +1551,7 @@ export async function githubPullPanel(
     mergeable_state?: unknown;
     additions?: unknown;
     deletions?: unknown;
+    labels?: unknown;
     head?: { sha?: unknown; ref?: unknown } | null;
     base?: { sha?: unknown; ref?: unknown } | null;
   };
@@ -1572,6 +1574,11 @@ export async function githubPullPanel(
       mergeableState: optString(raw.mergeable_state),
       additions: typeof raw.additions === 'number' ? raw.additions : 0,
       deletions: typeof raw.deletions === 'number' ? raw.deletions : 0,
+      labels: Array.isArray(raw.labels)
+        ? raw.labels.flatMap((label: { name?: unknown } | null) =>
+            typeof label?.name === 'string' ? [label.name] : [],
+          )
+        : [],
     },
   };
 }
@@ -1583,6 +1590,7 @@ export interface GithubCheckRun {
   conclusion: string | null;
   outputTitle: string | null;
   outputSummary: string | null;
+  completedAt?: number | null;
 }
 
 export interface GithubCheckRunsPage {
@@ -1622,6 +1630,10 @@ export async function githubCommitCheckRuns(
       conclusion: typeof entry.conclusion === 'string' ? entry.conclusion : null,
       outputTitle: typeof output?.title === 'string' ? output.title : null,
       outputSummary: typeof output?.summary === 'string' ? output.summary : null,
+      completedAt:
+        typeof entry.completed_at === 'string' && Number.isFinite(Date.parse(entry.completed_at))
+          ? Date.parse(entry.completed_at)
+          : null,
     });
   }
   return { notModified: false, etag: got.etag, checkRuns };

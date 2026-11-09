@@ -4,6 +4,7 @@ import {
   isBuildStepKind,
   neutralizeIssueAttachmentTokens,
   type PrReviewFinding,
+  reviewFindingTitle,
 } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
@@ -22,6 +23,7 @@ import {
   type GithubPullPanel,
   GithubRateLimitedError,
   githubCollaboratorPermission,
+  githubComment,
   githubCommitCheckRuns,
 } from '../lib/github.js';
 import {
@@ -30,7 +32,7 @@ import {
   isCairnIdentity,
 } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
-import type { AutonomousToken } from '../lib/github-token.js';
+import { type AutonomousToken, githubTokenFetch } from '../lib/github-token.js';
 import { newRecordId } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
@@ -49,9 +51,74 @@ const ledgerSchema = z.object({
   failure: z.object({ head: z.string(), signature: z.string() }).nullable().default(null),
   repeated: z.boolean().default(false),
   pendingNotice: z.object({ buildId: z.string(), content: z.string() }).nullable().default(null),
+  findingClasses: z.array(z.string()).default([]),
+  capRequest: z.string().nullable().default(null),
 });
 
-type WakeKind = 'conflict' | 'ci' | 'review';
+type WakeKind = 'conflict' | 'ci' | 'review' | 'queue';
+
+const REVIEW_ROUND_CAP = 3;
+const QUEUE_CHECK = 'Mergify Merge Queue';
+const QUEUE_WAITING_TITLE = 'Waiting for queue conditions';
+const QUEUE_WAIT_MS = 10 * 60_000;
+const GREEN_CONCLUSIONS = new Set(['success', 'skipped', 'neutral']);
+const QUEUE_WAIT_PROMPT_HEAD = '[queue-wait]';
+export const CAP_REVIEW_FOCUS =
+  'every remaining instance of the finding classes listed above across the whole PR diff';
+
+export function focusedCodexReview(focus: string): string {
+  return `@codex review for ${focus}`;
+}
+
+function capComment(prNumber: number, classes: string[]): string {
+  return [
+    `Review round cap (${REVIEW_ROUND_CAP}) reached on #${prNumber}: cairn stops auto-fix wakes on this PR. Finding classes raised so far:`,
+    '',
+    ...classes.map((title) => `- ${title.replaceAll('@', '@\u200b')}`),
+    '',
+    'The owner or coordinator decides next: split the PR, accept the answers, or allow one final push that fixes every instance.',
+    '',
+    focusedCodexReview(CAP_REVIEW_FOCUS),
+  ].join('\n');
+}
+
+function unmetQueueConditions(
+  pull: GithubPullPanel,
+  runs: GithubCheckRun[] | null,
+  findings: PrReviewFinding[] | null,
+  now: number,
+): string | null {
+  if (runs === null || (findings ?? []).length > 0 || pull.draft) return null;
+  if ((pull.labels ?? []).includes('coordinator-hold')) return null;
+  const queue = runs.find((r) => r.name === QUEUE_CHECK);
+  if (!queue?.outputTitle?.startsWith(QUEUE_WAITING_TITLE) || !queue.outputSummary) return null;
+  const checks = runs.filter((r) => !r.name.startsWith('Mergify '));
+  const greenAt = checks.flatMap((r) =>
+    r.status === 'completed' &&
+    GREEN_CONCLUSIONS.has(r.conclusion ?? '') &&
+    typeof r.completedAt === 'number'
+      ? [r.completedAt]
+      : [],
+  );
+  if (checks.length === 0 || greenAt.length !== checks.length) return null;
+  if (now - Math.max(...greenAt) < QUEUE_WAIT_MS) return null;
+  const unmet = queue.outputSummary
+    .split('\n')
+    .filter((line) => /^\s*- \[ \] /.test(line))
+    .join('\n');
+  return unmet === '' ? null : unmet;
+}
+
+function buildQueueWaitPrompt(args: { prNumber: number; prUrl: string | null; unmet: string }) {
+  return [
+    `${QUEUE_WAIT_PROMPT_HEAD} PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 的检查已全部通过超过 ${QUEUE_WAIT_MS / 60_000} 分钟，但还没进合并队列。Mergify 列出的未满足的入队条件：`,
+    '',
+    neutralizeIssueAttachmentTokens(args.unmet),
+    '',
+    '修复你能修复的条件后推送一次；不要发任何 Mergify 命令。修不了的条件（例如需要协调者或 ian 决定的标签）在回复里说明原因。',
+  ].join('\n');
+}
+
 interface WakeEvent {
   kind: WakeKind;
   key: string;
@@ -281,8 +348,24 @@ export function createPrWakes(deps: BuildDeps) {
       (finding) => `review-thread:${finding.id}:${digest(finding.body)}`,
     );
     const freshFindings = findingKeys.some((key) => !ledger.seen.includes(key));
-    if (findings !== null && findings.length > 0 && ledger.reviews >= 3)
-      notices.push('Review round cap (3) reached; rethink or hand to the owner.');
+    for (const finding of findings ?? []) {
+      const title = reviewFindingTitle(finding.body);
+      if (title !== '' && !ledger.findingClasses.includes(title)) ledger.findingClasses.push(title);
+    }
+    const capped = findings !== null && findings.length > 0 && ledger.reviews >= REVIEW_ROUND_CAP;
+    if (capped) notices.push('Review round cap (3) reached; rethink or hand to the owner.');
+    const requestCapReview = capped && ledger.capRequest === null;
+    if (requestCapReview) ledger.capRequest = row.head;
+    const unmet = unmetQueueConditions(pull, runs, findings, now);
+    if (unmet !== null) {
+      const key = `queue:${row.head}:${digest(unmet)}`;
+      if (!ledger.seen.includes(key))
+        events.push({
+          kind: 'queue',
+          key,
+          prompt: buildQueueWaitPrompt({ prNumber: row.number, prUrl: row.url, unmet }),
+        });
+    }
     if (comments.length > 0 || freshFindings) {
       if (ledger.reviews >= 3 && (findings === null || findings.length === 0))
         notices.push('Review round cap (3) reached; rethink or hand to the owner.');
@@ -306,6 +389,7 @@ export function createPrWakes(deps: BuildDeps) {
             .join('\n\n'),
         });
     }
+    let capRequested = false;
     deps.db.transaction(() => {
       const latestLedger = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
       if (digest(latestLedger?.content ?? {}) !== digest(stored?.content ?? {})) return;
@@ -428,6 +512,7 @@ export function createPrWakes(deps: BuildDeps) {
         })
         .onConflictDoUpdate({ target: message.id, set: { content: ledger } })
         .run();
+      capRequested = requestCapReview;
       if (notices.length > 0) {
         const content = `PR Auto-fix needs you: #${row.number} ${notices.join(' ')}`;
         const id = `${ledgerId}:cap:${digest(content)}`;
@@ -439,6 +524,31 @@ export function createPrWakes(deps: BuildDeps) {
         deps.db.update(build).set({ errorMessage: content }).where(eq(build.id, row.buildId)).run();
       }
     });
+    if (capRequested) {
+      try {
+        await githubComment(
+          githubTokenFetch(input.fetch, token, { owner, repo }),
+          token,
+          owner,
+          repo,
+          row.number,
+          capComment(row.number, ledger.findingClasses),
+        );
+      } catch (error) {
+        deps.db.transaction(() => {
+          const current = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
+          const latest = ledgerSchema.parse(current?.content ?? {});
+          if (latest.capRequest !== row.head) return;
+          latest.capRequest = null;
+          deps.db.update(message).set({ content: latest }).where(eq(message.id, ledgerId)).run();
+        });
+        if (error instanceof GithubRateLimitedError) throw error;
+        console.warn('Review round cap comment not posted; retrying on the next poll', {
+          pr: row.number,
+          error,
+        });
+      }
+    }
     settlePrWakeNotices(deps, row.teamId);
   };
 }
