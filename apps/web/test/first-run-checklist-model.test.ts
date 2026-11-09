@@ -41,7 +41,7 @@ test('while any fact is still loading the checklist stays hidden instead of flas
   expect(firstRunComplete(firstRunSteps({ ...done, modelSources: undefined }))).toBe(true);
 });
 
-test('the Coordinator needs a bound agent with a model to answer', () => {
+test('the Coordinator needs a routing facade with a model to answer', () => {
   expect(coordinatorCanAnswer(undefined)).toBeUndefined();
   const base = { chief: {}, watches: [], wakes: [], context: null };
   expect(coordinatorCanAnswer({ ...base, agentActor: null } as never)).toBe(false);

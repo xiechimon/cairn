@@ -10,9 +10,9 @@ export function desktopControlInstalled(
 
 export function browserCapabilityInstalled(
   machine: MachineRow,
-  computer: ComputerRecord | null | undefined,
+  _computer?: ComputerRecord | null,
 ): boolean {
-  return machine.capabilities?.computer === true || computer != null;
+  return machine.capabilities?.browser === true;
 }
 
 export function desktopControlOnline(

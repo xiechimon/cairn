@@ -93,7 +93,8 @@ test('old resource URLs land on their settings section with the query intact', a
     ['/app/resources/secrets', 'secrets'],
     ['/app/account', 'account'],
     ['/app/api-keys', 'api-keys'],
-    ['/app/team', 'team'],
+    ['/app/team', 'work-routing'],
+    ['/app/settings/team', 'work-routing'],
   ] as const;
   for (const [from, section] of cases) {
     await page.goto(`${from}?scenario=10&scope=x`);
