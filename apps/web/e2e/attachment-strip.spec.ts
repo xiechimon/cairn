@@ -465,24 +465,8 @@ test('detail face: a picked file shows an uploading tile, then a file tile whose
 
 // —— chief face ————
 
-const AGENTS = [
-  { id: 'agent-1', displayName: 'builder', description: 'Builds features' },
-  { id: 'agent-2', displayName: 'reviewer', description: 'Reviews PRs' },
-];
-
 async function openChief(page: Page, art: TestArt) {
   await stubBoot(page, art);
-  const members = [
-    { id: 'member-user', teamId: TEAM_ID, actorId: USER.id, memberType: 'user', actor: USER },
-    ...AGENTS.map((a, i) => ({
-      id: `member-agent-${i}`,
-      teamId: TEAM_ID,
-      actorId: a.id,
-      memberType: 'agent',
-      actor: a,
-    })),
-  ];
-  await page.route(`**/api/teams/${TEAM_ID}/members`, (route) => route.fulfill({ json: members }));
   await page.route('**/api/todos?*', (route) => route.fulfill({ json: [WIRE_CARD] }));
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route('**/api/skills?*', (route) => route.fulfill({ json: [] }));
@@ -492,11 +476,11 @@ async function openChief(page: Page, art: TestArt) {
     return route.fulfill({ json: [] });
   });
   await stubCoordinatorChief(page, TEAM_ID, USER.id);
-  const membersLoaded = page.waitForResponse(
-    (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
+  const todosLoaded = page.waitForResponse(
+    (r) => r.url().includes('/api/todos') && r.status() === 200,
   );
   await page.goto('/app');
-  await membersLoaded;
+  await todosLoaded;
 
   const coordinator = page.getByTestId('home-c');
   await expect(coordinator).toBeVisible();

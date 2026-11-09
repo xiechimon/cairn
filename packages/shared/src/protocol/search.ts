@@ -38,7 +38,7 @@ export const searchResponseSchema = z.object({
 });
 export type SearchResponse = z.infer<typeof searchResponseSchema>;
 
-export const SEARCH_PLACEHOLDER = '搜索任务、项目、成员…';
+export const SEARCH_PLACEHOLDER = '搜索任务、项目…';
 
 export const SEARCH_GOTO_GROUP = [
   '看板',

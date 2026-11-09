@@ -381,7 +381,7 @@ export const EN: Record<string, string> = {
   面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
-  '搜索任务、项目、成员…': 'Search todos, projects, members…',
+  '搜索任务、项目…': 'Search todos, projects…',
   最近: 'Recent',
   '{dir} 里的仓库': 'Repositories in {dir}',
   查找文件夹或粘贴路径: 'Find a folder or paste a path',
