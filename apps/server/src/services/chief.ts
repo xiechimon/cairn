@@ -1239,8 +1239,10 @@ function wakeFactText(
 ): string {
   switch (kind) {
     case 'gate': {
-      if (todo.phase === 'review' && todo.output === 'info') {
-        return `任务 ${ref} 的研究报告已交付，验收归你，不归用户：读报告，满意就用 complete_todos 收下，需要补充就用 message_thread 让它补。只有需要用户决定的事才用 notify_user 或 ask_user。`;
+      if (todo.phase === 'review') {
+        const deliverable =
+          todo.output === 'info' ? '研究报告' : '工作分支上的改动（没有可合并的 PR）';
+        return `任务 ${ref} 已交付${deliverable}，验收归你，不归用户：读完后三选一——满意就用 complete_todos 收下；需要补充或返工就用 message_thread 让它继续；不再需要就用 close_todos 关掉。只有需要用户决定的事才用 ask_user。`;
       }
       return `任务 ${ref} 停驻在 ${todo.phase} 关口，等人处理。不要自己放行：需要用户知道或决定时，用 notify_user 或 ask_user 说明，否则直接结束本轮。`;
     }

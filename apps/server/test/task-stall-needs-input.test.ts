@@ -34,14 +34,29 @@ function deps() {
   };
 }
 
-function seedTodo() {
+function githubProject(): string {
+  const id = `proj-gh-${Math.random().toString(36).slice(2, 8)}`;
+  H.s.db
+    .insert(project)
+    .values({
+      id,
+      name: id,
+      teamId: H.teamId,
+      repoKind: 'github',
+      githubRepo: 'acme/app',
+    })
+    .run();
+  return id;
+}
+
+function seedTodo(projectId = H.projectId) {
   const id = `todo-${Math.random().toString(36).slice(2, 8)}`;
   H.s.db
     .insert(todo)
     .values({
       id,
       teamId: H.teamId,
-      projectId: H.projectId,
+      projectId,
       title: 'Port the onboarding copy',
       spec: 'Copy the onboarding text byte-for-byte.',
       phase: 'todo',
@@ -52,9 +67,9 @@ function seedTodo() {
   return id;
 }
 
-function startSession() {
-  const todoId = seedTodo();
-  const [started] = startBuilds(deps(), { projectId: H.projectId, todoIds: [todoId] });
+function startSession(projectId = H.projectId) {
+  const todoId = seedTodo(projectId);
+  const [started] = startBuilds(deps(), { projectId, todoIds: [todoId] });
   const buildId = started!.id;
   const first = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
   H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
@@ -120,7 +135,7 @@ function pendingWork(buildId: string) {
 }
 
 function zeroChangeId(buildId: string) {
-  return `no-change-${buildId}`;
+  return `no-deliverable-${buildId}`;
 }
 
 describe('a parked question is its own phase and wakes the Coordinator', () => {
@@ -196,8 +211,89 @@ describe('a parked question is its own phase and wakes the Coordinator', () => {
       .from(message)
       .where(eq(message.conversationId, buildId))
       .all()
-      .filter((row) => row.id.startsWith('no-change-'));
+      .filter((row) => row.id.startsWith('no-deliverable-'));
     expect(asked).toHaveLength(1);
+  });
+});
+
+describe('a step that delivered nothing asks once (task stall class 2)', () => {
+  test('a GitHub task whose step committed but opened no PR asks, quoting the report line, instead of going to review', async () => {
+    const { todoId, buildId, stepRow } = startSession(githubProject());
+    H.s.db
+      .update(build)
+      .set({ reportLine: 'Pushed the branch; no PR opened, remote CI unverified.' })
+      .where(eq(build.id, buildId))
+      .run();
+    endStep(stepRow.id, { hasChanges: true });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBe('pending');
+    const wake = coordinatorSteps().find((row) => row.prompt?.includes(zeroChangeId(buildId)));
+    expect(wake?.prompt).toContain('no PR opened, remote CI unverified');
+  });
+
+  test('a GitHub task whose step opened a PR asks nothing', () => {
+    const { todoId, buildId, stepRow } = startSession(githubProject());
+    H.s.db.update(build).set({ prNumber: 42 }).where(eq(build.id, buildId)).run();
+    endStep(stepRow.id, { hasChanges: true });
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+    expect(phaseOf(todoId)).not.toBe('needs_input');
+  });
+
+  test('a task in a project without GitHub that committed goes to review as before', () => {
+    const { todoId, buildId, stepRow } = startSession();
+    endStep(stepRow.id, { hasChanges: true });
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+    expect(phaseOf(todoId)).toBe('review');
+  });
+
+  test('a GitHub task that ends without a PR again after the answer goes to review, asked once', async () => {
+    const { todoId, buildId, stepRow } = startSession(githubProject());
+    endStep(stepRow.id, { hasChanges: true });
+    await relay('answer_question', {
+      todoId,
+      requestId: zeroChangeId(buildId),
+      answer: 'A verified branch is enough here.',
+    });
+    const [resumed] = pendingWork(buildId);
+    if (resumed === undefined) throw new Error('no resumed step');
+    H.s.db
+      .update(step)
+      .set({ status: 'claimed', machineId: stepRow.machineId })
+      .where(eq(step.id, resumed.id))
+      .run();
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    ackSteer(deps(), { id: stepRow.machineId, teamId: H.teamId }, resumed.id, {
+      answerIds: [zeroChangeId(buildId)],
+      via: 'session-start',
+    });
+    endStep(resumed.id, { hasChanges: true });
+    expect(phaseOf(todoId)).toBe('review');
+  });
+});
+
+describe('a build answered under the old zero-change id is not asked again', () => {
+  test('a continuation that ends without commits after an answered no-change question goes to review', () => {
+    const { todoId, buildId, stepRow } = startSession();
+    H.s.db
+      .insert(message)
+      .values({
+        id: `no-change-${buildId}`,
+        conversationId: buildId,
+        role: 'assistant',
+        content: {
+          kind: 'ask_user_question',
+          requestId: `no-change-${buildId}`,
+          status: 'answered',
+          questions: [{ header: 'No changes', question: 'What next?', options: [] }],
+          answers: [{ text: 'No code change is needed.' }],
+        },
+        createdAt: Date.now(),
+        actor: null,
+      })
+      .run();
+    endStep(stepRow.id, { hasChanges: false });
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+    expect(phaseOf(todoId)).toBe('review');
   });
 });
 

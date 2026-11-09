@@ -51,6 +51,9 @@ function openWorld(
     output?: 'code' | 'info';
     failure?: Failure;
     prNumber?: number;
+    repo?: 'github' | 'local' | 'hosted';
+    hasChanges?: boolean;
+    shipRoute?: 'merge-gate' | 'local-merge' | 'custom';
   } = {},
 ): World {
   const s = bootServer();
@@ -67,8 +70,16 @@ function openWorld(
       id: projectId,
       name: `owner-${suffix}`,
       teamId: s.team.id,
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: opts.policy ?? 'autonomous' },
-      ...(opts.prNumber !== undefined ? { repoKind: 'github', githubRepo: 'acme/app' } : {}),
+      autonomy: {
+        ...DEFAULT_AUTONOMY_SETTINGS,
+        mergePolicy: opts.policy ?? 'autonomous',
+        ...(opts.shipRoute !== undefined ? { shipRoute: opts.shipRoute } : {}),
+      },
+      ...(opts.prNumber !== undefined || opts.repo === 'github'
+        ? { repoKind: 'github', githubRepo: 'acme/app' }
+        : {}),
+      ...(opts.repo === 'local' ? { repoKind: 'local', localPath: '/srv/app' } : {}),
+      ...(opts.repo === 'hosted' ? { repoKind: 'hosted', repoName: 'app' } : {}),
     })
     .run();
   s.db
@@ -84,6 +95,7 @@ function openWorld(
       seqNum: 1,
       latestBuildId: buildId,
       output: opts.output ?? 'code',
+      hasChanges: opts.hasChanges ?? false,
     })
     .run();
   const failure = opts.failure ?? 'owed-retry';
@@ -156,6 +168,9 @@ describe('ownerOf (#3512)', () => {
     question?: boolean;
     gate?: 'transient' | 'human' | 'ready' | 'stale';
     prNumber?: number;
+    repo?: 'github' | 'local' | 'hosted';
+    hasChanges?: boolean;
+    shipRoute?: 'merge-gate' | 'local-merge' | 'custom';
     archived?: boolean;
     owner: TodoOwner;
   }[] = [
@@ -167,7 +182,50 @@ describe('ownerOf (#3512)', () => {
     { name: 'confirm', phase: 'confirm', owner: 'owner' },
     { name: 'confirm, human policy', phase: 'confirm', policy: 'human', owner: 'owner' },
     { name: 'archived confirm', phase: 'confirm', archived: true, owner: null },
-    { name: 'code review, autonomous', phase: 'review', owner: null },
+    { name: 'code review, autonomous, no repository', phase: 'review', owner: 'coordinator' },
+    {
+      name: 'code review, autonomous, GitHub project without a PR',
+      phase: 'review',
+      repo: 'github',
+      hasChanges: true,
+      owner: 'coordinator',
+    },
+    {
+      name: 'code review, human, GitHub project without a PR',
+      phase: 'review',
+      policy: 'human',
+      repo: 'github',
+      hasChanges: true,
+      owner: 'owner',
+    },
+    {
+      name: 'code review, autonomous, local repository with changes: a person lands it',
+      phase: 'review',
+      repo: 'local',
+      hasChanges: true,
+      owner: 'owner',
+    },
+    {
+      name: 'code review, autonomous, hosted repository with changes: a person lands it',
+      phase: 'review',
+      repo: 'hosted',
+      hasChanges: true,
+      owner: 'owner',
+    },
+    {
+      name: 'code review, autonomous, local repository, custom ship route without a PR',
+      phase: 'review',
+      repo: 'local',
+      hasChanges: true,
+      shipRoute: 'custom',
+      owner: 'coordinator',
+    },
+    {
+      name: 'code review, autonomous, local repository without changes',
+      phase: 'review',
+      repo: 'local',
+      owner: 'coordinator',
+    },
     { name: 'code review, human', phase: 'review', policy: 'human', owner: 'owner' },
     {
       name: 'code review, autonomous, human blocker',
@@ -214,7 +272,7 @@ describe('ownerOf (#3512)', () => {
       output: 'info',
       owner: 'coordinator',
     },
-    { name: 'info review, autonomous', phase: 'review', output: 'info', owner: null },
+    { name: 'info review, autonomous', phase: 'review', output: 'info', owner: 'coordinator' },
     { name: 'failure owed a retry', phase: 'failed', failure: 'owed-retry', owner: null },
     { name: 'repeated failure', phase: 'failed', failure: 'repeated', owner: 'coordinator' },
     { name: 'parked failure', phase: 'failed', failure: 'parked', owner: 'coordinator' },
@@ -243,6 +301,9 @@ describe('ownerOf (#3512)', () => {
       ...(c.output !== undefined ? { output: c.output } : {}),
       ...(c.failure !== undefined ? { failure: c.failure } : {}),
       ...(c.prNumber !== undefined ? { prNumber: c.prNumber } : {}),
+      ...(c.repo !== undefined ? { repo: c.repo } : {}),
+      ...(c.hasChanges !== undefined ? { hasChanges: c.hasChanges } : {}),
+      ...(c.shipRoute !== undefined ? { shipRoute: c.shipRoute } : {}),
     });
     if (c.question) {
       await ask(w, 'ask-0000000a');
@@ -736,6 +797,30 @@ describe('the Coordinator can act on what it owns (#3512)', () => {
     const out = transitionTodos(w.deps, w.s.team.id, [w.todoId], 'done', coordinator);
     expect(out.transitioned.includes(w.todoId)).toBe(c.done);
     expect(getTodo(w.deps, w.todoId)?.phase).toBe(c.done ? 'done' : 'review');
+  });
+
+  test.each([
+    { name: 'an autonomous research report', output: 'info' as const },
+    {
+      name: 'an autonomous GitHub review without a PR',
+      output: 'code' as const,
+      repo: 'github' as const,
+    },
+  ])('$name wakes the Coordinator once, and complete_todos accepts it', (c) => {
+    const w = openWorld({
+      phase: 'building',
+      output: c.output,
+      ...(c.repo ? { repo: c.repo } : {}),
+    });
+    setTodoPhase(w.deps, w.todoId, 'review');
+    reconcileOwners(w.deps);
+    reconcileOwners(w.deps, [w.todoId]);
+    expect(ownerNow(w)).toBe('coordinator');
+    expect(wakes(w)).toHaveLength(1);
+    expect(wakes(w)[0]).toMatch(/^\[wake:gate\]/);
+    expect(wakes(w)[0]).toContain('complete_todos');
+    const out = transitionTodos(w.deps, w.s.team.id, [w.todoId], 'done', coordinator);
+    expect(out.transitioned).toEqual([w.todoId]);
   });
 
   test('a code review that is Coordinator-owned only through a question still needs the person', async () => {
