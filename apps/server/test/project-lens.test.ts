@@ -52,8 +52,7 @@ describe('Duet project lens', () => {
     await req(H.s.app, 'POST', `${url}/messages`, { content: 'Everything only' });
     const task = (await relay('create_todo', {
       projectId: H.projectId,
-      title: 'Lens task',
-      spec: 'Keep these exact words',
+      messageIds: [message.id],
     })) as { id: string };
     for (const phase of ['queued', 'building', 'done'] as const)
       setTodoPhase(H.s.svc, task.id, phase);

@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '../brief-file.js';
 import { epochMs, recordId } from './common.js';
-import { diffFileSchema } from './document-diff.js';
 import { mergePolicySchema } from './merge-gate.js';
 
 export const PROJECT_REPO_KINDS = ['hosted', 'github', 'local'] as const;
+export const evidenceStoreSchema = z.enum(['attachments', 'repository']);
+export type EvidenceStore = z.infer<typeof evidenceStoreSchema>;
 export const SPLIT_POLICIES = ['human', 'shadow', 'auto'] as const;
 export const splitPolicySchema = z.enum(SPLIT_POLICIES);
 export type SplitPolicy = z.infer<typeof splitPolicySchema>;
@@ -58,6 +59,7 @@ export const projectRecordSchema = z.object({
   group: z.string().nullable().optional(),
   teamId: recordId,
   splitPolicy: splitPolicySchema.default('human'),
+  evidenceStore: evidenceStoreSchema.default('attachments'),
   description: z.string().optional(),
   instructions: z.string().optional(),
   maxConcurrent: z.number().int().optional(),
@@ -131,6 +133,7 @@ export const patchProjectBodySchema = z
     name: z.string().optional(),
     group: z.string().trim().min(1).nullable().optional(),
     splitPolicy: splitPolicySchema.optional(),
+    evidenceStore: evidenceStoreSchema.optional(),
     description: z.string().nullish(),
     instructions: z
       .string()
@@ -186,23 +189,6 @@ export type LocalErrorBody = { error: string; reason?: LocalErrorReason };
 
 export type LocalErrorReasonMap<T> = Record<LocalErrorReason, T>;
 
-export const PROJECT_TABS = ['Tasks', 'Files'] as const;
-
-export const projectTreeResponseSchema = z.object({
-  ref: z.string(),
-  commit: z.string(),
-  path: z.string(),
-  entries: z.array(
-    z.object({
-      name: z.string(),
-      path: z.string(),
-      type: z.enum(['blob', 'tree']),
-      size: z.number().int().nullable(),
-    }),
-  ),
-});
-export type ProjectTreeResponse = z.infer<typeof projectTreeResponseSchema>;
-
 export const projectFilesResponseSchema = z.object({
   ref: z.string(),
   commit: z.string(),
@@ -237,27 +223,3 @@ export const projectBranchesResponseSchema = z.object({
   ),
 });
 export type ProjectBranchesResponse = z.infer<typeof projectBranchesResponseSchema>;
-
-export const projectCommitsResponseSchema = z.object({
-  ref: z.string(),
-  commits: z.array(
-    z.object({
-      sha: z.string(),
-      shortSha: z.string(),
-      message: z.string(),
-      authorName: z.string(),
-      at: z.number(),
-    }),
-  ),
-});
-export type ProjectCommitsResponse = z.infer<typeof projectCommitsResponseSchema>;
-
-export const projectCommitDetailResponseSchema = z.object({
-  sha: z.string(),
-  shortSha: z.string(),
-  message: z.string(),
-  authorName: z.string(),
-  at: z.number(),
-  files: z.array(diffFileSchema),
-});
-export type ProjectCommitDetailResponse = z.infer<typeof projectCommitDetailResponseSchema>;

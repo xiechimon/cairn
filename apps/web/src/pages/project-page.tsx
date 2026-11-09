@@ -1,20 +1,8 @@
-import {
-  LOCAL_ERROR_REASON_COPY,
-  type LocalErrorReason,
-  type ProjectFileResponse,
-} from '@cairn/shared';
 import { cn } from 'cn';
 import { ListTodo } from 'lucide-react';
-import { Fragment, type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
-import { ApiError } from '../api/client.js';
-import {
-  useGithubConnection,
-  useProjectFile,
-  useProjects,
-  useProjectTree,
-  useTodos,
-} from '../api/hooks.js';
+import { useGithubConnection, useProjects, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
@@ -25,7 +13,6 @@ import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js
 import { SegmentedTabs } from '../components/segmented.js';
 import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { StatusGlyph } from '../components/status-glyph.js';
-import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import {
@@ -35,15 +22,12 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import type { Phase, ProjectContent } from '../fixtures/records.js';
+import type { Phase } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ArrowUpDown,
   ChevronDown,
-  ChevronRight,
-  FileTab,
-  Folder,
   Funnel,
   Grid2x2,
   ListLines,
@@ -54,128 +38,6 @@ import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { GithubIssuesDialog } from './github-issues-dialog.js';
 import { PageShell } from './shell.js';
-
-const FILE_ROW_CLS = 'w-full cursor-pointer justify-start gap-2 px-1.5 font-normal';
-const FILE_ROW_ACTIVE_CLS = 'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
-
-export interface FileTreeRow {
-  name: string;
-  path: string;
-  type: 'blob' | 'tree';
-}
-
-const CRUMB_BTN_CLS = 'h-6 cursor-pointer px-1 font-mono text-meta font-normal';
-
-const PANE_NOTE_CLS = 'px-1 py-6 text-center text-meta text-content-tertiary';
-
-function FilesPane({
-  branch,
-  entries,
-  treeLoading,
-  treeError,
-  dirPath,
-  onNavigateDir,
-  selectedFile,
-  onSelectFile,
-}: {
-  branch: string;
-  entries: FileTreeRow[];
-  treeLoading: boolean;
-  treeError: boolean;
-  dirPath: string;
-  onNavigateDir: (path: string) => void;
-  selectedFile: string | null;
-  onSelectFile: (path: string) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className="flex w-69 flex-none flex-col border-r border-border py-2 pr-2 pl-4">
-      <div className="flex items-center justify-between pr-2">
-        <Badge
-          variant="secondary"
-          className="prj-branch-chip gap-1.5 font-mono text-muted-foreground"
-        >
-          {branch}
-          <ChevronDown width={12} height={12} />
-        </Badge>
-      </div>
-      <div className="mt-3">
-        {dirPath !== '' ? (
-          <nav
-            aria-label={t('目录导航')}
-            className="mb-1 flex flex-wrap items-center gap-x-0.5 px-1.5 text-muted-foreground"
-          >
-            <Button variant="ghost" className={CRUMB_BTN_CLS} onClick={() => onNavigateDir('')}>
-              {t('根目录')}
-            </Button>
-            {dirPath
-              .split('/')
-              .filter(Boolean)
-              .map((name, i, segs) => {
-                const prefix = segs.slice(0, i + 1).join('/');
-                const isCurrent = i === segs.length - 1;
-                return (
-                  <Fragment key={prefix}>
-                    <ChevronRight width={12} height={12} aria-hidden="true" className="flex-none" />
-                    {isCurrent ? (
-                      <span
-                        aria-current="location"
-                        className="px-1 font-mono text-meta text-foreground"
-                      >
-                        {name}
-                      </span>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        className={CRUMB_BTN_CLS}
-                        onClick={() => onNavigateDir(prefix)}
-                      >
-                        {name}
-                      </Button>
-                    )}
-                  </Fragment>
-                );
-              })}
-          </nav>
-        ) : null}
-        {treeLoading ? (
-          <div className={PANE_NOTE_CLS}>{t('加载中…')}</div>
-        ) : treeError ? (
-          <div className={PANE_NOTE_CLS}>{t('文件树读取失败。')}</div>
-        ) : entries.length === 0 ? (
-          <div className={PANE_NOTE_CLS}>{t('此目录为空。')}</div>
-        ) : (
-          entries.map((e) =>
-            e.type === 'tree' ? (
-              <Button
-                key={e.path}
-                variant="ghost"
-                data-tree-entry="folder"
-                className={`prj-file-row ${FILE_ROW_CLS}`}
-                onClick={() => onNavigateDir(e.path)}
-              >
-                <Folder className="size-3.5 text-icon" />
-                <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
-              </Button>
-            ) : (
-              <Button
-                key={e.path}
-                variant="ghost"
-                data-tree-entry="file"
-                aria-current={selectedFile === e.path ? 'true' : undefined}
-                className={`prj-file-row ${FILE_ROW_CLS}${selectedFile === e.path ? ` ${FILE_ROW_ACTIVE_CLS}` : ''}`}
-                onClick={() => onSelectFile(e.path)}
-              >
-                <FileTab className="size-3.5 text-icon" />
-                <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
-              </Button>
-            ),
-          )
-        )}
-      </div>
-    </div>
-  );
-}
 
 export const PROJECT_TASKS_LAYOUT_STORAGE_KEY = 'cairn.projectTasksLayout';
 
@@ -218,30 +80,6 @@ function TaskAvatar({ name, src }: { name?: string | null; src?: string | null }
       <SeededAvatar className="size-5" name={name} src={src} fallback="/avatar-user.png" />
     </span>
   );
-}
-
-type FileViewState =
-  | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'error' }
-  | { kind: 'binary' }
-  | { kind: 'text'; content: string };
-
-function deriveFileView(
-  selected: string | null,
-  live: boolean,
-  fixtureContent: string | null,
-  file: { isError: boolean; data: ProjectFileResponse | undefined },
-): FileViewState {
-  if (selected === null) return { kind: 'idle' };
-  if (!live) {
-    return fixtureContent !== null ? { kind: 'text', content: fixtureContent } : { kind: 'binary' };
-  }
-  if (file.isError) return { kind: 'error' };
-  if (file.data === undefined) return { kind: 'loading' };
-  return file.data.encoding === 'base64'
-    ? { kind: 'binary' }
-    : { kind: 'text', content: file.data.content };
 }
 
 function readStoredLayout(storage: Storage | null): TasksLayout {
@@ -482,84 +320,23 @@ function TasksPane({
   );
 }
 
-export function ProjectPage() {
+export function ProjectTasksPage() {
   const { t } = useI18n();
   const { id } = useParams();
   const navigate = useNavigate();
   const { search } = useLocation();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  const tabParam = searchParams.get('tab');
-  const [chosenTab, setTab] = useState<'tasks' | 'files' | null>(
-    tabParam === 'tasks' || tabParam === 'files' ? tabParam : (fixture.projectTab ?? null),
-  );
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const todosQ = useTodos(teamId, live);
   const wireProject = live ? (projectsQ.data ?? []).find((p) => p.id === id) : undefined;
-  const hostedRepo = live && wireProject?.repoKind === 'hosted';
-  const localRepo = live && wireProject?.repoKind === 'local';
   const isGithubRepoEntry = live && wireProject?.repoKind === 'github';
-  const tab = chosenTab ?? (isGithubRepoEntry ? 'tasks' : 'files');
-  const [dirSel, setDirSel] = useState<{ projectId: string; path: string }>({
-    projectId: '',
-    path: '',
-  });
-  const dirPath = dirSel.projectId === id ? dirSel.path : '';
-  const navigateDir = useCallback((path: string) => setDirSel({ projectId: id ?? '', path }), [id]);
-  const treeQ = useProjectTree(
-    live && (hostedRepo || localRepo) ? id : undefined,
-    hostedRepo ? 'main' : undefined,
-    dirPath === '' ? undefined : dirPath,
-  );
-  const treeLoading =
-    live &&
-    !treeQ.isError &&
-    treeQ.data === undefined &&
-    (projectsQ.isLoading || hostedRepo || localRepo);
-  const project: ProjectContent | undefined = live
-    ? wireProject
-      ? {
-          name: wireProject.name,
-          branch: treeQ.data?.ref ?? 'main',
-          files: [],
-          repoName: wireProject.repoName ?? wireProject.githubRepo ?? '',
-          hosted: wireProject.repoKind === 'hosted',
-          ...(wireProject.repoKind !== undefined ? { repoKind: wireProject.repoKind } : {}),
-          defaultBranch: 'main',
-          description: null,
-        }
-      : undefined
-    : fixture.project;
-  const isLocalRepo = project?.repoKind === 'local';
-  const treeError = live && treeQ.isError && !isLocalRepo;
-  const fileRows: FileTreeRow[] = useMemo(() => {
-    const rows = live
-      ? (treeQ.data?.entries ?? []).map((e) => ({ name: e.name, path: e.path, type: e.type }))
-      : (project?.files ?? []).map((f) => ({ name: f, path: f, type: 'blob' as const }));
-    return rows.sort((a, b) =>
-      a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'tree' ? -1 : 1,
-    );
-  }, [live, treeQ.data, project]);
-  const [fileSel, setFileSel] = useState<{ projectId: string; path: string } | null>(null);
-  const selectedFile = fileSel !== null && fileSel.projectId === id ? fileSel.path : null;
-  const fileQ = useProjectFile(
-    live ? id : undefined,
-    selectedFile ?? undefined,
-    hostedRepo ? 'main' : undefined,
-  );
-  const fixtureFileContent =
-    !live && selectedFile !== null ? (fixture.project?.fileContents?.[selectedFile] ?? null) : null;
-  const fileView = deriveFileView(selectedFile, live, fixtureFileContent, fileQ);
   const todos = live
     ? (todosQ.data ?? []).map(toDisplayTodo).filter((x) => x.projectId === id)
     : fixture.todos.filter((x) => x.projectId === id);
   const openComposer = useOpenComposer();
   const openNewTask = useCallback(() => openComposer(id), [openComposer, id]);
-  const githubFilesUrl =
-    isGithubRepoEntry && wireProject?.githubRepo != null
-      ? `https://github.com/${wireProject.githubRepo}`
-      : null;
   const ghConnQ = useGithubConnection(isGithubRepoEntry ? teamId : undefined, isGithubRepoEntry);
   const ghIssuesAvailable = isGithubRepoEntry && ghConnQ.data?.connected === true;
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -574,16 +351,9 @@ export function ProjectPage() {
   return (
     <PageShell
       route="project"
-      bleed={tab === 'files'}
       fixture={live ? { ...fixture, todos } : fixture}
       selected="none"
-      title={project?.name ?? ''}
-      tabs={[
-        { id: 'tasks', label: '任务' },
-        { id: 'files', label: '文件' },
-      ]}
-      tab={tab}
-      onTab={(next) => setTab(next === 'tasks' ? 'tasks' : 'files')}
+      title={(live ? wireProject?.name : fixture.project?.name) ?? ''}
       actions={
         id === undefined ? undefined : (
           <Button
@@ -597,69 +367,12 @@ export function ProjectPage() {
         )
       }
     >
-      {tab === 'files' && isLocalRepo && treeQ.isError ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 text-ui text-content-tertiary">
-          <span>{t('本地仓库当前无法读取。')}</span>
-          {treeQ.error instanceof ApiError &&
-          treeQ.error.reason !== undefined &&
-          treeQ.error.reason in LOCAL_ERROR_REASON_COPY ? (
-            <span className="text-meta">
-              {t(LOCAL_ERROR_REASON_COPY[treeQ.error.reason as LocalErrorReason])}
-            </span>
-          ) : null}
-        </div>
-      ) : tab === 'files' && isGithubRepoEntry ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center gap-3 text-ui text-content-tertiary">
-          <span>{t('GitHub 仓库项目的文件在 GitHub 上查看')}</span>
-          {githubFilesUrl != null && (
-            <a
-              className="text-primary underline"
-              href={githubFilesUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('打开 GitHub 仓库')}
-            </a>
-          )}
-        </div>
-      ) : tab === 'files' ? (
-        <div className="prj-files flex min-h-0 flex-1">
-          <FilesPane
-            branch={project?.branch ?? 'main'}
-            entries={fileRows}
-            treeLoading={treeLoading}
-            treeError={treeError}
-            dirPath={dirPath}
-            onNavigateDir={navigateDir}
-            selectedFile={selectedFile}
-            onSelectFile={(path) => setFileSel({ projectId: id ?? '', path })}
-          />
-          {fileView.kind === 'text' ? (
-            <div className="block min-w-0 flex-1 overflow-auto px-4 py-3">
-              <pre className="m-0 font-mono text-meta leading-4.5 whitespace-pre text-foreground">
-                {fileView.content}
-              </pre>
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-ui text-content-tertiary">
-              {fileView.kind === 'loading'
-                ? t('加载中…')
-                : fileView.kind === 'error'
-                  ? t('文件加载失败')
-                  : fileView.kind === 'binary'
-                    ? t('二进制文件暂不支持预览')
-                    : t('请选择一个文件查看')}
-            </div>
-          )}
-        </div>
-      ) : (
-        <TasksPane
-          todos={todos}
-          now={live ? Date.now() : fixture.now}
-          onNewTask={openNewTask}
-          {...(ghIssuesAvailable ? { onOpenGithubIssues: () => setIssuesOpen(true) } : {})}
-        />
-      )}
+      <TasksPane
+        todos={todos}
+        now={live ? Date.now() : fixture.now}
+        onNewTask={openNewTask}
+        {...(ghIssuesAvailable ? { onOpenGithubIssues: () => setIssuesOpen(true) } : {})}
+      />
       {ghIssuesAvailable && id !== undefined && (
         <GithubIssuesDialog
           open={issuesOpen}

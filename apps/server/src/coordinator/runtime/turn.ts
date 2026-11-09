@@ -1,8 +1,10 @@
 import {
   type ClaimedStep,
+  contextTokensOf,
   estimateTokens,
   type MachineDoneBody,
   type ModelUsage,
+  type OtelObservation,
 } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage, ModelThinkingLevel } from '@earendil-works/pi-ai';
@@ -19,7 +21,7 @@ import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
 import type { ConversationGate, StepGate } from './tools.js';
 import { emitTurnSpans } from './turn-spans.js';
-import type { VolatileContext } from './volatile.js';
+import type { ColdSlimPlan, VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
 
@@ -36,6 +38,8 @@ export interface TurnDeps {
   conversationGate?: ConversationGate;
   volatile?: VolatileContext;
   volatileText?: string | null;
+  coldSlim?: ColdSlimPlan | null;
+  beforeDone?: () => void;
   onModel?: (ref: ModelRef) => void;
 }
 
@@ -46,7 +50,7 @@ function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): M
     output: 0,
     cacheRead: 0,
     cacheWrite: 0,
-    contextTokens: answer.usage.input + answer.usage.cacheRead + answer.usage.cacheWrite,
+    contextTokens: contextTokensOf(answer.usage),
   };
   for (const entry of entries) {
     const message = entry.model?.[0];
@@ -94,8 +98,10 @@ export async function runCoordinatorTurn(
 ): Promise<MachineDoneBody> {
   const { harness, api, context } = deps;
   const stepId = claimed.step.id;
+  let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
-    await api.done(stepId, body);
+    if (body.status === 'success') deps.beforeDone?.();
+    await api.done(stepId, body, observation);
     return body;
   };
   const provider = claimed.agent?.provider ?? null;
@@ -125,6 +131,7 @@ export async function runCoordinatorTurn(
     deps.conversationGate?.set(rootKey, stepId);
     deps.volatile?.set(rootKey, deps.volatileText ?? null);
     deps.volatile?.setStep(rootKey, stepId);
+    deps.volatile?.setColdSlim(rootKey, deps.coldSlim ?? null);
     let stopping: Promise<void> | null = null;
     let polling = false;
     stopPoll = setInterval(() => {
@@ -208,6 +215,28 @@ export async function runCoordinatorTurn(
         ? []
         : (await root.entries({ minEntryId: settled.entry }, 500, undefined, context)).items;
     await mirror.flush(turnEntries);
+    const ordered = [...turnEntries].sort((a, b) => Number(a.id) - Number(b.id));
+    observation = {
+      input: ordered.flatMap((entry) =>
+        (entry.model ?? [])
+          .filter((message) => message.role === 'user')
+          .map((message) => ({ role: message.role, content: message.content })),
+      ),
+      output: ordered
+        .flatMap((entry) =>
+          (entry.model ?? []).flatMap((message) =>
+            message.role === 'assistant' && message.stopReason !== 'aborted'
+              ? [
+                  {
+                    role: message.role,
+                    content: message.content.filter((block) => block.type === 'text'),
+                  },
+                ]
+              : [],
+          ),
+        )
+        .slice(-1),
+    };
     emitTurnSpans(
       { threadId: claimed.chief.threadId, stepId, provider, model: modelId },
       turnEntries,
@@ -249,6 +278,7 @@ export async function runCoordinatorTurn(
       deps.conversationGate?.set(rootKey, null);
       deps.volatile?.set(rootKey, null);
       deps.volatile?.setStep(rootKey, null);
+      deps.volatile?.setColdSlim(rootKey, null);
     }
     clearInterval(heartbeat);
   }

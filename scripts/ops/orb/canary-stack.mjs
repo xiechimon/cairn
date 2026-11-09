@@ -379,17 +379,22 @@ export async function startStack({
         { signal, timeout: 600000, label: `${executor} runner delivery` },
       );
       const result = JSON.parse(await git(['show', `${branch}:canary-result.json`], repo));
-      const isHook = (entry) =>
-        typeof entry.content === 'string' && entry.content.includes('CAIRN_CANARY_RESULT=');
-      let hook;
+      let hookOutput;
       let before = null;
       do {
         const query = before === null ? '' : `?before=${encodeURIComponent(before)}`;
         const page = await api('GET', `/api/conversations/${buildId}/messages${query}`);
-        hook = page.messages.find(isHook);
+        hookOutput = page.messages
+          .flatMap((entry) => {
+            if (entry.role !== 'system' || typeof entry.content !== 'string') return [];
+            if (!entry.content.startsWith('{')) return [];
+            const row = JSON.parse(entry.content);
+            return row.kind === 'workspace-hook' ? [row.output] : [];
+          })
+          .find((output) => output.includes('CAIRN_CANARY_RESULT='));
         before = page.nextCursor;
-      } while (hook === undefined && before !== null);
-      const noteResult = hook?.content.split('CAIRN_CANARY_RESULT=')[1]?.split('\n')[0];
+      } while (hookOutput === undefined && before !== null);
+      const noteResult = hookOutput?.split('CAIRN_CANARY_RESULT=')[1]?.split('\n')[0];
       if (!noteResult || JSON.stringify(JSON.parse(noteResult)) !== JSON.stringify(result))
         throw new Error('Delivered attacker result does not match the server hook note');
       await stopChild(runnerDaemon, join(checkout, 'apps/daemon'), 'src/cli.ts');

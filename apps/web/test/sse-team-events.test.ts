@@ -32,12 +32,32 @@ describe('team event → invalidation keys', () => {
     expect(keys).toContain('plans/build-1');
   });
 
-  it('notification: three keys verbatim (the desktop-notification side effect is not in the map)', () => {
+  it('notification: board, threads, chief context and Tasks keys verbatim (the desktop-notification side effect is not in the map)', () => {
     const keys = keysOf({
       type: 'notification',
       notification: { id: 'n-1', type: 'plan_ready', entityId: 'todo-7' },
     });
-    expect(keys).toEqual([`notifications/${TEAM}`, `chiefThreads/${TEAM}`, 'todos']);
+    expect(keys).toEqual([
+      `notifications/${TEAM}`,
+      `chiefThreads/${TEAM}`,
+      `chief/${TEAM}`,
+      'todos',
+      `tasks/${TEAM}`,
+    ]);
+  });
+
+  it('every event that refreshes the board also refreshes the Tasks panel read', () => {
+    const events: Record<string, unknown>[] = [
+      { type: 'todo', seq: 1, v: 3, doc: todo(7, 'confirm') },
+      { type: 'build', seq: 2, v: 1, doc: { id: 'build-1', todoId: 'todo-7' } },
+      { type: 'notification', notification: { id: 'n-2', type: 'chief_message', entityId: 'c-1' } },
+      { type: 'machine_presence', machineId: 'm-1', online: false },
+    ];
+    for (const ev of events) {
+      const keys = keysOf(ev);
+      expect(keys).toContain('todos');
+      expect(keys).toContain(`tasks/${TEAM}`);
+    }
   });
 
   it('machine_presence carries board todo invalidation (#1257 suspended-state derived); branch_sync single key as usual', () => {
@@ -46,6 +66,7 @@ describe('team event → invalidation keys', () => {
       `machines/${TEAM}`,
       `computers/${TEAM}`,
       'todos',
+      `tasks/${TEAM}`,
       `model-routing/${TEAM}`,
     ]);
     expect(keysOf({ type: 'branch_sync', sync: { buildId: 'build-1' } })).toEqual([

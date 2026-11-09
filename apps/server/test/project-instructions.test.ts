@@ -208,7 +208,10 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
       machineId: machineIdByName(s, 'rules-chief'),
     });
     const claimed = await claim(token);
-    expect(claimed.agent?.memories?.map((m) => m.title)).toEqual(['team rule']);
+    expect(claimed.agent?.memories).toEqual([
+      { title: 'MEMORY.md', content: '- team rule：commits are English' },
+      { title: '记忆文件', content: '0 个；用 memories 按需读取。' },
+    ]);
   });
 
   test('an unscoped turn carries no project instructions', async () => {

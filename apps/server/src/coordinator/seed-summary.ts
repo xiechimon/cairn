@@ -1,5 +1,5 @@
 import { CHIEF_DIGEST_ROW_ID_PREFIX, CHIEF_REPORT_ROW_ID_PREFIX } from '@cairn/shared';
-import { and, desc, eq, gt, like, lt, ne, not, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, like, lt, ne, not, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, chiefSummary } from '../db/schema.js';
 import { chiefTranscriptLines } from '../services/chief-digest.js';
@@ -11,6 +11,11 @@ const SEED_SUMMARY_MAX_ROWS = 2_000;
 export interface RowPosition {
   at: number;
   rowid: number;
+}
+
+export interface SeedSummaryResult {
+  summary: string;
+  complete: boolean;
 }
 
 const conversational = (threadId: string) =>
@@ -40,10 +45,10 @@ export async function seedSummary(
   summarize: Summarize | null,
   onError: (error: unknown) => void,
   now: number,
-): Promise<string> {
+): Promise<SeedSummaryResult> {
   const prior = db.select().from(chiefSummary).where(eq(chiefSummary.threadId, threadId)).get();
   const previous = prior?.summary ?? '';
-  if (summarize === null || windowStart === null) return previous;
+  if (summarize === null || windowStart === null) return { summary: previous, complete: true };
   const gap = db
     .select({
       id: chiefMessage.id,
@@ -64,30 +69,54 @@ export async function seedSummary(
         strictlyBefore(windowStart),
       ),
     )
-    .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+    .orderBy(asc(chiefMessage.createdAt), sql`rowid asc`)
     .limit(SEED_SUMMARY_MAX_ROWS)
-    .all()
-    .reverse();
-  const through = gap.at(-1);
-  if (through === undefined) return previous;
-  const batches = summaryBatches(chiefTranscriptLines(gap).map((line) => line.text)).slice(
-    -SEED_SUMMARY_MAX_BATCHES,
-  );
-  if (batches.length === 0) return previous;
+    .all();
+  if (gap.length === 0) return { summary: previous, complete: true };
+  const lineTexts = (n: number) => chiefTranscriptLines(gap.slice(0, n)).map((line) => line.text);
+  let chunkEnd = gap.length;
+  if (summaryBatches(lineTexts(chunkEnd)).length > SEED_SUMMARY_MAX_BATCHES) {
+    let lo = 0;
+    let hi = gap.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (summaryBatches(lineTexts(mid)).length <= SEED_SUMMARY_MAX_BATCHES) lo = mid;
+      else hi = mid - 1;
+    }
+    chunkEnd = lo;
+  }
+  const chunk = gap.slice(0, chunkEnd);
+  const through = chunk.at(-1);
+  if (through === undefined) return { summary: previous, complete: false };
+  const batches = summaryBatches(lineTexts(chunkEnd));
+  if (batches.length === 0) return { summary: previous, complete: true };
+  const moreRemain =
+    db
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(
+        and(
+          conversational(threadId),
+          strictlyAfter({ at: through.createdAt, rowid: through.rowid }),
+          strictlyBefore(windowStart),
+        ),
+      )
+      .limit(1)
+      .get() !== undefined;
   let folded: string;
   try {
     folded = await foldSummary(prior?.summary ?? null, batches, summarize);
   } catch (error) {
     onError(error);
-    return previous;
+    return { summary: previous, complete: false };
   }
-  if (folded.trim() === '') return previous;
+  if (folded.trim() === '') return { summary: previous, complete: false };
   const values = {
     summary: folded,
     coveredThroughId: through.id,
     coveredAt: through.createdAt,
     coveredRowid: through.rowid,
-    compactedMessages: (prior?.compactedMessages ?? 0) + gap.length,
+    compactedMessages: (prior?.compactedMessages ?? 0) + chunk.length,
     generation: (prior?.generation ?? 0) + 1,
     updatedAt: now,
   };
@@ -95,5 +124,5 @@ export async function seedSummary(
     .values({ threadId, ...values })
     .onConflictDoUpdate({ target: chiefSummary.threadId, set: values })
     .run();
-  return folded;
+  return { summary: folded, complete: !moreRemain };
 }

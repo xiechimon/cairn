@@ -11,6 +11,7 @@ import type {
   SecretBox,
   StepJournalRow,
   StepKind,
+  StepPromptOrigin,
   StepRecord,
   TriggerSource,
   UserRecord,
@@ -20,7 +21,8 @@ import {
   AGENT_TOOL_PUSH,
   ANSWERS_CONTINUE_PROMPT,
   ASK_USER_QUESTION_KIND,
-  buildFallbackReport,
+  BUILD_FAILURE_ROW_KIND,
+  buildFailureRowContent,
   buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
   buildReplanPrompt,
@@ -57,6 +59,7 @@ import {
   SESSION_REWORK_BRIEF,
   STOP_MESSAGE,
   type StopAttribution,
+  systemRowOf,
   type TodoOutputKind,
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
@@ -406,6 +409,8 @@ export async function sendBuildSteer(
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
   }
+  const afterCommit: (() => void)[] = [];
+  const transcriptDeps = { ...deps, afterCommit };
   let sent: BuildSteerResult;
   try {
     sent = db.transaction((): BuildSteerResult => {
@@ -460,7 +465,7 @@ export async function sendBuildSteer(
             createdAt: now,
           })
           .run();
-        insertMessageRow(deps, targetBuildId, {
+        insertMessageRow(transcriptDeps, targetBuildId, {
           id: newRecordId(),
           role: 'system',
           content:
@@ -475,7 +480,15 @@ export async function sendBuildSteer(
           createdAt: now,
         });
       }
-      if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
+      if (!continuationOptions.schedule)
+        insertMessageRow(
+          transcriptDeps,
+          targetBuildId,
+          messageRow,
+          body.queuedMessageId === undefined
+            ? undefined
+            : { conversationId, messageId: body.queuedMessageId },
+        );
       if (running && !answered) {
         db.insert(steerPending)
           .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
@@ -534,7 +547,7 @@ export async function sendBuildSteer(
               .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
               .where(eq(step.id, continuedStep.id))
               .run();
-            insertMessageRow(deps, targetBuildId, {
+            insertMessageRow(transcriptDeps, targetBuildId, {
               id: `schedule-wake-${continuedStep.id}`,
               role: 'system',
               content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
@@ -563,6 +576,7 @@ export async function sendBuildSteer(
   } catch (error) {
     return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
   }
+  for (const publish of afterCommit) publish();
   const fromUser =
     continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
   if (fromUser && !continuationOptions.schedule) endSnoozeOn(deps, buildRow.todoId, 'user-message');
@@ -1012,6 +1026,7 @@ export function enqueueStep(
   prompt?: string,
   freshSession?: boolean,
   byPerson?: boolean,
+  promptOrigin?: StepPromptOrigin,
 ): StepRecord {
   const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (byPerson !== true && current && retryIsParked(current.errorMessage ?? ''))
@@ -1031,6 +1046,7 @@ export function enqueueStep(
       machineId: null,
       status: 'pending',
       prompt: prompt ?? null,
+      promptOrigin: promptOrigin ?? null,
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
@@ -1103,6 +1119,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
     ...(r.status === 'waiting_quota' && r.quotaBlock !== null
       ? { quotaWait: toQuotaWait(r.quotaBlock) }
       : {}),
+    ...(r.promptOrigin !== null ? { promptOrigin: r.promptOrigin } : {}),
   }));
 }
 
@@ -1233,17 +1250,33 @@ export function maybeEnqueueVerifyStep(
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined) return;
   if (githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (projectRow === undefined) return;
   const planRow = latestPlanRow(deps, buildId);
-  const prompt = buildVerifyStepPrompt({
-    ticketRef: ticketRefOf(todoRow),
-    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
-    planText: planRow?.content ?? '',
-    verificationItems: planVerificationItems(planRow?.content ?? ''),
-    pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
-    expectedHeadSha,
+  deps.db.transaction(() => {
+    deps.db
+      .update(build)
+      .set({ evidenceStore: projectRow.evidenceStore })
+      .where(and(eq(build.id, buildId), isNull(build.evidenceStore)))
+      .run();
+    const snapshot = deps.db
+      .select({ evidenceStore: build.evidenceStore })
+      .from(build)
+      .where(eq(build.id, buildId))
+      .get();
+    if (snapshot?.evidenceStore == null) throw new Error('Verify evidence snapshot unavailable');
+    const prompt = buildVerifyStepPrompt({
+      ticketRef: ticketRefOf(todoRow),
+      taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
+      planText: planRow?.content ?? '',
+      verificationItems: planVerificationItems(planRow?.content ?? ''),
+      pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+      expectedHeadSha,
+      evidenceStore: snapshot.evidenceStore,
+    });
+    insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
+    enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
   });
-  insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
-  enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
 }
 
 const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
@@ -1476,7 +1509,9 @@ export async function applyBuildStepAction(
     const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
     const prClosed: 'merged' | 'closed' | null =
       reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
-    return deps.db.transaction(() => {
+    const afterCommit: (() => void)[] = [];
+    const transcriptDeps = { ...deps, afterCommit };
+    deps.db.transaction(() => {
       const current = getTodo(deps, row.todoId);
       if (
         !current ||
@@ -1503,21 +1538,34 @@ export async function applyBuildStepAction(
         const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
         recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
         if (feedbackText !== null) {
-          insertMessageRow(deps, reworkTarget.id, {
+          insertMessageRow(transcriptDeps, reworkTarget.id, {
             id: newRecordId(),
             role: 'user',
             content: feedbackText,
             createdAt: now,
           });
         }
-        insertMessageRow(deps, reworkTarget.id, {
+        if (
+          reworkTarget.errorMessage !== null &&
+          !hasFailureRow(deps, reworkTarget.id, reworkTarget.errorMessage)
+        ) {
+          insertMessageRow(transcriptDeps, reworkTarget.id, {
+            id: newRecordId(),
+            role: 'system',
+            content: buildFailureRowContent({
+              reason: reworkTarget.errorMessage,
+              pr:
+                reworkTarget.prNumber !== null
+                  ? { number: reworkTarget.prNumber, url: reworkTarget.prUrl }
+                  : null,
+            }),
+            createdAt: now - 1,
+          });
+        }
+        insertMessageRow(transcriptDeps, reworkTarget.id, {
           id: newRecordId(),
           role: 'system',
-          content: buildReworkReuseNote({
-            prNumber: reworkTarget.prNumber,
-            prUrl: reworkTarget.prUrl,
-            failureReason: reworkTarget.errorMessage,
-          }),
+          content: buildReworkReuseNote({ prNumber: reworkTarget.prNumber }),
           createdAt: now,
         });
         const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
@@ -1578,7 +1626,7 @@ export async function applyBuildStepAction(
         })
         .run();
       if (feedbackText !== null) {
-        insertMessageRow(deps, newId, {
+        insertMessageRow(transcriptDeps, newId, {
           id: newRecordId(),
           role: 'user',
           content: feedbackText,
@@ -1586,7 +1634,7 @@ export async function applyBuildStepAction(
         });
       }
       if (prClosed !== null && reworkTarget !== null) {
-        insertMessageRow(deps, newId, {
+        insertMessageRow(transcriptDeps, newId, {
           id: newRecordId(),
           role: 'system',
           content: buildReworkNewBranchNote({
@@ -1617,6 +1665,8 @@ export async function applyBuildStepAction(
       publishBuild(deps, newRow);
       return;
     });
+    for (const publish of afterCommit) publish();
+    return;
   }
 
   if (body.action === 'confirm') {
@@ -1713,6 +1763,7 @@ export async function applyBuildStepAction(
       `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
       false,
       origin === 'person',
+      { kind: 'rework' },
     );
     return;
   }
@@ -2541,7 +2592,7 @@ export function applyStepFailure(
     insertMessageRow(deps, buildRow.id, {
       id: newRecordId(),
       role: 'system',
-      content: buildFallbackReport({
+      content: buildFailureRowContent({
         reason: errorMessage,
         ...(preservedCommits !== undefined ? { commits: preservedCommits } : {}),
         ...(files !== undefined ? { files } : {}),
@@ -2947,19 +2998,22 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
   }
 }
 
-const ZERO_CHANGE_EXCERPT_MAX = 1_200;
+const UNDELIVERED_EXCERPT_MAX = 1_200;
 
-function endedWithoutChanges(
+type Undelivered = 'no-commits' | 'no-pr';
+
+function undeliveredEnd(
+  deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   todoRow: TodoRow,
+  buildRow: BuildRow,
   outcome: { hasChanges?: boolean; workBranchDrift?: unknown },
-): boolean {
-  return (
-    isBuildStepKind(stepRow.kind) &&
-    todoRow.output !== 'info' &&
-    outcome.hasChanges === false &&
-    outcome.workBranchDrift === undefined
-  );
+): Undelivered | null {
+  if (!isBuildStepKind(stepRow.kind) || todoRow.output === 'info') return null;
+  if (outcome.workBranchDrift !== undefined) return null;
+  if (outcome.hasChanges === false) return 'no-commits';
+  const githubProject = githubRepoOfProject(projectOfTodo(deps.db, todoRow)) !== null;
+  return githubProject && buildRow.prNumber === null ? 'no-pr' : null;
 }
 
 function spokenText(content: unknown): string {
@@ -2972,6 +3026,18 @@ function spokenText(content: unknown): string {
       return type === 'text' && typeof text === 'string' ? [text] : [];
     })
     .join('\n');
+}
+
+function hasFailureRow(deps: BuildDeps, buildId: string, reason: string): boolean {
+  return deps.db
+    .select({ content: message.content })
+    .from(message)
+    .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
+    .all()
+    .some((row) => {
+      const parsed = systemRowOf(row.content);
+      return parsed?.kind === BUILD_FAILURE_ROW_KIND && parsed.reason === reason;
+    });
 }
 
 function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {
@@ -2988,18 +3054,31 @@ function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {
   return null;
 }
 
-function askAboutZeroChangeOnce(deps: BuildDeps, buildId: string): void {
-  const last = lastAgentMessage(deps, buildId);
-  const excerpt =
-    last === null
-      ? '(the agent left no message)'
-      : last.length > ZERO_CHANGE_EXCERPT_MAX
-        ? `${last.slice(0, ZERO_CHANGE_EXCERPT_MAX - 1)}…`
-        : last;
-  const requestId = `no-change-${buildId}`;
+function excerptOf(text: string | null, missing: string): string {
+  if (text === null || text.trim() === '') return missing;
+  return text.length > UNDELIVERED_EXCERPT_MAX
+    ? `${text.slice(0, UNDELIVERED_EXCERPT_MAX - 1)}…`
+    : text;
+}
+
+const UNDELIVERED_SUMMARY: Record<Undelivered, string> = {
+  'no-commits': 'The step ended without committing anything.',
+  'no-pr': 'The step ended without opening a pull request.',
+};
+
+function askUndeliveredOnce(deps: BuildDeps, buildRow: BuildRow, kind: Undelivered): void {
+  const asked = deps.db
+    .select({ id: message.id })
+    .from(message)
+    .where(inArray(message.id, [`no-deliverable-${buildRow.id}`, `no-change-${buildRow.id}`]))
+    .get();
+  if (asked !== undefined) return;
+  const reportLine = excerptOf(buildRow.reportLine, '(no report line)');
+  const last = excerptOf(lastAgentMessage(deps, buildRow.id), '(the agent left no message)');
+  const requestId = `no-deliverable-${buildRow.id}`;
   writeWorkerQuestion(
     deps,
-    buildId,
+    buildRow.id,
     requestId,
     {
       kind: ASK_USER_QUESTION_KIND,
@@ -3007,8 +3086,8 @@ function askAboutZeroChangeOnce(deps: BuildDeps, buildId: string): void {
       status: 'pending',
       questions: [
         {
-          header: 'No changes',
-          question: `The step ended without committing anything. The agent's last message:\n${excerpt}\nAnswer with what it should do next, or say the task needs no code change.`,
+          header: 'Not delivered',
+          question: `Report line: ${reportLine}\n${UNDELIVERED_SUMMARY[kind]} The agent's last message:\n${last}\nAnswer with what is missing and who supplies it, or say what the task should deliver instead.`,
           options: [],
         },
       ],
@@ -3079,11 +3158,9 @@ export function completeStep(
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
-  if (
-    endedWithoutChanges(stepRow, todoRow, outcome) &&
-    pendingWorkerQuestions(deps.db, buildRow.id).length === 0
-  )
-    askAboutZeroChangeOnce(deps, buildRow.id);
+  const undelivered = undeliveredEnd(deps, stepRow, todoRow, buildRow, outcome);
+  if (undelivered !== null && pendingWorkerQuestions(deps.db, buildRow.id).length === 0)
+    askUndeliveredOnce(deps, buildRow, undelivered);
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
   const gateFailure = stepArtifactGate(
     deps,

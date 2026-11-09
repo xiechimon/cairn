@@ -65,6 +65,107 @@ afterEach(() => {
   agentTodoStore.clear(CONV);
 });
 
+describe('confirmed user message visibility', () => {
+  it('hands a source-stream rollover confirmation to the target cache before subscribing there', () => {
+    const qc = freshClient();
+    const onMessage = vi.fn();
+    const delivered = { id: 'delivered-rollover', role: 'user', content: 'Identical words', createdAt: 5 };
+    const keep = { id: 'keep-queued', content: delivered.content, createdAt: 2 };
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null, queuedMessages: [{ ...keep, id: 'source-queued' }, keep] };
+    qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
+    const stopSource = startConversationStream(CONV, qc, { onMessage });
+    const source = FakeEventSource.instances.at(-1)!;
+    source.fireOpen();
+    const event = { type: 'message', conversationId: 'replacement-build', message: delivered, deliveredQueue: { conversationId: CONV, messageId: 'source-queued' } };
+    source.push(event);
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toMatchObject({ pages: [{ messages: [], queuedMessages: [keep] }] });
+    expect(qc.getQueryData(['messages', 'replacement-build', 'pages'])).toMatchObject({ pages: [{ messages: [delivered] }] });
+    expect(onMessage).toHaveBeenCalledWith(delivered);
+    const stopTarget = startConversationStream('replacement-build', qc, {});
+    const target = FakeEventSource.instances.at(-1)!;
+    target.fireOpen();
+    target.push({ type: 'message', message: delivered, deliveredQueue: event.deliveredQueue });
+    source.push(event);
+    expect(qc.getQueryData(['messages', 'replacement-build', 'pages'])).toMatchObject({ pages: [{ messages: [delivered] }] });
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toMatchObject({ pages: [{ messages: [], queuedMessages: [keep] }] });
+    stopSource();
+    stopTarget();
+    qc.clear();
+  });
+
+  it.each([CONV, 'replacement-build'])('correlates automatic queue delivery into %s by identity, not equal content', (target) => {
+    const qc = freshClient();
+    const delivered = { id: 'delivered', role: 'user', content: 'Identical words', createdAt: 5 };
+    const keep = { id: 'keep-queued', content: delivered.content, createdAt: 2 };
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null, queuedMessages: [{ ...keep, id: 'source-queued' }, keep] };
+    qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
+    const stop = startConversationStream(target, qc, {});
+    const es = FakeEventSource.instances.at(-1) as FakeEventSource;
+    es.fireOpen();
+    const event = { type: 'message', message: delivered, deliveredQueue: { conversationId: CONV, messageId: 'source-queued' } };
+    es.push(event);
+    es.push(event);
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toMatchObject({ pages: [{ queuedMessages: [keep] }] });
+    expect(qc.getQueryData(['messages', target, 'pages'])).toMatchObject({ pages: [{ messages: [delivered] }] });
+    stop();
+    qc.clear();
+  });
+
+  it('keeps queued messages out of the delivered transcript and updates the capsule once', () => {
+    const qc = freshClient();
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+    qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
+    const es = startStream(qc);
+    const message = { id: 'queued-1', role: 'user', content: 'Wait for the current turn', createdAt: 3, deliverAfterStop: false };
+    es.push({ type: 'message', message });
+    es.push({ type: 'message', message });
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toEqual({
+      pages: [{ ...envelope, queuedMessages: [{ id: message.id, content: message.content, createdAt: 3 }] }],
+      pageParams: [null],
+    });
+    qc.clear();
+  });
+
+  it('does not let a pre-confirmation read erase a received message', async () => {
+    const qc = freshClient();
+    const key = ['messages', CONV, 'pages'];
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+    const initial = { pages: [envelope], pageParams: [null] };
+    qc.setQueryData(key, initial);
+    let finish = (_value: typeof initial) => {};
+    const read = qc.fetchQuery({ queryKey: key, queryFn: () => new Promise<typeof initial>((resolve) => { finish = resolve; }) }).catch(() => undefined);
+    const es = startStream(qc);
+    const message = { id: 'new-user', role: 'user', content: 'Keep my confirmation', createdAt: 3 };
+    es.push({ type: 'message', message });
+    finish(initial);
+    await read;
+    expect(qc.getQueryData(key)).toEqual({ pages: [{ ...envelope, messages: [message] }], pageParams: [null] });
+    qc.clear();
+  });
+
+  it.each(['chief-t-740', 'build-740'])('shows %s events before a transcript read and deduplicates replay', (id) => {
+    const qc = freshClient();
+    const message = { id: 'user-740', role: 'user', content: 'Show this now', createdAt: 3 };
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+    const older = { ...envelope, messages: [{ ...message, id: 'older', createdAt: 1 }] };
+    qc.setQueryData(['messages', id, 'pages'], {
+      pages: [{ ...envelope, nextCursor: 'older' }, older],
+      pageParams: [null, 'older'],
+    });
+    const stop = startConversationStream(id, qc, {});
+    const es = FakeEventSource.instances.at(-1) as FakeEventSource;
+    es.fireOpen();
+    es.push({ type: 'message', message });
+    es.push({ type: 'message', message });
+    expect(qc.getQueryData(['messages', id, 'pages'])).toEqual({
+      pages: [{ ...envelope, messages: [message], nextCursor: 'older' }, older],
+      pageParams: [null, 'older'],
+    });
+    stop();
+    qc.clear();
+  });
+});
+
 describe('clear on entry: a replay is a snapshot (failure mode 1)', () => {
   it('stale buffer from before the subscription is cleared before the first event can arrive', () => {
 
@@ -130,6 +231,19 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
     const keys = invalidate.mock.calls.map(([filters]) => filters as { queryKey?: string[] });
     expect(keys.some((f) => f.queryKey?.[0] === 'messages')).toBe(true);
     expect(keys.some((f) => f.queryKey?.[0] === 'plans')).toBe(true);
+  });
+
+  it('a Coordinator message refreshes the Tasks read, where its questions are listed', () => {
+    const qc = freshClient();
+    const invalidate = vi.spyOn(qc, 'invalidateQueries');
+    const es = startStream(qc);
+    es.push({
+      type: 'message',
+      message: { id: 'm-q', role: 'assistant', content: 'question', createdAt: 1 },
+    });
+
+    const keys = invalidate.mock.calls.map(([filters]) => filters as { queryKey?: string[] });
+    expect(keys.some((f) => f.queryKey?.[0] === 'tasks')).toBe(true);
   });
 
   it('message event (tool row): does not record handoff, buffer kept', () => {

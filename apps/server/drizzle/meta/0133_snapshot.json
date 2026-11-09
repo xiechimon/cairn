@@ -1,8 +1,8 @@
 {
-  "id": "69b5c8c3-067f-4f56-84f9-9dc26026df03",
-  "prevId": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
   "version": "6",
   "dialect": "sqlite",
+  "id": "cde508aa-38fa-437f-8811-63ece2f18800",
+  "prevId": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
   "tables": {
     "agent_memory": {
       "name": "agent_memory",
@@ -232,15 +232,15 @@
         "api_key_teamId_team_id_fk": {
           "name": "api_key_teamId_team_id_fk",
           "tableFrom": "api_key",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -348,15 +348,15 @@
         "attachment_teamId_team_id_fk": {
           "name": "attachment_teamId_team_id_fk",
           "tableFrom": "attachment",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -522,15 +522,15 @@
         "autonomy_pause_teamId_team_id_fk": {
           "name": "autonomy_pause_teamId_team_id_fk",
           "tableFrom": "autonomy_pause",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -588,15 +588,15 @@
         "autonomy_state_projectId_project_id_fk": {
           "name": "autonomy_state_projectId_project_id_fk",
           "tableFrom": "autonomy_state",
+          "tableTo": "project",
           "columnsFrom": [
             "projectId"
           ],
-          "tableTo": "project",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -713,41 +713,41 @@
         "branch_sync_buildId_build_id_fk": {
           "name": "branch_sync_buildId_build_id_fk",
           "tableFrom": "branch_sync",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "branch_sync_machineId_machine_id_fk": {
           "name": "branch_sync_machineId_machine_id_fk",
           "tableFrom": "branch_sync",
+          "tableTo": "machine",
           "columnsFrom": [
             "machineId"
           ],
-          "tableTo": "machine",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "branch_sync_teamId_team_id_fk": {
           "name": "branch_sync_teamId_team_id_fk",
           "tableFrom": "branch_sync",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -889,15 +889,15 @@
         "build_todoId_todo_id_fk": {
           "name": "build_todoId_todo_id_fk",
           "tableFrom": "build",
+          "tableTo": "todo",
           "columnsFrom": [
             "todoId"
           ],
-          "tableTo": "todo",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -977,15 +977,15 @@
         "build_feedback_buildId_build_id_fk": {
           "name": "build_feedback_buildId_build_id_fk",
           "tableFrom": "build_feedback",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1036,15 +1036,15 @@
         "build_outcome_backfill_buildId_build_id_fk": {
           "name": "build_outcome_backfill_buildId_build_id_fk",
           "tableFrom": "build_outcome_backfill",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1126,15 +1126,15 @@
         "chief_teamId_team_id_fk": {
           "name": "chief_teamId_team_id_fk",
           "tableFrom": "chief",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1192,15 +1192,15 @@
         "chief_message_threadId_chief_thread_id_fk": {
           "name": "chief_message_threadId_chief_thread_id_fk",
           "tableFrom": "chief_message",
+          "tableTo": "chief_thread",
           "columnsFrom": [
             "threadId"
           ],
-          "tableTo": "chief_thread",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1502,8 +1502,8 @@
           "columns": [
             "chiefId"
           ],
-          "where": "\"chief_thread\".\"archivedAt\" is null and \"chief_thread\".\"id\" not like 'chief-digest-%'",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"chief_thread\".\"archivedAt\" is null and \"chief_thread\".\"id\" not like 'chief-digest-%'"
         }
       },
       "foreignKeys": {},
@@ -1663,15 +1663,15 @@
         "claude_subscription_teamId_team_id_fk": {
           "name": "claude_subscription_teamId_team_id_fk",
           "tableFrom": "claude_subscription",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1785,28 +1785,28 @@
         "composer_draft_teamId_team_id_fk": {
           "name": "composer_draft_teamId_team_id_fk",
           "tableFrom": "composer_draft",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "composer_draft_userId_user_id_fk": {
           "name": "composer_draft_userId_user_id_fk",
           "tableFrom": "composer_draft",
+          "tableTo": "user",
           "columnsFrom": [
             "userId"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1978,28 +1978,28 @@
         "computer_teamId_team_id_fk": {
           "name": "computer_teamId_team_id_fk",
           "tableFrom": "computer",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "computer_machineId_machine_id_fk": {
           "name": "computer_machineId_machine_id_fk",
           "tableFrom": "computer",
+          "tableTo": "machine",
           "columnsFrom": [
             "machineId"
           ],
-          "tableTo": "machine",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2197,41 +2197,41 @@
         "computer_call_teamId_team_id_fk": {
           "name": "computer_call_teamId_team_id_fk",
           "tableFrom": "computer_call",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "computer_call_machineId_machine_id_fk": {
           "name": "computer_call_machineId_machine_id_fk",
           "tableFrom": "computer_call",
+          "tableTo": "machine",
           "columnsFrom": [
             "machineId"
           ],
-          "tableTo": "machine",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "computer_call_computerId_computer_id_fk": {
           "name": "computer_call_computerId_computer_id_fk",
           "tableFrom": "computer_call",
+          "tableTo": "computer",
           "columnsFrom": [
             "computerId"
           ],
-          "tableTo": "computer",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2392,6 +2392,49 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "deploy_lease": {
+      "name": "deploy_lease",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "deploy_lease_status": {
+          "name": "deploy_lease_status",
+          "value": "\"deploy_lease\".\"status\" in ('accepting', 'draining')"
+        }
+      }
+    },
     "due_event": {
       "name": "due_event",
       "columns": {
@@ -2498,8 +2541,8 @@
           "columns": [
             "key"
           ],
-          "where": "\"feature_flag\".\"userId\" IS NULL",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"feature_flag\".\"userId\" IS NULL"
         },
         "feature_flag_key_user_unique": {
           "name": "feature_flag_key_user_unique",
@@ -2507,23 +2550,23 @@
             "key",
             "userId"
           ],
-          "where": "\"feature_flag\".\"userId\" IS NOT NULL",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"feature_flag\".\"userId\" IS NOT NULL"
         }
       },
       "foreignKeys": {
         "feature_flag_userId_user_id_fk": {
           "name": "feature_flag_userId_user_id_fk",
           "tableFrom": "feature_flag",
+          "tableTo": "user",
           "columnsFrom": [
             "userId"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2603,28 +2646,28 @@
         "feishu_binding_teamId_team_id_fk": {
           "name": "feishu_binding_teamId_team_id_fk",
           "tableFrom": "feishu_binding",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "feishu_binding_userId_user_id_fk": {
           "name": "feishu_binding_userId_user_id_fk",
           "tableFrom": "feishu_binding",
+          "tableTo": "user",
           "columnsFrom": [
             "userId"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2696,15 +2739,15 @@
         "gate_digest_buildId_build_id_fk": {
           "name": "gate_digest_buildId_build_id_fk",
           "tableFrom": "gate_digest",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -2819,15 +2862,15 @@
         "gate_round_buildId_build_id_fk": {
           "name": "gate_round_buildId_build_id_fk",
           "tableFrom": "gate_round",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2892,15 +2935,15 @@
         "gate_state_buildId_build_id_fk": {
           "name": "gate_state_buildId_build_id_fk",
           "tableFrom": "gate_state",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2987,15 +3030,15 @@
         "gate_verdict_buildId_build_id_fk": {
           "name": "gate_verdict_buildId_build_id_fk",
           "tableFrom": "gate_verdict",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3081,15 +3124,15 @@
         "github_connection_teamId_team_id_fk": {
           "name": "github_connection_teamId_team_id_fk",
           "tableFrom": "github_connection",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3256,15 +3299,15 @@
         "harness_profile_teamId_team_id_fk": {
           "name": "harness_profile_teamId_team_id_fk",
           "tableFrom": "harness_profile",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3399,15 +3442,15 @@
         "machine_teamId_team_id_fk": {
           "name": "machine_teamId_team_id_fk",
           "tableFrom": "machine",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3812,15 +3855,15 @@
         "paired_device_teamId_team_id_fk": {
           "name": "paired_device_teamId_team_id_fk",
           "tableFrom": "paired_device",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3887,15 +3930,15 @@
         "plan_buildId_build_id_fk": {
           "name": "plan_buildId_build_id_fk",
           "tableFrom": "plan",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4031,15 +4074,15 @@
         "project_teamId_team_id_fk": {
           "name": "project_teamId_team_id_fk",
           "tableFrom": "project",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4156,15 +4199,15 @@
         "provider_teamId_team_id_fk": {
           "name": "provider_teamId_team_id_fk",
           "tableFrom": "provider",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4439,15 +4482,15 @@
         "queued_message_conversationId_build_id_fk": {
           "name": "queued_message_conversationId_build_id_fk",
           "tableFrom": "queued_message",
+          "tableTo": "build",
           "columnsFrom": [
             "conversationId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4729,28 +4772,28 @@
         "routing_rule_teamId_team_id_fk": {
           "name": "routing_rule_teamId_team_id_fk",
           "tableFrom": "routing_rule",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "routing_rule_machineId_machine_id_fk": {
           "name": "routing_rule_machineId_machine_id_fk",
           "tableFrom": "routing_rule",
+          "tableTo": "machine",
           "columnsFrom": [
             "machineId"
           ],
-          "tableTo": "machine",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4909,15 +4952,15 @@
         "schedule_teamId_team_id_fk": {
           "name": "schedule_teamId_team_id_fk",
           "tableFrom": "schedule",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5012,15 +5055,15 @@
         "schedule_report_projectId_project_id_fk": {
           "name": "schedule_report_projectId_project_id_fk",
           "tableFrom": "schedule_report",
+          "tableTo": "project",
           "columnsFrom": [
             "projectId"
           ],
-          "tableTo": "project",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5078,28 +5121,28 @@
         "secret_teamId_team_id_fk": {
           "name": "secret_teamId_team_id_fk",
           "tableFrom": "secret",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "secret_projectId_project_id_fk": {
           "name": "secret_projectId_project_id_fk",
           "tableFrom": "secret",
+          "tableTo": "project",
           "columnsFrom": [
             "projectId"
           ],
-          "tableTo": "project",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5528,15 +5571,15 @@
         "step_route_teamId_team_id_fk": {
           "name": "step_route_teamId_team_id_fk",
           "tableFrom": "step_route",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5635,15 +5678,15 @@
         "tag_projectId_project_id_fk": {
           "name": "tag_projectId_project_id_fk",
           "tableFrom": "tag",
+          "tableTo": "project",
           "columnsFrom": [
             "projectId"
           ],
-          "tableTo": "project",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5694,15 +5737,15 @@
         "task_issue_close_teamId_team_id_fk": {
           "name": "task_issue_close_teamId_team_id_fk",
           "tableFrom": "task_issue_close",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6100,41 +6143,41 @@
         "thread_pr_teamId_team_id_fk": {
           "name": "thread_pr_teamId_team_id_fk",
           "tableFrom": "thread_pr",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "thread_pr_threadId_todo_id_fk": {
           "name": "thread_pr_threadId_todo_id_fk",
           "tableFrom": "thread_pr",
+          "tableTo": "todo",
           "columnsFrom": [
             "threadId"
           ],
-          "tableTo": "todo",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "thread_pr_buildId_build_id_fk": {
           "name": "thread_pr_buildId_build_id_fk",
           "tableFrom": "thread_pr",
+          "tableTo": "build",
           "columnsFrom": [
             "buildId"
           ],
-          "tableTo": "build",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6401,28 +6444,28 @@
         "todo_teamId_team_id_fk": {
           "name": "todo_teamId_team_id_fk",
           "tableFrom": "todo",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "todo_projectId_project_id_fk": {
           "name": "todo_projectId_project_id_fk",
           "tableFrom": "todo",
+          "tableTo": "project",
           "columnsFrom": [
             "projectId"
           ],
-          "tableTo": "project",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6452,28 +6495,28 @@
         "todo_tag_todoId_todo_id_fk": {
           "name": "todo_tag_todoId_todo_id_fk",
           "tableFrom": "todo_tag",
+          "tableTo": "todo",
           "columnsFrom": [
             "todoId"
           ],
-          "tableTo": "todo",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "todo_tag_tagId_tag_id_fk": {
           "name": "todo_tag_tagId_tag_id_fk",
           "tableFrom": "todo_tag",
+          "tableTo": "tag",
           "columnsFrom": [
             "tagId"
           ],
-          "tableTo": "tag",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -6713,15 +6756,15 @@
         "work_policy_teamId_team_id_fk": {
           "name": "work_policy_teamId_team_id_fk",
           "tableFrom": "work_policy",
+          "tableTo": "team",
           "columnsFrom": [
             "teamId"
           ],
-          "tableTo": "team",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6732,9 +6775,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}

@@ -8,7 +8,7 @@ import { claimStep } from '../src/services/machines.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { applyQuotaWaitStep, sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
-import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { req, seedSessionRoute } from './helpers.js';
 
 registerChiefHarness();
@@ -16,9 +16,7 @@ registerChiefHarness();
 async function create(over: Record<string, unknown> = {}): Promise<string> {
   seedSessionRoute(H.s);
   const out = (await relay('create_todo', {
-    projectId: H.projectId,
-    title: `Task ${Math.random().toString(36).slice(2, 6)}`,
-    spec: 'Do the work.',
+    ...ownerTodo('Do the work.'),
     ...over,
   })) as { id: string };
   return out.id;
@@ -89,6 +87,20 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     releaseBlockedSteps(toolDeps());
     expect(sessions(id)[0]?.holdReason).toBeNull();
     expect(sessions(id)[0]?.holdUntil).toBeNull();
+  });
+
+  test('dependsOn and blockedBy both hold the automatically started session', async () => {
+    const first = await create();
+    const second = await create();
+    const id = await create({ dependsOn: [first], blockedBy: [second, first] });
+    expect(row(id).blockedBy).toEqual([first, second]);
+    expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+    finish(first, 'done');
+    releaseBlockedSteps(toolDeps());
+    expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+    finish(second, 'done');
+    releaseBlockedSteps(toolDeps());
+    expect(sessions(id)[0]?.holdReason).toBeNull();
   });
 
   test('update_todo adds an edge and holds the pending session', async () => {
@@ -327,6 +339,19 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       .all();
     expect(wakes).toHaveLength(1);
     expect(wakes[0]?.prompt).toContain(`#${row(blocker).seqNum}`);
+  });
+
+  test('an ended blocked-task wake hands the unchanged task to the owner', async () => {
+    const blocker = await create();
+    const id = await create({ blockedBy: [blocker] });
+    finish(blocker, 'failed');
+    reconcileOwners(toolDeps());
+    const turn = row(id).coordinatorTurn;
+    expect(turn).not.toBeNull();
+    H.s.db.update(step).set({ status: 'done' }).where(eq(step.id, turn!.stepId)).run();
+    reconcileOwners(toolDeps());
+    expect(getTodo(toolDeps(), id)?.owner).toBe('owner');
+    expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
   });
 
   test('the Coordinator dropping the edge releases the task', async () => {

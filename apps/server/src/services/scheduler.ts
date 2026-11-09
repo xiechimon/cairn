@@ -50,6 +50,7 @@ import {
   type IssueIntakeLogger,
 } from './issue-intake.js';
 import { sweepStaleMachines } from './machines.js';
+import { purgeExpiredMemoryVersions } from './memory.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { reconcileOwners } from './owner.js';
@@ -549,6 +550,7 @@ export function createScheduler(
           now,
         );
         sweepIdleComposerDrafts(deps.db, now);
+        purgeExpiredMemoryVersions(deps.db, now);
         advanceGc();
         sweepStepSessions(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },

@@ -7,6 +7,19 @@ import { scheduleOnce } from './schedules.js';
 
 export const HOME_C_CRED = 'home-c-cred';
 
+const SERVER_SECTION: Record<TodoRecord['phase'], Pick<TodoRecord, 'section' | 'owner'>> = {
+  todo: { section: 'up_next', owner: null },
+  queued: { section: 'working', owner: null },
+  planning: { section: 'working', owner: null },
+  building: { section: 'working', owner: null },
+  confirm: { section: 'needs_input', owner: 'owner' },
+  needs_input: { section: 'needs_input', owner: 'owner' },
+  review: { section: 'ready_for_review', owner: 'owner' },
+  failed: { section: 'working', owner: 'coordinator' },
+  done: { section: 'resolved', owner: null },
+  closed: { section: 'resolved', owner: null },
+};
+
 function homeTodo(
   id: string,
   seqNum: number,
@@ -22,6 +35,7 @@ function homeTodo(
     spec: title,
     projectId,
     latestBuildId: phase === 'todo' ? null : `build-${id}`,
+    ...SERVER_SECTION[phase],
   };
 }
 
@@ -44,6 +58,14 @@ const conversation: ChiefContent = {
       id: 'home-c-reply-orb',
       seconds: '',
       paragraphs: [[{ text: 'Round 6 found no /work in the orb; fixed, round 7 is running.' }]],
+    },
+    {
+      kind: 'task-card',
+      id: 'home-c-card-orb',
+      todoId: 'home-c-working-c',
+      projectId: HOME_C_CRED,
+      seq: 75,
+      title: 'Orb canary round 7',
     },
     {
       kind: 'question',
@@ -81,8 +103,16 @@ const conversation: ChiefContent = {
       createdAt: r7(20, 5) + 4 * 60_000,
       paragraphs: [[{ text: 'Started it; the PR is up for your review.' }]],
     },
+    {
+      kind: 'task-card',
+      id: 'home-c-card-fold',
+      todoId: 'home-c-review',
+      projectId: PROJECT_ID,
+      seq: 2271,
+      title: 'Fold finished turns into purpose and duration',
+    },
   ],
-  streamAt: [r7(20, 0), r7(20, 1), r7(20, 1), r7(20, 5), r7(20, 6)],
+  streamAt: [r7(20, 0), r7(20, 1), r7(20, 1), r7(20, 1), r7(20, 5), r7(20, 6), r7(20, 6)],
 };
 
 export const homeC: FixtureSet = {

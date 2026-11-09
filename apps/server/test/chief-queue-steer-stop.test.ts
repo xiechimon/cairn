@@ -373,7 +373,7 @@ describe('steer (T5): `现在插话`', () => {
     });
     const queued = ((await res.json()) as { message: { id: string } }).message.id;
     expect((await w.steer(queued)).status).toBe(200);
-    expect(await w.fetchSteer(running!.step.id)).toBe(
+    expect(await w.fetchSteer(running!.step.id)).toContain(
       `【输入框选定项目：queue-proj（id: ${w.projectId}）】\n改一下按钮`,
     );
   });
@@ -492,13 +492,11 @@ describe('stop (T5)', () => {
     const running = await w.claim();
     const created = await w.relay(running!.step.id, 'create_todo', {
       projectId: w.projectId,
-      title: '修复看板计数',
-      spec: '> 把看板计数修一下',
     });
     await w.reportTool(running!.step.id, {
       id: 'call-create',
       name: 'create_todo',
-      arguments: { projectId: w.projectId, title: '修复看板计数' },
+      arguments: { projectId: w.projectId },
       result: JSON.stringify(created),
       startedAt: Date.now(),
       endedAt: Date.now(),
@@ -508,7 +506,7 @@ describe('stop (T5)', () => {
     const note = w.messages().find((m) => m.id === `chief-stop-${running!.step.id}`);
     expect(JSON.parse(note!.content as string)).toEqual({
       kind: 'chief_turn_stopped',
-      todos: [{ id: created.id, seq: created.seqNum, title: '修复看板计数' }],
+      todos: [{ id: created.id, seq: created.seqNum, title: '把看板计数修一下' }],
     });
   });
 

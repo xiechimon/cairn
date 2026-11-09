@@ -59,6 +59,8 @@ export const EN: Record<string, string> = {
   '改了 {n} 个文件': 'Edited {n#1 file|# files}',
   '推送 {n} 次': 'Pushed {n#once|# times}',
   '调用 {n} 个工具': 'Called {n#1 tool|# tools}',
+  准备了工作区: 'Prepared the workspace',
+  正在准备工作区: 'Preparing the workspace',
   正在思考: 'Thinking',
   '正在读 {n} 个文件': 'Reading {n#1 file|# files}',
   '正在搜索 {n} 次': 'Searching {n#once|# times}',
@@ -76,13 +78,23 @@ export const EN: Record<string, string> = {
   修改了: 'Edited',
   推送了: 'Pushed',
   调用了: 'Called',
+  准备了: 'Prepared',
   正在读取: 'Reading',
   正在搜索: 'Searching',
   正在运行: 'Running',
   正在修改: 'Editing',
+  正在准备: 'Preparing',
   '已加载 {n} 个技能': 'Skills loaded: {n}',
   '还有 {n} 行': '{n## more line|# more lines}',
   无输出: 'No output',
+  '本步异常结束：{reason}': 'This step ended abnormally: {reason}',
+  '改动 {n} 个文件': 'Changed {n#1 file|# files}',
+  '提交 {shas}': 'Commit {shas}',
+  'PR #{n}': 'PR #{n}',
+  '未开 PR': 'No PR',
+  'git 凭据': 'git credentials',
+  'integration：每步下发的 token': 'integration: a token issued for each step',
+  'machine：执行机本机的 git 凭据': "machine: the executor machine's own git credentials",
   未完成: 'Not finished',
 
   // —— shared chrome / sidebar (r2 §1.1) ——
@@ -100,6 +112,9 @@ export const EN: Record<string, string> = {
   '{n} 项待你处理': '{n} waiting on you',
   换项目: 'Move project',
   已转给任务: 'Passed to task',
+  已建任务: 'Created task',
+  '{n} 次更新': 'updates: {n}',
+  '最新：{line}': 'Latest: {line}',
   '任务 #{n} {title}：{status}': 'Task #{n} {title}: {status}',
   审阅中: 'In review',
   '已完成，未验证': 'Done, not verified',
@@ -186,8 +201,6 @@ export const EN: Record<string, string> = {
   目前用团队密钥: 'Team secrets for now',
   目前跟随机器上限: 'Machine limits for now',
   保存项目说明: 'Save instructions',
-  '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':
-    'Every thread and the Coordinator read these in this project, after the repository AGENTS.md.',
   '例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。':
     'For example: repository content is English; run pnpm lint after changes; never force push.',
   '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
@@ -209,14 +222,18 @@ export const EN: Record<string, string> = {
   '{n} 分': '{n}m',
   '{n} 小时': '{n}h',
   '{n} 天': '{n}d',
-  已归档: 'Archived',
   归档: 'Archive',
   '{name} 的菜单': '{name} menu',
   '无法归档项目。': 'Could not archive the project.',
-  '无法取消归档项目。': 'Could not unarchive the project.',
+  '无法移动项目。': 'Could not move the project.',
+  有任务在等你: 'A task is waiting on you',
+  '{name}：有任务在等你': '{name}: A task is waiting on you',
+  移到分组: 'Move to group',
+  新建分组: 'New group',
+  移出分组: 'Remove from group',
+  分组名称: 'Group name',
+  移入: 'Move',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
-  需要你: 'Needs you',
-  在跑: 'Running',
   看板: 'Board',
   技能: 'Skills',
   密钥: 'Secrets',
@@ -245,8 +262,6 @@ export const EN: Record<string, string> = {
   执行中: 'Running',
   已完成: 'Done',
   暂无: 'None',
-  // Paper card footer (DESIGN.md 任务卡): needs-you state flag + action link
-  待确认: 'Plan to confirm',
   审阅: 'Review',
   回复: 'Reply',
   选中文字的操作: 'Selection actions',
@@ -286,6 +301,13 @@ export const EN: Record<string, string> = {
   运行历史: 'Run history',
   打开方案: 'Open plan',
   添加附件: 'Add attachment',
+  '上下文 {percent}%（示意）': 'Context {percent}% (mock)',
+  '上下文 {percent}%': 'Context {percent}%',
+  暖: 'Warm',
+  冷·将精简: 'Cold · will slim',
+  已压实: 'Compacted',
+  '{state} · {percent}%（示意）': '{state} · {percent}% (mock)',
+  '{state} · {percent}%': '{state} · {percent}%',
   'AI 审核': 'AI review',
   移除附件: 'Remove attachment',
   '上传中 {percent}%': 'Uploading {percent}%',
@@ -472,7 +494,7 @@ export const EN: Record<string, string> = {
   未配置模型: 'No model configured',
 
   // —— api-keys route (r2 19, 02 §8 canon note) ——
-  '尚无 API 密钥。': 'No API keys yet.',
+  '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入机器，也让 MCP 客户端能访问你的工作台。':
     'API keys connect machines from the command line and let MCP clients reach your workbench.',
   新建密钥: 'New key',
@@ -490,7 +512,7 @@ export const EN: Record<string, string> = {
   自定义: 'Custom',
   '搜索技能...': 'Search skills...',
   排序: 'Sort',
-  '尚无技能。': 'No skills yet.',
+  尚无技能: 'No skills yet',
   // spec 13 + XMON-109（spec 13 回摆）技能面：双入口口径——本地目录或页面
   // 新建都会出现在这里（{dir} = SKILLS_DIR_DEFAULT）。
   '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。':
@@ -531,11 +553,11 @@ export const EN: Record<string, string> = {
   '来源未通过校验。': 'The source failed validation.',
   '拉取来源失败——稍后重试。': 'Fetching the source failed — try again later.',
   '导入失败，请重试。': 'Import failed, please retry.',
-  '尚无 MCP 服务器。': 'No MCP servers yet.',
+  '尚无 MCP 服务器': 'No MCP servers yet',
   // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
   '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
     'Reads the mcpServers section of ~/.claude.json on the cairn server machine — add entries there and refresh to see them here. MCP servers give Agents extra tools; authorization happens per Agent, on its own page.',
-  '尚无密钥。': 'No secrets yet.',
+  尚无密钥: 'No secrets yet',
   '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
     'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
   添加密钥: 'Add secret',
@@ -549,11 +571,7 @@ export const EN: Record<string, string> = {
   历史: 'History',
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
-  // #1097 files-pane folder drill-down
-  目录导航: 'Directory navigation',
   根目录: 'Root',
-  '此目录为空。': 'This folder is empty.',
-  '文件树读取失败。': 'Failed to read the file tree.',
   '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
@@ -587,10 +605,10 @@ export const EN: Record<string, string> = {
   整机迁移: 'Migrate all agents',
   状态: 'Status',
   删除机器: 'Delete machine',
-  '删除后，这台机器要重新注册才能再接任务。':
-    'Once deleted, the machine has to enroll again before it takes work.',
+  '删除后，这台机器要重新注册才能再接任务':
+    'Once deleted, the machine has to enroll again before it takes work',
   '确定删除这台机器？此操作不可撤销。': 'Delete this machine? This cannot be undone.',
-  '尚无机器。': 'No machines yet.',
+  尚无机器: 'No machines yet',
   '在要执行任务的机器上运行注册命令，它就会出现在这里。':
     'Run the enroll command on the machine that should run tasks and it appears here.',
   '整机迁移失败，请重试。': 'Migration failed. Try again.',
@@ -616,7 +634,6 @@ export const EN: Record<string, string> = {
   // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
   额度空: 'out of quota',
   限流: 'rate limited',
-  请选择一个文件查看: 'Select a file to view',
   // #202 文件查看器三态（loading / error / 不可预览）
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
@@ -805,7 +822,7 @@ export const EN: Record<string, string> = {
   // #1251 visible pending reasons (queue blocked face): missing capability =
   // the fix, offline = waiting.
   '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':
-    'Queued: no machine meets the capability requirements (missing {missing}) — installs unlock it on the next heartbeat ({ahead} ahead)',
+    'Queued: no machine meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed ({ahead} ahead)',
   '排队中：等 {machine} 上线（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online ({ahead} ahead)',
   '排队中：等机器上线（前面 {ahead} 个）':
@@ -842,7 +859,7 @@ export const EN: Record<string, string> = {
   '等待模型响应...': 'Waiting for the model...',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
   // #918 skill facts: live-panel entries (read / denied) + the detail summary.
-  '▶ skill: {n}': '▶ skill: {n}',
+  'skill: {n}': 'skill: {n}',
   '✕ skill: {n}（已挡下）': '✕ skill: {n} (blocked)',
   '技能：{n}': 'Skills: {n}',
   '挡下：{n}': 'Blocked: {n}',
@@ -926,6 +943,16 @@ export const EN: Record<string, string> = {
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
+  'CI 修复第 {round}/{max} 轮：推送前检查未通过':
+    'CI fix round {round}/{max}: pre-push checks failed',
+  'CI 修复第 {round}/{max} 轮：CI 检查未通过': 'CI fix round {round}/{max}: CI checks failed',
+  '解冲突第 {round}/{max} 轮：PR 与默认分支冲突':
+    'Conflict fix round {round}/{max}: the PR conflicts with the default branch',
+  '按反馈返工，继续本会话': 'Reworking from feedback in this session',
+  查看原始日志: 'View raw log',
+  原始日志: 'Raw log',
+  查看完整指令: 'View full instruction',
+  完整指令: 'Full instruction',
   // #1285 失败行指引按分类分族
   '请将其重新上线，或重新运行任务以改派其他机器。':
     'Reconnect the machine, or rerun the task to assign another machine.',
@@ -1009,7 +1036,7 @@ export const EN: Record<string, string> = {
   未登录: 'Not signed in',
   '在该机器上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。':
     'Add ANTHROPIC_*_MODEL slots to env in ~/.claude/settings.json on that machine and its model slots show up here.',
-  '尚未添加服务商。': 'No providers yet.',
+  尚未添加服务商: 'No providers yet',
   // #231/#243 OAuth 落地 reason 三译(providers-page 喂 connectError 行)
   '授权已被取消。': 'Authorization was cancelled.',
   '令牌交换失败，请稍后重试。': 'Token exchange failed — please try again.',
@@ -1063,13 +1090,6 @@ export const EN: Record<string, string> = {
 
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
-
-  // —— local 项目 Files tab 读面（#1030 开闸；不可达降级文案）——
-  '本地仓库当前无法读取。': 'The local repository cannot be read right now.',
-
-  // —— github 项目 Files tab 诚实降级面（#704 / B-C1：文件在 GitHub，外链承接）——
-  'GitHub 仓库项目的文件在 GitHub 上查看': 'Files for GitHub repository projects live on GitHub',
-  '打开 GitHub 仓库': 'Open the GitHub repository',
 
   // —— #403/#445 看板筛选面（仓库 chip 组 + 类型 popover + 空结果态）——
   类型: 'Type',
@@ -1158,15 +1178,37 @@ export const EN: Record<string, string> = {
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
-  '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。':
-    'No memories yet. The Coordinator stores experience worth keeping here as it works.',
+  'Coordinator 在所有项目里都会用到的笔记。': 'Notes the Coordinator uses across every project.',
+  '像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。':
+    'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
+  自动记忆: 'Auto memory',
+  'Coordinator 在这个项目里工作时自己写下的笔记。':
+    'Notes the Coordinator writes itself as it works in this project.',
+  'Coordinator 还没有记下团队笔记。': 'The Coordinator has not written team notes yet.',
+  'Coordinator 还没有在这个项目里记下笔记。':
+    'The Coordinator has not written notes in this project yet.',
+  可自动注入: 'Eligible for automatic injection',
+  记忆文件: 'Memory files',
+  '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
+  正在加载记忆: 'Loading memories',
+  '打开记忆：{title}': 'Open memory: {title}',
+  '可检索 · 不自动注入': 'Searchable · not injected automatically',
+  核心: 'Core',
+  '更新于 {date}': 'Updated {date}',
+  更新于: 'Updated',
+  概要: 'Summary',
+  '删除…': 'Delete…',
+  删除这条记忆: 'Delete this memory',
+  '删除这条记忆？': 'Delete this memory?',
+  删除记忆: 'Delete memory',
+  '正在删除…': 'Deleting…',
+  '只删除这条记忆，不影响保存它的对话。':
+    'Deletes only this memory, not the conversation it was saved from.',
+  '没有删除成功，记忆保持原样，请重试。': 'The memory was not deleted and is unchanged. Try again.',
+  '离线中。记忆只能查看，重新连接后才能删除。':
+    'Offline. Memories are read-only until you reconnect.',
   模型与机器: 'Model & machine',
 
-  // —— #499 记忆 tab 的搜索与排序（配额头 + 搜索框 + 排序档）——
-  // `记忆 · {n} / {max}`：{max} = shared MEMORY_QUOTA_PER_AGENT 插值，不写死
-  // 数字；`搜索记忆…` = shared MEMORY_UI_COPY.searchPlaceholder（经 t() 消费、
-  // 不作字面量出现，i18n-coverage COMPUTED_KEYS 登记）。
-  '记忆 · {n} / {max}': 'Memory · {n} / {max}',
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
@@ -1248,6 +1290,13 @@ export const EN: Record<string, string> = {
     'It failed. Retry, or reply below with what to change.',
   '已归档。': 'Archived.',
   取消归档: 'Unarchive',
+  归档于: 'Archived',
+  已归档项目: 'Archived projects',
+  没有已归档的项目: 'No archived projects',
+  '在侧栏项目菜单里归档的项目会出现在这里。':
+    'Projects you archive from the sidebar project menu appear here.',
+  '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',
+  '取消归档中…': 'Unarchiving…',
   '批准失败，请重试。': 'Could not approve. Try again.',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
@@ -1345,31 +1394,11 @@ export const EN: Record<string, string> = {
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
-  飞书机器人: 'Feishu bot',
-  飞书配置加载失败: 'Could not load Feishu configuration',
-  正在加载飞书配置: 'Loading Feishu configuration',
-  '仅保存配置，不会连接飞书或启用审批。':
-    'Saves configuration only. Does not connect to Feishu or enable approvals.',
-  已配置: 'Configured',
   未配置: 'Not configured',
-  '接收者 Open ID': 'Recipient Open ID',
-  'Cairn 地址': 'Cairn origin',
-  '留空保留当前密钥；更换 App ID 时须填写新密钥。':
-    'Leave blank to keep the current secret. A new App ID requires a new secret.',
-  '请检查 App ID、密钥、接收者和 Cairn 地址。':
-    'Check the App ID, secret, recipient and Cairn origin.',
-  保存配置: 'Save configuration',
-  解除绑定: 'Unbind',
-  '解除飞书绑定？': 'Unbind Feishu?',
-  '将删除保存的 App ID 和 App Secret。': 'This deletes the saved App ID and App Secret.',
-  '解除后需要重新填写才能恢复连接。':
-    'Re-entering the fields is required to reconnect after unbinding.',
-  解除飞书绑定确认: 'Unbind Feishu confirmation',
   空闲: 'Idle',
   项目设置: 'Project settings',
   回答: 'Answer',
   看计划: 'Review plan',
-  '查看 thread': 'View thread',
   '在问你一个问题。': 'Asked you a question.',
   '计划已就绪，批准后开工。': 'Plan ready. Approve to start.',
   '已就绪，等你审阅。': 'Ready for your review.',
@@ -1389,12 +1418,10 @@ export const EN: Record<string, string> = {
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   '{n} 件在进行': '{n} in progress',
   待你决定: 'Needs you',
-  '还有 {n} 件': '{n} more',
   首页概况: 'Home overview',
   '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
   '跟 Coordinator 说点什么，或描述一个新任务…':
     'Tell the Coordinator something, or describe a new task…',
-  收起其余: 'Show less',
   首页: 'Home',
   往上滑看更早的对话: 'Scroll up for earlier messages',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
@@ -1541,7 +1568,7 @@ export const EN: Record<string, string> = {
   模型与账户: 'Models & accounts',
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
-  '还没有路由规则。': 'No routing rules yet.',
+  还没有路由规则: 'No routing rules yet',
   '先创建 Coordinator 规则，它才能回答你的消息。':
     'Create the Coordinator rule first so it can answer your messages.',
   '这条路由还没有规则，选好运行时与模型后创建。':
@@ -1656,16 +1683,6 @@ export const EN: Record<string, string> = {
   '评审 head': 'Judged head',
   解决: 'Resolve',
   '在 GitHub 打开': 'Open on GitHub',
-  新功能发布: 'Feature releases',
-  '发布后对所有成员开启，不能在这里关闭。':
-    'Releasing enables the feature for every member. It cannot be turned off here.',
-  新功能列表加载失败: 'Could not load feature releases',
-  还没有登记的新功能: 'No features registered yet',
-  '向所有成员发布 {key}': 'Release {key} to every member',
-  '发布失败，请重试。': 'Release failed. Try again.',
-  功能标识: 'Feature key',
-  '输入开发者提供的功能标识。': 'Enter the feature key provided by its developer.',
-  发布新功能: 'Release feature',
   'thread 用量': 'Thread usage',
   '正在加载用量…': 'Loading usage…',
   用量加载失败: 'Usage could not load',
@@ -1743,7 +1760,7 @@ export const EN: Record<string, string> = {
   'No team is available for this schedule.': 'No team is available for this schedule.',
   'Create a thread before scheduling it.': 'Create a thread before scheduling it.',
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
-  'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
+  'Scheduled tasks could not be loaded': 'Scheduled tasks could not be loaded',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
   等待审核: 'Review pending',
   草稿: 'Draft',
@@ -1758,9 +1775,6 @@ export const EN: Record<string, string> = {
   已复制链接: 'Link copied',
   显示更多: 'Show more',
   'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
-  拉取请求: 'Pull requests',
-  'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
-  '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
   '这台机器在 Coordinator 里的角色': "This machine's role for the Coordinator",
   '这台机器上能接任务的执行器，以及它们的登录状态。':
     'The runtimes that can take tasks on this machine, and their sign-in state.',
@@ -1819,7 +1833,7 @@ export const EN: Record<string, string> = {
   配对二维码: 'Pairing QR code',
   '手机将连接到 {origin}': 'Your phone will connect to {origin}',
   '生成配对码失败，请重试。': 'Could not create a pairing code. Try again.',
-  '这台电脑暂时没有手机可用的线路。': 'This computer has no route your phone can use yet.',
+  这台电脑暂时没有手机可用的线路: 'This computer has no route your phone can use yet',
   '请先登录 Tailscale：{url}': 'Sign in to Tailscale first: {url}',
   '设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。':
     'Set CAIRN_TSNET=1 and restart to reach this computer from your phone over Tailscale.',
@@ -1853,4 +1867,33 @@ export const EN: Record<string, string> = {
     'Until you sign in again, these machines and subscriptions take no new tasks.',
   查看机器: 'View machines',
   查看订阅: 'View subscriptions',
+  待你审阅: 'Ready for review',
+  待你回答: 'Needs input',
+  已解决: 'Resolved',
+  'PR #{n} 有 {f} 项检查没过': 'PR #{n} has {f} failing checks',
+  'PR #{n} 检查还在跑': 'Checks are still running on PR #{n}',
+  'PR #{n} 检查 {p}/{t} 通过': 'PR #{n}: all checks passed ({p}/{t})',
+  'PR #{n} 已合并': 'PR #{n} merged',
+  改动写好了: 'The changes are ready',
+  '到 PR 卡合并': 'Merge on the PR card',
+  到任务里看改动: 'Review the changes in the task',
+  计划写好了: 'The plan is written',
+  到任务里批准计划: 'Approve the plan in the task',
+  在问你一个问题: 'Asked you a question',
+  到任务里回答: 'Answer in the task',
+  'Coordinator 在跟进': 'Coordinator is on it',
+  'Coordinator 建任务前先问你': 'Coordinator asks before creating a task',
+  在问题卡里选: 'Choose on the question card',
+  还没开始: 'Not started',
+  现在没有任务: 'No tasks right now',
+  '跟 Coordinator 说一件事，它会在这里出现。':
+    'Tell the Coordinator about something and it shows up here.',
+  '给 Coordinator 发消息': 'Message the Coordinator',
+  '待开始 {n}': 'Up next {n}',
+  没有待开始的任务: 'Nothing up next',
+  '任务，{n} 件等你': 'Tasks, {n} waiting on you',
+  拉取请求: 'Pull requests',
+  'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
+  '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
+  '失败了，等自动重试': 'Failed; an automatic retry is coming',
 };

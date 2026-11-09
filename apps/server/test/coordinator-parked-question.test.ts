@@ -30,7 +30,7 @@ async function askFromProjectTurn(projectId: string, ageMs: number) {
     .run();
   createOrGetQuestion(
     { db: H.s.db },
-    { threadId: H.threadId, requestId: 'ask-q', questions: QUESTIONS },
+    { threadId: H.threadId, requestId: 'ask-q', questions: QUESTIONS, askedFor: [stepId] },
   );
   H.s.db
     .update(chiefMessage)
@@ -110,6 +110,14 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     expect(stored.projectId).toBe(H.projectId);
   });
 
+  test('an answer given while the asking turn runs is cited by that turn', async () => {
+    const asker = await askFromProjectTurn(H.projectId, 0);
+    const res = await answer();
+    expect(res.status).toBe(200);
+    const running = chiefSteps().find((s) => s.id === asker)!;
+    expect(running.ownerMessageIds).toEqual([asker, 'ask-q']);
+  });
+
   test('a parked question survives the end of its turn and answers hours later start a new turn', async () => {
     const asker = await askFromProjectTurn(H.projectId, 31 * 60_000);
     await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });
@@ -124,6 +132,7 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     expect(resumed[0]?.prompt).toContain(`demo（id: ${H.projectId}）`);
     expect(resumed[0]?.prompt).toContain('Which pages?');
     expect(resumed[0]?.prompt).toContain('only the board');
+    expect(resumed[0]?.ownerMessageIds).toEqual([asker, 'ask-q']);
   });
 
   test('while a question is parked another project turn runs and finishes', async () => {

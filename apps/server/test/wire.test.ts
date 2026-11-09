@@ -25,6 +25,9 @@ import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, req, startLegacyBuild } from './helpers.js';
 
 const INFERRED_ROUTES = [
+  'GET /api/server/deploy/lease',
+  'PUT /api/server/deploy/lease',
+  'DELETE /api/server/deploy/lease',
   'GET /api/teams/{id}/claude-subscriptions',
   'DELETE /api/teams/{id}/claude-subscriptions/{cid}',
   'POST /api/teams/{id}/claude-subscriptions',
@@ -87,8 +90,6 @@ const INFERRED_ROUTES = [
   'GET /api/teams/{id}/memories',
   'DELETE /api/teams/{id}/memories/{mid}',
   'POST /api/teams/{id}/memories/{mid}/promote',
-  'GET /api/projects/{id}/commits',
-  'GET /api/projects/{id}/commits/{sha}',
   'GET /api/builds/{id}/plans',
   'GET /api/builds/{id}/merge-permission',
   'POST /api/builds/{id}/plans/{planId}/pause-auto-approve',
@@ -132,8 +133,6 @@ const CORE_ROUTES = [
   'GET /api/projects/{id}/builds',
   'GET /api/projects/{id}/tags',
   'GET /api/projects/{id}/branches',
-  'GET /api/projects/{id}/tree',
-  'GET /api/projects/{id}/file',
   'GET /api/todos',
   'GET /api/todos/{id}',
   'GET /api/builds/{id}',

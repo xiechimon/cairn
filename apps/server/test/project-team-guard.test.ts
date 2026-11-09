@@ -10,7 +10,7 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import { nowMs } from '../src/lib/ids.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
-import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
 registerChiefHarness();
 
@@ -101,11 +101,7 @@ function insertCrossTodo(): void {
 }
 
 async function createOwnTodo(): Promise<string> {
-  const created = (await relay('create_todo', {
-    projectId: H.projectId,
-    title: '本队任务',
-    spec: 's',
-  })) as { id: string };
+  const created = (await relay('create_todo', ownerTodo('本队任务'))) as { id: string };
   return created.id;
 }
 
@@ -118,7 +114,7 @@ function todoState(todoId: string) {
 describe('#1466 the chief tool surface: a cross-team project id = 404 (same shape as nonexistent)', () => {
   const projectFaces: [string, (projectId: string) => Record<string, unknown>][] = [
     ['docs', (projectId) => ({ projectId, paths: [] })],
-    ['create_todo', (projectId) => ({ projectId, title: '越权任务', spec: 's' })],
+    ['create_todo', (projectId) => ownerTodo('越权任务', projectId)],
     ['update_project', (projectId) => ({ projectId, name: 'hijacked' })],
     ['connect_repo', (projectId) => ({ projectId, githubRepo: 'evil/repo' })],
   ];
@@ -182,11 +178,10 @@ describe('#1466 the chief tool surface: a cross-team project id = 404 (same shap
   test('T8 same-team paths unchanged: docs / create_todo / update_project / connect_repo / todos / watch_todos', async () => {
     const docs = (await relay('docs', { projectId: H.projectId, paths: [] })) as { name: string };
     expect(docs.name).toBe('demo');
-    const created = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: '本队任务',
-      spec: 's',
-    })) as { id: string; projectId: string };
+    const created = (await relay('create_todo', ownerTodo('本队任务'))) as {
+      id: string;
+      projectId: string;
+    };
     expect(created.projectId).toBe(H.projectId);
     const listed = (await relay('todos', { projectId: H.projectId })) as {
       todos: { id: string }[];

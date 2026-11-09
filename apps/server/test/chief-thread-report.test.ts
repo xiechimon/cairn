@@ -4,18 +4,22 @@ import { describe, expect, test, vi } from 'vitest';
 import { build, gateState, gateVerdict, step, todo } from '../src/db/schema.js';
 import { addChiefWatch, sendChiefMessage } from '../src/services/chief.js';
 import { upsertChiefRow } from '../src/services/machine-deps.js';
-import { getTodo, setTodoPhase } from '../src/services/todos.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { createAutonomousTodo, getTodo, setTodoPhase } from '../src/services/todos.js';
+import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
 registerChiefHarness();
 
 async function seedTask(watched: boolean) {
-  const record = (await relay('create_todo', {
+  const record = createAutonomousTodo(H.s, {
+    teamId: H.teamId,
     projectId: H.projectId,
     title: 'Repair board counts',
     spec: 'Refresh counts after dragging a task.',
-  })) as { id: string };
+    createdBy: H.userId,
+    ownerId: H.userId,
+    orchestration: { threadId: H.threadId },
+  });
   H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, record.id)).run();
   const deps = {
     db: H.s.db,

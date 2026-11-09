@@ -268,7 +268,10 @@ describe('a digest turn is not a use', () => {
       threadRow,
       agent(),
     );
-    expect(context.memories).toHaveLength(4);
+    expect(context.memories).toEqual([
+      { title: 'MEMORY.md', content: '- title a：a\n- title b：b\n- title c：c\n- title d：d' },
+      { title: '记忆文件', content: '0 个；用 memories 按需读取。' },
+    ]);
     expect(valid().every((m) => m.lastInjectedAt === null)).toBe(true);
   });
 });

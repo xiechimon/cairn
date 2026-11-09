@@ -15,7 +15,7 @@ const STREAM_PATH_PATTERNS = [
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const AMBIENT_FETCH_SITES = new Set(['same-origin', 'none']);
 const OWNER_ONLY_PATTERNS = [
-  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|feishu)(?:\/|$)/,
+  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions)(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
   /^\/api\/machines\/[^/]+(?:\/|$)/,
 ];

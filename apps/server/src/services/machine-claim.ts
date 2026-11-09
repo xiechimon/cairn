@@ -7,11 +7,13 @@ import {
   buildTaskPromptText,
   claudeLoginBlocksClaim,
   claudeRateBlock,
+  fencedTitle,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   parseLocalMergeInstruction,
+  parseVerifyPromptMeta,
   type RemoteToolDef,
   type SkillInjectionRecord,
   type StepKind,
@@ -48,6 +50,7 @@ import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
+import { readDeployLease } from './deploy-lease.js';
 import {
   capabilityGatePasses,
   machineRunningCount,
@@ -79,7 +82,7 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
-  memoryInjectTeamId,
+  memoryOpsAreTeamScoped,
   memoryOwnerOf,
   type RouteProfile,
   routeProfile,
@@ -173,6 +176,8 @@ export function serverTakesTurn(
     coordinatorRoute(db, teamId) !== null
   );
 }
+
+export const TASK_SEGMENTS_MIN_CLI_VERSION = '0.2.4';
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
   return cliVersionAtLeast(latestCliVersion, MCP_MIN_CLI_VERSION);
@@ -356,6 +361,7 @@ async function tryClaim(
   teamId: string,
   origin: string,
   maxWorkers: number | undefined,
+  supportsAttachmentVerify: boolean,
   stillAuthorized: () => boolean,
 ): Promise<ClaimedStep | null> {
   if (!stillAuthorized()) return null;
@@ -382,6 +388,12 @@ async function tryClaim(
   if (chiefAhead) return chiefAhead;
 
   for (const cand of workerCands) {
+    if (
+      cand.stepRow.kind === 'verify' &&
+      parseVerifyPromptMeta(cand.stepRow.prompt)?.evidence === 'attachments' &&
+      !supportsAttachmentVerify
+    )
+      continue;
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
     if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
@@ -557,12 +569,16 @@ async function tryClaim(
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
     const workerMcp = claimMcpSlugs(machineRow.latestCliVersion, agentRow.mcpServers);
+    const segmentsDaemon = cliVersionAtLeast(
+      machineRow.latestCliVersion,
+      TASK_SEGMENTS_MIN_CLI_VERSION,
+    );
     const isGithubProject = projectRow?.repoKind === 'github';
     const namesTask = stepNamesTask(db, cand.stepRow);
     const taskMeta =
       isGithubProject && namesTask && projectRow
         ? {
-            titleFinal: cand.todoRow.sourceKind === 'github-issue',
+            titleFinal: cand.todoRow.sourceKind === 'github-issue' || cand.todoRow.request !== null,
             vocab: listProjectTagVocab(db, projectRow.id),
           }
         : undefined;
@@ -598,12 +614,18 @@ async function tryClaim(
       todo: {
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,
-        title: cand.todoRow.title,
+        title:
+          cand.todoRow.request !== null && !segmentsDaemon
+            ? fencedTitle(cand.todoRow.title, cand.todoRow)
+            : cand.todoRow.title,
         spec: cand.todoRow.spec,
         ...(cand.todoRow.decisions.length > 0 ? { decisions: cand.todoRow.decisions } : {}),
         ...(taskMeta !== undefined ? { meta: taskMeta } : {}),
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,
+        ...(cand.todoRow.request !== null && segmentsDaemon
+          ? { request: cand.todoRow.request }
+          : {}),
         ...(blockerHandoff !== null ? { blockerHandoff } : {}),
         output: cand.todoRow.output,
       },
@@ -622,7 +644,8 @@ async function tryClaim(
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
           agentId: memoryOwnerOf(db, teamId, cand.stepRow.kind),
-          teamId: memoryInjectTeamId(cand.stepRow.kind, teamId),
+          teamId,
+          teamScoped: memoryOpsAreTeamScoped(cand.stepRow.kind),
           threadId: cand.todoRow.id,
           projectId: cand.todoRow.projectId,
         }),
@@ -662,13 +685,30 @@ export async function claimStep(
   origin: string,
   signal?: AbortSignal,
   body?: MachineClaimBody,
-  stillAuthorized: () => boolean = () => true,
+  authorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
+  const stillAuthorized = () => authorized() && readDeployLease(deps.db).status === 'accepting';
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
-  const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
+  const first = await tryClaim(
+    deps,
+    machineId,
+    teamId,
+    origin,
+    body?.maxWorkers,
+    body?.verifyAttachments === true,
+    stillAuthorized,
+  );
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
   if (signal?.aborted || !stillAuthorized()) return null;
-  return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
+  return tryClaim(
+    deps,
+    machineId,
+    teamId,
+    origin,
+    body?.maxWorkers,
+    body?.verifyAttachments === true,
+    stillAuthorized,
+  );
 }

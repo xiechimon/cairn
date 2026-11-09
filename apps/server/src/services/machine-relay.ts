@@ -70,6 +70,7 @@ export async function machineAsk(
     requestId: body.requestId,
     questions: body.questions,
     provenance,
+    askedFor: row.ownerMessageIds ?? [],
   });
   const final =
     content.status === 'pending'
@@ -162,6 +163,7 @@ export async function executeRelayToolCall(
       user: deps.user,
       vapidKeys: deps.vapidKeys,
       reposDir: deps.reposDir,
+      workspacesDir: deps.workspacesDir,
       attachmentsDir: deps.attachmentsDir,
       skillsDir: deps.skillsDir,
       ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
@@ -176,6 +178,7 @@ export async function executeRelayToolCall(
       chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
       conversationId: threadId,
       turnPrompt: row.prompt,
+      turnMessageIds: row.ownerMessageIds ?? [],
       turnScopeProjectId: stepScopeProjectId(row),
       turnScopeMixed: steeredFromAnotherScope(deps, row),
     },
@@ -275,7 +278,7 @@ async function setTaskMeta(
   const projectRow = projectOfTodo(deps.db, todoRow);
   if (!projectRow) throw new HttpError(404, `project ${todoRow.projectId}`);
   if (projectRow.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
-  const title = normalizedMetaTitle(params.title);
+  const title = todoRow.request !== null ? undefined : normalizedMetaTitle(params.title);
   let tagIds: string[] | undefined;
   if (params.tag !== undefined) {
     const tagName = params.tag;
@@ -298,7 +301,10 @@ async function setTaskMeta(
       vapidKeys: deps.vapidKeys,
     },
     todoRow.id,
-    { title, ...(tagIds !== undefined ? { tagIds } : {}) },
+    {
+      ...(title !== undefined ? { title } : {}),
+      ...(tagIds !== undefined ? { tagIds } : {}),
+    },
   );
   if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
   return JSON.stringify({ todoId: record.id, title: record.title, tagIds: record.tagIds });
@@ -317,8 +323,11 @@ async function setTaskMetaGithubForm(
 ): Promise<string> {
   let title: string | undefined;
   if (params.title !== undefined) {
-    if (todoRow.sourceKind === 'github-issue') {
-      throw new HttpError(400, 'invalid params.title: title is final (issue-sourced)');
+    if (todoRow.sourceKind === 'github-issue' || todoRow.request !== null) {
+      throw new HttpError(
+        400,
+        'invalid params.title: title is final (issue-sourced or owner words)',
+      );
     }
     title = normalizedMetaTitle(params.title);
   }

@@ -4,8 +4,10 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
+  apiKey,
   build as buildTable,
   machine as machineTable,
+  step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { bootServer, issueApiKey, seedSessionRoute, type TestServer } from './helpers.js';
@@ -117,6 +119,38 @@ const SAMPLE_DIFF = [
 ].join('\n');
 
 describe('done channel delivery-surface backfill (#704 / B-C16)', () => {
+  test('malformed diff is rejected before credentials, checkpoints or build state change', async () => {
+    const w = await setupWorld();
+    const buildId = await w.startBuild(w.githubProjectId);
+    const claimed = await w.claim();
+    const beforeBuild = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get();
+    const beforeStep = w.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.id, claimed.step.id))
+      .get();
+    const beforeKeys = w.s.db.select({ id: apiKey.id }).from(apiKey).all();
+    const response = await w.done(claimed.step.id, {
+      status: 'success',
+      commit: 'a'.repeat(40),
+      sessionId: 'unaccepted-session',
+      prNumber: 606,
+      prUrl: 'https://github.com/octocat/Hello-World/pull/606',
+      changesDiff: SAMPLE_DIFF.replace('@@ -1 +1,2 @@', '@@ -1 +1,9 @@'),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid changesDiff: malformed unified diff' });
+    expect(w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()).toEqual(
+      beforeBuild,
+    );
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()).toEqual(
+      beforeStep,
+    );
+    expect(w.s.db.select({ id: apiKey.id }).from(apiKey).all()).toEqual(beforeKeys);
+    expect(
+      (await w.done(claimed.step.id, { status: 'success', changesDiff: SAMPLE_DIFF })).status,
+    ).toBe(200);
+  });
   test('failure mode 1: done carries prUrl/prNumber -> build row backfilled', async () => {
     const w = await setupWorld();
     const buildId = await w.startBuild(w.githubProjectId);

@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -12,7 +12,6 @@ import type {
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
-  GitCredentialSource,
   LocalToolDef,
   MachineAskBody,
   MachineDoneBody,
@@ -47,6 +46,7 @@ import {
   composeTaskPromptWithInstruction,
   conversationBranch,
   FIXED_TAGS,
+  gitCredentialRowContent,
   INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
   isBuildStepKind,
@@ -59,6 +59,7 @@ import {
   PLAN_FILE_NAME,
   parseRetryAfterMs,
   parseReviewPromptMeta,
+  parseVerifyPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
   REPORT_FILE_NAME,
   type ReviewGate,
@@ -70,7 +71,10 @@ import {
   subscriptionKeyOf,
   transcriptPromptRowId,
   withCoAuthor,
+  workspaceHookRowContent,
 } from '@cairn/shared';
+import { createTempEnvironment } from '@cairn/shared/temp-environment';
+import { z } from 'zod';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
 import { prepareFileAttachment } from './attach-file.js';
@@ -84,8 +88,9 @@ import {
   piWorktreeSkillDirs,
   type SkillsCatalogOpts,
 } from './backend/skills.js';
+import { createVerificationClone } from './backend/verification-clone.js';
 import { prepareWebTools } from './backend/web-search.js';
-import { type BriefHandle, caseInsensitiveFsFor, cleanupBrief, writeBrief } from './brief-file.js';
+import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
   type ClaudeCodeAuthProbe,
   claudeCodeAuthFailureMessage,
@@ -123,12 +128,6 @@ import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
 import { localRepoUnreachableMessage } from './workspace.js';
-
-function gitCredentialSourceRowContent(source: GitCredentialSource): string {
-  return source === 'machine'
-    ? 'git 凭据来源：machine（执行机本机 git 凭据）'
-    : 'git 凭据来源：integration（per-step 下发 token）';
-}
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -237,7 +236,7 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
 
 const READONLY_GIT_ENV: Record<string, string> = {
   GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied:.pushInsteadOf',
+  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied://.pushInsteadOf',
   GIT_CONFIG_VALUE_0: '',
 };
 
@@ -262,7 +261,8 @@ function degradedFreshPrompt(claimed: ClaimedStep, plansDir: string, convId: str
   if (
     (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
-      claimed.step.kind === 'verify') &&
+      (claimed.step.kind === 'verify' &&
+        parseVerifyPromptMeta(claimed.instruction ?? null)?.evidence !== 'attachments')) &&
     (claimed.project?.repo ?? null) !== null
   ) {
     text = appendWorkBranchNote(
@@ -391,18 +391,36 @@ export async function runStep(
   }, deps.heartbeatIntervalMs ?? 30_000);
   if (heartbeat.unref) heartbeat.unref();
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
-  const credentialCleanups: (() => void)[] = [];
+  const stepCleanups: (() => void | Promise<void>)[] = [];
+  const errors: unknown[] = [];
   try {
-    await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, credentialCleanups);
-  } finally {
-    for (const cleanup of credentialCleanups.reverse()) cleanup();
-    deps.sessionHandles?.delete(stepId);
-    clearInterval(heartbeat);
-    deps.stepImageSupport?.delete(stepId);
-    deps.stepSteeringSupport?.delete(stepId);
-    deps.stepTranscripts?.delete(stepId);
-    stop.settle();
+    await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, stepCleanups);
+  } catch (error) {
+    errors.push(error);
   }
+  for (const cleanup of [
+    ...stepCleanups.reverse(),
+    () => deps.sessionHandles?.delete(stepId),
+    () => clearInterval(heartbeat),
+    () => deps.stepImageSupport?.delete(stepId),
+    () => deps.stepSteeringSupport?.delete(stepId),
+    () => deps.stepTranscripts?.delete(stepId),
+    () => stop.settle(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1)
+    throw new AggregateError(
+      errors,
+      `Step execution or cleanup failed: ${errors
+        .map((error) => (error instanceof Error ? error.message : String(error)))
+        .join('; ')}`,
+    );
 }
 
 async function runClaimedStep(
@@ -412,7 +430,7 @@ async function runClaimedStep(
   heartbeat: ReturnType<typeof setInterval>,
   stop: RunStop,
   provenance: MachineHeartbeatBody,
-  credentialCleanups: (() => void)[],
+  stepCleanups: (() => void | Promise<void>)[],
 ): Promise<void> {
   let { client, journal, logger } = deps;
   const now = deps.now ?? (() => Date.now());
@@ -467,6 +485,9 @@ async function runClaimedStep(
   const isChief = claimed.step.kind === 'chief';
   const isReview = claimed.step.kind === 'review';
   const isVerify = claimed.step.kind === 'verify';
+  const verifyMeta = isVerify ? parseVerifyPromptMeta(claimed.instruction ?? null) : null;
+  const attachmentVerify = verifyMeta?.evidence === 'attachments';
+  const verifyEvidenceDirectory = verifyMeta?.evidenceDirectory;
   const reviewGate: ReviewGate =
     (isReview ? parseReviewPromptMeta(claimed.instruction ?? null)?.gate : undefined) ?? 'confirm';
   const basePrompt =
@@ -494,7 +515,7 @@ async function runClaimedStep(
     !isInfoBuild &&
     (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
-      claimed.step.kind === 'verify') &&
+      (claimed.step.kind === 'verify' && !attachmentVerify)) &&
     (claimed.project?.repo ?? null) !== null
       ? appendWorkBranchNote(
           promptWithPlanNote,
@@ -572,7 +593,7 @@ async function runClaimedStep(
 
   const tokenRes = await client.token(stepId);
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
-  credentialCleanups.push(() => clearCredentials(creds));
+  stepCleanups.push(() => clearCredentials(creds));
   const credentialValues = [creds.claudeSubscriptionToken, creds.git?.password];
   const redactors = [credentialRedactor(...credentialValues)];
   const redact = <T>(value: T): T => redactors.reduce((result, next) => next(result), value);
@@ -599,7 +620,7 @@ async function runClaimedStep(
           () => logger.step('App credential timer refresh failed; retrying next minute'),
         )
       : null;
-  if (appCredential !== null) credentialCleanups.push(() => appCredential.dispose());
+  if (appCredential !== null) stepCleanups.push(() => appCredential.dispose());
   const refreshGit = async () => {
     if (appCredential === null) throw new Error('App credential refresh unavailable');
     return appCredential.refresh();
@@ -769,7 +790,7 @@ async function runClaimedStep(
       return;
     }
   }
-  const cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
+  let cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
   if (!ws) mkdirSync(cwd, { recursive: true });
 
   const stepStartMs = Date.now();
@@ -779,6 +800,39 @@ async function runClaimedStep(
       headAtStart = await deps.workspace.headCommit(ws.cwd);
     } catch {
       headAtStart = null;
+    }
+  }
+
+  const uploadedVerifyEvidence = new Set<string>();
+  if (attachmentVerify) {
+    if (
+      verifyEvidenceDirectory === undefined ||
+      !/^\.cairn-verify\/[a-zA-Z0-9_-]+\/$/.test(verifyEvidenceDirectory)
+    ) {
+      await failStep(deps, heartbeat, stepId, 'Verify evidence directory unavailable or invalid');
+      return;
+    }
+    if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
+      await failStep(deps, heartbeat, stepId, 'Verify delivery commit unavailable');
+      return;
+    }
+    try {
+      const clone = await createVerificationClone(
+        ws.cwd,
+        verifyMeta?.expectedHeadSha ?? headAtStart,
+      );
+      stepCleanups.push(clone.cleanup);
+      cwd = clone.cwd;
+      ws = { ...ws, cwd, reused: false };
+      headAtStart = await deps.workspace.headCommit(cwd);
+    } catch (error) {
+      await failStep(
+        deps,
+        heartbeat,
+        stepId,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
     }
   }
 
@@ -986,12 +1040,26 @@ async function runClaimedStep(
           GITHUB_TOKEN: creds.git.password,
         })
       : {};
+  let temporary: ReturnType<typeof createTempEnvironment>;
+  try {
+    temporary = createTempEnvironment({ ...process.env, ...opts.env });
+  } catch (error) {
+    await failStep(
+      deps,
+      heartbeat,
+      stepId,
+      `Temporary directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return;
+  }
+  stepCleanups.push(temporary.cleanup);
   const stepEnv: Record<string, string> = {
     ...opts.env,
+    ...temporary.env,
     ...stepGitEnv,
-    ...(readonlyWorkspace ? READONLY_GIT_ENV : {}),
+    ...(readonlyWorkspace || attachmentVerify ? READONLY_GIT_ENV : {}),
   };
-  credentialCleanups.push(() => {
+  stepCleanups.push(() => {
     for (const key of Object.keys(stepGitEnv)) {
       delete stepEnv[key];
       delete stepGitEnv[key];
@@ -1011,7 +1079,7 @@ async function runClaimedStep(
     provider,
     modelId: agent.modelId,
     ...(agent.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}),
-    ...(systemPrompt && backend.brief === undefined ? { systemPrompt } : {}),
+    ...(systemPrompt ? { systemPrompt } : {}),
     cwd,
     ...(deliveryPrompt !== null ? { prompt: deliveryPrompt } : {}),
     ...(promptImages !== undefined ? { promptImages } : {}),
@@ -1022,7 +1090,24 @@ async function runClaimedStep(
           executeRemoteTool: (name, params) => {
             if (name === 'ask_user' && client.askUser) return runAskChannel(params);
             if (name === 'attach_file' && !isChief) {
-              return client.relayTool(stepId, name, prepareFileAttachment(cwd, params));
+              const prepared = prepareFileAttachment(
+                cwd,
+                params,
+                attachmentVerify ? verifyEvidenceDirectory : undefined,
+              );
+              const upload = client.relayTool(stepId, name, prepared);
+              if (!attachmentVerify) return upload;
+              const path = resolve(cwd, String(params.path));
+              const sha256 = createHash('sha256')
+                .update(Buffer.from(String(prepared.contentBase64), 'base64'))
+                .digest('hex');
+              return upload.then((result) => {
+                z.object({ id: z.string().min(1), sha256: z.literal(sha256) }).parse(
+                  JSON.parse(result),
+                );
+                uploadedVerifyEvidence.add(path);
+                return result;
+              });
             }
             const def = remoteTools.find((t) => t.name === name);
             return client.relayTool(stepId, name, params, {
@@ -1072,29 +1157,18 @@ async function runClaimedStep(
     });
   }
   for (const [index, hook] of [...(opts.hookNotes ?? []), ...(ws?.hooks ?? [])].entries()) {
-    const head =
-      hook.status === 'ok'
-        ? `.agents/${hook.name} hook ok (${hook.ms}ms)`
-        : hook.status === 'timeout'
-          ? `.agents/${hook.name} hook timed out after ${Math.round(hook.ms / 1000)}s — process group killed`
-          : `.agents/${hook.name} hook failed (exit ${hook.exitCode})`;
-    const truncated =
-      hook.totalChars > hook.output.length
-        ? `\n… output truncated (${hook.totalChars - hook.output.length} more chars)`
-        : '';
     const output =
       opts.hookNotes?.includes(hook) &&
       hook.output.startsWith('orb: started in') &&
       opts.orbStartedAt !== undefined
         ? `orb: started in ${Math.max(0, now() - opts.orbStartedAt)}ms`
         : hook.output;
-    const body = output.trim() === '' ? '' : `\n${output.trimEnd()}${truncated}`;
     transcript.upsert({
       id: opts.hookNotes?.includes(hook)
         ? `orb-hook-${index}-${stepId}`
         : `hook-${hook.name}-${stepId}`,
       role: 'system',
-      content: `${head}${body}`,
+      content: workspaceHookRowContent(hook, redact(output)),
       createdAt: now(),
     });
   }
@@ -1103,7 +1177,7 @@ async function runClaimedStep(
     transcript.upsert({
       id: `git-credential-${stepId}`,
       role: 'system',
-      content: gitCredentialSourceRowContent(ws.credentialSource ?? 'integration'),
+      content: gitCredentialRowContent(ws.credentialSource ?? 'integration'),
       createdAt: now(),
     });
   }
@@ -1113,6 +1187,7 @@ async function runClaimedStep(
     deps.workspace &&
     claimed.session.action === 'new' &&
     !isReview &&
+    !attachmentVerify &&
     ws.reused &&
     headAtStart !== null
   ) {
@@ -1132,43 +1207,20 @@ async function runClaimedStep(
     }
   }
 
-  let briefHandle: BriefHandle | null = null;
-  let briefCleanupFailed = false;
-  const cleanupBriefOnce = (): void => {
-    if (briefHandle === null) return;
-    const h = briefHandle;
-    briefHandle = null;
-    try {
-      logger.step(`brief ${cleanupBrief(h)} (${h.file})`);
-    } catch (err) {
-      briefCleanupFailed = true;
-      const reason = err instanceof Error ? err.message : String(err);
-      logger.step(`brief cleanup failed: ${reason}`);
-      transcript.upsert({
-        id: `brief-cleanup-${stepId}`,
-        role: 'system',
-        content: `运行简报未能从工作区擦除（${reason}，文件 ${h.file}）——本轮不提交不推送，以免它被当作改动带进分支`,
-        createdAt: now(),
-      });
-    }
-  };
-  if (backend.brief !== undefined) {
-    try {
-      briefHandle = writeBrief({
+  try {
+    assertNoLegacyBrief(cwd);
+    if (backend.brief !== undefined) {
+      sessionOpts.systemPrompt = composeBrief({
         cwd,
         backendId: backend.brief.backendId,
         content: backend.brief.composeBody(sessionOpts, systemPrompt),
-        caseInsensitiveFs: caseInsensitiveFsFor(process.platform),
       });
-      logger.step(`brief written: ${briefHandle.file} (${briefHandle.mode})`);
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      logger.step(`brief write failed: ${reason}`);
-      cleanupBriefOnce();
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, `运行简报写入失败（${reason}）`);
-      return;
     }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    clearCredentials(creds);
+    await failStep(deps, heartbeat, stepId, `Runtime guidance could not be composed: ${reason}`);
+    return;
   }
 
   if (!isChief) {
@@ -1579,7 +1631,6 @@ async function runClaimedStep(
       if (await retryWithoutImages(message)) continue;
       flushDeltas();
       flushThinking();
-      cleanupBriefOnce();
       clearCredentials(creds);
       await failStep(deps, heartbeat, stepId, message);
       return;
@@ -1933,9 +1984,8 @@ async function runClaimedStep(
   }
   if (!sawDone && handle !== null) usage = handle.usage();
 
-  cleanupBriefOnce();
-
   const rewindToStepStart = async (): Promise<string | null> => {
+    if (attachmentVerify) return null;
     if (ws?.readonly === true) return null;
     if (ws === null || !deps.workspace || headAtStart === null) return '步起点 commit 不可得';
     try {
@@ -1975,10 +2025,10 @@ async function runClaimedStep(
         coAuthor: tokenRes.coAuthor ?? null,
       });
     });
-  let headCommit: string | null = null;
+  let headCommit: string | null = attachmentVerify ? headAtStart : null;
   let branchDrift: { expected: string; actual: string } | null = null;
   let artifactBranches: string[] = [];
-  let hasChanges = isReview ? false : sawChangeTool;
+  let hasChanges = isReview || attachmentVerify ? false : sawChangeTool;
   if (readonlyWorkspace) hasChanges = false;
   if (
     ws !== null &&
@@ -1987,7 +2037,7 @@ async function runClaimedStep(
     lastError === null &&
     !stopped &&
     !isReview &&
-    !briefCleanupFailed
+    !attachmentVerify
   ) {
     const git = deps.workspace;
     try {
@@ -2045,7 +2095,7 @@ async function runClaimedStep(
           transcript.upsert({
             id: `git-credential-${stepId}`,
             role: 'system',
-            content: gitCredentialSourceRowContent('machine'),
+            content: gitCredentialRowContent('machine'),
             createdAt: now(),
           });
         }
@@ -2104,8 +2154,7 @@ async function runClaimedStep(
     !stopped &&
     ws !== null &&
     ws.readonly !== true &&
-    deps.workspace &&
-    !briefCleanupFailed
+    deps.workspace
   ) {
     const git = deps.workspace;
     try {
@@ -2132,10 +2181,6 @@ async function runClaimedStep(
     }
   }
 
-  if (briefCleanupFailed && lastError === null) {
-    lastError = '运行简报未能从工作区擦除——本轮未提交未推送（详见 transcript 的简报行）';
-  }
-
   let report: string | null = null;
   if (isInfoBuild && !stopped && lastError === null && existsSync(reportFile)) {
     const content = readFileSync(reportFile, 'utf8');
@@ -2158,7 +2203,8 @@ async function runClaimedStep(
     repo !== null &&
     (lastError === null || preservedCommits.length > 0) &&
     !stopped &&
-    !isReview
+    !isReview &&
+    !attachmentVerify
   ) {
     const ghRef = repo.kind === 'github' ? githubRepoRefOf(repo.cloneUrl) : null;
     if (ghRef !== null) {
@@ -2224,7 +2270,22 @@ async function runClaimedStep(
   const reviewExtraction =
     claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
   const verifyExtraction =
-    claimed.step.kind === 'verify' ? extractVerifyVerdict(transcript.messages()) : null;
+    claimed.step.kind === 'verify'
+      ? extractVerifyVerdict(transcript.messages(), { strict: attachmentVerify })
+      : null;
+  if (attachmentVerify && verifyExtraction?.status === 'ok' && verifyExtraction.verdict.passed) {
+    const evidence = verifyExtraction.verdict.evidence;
+    if (
+      evidence.length === 0 ||
+      evidence.some((item) => !uploadedVerifyEvidence.has(resolve(cwd, item.path)))
+    ) {
+      verifyExtraction.verdict = {
+        ...verifyExtraction.verdict,
+        passed: false,
+        conclusion: `${verifyExtraction.verdict.conclusion}\nAttachment evidence is missing or was not successfully uploaded by this verification step.`,
+      };
+    }
+  }
   const sessionIdForDone = handle?.sessionId ?? continueId;
   const doneBody: MachineDoneBody = {
     status,

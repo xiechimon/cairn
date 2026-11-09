@@ -11,6 +11,7 @@ import {
   summarizerFor,
 } from './compaction.js';
 import { reportCompactionFailure } from './failure-report.js';
+import { generationTelemetryExtension } from './generation-telemetry.js';
 import type { MachineApi } from './machine-api.js';
 import { type CoordinatorModels, createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
@@ -49,6 +50,8 @@ export interface ProviderBinding {
 export interface ServerTurn {
   claimed: ClaimedStep;
   volatileText: string | null;
+  coldSlim?: { cold: boolean; summaryHint?: string | null } | null;
+  beforeDone?: () => void;
   router: ProviderBinding;
   summary: ProviderBinding;
 }
@@ -95,6 +98,10 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         () => config.memoryFlush?.(threadId) ?? null,
         threadId,
       ),
+      generationTelemetryExtension(async (conversationId) => ({
+        threadId,
+        stepId: await gate.stepFor(conversationId),
+      })),
     ];
     const summarize = (): Summarize | null => {
       try {
@@ -196,6 +203,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
             conversationGate: current.gate,
             volatile: current.volatile,
             volatileText: turn.volatileText,
+            coldSlim: turn.coldSlim ?? null,
+            ...(turn.beforeDone === undefined ? {} : { beforeDone: turn.beforeDone }),
           },
           claimed,
         );

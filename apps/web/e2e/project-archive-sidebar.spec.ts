@@ -21,37 +21,26 @@ async function open(page: Page) {
 
 const rows = (page: Page) => page.locator('aside [data-slot="sidebar-project-row"]');
 
-test('archive hides the project from the list and the archived group reaches it', async ({
-  page,
-}) => {
+test('archive takes the project out of the sidebar with no archived section', async ({ page }) => {
   const calls = await open(page);
   await expect(rows(page)).toHaveCount(2);
   await rows(page).filter({ hasText: 'probe-old' }).hover();
   await page.getByRole('button', { name: 'probe-old 的菜单' }).click();
   await page.getByRole('menuitem', { name: '归档' }).click();
   await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(0);
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator('aside')).not.toContainText('已归档');
   expect(calls).toEqual(['/api/projects/proj-2/archive']);
-
-  const group = page.getByTestId('archived-group');
-  await expect(group).toContainText('已归档');
-  await group.getByRole('button', { name: /已归档/ }).click();
-  await expect(group.locator('[data-slot="sidebar-project-row"]')).toContainText('probe-old');
 });
 
-test('unarchive returns the project to the main list', async ({ page }) => {
-  const calls = await open(page);
+test('archiving the open project returns to the Coordinator', async ({ page }) => {
+  await open(page);
+  await rows(page).filter({ hasText: 'probe-old' }).click();
+  await expect(page).toHaveURL(/[?&]project=proj-2/);
   await rows(page).filter({ hasText: 'probe-old' }).hover();
   await page.getByRole('button', { name: 'probe-old 的菜单' }).click();
   await page.getByRole('menuitem', { name: '归档' }).click();
-  const group = page.getByTestId('archived-group');
-  await group.getByRole('button', { name: /已归档/ }).click();
-  const archivedRow = group.locator('[data-slot="sidebar-project-row"]');
-  await archivedRow.hover();
-  await page.getByRole('button', { name: 'probe-old 的菜单' }).click();
-  await page.getByRole('menuitem', { name: '取消归档' }).click();
-  await expect(page.getByTestId('archived-group')).toHaveCount(0);
-  await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(1);
-  expect(calls).toEqual(['/api/projects/proj-2/archive', '/api/projects/proj-2/unarchive']);
+  await expect(page).not.toHaveURL(/[?&]project=/);
 });
 
 test('archiving never issues a delete', async ({ page }) => {
@@ -63,6 +52,6 @@ test('archiving never issues a delete', async ({ page }) => {
   await rows(page).filter({ hasText: 'probe-old' }).hover();
   await page.getByRole('button', { name: 'probe-old 的菜单' }).click();
   await page.getByRole('menuitem', { name: '归档' }).click();
-  await expect(page.getByTestId('archived-group')).toBeVisible();
+  await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(0);
   expect(deletes).toEqual([]);
 });

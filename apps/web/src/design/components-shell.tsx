@@ -1,13 +1,13 @@
 import {
   Activity,
   Archive,
+  CalendarClock,
   Clock,
   FolderGit2,
   Inbox,
   LayoutGrid,
   Plus,
   Search,
-  Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
 import { BrandGlyph } from '../components/brand-glyph.js';
@@ -24,9 +24,8 @@ import { PhoneTabBar } from '../components/shell/phone-tab-bar.js';
 import { ArchivedProjectCard, ProjectCard } from '../components/shell/project-card.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
-  SidebarGroupHeader,
+  SidebarProjectGroupHeader,
   SidebarProjectRow,
-  SidebarThreadRow,
 } from '../components/shell/sidebar-project.js';
 import { GoalLine } from '../components/stream/goal-line.js';
 import { Greeting } from '../components/stream/greeting.js';
@@ -38,18 +37,19 @@ import { Section, Specimen } from './specimen.js';
 
 export function SidebarSection() {
   const [active, setActive] = useState('cairn');
+  const [sideOpen, setSideOpen] = useState(true);
   return (
     <Section
       id="sidebar"
       title="Sidebar parts"
-      lede="The sidebar sits on the canvas: nav rows with key hints, project rows with a waiting count, the open project's nested thread rows on a dashed trail, and the user footer."
+      lede="The sidebar sits on the canvas: nav rows with key hints, project rows with an ochre dot when a task waits on the owner, and owner-made project groups that fold."
     >
       <Specimen
         id="sidebar"
         title="Sidebar"
         note="Click a project"
         stage="canvas"
-        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarGroupHeader label="Needs you" count={1} accent />\n<SidebarThreadRow title="Snooze until needed" state="needs-you" open />\n<SidebarProjectRow name="cairn" active />`}
+        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" active waiting="A task is waiting on you" />\n<SidebarProjectGroupHeader name="Side projects" expanded onToggle={toggle} />\n<SidebarProjectRow name="site" nested />`}
       >
         <div className="flex w-62 flex-col gap-0.5 py-1">
           <SidebarNavRow icon={<Plus className="size-4" />} label="New" shortcut="C" />
@@ -74,19 +74,10 @@ export function SidebarSection() {
               <Plus />
             </Button>
           </div>
-          <SidebarGroupHeader label="Needs you" count={1} accent />
-          <SidebarThreadRow title="Connect a Claude subscription" state="needs-you" />
-          <SidebarThreadRow title="Failed deploy to staging" state="failed" tag="Failed" />
-          <SidebarGroupHeader label="In progress" count={2} />
-          <SidebarThreadRow
-            title="Snooze until needed and an unreasonably long title that truncates"
-            state="running"
-            elapsed="12m"
-          />
-          <SidebarThreadRow title="Fold finished turns" state="idle" hoverTime="3h" />
           <SidebarProjectRow
             name="cairn"
             icon="mountain"
+            waiting="A task is waiting on you"
             active={active === 'cairn'}
             onClick={() => setActive('cairn')}
           />
@@ -95,6 +86,19 @@ export function SidebarSection() {
             active={active === 'api'}
             onClick={() => setActive('api')}
           />
+          <SidebarProjectGroupHeader
+            name="Side projects"
+            expanded={sideOpen}
+            onToggle={() => setSideOpen((open) => !open)}
+          />
+          {sideOpen && (
+            <SidebarProjectRow
+              name="site"
+              nested
+              active={active === 'site'}
+              onClick={() => setActive('site')}
+            />
+          )}
         </div>
       </Specimen>
     </Section>
@@ -166,7 +170,7 @@ export function ProjectsSection() {
             trailing="Yesterday"
           />
           <ListRow
-            icon={<Sparkles className="size-4" />}
+            icon={<CalendarClock className="size-4" />}
             title="weekly-report.md"
             subtitle="Scheduled task · 3 KB"
             trailing="Oct 27"

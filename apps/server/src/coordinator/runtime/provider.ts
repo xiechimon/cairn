@@ -14,7 +14,7 @@ const STREAMS: Record<string, () => ProviderStreams> = {
   'openai-codex-responses': openAICodexResponsesApi,
 };
 
-const DEFAULT_CONTEXT_WINDOW = 200_000;
+export const DEFAULT_CONTEXT_WINDOW = 200_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const KEYLESS_PLACEHOLDER = 'cairn-keyless';
 
@@ -32,7 +32,7 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
     api,
     provider: config.providerId,
     baseUrl,
-    input: m.input ?? ['text'],
+    input: m.input ?? ['text', 'image'],
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     reasoning: subscription,
     contextWindow: m.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
@@ -50,9 +50,10 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
           const key = resolveKey === undefined ? credential?.key : await resolveKey();
           const resolvedKey = key || KEYLESS_PLACEHOLDER;
           return {
-            auth: config.authHeader
-              ? { headers: { Authorization: `Bearer ${resolvedKey}` } }
-              : { apiKey: resolvedKey },
+            auth:
+              config.authHeader && !subscription
+                ? { headers: { Authorization: `Bearer ${resolvedKey}` } }
+                : { apiKey: resolvedKey },
             source: key ? 'cairn step token' : 'no key on the provider',
           };
         },

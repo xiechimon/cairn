@@ -6,11 +6,13 @@ import type { StreamGuards } from './sse-connection.js';
 export const STREAM_QUERY_KEYS: readonly (readonly string[])[] = [
   ['todos'],
   ['todo'],
+  ['tasks'],
   ['schedules'],
   ['build'],
   ['steps'],
   ['notifications'],
   ['chiefThreads'],
+  ['chief'],
   ['machines'],
   ['branchSync'],
   ['messages'],

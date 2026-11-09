@@ -448,7 +448,7 @@ jobs:
 
   gates:
     needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.gates-needed != 'false') }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -466,6 +466,13 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Migration additions stay ahead of current main (#3692)
+        if: ${{ !cancelled() }}
+        run: |
+          git fetch origin +refs/heads/main:refs/remotes/origin/main
+          node --test scripts/migration-main-gate.test.mjs
+          node scripts/migration-main-gate.mjs
 
       - name: "Comment discipline gate (advisory, #1520)"
         continue-on-error: true

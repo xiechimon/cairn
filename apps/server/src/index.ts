@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { ENV_VARS } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
@@ -24,6 +25,8 @@ import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environmen
 import { createServerLogger } from './lib/logger.js';
 import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import { localWorkspaceRoot } from './lib/workspace-root.js';
+import { shutdownRuntimeOtel } from './runtime-otel.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
   setCoordinatorInServer,
@@ -49,13 +52,13 @@ import {
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
+import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
 
 const loadedConfig = loadConfig();
 const logSecrets = [loadedConfig.authToken ?? ''];
 const logger = createServerLogger(logSecrets, {
   level: process.env.LOG_LEVEL ?? 'info',
-  // pino-pretty cannot load its transport worker from a single-file bundle.
   ...(process.env.NODE_ENV === 'production' || BUNDLED_FORM
     ? {}
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
@@ -218,6 +221,12 @@ const coordinator = config.coordinatorInServer
         user: seeded.user,
         vapidKeys,
         reposDir,
+        get workspacesDir() {
+          return localWorkspaceRoot(
+            config.homeDir,
+            resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
+          );
+        },
         attachmentsDir,
         skillsDir: config.skillsDir,
         mcpConfigPath: config.mcpConfigPath,
@@ -248,6 +257,7 @@ const server = serve(
   },
 );
 
+const drainHttp = createHttpDrain(server);
 const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
 computerScreens.attach(server);
@@ -275,7 +285,7 @@ async function shutdown(): Promise<void> {
   ]);
   killInFlightPick();
   computerScreens.close();
-  server.close();
+  await drainHttp(shutdownRuntimeOtel);
   await (await tsnetStarting)?.stop();
   close();
   process.exit(0);

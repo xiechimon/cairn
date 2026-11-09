@@ -44,10 +44,8 @@ import type {
   PatchTeamBody,
   PatchUserBody,
   PlanResponse as PlanRow,
-  ProjectFileResponse,
   ProjectFilesResponse,
   ProjectRecord,
-  ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
   ProviderTestResult,
@@ -66,10 +64,16 @@ import type {
   ThreadMessageResult,
   TodoRecord,
   TokenUsage,
+  TranscriptRow,
   UpdateSkillBody,
   UserRecord,
 } from '@cairn/shared';
-import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
+import {
+  backupHealthSchema,
+  backupNotice,
+  SKILL_ENTRY_FILE,
+  tasksQuerySchema,
+} from '@cairn/shared';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -83,6 +87,8 @@ import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { useAuth } from './auth.js';
 import { api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
+import { cacheUserMessage } from './message-cache.js';
+import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
@@ -181,6 +187,13 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useTasks = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['tasks', teamId],
+    queryFn: async () => tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}`)),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -549,12 +562,28 @@ export const useSkillFile = (
     retry: false,
   });
 
-export const useChief = (teamId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['chief', teamId],
-    queryFn: () => api.get<ChiefGetResponse>(`/api/teams/${teamId}/chief`),
+export function useChief(teamId: string | undefined, enabled: boolean, threadId?: string | null) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ['chief', teamId, threadId ?? null],
+    queryFn: () => {
+      const q =
+        threadId != null && threadId !== '' ? `?threadId=${encodeURIComponent(threadId)}` : '';
+      return api.get<ChiefGetResponse>(`/api/teams/${teamId}/chief${q}`);
+    },
     enabled: enabled && teamId !== undefined,
   });
+  const resumeExpiresInMs = query.data?.context?.resumeExpiresInMs;
+  const dataUpdatedAt = query.dataUpdatedAt;
+  useEffect(() => {
+    if (!enabled || teamId === undefined || resumeExpiresInMs == null) return;
+    const timer = window.setTimeout(() => {
+      void qc.invalidateQueries({ queryKey: ['chief', teamId, threadId ?? null] });
+    }, resumeRefreshDelayMs(resumeExpiresInMs));
+    return () => window.clearTimeout(timer);
+  }, [enabled, teamId, threadId, resumeExpiresInMs, dataUpdatedAt, qc]);
+  return query;
+}
 
 export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
@@ -572,25 +601,6 @@ export const useNotifications = (teamId: string | undefined, enabled: boolean) =
     enabled: enabled && teamId !== undefined,
   });
 
-export const useProjectTree = (
-  projectId: string | undefined,
-  ref: string | undefined,
-  path: string | undefined,
-) =>
-  useQuery({
-    queryKey: ['tree', projectId, ref, path],
-    queryFn: () => {
-      const qs = new URLSearchParams();
-      if (ref !== undefined) qs.set('ref', ref);
-      if (path !== undefined && path !== '') qs.set('path', path);
-      const query = qs.toString();
-      return api.get<ProjectTreeResponse>(
-        `/api/projects/${projectId}/tree${query !== '' ? `?${query}` : ''}`,
-      );
-    },
-    enabled: projectId !== undefined,
-  });
-
 export const useProjectFiles = (projectId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['files', projectId],
@@ -601,19 +611,19 @@ export const useProjectFiles = (projectId: string | undefined, enabled: boolean)
     staleTime: 5 * 60 * 1000,
   });
 
-export const useProjectFile = (
-  projectId: string | undefined,
-  path: string | undefined,
-  ref: string | undefined,
-) =>
-  useQuery({
-    queryKey: ['file', projectId, path, ref],
-    queryFn: () =>
-      api.get<ProjectFileResponse>(
-        `/api/projects/${projectId}/file?path=${encodeURIComponent(path ?? '')}${ref !== undefined ? `&ref=${encodeURIComponent(ref)}` : ''}`,
-      ),
-    enabled: projectId !== undefined && path !== undefined,
+export function usePatchProject(teamId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; body: PatchProjectBody }) =>
+      api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
+    onSuccess: (record) => {
+      qc.setQueryData<ProjectRecord[]>(['projects', teamId], (records) =>
+        records?.map((project) => (project.id === record.id ? record : project)),
+      );
+      void qc.invalidateQueries();
+    },
   });
+}
 
 export function useApiMutations(teamId: string | undefined) {
   const qc = useQueryClient();
@@ -826,11 +836,7 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<ProjectRecord>('/api/projects', { ...body, ...(teamId ? { teamId } : {}) }),
       onSuccess: invalidateAll,
     }),
-    patchProject: useMutation({
-      mutationFn: (input: { id: string; body: PatchProjectBody }) =>
-        api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
-      onSuccess: invalidateAll,
-    }),
+    patchProject: usePatchProject(teamId),
     patchAutonomy: useMutation({
       mutationFn: (input: { id: string; body: PatchAutonomyBody }) =>
         api.patch<AutonomyRecord>(`/api/projects/${input.id}/autonomy`, input.body),
@@ -866,13 +872,26 @@ export function useApiMutations(teamId: string | undefined) {
           ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
         };
         return input.threadId === null
-          ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, body)
-          : api.post<{ thread: ChiefThread }>(
+          ? api.post<{ thread: ChiefThread; message: TranscriptRow }>(
+              `/api/teams/${teamId}/chief/threads`,
+              body,
+            )
+          : api.post<{ thread: ChiefThread; message: TranscriptRow }>(
               `/api/conversations/${input.threadId}/messages`,
               body,
             );
       },
-      onSuccess: invalidateAll,
+      onSuccess: (result) => {
+        void qc.cancelQueries({ queryKey: ['chiefThreads', teamId] });
+        qc.setQueryData<ChiefThread[]>(['chiefThreads', teamId], (threads) => {
+          const current = threads ?? [];
+          return current.some((thread) => thread.id === result.thread.id)
+            ? current.map((thread) => (thread.id === result.thread.id ? result.thread : thread))
+            : [...current, result.thread];
+        });
+        cacheUserMessage(qc, result.thread.id, result.message);
+        invalidateAll();
+      },
     }),
     chiefRewind: useMutation({
       mutationFn: (input: { threadId: string; messageId: string }) =>
@@ -1007,7 +1026,12 @@ export function useApiMutations(teamId: string | undefined) {
     deleteMemory: useMutation({
       mutationFn: (input: { memoryId: string }) =>
         api.del<void>(`/api/teams/${teamId}/memories/${input.memoryId}`),
-      onSuccess: invalidateAll,
+      onSuccess: (_data, input) => {
+        qc.setQueryData<MemoryRecord[]>(['memories', teamId], (records) =>
+          records?.filter((record) => record.id !== input.memoryId),
+        );
+        invalidateAll();
+      },
     }),
     sendSteer: useMutation({
       mutationFn: (input: {
@@ -1020,7 +1044,7 @@ export function useApiMutations(teamId: string | undefined) {
         queuedMessageId?: string;
         clientMessageId?: string;
       }) =>
-        api.post<{ message: { id: string } }>(
+        api.post<{ conversationId?: string; message?: unknown }>(
           `/api/conversations/${input.conversationId}/messages`,
           {
             content: input.content,
@@ -1035,7 +1059,18 @@ export function useApiMutations(teamId: string | undefined) {
       onError: (_error, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
       },
-      onSuccess: (_data, input) => {
+      onSuccess: (data, input) => {
+        cacheUserMessage(
+          qc,
+          data.conversationId ?? input.conversationId,
+          data.message,
+          input.queuedMessageId === undefined
+            ? undefined
+            : {
+                conversationId: input.conversationId,
+                messageId: input.queuedMessageId,
+              },
+        );
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });

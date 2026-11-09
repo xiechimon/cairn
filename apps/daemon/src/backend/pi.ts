@@ -16,7 +16,13 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { classifyStepFailure, ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
+import {
+  classifyStepFailure,
+  ENV_VARS,
+  THINKING_LEVELS,
+  contextTokensOf as usageContextTokens,
+} from '@cairn/shared';
+import { getSystemMessageText } from '@earendil-works/pi-ai';
 import {
   type BuiltinProvider,
   getAllBuiltinModels,
@@ -505,6 +511,7 @@ export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEvent
           cacheWrite: msg.usage.cacheWrite,
         },
         costUsd: msg.usage.cost?.total,
+        output: { role: msg.role, content: msg.content },
       });
     }
     return;
@@ -686,8 +693,7 @@ function contextTokensOf(msg: PiMessageLike): number {
   if (msg.stopReason === 'aborted' || msg.stopReason === 'error' || msg.usage === undefined) {
     return 0;
   }
-  const u = msg.usage;
-  return (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+  return usageContextTokens(msg.usage);
 }
 
 function settledUsage(state: MapState): ModelUsage[] {
@@ -930,9 +936,24 @@ export class PiBackend implements AgentBackend {
     const ceilingFetch = compactionCeilingFetch(diagnosedFetch, (line) => {
       this.opts.onCompactionLog?.(line);
     });
+    const spans =
+      opts.telemetry !== undefined
+        ? new PiStepSpanSink(
+            opts.telemetry,
+            { provider: opts.provider.providerId, model: opts.modelId },
+            this.opts.onOtelLog,
+          )
+        : undefined;
     const streamSimple = runtime.streamSimple.bind(runtime);
-    runtime.streamSimple = (requestModel, context, options) =>
-      streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+    runtime.streamSimple = (requestModel, context, options) => {
+      spans?.request(
+        context.messages.map((message) => ({
+          role: message.role,
+          content: message.role === 'system' ? getSystemMessageText(message) : message.content,
+        })),
+      );
+      return streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+    };
     const diagnose = (message: string): string =>
       enrichProviderError(message, providerResponses.current, {
         ...(this.opts.machineName !== undefined
@@ -985,12 +1006,15 @@ export class PiBackend implements AgentBackend {
         onMcpLog?.(connectFailedLine(slug, reason));
       }
     }, askRelay);
+    const runtimePrompt = opts.systemPrompt;
     const loader = new DefaultResourceLoader({
       cwd: opts.cwd,
       agentDir: this.opts.agentDir,
       settingsManager,
       noSkills: true,
-      ...(opts.systemPrompt !== undefined ? { systemPromptOverride: () => opts.systemPrompt } : {}),
+      ...(runtimePrompt !== undefined
+        ? { appendSystemPromptOverride: (base) => [...base, runtimePrompt] }
+        : {}),
       extensionFactories: [
         gateExtension,
         mcpRegisterExtension,
@@ -1103,18 +1127,8 @@ export class PiBackend implements AgentBackend {
       mcpEndpoints.length > 0 || askRelay !== undefined ? { uiContext: mcpCaptureUi } : {},
     );
     this.opts.onSession?.(session.sessionId, session.sessionFile);
-    const handle = new PiSessionHandle(
-      session,
-      model,
-      diagnose,
-      opts.telemetry !== undefined
-        ? new PiStepSpanSink(
-            opts.telemetry,
-            { provider: opts.provider.providerId, model: opts.modelId },
-            this.opts.onOtelLog,
-          )
-        : undefined,
-      (line) => this.opts.onCompactionLog?.(line),
+    const handle = new PiSessionHandle(session, model, diagnose, spans, (line) =>
+      this.opts.onCompactionLog?.(line),
     );
     if (opts.prompt !== undefined) {
       const promptImages =

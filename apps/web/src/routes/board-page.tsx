@@ -8,6 +8,7 @@ import {
   useProjects,
   useSchedules,
   useSearchResults,
+  useTasks,
   useTeams,
   useTodos,
 } from '../api/hooks.js';
@@ -27,6 +28,7 @@ import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
+import { useTasksView } from '../board/use-tasks-view.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
@@ -42,6 +44,7 @@ export function BoardPage() {
   const { chiefView, setChiefView, chiefData } = chief;
 
   const todosQ = useTodos(teamId, live);
+  const tasksQ = useTasks(teamId, live);
   const schedulesQ = useSchedules(live);
   const projectsQ = useProjects(teamId, live);
   const machinesQ = useMachines(teamId, live);
@@ -98,6 +101,7 @@ export function BoardPage() {
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
   const todos = live ? liveTodos : fixtureTodos;
+  const tasks = useTasksView(fixture);
   const machines = useMemo(
     () => (live ? mapMachines(machinesQ.data ?? []) : fixture.resources?.machines),
     [live, machinesQ.data, fixture],
@@ -241,10 +245,10 @@ export function BoardPage() {
               banner={homeBanner}
               machines={machines}
               coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
-              schedules={schedules}
               machinesQuery={live ? machinesQ : undefined}
               todosQuery={live ? todosQ : undefined}
-              schedulesQuery={live ? schedulesQ : undefined}
+              tasks={tasks}
+              tasksQuery={live ? tasksQ : undefined}
             />
           )}
         </div>

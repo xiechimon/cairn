@@ -7,6 +7,8 @@ import type {
 } from '@cairn/shared';
 import {
   CHIEF_NOTICE_KIND,
+  coordinatorCreateTodoParamsSchema,
+  coordinatorUpdateTodoParamsSchema,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
@@ -16,7 +18,6 @@ import {
   type MemoryLayer,
   MODEL_SOURCE_RUNTIME_LABELS,
   snoozeTodoBodySchema,
-  todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
@@ -50,6 +51,7 @@ import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
+import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
@@ -73,14 +75,7 @@ import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js
 import { snoozeTodo } from './snooze.js';
 import { seedFixedTags } from './tags.js';
 import { startThreadBuild } from './thread-message.js';
-import {
-  createAutonomousTodo,
-  deleteTodo,
-  getTodo,
-  listTodos,
-  setTodoPhase,
-  updateAutonomousTodo,
-} from './todos.js';
+import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
@@ -94,6 +89,7 @@ export interface ChiefToolDeps {
   vapidKeys?: VapidKeys | null;
   convHub?: ConversationStreamHub;
   reposDir: string;
+  workspacesDir?: string | undefined;
   attachmentsDir: string;
   skillsDir: string;
   mcpConfigPath?: string;
@@ -109,6 +105,7 @@ export interface ChiefToolCtx {
   chiefAgentId: string | null;
   conversationId: string;
   turnPrompt?: string | null;
+  turnMessageIds?: readonly string[];
   turnScopeProjectId?: string | null;
   turnScopeMixed?: boolean;
 }
@@ -133,24 +130,12 @@ function optStr(params: Params, key: string): string | undefined {
   if (typeof v !== 'string') throw new HttpError(400, `invalid params.${key}: expected string`);
   return v;
 }
-function optTodoOutput(params: Params, key: string): 'code' | 'info' | undefined {
-  const v = params[key];
-  if (v === undefined || v === null) return undefined;
-  const parsed = todoOutputSchema.safeParse(v);
-  if (!parsed.success) {
-    throw new HttpError(400, `invalid params.${key}: expected "code" or "info"`);
-  }
-  return parsed.data;
-}
 function strArr(params: Params, key: string): string[] {
   const v = params[key];
   if (!Array.isArray(v) || v.some((x) => typeof x !== 'string')) {
     throw new HttpError(400, `invalid params.${key}: expected string[]`);
   }
   return v as string[];
-}
-function optStrArr(params: Params, key: string): string[] | undefined {
-  return params[key] === undefined || params[key] === null ? undefined : strArr(params, key);
 }
 function num(params: Params, key: string): number | undefined {
   const v = params[key];
@@ -272,6 +257,10 @@ function requireUnarchivedTargets(db: Db, teamId: string, name: string, params: 
 }
 
 const DOCS_MAX_PATHS = 24;
+const DOCS_MAX_FILE_BYTES = 64 * 1024;
+const DOCS_MAX_RESPONSE_BYTES = 128 * 1024;
+const DOCS_MAX_JSON_EXPANSION = 6;
+const DOCS_FILE_METADATA_RESERVE_BYTES = 2048;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
@@ -435,17 +424,76 @@ export async function executeChiefTool(
       const files: Record<string, unknown>[] = [];
       for (const p of capped) {
         try {
-          const f = await readFile({ db, reposDir: deps.reposDir }, projectId, p, ref);
-          files.push({ path: f.path, ref: f.ref, encoding: f.encoding, content: f.content });
+          const segments = p.toLowerCase().split(/[\\/]/);
+          if (
+            segments.some((segment) =>
+              /^(?:\.git|\.ssh|\.aws|\.gnupg|\.env(?:\..*)?|\.npmrc|\.pypirc|credentials(?:\.json)?|id_rsa|id_ed25519)$/.test(
+                segment,
+              ),
+            ) ||
+            /\.(?:pem|key|p12|pfx)$/i.test(p)
+          ) {
+            throw new HttpError(403, 'credential file access denied');
+          }
+          const f = await readFile(
+            { db, reposDir: deps.reposDir, workspacesDir: deps.workspacesDir },
+            projectId,
+            p,
+            ref,
+            {
+              defaultBranch: true,
+              maxBytes: Math.max(
+                0,
+                Math.min(
+                  DOCS_MAX_FILE_BYTES,
+                  Math.floor(
+                    (DOCS_MAX_RESPONSE_BYTES -
+                      Buffer.byteLength(
+                        json({ projectId, name: row.name, files, omitted: paths.length }),
+                      ) -
+                      DOCS_FILE_METADATA_RESERVE_BYTES) /
+                      DOCS_MAX_JSON_EXPANSION,
+                  ),
+                ),
+              ),
+            },
+          );
+          files.push({
+            path: f.path,
+            ref: f.ref,
+            commit: f.commit,
+            encoding: f.encoding,
+            content: f.content,
+          });
         } catch (err) {
-          files.push({ path: p, error: err instanceof Error ? err.message : String(err) });
+          files.push({
+            path: p.slice(0, 512),
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 1024),
+          });
+        }
+        if (
+          Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
+          DOCS_MAX_RESPONSE_BYTES
+        ) {
+          files.pop();
+          files.push({
+            path: p.slice(0, 512),
+            error: 'repository document response limit exceeded',
+          });
+          if (
+            Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
+            DOCS_MAX_RESPONSE_BYTES
+          ) {
+            files.pop();
+            break;
+          }
         }
       }
       return json({
         projectId,
         name: row.name,
         files,
-        ...(paths.length > capped.length ? { omitted: paths.length - capped.length } : {}),
+        ...(paths.length > files.length ? { omitted: paths.length - files.length } : {}),
       });
     }
     case 'usage': {
@@ -500,45 +548,27 @@ export async function executeChiefTool(
       );
 
     case 'create_todo': {
-      const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId, ctx.teamId);
-      const output = optTodoOutput(params, 'output');
-      const blockedBy = optStrArr(params, 'blockedBy');
-      const record = createAutonomousTodo(svc, {
-        teamId: ctx.teamId,
-        projectId,
-        title: str(params, 'title'),
-        spec: str(params, 'spec'),
+      const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
+      requireProjectRow(db, body.projectId, ctx.teamId);
+      const record = createRequestTodo(svc, ctx, body, {
         createdBy:
           ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
             ? ctx.userId
             : ctx.chiefAgentId,
         ownerId: ctx.userId,
-        orchestration: { threadId: ctx.threadId },
-        ...(output !== undefined ? { output } : {}),
-        ...(blockedBy !== undefined ? { blockedBy } : {}),
       });
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
         actor: 'Coordinator',
       });
-      return json({ ...getTodo(svc, record.id), sourceBuildId: ctx.chiefId, buildId });
+      return json({ ...record, ...getTodo(svc, record.id), sourceBuildId: ctx.chiefId, buildId });
     }
     case 'update_todo': {
-      const todoId = str(params, 'todoId');
-      requireTeamTodo(db, todoId, ctx.teamId);
-      const blockedBy = optStrArr(params, 'blockedBy');
-      const record = updateAutonomousTodo(svc, todoId, {
-        ...(blockedBy !== undefined ? { blockedBy } : {}),
-        ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
-        ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
-        ...(params.tagIds !== undefined ? { tagIds: strArr(params, 'tagIds') } : {}),
-        ...(optStr(params, 'projectId') !== undefined
-          ? { projectId: optStr(params, 'projectId') }
-          : {}),
-      });
-      if (!record) throw new HttpError(404, `todo ${todoId}`);
+      const body = parseWith(coordinatorUpdateTodoParamsSchema, params, 'params');
+      requireTeamTodo(db, body.todoId, ctx.teamId);
+      const record = updateRequestTodo(svc, ctx, body);
+      if (!record) throw new HttpError(404, `todo ${body.todoId}`);
       return json(record);
     }
     case 'delete_todos': {
@@ -785,6 +815,7 @@ export async function executeChiefTool(
           requestId,
           questions,
           provenance,
+          askedFor: [...(ctx.turnMessageIds ?? [])],
         },
       );
       return json({

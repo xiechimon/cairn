@@ -177,7 +177,7 @@ describe('#1148 port base (CAIRN_PORT_BASE slot segmentation)', () => {
     await waitFor(() => api.parked !== null);
     api.parked?.(claimedFor('c1', 'chief-t1', 'chief'));
     await waitFor(() => created.length >= 3);
-    expect(created[2]?.env).toBeUndefined();
+    expect(created[2]?.env?.CAIRN_PORT_BASE).toBeUndefined();
     gate1.resolve();
     await waitFor(() => api.doneBodies.some((d) => d.stepId === 's1'));
     await waitFor(() => api.parked !== null);

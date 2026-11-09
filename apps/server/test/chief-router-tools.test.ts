@@ -22,7 +22,7 @@ import { buildChiefSystemPrompt, chiefToolDefHashes } from '../src/services/chie
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
-import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { AGENT_ID, H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { seedSessionRoute } from './helpers.js';
 
 registerChiefHarness();
@@ -136,11 +136,7 @@ describe('router tools', () => {
     });
 
     test('the other base tools keep working', async () => {
-      const created = (await relay('create_todo', {
-        projectId: H.projectId,
-        title: 'Still creatable',
-        spec: 'spec',
-      })) as { id: string };
+      const created = (await relay('create_todo', ownerTodo('Still creatable'))) as { id: string };
       expect(created.id).toBeTruthy();
       expect(await relay('projects', {})).toHaveLength(1);
     });

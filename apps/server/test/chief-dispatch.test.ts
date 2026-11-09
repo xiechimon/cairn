@@ -2,36 +2,23 @@ import { MERGE_HUMAN_ONLY_COPY } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build as buildTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
-import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
+import { AGENT_ID, H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
 
-describe('wording -> spec three-segment transform + provenance (r5 section 3.2)', () => {
-  test('create_todo lands the three-segment spec verbatim + provenance createdBy/sourceBuildId/ownerId', async () => {
-    const spec = [
-      '> 帮 demo 写一份 CONTRIBUTING.md 贡献指南',
-      '',
-      '要求：',
-      '- 说明怎么给 Agent 提任务',
-      '- 说明怎么验收改动',
-      '',
-      '补充信息（探测得出，非用户确认）：',
-      '- 当前仓库仅有 README.md',
-    ].join('\n');
-    const created = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: '编写 CONTRIBUTING.md 贡献指南',
-      spec,
-    })) as {
+describe('create_todo provenance', () => {
+  test('create_todo lands the owner words verbatim + provenance createdBy/sourceBuildId/ownerId', async () => {
+    const created = (await relay(
+      'create_todo',
+      ownerTodo('帮 demo 写一份 CONTRIBUTING.md 贡献指南'),
+    )) as {
       id: string;
       createdBy: string | null;
       ownerId: string | null;
       sourceBuildId: string | null;
       spec: string;
     };
-    expect(created.spec).toContain('> 帮 demo');
-    expect(created.spec).toContain('要求：');
-    expect(created.spec).toContain('补充信息（探测得出，非用户确认）：');
+    expect(created.spec).toBe('帮 demo 写一份 CONTRIBUTING.md 贡献指南');
     expect(created.createdBy).toBe(AGENT_ID);
     expect(created.ownerId).toBe(H.userId);
     expect(created.sourceBuildId).toBe(H.chiefId);
@@ -43,11 +30,7 @@ describe('wording -> spec three-segment transform + provenance (r5 section 3.2)'
 
 describe('open_thread dispatch', () => {
   test('create_todo starts one session step triggered by the chief and queues the todo (#903, task stall class 3)', async () => {
-    const out = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: '写文档',
-      spec: 's',
-    })) as {
+    const out = (await relay('create_todo', ownerTodo('写文档'))) as {
       id: string;
       buildId: string;
     };
@@ -64,11 +47,7 @@ describe('open_thread dispatch', () => {
 
 describe('merge_builds machine entry hard-refused (#1256)', () => {
   test('chief calls merge_builds -> refusal JSON, text names the human exit, no merge step landed', async () => {
-    const todoRec = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: '合并只由人触发',
-      spec: 's',
-    })) as { id: string };
+    const todoRec = (await relay('create_todo', ownerTodo('合并只由人触发'))) as { id: string };
     const now = Date.now();
     H.s.db
       .insert(buildTable)
@@ -107,11 +86,9 @@ describe('merge_builds machine entry hard-refused (#1256)', () => {
 test.each(['Please implement this', '[wake:gate] provenance=test\nReview task'])(
   'records the requesting actor from the coordinator turn: %s',
   async (turnPrompt) => {
-    const created = (await relay(
-      'create_todo',
-      { projectId: H.projectId, title: 'Requested task', spec: 'Implement' },
-      { turnPrompt },
-    )) as { createdBy: string | null };
+    const created = (await relay('create_todo', ownerTodo('Requested task'), { turnPrompt })) as {
+      createdBy: string | null;
+    };
     expect(created.createdBy).toBe(turnPrompt.startsWith('[wake:') ? AGENT_ID : H.userId);
   },
 );
