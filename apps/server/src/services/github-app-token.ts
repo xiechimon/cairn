@@ -1,5 +1,4 @@
 import { request } from 'node:http';
-import { appBotIdentity, type GitIdentity } from '@cairn/shared';
 import { z } from 'zod';
 import type { ServerConfig } from '../config.js';
 import type { FetchLike } from '../lib/github.js';
@@ -40,8 +39,6 @@ type CachedInstallation = {
 };
 
 const installations = new Map<string, CachedInstallation>();
-const botIdentities = new Map<string, GitIdentity>();
-const botUserSchema = z.object({ login: z.string(), id: z.number().int().positive() });
 const pendingInstallations = new Map<string, Promise<CachedInstallation | null>>();
 
 async function mintToken(socketPath: string, force: boolean) {
@@ -184,35 +181,6 @@ async function repoToken(
     return null;
   }
   return null;
-}
-
-export async function appCommitIdentity(deps: GithubAppTokenDeps): Promise<GitIdentity | null> {
-  if (!deps.config.githubAppTokenSocket) return null;
-  const value = await installation(deps, false);
-  if (value === null) throw new Error('GitHub App identity unavailable');
-  const cached = botIdentities.get(value.appSlug);
-  if (cached) return cached;
-  const login = `${value.appSlug}[bot]`;
-  const response = await (deps.fetchImpl ?? fetch)(
-    `${githubApiBaseUrl()}/users/${encodeURIComponent(login)}`,
-    {
-      headers: {
-        authorization: `Bearer ${tokenValue(value.token)}`,
-        accept: 'application/vnd.github+json',
-        'x-github-api-version': '2022-11-28',
-        'user-agent': 'cairn-server',
-      },
-      redirect: 'error',
-      signal: AbortSignal.timeout(15_000),
-    },
-  );
-  if (!response.ok) throw new Error(`GitHub App bot user ${login} unavailable`);
-  const user = botUserSchema.parse(await response.json());
-  if (user.login.toLowerCase() !== login.toLowerCase())
-    throw new Error(`GitHub returned ${user.login} for the App bot user ${login}`);
-  const identity = appBotIdentity(value.appSlug, user.id);
-  botIdentities.set(value.appSlug, identity);
-  return identity;
 }
 
 export function appTokenOrNull(
