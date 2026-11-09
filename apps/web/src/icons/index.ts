@@ -62,7 +62,6 @@ export { SearchWhite } from './SearchWhite.js';
 export { Server } from './Server.js';
 export { ServerThin } from './ServerThin.js';
 export { Settings } from './Settings.js';
-export { Sparkle } from './Sparkle.js';
 export { SquarePen } from './SquarePen.js';
 export { Tag } from './Tag.js';
 export { Terminal } from './Terminal.js';
