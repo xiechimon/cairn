@@ -45,6 +45,34 @@ export function retentionMsFor(
   return LONG_RETENTION_OPENAI_MS;
 }
 
+export type ContextResume = 'warm' | 'cold' | 'compacted' | 'idle';
+
+export function contextResumeOf(args: {
+  now: number;
+  retentionMs: number;
+  lastUsage: TurnUsageSnapshot | null;
+  lastColdSlimAt: number | null;
+}): ContextResume {
+  if (args.lastUsage === null) return 'idle';
+  if (
+    args.lastColdSlimAt !== null &&
+    args.now - args.lastColdSlimAt >= 0 &&
+    args.now - args.lastColdSlimAt < args.retentionMs
+  ) {
+    return 'compacted';
+  }
+  if (
+    isColdResume({
+      now: args.now,
+      lastUsage: args.lastUsage,
+      retentionMs: args.retentionMs,
+    })
+  ) {
+    return 'cold';
+  }
+  return 'warm';
+}
+
 export function isColdResume(args: {
   now: number;
   lastUsage: TurnUsageSnapshot | null;

@@ -4,6 +4,7 @@ import {
   COLD_CACHE_MISS_MIN_TOKENS,
   COLD_RECENT_EXCHANGES,
   coldWindowStartFromRows,
+  contextResumeOf,
   imageOmissionNote,
   isColdResume,
   isPureToolCallAssistant,
@@ -258,6 +259,61 @@ describe('selectColdMessageWindow', () => {
       'u0',
       'current',
     ]);
+  });
+});
+
+describe('contextResumeOf', () => {
+  it('maps idle / warm / cold / compacted for the meter short states', () => {
+    expect(
+      contextResumeOf({
+        now: 10_000,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: null,
+        lastColdSlimAt: null,
+      }),
+    ).toBe('idle');
+    expect(
+      contextResumeOf({
+        now: 10_000,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: {
+          createdAt: 9_000,
+          cacheRead: 12_000,
+          input: 100,
+          contextTokens: 12_100,
+          model: 'openai/gpt',
+        },
+        lastColdSlimAt: null,
+      }),
+    ).toBe('warm');
+    expect(
+      contextResumeOf({
+        now: SHORT_RETENTION_MS + 5_000,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: {
+          createdAt: 0,
+          cacheRead: 0,
+          input: COLD_CACHE_MISS_MIN_TOKENS,
+          contextTokens: 20_000,
+          model: 'anthropic/claude',
+        },
+        lastColdSlimAt: null,
+      }),
+    ).toBe('cold');
+    expect(
+      contextResumeOf({
+        now: SHORT_RETENTION_MS + 5_000,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: {
+          createdAt: 0,
+          cacheRead: 0,
+          input: COLD_CACHE_MISS_MIN_TOKENS,
+          contextTokens: 20_000,
+          model: 'anthropic/claude',
+        },
+        lastColdSlimAt: SHORT_RETENTION_MS + 4_000,
+      }),
+    ).toBe('compacted');
   });
 });
 
