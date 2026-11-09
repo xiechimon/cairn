@@ -16,7 +16,7 @@ import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
 import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
-import { jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
+import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
@@ -134,6 +134,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (body.autonomyPaused === true) {
       await pauseTeamGithubRepos(
         {
+          ...githubAppOf(ctx),
           db: ctx.db,
           box: ctx.secretBox,
           githubFetch: ctx.githubFetch,
