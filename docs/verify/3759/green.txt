@@ -3,12 +3,12 @@
  RUN  v5.0.1 REPO
 
 
- Test Files  11 passed (11)
-      Tests  92 passed (92)
-   Start at  12:29:15
-   Duration  7.60s (tests 44%, import 32%, transform 23%, setup 1%)
+ Test Files  14 passed (14)
+      Tests  119 passed (119)
+   Start at  12:38:10
+   Duration  11.53s (import 41%, tests 41%, transform 17%, setup 1%)
 
-     Import  |@xiechimon/cairn| 385 modules were evaluated 3420 times · 8.96s total, 32% of tracked time
-             ~1.25s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+     Import  |@xiechimon/cairn| 419 modules were evaluated 4455 times · 16.83s total, 41% of tracked time
+             ~2.75s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
              learn more: https://vitest.dev/guide/improving-performance#test-isolation
 
