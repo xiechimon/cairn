@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b2232e95-df50-4c40-b8c9-0b4476d55c87",
-  "prevId": "81a8be48-dab9-429a-935b-ff282906030c",
+  "id": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
+  "prevId": "b875be75-f86b-4e0e-b2df-e0f143bdbe4c",
   "tables": {
     "agent_memory": {
       "name": "agent_memory",
@@ -1941,6 +1941,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "browserEnabled": {
+          "name": "browserEnabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -3911,6 +3919,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "group": {
+          "name": "group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "teamId": {
           "name": "teamId",
           "type": "text",
@@ -5311,13 +5326,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "ownerMessageIds": {
-          "name": "ownerMessageIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "byPerson": {
           "name": "byPerson",
           "type": "integer",
@@ -6378,13 +6386,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
-        },
-        "request": {
-          "name": "request",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {

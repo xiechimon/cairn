@@ -7,6 +7,7 @@ import type {
   TaskRequest,
   TodoOutputKind,
   TodoRecord,
+  TodoSection,
   TodoSourceKind,
   UserRecord,
 } from '@cairn/shared';
@@ -54,7 +55,7 @@ import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
-import { ownerOf, reconcileOwners } from './owner.js';
+import { ownershipOf, reconcileOwners, sectionOf } from './owner.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
 import { profileForStep } from './routing-rules.js';
@@ -96,7 +97,11 @@ function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: P
   triggerChiefWakes(deps, record, to);
 }
 
-export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoRecord {
+export function toTodoRecord(
+  deps: Pick<TodoDeps, 'db'>,
+  row: TodoRow,
+  now = nowMs(),
+): TodoRecord & { section: TodoSection | null } {
   const { db } = deps;
   const tagIds = db
     .select({ tagId: todoTag.tagId })
@@ -130,6 +135,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     }
   }
   const waitingOn = waitingOnOf(deps, row);
+  const ownership = ownershipOf(db, row);
   const usage = db
     .select({
       rows: sql<number>`count(*)`,
@@ -173,7 +179,8 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
     output: row.output,
-    owner: ownerOf(db, row),
+    owner: ownership?.owner ?? null,
+    section: sectionOf(row, ownership, now),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     ...((row.phase === 'done' || row.phase === 'closed') && row.latestBuildId !== null
       ? { verified: buildVerified(db, row.latestBuildId) }

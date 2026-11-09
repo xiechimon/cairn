@@ -178,6 +178,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
   return {
     id: row.id,
     name: row.name,
+    group: row.group,
     teamId: row.teamId,
     splitPolicy: row.splitPolicy,
     baseBranch: row.baseBranch,

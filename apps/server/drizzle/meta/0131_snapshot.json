@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "81a8be48-dab9-429a-935b-ff282906030c",
+  "id": "b875be75-f86b-4e0e-b2df-e0f143bdbe4c",
   "prevId": "8bdb6a42-fac8-4dc9-8d09-778f4351e693",
   "tables": {
     "agent_memory": {
@@ -3911,6 +3911,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "group": {
+          "name": "group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "teamId": {
           "name": "teamId",
           "type": "text",
@@ -6371,13 +6378,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
-        },
-        "request": {
-          "name": "request",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {

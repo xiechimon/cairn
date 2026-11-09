@@ -6802,6 +6802,23 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "section": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "needs_input",
+                    "ready_for_review",
+                    "up_next",
+                    "working",
+                    "resolved",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "seqNum": {
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
@@ -8310,6 +8327,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/computers",
   },
   {
+    "method": "POST",
+    "note": "D75: ensure a stopped private computer for a capable machine and set browserEnabled",
+    "path": "/api/computers",
+  },
+  {
+    "method": "PATCH",
+    "note": "D75: enable or disable browser tools on a computer",
+    "path": "/api/computers/{id}",
+  },
+  {
     "method": "GET",
     "note": "recent computer.command feed entries, newest last (D75 P8a)",
     "path": "/api/computers/{id}/commands",
@@ -8508,6 +8535,13 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/todos",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/tasks",
     "query": [
       "teamId",
     ],
@@ -9511,6 +9545,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "browser": {
+              "const": true,
+              "type": "boolean",
+            },
             "codexLogin": {
               "additionalProperties": false,
               "properties": {
@@ -9973,6 +10011,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     },
     "githubRepo": {
       "type": "string",
+    },
+    "group": {
+      "type": [
+        "string",
+        "null",
+      ],
     },
     "icon": {
       "anyOf": [
@@ -11160,6 +11204,23 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             },
           },
           "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "section": {
+      "anyOf": [
+        {
+          "enum": [
+            "needs_input",
+            "ready_for_review",
+            "up_next",
+            "working",
+            "resolved",
+          ],
+          "type": "string",
         },
         {
           "type": "null",

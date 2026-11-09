@@ -4,7 +4,7 @@ import { pressOpenCoordinator } from './helpers.js';
 const ROUTES = [
   ['home', '/app?scenario=home-c'],
   ['pages', '/app/schedules?scenario=11'],
-  ['team', '/app/team?scenario=12'],
+  ['work-routing', '/app/settings/work-routing?scenario=12'],
   ['settings', '/app/settings?scenario=01'],
   ['project', '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks'],
   ['detail with unread', '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread'],

@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment } from '../db/schema.js';
 import type { AttachmentGrantPayload } from '../lib/attachments-token.js';
@@ -351,6 +351,21 @@ export interface AttachmentRow {
   scope: 'spec' | 'message';
   status: 'pending' | 'ready' | 'failed';
   createdAt: number;
+}
+
+export function resolveToolAttachmentId(db: Db, teamId: string, reference: string): string {
+  const row = db
+    .select({ id: attachment.id })
+    .from(attachment)
+    .where(
+      and(
+        eq(attachment.teamId, teamId),
+        or(eq(attachment.id, reference), eq(attachment.storageKey, reference)),
+      ),
+    )
+    .get();
+  if (!row) throw new HttpError(404, `attachment ${reference}`);
+  return row.id;
 }
 
 export function requireAttachmentRow(db: Db, teamId: string, attachmentId: string): AttachmentRow {

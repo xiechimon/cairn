@@ -114,6 +114,7 @@ export const autonomyPause = sqliteTable(
 export const project = sqliteTable('project', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  group: text('group'),
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
@@ -376,6 +377,7 @@ export const computer = sqliteTable(
     controlLeaseExpiresAt: epochMs('controlLeaseExpiresAt'),
     controlFence: integer('controlFence').notNull().default(0),
     screenGeneration: integer('screenGeneration').notNull().default(0),
+    browserEnabled: bool('browserEnabled').notNull().default(false),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
   },
