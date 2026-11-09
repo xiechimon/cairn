@@ -53,6 +53,15 @@ test('digits respect composition, modifiers, other dialogs, typed answers and or
     await expect(option(0)).toHaveAttribute('aria-pressed', 'true');
     await page.getByTestId('chief-composer-block').screenshot({ path: testInfo.outputPath(`generic-question-${theme}.png`) });
   }
+  for (let n = 1; n <= 8; n++) {
+    const shiftedDigit = { key: String(n), code: `Digit${n}`, shiftKey: true };
+    const initiallySelected = n === 1;
+    await composer.dispatchEvent('keydown', shiftedDigit);
+    await expect(option(n - 1)).toHaveAttribute('aria-pressed', String(!initiallySelected));
+    await expect(composer).toHaveValue('');
+    await composer.dispatchEvent('keydown', shiftedDigit);
+    await expect(option(n - 1)).toHaveAttribute('aria-pressed', String(initiallySelected));
+  }
   await composer.dispatchEvent('keydown', { key: '2', code: 'Numpad2' });
   await expect(option(1)).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('2');
@@ -60,7 +69,8 @@ test('digits respect composition, modifiers, other dialogs, typed answers and or
     { key: '2', isComposing: true },
     { key: '2', keyCode: 229 },
     { key: '2', repeat: true },
-    { key: '2', shiftKey: true },
+    { key: '@', code: 'Digit2', shiftKey: true },
+    { key: 'é', code: 'Digit2' },
     { key: '2', ctrlKey: true },
     { key: '2', metaKey: true },
     { key: '2', altKey: true },
@@ -68,6 +78,7 @@ test('digits respect composition, modifiers, other dialogs, typed answers and or
   ]) {
     await composer.dispatchEvent('keydown', event);
     await expect(option(0)).toHaveAttribute('aria-pressed', 'true');
+    await expect(option(1)).toHaveAttribute('aria-pressed', 'false');
   }
   await composer.fill('Prefer region ');
   await page.keyboard.press('2');

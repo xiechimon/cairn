@@ -221,8 +221,7 @@ export function ChiefQuestionCard({
     if (!pending || collapsed || question === undefined || question.options.length === 0) return;
     const max = question.options.length;
     const handler = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing || e.keyCode === 229)
-        return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.keyCode === 229) return;
       const card = cardRef.current;
       if (card?.checkVisibility() !== true) return;
       const target = e.target;
