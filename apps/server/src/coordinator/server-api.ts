@@ -81,7 +81,8 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         .get();
       if (thread !== undefined) ackSteer(deps, { id: null, teamId: thread.teamId }, stepId);
     },
-    relayTool: (stepId, name, params) => executeRelayToolCall(deps, null, stepId, name, params),
+    relayTool: (stepId, name, params, toolCallId) =>
+      executeRelayToolCall(deps, null, stepId, name, params, toolCallId),
     askUser: (stepId, body, signal) =>
       machineAsk(deps, null, stepId, body, {
         holdMs: ASK_HOLD_MS,

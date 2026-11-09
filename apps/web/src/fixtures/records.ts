@@ -288,6 +288,7 @@ export interface MachineRow {
     executor?: MachineExecutor;
     computer?: true;
     ownComputer?: true;
+    browser?: true;
   } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;

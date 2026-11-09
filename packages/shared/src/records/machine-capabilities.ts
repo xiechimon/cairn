@@ -24,6 +24,7 @@ export const machineCapabilitiesSchema = z.object({
   executor: machineExecutorSchema.optional(),
   computer: z.literal(true).optional(),
   ownComputer: z.literal(true).optional(),
+  browser: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
@@ -48,6 +49,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(executor.success ? { executor: executor.data } : {}),
     ...(rec.computer === true ? { computer: true as const } : {}),
     ...(rec.ownComputer === true ? { ownComputer: true as const } : {}),
+    ...(rec.browser === true ? { browser: true as const } : {}),
   };
 }
 

@@ -142,7 +142,7 @@ describe('orb routing', () => {
     expect(log).toEqual(['orb[chief:c1]:execute:ls', 'orb[chief:c2]:read:a', 'host:execute:pwd']);
   });
 
-  test('other tools are still refused even with an Orb provider', async () => {
+  test('screen tools are still refused even with an Orb provider', async () => {
     const log: string[] = [];
     const fake = fakeClient();
     const dispatcher = createComputerDispatcher({
@@ -153,6 +153,24 @@ describe('orb routing', () => {
     await dispatcher.dispatch(call('computer_act', {}, { scopeKey: 'chief:c1' }));
     expect(errorOf(fake.frames)).toMatchObject({ message: NO_COMPUTER_PROVIDER_MESSAGE });
     expect(log).toEqual([]);
+  });
+
+  test('browser_navigate runs agent-browser open on the Orb provider', async () => {
+    const log: string[] = [];
+    const fake = fakeClient();
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: fakeOrb(log),
+      ...FAST,
+    });
+    await dispatcher.dispatch(
+      call('browser_navigate', { url: 'https://example.com' }, { scopeKey: 'chief:c1' }),
+    );
+    expect(errorOf(fake.frames)).toBeUndefined();
+    expect(log.some((line) => line.includes('orb[chief:c1]:execute:https://example.com'))).toBe(
+      true,
+    );
+    expect(fake.frames.some((frame) => frame.kind === 'done')).toBe(true);
   });
 
   test('the Orb shell keeps the desktop-protection guard but not the cairn host rules', async () => {

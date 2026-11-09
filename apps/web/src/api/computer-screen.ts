@@ -1,4 +1,4 @@
-import type { ComputerControlLease, ComputerScreenKind } from '@cairn/shared';
+import type { ComputerControlLease, ComputerRecord, ComputerScreenKind } from '@cairn/shared';
 import { api } from './client.js';
 
 export interface OpenedComputerScreen {
@@ -51,4 +51,13 @@ export function computerScreenWsUrl(path: string): string {
   const url = new URL(path, window.location.href);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.toString();
+}
+
+export function patchComputerBrowser(
+  computerId: string,
+  browserEnabled: boolean,
+): Promise<{ computer: ComputerRecord }> {
+  return api.patch<{ computer: ComputerRecord }>(`/api/computers/${computerId}`, {
+    browserEnabled,
+  });
 }

@@ -34,8 +34,24 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
       scopeKey: row.scopeKey,
       state: row.state,
       controlHolder: row.controlHolder,
+      browserEnabled: row.browserEnabled,
       machine: { id: row.machineId, name: machineName, online: machineOnline },
     }));
+}
+
+export function setComputerBrowserEnabled(
+  db: Db,
+  teamId: string,
+  userId: string,
+  computerId: string,
+  browserEnabled: boolean,
+): ComputerRecord | null {
+  if (!ownedPrivateComputer(db, teamId, userId, computerId)) return null;
+  db.update(computer)
+    .set({ browserEnabled, updatedAt: Date.now() })
+    .where(eq(computer.id, computerId))
+    .run();
+  return listComputers(db, teamId, userId).find((row) => row.id === computerId) ?? null;
 }
 
 export function recentComputerCommands(

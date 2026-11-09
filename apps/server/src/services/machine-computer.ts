@@ -8,6 +8,7 @@ import {
   type ComputerFrame,
   type ComputerRelayResult,
   type ComputerTool,
+  isComputerBrowserTool,
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   redactSecrets,
@@ -44,6 +45,8 @@ export const COMPUTER_BUSY = 'the computer is busy with another Coordinator turn
 export const COMPUTER_USER_CONTROL = 'ian has control of this computer';
 export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was not retried';
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
+export const COMPUTER_BROWSER_DISABLED =
+  'browser tools are off for this computer; enable 浏览器 in the Computers panel';
 
 const SHELL_TOOLS: ReadonlySet<ComputerTool> = new Set(['shell', 'user_computer_shell']);
 const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
@@ -656,7 +659,7 @@ export const refuseOwnComputerUntilGated: OwnComputerGate = () => {
 
 export async function forwardComputerCall(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   body: MachineComputerRelayBody,
   opts: { signal?: AbortSignal; ownComputerGate?: OwnComputerGate } = {},
@@ -711,6 +714,12 @@ export async function forwardComputerCall(
   }
 
   const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
+  if (isComputerBrowserTool(tool) && target.computerId !== null) {
+    const row = db.select().from(computer).where(eq(computer.id, target.computerId)).get();
+    if (row !== undefined && !row.browserEnabled) {
+      throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
+    }
+  }
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);
   if (target.computerId !== null) {

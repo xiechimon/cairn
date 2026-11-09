@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import {
   acquireComputerControl,
+  patchComputerBrowser,
   releaseComputerControl,
   renewComputerControl,
 } from '../api/computer-screen.js';
@@ -27,7 +28,11 @@ import { X } from '../icons/index.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
 import { machineStateLabel } from './fleet-status.js';
-import { desktopControlInstalled, desktopControlOnline } from './machine-capabilities.js';
+import {
+  browserCapabilityInstalled,
+  desktopControlInstalled,
+  desktopControlOnline,
+} from './machine-capabilities.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -174,14 +179,19 @@ function MachineCard({
   const online = machine.online === true;
   const Icon = machine.kind === 'local' ? Laptop : Server;
   const desktopInstalled = desktopControlInstalled(machine, computer);
+  const browserInstalled = browserCapabilityInstalled(machine, computer);
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [browserBusy, setBrowserBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandAfterLease, setExpandAfterLease] = useState(false);
   const reclaiming = useRef(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
+  const canToggleBrowser =
+    browserInstalled && online && computer !== null && teamId !== undefined && !browserBusy;
+  const browserEnabled = computer?.browserEnabled === true;
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -255,6 +265,18 @@ function MachineCard({
     void run
       .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
       .finally(() => setBusy(false));
+  };
+
+  const onBrowserToggle = (checked: boolean) => {
+    if (computer === null || browserBusy) return;
+    setBrowserBusy(true);
+    void patchComputerBrowser(computer.id, checked)
+      .then(() =>
+        teamId !== undefined
+          ? invalidateConverged(qc, { queryKey: ['computers', teamId] })
+          : undefined,
+      )
+      .finally(() => setBrowserBusy(false));
   };
 
   const openEnlarged = () => {
@@ -384,8 +406,9 @@ function MachineCard({
         icon={<Globe aria-hidden="true" className="size-4" />}
         label={t('浏览器')}
         hint={t('让 agent 打开网页、点击和填表。')}
-        checked={false}
-        disabled
+        checked={browserEnabled}
+        disabled={!canToggleBrowser}
+        onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
       />
     </ListCard>
   );

@@ -154,10 +154,33 @@ describe('computer feed routes', () => {
           scopeKey: `chief:${chiefIdFormat(s.user.id, s.team.id)}`,
           state: 'running',
           controlHolder: 'none',
+          browserEnabled: false,
           machine: { id: 'm1', name: 'name-m1', online: false },
         },
       ],
     });
+  });
+
+  test('PATCH enables and disables browser tools on the owned computer', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1');
+    addComputer(s, s.team.id, 'c1', 'm1');
+    const on = await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: true });
+    expect(on.status).toBe(200);
+    expect(await on.json()).toMatchObject({
+      computer: { id: 'c1', browserEnabled: true },
+    });
+    const listed = await req(s.app, 'GET', '/api/computers');
+    expect(await listed.json()).toMatchObject({
+      computers: [{ id: 'c1', browserEnabled: true }],
+    });
+    const off = await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: false });
+    expect(await off.json()).toMatchObject({
+      computer: { id: 'c1', browserEnabled: false },
+    });
+    expect(
+      (await req(s.app, 'PATCH', '/api/computers/missing', { browserEnabled: true })).status,
+    ).toBe(404);
   });
 
   test('another team computer and calls are never returned', async () => {

@@ -234,7 +234,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...capabilitiesProbe(),
     codexLogin: readCodexLogin(paths.agentRuntimeDir),
     executor: orbProvider.kind,
-    ...(orbComputer ? { computer: true as const } : {}),
+    ...(orbComputer ? { computer: true as const, browser: true as const } : {}),
     ...(hostComputer ? { ownComputer: true as const } : {}),
   });
 

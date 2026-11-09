@@ -16,6 +16,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/machines' },
   { method: 'GET', path: '/api/computers', note: 'the team computers (D75 P8a)' },
   {
+    method: 'PATCH',
+    path: '/api/computers/{id}',
+    note: 'D75: enable or disable browser tools on a computer',
+  },
+  {
     method: 'GET',
     path: '/api/computers/{id}/commands',
     query: ['limit'],

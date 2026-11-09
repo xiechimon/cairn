@@ -7,6 +7,7 @@ import {
 import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
+import { AGENT_BROWSER_SESSION, type BrowserToolName, runBrowserTool } from './browser.js';
 import { FramePoster } from './frame-poster.js';
 import {
   desktopProtectionGuardMessage,
@@ -50,6 +51,15 @@ const ORB_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'list_files',
   'read_file',
   'write_file',
+  'browser_navigate',
+  'browser_snapshot',
+  'browser_act',
+]);
+
+const BROWSER_TOOLS: ReadonlySet<ComputerTool> = new Set([
+  'browser_navigate',
+  'browser_snapshot',
+  'browser_act',
 ]);
 
 interface Route {
@@ -373,6 +383,44 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     await poster.finish({ kind: 'done', text });
   }
 
+  async function handleBrowser(
+    call: ComputerCall,
+    route: Route,
+    controller: AbortController,
+  ): Promise<void> {
+    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
+      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    let text: string;
+    try {
+      text = await runBrowserTool(route.provider, call.tool as BrowserToolName, call.params, {
+        timeoutMs: Math.max(0, call.deadlineAt - now() - FINAL_FRAME_MARGIN_MS),
+        signal: controller.signal,
+        session: call.scopeKey ?? AGENT_BROWSER_SESSION,
+        env: {
+          DISPLAY: ':1',
+          AGENT_BROWSER_EXECUTABLE_PATH: '/usr/bin/chromium',
+          AGENT_BROWSER_HEADED: '1',
+        },
+      });
+    } catch (error) {
+      await poster.finish(
+        error instanceof ComputerRefusal
+          ? { kind: 'error', message: error.message, delivery: 'not_delivered' }
+          : {
+              kind: 'error',
+              message: 'The browser operation failed',
+              delivery: 'unknown',
+            },
+      );
+      return;
+    }
+    if (poster.abandoned) return;
+    await poster.finish({ kind: 'done', text });
+  }
+
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
     if (call.tool === 'user_computer_observe' || call.tool === 'user_computer_act') {
       if (options.screen) await handleScreen(call, options.screen, controller);
@@ -386,6 +434,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (call.tool === 'shell' || call.tool === 'user_computer_shell') {
       await handleShell(call, route, controller);
+    } else if (BROWSER_TOOLS.has(call.tool)) {
+      await handleBrowser(call, route, controller);
     } else {
       await handleFile(call, route, controller);
     }

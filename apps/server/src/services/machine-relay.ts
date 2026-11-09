@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
@@ -6,6 +7,7 @@ import {
   derivePlaceholderTitle,
   FIXED_TAGS,
   isBuildStepKind,
+  isComputerBrowserTool,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -24,6 +26,7 @@ import {
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
 import { projectOfTodo } from './git.js';
+import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
 import {
@@ -92,8 +95,38 @@ export async function executeRelayToolCall(
   stepId: string,
   name: string,
   params: Record<string, unknown>,
+  toolCallId?: string,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
+  if (isComputerBrowserTool(name)) {
+    if (row.kind !== 'chief') {
+      throw new HttpError(400, 'browser tools require a chief step');
+    }
+    if (!isChiefConversation(row.buildId)) {
+      throw new HttpError(400, `step ${stepId} is not a chief step`);
+    }
+    if (row.status !== 'claimed') {
+      throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
+    }
+    const callId =
+      toolCallId ??
+      createHash('sha256')
+        .update(`${stepId}\0${name}\0${JSON.stringify(params)}`)
+        .digest('hex');
+    const result = await forwardComputerCall(
+      deps,
+      machineId,
+      stepId,
+      {
+        computer: true,
+        name,
+        toolCallId: callId,
+        params,
+      },
+      { signal: undefined },
+    );
+    return result.text;
+  }
   if (isThreadScheduleTool(name)) {
     if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
       throw new HttpError(400, 'schedule tools require a plan or build step');

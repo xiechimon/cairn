@@ -12,7 +12,11 @@ export function browserCapabilityInstalled(
   machine: MachineRow,
   computer: ComputerRecord | null | undefined,
 ): boolean {
-  return machine.capabilities?.computer === true || computer != null;
+  return (
+    machine.capabilities?.browser === true ||
+    machine.capabilities?.computer === true ||
+    computer != null
+  );
 }
 
 export function desktopControlOnline(
