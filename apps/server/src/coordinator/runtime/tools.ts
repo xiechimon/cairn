@@ -5,8 +5,14 @@ import {
   type MachineAskBody,
   type RemoteToolDef,
 } from '@cairn/shared';
-import type { ImageContent } from '@earendil-works/pi-ai';
-import { defineExtension, defineTool, type ToolRegistration } from '@earendil-works/pi-durable';
+import {
+  defineExtension,
+  defineTool,
+  GenerationTask,
+  hook,
+  type ToolRegistration,
+} from '@earendil-works/pi-durable';
+import { boundCoordinatorImages, prepareCoordinatorImage } from './images.js';
 import type { MachineApi } from './machine-api.js';
 
 export class ShutdownInterrupt extends Error {
@@ -145,12 +151,9 @@ export function coordinatorTool(
             content: string;
           };
           if (attachment.mimeType.startsWith('image/') && attachment.encoding === 'base64') {
-            const image: ImageContent = {
-              type: 'image',
-              data: attachment.content,
-              mimeType: attachment.mimeType,
+            return {
+              output: [await prepareCoordinatorImage(attachment.content, attachment.mimeType)],
             };
-            return { output: [image] };
           }
         }
         return { output: [{ type: 'text', text }] };
@@ -174,6 +177,11 @@ export function coordinatorToolsExtension(
       : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
   return defineExtension({
     name: 'cairn-coordinator-tools',
+    hooks: [
+      hook(GenerationTask, {
+        beforeRequest: ({ messages }) => ({ messages: boundCoordinatorImages(messages) }),
+      }),
+    ],
     tools: defs.map((def) => coordinatorTool(def, channel, gate, options.shuttingDown)),
   });
 }

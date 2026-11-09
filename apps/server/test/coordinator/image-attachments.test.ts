@@ -6,7 +6,7 @@ import { req } from '../helpers.js';
 import { boot, world } from './runner-world.js';
 
 const imageData =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 describe('Coordinator owner image attachments', () => {
   it('reads an owner upload by its token key through the chief relay and delivers an image block', async () => {

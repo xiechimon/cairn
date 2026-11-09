@@ -1,4 +1,5 @@
 import { copyFileSync, mkdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -39,4 +40,12 @@ mkdirSync(resolve(root, 'dist'), { recursive: true });
 copyFileSync(
   resolve(root, '../../scripts/harness-eval-worker.mjs'),
   resolve(root, 'dist/harness-eval-worker.mjs'),
+);
+
+const photonRequire = createRequire(
+  createRequire(import.meta.url).resolve('@earendil-works/pi-durable/images'),
+);
+copyFileSync(
+  photonRequire.resolve('@silvia-odwyer/photon/photon_rs_bg.wasm'),
+  resolve(root, 'dist/photon_rs_bg.wasm'),
 );
