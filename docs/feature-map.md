@@ -19,10 +19,10 @@
 | status shipped | 46 |
 | status partial | 7 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 17 |
+| research, frontend design and backend design all present or not applicable | 18 |
 | Research gaps | 20 |
 | Frontend design gaps | 25 |
-| Backend design gaps | 25 |
+| Backend design gaps | 23 |
 | notes cited but not on main | 20 |
 
 ## Coverage
@@ -31,12 +31,12 @@
 |---|---|---|---|---|---|---|
 | [The agent's computer](#agent-computer) | 1 | partial | yes (not on main) | gap | gap | B4 |
 | [Coordinator chat](#coordinator-chat) | 1 | shipped | yes | yes | yes |  |
-| [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | gap | B1 |
+| [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | yes |  |
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Daily report and retro](#daily-report) | 1 | shipped | yes | gap | gap | B2 |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
-| [Memory](#memory) | 1 | shipped | yes | gap | gap | B1 |
+| [Memory](#memory) | 1 | shipped | yes | gap | yes | B1 |
 | [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
 | [Needs-you tray](#needs-you) | 1 | shipped | yes | gap | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
@@ -95,8 +95,7 @@ How the never-ending Coordinator conversation assembles each turn and what it re
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Coordinator context and compaction](#coordinator-context) | 1 | Backend design: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes |
-| [Memory](#memory) | 1 | Frontend design: the memory list in Coordinator settings has no design<br>Backend design: no design for memory keys, scope, consolidation, promotion and invalidation |
+| [Memory](#memory) | 1 | Frontend design: draft at docs/design/memory.md with real-component fixtures; signed-in Claude reference operation and owner selection are still missing |
 
 ### B2 · What reaches ian: needs-you, questions, daily report, push
 
@@ -233,9 +232,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Coordinator context and compaction** (shipped). Each Coordinator turn is assembled by the server within a token budget from recent messages, an index of older ones, history tools and ledger facts, so compaction is invisible to the user.
 
-- Research: [docs/research/coordinator-compaction-2026-11-07.md](research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md)
+- Research: [docs/research/coordinator-compaction-2026-11-07.md](research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/coordinator-context-2026-11-08.md](research/coordinator-context-2026-11-08.md)
 - Frontend design: n/a: compaction is invisible by design; the transcript keeps full history
-- Backend design: **gap**: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes
+- Backend design: [docs/design/coordinator-context-backend.md](design/coordinator-context-backend.md)
 
 ### coordinator-dispatch
 
@@ -273,9 +272,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.
 
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md)
-- Frontend design: **gap**: the memory list in Coordinator settings has no design
-- Backend design: **gap**: no design for memory keys, scope, consolidation, promotion and invalidation
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md)
+- Frontend design: **gap**: draft at docs/design/memory.md with real-component fixtures; signed-in Claude reference operation and owner selection are still missing
+- Backend design: [docs/design/memory-backend.md](design/memory-backend.md)
 
 ### merge-gate
 

@@ -1,65 +1,70 @@
 # Memory frontend
 
-Status: B1 draft, not approved and not frontend-complete. Reference operation and the real-component state screenshot matrix remain required before the registry gap can be closed. No product implementation is included.
+Status: B1 design draft, not owner-approved. [Real-component prototype and 52-state capture matrix](memory-prototype/README.md) exist; operated claude.ai reference evidence is still blocked. The registry frontend gap must not be closed on the strength of fixture screenshots alone. No product implementation is included.
 
 ## Brief
 
-User: the owner checking what the Coordinator will remember, removing a wrong fact, or deliberately expanding a project fact to the team. Success: the owner can distinguish stored memory from automatically injected memory, read the full fact and scope, and understand the consequence of promotion/deletion.
+Surface: Coordinator settings, memory tab. User: the owner checking what the Coordinator will remember, removing a wrong fact, or deliberately expanding a project fact to the team. Success: distinguish stored memory from automatically injected memory, read the full fact and scope, and understand promotion/deletion.
 
-Research: [B1 memory review](../research/memory-2026-11-08.md), [prior art](../research/personal-agent-memory-2026-11-07.md). Backend contract: [memory-backend](memory-backend.md). Reference: Claude Settings → Your Claude → Your memory → Manage → Topics, as documented by Claude; actual signed-in operation is pending. Do not call this a one-to-one measured reproduction yet.
+Research: [B1 memory review](../research/memory-2026-11-08.md), [prior art](../research/personal-agent-memory-2026-11-07.md). Backend: [memory-backend](memory-backend.md). Reference: Claude Settings → Your Claude → Your memory → Manage → Topics, as documented by Claude. Exact one-to-one layout, computed styles and interaction recording are not claimed without signed-in operation.
 
-Keep the existing Coordinator settings entry and memory tab. No new route or top-level navigation. No charts, colored identity tiles, memory score badges or new settings modes. The page is a list, not a grid of cards. Rules checked in the written design: P1–P5, C1/C5/C12, V1–V4/V6/V10/V20/V21, T2, A1–A4 and R1. Rendered contrast/keyboard/axe verification remains pending.
+Existing general settings references: [t3code General](references/settings/t3code-general.jpg), [t3code phone settings](references/settings/t3code-mobile-settings.png). These establish the repository's settings context, not the Claude memory surface. Do not substitute them for the requested memory reference.
 
-## Real-component inventory
+Keep the existing Coordinator settings entry and tab navigation. No new route, top-level navigation, charts, colored identity tiles, memory score badges, account-memory switch or incognito mode. One list, not a grid of cards. Rules applied: P1–P5, C1/C5/C12, V1–V4/V6/V10/V20/V21, T2, A1–A4 and R1.
 
-Use `ChiefSettings`' existing header and `SegmentedTabs`; compose `SettingsCard` with `SettingsRow`/`SETTINGS_ROW_CLS`, `Button`, existing `EmptyState`, registry `Skeleton`, existing query-state error presentation, `DialogShell` for reading, and the project's alert-dialog confirmation shell. These are the real gallery/system components, not SVG/HTML drawings of controls. Discover their actual props before writing a prototype. Do not add a second local version of any component.
+## Real components and replacement boundary
 
-The old memory branch in `apps/web/src/chief/chief-settings.tsx` is replaced in separately dispatched implementation: remove `agentActor` gating, the obsolete select-an-agent message, and silent null rendering during reads. The server owns memory scope and validity.
+Compose the existing settings shell with `ListCard`/`ListRow`, `SettingsCard`, `Button`, `EmptyState`, `Skeleton`, `DialogShell` and `AlertDialogShell`. The prototype imports these real components and actual fonts/tokens directly; it does not draw lookalike controls. Its isolated content specimen intentionally omits the surrounding navigation and is labelled fictional, disconnected fixture data.
 
-## Layout and content
+#3608 already removed `agentActor` gating and the obsolete select-an-agent message. Preserve that work. The separately dispatched implementation replaces silent pending/error rendering and adds memory detail/management controls in `apps/web/src/chief/chief-settings.tsx`. No product code is changed by this PR.
 
-Keep the settings column at its existing maximum width, with 16px horizontal body padding. Use the current 56px settings header and token typography. Above one divided card, show stored active-entry count and capacity, not “memories in use”: not every stored row is injected. Each row has the full topic title, a short content preview, and a neutral Team or project-name scope label. Show layer as secondary text when needed; do not imply that log/searchable rows are automatically injected.
+## Layout and copy
 
-A row opens a read-only detail dialog: title, full wrapping body, scope/layer, updated time and available provenance. No raw database ids as primary content. Promotion is a quiet action only for a valid project row; Delete opens confirmation. Do not add inline Edit without an API design. Correction through the Coordinator is explained in plain copy rather than a nonfunctional button.
+Keep the settings column's existing maximum width and 16px horizontal padding; current 56px header and token typography. Above one divided list, show active stored-entry count and capacity, not “memories in use”: not every stored entry is injected. Each row shows title, bounded content preview and neutral Team/project scope plus layer text. Log/searchable rows must not imply automatic injection.
 
-Example fixture facts: “Verification commands” with “Run the affected tests before pushing a code change” (team core); “Accessibility review” with “Check keyboard navigation before requesting review” (project core). Use fictional projects and no personal data or live identifiers.
+Open a row to read full wrapping content in a dialog: title, body, scope/layer, updated time and available provenance. Raw database ids are not primary content. Promotion is a quiet action only for a valid project row; Delete opens confirmation. Inline Edit is not added without an HTTP edit contract; correction remains available through the Coordinator's tools.
 
-## State matrix
+Fixture facts: Verification commands (team core), Accessibility review (fictional Field Notes project core), Release handover (project searchable). No personal data or live identifiers.
 
-Every row below requires desktop 1440px and phone 390px screenshots in light and dark, using real components on the fixture stack.
+## State and reference comparison
 
-| State | Appearance and behavior | Reference versus ours |
+All fixture images below link to the matrix with 1440px/390px and light/dark captures. The reference column explicitly distinguishes documented behavior from blocked operation.
+
+| State | Proposed behavior and actual fixture | Reference versus ours |
 |---|---|---|
-| Empty | One sentence: no saved memories yet; explain that useful facts are saved during work. No disabled Add button | Claude empty reference pending; Cairn fixture pending |
-| Loading | Preserve header/tab; after the existing loading threshold show three row-shaped Skeletons, no false zero count | Reference pending; fixture pending |
-| Read error | One plain sentence and Retry; never replace failed reads with empty. Existing cached rows remain with an inline refresh error | Reference pending; fixture pending |
-| Populated | One divided list, count, title, preview, scope; row opens full detail | Claude documented Topics model; operated reference and fixture pending |
-| Long fact/title | Wrap title/body in detail; preview stays bounded; actions never squeeze content into a narrow band | Both pending |
-| Promotion confirmation | Full fact and project → Team destination; explain wider future visibility; confirm or cancel | Cairn-specific scope extension; real dialog fixture pending |
-| Promotion pending/error | Disable only the affected action with a reason; retain fact on failure; retry is deliberate | Cairn-specific; fixture pending |
-| Delete confirmation | State that the selected saved fact is removed, not its source conversation/history; cancel receives safe initial focus | Documented Claude delete action; exact reference and fixture pending |
-| Delete pending/error | Keep row until 204; failure retains it and dialog text explains recovery | Both pending |
-| Success | Invalidate/refetch list; close confirmation and return focus to next surviving row, or empty-state heading | Both pending |
-| Offline | Preserve cached content with read-only explanation; do not offer a mutation that cannot be delivered | Both pending |
+| Empty | One sentence plus explanation, no disabled Add button; `empty` | Claude empty shot blocked; our real EmptyState composition is a draft |
+| Loading | Preserve shell, then three row-shaped Skeletons; no false zero count; `loading` | No observed Claude loading state; ours is explicitly seeded |
+| Read error | Plain recovery sentence and Retry; no false empty list; `error` | No observed Claude error; ours supplies explicit recovery |
+| Populated | Count plus one divided list; row opens full detail; `populated` | Claude Topics documented, exact operated reference blocked |
+| Long detail | Wrapping full body, one scrolling dialog body; `long` | No observed Claude long-topic state; ours uses real DialogShell |
+| Detail | Read-only body and scope, correction-by-chat explanation; `detail` | Claude also documents inline editing; ours deliberately does not invent an API |
+| Promote confirmation | Full fact and project → Team consequence; `promote` | Cairn-specific scope expansion, not attributed to Claude |
+| Promote pending/error | Disable affected controls with visible reason; failure preserves fact; `promote-pending`, `promote-error` | Cairn-specific fixtures; no external reference claim |
+| Delete confirmation | Selected saved fact removed, not conversation or earlier versions; `delete` | Claude Delete documented; exact reference shot blocked |
+| Delete pending/error | Keep row until success; failure retains content and actionable error; `delete-pending`, `delete-error` | No observed Claude failure state; ours is seeded |
+| Success | Refetch authoritative list, close confirmation, focus next row/empty heading; local prototype updates only | API/query invalidation and focus after actual deletion remain implementation acceptance |
+| Offline | Cached content with read-only explanation, no deliverable mutation control; `offline` | No observed Claude offline state; ours is a product-specific draft |
 
-No hover/press shadow, lift, pointer movement or delayed hover feedback. Any hover background covers the complete interactive row/control, never a partial band. Touch actions remain visible; no hover-only control is required to manage a fact.
+No hover/press shadow or lift, partial hover band or delayed hover. Hover fill covers the entire interactive row/control. Touch actions are visible without hover. Existing cached data on refresh failure stays visible with an inline error; this combined cached-error variant remains an implementation fixture to add, not a claim about the current server.
 
 ## Phone and accessibility
 
-At 390px use the same list order, no horizontal scrolling, no fixed-width fact body. The detail/confirmation dialog uses the existing viewport-clamped shell and one scrolling body. Stack actions if necessary; touch hit areas are at least 44px. If the settings tabs do not fit, use the existing Select pattern rather than shrinking/truncating labels.
+At 390px preserve row order and avoid horizontal scrolling. Detail/confirmation uses viewport-clamped shells with a single scrolling body. Stack actions as needed; interactive touch areas are at least 44px. The surrounding settings tabs use the existing Select fallback if labels do not fit, rather than shrinking/truncating labels.
 
-Tab reaches tabs, rows, detail controls and confirmation actions in visual order. Escape closes the topmost layer and restores focus. A refresh error is announced without stealing focus. Mutation progress and success use the existing live-region pattern. Measure WCAG AA contrast in both themes and axe violations; token selection alone does not prove rendered compliance.
+Keyboard reaches tabs, rows, detail and confirmation controls in visual order. Escape closes the top layer and restores origin focus. Cancel receives safe initial confirmation focus. Refresh errors announce without stealing focus; mutation progress uses a live region.
 
-## Tests to write first
+The capture script measured zero WCAG A/AA/2.1/2.2 axe violations (including rendered contrast), no horizontal overflow in 52 fixtures, focus restoration after keyboard detail close and unchanged hover shadow/position with zero transition delay. These are fixture measurements, not live product acceptance or proof of every interaction rule. Long titles, actual query refetch, last-row deletion focus and complete-shell tab fallback remain implementation tests.
 
-1. Team memory loads when the retired agent actor is absent; no select-agent dead end.
-2. Pending read, failed read, empty response and populated response are four distinct states.
-3. Wrong-team rows never appear; scratchpads are not exposed by settings.
-4. Row detail shows untruncated body and scope; promotion appears only for valid project entries.
-5. Failed promotion/delete preserves the row and actionable error; success refetches authoritative data.
-6. Keyboard focus returns correctly after cancel, deletion and last-row deletion.
-7. Four-state plus mutation screenshot matrix at 390/1440 in both themes; no overflow, no shadow change, full-row immediate hover.
+## Tests to write first for implementation
 
-## Acceptance blockers
+1. Preserve #3608's team-scoped availability with no retired-agent dependency.
+2. Pending, failed, empty and populated reads are distinct; cached refresh error retains content.
+3. Wrong-team and foreign scratchpad rows never appear.
+4. Detail shows untruncated body/scope; promotion appears only for valid project entries.
+5. Failed mutation preserves row; success refetches authoritative data without blind retry.
+6. Keyboard focus returns after cancel, deletion and last-row deletion.
+7. Full-shell states at 390/1440 in both themes; no overflow, hover/press shadow change or partial-band feedback.
 
-No signed-in claude.ai/Linear/t3code app session is exposed in this execution environment. The official article was readable, but that does not satisfy operated-reference, 60fps recording or computed-style evidence. Local Chromium and Playwright are present; the required prototype matrix has not been produced. Owner selection has not happened. Keep the registry frontend gap open until these artifacts exist; do not substitute hand-drawn screenshots or present this document as an approved design.
+## Acceptance blocker
+
+This session exposes no signed-in browser/desktop-control tool; the conventional local CDP endpoint has no listener. Reference app operation, 60fps recording, computed styles and owner selection therefore remain unavailable. Do not inspect credential stores, sign in independently, invent reference screenshots or call this approved. The documentation PR can preserve these concrete drafts while keeping the frontend gap open; implementing the draft requires the owner's reference/selection step first.

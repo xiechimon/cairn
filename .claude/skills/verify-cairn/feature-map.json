@@ -210,20 +210,20 @@
       ],
       "research": [
         "docs/research/coordinator-compaction-2026-11-07.md",
-        "docs/research/personal-agent-memory-2026-11-07.md"
+        "docs/research/personal-agent-memory-2026-11-07.md",
+        "docs/research/coordinator-context-2026-11-08.md"
       ],
       "frontendDesign": {
         "na": "compaction is invisible by design; the transcript keeps full history"
       },
-      "backendDesign": {
-        "gap": "the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes"
-      },
+      "backendDesign": [
+        "docs/design/coordinator-context-backend.md"
+      ],
       "evidence": [
         "integration/test/coordinator-context-assemble.test.ts",
         "apps/server/test/chief-history.test.ts",
         "apps/server/test/coordinator/compaction.test.ts"
-      ],
-      "batch": "B1"
+      ]
     },
     {
       "id": "memory",
@@ -253,14 +253,15 @@
       ],
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",
-        "docs/research/research-loop-plan.md"
+        "docs/research/research-loop-plan.md",
+        "docs/research/memory-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "the memory list in Coordinator settings has no design"
+        "gap": "draft at docs/design/memory.md with real-component fixtures; signed-in Claude reference operation and owner selection are still missing"
       },
-      "backendDesign": {
-        "gap": "no design for memory keys, scope, consolidation, promotion and invalidation"
-      },
+      "backendDesign": [
+        "docs/design/memory-backend.md"
+      ],
       "evidence": [
         "apps/server/test/memory-consolidation.test.ts",
         "apps/server/test/project-memory.test.ts",
