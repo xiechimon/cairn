@@ -25,6 +25,9 @@ import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, req, startLegacyBuild } from './helpers.js';
 
 const INFERRED_ROUTES = [
+  'GET /api/server/deploy/lease',
+  'PUT /api/server/deploy/lease',
+  'DELETE /api/server/deploy/lease',
   'GET /api/teams/{id}/claude-subscriptions',
   'DELETE /api/teams/{id}/claude-subscriptions/{cid}',
   'POST /api/teams/{id}/claude-subscriptions',
