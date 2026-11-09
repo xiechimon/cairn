@@ -1016,24 +1016,6 @@ Reach:
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
 - Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
 
-### feishu
-
-**Feishu integration** (shipped, centrality 4). Team settings for a Feishu bot connection.
-
-States: Not connected, connected, or failing, in the account settings.
-
-Reach:
-
-1. `settings account`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: **gap**: no note on why Feishu and what it delivers
-- Frontend design: **gap**: the Feishu settings have no design
-- Backend design: **gap**: no design for the Feishu delivery path
-- Evidence: `apps/web/e2e/account-feishu.spec.ts`, `apps/server/test/feishu-config.test.ts`
-
 ### ios-app
 
 **iOS app** (planned, centrality 4). D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.
