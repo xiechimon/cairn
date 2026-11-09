@@ -1,4 +1,4 @@
-import { MEMORY_QUOTA_PER_TEAM, type MemoryRecord } from '@cairn/shared';
+import type { MemoryRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
@@ -209,7 +209,7 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
               </>
             )}
             {rows(t('每个 thread 都会读'), section.injected)}
-            {rows(t('按需查阅'), section.lookup)}
+            {rows(t('记忆文件'), section.lookup)}
           </section>
         ))}
       </div>
@@ -219,20 +219,13 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
   const content = open === null ? null : splitMemoryContent(open.content);
   return (
     <div>
-      <div className="mt-6 flex items-baseline justify-between gap-4">
-        <p
-          ref={summaryRef}
-          tabIndex={-1}
-          className="text-card-title text-foreground outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-(--focus-ring)"
-        >
-          {t('记忆')}
-        </p>
-        {memoriesQ.data !== undefined && (
-          <span data-testid="memory-count" className="text-meta tabular-nums text-content-tertiary">
-            {`${memories.length} / ${MEMORY_QUOTA_PER_TEAM}`}
-          </span>
-        )}
-      </div>
+      <p
+        ref={summaryRef}
+        tabIndex={-1}
+        className="mt-6 text-card-title text-foreground outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-(--focus-ring)"
+      >
+        {t('记忆')}
+      </p>
       {!connected && (
         <p className="mt-1 text-meta text-content-secondary">
           {t('离线中。记忆只能查看，重新连接后才能删除。')}

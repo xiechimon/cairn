@@ -108,8 +108,7 @@ test('the tab follows the Claude Code memory page: count, sections per scope, re
   await openMemory(page);
   const list = page.getByTestId('memory-list');
   await expect(list).toBeVisible();
-  await expect(page.getByTestId('memory-count')).toHaveText('5 / 100');
-  await expect(page.getByText(/已存 \d+ 条/)).toHaveCount(0);
+  await expect(page.getByText(/\d+ \/ 100\b|已存 \d+ 条/)).toHaveCount(0);
   await expect(list.getByRole('heading', { level: 2 })).toHaveText(['团队', 'Field Notes', 'Harbor API']);
 
   const team = list.getByRole('region', { name: '团队' });
@@ -122,7 +121,7 @@ test('the tab follows the Claude Code memory page: count, sections per scope, re
     '项目说明',
     '自动记忆',
     '每个 thread 都会读',
-    '按需查阅',
+    '记忆文件',
   ]);
   await expect(notes.getByRole('textbox', { name: 'Field Notes 的项目说明' })).toHaveValue('');
   await expect(notes.getByText('0 / 16,000')).toBeVisible();
@@ -205,7 +204,6 @@ test('delete confirms first, then removes the row and closes both dialogs', asyn
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(deleted).toEqual(['m-a11y']);
   await expect(memoryRow(page, '无障碍检查')).toHaveCount(0);
-  await expect(page.getByTestId('memory-count')).toHaveText('4 / 100');
 });
 
 test('a failed delete keeps the row and says so in the confirmation', async ({ page }) => {
@@ -249,7 +247,6 @@ test('with no memories each project still shows its instructions and an empty au
   await expect(notes.getByRole('textbox', { name: 'Field Notes 的项目说明' })).toBeVisible();
   await expect(notes.getByText('Coordinator 还没有在这个项目里记下笔记。')).toBeVisible();
   await expect(page.getByTestId('memory-list').getByRole('region', { name: '团队' })).toHaveCount(0);
-  await expect(page.getByTestId('memory-count')).toHaveText('0 / 100');
   await settled(page);
   await evidenceShot(page, 'memory-empty.png');
 });
@@ -283,7 +280,6 @@ test('on a phone each row is two lines and nothing scrolls sideways', async ({ p
 
 test('project loading keeps memories in the loading state without claiming projects were removed', async ({ page }) => {
   await openMemory(page, { projects: 'hang' });
-  await expect(page.getByTestId('memory-count')).toHaveText('5 / 100');
   await expect(page.getByRole('status', { name: '正在加载记忆' })).toBeVisible();
   await expect(page.getByTestId('memory-list')).toHaveCount(0);
   await expect(page.getByText('已移除的项目')).toHaveCount(0);
@@ -337,7 +333,6 @@ test('delete waits for closure and focuses the summary when no rows remain', asy
   await memoryRow(page, '验证命令').click();
   await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '删除记忆' }).click();
-  await expect(page.getByTestId('memory-count')).toHaveText('0 / 100');
   await expect(page.getByRole('button', { name: /打开记忆/ })).toHaveCount(0);
   await settled(page);
   await expect(page.getByRole('paragraph').filter({ hasText: /^记忆$/ })).toBeFocused();

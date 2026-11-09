@@ -1172,7 +1172,7 @@ export const EN: Record<string, string> = {
   'Coordinator 还没有在这个项目里记下笔记。':
     'The Coordinator has not written notes in this project yet.',
   '每个 thread 都会读': 'Read every thread',
-  按需查阅: 'Looked up when needed',
+  记忆文件: 'Memory files',
   '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
   正在加载记忆: 'Loading memories',
   已移除的项目: 'Removed project',
