@@ -7,6 +7,7 @@ import {
   type DocumentDiffFile,
   type GithubRepoRef,
   gitHostedRepoPath,
+  normalizedRepoRef,
   type ProjectBranchesResponse,
   type ProjectCommitDetailResponse,
   type ProjectCommitsResponse,
@@ -214,13 +215,11 @@ async function requireGithubRepoIdentity(dir: string, ref: GithubRepoRef): Promi
     cwd: dir,
     timeoutMs: 15000,
   });
-  const slug = origin.stdout
-    .toString('utf8')
-    .trim()
-    .match(
-      /^(?:https:\/\/github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?\/?$/,
-    )?.[1];
-  if (origin.code !== 0 || slug?.toLowerCase() !== `${ref.owner}/${ref.repo}`.toLowerCase()) {
+  if (
+    origin.code !== 0 ||
+    normalizedRepoRef(origin.stdout.toString('utf8')).toLowerCase() !==
+      normalizedRepoRef(githubCloneUrl(ref)).toLowerCase()
+  ) {
     throw new HttpError(409, 'project repository identity mismatch');
   }
 }

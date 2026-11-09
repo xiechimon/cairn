@@ -167,6 +167,52 @@ describe('Coordinator repository reads', () => {
     );
   });
 
+  for (const binding of ['localPath', 'cache'] as const) {
+    test.each([
+      { origin: 'https://github.com/fixture/repository.git', allowed: true },
+      { origin: 'git@github.com:fixture/repository.git', allowed: true },
+      { origin: 'ssh://git@github.com/fixture/repository.git', allowed: true },
+      { origin: 'git://github.com/fixture/repository.git', allowed: true },
+      { origin: 'http://github.com/fixture/repository.git', allowed: true },
+      { origin: 'https://GitHub.com/FiXtUrE/RePoSiToRy.git/', allowed: true },
+      { origin: 'ssh://git@github.example/fixture/repository.git', allowed: false },
+      { origin: 'git://github.com/other/repository.git', allowed: false },
+      { origin: 'http://github.com/fixture/other.git', allowed: false },
+      { origin: '', allowed: false },
+    ])(`${binding}: validates normalized origin $origin`, async ({ origin, allowed }) => {
+      const dir = await bindRepo('github');
+      const workspacesDir = join(H.s.reposDir, 'workspaces');
+      const cache = join(workspacesDir, H.projectId, 'repo');
+      if (binding === 'cache') {
+        mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+        expect((await runGit(['clone', dir, cache])).code).toBe(0);
+        H.s.db.update(project).set({ localPath: null }).where(eq(project.id, H.projectId)).run();
+      }
+      expect(
+        (
+          await runGit(['remote', 'set-url', 'origin', origin], {
+            cwd: binding === 'cache' ? cache : dir,
+          })
+        ).code,
+      ).toBe(0);
+      const result = JSON.parse(
+        await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+          projectId: H.projectId,
+          paths: ['scripts/owned-process.mjs'],
+        }),
+      ) as Docs;
+      if (allowed) {
+        expect(result.files[0]).toMatchObject({
+          content: 'export const spawn = true;\n',
+          commit: (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim(),
+        });
+      } else {
+        expect(result.files[0]?.error).toMatch(/identity mismatch/);
+        expect(result.files[0]?.content).toBeUndefined();
+      }
+    });
+  }
+
   test('uses the persisted daemon CLI root, including changes after server startup', async () => {
     const dir = await bindRepo('github');
     const home = join(H.s.reposDir, 'daemon-home');
