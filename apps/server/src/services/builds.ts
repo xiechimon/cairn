@@ -118,7 +118,7 @@ import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
-import { blockedHold, blockedNow } from './blockers.js';
+import { BLOCKED_STEP_KINDS, blockedHold, blockedNow } from './blockers.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import {
@@ -1034,7 +1034,7 @@ export function enqueueStep(
   const id = newRecordId();
   const createdAt = nowMs();
   const owner =
-    current === undefined || (kind !== 'plan' && kind !== 'session')
+    current === undefined || !BLOCKED_STEP_KINDS.includes(kind)
       ? undefined
       : deps.db.select().from(todo).where(eq(todo.id, current.todoId)).get();
   deps.db

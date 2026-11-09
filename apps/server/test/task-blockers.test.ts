@@ -1,17 +1,25 @@
+import { stepKindSchema } from '@cairn/shared';
 import { and, eq, like } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import { build, machine, step, todo } from '../src/db/schema.js';
-import { BLOCKED_BY_HOLD, releaseBlockedSteps } from '../src/services/blockers.js';
-import { enqueueStep } from '../src/services/builds.js';
+import {
+  BLOCKED_BY_HOLD,
+  BLOCKED_STEP_KINDS,
+  releaseBlockedSteps,
+} from '../src/services/blockers.js';
+import { applyBuildStepAction, enqueueStep } from '../src/services/builds.js';
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
-import { claimStep } from '../src/services/machines.js';
+import { claimStep, heartbeatStep } from '../src/services/machines.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { applyQuotaWaitStep, sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
+import * as shipGate from '../src/services/ship-gate.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
-import { req, seedSessionRoute } from './helpers.js';
+import { req, seedRoute, seedSessionRoute } from './helpers.js';
 
 registerChiefHarness();
+
+const TASK_WORK_KINDS = stepKindSchema.options.filter((kind) => kind !== 'chief');
 
 async function create(over: Record<string, unknown> = {}): Promise<string> {
   seedSessionRoute(H.s);
@@ -76,6 +84,10 @@ describe('reopen_todos reports a task it could not start', () => {
 });
 
 describe('blockedBy holds a task until its blockers are satisfied', () => {
+  test('dependency holds cover every task-work kind and exclude the Coordinator', () => {
+    expect(BLOCKED_STEP_KINDS).toEqual(TASK_WORK_KINDS);
+  });
+
   test('a task created behind an unfinished blocker is held, and released once the blocker is done', async () => {
     const blocker = await create();
     const id = await create({ blockedBy: [blocker] });
@@ -103,12 +115,49 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     expect(sessions(id)[0]?.holdReason).toBeNull();
   });
 
-  test('update_todo adds an edge and holds the pending session', async () => {
-    const blocker = await create();
-    const id = await create();
-    await relay('update_todo', { todoId: id, blockedBy: [blocker] });
-    expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
-  });
+  test.each(TASK_WORK_KINDS)(
+    'update_todo parks a pending %s and completion releases it',
+    async (kind) => {
+      const blocker = await create();
+      const id = await create();
+      H.s.db
+        .update(step)
+        .set({ kind })
+        .where(eq(step.id, sessions(id)[0]!.id))
+        .run();
+      await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+      expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+      finish(blocker, 'done');
+      releaseBlockedSteps(toolDeps());
+      expect(sessions(id)[0]?.holdReason).toBeNull();
+      expect(sessions(id)[0]?.holdUntil).toBeNull();
+    },
+  );
+
+  test.each(['before-confirm', 'after-confirm'])(
+    'plan confirmation enqueues a blocked build when the edge is added %s',
+    async (timing) => {
+      const blocker = await create();
+      const id = await create();
+      const buildId = row(id).latestBuildId!;
+      H.s.db
+        .update(step)
+        .set({ kind: 'plan', status: 'done' })
+        .where(eq(step.buildId, buildId))
+        .run();
+      H.s.db.update(todo).set({ phase: 'confirm' }).where(eq(todo.id, id)).run();
+      if (timing === 'before-confirm')
+        await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+      await applyBuildStepAction(toolDeps(), buildId, { action: 'confirm' });
+      if (timing === 'after-confirm')
+        await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+      const work = sessions(id).find((entry) => entry.kind === 'build')!;
+      expect(work).toMatchObject({ status: 'pending', holdReason: BLOCKED_BY_HOLD });
+      finish(blocker, 'done');
+      releaseBlockedSteps(toolDeps());
+      expect(sessions(id).find((entry) => entry.id === work.id)?.holdReason).toBeNull();
+    },
+  );
 
   test.each(['tool', 'rest'] as const)(
     'deleting a blocker through %s keeps its dependent held and owned',
@@ -143,11 +192,11 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     );
   });
 
-  test('a step enqueued later on a blocked task is held at insert', async () => {
+  test.each(TASK_WORK_KINDS)('a later %s is held at insert', async (kind) => {
     const blocker = await create();
     const id = await create({ blockedBy: [blocker] });
     const record = getTodo(toolDeps(), id)!;
-    enqueueStep(toolDeps(), record.latestBuildId!, 'session', H.teamId, 'Continue.');
+    enqueueStep(toolDeps(), record.latestBuildId!, kind, H.teamId, 'Continue.');
     expect(sessions(id).every((s) => s.holdReason === BLOCKED_BY_HOLD)).toBe(true);
   });
 
@@ -179,18 +228,28 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     expect(sessions(id)[0]?.holdReason).toBeNull();
   });
 
-  test('a blocker cannot be added under a running session', async () => {
+  test.each(TASK_WORK_KINDS)('a blocker cannot be added under a running %s', async (kind) => {
     const blocker = await create();
     const id = await create();
     const [session] = sessions(id);
-    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, session!.id)).run();
+    H.s.db.update(step).set({ kind, status: 'claimed' }).where(eq(step.id, session!.id)).run();
+    heartbeatStep(
+      {
+        ...H.s.svc,
+        box: H.s.secretBox,
+        reposDir: H.s.reposDir,
+        attachmentsDir: H.s.attachmentsDir,
+      },
+      null,
+      session!.id,
+    );
     await expect(relay('update_todo', { todoId: id, blockedBy: [blocker] })).rejects.toMatchObject({
       status: 409,
     });
     expect(row(id).blockedBy ?? []).toEqual([]);
   });
 
-  test.each(['plan', 'session'] as const)(
+  test.each(TASK_WORK_KINDS)(
     'a quota-waiting %s stays blocked through recovery and claim',
     async (kind) => {
       const blocker = await create();
@@ -213,6 +272,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         })
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
       const [session] = sessions(id);
       H.s.db.update(step).set({ kind }).where(eq(step.id, session!.id)).run();
       applyQuotaWaitStep(toolDeps(), sessions(id)[0]!, {
@@ -275,45 +335,120 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
   });
 
-  test('a blocker added during asynchronous claim preparation prevents that claim', async () => {
-    const blocker = await create();
-    const id = await create();
-    finish(blocker, 'done');
-    H.s.db
-      .update(step)
-      .set({ status: 'done' })
-      .where(eq(step.buildId, row(blocker).latestBuildId!))
-      .run();
-    const machineId = 'blocker-race-machine';
-    H.s.db
-      .insert(machine)
-      .values({
-        id: machineId,
-        teamId: H.teamId,
-        name: 'Blocker race',
-        online: true,
-        enabledRuntimes: ['pi'],
-      })
-      .run();
-    seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
-    const result = claimStep(
-      {
-        ...H.s.svc,
-        box: H.s.secretBox,
-        reposDir: H.s.reposDir,
-        attachmentsDir: H.s.attachmentsDir,
-      },
-      machineId,
-      H.teamId,
-      0,
-      'http://localhost',
-    );
-    await relay('update_todo', { todoId: id, blockedBy: [blocker] });
-    finish(blocker, 'failed');
-    await relay('update_todo', { todoId: id, blockedBy: [blocker] });
-    expect(await result).toBeNull();
-    expect(sessions(id)[0]?.status).toBe('pending');
-  });
+  test.each(TASK_WORK_KINDS)(
+    'an edge added during asynchronous %s claim prevents it',
+    async (kind) => {
+      const blocker = await create();
+      const id = await create();
+      finish(blocker, 'done');
+      H.s.db
+        .update(step)
+        .set({ status: 'done' })
+        .where(eq(step.buildId, row(blocker).latestBuildId!))
+        .run();
+      const machineId = 'blocker-race-machine';
+      H.s.db
+        .insert(machine)
+        .values({
+          id: machineId,
+          teamId: H.teamId,
+          name: 'Blocker race',
+          online: true,
+          enabledRuntimes: ['pi'],
+        })
+        .run();
+      seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      H.s.db
+        .update(step)
+        .set({ kind })
+        .where(eq(step.id, sessions(id)[0]!.id))
+        .run();
+      let resume = () => {};
+      const prepared = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const gate = vi.spyOn(shipGate, 'reverifyShip').mockImplementation(async () => {
+        await prepared;
+        return null;
+      });
+      const result = claimStep(
+        {
+          ...H.s.svc,
+          box: H.s.secretBox,
+          reposDir: H.s.reposDir,
+          attachmentsDir: H.s.attachmentsDir,
+        },
+        machineId,
+        H.teamId,
+        0,
+        'http://localhost',
+      );
+      try {
+        expect(gate).toHaveBeenCalledOnce();
+        await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+        finish(blocker, 'failed');
+        await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+        resume();
+        expect(await result).toBeNull();
+        expect(sessions(id)[0]).toMatchObject({ status: 'pending', holdReason: BLOCKED_BY_HOLD });
+      } finally {
+        resume();
+        await result;
+        gate.mockRestore();
+      }
+    },
+  );
+
+  test.each(TASK_WORK_KINDS)(
+    'claim rechecks an unheld %s against current blockers',
+    async (kind) => {
+      const blocker = await create();
+      const id = await create({ blockedBy: [blocker] });
+      H.s.db
+        .update(step)
+        .set({ status: 'done' })
+        .where(eq(step.buildId, row(blocker).latestBuildId!))
+        .run();
+      const machineId = 'unheld-claim-machine';
+      H.s.db
+        .insert(machine)
+        .values({
+          id: machineId,
+          teamId: H.teamId,
+          name: 'Unheld claim',
+          online: true,
+          enabledRuntimes: ['pi'],
+        })
+        .run();
+      seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      const pending = sessions(id)[0]!;
+      H.s.db
+        .update(step)
+        .set({ kind, holdReason: null, holdUntil: null })
+        .where(eq(step.id, pending.id))
+        .run();
+      const claim = () =>
+        claimStep(
+          {
+            ...H.s.svc,
+            box: H.s.secretBox,
+            reposDir: H.s.reposDir,
+            attachmentsDir: H.s.attachmentsDir,
+          },
+          machineId,
+          H.teamId,
+          0,
+          'http://localhost',
+        );
+      expect(await claim()).toBeNull();
+      expect(sessions(id)[0]).toMatchObject({ status: 'pending', holdReason: BLOCKED_BY_HOLD });
+      finish(blocker, 'done');
+      releaseBlockedSteps(toolDeps());
+      expect((await claim())?.step.id).toBe(pending.id);
+    },
+  );
 
   test('a cycle is refused', async () => {
     const a = await create();

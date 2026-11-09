@@ -1,4 +1,9 @@
-import { infoReportMessageSchema, quoteIssueLines } from '@cairn/shared';
+import {
+  infoReportMessageSchema,
+  isSessionStepKind,
+  quoteIssueLines,
+  stepKindSchema,
+} from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, message, step, todo } from '../db/schema.js';
@@ -7,7 +12,9 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 
 export const BLOCKED_BY_HOLD = 'blocked-by';
 const HOLD_MS = 100 * 365 * 24 * 60 * 60 * 1000;
-const HELD_KINDS = ['plan', 'session'] as const;
+export const BLOCKED_STEP_KINDS = stepKindSchema.options.filter(
+  (kind) => isSessionStepKind(kind) || kind === 'merge' || kind === 'review',
+);
 const DEAD_ENDS = new Set(['failed', 'closed']);
 
 type TodoRow = typeof todo.$inferSelect;
@@ -82,7 +89,7 @@ export function holdBlockedBuild(db: Db, buildId: string): void {
       and(
         eq(step.buildId, buildId),
         inArray(step.status, ['pending', 'waiting_quota']),
-        inArray(step.kind, [...HELD_KINDS]),
+        inArray(step.kind, BLOCKED_STEP_KINDS),
       ),
     )
     .run();
@@ -117,7 +124,7 @@ export function checkBlockedBy(db: Db, row: BlockedRow, ids: readonly string[]):
         and(
           eq(step.buildId, row.latestBuildId),
           eq(step.status, 'claimed'),
-          inArray(step.kind, [...HELD_KINDS]),
+          inArray(step.kind, BLOCKED_STEP_KINDS),
         ),
       )
       .get();
