@@ -363,8 +363,12 @@ export const gitPrim = {
     });
   },
 
-  async fetch(repoDir: string, cred: BoundGitCredentials | null): Promise<void> {
-    const origin = await gitPrim.originConfigUrl(repoDir);
+  async fetch(
+    repoDir: string,
+    cred: BoundGitCredentials | null,
+    options: { origin?: string; timeoutMs?: number } = {},
+  ): Promise<void> {
+    const origin = options.origin ?? (await gitPrim.originConfigUrl(repoDir));
     if (origin === null) throw new Error('repository has no origin for verified cache fetch');
     const prefix = repositoryCacheRefPrefix(origin);
     await runGitOk(
@@ -381,7 +385,7 @@ export const gitPrim = {
       {
         cwd: repoDir,
         env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
-        timeoutMs: NET_TIMEOUT_MS,
+        timeoutMs: options.timeoutMs ?? NET_TIMEOUT_MS,
       },
     );
   },
