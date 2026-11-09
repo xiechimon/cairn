@@ -529,6 +529,27 @@ describe('contextResumeOf', () => {
       }),
     ).toBe('cold');
   });
+
+  it('is cold when a compacted slim still owns the latest step but the route model changed', () => {
+    const slimAt = 10_000;
+    expect(
+      contextResumeOf({
+        now: slimAt + 30_000,
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'stub-gw/model-c',
+        lastUsage: {
+          createdAt: slimAt - 1,
+          cacheRead: 0,
+          input: COLD_CACHE_MISS_MIN_TOKENS,
+          contextTokens: 20_000,
+          model: 'stub-gw/model-b',
+        },
+        lastColdSlimAt: slimAt,
+        lastColdSlimStepId: 'cold-step-b',
+        lastUsageStepId: 'cold-step-b',
+      }),
+    ).toBe('cold');
+  });
 });
 
 describe('resumeExpiresAtOf', () => {

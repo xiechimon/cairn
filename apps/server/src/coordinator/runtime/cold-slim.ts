@@ -72,7 +72,9 @@ export function contextResumeOf(args: {
     usageStep !== ''
       ? slimStep === usageStep
       : args.lastColdSlimAt !== null && args.lastColdSlimAt >= args.lastUsage.createdAt;
-  if (slimRecent && slimOwnsLatest) return 'compacted';
+  const active = args.activeModel?.trim() ?? '';
+  const modelMatches = active === '' || args.lastUsage.model === active;
+  if (slimRecent && slimOwnsLatest && modelMatches) return 'compacted';
   if (
     isColdResume({
       now: args.now,
