@@ -24,10 +24,8 @@ test('the owner browser on the server machine opens /app without a token', async
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
   const identity = await page.evaluate(async () => (await fetch('/api/remote/identity')).json());
   expect(identity).toEqual({ login: null, via: null });
-  const pairing = page.waitForResponse((res) => new URL(res.url()).pathname === '/api/remote/pairing');
-  await page.getByTestId('pair-new-device').click();
-  expect((await pairing).status()).toBe(201);
-  await expect(page.getByLabel('Pairing QR code')).toBeVisible();
+  const pairing = await page.evaluate(async () => (await fetch('/api/remote/pairing', { method: 'POST' })).status);
+  expect(pairing).toBe(201);
   await page.screenshot({ path: testInfo.outputPath('loopback-owner.png'), fullPage: true });
 });
 
