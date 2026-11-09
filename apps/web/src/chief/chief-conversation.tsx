@@ -20,6 +20,7 @@ import {
 import { useConnected } from '../api/connection-state.js';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { useLiveSeconds } from '../components/chat/live-row.js';
@@ -47,7 +48,6 @@ import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { AnswerComposer } from './answer-composer.js';
-import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import {
   ChiefConnectionBanner,
@@ -64,7 +64,6 @@ import { awaitingStream } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
-import type { ChiefEarlier } from './use-chief-surface.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
@@ -104,7 +103,7 @@ export interface ChiefConversationProps {
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
-  earlier?: ChiefEarlier;
+  earlier?: EarlierPages;
   hero?: ReactNode;
   below?: ReactNode;
   heroCollapsed?: boolean;
@@ -499,7 +498,7 @@ export function ChiefConversation({
               onReply={stageReply}
             />
             {earlier != null && (
-              <ChiefEarlierLoader
+              <EarlierLoader
                 earlier={earlier}
                 hasEarlier={chief.hasEarlier === true}
                 rowCount={rows.length}
