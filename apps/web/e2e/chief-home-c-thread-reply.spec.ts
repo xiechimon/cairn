@@ -107,104 +107,6 @@ async function stubHome(
   return sent;
 }
 
-const card = (page: Page, title: string) =>
-  page.getByTestId('needs-you').locator('[data-slot="thread-card"]').filter({ hasText: title });
-
-test('a needs-you card replies straight to its thread and says where it went', async ({ page }) => {
-  const sent = await stubHome(page, [todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1')]);
-  await page.goto('/app');
-  const target = card(page, 'Split the routing migration');
-  await expect(target.locator('[data-slot="thread-reply"]')).toHaveCount(0);
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
-  const box = target.getByRole('textbox', { name: 'Reply to #7' });
-  await expect(box).toBeFocused();
-  await expect(target).toContainText('Plan feedback for #7, not an approval.');
-  await box.fill('Split the migration out first');
-  await box.press('Enter');
-  await expect(target).toContainText('Sent to #7.');
-  await expect(box).toHaveValue('');
-  await expect(box).not.toBeEditable();
-  expect(sent).toHaveLength(1);
-  expect(sent[0]).toMatchObject({
-    todoId: 'todo-7',
-    body: { content: 'Split the migration out first', clientMessageId: expect.any(String) },
-  });
-});
-
-test('a refused reply keeps the draft and says it was not sent', async ({ page }) => {
-  await stubHome(page, [todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1')], 409);
-  await page.goto('/app');
-  const target = card(page, 'Split the routing migration');
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
-  const box = target.getByRole('textbox', { name: 'Reply to #7' });
-  await box.fill('Keep this text');
-  await box.press('Enter');
-  await expect(target).toContainText('Not sent. Try again.');
-  await expect(box).toHaveValue('Keep this text');
-});
-
-test('a failed thread offers a reply that reruns it; an empty reply cannot be sent', async ({ page }) => {
-  const sent = await stubHome(page, [todo('todo-12', 12, 'Fix the orb permission', 'failed', 'build-12')]);
-  await page.goto('/app');
-  const target = card(page, 'Fix the orb permission');
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
-  await expect(target).toContainText('Reruns #12 with this note.');
-  await expect(target.getByRole('button', { name: 'Send' })).toBeDisabled();
-  await target.getByRole('textbox', { name: 'Reply to #12' }).press('Enter');
-  expect(sent).toHaveLength(0);
-});
-
-test('while a reply is in flight the box is read-only; on success the thread leaves Needs you without a visible relay marker', async ({
-  page,
-}) => {
-  let release = () => {};
-  const hold = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const confirm = todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1');
-  const todos = [confirm];
-  const sent = await stubHome(page, todos, 201, hold);
-  let delivered = false;
-  await page.route(`**/api/conversations/${THREAD.id}/messages*`, (route) =>
-    route.fulfill({
-      json: {
-        messages: delivered
-          ? [
-              {
-                id: 'marker-1',
-                role: 'system',
-                createdAt: 2,
-                content: JSON.stringify({
-                  kind: 'thread-message',
-                  todoId: 'todo-7',
-                  seqNum: 7,
-                  title: 'Split the routing migration',
-                  excerpt: 'Do A',
-                  delivered: 'revision',
-                  conversationId: 'build-1',
-                }),
-              },
-            ]
-          : [],
-      },
-    }),
-  );
-  await page.goto('/app');
-  const target = card(page, 'Split the routing migration');
-  await target.getByRole('button', { name: 'Reply', exact: true }).click();
-  const box = target.getByRole('textbox', { name: 'Reply to #7' });
-  await box.fill('Do A');
-  await box.press('Enter');
-  await expect.poll(() => sent.length).toBe(1);
-  await expect(box).not.toBeEditable();
-  todos[0] = { ...confirm, phase: 'planning' };
-  delivered = true;
-  release();
-  await expect(target).toHaveCount(0);
-  await expect(page.getByTestId('thread-message-marker')).toHaveCount(0);
-  await expect(page.getByTestId('home-c')).not.toContainText('You told #7 directly: Do A');
-});
-
 async function recordCoordinatorSends(page: Page): Promise<string[]> {
   const posts: string[] = [];
   await page.route(`**/api/conversations/${THREAD.id}/messages*`, (route, request) => {
@@ -215,6 +117,7 @@ async function recordCoordinatorSends(page: Page): Promise<string[]> {
 }
 
 const composer = (page: Page) => page.getByTestId('chief-composer-input');
+
 
 test('the home composer can talk to a running thread directly, and back to the Coordinator', async ({
   page,

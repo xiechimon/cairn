@@ -367,16 +367,16 @@
     },
     {
       "id": "needs-you",
-      "name": "Needs-you tray",
-      "summary": "Questions, failures, pending approvals and reviews that wait on the user, shown as at most three cards above the composer.",
-      "states": "Up to three cards above the composer for questions, failures, approvals and reviews; empty when nothing waits, with a count when there are more.",
+      "name": "Task cards and needs-you",
+      "summary": "A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.",
+      "states": "A card per created task after the reply that announced it (waiting, working, resolved); a one-line link when the Tasks read no longer lists the task; no tray above the composer.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/needs-you.ts",
-          "apps/web/src/board/needs-you-tray.tsx",
-          "apps/web/src/board/needs-you-thread-card.tsx"
+          "apps/web/src/board/task-card.tsx",
+          "apps/web/src/board/task-card-facts.ts"
         ],
         "server": [
           "apps/server/src/services/needs-you.ts"
@@ -389,21 +389,23 @@
       },
       "reach": [
         "open /app",
-        "click testid:needs-you"
+        "click testid:chief-task-card"
       ],
       "research": [
         "docs/research/link-roundup-2026-11-01.md",
-        "docs/research/ui-ux-audit-2026-11-06.md"
+        "docs/research/ui-ux-audit-2026-11-06.md",
+        "docs/design/duet-shaped-clients.md"
       ],
-      "frontendDesign": {
-        "gap": "D121 decided the tray, but no design or approved screenshot set shows its states"
-      },
+      "frontendDesign": [
+        "docs/design/duet-shaped-clients.md"
+      ],
       "backendDesign": {
         "gap": "no design for which records enter the tray, their order and when they leave"
       },
       "evidence": [
         "apps/web/e2e/chief-home-needs-you.spec.ts",
         "apps/web/e2e/chief-home-tray.spec.ts",
+        "apps/web/e2e/chief-home-task-cards.spec.ts",
         "apps/server/test/needs-you.test.ts"
       ],
       "batch": "B2"
@@ -478,7 +480,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:needs-you"
+        "click testid:tasks-toggle"
       ],
       "research": {
         "gap": "no prior-art note on agent notifications and push delivery"
