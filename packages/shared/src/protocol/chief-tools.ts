@@ -637,7 +637,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         },
         projectId: str('Optional project id for provenance.'),
         layer: str(
-          'core (always in the prompt), log, scratchpad (this thread only), or searchable. Default core.',
+          'core (always in the prompt), scratchpad (this thread only), or searchable (read on demand). Default core.',
         ),
       },
       ['title', 'content'],
@@ -646,7 +646,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_memory',
     description:
-      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. Only valid entries can be updated. GitHub issue fence text is rejected.',
+      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. For MEMORY.md, pass the whole new document. Only valid entries can be updated. GitHub issue fence text is rejected.',
     parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
       'memoryId',
       'content',
@@ -812,7 +812,7 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         projectId: str('Optional project id for provenance.'),
         sourceTodoId: str('Optional source todo id; defaults to the running task.'),
         layer: str(
-          'core (always in the prompt), log, scratchpad (this thread only), or searchable. Default core.',
+          'core (always in the prompt), scratchpad (this thread only), or searchable (read on demand). Default core.',
         ),
       },
       ['title', 'content'],
@@ -821,7 +821,7 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_memory',
     description:
-      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. Only valid entries can be updated. GitHub issue fence text is rejected.',
+      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. For MEMORY.md, pass the whole new document. Only valid entries can be updated. GitHub issue fence text is rejected.',
     parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
       'memoryId',
       'content',

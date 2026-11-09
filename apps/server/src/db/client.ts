@@ -14,6 +14,7 @@ import Database from 'better-sqlite3';
 import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { runAgentLayerDataMigration } from '../legacy/agent-layer/data-migration.js';
+import { foldMemoryIndexes } from '../services/memory.js';
 import { exportLegacyTables } from './legacy-export.js';
 import * as schema from './schema.js';
 
@@ -76,7 +77,9 @@ export function migrateDatabase(sqlite: Database.Database, db: Db, logger?: Migr
     );
     dropAgents = !outcome.hadAgents;
   }
-  if (dropAgents) migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+  if (!dropAgents) return;
+  migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+  foldMemoryIndexes(db);
 }
 
 export interface OpenedDb {

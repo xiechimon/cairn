@@ -1,5 +1,6 @@
 import type { PrPanelRow, TasksQuery, TodoSection } from '@cairn/shared';
 import { toDisplayTodo } from '../api/mappers.js';
+import type { GlyphKind } from '../components/status-glyph.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
 import { pendingQuestions } from './needs-you.js';
 import { threadCopy } from './thread-copy.js';
@@ -106,6 +107,21 @@ export function taskRowCopy(entry: TaskEntry, pr?: PrPanelRow): TaskRowCopy {
     }
     case 'up_next':
       return { ...base, word: '待开始', what: { key: '还没开始' }, where: null };
+  }
+}
+
+export function glyphOf(entry: TaskEntry): GlyphKind {
+  switch (entry.section) {
+    case 'ready_for_review':
+      return 'three-quarter';
+    case 'needs_input':
+      return 'half';
+    case 'resolved':
+      return entry.todo.phase === 'closed' ? 'closed' : 'done';
+    case 'up_next':
+      return 'todo';
+    case 'working':
+      return 'ring';
   }
 }
 

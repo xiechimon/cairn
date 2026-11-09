@@ -224,8 +224,8 @@
     {
       "id": "memory",
       "name": "Memory",
-      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.",
-      "states": "Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete.",
+      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.",
+      "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned D123 replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -253,7 +253,8 @@
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",
         "docs/research/research-loop-plan.md",
-        "docs/research/memory-2026-11-08.md"
+        "docs/research/memory-2026-11-08.md",
+        "docs/research/memory-inplace-edit-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/design/memory-inplace-edit.md"
@@ -366,16 +367,16 @@
     },
     {
       "id": "needs-you",
-      "name": "Needs-you tray",
-      "summary": "Questions, failures, pending approvals and reviews that wait on the user, shown as at most three cards above the composer.",
-      "states": "Up to three cards above the composer for questions, failures, approvals and reviews; empty when nothing waits, with a count when there are more.",
+      "name": "Task cards and needs-you",
+      "summary": "A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.",
+      "states": "A card per created task after the reply that announced it (waiting, working, resolved); a one-line link when the Tasks read no longer lists the task; no tray above the composer.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/needs-you.ts",
-          "apps/web/src/board/needs-you-tray.tsx",
-          "apps/web/src/board/needs-you-thread-card.tsx"
+          "apps/web/src/board/task-card.tsx",
+          "apps/web/src/board/task-card-facts.ts"
         ],
         "server": [
           "apps/server/src/services/needs-you.ts"
@@ -388,21 +389,23 @@
       },
       "reach": [
         "open /app",
-        "click testid:needs-you"
+        "click testid:chief-task-card"
       ],
       "research": [
         "docs/research/link-roundup-2026-11-01.md",
-        "docs/research/ui-ux-audit-2026-11-06.md"
+        "docs/research/ui-ux-audit-2026-11-06.md",
+        "docs/design/duet-shaped-clients.md"
       ],
-      "frontendDesign": {
-        "gap": "D121 decided the tray, but no design or approved screenshot set shows its states"
-      },
+      "frontendDesign": [
+        "docs/design/duet-shaped-clients.md"
+      ],
       "backendDesign": {
         "gap": "no design for which records enter the tray, their order and when they leave"
       },
       "evidence": [
         "apps/web/e2e/chief-home-needs-you.spec.ts",
         "apps/web/e2e/chief-home-tray.spec.ts",
+        "apps/web/e2e/chief-home-task-cards.spec.ts",
         "apps/server/test/needs-you.test.ts"
       ],
       "batch": "B2"
@@ -477,7 +480,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:needs-you"
+        "click testid:tasks-toggle"
       ],
       "research": {
         "gap": "no prior-art note on agent notifications and push delivery"

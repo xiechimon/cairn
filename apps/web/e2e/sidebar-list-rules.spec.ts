@@ -19,12 +19,17 @@ async function open(page: Page) {
     taskEntry({ id: 't-ask', title: 'Pick a provider', phase: 'confirm', section: 'needs_input' }),
     taskEntry({ id: 't-run', title: LONG, phase: 'building', section: 'working', projectId: 'proj-4' }),
   ];
-  await mockLive(page, { threads: [THREAD], messages: [], todos: [], tasks, projects });
+  const tasksReady = Promise.withResolvers<void>();
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [], tasks, projects }, (path, _route, json) => {
+    if (path !== '/api/tasks') return undefined;
+    return tasksReady.promise.then(() => json({ entries: tasks }));
+  });
   await page.goto('/app?project=proj-2');
   if (page.viewportSize()!.width < 640) {
     await page.getByRole('button', { name: '展开侧边栏' }).click();
   }
   await expect(page.locator('aside [data-slot="sidebar-project-row"]').first()).toBeVisible();
+  return tasksReady.resolve;
 }
 
 const probe = (page: Page) =>
@@ -95,7 +100,11 @@ for (const scheme of ['dark', 'light'] as const) {
     test(`L1-L7 hold at ${width}px in ${scheme}`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme });
       await page.setViewportSize({ width, height: 800 });
-      await open(page);
+      const releaseTasks = await open(page);
+      const dots = page.locator('aside [data-slot="needs-you-dot"]');
+      await expect(dots).toHaveCount(0);
+      releaseTasks();
+      await expect(dots).toHaveCount(1);
       const m = await probe(page);
 
       expect(m.hues, 'L1: distinct chromatic hues in the list').toBeLessThanOrEqual(2);

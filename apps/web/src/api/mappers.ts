@@ -669,6 +669,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       return typeof wake.stepId === 'string' ? [wake.stepId] : [];
     }),
   );
+  const promptOrigins = new Map(
+    steps.flatMap((s) =>
+      s.promptOrigin !== undefined ? [[transcriptPromptRowId(s.id), s.promptOrigin] as const] : [],
+    ),
+  );
   const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
@@ -714,6 +719,14 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const text = textOfContent(m.content).trim();
     if (m.role === 'user') {
       if ([...scheduledStepIds].some((id) => m.id === transcriptPromptRowId(id))) continue;
+      const origin = promptOrigins.get(m.id);
+      if (origin !== undefined) {
+        entries.push({
+          at: m.createdAt,
+          item: { kind: 'step-prompt', id: m.id, origin, raw: text },
+        });
+        continue;
+      }
       if (GATE_ANNOUNCEMENTS.includes(text)) {
         entries.push({
           at: m.createdAt,
@@ -1452,6 +1465,34 @@ function handoffTodoOf(call: ToolCallRecord): string | null {
   return typeof todoId === 'string' && todoId !== '' ? todoId : null;
 }
 
+function createdTodoOf(call: ToolCallRecord): {
+  todoId: string;
+  projectId: string | null;
+  seq: number | null;
+  title: string | null;
+} | null {
+  if (call.name !== 'create_todo' || call.result === undefined || call.isError === true)
+    return null;
+  let result: unknown = call.result;
+  if (typeof result === 'string') {
+    try {
+      result = JSON.parse(result);
+    } catch {
+      return null;
+    }
+  }
+  const record = result as { id?: unknown; seqNum?: unknown; title?: unknown } | null;
+  const todoId = record?.id;
+  if (typeof todoId !== 'string' || todoId === '') return null;
+  const projectId = (call.arguments as { projectId?: unknown } | null)?.projectId;
+  return {
+    todoId,
+    projectId: typeof projectId === 'string' ? projectId : null,
+    seq: typeof record?.seqNum === 'number' ? record.seqNum : null,
+    title: typeof record?.title === 'string' && record.title !== '' ? record.title : null,
+  };
+}
+
 export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
   return collectChiefStream(messages).items;
 }
@@ -1477,6 +1518,11 @@ function collectChiefStream(
       .map((m) => chiefUserText(textOfContent(m.content).trim())),
   );
   let pendingTools: ChiefToolRow[] = [];
+  let pendingCards: ChiefStreamItem[] = [];
+  const flushCards = () => {
+    items.push(...pendingCards);
+    pendingCards = [];
+  };
   let eventTurn = false;
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
@@ -1569,8 +1615,11 @@ function collectChiefStream(
       }
     }
     const call = toolCallOfContent(m.content);
-    if (call !== null && eventTurn) continue;
     if (call !== null) {
+      const created = createdTodoOf(call);
+      if (created !== null)
+        pendingCards.push({ kind: 'task-card', id: `${m.id}:task-card`, ...created });
+      if (eventTurn) continue;
       pendingTools.push({
         label: pillOf(call),
         ...(call.startedAt !== undefined && call.endedAt !== undefined
@@ -1610,6 +1659,7 @@ function collectChiefStream(
       if (text === '') continue;
       if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
+      flushCards();
       const head = orchestratePromptHeadOf(text);
       items.push(
         head === null
@@ -1647,7 +1697,9 @@ function collectChiefStream(
       ...rowProject(m),
     });
     pendingTools = [];
+    flushCards();
   }
+  flushCards();
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
   items.forEach((item, index) => {
     if (

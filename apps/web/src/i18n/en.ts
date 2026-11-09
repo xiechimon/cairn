@@ -112,6 +112,9 @@ export const EN: Record<string, string> = {
   '{n} 项待你处理': '{n} waiting on you',
   换项目: 'Move project',
   已转给任务: 'Passed to task',
+  已建任务: 'Created task',
+  '{n} 次更新': 'updates: {n}',
+  '最新：{line}': 'Latest: {line}',
   '任务 #{n} {title}：{status}': 'Task #{n} {title}: {status}',
   审阅中: 'In review',
   '已完成，未验证': 'Done, not verified',
@@ -942,6 +945,16 @@ export const EN: Record<string, string> = {
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
+  'CI 修复第 {round}/{max} 轮：推送前检查未通过':
+    'CI fix round {round}/{max}: pre-push checks failed',
+  'CI 修复第 {round}/{max} 轮：CI 检查未通过': 'CI fix round {round}/{max}: CI checks failed',
+  '解冲突第 {round}/{max} 轮：PR 与默认分支冲突':
+    'Conflict fix round {round}/{max}: the PR conflicts with the default branch',
+  '按反馈返工，继续本会话': 'Reworking from feedback in this session',
+  查看原始日志: 'View raw log',
+  原始日志: 'Raw log',
+  查看完整指令: 'View full instruction',
+  完整指令: 'Full instruction',
   // #1285 失败行指引按分类分族
   '请将其重新上线，或重新运行任务以改派其他机器。':
     'Reconnect the machine, or rerun the task to assign another machine.',
@@ -1400,7 +1413,6 @@ export const EN: Record<string, string> = {
   项目设置: 'Project settings',
   回答: 'Answer',
   看计划: 'Review plan',
-  '查看 thread': 'View thread',
   '在问你一个问题。': 'Asked you a question.',
   '计划已就绪，批准后开工。': 'Plan ready. Approve to start.',
   '已就绪，等你审阅。': 'Ready for your review.',
@@ -1420,12 +1432,10 @@ export const EN: Record<string, string> = {
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   '{n} 件在进行': '{n} in progress',
   待你决定: 'Needs you',
-  '还有 {n} 件': '{n} more',
   首页概况: 'Home overview',
   '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
   '跟 Coordinator 说点什么，或描述一个新任务…':
     'Tell the Coordinator something, or describe a new task…',
-  收起其余: 'Show less',
   首页: 'Home',
   往上滑看更早的对话: 'Scroll up for earlier messages',
   'Claude 登录需要处理': 'Claude sign-in needs attention',

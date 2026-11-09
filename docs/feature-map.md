@@ -21,7 +21,7 @@
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 19 |
 | Research gaps | 17 |
-| Frontend design gaps | 22 |
+| Frontend design gaps | 21 |
 | Backend design gaps | 20 |
 | notes cited but not on main | 21 |
 
@@ -38,7 +38,7 @@
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
-| [Needs-you tray](#needs-you) | 1 | shipped | yes | gap | gap | B2 |
+| [Task cards and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
 | [Phone push](#push-notifications) | 1 | shipped | gap | gap | gap | B2 |
@@ -94,7 +94,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
-| [Needs-you tray](#needs-you) | 1 | Frontend design: D121 decided the tray, but no design or approved screenshot set shows its states<br>Backend design: no design for which records enter the tray, their order and when they leave |
+| [Task cards and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Research: no prior-art note on agent notifications and push delivery<br>Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns behind D85 and D119 were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
 
@@ -258,9 +258,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.
+**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.
 
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md)
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 - Backend design: [docs/design/memory-backend.md](design/memory-backend.md), [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 
@@ -274,10 +274,10 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### needs-you
 
-**Needs-you tray** (shipped). Questions, failures, pending approvals and reviews that wait on the user, shown as at most three cards above the composer.
+**Task cards and needs-you** (shipped). A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.
 
-- Research: [docs/research/link-roundup-2026-11-01.md](research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
-- Frontend design: **gap**: D121 decided the tray, but no design or approved screenshot set shows its states
+- Research: [docs/research/link-roundup-2026-11-01.md](research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
+- Frontend design: [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
 
 ### orb-isolation
