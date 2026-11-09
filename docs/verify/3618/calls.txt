@@ -1,0 +1,19 @@
+GET /api/computers
+200
+{"computers":[{"id":"c1","scopeKey":"chief:chief-oGVk16l9lfVc-99oX5eBt-aBfE9D3AfgypCCxCmiKJj","state":"running","controlHolder":"none","browserEnabled":false,"machine":{"id":"m1","name":"omarchy","online":true}}]}
+
+PATCH /api/computers/missing {"browserEnabled":true}
+404
+{"error":"computer missing not found"}
+
+PATCH /api/computers/c1 {"browserEnabled":true}
+200
+{"computer":{"id":"c1","scopeKey":"chief:chief-oGVk16l9lfVc-99oX5eBt-aBfE9D3AfgypCCxCmiKJj","state":"running","controlHolder":"none","browserEnabled":true,"machine":{"id":"m1","name":"omarchy","online":true}}}
+
+GET /api/computers
+200
+{"computers":[{"id":"c1","scopeKey":"chief:chief-oGVk16l9lfVc-99oX5eBt-aBfE9D3AfgypCCxCmiKJj","state":"running","controlHolder":"none","browserEnabled":true,"machine":{"id":"m1","name":"omarchy","online":true}}]}
+
+PATCH /api/computers/c1 {"browserEnabled":false}
+200
+{"computer":{"id":"c1","scopeKey":"chief:chief-oGVk16l9lfVc-99oX5eBt-aBfE9D3AfgypCCxCmiKJj","state":"running","controlHolder":"none","browserEnabled":false,"machine":{"id":"m1","name":"omarchy","online":true}}}
