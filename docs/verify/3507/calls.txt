@@ -1,0 +1,15 @@
+# Before: origin/main 2c02dd95f (contains #3496): server http://127.0.0.1:8821, server env CAIRN_GITHUB_APP_SLUG=cairnwright CAIRN_GITHUB_APP_BOT_ID=347615582
+POST /api/machine/tasks/claim -> 200 step yB4vDnYf_Id7DWJfrLVKG
+GET /api/machine/token/yB4vDnYf_Id7DWJfrLVKG
+-> 200 commitIdentity: null
+
+# Intermediate: PR head 97bc1974e (machine route fixed, Coordinator step token still without identity): server http://127.0.0.1:8897, server env CAIRN_GITHUB_APP_SLUG=cairnwright CAIRN_GITHUB_APP_BOT_ID=347615582
+POST /api/machine/tasks/claim -> 200 step uotvt-bCkhn2iSLectDBE
+GET /api/machine/token/uotvt-bCkhn2iSLectDBE
+-> 200 commitIdentity: null
+
+# After: PR head aa78ef9be: server http://127.0.0.1:8897, server env CAIRN_GITHUB_APP_SLUG=cairnwright CAIRN_GITHUB_APP_BOT_ID=347615582
+POST /api/machine/tasks/claim -> 200 step T5R86Vxz1Btap8raKharp
+GET /api/machine/token/T5R86Vxz1Btap8raKharp
+-> 200 commitIdentity: {"name":"cairnwright[bot]","email":"347615582+cairnwright[bot]@users.noreply.github.com"}
+
