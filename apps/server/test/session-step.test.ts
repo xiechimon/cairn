@@ -2,7 +2,7 @@ import { SESSION_BRIEF } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build, step, todo } from '../src/db/schema.js';
-import { completeStep, startBuilds } from '../src/services/builds.js';
+import { completeStep, listSteps, startBuilds } from '../src/services/builds.js';
 import { countMarkedRounds } from '../src/services/ci-loop.js';
 import { priorSessionOf } from '../src/services/machine-routing.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
@@ -79,6 +79,13 @@ describe('session step kind', () => {
       .find((r) => r.status === 'pending')!;
     expect(next.kind).toBe('session');
     expect(next.prompt).toContain('Also cover the empty board');
+    expect(next.promptOrigin).toEqual({ kind: 'rework' });
+    expect(listSteps(deps(), buildId).find((r) => r.id === next.id)?.promptOrigin).toEqual({
+      kind: 'rework',
+    });
+    expect(listSteps(deps(), buildId).find((r) => r.id === stepRow.id)).not.toHaveProperty(
+      'promptOrigin',
+    );
     expect(getTodo(deps(), todoId)!.phase).toBe('queued');
   });
 });

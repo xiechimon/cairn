@@ -360,6 +360,9 @@ export function createCiPoller(
       'build',
       teamId,
       buildMergeConflictPrompt({ ...pr, defaultBranch, round: rounds + 1 }),
+      undefined,
+      undefined,
+      { kind: 'merge-conflict', round: rounds + 1, roundsMax: CI_MERGE_CONFLICT_ROUNDS_MAX },
     );
     if (reverify) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
     if (stopsReview) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_REVIEW_NOTE);
@@ -1006,6 +1009,9 @@ export function createCiPoller(
         'build',
         todoRow.teamId,
         lessons === null ? fixPrompt : `${fixPrompt}\n\n${lessons}`,
+        undefined,
+        undefined,
+        { kind: 'ci-fix', trigger: 'ci-checks', round: rounds + 1, roundsMax: CI_FIX_ROUNDS_MAX },
       );
       tally.appended += 1;
       return;
