@@ -283,6 +283,16 @@ async function resolveReadCommit(
   const binding = githubRepoOfProject(row);
   if (binding === null) throw new HttpError(409, 'project repository binding changed during read');
   const prefix = repositoryCacheRefPrefix(githubCloneUrl(binding));
+  const verified = await runGit(
+    ['for-each-ref', '--count=1', '--format=%(refname)', `${prefix}/`],
+    { cwd: dir, timeoutMs: 15000 },
+  );
+  if (verified.code !== 0 || verified.stdout.toString('utf8').trim() === '') {
+    throw new HttpError(
+      403,
+      'repository cache not verified yet; restart the daemon to run cache verification and check daemon logs if it fails',
+    );
+  }
   const shortName = !ref.startsWith('refs/') && ref !== 'HEAD' && !/^[0-9a-f]{40,64}$/i.test(ref);
   const candidates: string[] = [];
   if (shortName || ref.startsWith('refs/tags/')) {
