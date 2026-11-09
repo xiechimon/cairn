@@ -13,6 +13,12 @@ import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js
 import { rejectGuestExec } from './orb-fake.js';
 import { testTempDir } from './test-temp-dir.js';
 
+function writeMarker(machinesRoot: string, name: string, text: string): void {
+  const dir = join(machinesRoot, name, 'etc');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'cairn-orb-computer-image'), text);
+}
+
 function fixture(
   options: {
     busy?: Set<string>;
@@ -24,17 +30,35 @@ function fixture(
 ) {
   const stopping = new Map<string, number>();
   const runtimeRoot = testTempDir('orb-computer-run-');
+  const machinesRoot = testTempDir('orb-computer-machines-');
   const stateFile = join(testTempDir('orb-computer-state-'), 'computers.json');
   const commands: string[][] = [];
   const images = new Set<string>(['cairn-orb-base', 'cairn-orb-computer']);
   const machines = new Set<string>();
+  writeMarker(
+    machinesRoot,
+    'cairn-orb-computer',
+    `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`,
+  );
   const runner: OrbCommandRunner = async (argv) => {
     rejectGuestExec(argv);
     commands.push([...argv]);
     const [, verb, name] = argv;
     if (verb === 'clone') {
       if (options.failClone) return { code: 1, stdout: '', stderr: 'clone failed' };
-      images.add(argv[3] ?? '');
+      const target = argv[3] ?? '';
+      images.add(target);
+      writeMarker(
+        machinesRoot,
+        target,
+        readFileSync(
+          join(machinesRoot, 'cairn-orb-computer', 'etc', 'cairn-orb-computer-image'),
+          'utf8',
+        ),
+      );
+    }
+    if (verb === 'remove') {
+      images.delete(name ?? '');
     }
     if (verb === 'start') {
       if (!options.noRuntime)
@@ -69,6 +93,7 @@ function fixture(
   const computers = new ComputerOrbs({
     runner,
     runtimeRoot,
+    machinesRoot,
     stateFile,
     runtimeDirectoryTimeoutMs: 50,
     now: () => now,
@@ -80,6 +105,7 @@ function fixture(
     commands,
     machines,
     images,
+    machinesRoot,
     stateFile,
     runner,
     runtimeRoot,
@@ -127,14 +153,38 @@ describe('computer Orbs', () => {
   });
 
   test('an existing stopped computer is started again without cloning, so its home survives', async () => {
-    const { computers, commands, machines, images } = fixture();
+    const { computers, commands, machines, images, machinesRoot } = fixture();
     const name = computerMachineName('chief:c1');
     images.add(name);
+    writeMarker(
+      machinesRoot,
+      name,
+      readFileSync(
+        join(machinesRoot, 'cairn-orb-computer', 'etc', 'cairn-orb-computer-image'),
+        'utf8',
+      ),
+    );
     await computers.ensure('chief:c1');
     machines.clear();
     await computers.ensure('chief:c1');
     expect(commands.filter((c) => c[1] === 'clone')).toEqual([]);
     expect(commands.filter((c) => c[1] === 'start')).toHaveLength(2);
+  });
+
+  test('a clone whose image marker lags the template is removed and recloned before start', async () => {
+    const { computers, commands, images, machines, machinesRoot } = fixture();
+    const name = computerMachineName('chief:c1');
+    images.add(name);
+    writeMarker(machinesRoot, name, 'recipe=old\npackages=chromium\n');
+    machines.add(name);
+    await computers.ensure('chief:c1');
+    expect(commands.filter((c) => c[1] === 'remove')).toEqual([['machinectl', 'remove', name]]);
+    expect(commands.filter((c) => c[1] === 'clone')).toEqual([
+      ['machinectl', 'clone', 'cairn-orb-computer', name],
+    ]);
+    expect(
+      readFileSync(join(machinesRoot, name, 'etc', 'cairn-orb-computer-image'), 'utf8'),
+    ).toContain(`agent-browser=${PINNED_AGENT_BROWSER_VERSION}`);
   });
 
   test('a failed clone is reported and nothing is recorded or started', async () => {
