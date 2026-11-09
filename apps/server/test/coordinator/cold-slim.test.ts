@@ -298,6 +298,12 @@ describe('coldWindowStartFromRows', () => {
   });
 });
 
+const COLD_FIRST_SHOT_MAX_ESTIMATED_TOKENS = 22_500;
+
+function estimatedTokens(messages: readonly Message[]): number {
+  return Math.ceil(JSON.stringify(messages).length / 4);
+}
+
 describe('idle → miss → slim', () => {
   it('cuts a fat residual to summary + recent exchanges after TTL cold', () => {
     const fat: Message[] = [];
@@ -341,6 +347,34 @@ describe('idle → miss → slim', () => {
     );
     expect(after * 4).toBeLessThan(before);
     expect(after).toBeLessThan(80_000);
+  });
+
+  it('keeps cold first-shot estimated tokens well under the 22.5k miss cliff', () => {
+    const fat: Message[] = [];
+    for (let i = 0; i < 60; i++) {
+      fat.push(user(`turn-${i} ${'body '.repeat(400)}`));
+      fat.push(assistant(`reply-${i} ${'ok '.repeat(100)}`));
+      fat.push(tool('tour', 'LOG '.repeat(2_000), i + 1));
+      fat.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: `shot-${i}` },
+          { type: 'image', data: 'x'.repeat(12_000), mimeType: 'image/png' },
+        ],
+        timestamp: i + 1,
+      });
+    }
+    fat.push(user('resume the queued billing fix'));
+    const beforeTokens = estimatedTokens(fat);
+    expect(beforeTokens).toBeGreaterThan(COLD_FIRST_SHOT_MAX_ESTIMATED_TOKENS);
+    const slim = projectColdMessages(fat, {
+      summaryHint: 'queued billing fix; tour done; waiting on review',
+    });
+    const afterTokens = estimatedTokens(slim);
+    expect(afterTokens).toBeLessThan(COLD_FIRST_SHOT_MAX_ESTIMATED_TOKENS);
+    expect(slim.some((message) => JSON.stringify(message).includes('"type":"image"'))).toBe(false);
+    const toolBodies = slim.filter((message) => message.role === 'toolResult').map(toolResultChars);
+    expect(toolBodies.filter((text) => text.length > 1_200).length).toBeLessThanOrEqual(3);
   });
 });
 
