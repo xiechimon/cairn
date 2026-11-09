@@ -182,6 +182,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     group: row.group,
     teamId: row.teamId,
     splitPolicy: row.splitPolicy,
+    evidenceStore: row.evidenceStore,
     baseBranch: row.baseBranch,
     ...(row.icon !== null ? { icon: row.icon } : {}),
     ...(row.color !== null ? { color: row.color } : {}),
