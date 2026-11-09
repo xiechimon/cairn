@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
+  BriefBackendId,
   ClaimedStep,
   MachineDoneBody,
   MachineStreamEvent,
@@ -13,7 +14,12 @@ import type {
   TranscriptUpload,
   WorktreeOps,
 } from '@cairn/shared';
-import { WORKER_REMOTE_TOOLS } from '@cairn/shared';
+import {
+  BRIEF_MARKER_BEGIN,
+  BRIEF_MARKER_END,
+  BRIEF_RECONCILE_FILENAMES,
+  WORKER_REMOTE_TOOLS,
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
@@ -152,7 +158,7 @@ class FakeClient implements MachineApi {
 
 function stubBackend(opts: {
   events?: StepEvent[];
-  briefBackendId?: 'pi' | null;
+  briefBackendId?: BriefBackendId | null;
   onSessionStart?: (cwd: string, session: SessionOpts) => void | Promise<void>;
   throwOnOpen?: boolean;
 }): { backend: AgentBackend; seen: { cwd: string; systemPrompt: string | undefined }[] } {
@@ -164,7 +170,7 @@ function stubBackend(opts: {
       ? {}
       : {
           brief: {
-            backendId: (opts.briefBackendId ?? 'pi') as 'pi',
+            backendId: opts.briefBackendId ?? 'pi',
             composeBody: (_o, base) => `${base ?? ''}\n\n<skills>stub-catalog</skills>`,
           },
         }),
@@ -464,3 +470,31 @@ test('an intentional no-op worker completes successfully through the real worksp
   expect(client.doneBodies[0]?.body).toMatchObject({ status: 'success', hasChanges: false });
   expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
 });
+
+test.each(
+  BRIEF_RECONCILE_FILENAMES.flatMap((file) =>
+    (['pi', 'claude-code', 'gemini', null] as const).flatMap((briefBackendId) =>
+      [undefined, 'previous-session'].map((continueSession) => ({
+        file,
+        briefBackendId,
+        continueSession,
+      })),
+    ),
+  ),
+)(
+  'legacy $file blocks $briefBackendId/$continueSession before native context loads',
+  async ({ file, briefBackendId, continueSession }) => {
+    const legacy = `Repository guidance\n\n${BRIEF_MARKER_BEGIN}\nprivate-stale-memory\n${continueSession ? BRIEF_MARKER_END : ''}`;
+    const { backend, seen } = stubBackend({ briefBackendId });
+    const { cwd, client } = await run({
+      claimed: claimedStep({ repoBound: false, continueSession }),
+      backend,
+      seed: (cwd) => writeFileSync(join(cwd, file), legacy),
+    });
+    expect(seen).toEqual([]);
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+    expect(client.doneBodies[0]?.body.errorMessage).toContain(file);
+    expect(JSON.stringify(client.uploads)).not.toContain('private-stale-memory');
+    expect(readFileSync(join(cwd, file), 'utf8')).toBe(legacy);
+  },
+);

@@ -1,6 +1,24 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END, type BriefBackendId } from '@cairn/shared';
+import {
+  BRIEF_MARKER_BEGIN,
+  BRIEF_MARKER_END,
+  BRIEF_RECONCILE_FILENAMES,
+  type BriefBackendId,
+} from '@cairn/shared';
+
+const CONTEXT_FILENAMES = new Set(BRIEF_RECONCILE_FILENAMES.map((file) => file.toLowerCase()));
+
+export function assertNoLegacyBrief(cwd: string): void {
+  const legacyFiles = readdirSync(cwd)
+    .filter((file) => CONTEXT_FILENAMES.has(file.toLowerCase()))
+    .filter((file) => readFileSync(join(cwd, file), 'utf8').includes(BRIEF_MARKER_BEGIN));
+  if (legacyFiles.length > 0) {
+    throw new Error(
+      `Legacy runtime guidance remains in ${legacyFiles.join(', ')}. Recreate this workspace before continuing.`,
+    );
+  }
+}
 
 export function composeBrief(opts: {
   cwd: string;

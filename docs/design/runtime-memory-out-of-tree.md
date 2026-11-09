@@ -11,6 +11,7 @@ Keep worker runtime instructions, team memory and skill catalogs in the existing
 | New and resumed Pi sessions | Compose the runtime prompt in memory; let the SDK load repository context | Prompt composition errors fail the step before opening the session |
 | New and resumed Claude sessions | Append the runtime prompt through the SDK; include AGENTS.md only when native CLAUDE.md is absent | Repository read errors fail before session open |
 | ACP sessions, including Gemini new/load/resume | Prefix runtime guidance to each delivered user prompt through the existing ACP bridge; never submit a guidance-only turn | Existing session error handling |
+| Every harness before new/continued session open | Read-only scan of all former carrier names; reject legacy runtime blocks with filenames only | Fail before model start; preserve every existing byte and request workspace recreation |
 | Session completion, open failure, stream failure and stop | Leave repository files unchanged; no brief cleanup | Existing session outcome handling |
 | Commit after setup/resume | Exclude fingerprint-matching setup drift, then check the staged diff | Empty index returns committed=false; real Git errors propagate |
 | Worker changes after setup | Stage and commit worker changes, preserving hook failures | Existing commit errors remain failures |
@@ -18,7 +19,7 @@ Keep worker runtime instructions, team memory and skill catalogs in the existing
 
 ## 3. Single path
 
-Delete runtime block writing, reconciliation and cleanup. Keep the existing backend brief composer as a pure in-memory composer; pass its result through systemPrompt. Pi retains the SDK base prompt and repository-context loading through appendSystemPromptOverride. The existing runtime envelope is retained in memory so prompt identity extraction stops before SDK-added context. Claude retains native CLAUDE.md loading and the existing AGENTS.md fallback, now read-only. Historical marker detection remains an independent leak diagnostic.
+Delete runtime block writing, reconciliation and cleanup. Keep the existing backend brief composer as a pure in-memory composer; pass its result through systemPrompt. Pi retains the SDK base prompt and repository-context loading through appendSystemPromptOverride. The existing runtime envelope is retained in memory so prompt identity extraction stops before SDK-added context. Claude retains native CLAUDE.md loading and the existing AGENTS.md fallback, now read-only. A shared read-only preflight rejects legacy blocks before any harness opens, including adapters without a brief composer. Historical marker detection remains an independent leak diagnostic.
 
 ## 4. Lockfile cause
 
@@ -33,7 +34,7 @@ The installed pnpm launcher resolves packageManager before dispatching commands,
 | Check the staged diff before commit | An empty worker step must not execute commit hooks | Revert the preflight |
 
 
-Red tests exercise a real Git status during session opening, an empty worker step with a rejecting commit hook, and a real offline pnpm install with an unchanged manifest and byte-identical lockfile assertion. Retain worker edits and real hook failures as controls. Run targeted Vitest with four workers, lint, typecheck, spec:parse and prepush. The codebase regression tests are the recurrence safeguard. Rollback is reverting this change; no migration is needed.
+Red tests exercise a real Git status during session opening, an empty worker step with a rejecting commit hook, and a real offline pnpm install with an unchanged manifest and byte-identical lockfile assertion. Retain worker edits and real hook failures as controls. Run targeted Vitest with four workers, lint, typecheck, spec:parse and prepush. The codebase regression tests are the recurrence safeguard. Rollback is reverting this change. No files are migrated; contaminated workspaces must be recreated before continuation.
 
 ## 6. Delivery
 

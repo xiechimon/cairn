@@ -85,7 +85,7 @@ import {
   type SkillsCatalogOpts,
 } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
-import { composeBrief } from './brief-file.js';
+import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
   type ClaudeCodeAuthProbe,
   claudeCodeAuthFailureMessage,
@@ -1132,19 +1132,20 @@ async function runClaimedStep(
     }
   }
 
-  if (backend.brief !== undefined) {
-    try {
+  try {
+    assertNoLegacyBrief(cwd);
+    if (backend.brief !== undefined) {
       sessionOpts.systemPrompt = composeBrief({
         cwd,
         backendId: backend.brief.backendId,
         content: backend.brief.composeBody(sessionOpts, systemPrompt),
       });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, `Runtime guidance could not be composed: ${reason}`);
-      return;
     }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    clearCredentials(creds);
+    await failStep(deps, heartbeat, stepId, `Runtime guidance could not be composed: ${reason}`);
+    return;
   }
 
   if (!isChief) {
