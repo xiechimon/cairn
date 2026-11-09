@@ -1,6 +1,12 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { emitCoordinatorTurnSpans } from '../../src/runtime-otel.js';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  emitCoordinatorTurnSpans,
+  flushRuntimeOtel,
+  shutdownRuntimeOtel,
+} from '../../src/runtime-otel.js';
 import { boot, world } from './runner-world.js';
 
 interface Span {
@@ -11,34 +17,49 @@ interface Span {
   attributes: { key: string; value: { stringValue?: string; intValue?: string } }[];
 }
 
-function captureSpans(): Span[] {
-  const spans: Span[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_url: string, init: RequestInit) => {
-      const body = JSON.parse(String(init.body)) as {
+const received: Span[] = [];
+let server: Server | undefined;
+let endpoint = '';
+
+beforeAll(async () => {
+  server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
         resourceSpans: { scopeSpans: { spans: Span[] }[] }[];
       };
       for (const resource of body.resourceSpans) {
-        for (const scope of resource.scopeSpans) spans.push(...scope.spans);
+        for (const scope of resource.scopeSpans) received.push(...scope.spans);
       }
-      return new Response('{}', { status: 200 });
-    }),
-  );
-  return spans;
+      res.setHeader('content-type', 'application/json');
+      res.end('{}');
+    });
+  });
+  await new Promise<void>((done) => server?.listen(0, '127.0.0.1', done));
+  endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1/traces`;
+});
+
+afterAll(async () => {
+  await shutdownRuntimeOtel();
+  server?.close();
+});
+
+function captureSpans(): Span[] {
+  received.splice(0);
+  return received;
 }
 
 const attr = (span: Span, key: string) =>
   span.attributes.find((a) => a.key === key)?.value.stringValue;
 
 afterEach(() => {
-  vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 
 describe('in-server Coordinator telemetry', () => {
   it('exports the turn, one chat span per model call and one span per tool call under the thread session', async () => {
-    vi.stubEnv('CAIRN_OTEL_ENDPOINT', 'http://127.0.0.1:4318/v1/traces');
+    vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
     const spans = captureSpans();
     const w = await world('what is open?');
     const faux = fauxProvider({
@@ -84,6 +105,7 @@ describe('in-server Coordinator telemetry', () => {
     const coordinator = boot(w, faux);
     coordinator.wake(w.threadId);
     await coordinator.idle();
+    await flushRuntimeOtel();
     expect(spans).toEqual([]);
   });
 
@@ -102,9 +124,10 @@ describe('in-server Coordinator telemetry', () => {
           errorMessage: 'provider said no for sk-abcdefghijklmnopqrstuvwxyz123456',
         },
       ],
-      { CAIRN_OTEL_ENDPOINT: 'http://127.0.0.1:4318/v1/traces' },
+      { CAIRN_OTEL_ENDPOINT: endpoint },
     );
-    await vi.waitFor(() => expect(spans).toHaveLength(1));
+    await flushRuntimeOtel();
+    expect(spans).toHaveLength(1);
     expect(spans[0]?.status?.code).toBe(2);
     expect(spans[0]?.status?.message).not.toContain('sk-abcdefghijklmnop');
   });
