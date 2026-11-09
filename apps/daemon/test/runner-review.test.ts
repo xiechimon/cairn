@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -499,6 +499,7 @@ describe('out-of-tree verify execution', () => {
       kind: 'verify',
       expectedHeadSha: 'abc123',
       evidence: 'attachments',
+      evidenceDirectory: '.cairn-verify/1/',
     }),
   };
 
@@ -540,6 +541,7 @@ describe('out-of-tree verify execution', () => {
           kind: 'verify',
           expectedHeadSha: startHead,
           evidence: 'attachments',
+          evidenceDirectory: '.cairn-verify/1/',
         }),
         remoteTools: [{ name: 'attach_file', description: 'Attach verification evidence' }],
       };
@@ -548,9 +550,9 @@ describe('out-of-tree verify execution', () => {
         async createSession(opts) {
           checkout = opts.cwd;
           expect(opts.prompt).not.toContain('工作分支注记');
-          mkdirSync(join(checkout, '.cairn-verify'), { recursive: true });
-          writeFileSync(join(checkout, '.cairn-verify/proof.txt'), 'checked delivery\n');
-          await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/proof.txt' });
+          mkdirSync(join(checkout, '.cairn-verify/1'), { recursive: true });
+          writeFileSync(join(checkout, '.cairn-verify/1/proof.txt'), 'checked delivery\n');
+          await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/1/proof.txt' });
           writeFileSync(join(checkout, 'delivery.txt'), 'agent modification\n');
           await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
           await runGitOk(['commit', '-m', 'unwanted verifier commit'], { cwd: checkout, env });
@@ -571,7 +573,7 @@ describe('out-of-tree verify execution', () => {
                   content: JSON.stringify({
                     passed: true,
                     conclusion: 'Checked delivery',
-                    evidence: [{ path: '.cairn-verify/proof.txt' }],
+                    evidence: [{ path: '.cairn-verify/1/proof.txt' }],
                   }),
                 },
               } as const;
@@ -613,7 +615,7 @@ describe('out-of-tree verify execution', () => {
       ]);
       expect(runtime.delivery).toBe('delivered\n');
       expect(runtime.scratchPresent).toBe(ignore === 'tracked');
-      expect(existsSync(join(checkout, '.cairn-verify/proof.txt'))).toBe(false);
+      expect(existsSync(join(checkout, '.cairn-verify/1/proof.txt'))).toBe(false);
       if (ignore === 'tracked')
         expect(readFileSync(join(checkout, '.cairn-verify/keep.txt'), 'utf8')).toBe(
           'original scratch\n',
@@ -709,6 +711,11 @@ describe('out-of-tree verify execution', () => {
     'empty',
     'unbound',
     'malformed',
+    'source',
+    'sibling',
+    'file-link',
+    'directory-link',
+    'root-link',
     'valid',
   ] as const)(
     'attachment verdict binds every evidence path to a successful upload (%s)',
@@ -726,11 +733,32 @@ describe('out-of-tree verify execution', () => {
         (captured) => ({
           ...capturingBackend(captured),
           async createSession(opts) {
-            mkdirSync(join(opts.cwd, '.cairn-verify'), { recursive: true });
-            writeFileSync(join(opts.cwd, '.cairn-verify/proof.txt'), 'proof');
+            mkdirSync(join(opts.cwd, '.cairn-verify/1'), { recursive: true });
+            writeFileSync(join(opts.cwd, '.cairn-verify/1/proof.txt'), 'proof');
+            let evidencePath = '.cairn-verify/1/proof.txt';
+            writeFileSync(join(opts.cwd, 'README.md'), 'delivery source');
+            if (scenario === 'source') evidencePath = 'README.md';
+            if (scenario === 'sibling') {
+              mkdirSync(join(opts.cwd, '.cairn-verify/2'), { recursive: true });
+              evidencePath = '.cairn-verify/2/proof.txt';
+              writeFileSync(join(opts.cwd, evidencePath), 'another ticket');
+            }
+            if (scenario === 'file-link') {
+              rmSync(join(opts.cwd, evidencePath));
+              symlinkSync(join(opts.cwd, 'README.md'), join(opts.cwd, evidencePath));
+            }
+            if (scenario === 'directory-link' || scenario === 'root-link') {
+              mkdirSync(join(opts.cwd, 'other'), { recursive: true });
+              writeFileSync(join(opts.cwd, 'other/proof.txt'), 'outside scratch');
+              const alias = scenario === 'root-link' ? '.cairn-verify' : '.cairn-verify/1';
+              rmSync(join(opts.cwd, alias), { recursive: true });
+              symlinkSync(join(opts.cwd, 'other'), join(opts.cwd, alias));
+              if (scenario === 'root-link') evidencePath = '.cairn-verify/proof.txt';
+            }
+
             if (scenario !== 'missing') {
               try {
-                await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/proof.txt' });
+                await opts.executeRemoteTool?.('attach_file', { path: evidencePath });
               } catch {}
             }
             return {
@@ -744,7 +772,7 @@ describe('out-of-tree verify execution', () => {
                       content: JSON.stringify({
                         passed: true,
                         conclusion: 'Earlier draft',
-                        evidence: [{ path: '.cairn-verify/proof.txt' }],
+                        evidence: [{ path: '.cairn-verify/1/proof.txt' }],
                       }),
                     },
                   } as const;
@@ -756,13 +784,13 @@ describe('out-of-tree verify execution', () => {
                     scenario === 'empty'
                       ? []
                       : scenario === 'malformed'
-                        ? [{ path: '.cairn-verify/proof.txt' }, { path: null }]
+                        ? [{ path: '.cairn-verify/1/proof.txt' }, { path: null }]
                         : [
                             {
                               path:
                                 scenario === 'mismatched'
-                                  ? '.cairn-verify/other.txt'
-                                  : '.cairn-verify/proof.txt',
+                                  ? '.cairn-verify/1/other.txt'
+                                  : evidencePath,
                             },
                           ],
                 });
@@ -782,6 +810,18 @@ describe('out-of-tree verify execution', () => {
       );
       if (scenario === 'valid') expect(client.doneBodies[0]?.body.verifyVerdict?.passed).toBe(true);
       else expect(client.doneBodies[0]?.body.verifyVerdict?.passed).not.toBe(true);
+    },
+  );
+
+  test.each([undefined, '../escape/', '.cairn-verify/1/../2/'])(
+    'attachment verify fails before starting without a canonical scratch scope: %s',
+    async (evidenceDirectory) => {
+      const { captured, client } = await setup({
+        ...verify,
+        instruction: JSON.stringify({ kind: 'verify', evidence: 'attachments', evidenceDirectory }),
+      });
+      expect(captured).toHaveLength(0);
+      expect(client.doneBodies[0]?.body.status).toBe('failed');
     },
   );
 

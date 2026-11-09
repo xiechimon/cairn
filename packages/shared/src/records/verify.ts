@@ -26,6 +26,7 @@ export const verifyPromptMetaSchema = z.object({
   kind: z.literal('verify'),
   expectedHeadSha: z.string().optional(),
   evidence: evidenceStoreSchema.optional(),
+  evidenceDirectory: z.string().optional(),
 });
 export type VerifyPromptMeta = z.infer<typeof verifyPromptMetaSchema>;
 
@@ -100,11 +101,11 @@ export function buildVerifyStepPrompt(args: {
           JSON.stringify({
             kind: 'verify',
             expectedHeadSha: args.expectedHeadSha,
-            ...(attachments ? { evidence: 'attachments' } : {}),
+            ...(attachments ? { evidence: 'attachments', evidenceDirectory } : {}),
           }),
         ]
       : attachments
-        ? [JSON.stringify({ kind: 'verify', evidence: 'attachments' })]
+        ? [JSON.stringify({ kind: 'verify', evidence: 'attachments', evidenceDirectory })]
         : []),
     attachments
       ? `Verify this round's delivery of the task below. **Verify step**: the code is read-only. Write evidence only under ${evidenceDirectory}, run the real stack and verify the key paths, then upload every evidence file with attach_file before your final verdict. Files must be at most 10 MiB; recordings must be real .gif files of at most 5 MiB. Do not commit, push, change repository files or edit the PR. The daemon discards all worktree changes after this step.`

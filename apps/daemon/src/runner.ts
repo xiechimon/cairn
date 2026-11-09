@@ -484,8 +484,9 @@ async function runClaimedStep(
   const isChief = claimed.step.kind === 'chief';
   const isReview = claimed.step.kind === 'review';
   const isVerify = claimed.step.kind === 'verify';
-  const attachmentVerify =
-    isVerify && parseVerifyPromptMeta(claimed.instruction ?? null)?.evidence === 'attachments';
+  const verifyMeta = isVerify ? parseVerifyPromptMeta(claimed.instruction ?? null) : null;
+  const attachmentVerify = verifyMeta?.evidence === 'attachments';
+  const verifyEvidenceDirectory = verifyMeta?.evidenceDirectory;
   const reviewGate: ReviewGate =
     (isReview ? parseReviewPromptMeta(claimed.instruction ?? null)?.gate : undefined) ?? 'confirm';
   const basePrompt =
@@ -823,6 +824,13 @@ async function runClaimedStep(
     return verifyRewindError;
   };
   if (attachmentVerify) {
+    if (
+      verifyEvidenceDirectory === undefined ||
+      !/^\.cairn-verify\/[a-zA-Z0-9_-]+\/$/.test(verifyEvidenceDirectory)
+    ) {
+      await failStep(deps, heartbeat, stepId, 'Verify evidence directory unavailable or invalid');
+      return;
+    }
     if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
       await failStep(deps, heartbeat, stepId, 'Verify start checkpoint unavailable');
       return;
@@ -1086,7 +1094,11 @@ async function runClaimedStep(
           executeRemoteTool: (name, params) => {
             if (name === 'ask_user' && client.askUser) return runAskChannel(params);
             if (name === 'attach_file' && !isChief) {
-              const prepared = prepareFileAttachment(cwd, params);
+              const prepared = prepareFileAttachment(
+                cwd,
+                params,
+                attachmentVerify ? verifyEvidenceDirectory : undefined,
+              );
               const upload = client.relayTool(stepId, name, prepared);
               if (!attachmentVerify) return upload;
               const path = resolve(cwd, String(params.path));

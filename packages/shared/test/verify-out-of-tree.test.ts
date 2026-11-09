@@ -22,6 +22,7 @@ test('attachments prompt uploads scratch evidence without changing repository hi
     kind: 'verify',
     expectedHeadSha: args.expectedHeadSha,
     evidence: 'attachments',
+    evidenceDirectory: '.cairn-verify/3611/',
   });
 });
 
