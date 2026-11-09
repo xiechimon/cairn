@@ -60,13 +60,13 @@ export function SidebarProjectRow({
       aria-current={active ? 'page' : undefined}
       data-slot="sidebar-project-row"
       className={cn(
-        'h-8 w-full justify-start gap-2.5 px-2 text-ui font-normal',
+        'h-8 w-full justify-start gap-2.5 px-2 text-ui font-normal pointer-coarse:h-11',
         active
           ? 'font-semibold text-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover'
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
         nested && 'pl-6',
         menu != null &&
-          'group-focus-within/project:pr-8 group-hover/project:pr-8 group-has-aria-expanded/project:pr-8 [@media(hover:none)]:pr-8',
+          'group-focus-within/project:pr-8 group-hover/project:pr-8 group-has-aria-expanded/project:pr-8 [@media(hover:none)]:pr-12',
       )}
     >
       <ProjectGlyph icon={icon} />

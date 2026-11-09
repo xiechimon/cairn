@@ -157,15 +157,30 @@ test('the collapsed rail names a waiting project with its status', async ({ page
 test.describe('on a touch screen', () => {
   test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
 
-  test('group headers and project menus in the drawer are 44px touch targets', async ({ page }) => {
+  test('group headers, project rows and their menus in the drawer are 44px touch targets that do not overlap', async ({ page }) => {
     await open(page, [PROJECT, project('proj-3', 'site', { group: 'Side' })]);
     await page.getByRole('button', { name: '展开侧边栏' }).click();
     const header = groupHeaders(page).filter({ hasText: 'Side' });
     await expect(header).toBeVisible();
-    expect((await header.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    const menu = page.getByRole('button', { name: 'cairn 的菜单' });
-    await expect(menu).toBeVisible();
-    const box = (await menu.boundingBox())!;
-    expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
+    await expect(page.getByRole('button', { name: 'cairn 的菜单' })).toBeVisible();
+    const boxes = await page.locator('aside.board-sidebar').evaluate((aside) => {
+      const rect = (node: Element | null) => {
+        const box = node!.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, height: box.height, width: box.width };
+      };
+      const row = [...aside.querySelectorAll('[data-slot="sidebar-project-row"]')].find((node) => node.textContent === 'cairn')!;
+      return {
+        header: rect(aside.querySelector('[data-testid="project-group-header"]')),
+        row: rect(row),
+        name: rect(row.querySelector('span[title]')),
+        menu: rect(row.parentElement!.querySelector('[aria-label="cairn 的菜单"]')),
+      };
+    });
+    expect(boxes.header.height).toBeGreaterThanOrEqual(44);
+    expect(boxes.row.height).toBeGreaterThanOrEqual(44);
+    expect(Math.min(boxes.menu.width, boxes.menu.height)).toBeGreaterThanOrEqual(44);
+    expect(boxes.menu.top).toBeGreaterThanOrEqual(boxes.row.top);
+    expect(boxes.menu.bottom).toBeLessThanOrEqual(boxes.row.bottom);
+    expect(boxes.name.right).toBeLessThanOrEqual(boxes.menu.left);
   });
 });
