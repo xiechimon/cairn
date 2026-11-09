@@ -75,16 +75,14 @@ export function issueFenceQuotedLines(lines: readonly string[]): (string | null)
 export function titleAuthor(source: TaskSource | undefined): TaskTitleAuthor {
   const request = source?.request;
   if (request != null) {
-    if (request.titleSource === 'worker') return 'worker';
-    return request.segments[0]?.author ?? 'owner';
+    return request.titleSource;
   }
   return isIssueSourcedTask(source) ? 'third-party' : 'owner';
 }
 
 export function fencedTitle(title: string, source: TaskSource | undefined): string {
   if (titleAuthor(source) !== 'third-party') return title;
-  const ref =
-    source?.request != null ? (source.request.segments[0]?.sourceRef ?? null) : source?.sourceRef;
+  const ref = source?.request != null ? source.request.titleSourceRef : source?.sourceRef;
   return fenceIssueText(ref, title);
 }
 

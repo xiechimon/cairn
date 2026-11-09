@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   ASK_USER_QUESTION_KIND,
   buildTaskPromptText,
+  fencedTitle,
   ISSUE_FENCE_OPEN,
   renderTaskText,
   type TaskRequest,
@@ -62,6 +63,7 @@ describe('create_todo copies the owner words verbatim', () => {
       siblings: [],
       difficulty: null,
       titleSource: 'owner',
+      titleSourceRef: null,
     } satisfies TaskRequest);
     expect(stored.spec).toBe(renderTaskText(stored.request!));
   });
@@ -377,6 +379,40 @@ describe('owner answers and appended words', () => {
     await relay('update_todo', { todoId: created.id, addMessageIds: [ownerMessage('补充')] });
     expect(row(created.id).spec).toBe('我改过的原话\n\n补充');
   });
+
+  test.each([
+    { name: 'spec only', patch: { spec: 'Owner correction' }, fences: 1 },
+    { name: 'title only', patch: { title: 'Owner title' }, fences: 0 },
+    {
+      name: 'title and spec',
+      patch: { title: 'Owner title', spec: 'Owner correction' },
+      fences: 0,
+    },
+  ])(
+    'title provenance survives a $name board edit independently of spec',
+    async ({ patch, fences }) => {
+      const issue = issueTask('Third-party title and body', 77);
+      const child = (await relay('create_todo', {
+        projectId: H.projectId,
+        sourceTodoId: issue.id,
+      })) as Created;
+      const response = await req(H.s.app, 'PATCH', `/api/todos/${child.id}`, patch);
+      expect(response.status).toBe(200);
+      const stored = row(child.id);
+      const prompt = buildTaskPromptText(stored.title, stored.spec, stored);
+      expect(stored.request?.titleSource).toBe(fences === 1 ? 'third-party' : 'owner');
+      expect(stored.request?.titleSourceRef).toBe(fences === 1 ? 'github:octo/demo#77' : null);
+      expect(fenceOpens(prompt.split('\n\n')[0]!)).toBe(fences);
+      expect(fenceOpens(fencedTitle(stored.title, stored))).toBe(fences);
+      expect(fenceOpens(wakeFacts('settle', getTodo(H.s, child.id)!, null))).toBe(fences);
+      if (fences === 1) expect(prompt).toContain('octo/demo#77');
+      await relay('update_todo', {
+        todoId: child.id,
+        addMessageIds: [ownerMessage('More detail')],
+      });
+      expect(fenceOpens(wakeFacts('settle', getTodo(H.s, child.id)!, null))).toBe(fences);
+    },
+  );
 
   test('W9 other writers cannot rewrite a request task', async () => {
     const created = (await relay('create_todo', {

@@ -46,6 +46,7 @@ const request = (segments: TaskSegment[], over: Partial<TaskRequest> = {}): Task
   siblings: [],
   difficulty: null,
   titleSource: 'owner',
+  titleSourceRef: null,
   ...over,
 });
 
@@ -135,7 +136,10 @@ describe('quoteSegments', () => {
 
 describe('prompt readers render from segments', () => {
   const quote = quoteSegments([issue('Fix the crash.')], ['Fix the crash.']);
-  const corrected = request([...quote, chat('m2', '只修崩溃。').segment]);
+  const corrected = request([...quote, chat('m2', '只修崩溃。').segment], {
+    titleSource: 'third-party',
+    titleSourceRef: 'github:o/r#7',
+  });
   const child = { sourceKind: null, sourceRef: null, request: corrected };
 
   it('fences the issue-quoted title and the issue quote, and nothing else', () => {
@@ -159,7 +163,7 @@ describe('prompt readers render from segments', () => {
     expect(text).toContain('\n只修崩溃。');
   });
 
-  it('titleAuthor follows the first segment, a worker name, or the task source', () => {
+  it('titleAuthor follows independent title provenance or the legacy task source', () => {
     expect(titleAuthor(child)).toBe('third-party');
     expect(titleAuthor({ request: { ...corrected, titleSource: 'worker' } })).toBe('worker');
     expect(titleAuthor({ request: request([chat('m', 'x').segment]) })).toBe('owner');

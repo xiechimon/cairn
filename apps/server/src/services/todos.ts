@@ -473,6 +473,13 @@ export function updateAutonomousTodo(
       sets.spec = renderTaskText(sets.request);
     }
   }
+  if (patch.title !== undefined && row.request !== null) {
+    sets.request = {
+      ...(sets.request ?? row.request),
+      titleSource: 'owner',
+      titleSourceRef: null,
+    };
+  }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
   if (patch.routeOverride !== undefined) {
     const machineId = patch.routeOverride?.machineId;

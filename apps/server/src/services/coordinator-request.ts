@@ -175,7 +175,8 @@ export function createRequestTodo(
     segments,
     siblings: siblings.map((row) => row.id),
     difficulty: params.difficulty ?? null,
-    titleSource: 'owner',
+    titleSource: segments[0]?.author ?? 'owner',
+    titleSourceRef: segments[0]?.sourceRef ?? null,
   };
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,
