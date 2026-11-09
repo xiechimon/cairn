@@ -248,7 +248,7 @@ describe('#1470 the chief envelope context.tokens: only this chief own threads a
       })
       .run();
     const svc = { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user };
-    expect(getChiefEnvelope(svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 2,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });

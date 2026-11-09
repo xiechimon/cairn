@@ -834,25 +834,6 @@ Reach:
 - Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
 - Evidence: `apps/server/test/mcp-servers.test.ts`, `apps/daemon/test/mcp-config.test.ts`
 
-### project-files
-
-**Project files** (shipped, centrality 3). The remaining project file tree and viewer, pending retirement in #3479.
-
-States: A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.
-
-Reach:
-
-1. `open /app/project/<id of a project listed by the projects API>/files`
-
-- Web routes: `/app/project/:id/files`
-- Keyboard shortcuts in its code: `A`, `D`, `P`, `R`, `T`
-- Test ids in its code: `task-card`, `task-meta`, `task-row`, `task-status`
-- Verify recipes: [.claude/skills/verify-cairn/features/project-files-drill.md](features/project-files-drill.md), [.claude/skills/verify-cairn/features/project-files-local.md](features/project-files-local.md)
-- Research: [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md)
-- Frontend design: **gap**: the files tab has no design
-- Backend design: **gap**: no design for reading files and commits from local and hosted repos
-- Evidence: `apps/web/e2e/project-files-tree.spec.ts`, `apps/web/e2e/project-commit-detail.spec.ts`
-
 ### projects
 
 **Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive and delete.
@@ -863,14 +844,15 @@ Reach:
 
 1. `open /app/project/new`
 2. `click testid:github-picker`
-3. `open /app/project/<id of a project listed by the projects API>/settings`
-4. `click testid:project-instructions-input`
+3. `open /app/project/<id of a project listed by the projects API>/tasks`
+4. `open /app/project/<id of a project listed by the projects API>/settings`
+5. `click testid:project-instructions-input`
 
-- Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/new`
-- Keyboard shortcuts in its code: `G`, `L`
-- Test ids in its code: `github-picker`, `project-home`, `project-home-ask`, `project-home-empty`, `project-home-instructions`, `project-home-links`
+- Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
+- Keyboard shortcuts in its code: `A`, `D`, `G`, `L`, `P`, `R`, `T`
+- Test ids in its code: `github-picker`, `project-home`, `project-home-ask`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
-- Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main)
+- Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 - Evidence: `apps/web/e2e/project-new-repo.spec.ts`, `apps/web/e2e/project-settings-autonomy.spec.ts`, `apps/server/test/project-delete.test.ts`

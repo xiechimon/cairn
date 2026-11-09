@@ -1,6 +1,13 @@
 import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import {
+  type ContextResume,
+  contextResumeOf,
+  resolveCacheRetentionTier,
+  retentionMsFor,
+} from '../coordinator/runtime/cold-slim.js';
 import type { Db } from '../db/client.js';
-import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
+import { chiefThread, chiefTurnUsage, coordinatorConversation, provider } from '../db/schema.js';
+import { nowMs } from '../lib/ids.js';
 
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
@@ -53,7 +60,7 @@ export function lastTurnContext(
   db: Db,
   chiefRow: { id: string; teamId: string },
   threadId?: string,
-): { tokens: number; contextWindow: number } | null {
+): { tokens: number; contextWindow: number; resume: ContextResume } | null {
   if (threadId !== undefined) {
     const owned = db
       .select({ id: chiefThread.id })
@@ -80,13 +87,46 @@ export function lastTurnContext(
     .get();
   if (latest == null) return null;
   const last = db
-    .select({ tokens: chiefTurnUsage.contextTokens, model: chiefTurnUsage.model })
+    .select({
+      tokens: chiefTurnUsage.contextTokens,
+      model: chiefTurnUsage.model,
+      createdAt: chiefTurnUsage.createdAt,
+      cacheRead: chiefTurnUsage.cacheRead,
+      input: chiefTurnUsage.input,
+      threadId: chiefTurnUsage.threadId,
+      stepId: chiefTurnUsage.stepId,
+    })
     .from(chiefTurnUsage)
     .where(and(eq(chiefTurnUsage.stepId, latest.stepId), isNotNull(chiefTurnUsage.contextTokens)))
+    .orderBy(desc(chiefTurnUsage.createdAt))
     .get();
   if (last?.tokens == null) return null;
+  const retentionMs = retentionMsFor(resolveCacheRetentionTier(), last.model);
+  const coldSlim =
+    db
+      .select({
+        at: coordinatorConversation.lastColdSlimAt,
+        stepId: coordinatorConversation.lastColdSlimStepId,
+      })
+      .from(coordinatorConversation)
+      .where(eq(coordinatorConversation.threadId, last.threadId))
+      .get() ?? null;
   return {
     tokens: last.tokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
+    resume: contextResumeOf({
+      now: nowMs(),
+      retentionMs,
+      lastUsage: {
+        createdAt: last.createdAt,
+        cacheRead: last.cacheRead,
+        input: last.input,
+        contextTokens: last.tokens,
+        model: last.model,
+      },
+      lastColdSlimAt: coldSlim?.at ?? null,
+      lastColdSlimStepId: coldSlim?.stepId ?? null,
+      lastUsageStepId: last.stepId,
+    }),
   };
 }

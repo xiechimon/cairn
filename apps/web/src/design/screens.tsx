@@ -24,8 +24,8 @@ const SCREENS = [
   },
   {
     title: 'Project tasks',
-    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks',
-    parts: 'Project header, segmented tabs, task list',
+    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks',
+    parts: 'Project header, task list, filters and layout',
   },
   {
     title: 'Schedules',

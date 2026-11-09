@@ -16,7 +16,7 @@
 
 ## Driving it with drive-1030-local-files.mjs
 
-Preconditions: this archived probe is stale because it still requires the retired history controls. Use the current e2e regression for the remaining file viewer. Historical execution required an isolated stack, no loopback proxy and local git.
+Preconditions: this archived probe is stale because #3479 retired the project file page. Historical execution required an isolated stack, no loopback proxy and local git.
 
 - One-command three phases: `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node docs/verify/1030/drive-1030-local-files.mjs` -> console 20 PASS/FAIL + `evidence:<dir>` (result.json + responses.json + 5 screenshots).
 - Phase A: a true git worktree repo (default branch `trunk` + README marker line) -> REST five read-face truth + browser Files tab opening/chip=HEAD/row->viewer/history.

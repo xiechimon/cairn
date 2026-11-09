@@ -260,12 +260,12 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       status: 'success',
       usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 1810,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
     setCoordinatorServerContextEnabled(false);
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
   });
 
   test('threadId scopes the meter to that thread, not the newest chief-wide turn', async () => {
@@ -309,15 +309,15 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
         createdAt: now + 10,
       })
       .run();
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toMatchObject({
       tokens: 9_000,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 1_000,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId, otherThread).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, otherThread).context).toMatchObject({
       tokens: 9_000,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
@@ -339,9 +339,10 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       ['turn-a', 21_000],
       ['turn-b', 23_456],
     ]);
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 23_456,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
+      resume: 'warm',
     });
   });
 
@@ -366,7 +367,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       ['pi/model-a', 5_000],
       ['pi/model-b', null],
     ]);
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 5_000,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
@@ -379,7 +380,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       status: 'success',
       usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 1810,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
@@ -388,7 +389,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       status: 'success',
       usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
   });
 
   test('flag on: the window comes from the model that ran the last turn, from its provider catalog', async () => {
@@ -414,18 +415,20 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       status: 'success',
       usage: [usage('stub-gw/stub-model', 100, 0, { contextTokens: 110 })],
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 110,
       contextWindow: 200_000,
+      resume: 'warm',
     });
     claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
     await finishStep(deps(), machineId, 'turn-fallback', {
       status: 'success',
       usage: [usage('other-gw/fallback-model', 100, 0, { contextTokens: 120 })],
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 120,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
+      resume: 'warm',
     });
   });
 });
