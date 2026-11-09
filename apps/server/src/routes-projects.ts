@@ -20,6 +20,7 @@ import { build, project, tag, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import {
+  githubAppOf,
   githubIssueDepsOf,
   githubIssuesQuerySchema,
   jsonBody,
@@ -269,6 +270,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(patchProjectBodySchema, await jsonBody(c), 'body');
     const updated = await updateProject(
       {
+        ...githubAppOf(ctx),
         db: ctx.db,
         box: ctx.secretBox,
         oauthClient: ctx.oauthClient,
