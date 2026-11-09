@@ -236,7 +236,7 @@ test('both e2e tiers run the CSS mechanism gate after a fixture build', () => {
   }
 });
 
-test('gates skips only a docs-only pull request whose classifier succeeded', () => {
+test('gates runs on every push including docs-only PRs unless cancelled', () => {
   assert.match(job('gates'), /^ {4}needs: changes$/m);
   assert.match(
     job('changes'),
@@ -252,11 +252,10 @@ test('gates skips only a docs-only pull request whose classifier succeeded', () 
             'needs.changes.result': result,
             'needs.changes.outputs.gates-needed': needed,
           });
-          const skip =
-            cancelled ||
-            (github['github.event_name'] === 'pull_request' &&
-              result === 'success' &&
-              needed === 'false');
-          assert.equal(runs, !skip, `${name}: ${JSON.stringify({ result, needed, cancelled })}`);
+          assert.equal(
+            runs,
+            !cancelled,
+            `${name}: ${JSON.stringify({ result, needed, cancelled })}`,
+          );
         }
 });
