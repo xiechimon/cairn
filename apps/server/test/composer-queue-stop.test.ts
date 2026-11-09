@@ -1,3 +1,4 @@
+import { ANSWERS_CONTINUE_PROMPT } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import {
@@ -349,9 +350,15 @@ test('a closed PR continuation carries the remaining queue into the new build', 
   expect((await w.finish('success', next.id)).status).toBe(200);
   expect(w.s.db.select().from(step).where(eq(step.buildId, newBuildId)).all()).toMatchObject([
     { id: next.id, status: 'done', prompt: 'A' },
-    { status: 'pending', prompt: 'B' },
+    { status: 'pending', prompt: ANSWERS_CONTINUE_PROMPT },
   ]);
-  expect(w.s.db.select().from(message).where(eq(message.content, 'B')).all()).toHaveLength(1);
+  const notDelivered = w.s.db
+    .select()
+    .from(message)
+    .where(eq(message.id, `no-deliverable-${newBuildId}`))
+    .get();
+  expect(notDelivered?.content).toMatchObject({ status: 'answered' });
+  expect(JSON.stringify(notDelivered?.content)).toContain('"B"');
   const finalResponse = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
   expect(await finalResponse.json()).toMatchObject({ queuedMessages: [] });
 });
