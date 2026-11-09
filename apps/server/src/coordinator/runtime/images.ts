@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire as createImageRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { INLINE_IMAGE_MIME_BY_EXT } from '@cairn/shared';
 import type { ImageContent, Message } from '@earendil-works/pi-ai';
@@ -17,8 +17,8 @@ export async function prepareCoordinatorImage(
   if (processor === undefined) {
     const wasmPath = BUNDLED_FORM
       ? fileURLToPath(new URL('./photon_rs_bg.wasm', import.meta.url))
-      : createRequire(
-          createRequire(import.meta.url).resolve('@earendil-works/pi-durable/images'),
+      : createImageRequire(
+          createImageRequire(import.meta.url).resolve('@earendil-works/pi-durable/images'),
         ).resolve('@silvia-odwyer/photon/photon_rs_bg.wasm');
     processor = createPhotonImages(readFileSync(wasmPath));
   }

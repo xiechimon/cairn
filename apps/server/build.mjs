@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -35,6 +36,8 @@ await build({
   sourcemap: true,
   logLevel: 'info',
 });
+
+execFileSync(process.execPath, ['--check', resolve(root, 'dist/index.mjs')], { stdio: 'inherit' });
 
 mkdirSync(resolve(root, 'dist'), { recursive: true });
 copyFileSync(
