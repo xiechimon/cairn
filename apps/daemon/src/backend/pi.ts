@@ -985,12 +985,15 @@ export class PiBackend implements AgentBackend {
         onMcpLog?.(connectFailedLine(slug, reason));
       }
     }, askRelay);
+    const runtimePrompt = opts.systemPrompt;
     const loader = new DefaultResourceLoader({
       cwd: opts.cwd,
       agentDir: this.opts.agentDir,
       settingsManager,
       noSkills: true,
-      ...(opts.systemPrompt !== undefined ? { systemPromptOverride: () => opts.systemPrompt } : {}),
+      ...(runtimePrompt !== undefined
+        ? { appendSystemPromptOverride: (base) => [...base, runtimePrompt] }
+        : {}),
       extensionFactories: [
         gateExtension,
         mcpRegisterExtension,

@@ -1,8 +1,6 @@
 import {
-  type DocumentDiffFile,
   LOCAL_ERROR_REASON_COPY,
   type LocalErrorReason,
-  type ProjectCommitDetailResponse,
   type ProjectFileResponse,
 } from '@cairn/shared';
 import { cn } from 'cn';
@@ -12,14 +10,12 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { ApiError } from '../api/client.js';
 import {
   useGithubConnection,
-  useProjectCommitDetail,
-  useProjectCommits,
   useProjectFile,
   useProjects,
   useProjectTree,
   useTodos,
 } from '../api/hooks.js';
-import { mapCommits, mapDiffFiles, toDisplayTodo } from '../api/mappers.js';
+import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
 import { joinMeta, relativeTime } from '../board/rel-time.js';
@@ -39,8 +35,7 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { DiffFileBlock } from '../detail/docpane.js';
-import type { DiffFile, Phase, ProjectCommitRow, ProjectContent } from '../fixtures/records.js';
+import type { Phase, ProjectContent } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -50,12 +45,10 @@ import {
   FileTab,
   Folder,
   Funnel,
-  GitCommit,
   Grid2x2,
   ListLines,
   Search,
   Settings,
-  X,
 } from '../icons/index.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
@@ -64,9 +57,6 @@ import { PageShell } from './shell.js';
 
 const FILE_ROW_CLS = 'w-full cursor-pointer justify-start gap-2 px-1.5 font-normal';
 const FILE_ROW_ACTIVE_CLS = 'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
-
-const HISTORY_ROW_CLS =
-  'h-auto w-full cursor-pointer justify-start gap-2 px-1.5 py-1.5 font-normal [&_svg]:flex-none [&_svg]:text-icon';
 
 export interface FileTreeRow {
   name: string;
@@ -85,14 +75,8 @@ function FilesPane({
   treeError,
   dirPath,
   onNavigateDir,
-  seg,
-  onSeg,
-  commits,
-  now,
   selectedFile,
   onSelectFile,
-  selectedCommit,
-  onSelectCommit,
 }: {
   branch: string;
   entries: FileTreeRow[];
@@ -100,14 +84,8 @@ function FilesPane({
   treeError: boolean;
   dirPath: string;
   onNavigateDir: (path: string) => void;
-  seg: 'files' | 'history';
-  onSeg: (seg: 'files' | 'history') => void;
-  commits: ProjectCommitRow[];
-  now: number;
   selectedFile: string | null;
   onSelectFile: (path: string) => void;
-  selectedCommit: string | null;
-  onSelectCommit: (sha: string) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -121,130 +99,80 @@ function FilesPane({
           <ChevronDown width={12} height={12} />
         </Badge>
       </div>
-      <SegmentedTabs
-        className="mt-2"
-        optionHandle="prj-files-seg-tab"
-        value={seg}
-        onChange={onSeg}
-        options={[
-          { value: 'files', label: t('文件') },
-          { value: 'history', label: t('历史') },
-        ]}
-      />
-      {seg === 'files' ? (
-        <div className="mt-3">
-          {dirPath !== '' ? (
-            <nav
-              aria-label={t('目录导航')}
-              className="mb-1 flex flex-wrap items-center gap-x-0.5 px-1.5 text-muted-foreground"
-            >
-              <Button variant="ghost" className={CRUMB_BTN_CLS} onClick={() => onNavigateDir('')}>
-                {t('根目录')}
-              </Button>
-              {dirPath
-                .split('/')
-                .filter(Boolean)
-                .map((name, i, segs) => {
-                  const prefix = segs.slice(0, i + 1).join('/');
-                  const isCurrent = i === segs.length - 1;
-                  return (
-                    <Fragment key={prefix}>
-                      <ChevronRight
-                        width={12}
-                        height={12}
-                        aria-hidden="true"
-                        className="flex-none"
-                      />
-                      {isCurrent ? (
-                        <span
-                          aria-current="location"
-                          className="px-1 font-mono text-meta text-foreground"
-                        >
-                          {name}
-                        </span>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          className={CRUMB_BTN_CLS}
-                          onClick={() => onNavigateDir(prefix)}
-                        >
-                          {name}
-                        </Button>
-                      )}
-                    </Fragment>
-                  );
-                })}
-            </nav>
-          ) : null}
-          {treeLoading ? (
-            <div className={PANE_NOTE_CLS}>{t('加载中…')}</div>
-          ) : treeError ? (
-            <div className={PANE_NOTE_CLS}>{t('文件树读取失败。')}</div>
-          ) : entries.length === 0 ? (
-            <div className={PANE_NOTE_CLS}>{t('此目录为空。')}</div>
-          ) : (
-            entries.map((e) =>
-              e.type === 'tree' ? (
-                <Button
-                  key={e.path}
-                  variant="ghost"
-                  data-tree-entry="folder"
-                  className={`prj-file-row ${FILE_ROW_CLS}`}
-                  onClick={() => onNavigateDir(e.path)}
-                >
-                  <Folder className="size-3.5 text-icon" />
-                  <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
-                </Button>
-              ) : (
-                <Button
-                  key={e.path}
-                  variant="ghost"
-                  data-tree-entry="file"
-                  aria-current={selectedFile === e.path ? 'true' : undefined}
-                  className={`prj-file-row ${FILE_ROW_CLS}${selectedFile === e.path ? ` ${FILE_ROW_ACTIVE_CLS}` : ''}`}
-                  onClick={() => onSelectFile(e.path)}
-                >
-                  <FileTab className="size-3.5 text-icon" />
-                  <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
-                </Button>
-              ),
-            )
-          )}
-        </div>
-      ) : commits.length === 0 ? (
-        <div className={`mt-3 ${PANE_NOTE_CLS}`}>{t('尚无提交历史。')}</div>
-      ) : (
-        <ul className="mt-3">
-          {commits.map((c) => (
-            <li key={c.id}>
+      <div className="mt-3">
+        {dirPath !== '' ? (
+          <nav
+            aria-label={t('目录导航')}
+            className="mb-1 flex flex-wrap items-center gap-x-0.5 px-1.5 text-muted-foreground"
+          >
+            <Button variant="ghost" className={CRUMB_BTN_CLS} onClick={() => onNavigateDir('')}>
+              {t('根目录')}
+            </Button>
+            {dirPath
+              .split('/')
+              .filter(Boolean)
+              .map((name, i, segs) => {
+                const prefix = segs.slice(0, i + 1).join('/');
+                const isCurrent = i === segs.length - 1;
+                return (
+                  <Fragment key={prefix}>
+                    <ChevronRight width={12} height={12} aria-hidden="true" className="flex-none" />
+                    {isCurrent ? (
+                      <span
+                        aria-current="location"
+                        className="px-1 font-mono text-meta text-foreground"
+                      >
+                        {name}
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        className={CRUMB_BTN_CLS}
+                        onClick={() => onNavigateDir(prefix)}
+                      >
+                        {name}
+                      </Button>
+                    )}
+                  </Fragment>
+                );
+              })}
+          </nav>
+        ) : null}
+        {treeLoading ? (
+          <div className={PANE_NOTE_CLS}>{t('加载中…')}</div>
+        ) : treeError ? (
+          <div className={PANE_NOTE_CLS}>{t('文件树读取失败。')}</div>
+        ) : entries.length === 0 ? (
+          <div className={PANE_NOTE_CLS}>{t('此目录为空。')}</div>
+        ) : (
+          entries.map((e) =>
+            e.type === 'tree' ? (
               <Button
+                key={e.path}
                 variant="ghost"
-                data-history-entry="commit"
-                aria-current={selectedCommit === c.id ? 'true' : undefined}
-                className={`prj-history-row ${HISTORY_ROW_CLS}${selectedCommit === c.id ? ` ${FILE_ROW_ACTIVE_CLS}` : ''}`}
-                onClick={() => onSelectCommit(c.id)}
+                data-tree-entry="folder"
+                className={`prj-file-row ${FILE_ROW_CLS}`}
+                onClick={() => onNavigateDir(e.path)}
               >
-                <GitCommit width={14} height={14} />
-                <span className="flex min-w-0 flex-1 flex-col items-start">
-                  <span
-                    data-testid="history-message"
-                    className="max-w-full truncate text-ui text-foreground"
-                  >
-                    {c.message}
-                  </span>
-                  <span
-                    data-testid="history-meta"
-                    className="max-w-full truncate text-meta text-content-tertiary"
-                  >
-                    {joinMeta([c.authorName, relativeTime(c.at, now, t)])} ·{' '}
-                    <span className="font-mono">{c.shortSha}</span>
-                  </span>
-                </span>
+                <Folder className="size-3.5 text-icon" />
+                <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
               </Button>
-            </li>
-          ))}
-        </ul>
-      )}
+            ) : (
+              <Button
+                key={e.path}
+                variant="ghost"
+                data-tree-entry="file"
+                aria-current={selectedFile === e.path ? 'true' : undefined}
+                className={`prj-file-row ${FILE_ROW_CLS}${selectedFile === e.path ? ` ${FILE_ROW_ACTIVE_CLS}` : ''}`}
+                onClick={() => onSelectFile(e.path)}
+              >
+                <FileTab className="size-3.5 text-icon" />
+                <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
+              </Button>
+            ),
+          )
+        )}
+      </div>
     </div>
   );
 }
@@ -314,131 +242,6 @@ function deriveFileView(
   return file.data.encoding === 'base64'
     ? { kind: 'binary' }
     : { kind: 'text', content: file.data.content };
-}
-
-type CommitViewState =
-  | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'error'; reason?: string }
-  | {
-      kind: 'detail';
-      sha: string;
-      shortSha: string;
-      message: string;
-      authorName: string;
-      at: number;
-      files: DocumentDiffFile[];
-    };
-
-function deriveCommitView(
-  selected: string | null,
-  live: boolean,
-  fixtureRow: ProjectCommitRow | undefined,
-  q: { isError: boolean; error: Error | null; data: ProjectCommitDetailResponse | undefined },
-): CommitViewState {
-  if (selected === null) return { kind: 'idle' };
-  if (!live) {
-    return fixtureRow === undefined
-      ? { kind: 'idle' }
-      : {
-          kind: 'detail',
-          sha: fixtureRow.id,
-          shortSha: fixtureRow.shortSha,
-          message: fixtureRow.message,
-          authorName: fixtureRow.authorName,
-          at: fixtureRow.at,
-          files: fixtureRow.files ?? [],
-        };
-  }
-  if (q.isError) {
-    return {
-      kind: 'error',
-      ...(q.error instanceof ApiError && q.error.reason !== undefined
-        ? { reason: q.error.reason }
-        : {}),
-    };
-  }
-  if (q.data === undefined) return { kind: 'loading' };
-  return { kind: 'detail', ...q.data };
-}
-
-function CommitDetailView({
-  view,
-  files,
-  now,
-  onClose,
-}: {
-  view: CommitViewState;
-  files: DiffFile[];
-  now: number;
-  onClose: () => void;
-}) {
-  const { t } = useI18n();
-  if (view.kind !== 'detail') {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-1 text-ui text-content-tertiary">
-        <span>
-          {view.kind === 'loading'
-            ? t('加载中…')
-            : view.kind === 'error'
-              ? t('提交详情加载失败')
-              : t('请选择一个提交查看')}
-        </span>
-        {view.kind === 'error' &&
-        view.reason !== undefined &&
-        view.reason in LOCAL_ERROR_REASON_COPY ? (
-          <span className="text-meta">
-            {t(LOCAL_ERROR_REASON_COPY[view.reason as LocalErrorReason])}
-          </span>
-        ) : null}
-      </div>
-    );
-  }
-  return (
-    <div className="flex min-w-0 flex-1 flex-col" data-commit-detail="pane">
-      <div className="flex flex-none items-start gap-2 border-b border-border px-4 py-3">
-        <GitCommit width={14} height={14} className="mt-0.75 flex-none text-icon" />
-        <div className="flex min-w-0 flex-1 flex-col items-start">
-          <span
-            className="max-w-full truncate text-ui text-foreground"
-            data-commit-detail="message"
-          >
-            {view.message}
-          </span>
-          <span className="text-meta text-content-tertiary" data-commit-detail="meta">
-            {joinMeta([view.authorName, relativeTime(view.at, now, t)])} ·{' '}
-            <span className="font-mono">{view.shortSha}</span>
-          </span>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="flex-none text-muted-foreground"
-          aria-label={t('关闭提交详情')}
-          onClick={onClose}
-        >
-          <X width={12} height={12} />
-        </Button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto">
-        {files.length === 0 ? (
-          <div className={PANE_NOTE_CLS}>{t('该提交没有可显示的改动。')}</div>
-        ) : (
-          <div className="w-max min-w-full">
-            {files.map((file) => (
-              <DiffFileBlock
-                key={file.path}
-                file={file}
-                expanded
-                buildId={null}
-                allowFullFile={false}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function readStoredLayout(storage: Storage | null): TasksLayout {
@@ -690,7 +493,6 @@ export function ProjectPage() {
   const [chosenTab, setTab] = useState<'tasks' | 'files' | null>(
     tabParam === 'tasks' || tabParam === 'files' ? tabParam : (fixture.projectTab ?? null),
   );
-  const [seg, setSeg] = useState<'files' | 'history'>('files');
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const todosQ = useTodos(teamId, live);
@@ -715,10 +517,6 @@ export function ProjectPage() {
     !treeQ.isError &&
     treeQ.data === undefined &&
     (projectsQ.isLoading || hostedRepo || localRepo);
-  const commitsQ = useProjectCommits(
-    live ? id : undefined,
-    live && tab === 'files' && seg === 'history' && (hostedRepo || localRepo),
-  );
   const project: ProjectContent | undefined = live
     ? wireProject
       ? {
@@ -753,24 +551,6 @@ export function ProjectPage() {
   const fixtureFileContent =
     !live && selectedFile !== null ? (fixture.project?.fileContents?.[selectedFile] ?? null) : null;
   const fileView = deriveFileView(selectedFile, live, fixtureFileContent, fileQ);
-  const [commitSel, setCommitSel] = useState<{ projectId: string; sha: string } | null>(null);
-  const selectedCommit = commitSel !== null && commitSel.projectId === id ? commitSel.sha : null;
-  const commitDetailQ = useProjectCommitDetail(
-    live ? id : undefined,
-    selectedCommit ?? undefined,
-    live && tab === 'files' && seg === 'history' && (hostedRepo || localRepo),
-  );
-  const fixtureCommitRows = !live ? (project?.commits ?? []) : [];
-  const commitView = deriveCommitView(
-    selectedCommit,
-    live,
-    selectedCommit !== null ? fixtureCommitRows.find((c) => c.id === selectedCommit) : undefined,
-    commitDetailQ,
-  );
-  const commitDiffFiles = useMemo(
-    () => (commitView.kind === 'detail' ? mapDiffFiles(commitView.files) : []),
-    [commitView],
-  );
   const todos = live
     ? (todosQ.data ?? []).map(toDisplayTodo).filter((x) => x.projectId === id)
     : fixture.todos.filter((x) => x.projectId === id);
@@ -851,23 +631,10 @@ export function ProjectPage() {
             treeError={treeError}
             dirPath={dirPath}
             onNavigateDir={navigateDir}
-            seg={seg}
-            onSeg={setSeg}
-            commits={live ? mapCommits(commitsQ.data?.commits ?? []) : (project?.commits ?? [])}
-            now={live ? Date.now() : fixture.now}
             selectedFile={selectedFile}
             onSelectFile={(path) => setFileSel({ projectId: id ?? '', path })}
-            selectedCommit={selectedCommit}
-            onSelectCommit={(sha) => setCommitSel({ projectId: id ?? '', sha })}
           />
-          {seg === 'history' ? (
-            <CommitDetailView
-              view={commitView}
-              files={commitDiffFiles}
-              now={live ? Date.now() : fixture.now}
-              onClose={() => setCommitSel(null)}
-            />
-          ) : fileView.kind === 'text' ? (
+          {fileView.kind === 'text' ? (
             <div className="block min-w-0 flex-1 overflow-auto px-4 py-3">
               <pre className="m-0 font-mono text-meta leading-4.5 whitespace-pre text-foreground">
                 {fileView.content}

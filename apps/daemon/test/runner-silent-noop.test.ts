@@ -1,3 +1,4 @@
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -10,13 +11,17 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
 } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import * as tempEnvironment from '@cairn/shared/temp-environment';
+import { describe, expect, test, vi } from 'vitest';
 import { createPiBackend, PI_CAPABILITIES } from '../src/backend/pi.js';
-import { StepJournal } from '../src/journal.js';
+import * as credentials from '../src/credentials.js';
+import { StepJournal, type TranscriptBuffer } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { StepAppCredential } from '../src/step-app-credential.js';
+import { StepStops } from '../src/step-stops.js';
 import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
@@ -137,10 +142,14 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-function scriptedBackend(script: StepEvent[]): { backend: AgentBackend; handle: null } {
+function scriptedBackend(
+  script: StepEvent[],
+  inspect?: (opts: SessionOpts) => void,
+): { backend: AgentBackend; handle: null } {
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
-    async createSession(_sessionOpts: SessionOpts): Promise<AgentSessionHandle> {
+    async createSession(sessionOpts: SessionOpts): Promise<AgentSessionHandle> {
+      inspect?.(sessionOpts);
       return {
         sessionId: 'pi-sess-noop',
         events: (async function* () {
@@ -151,20 +160,23 @@ function scriptedBackend(script: StepEvent[]): { backend: AgentBackend; handle: 
         usage: () => [],
       };
     },
-    async continueSession(): Promise<never> {
-      throw new Error('unused');
+    async continueSession(_id, sessionOpts): Promise<AgentSessionHandle> {
+      return backend.createSession(sessionOpts);
     },
   };
   return { backend, handle: null };
 }
 
-async function runNoopCase(script: StepEvent[]) {
+async function runNoopCase(
+  script: StepEvent[],
+  temporary?: { inspect: (opts: SessionOpts) => void; root: string; continuing?: boolean },
+) {
   const home = testTempDir('cairn-runner-noop-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
-  const { backend } = scriptedBackend(script);
+  const { backend } = scriptedBackend(script, temporary?.inspect);
   const deps = {
     client,
     journal,
@@ -175,7 +187,15 @@ async function runNoopCase(script: StepEvent[]) {
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
   };
-  await runStep(deps, claimedStep());
+  const claimed = claimedStep();
+  if (temporary?.continuing) claimed.session = { action: 'continue', sessionId: 'prior' };
+  await runStep(
+    deps,
+    claimed,
+    temporary
+      ? { env: { CAIRN_TEST_TEMP_ROOT: temporary.root, CAIRN_HEAVY_SLOTS_DIR: '/shared/slots' } }
+      : {},
+  );
   return { client, lines };
 }
 
@@ -253,4 +273,115 @@ describe('pi prompt() preflight rejection surfaces (#698 hole 2: swallowed error
       if (saved.authToken !== undefined) process.env.ANTHROPIC_AUTH_TOKEN = saved.authToken;
     }
   }, 15_000);
+});
+
+for (const mode of ['new', 'continue', 'failed'] as const) {
+  test(`step temp environment is private on disk and reclaimed after ${mode}`, async () => {
+    const root = testTempDir('step-disk-');
+    let allocated: string | undefined;
+    const { client } = await runNoopCase(mode === 'failed' ? [] : [{ type: 'done', usage: [] }], {
+      root,
+      continuing: mode === 'continue',
+      inspect(opts) {
+        allocated = opts.env?.TMPDIR;
+        expect(allocated?.startsWith(`${root}/ct-`)).toBe(true);
+        expect(opts.env?.CAIRN_HEAVY_SLOTS_DIR).toBe('/shared/slots');
+        expect(existsSync(allocated!)).toBe(true);
+        writeFileSync(join(allocated!, 'step-file'), 'owned');
+      },
+    });
+    expect(allocated).toBeDefined();
+    expect(existsSync(allocated!)).toBe(false);
+    expect(client.doneBodies[0]?.body.status).toBe(mode === 'failed' ? 'failed' : 'success');
+  });
+}
+
+test('cleanup failures do not skip credentials, heartbeat, maps or stop settlement', async () => {
+  const home = testTempDir('step-cleanup-failure-');
+  const paths = statePaths(home, join(home, 'workspaces'));
+  const { logger } = captureLogger();
+  const client = new FakeClient();
+  const stops = new StepStops();
+  const sessionHandles = new Map<string, AgentSessionHandle>();
+  const stepImageSupport = new Map<string, boolean | null>();
+  const stepSteeringSupport = new Map<string, boolean>();
+  const stepTranscripts = new Map<string, TranscriptBuffer>();
+  const temporaryFailure = new Error('temporary cleanup EACCES');
+  const credentialFailure = new Error('credential cleanup EACCES');
+  const mapFailure = new Error('session cleanup failure');
+  const createTemporary = tempEnvironment.createTempEnvironment;
+  const pushCredential = credentials.pushCredential;
+  const dispose = StepAppCredential.prototype.dispose;
+  vi.spyOn(tempEnvironment, 'createTempEnvironment').mockImplementation((env) => {
+    const temporary = createTemporary(env);
+    return {
+      ...temporary,
+      cleanup() {
+        temporary.cleanup();
+        vi.spyOn(sessionHandles, 'delete').mockImplementation((key) => {
+          Map.prototype.delete.call(sessionHandles, key);
+          throw mapFailure;
+        });
+        throw temporaryFailure;
+      },
+    };
+  });
+  vi.spyOn(credentials, 'pushCredential').mockImplementation((...args) => ({
+    ...pushCredential(...args),
+    git: {
+      kind: 'app',
+      username: 'test',
+      password: 'synthetic',
+      url: 'https://example.invalid/repo',
+    },
+  }));
+  const clear = vi.spyOn(credentials, 'clearCredentials');
+  const disposal = vi.spyOn(StepAppCredential.prototype, 'dispose').mockImplementation(function (
+    this: StepAppCredential,
+  ) {
+    dispose.call(this);
+    throw credentialFailure;
+  });
+  const intervals = vi.spyOn(globalThis, 'setInterval');
+  const clearTimer = vi.spyOn(globalThis, 'clearInterval');
+  try {
+    const { backend } = scriptedBackend([{ type: 'done', usage: [] }]);
+    const result = await runStep(
+      {
+        client,
+        journal: new StepJournal(paths.outboxDir),
+        backendFor: () => backend,
+        logger,
+        paths,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        stops,
+        sessionHandles,
+        stepImageSupport,
+        stepSteeringSupport,
+        stepTranscripts,
+      },
+      claimedStep(),
+      { env: { CAIRN_TEST_TEMP_ROOT: home } },
+    ).catch((error: unknown) => error);
+    expect(disposal).toHaveBeenCalledOnce();
+    expect(clear.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      disposal.mock.invocationCallOrder[0]!,
+    );
+    expect(clearTimer).toHaveBeenCalledWith(intervals.mock.results[0]!.value);
+    for (const map of [sessionHandles, stepImageSupport, stepSteeringSupport, stepTranscripts])
+      expect(map.has('step-noop1')).toBe(false);
+    expect(stops.get('step-noop1')).toBeUndefined();
+    expect(result).toBeInstanceOf(AggregateError);
+    for (const error of [temporaryFailure, credentialFailure, mapFailure])
+      expect((result as AggregateError).message).toContain(error.message);
+    expect((result as AggregateError).errors).toEqual([
+      temporaryFailure,
+      credentialFailure,
+      mapFailure,
+    ]);
+    expect(existsSync(join(paths.agentRuntimeDir, 'step-step-noop1-github'))).toBe(false);
+  } finally {
+    vi.restoreAllMocks();
+  }
 });

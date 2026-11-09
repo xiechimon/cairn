@@ -536,10 +536,12 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
     expect(DB_TABLES).toHaveLength(68);
+    expect(DB_TABLES).toContain('deploy_lease');
+    expect(INTERNAL_ONLY_TABLES).toContain('deploy_lease');
     expect(INTERNAL_ONLY_TABLES).toContain('task_issue_close');
     expect(INTERNAL_ONLY_TABLES).toContain('computer');
     expect(INTERNAL_ONLY_TABLES).toContain('computer_call');
-    expect(INTERNAL_ONLY_TABLES).toContain('feature_flag');
+    expect(INTERNAL_ONLY_TABLES).not.toContain('feature_flag');
     expect(INTERNAL_ONLY_TABLES).toContain('chief_report');
     expect(INTERNAL_ONLY_TABLES).toContain('retro_proposal');
     expect(DB_TABLES).toContain('queued_message');

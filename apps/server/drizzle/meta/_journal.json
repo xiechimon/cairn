@@ -897,6 +897,27 @@
       "when": 1794210968508,
       "tag": "0131_project_group",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "6",
+      "when": 1794216000000,
+      "tag": "0132_computer_browser_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "6",
+      "when": 1794232077552,
+      "tag": "0133_deploy_lease",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "6",
+      "when": 1794235057307,
+      "tag": "0134_drop_feature_releases",
+      "breakpoints": true
     }
   ]
 }

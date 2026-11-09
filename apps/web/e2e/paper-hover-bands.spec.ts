@@ -39,6 +39,7 @@ async function assertFlatRow(page: Page, row: Locator) {
 }
 
 const LISTS = [
+  ['tasks', '/app?scenario=home-c&pane=tasks', '[data-slot="task-row"]'],
   ['machines', '/app/settings/machines?scenario=machines-master-detail', '[data-testid="machine-item"]'],
   ['providers', '/app/settings/providers?scenario=providers-fleet', '[data-testid="provider-instance"]'],
   ['MCP', '/app/resources/mcp-servers?scenario=07', '[data-testid="resource-row"]'],

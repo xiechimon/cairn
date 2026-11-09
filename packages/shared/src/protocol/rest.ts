@@ -16,6 +16,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/machines' },
   { method: 'GET', path: '/api/computers', note: 'the team computers (D75 P8a)' },
   {
+    method: 'POST',
+    path: '/api/computers',
+    note: 'D75: ensure a stopped private computer for a capable machine and set browserEnabled',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/computers/{id}',
+    note: 'D75: enable or disable browser tools on a computer',
+  },
+  {
     method: 'GET',
     path: '/api/computers/{id}/commands',
     query: ['limit'],
@@ -50,16 +60,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'GET',
     path: '/api/server/deploy',
     note: 'deploy.json next to server.db, written by deploy-self.sh (#2427)',
-  },
-  {
-    method: 'GET',
-    path: '/api/flags',
-    note: 'owner lists registered flags and their global release state (#2427)',
-  },
-  {
-    method: 'POST',
-    path: '/api/flags/{key}/release',
-    note: 'owner releases a feature flag to every user (#2427)',
   },
   { method: 'GET', path: '/api/teams/{id}/providers', note: 'presets[] 38 项原样（r3 §2）' },
   { method: 'GET', path: '/api/teams/{id}/mcp-servers' },

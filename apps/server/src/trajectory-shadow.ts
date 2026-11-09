@@ -1,13 +1,6 @@
 import { createHash } from 'node:crypto';
 import { otelResourceAttributes, redactSecrets } from '@cairn/shared';
-import {
-  OTLP_SPAN_KIND,
-  type OtlpTarget,
-  otlpAttributes,
-  otlpNanos,
-  otlpTracesRequest,
-  postOtlpTraces,
-} from '@cairn/shared/otel';
+import { type CairnSpan, exportCairnSpans, type OtlpTarget } from '@cairn/shared/otel';
 import { z } from 'zod';
 
 export class TrajectoryShadowError extends Error {}
@@ -363,22 +356,21 @@ function iso(epochMs: number): string {
   return new Date(epochMs).toISOString();
 }
 
-function digestSpan(unit: Observation, digest: StepDigest) {
+function digestSpan(unit: Observation, digest: StepDigest): CairnSpan {
   const at = ms(unit.endTime);
   return {
-    traceId: unit.traceId,
     spanId: stableId(unit.id, STEP_DIGEST_NAME).slice(0, 16),
-    parentSpanId: unit.id,
+    parent: { traceId: unit.traceId, spanId: unit.id },
     name: STEP_DIGEST_NAME,
-    kind: OTLP_SPAN_KIND.internal,
-    startTimeUnixNano: otlpNanos(at),
-    endTimeUnixNano: otlpNanos(at),
-    attributes: otlpAttributes({
+    kind: 'internal',
+    startMs: at,
+    endMs: at,
+    attributes: {
       'langfuse.observation.input': JSON.stringify(digest),
       'langfuse.observation.metadata.unit': digest.unit,
       'langfuse.observation.metadata.has_owner_question': String(digest.owner_questions.length > 0),
       ...(unit.environment ? { 'langfuse.environment': unit.environment } : {}),
-    }),
+    },
   };
 }
 
@@ -504,11 +496,11 @@ export async function runShadow(
     if (digest.owner_questions.length > 0) result.questionUnits++;
     if (!options.dryRun)
       try {
-        await postOtlpTraces(
+        await exportCairnSpans(
           otlpTarget,
-          otlpTracesRequest(otelResourceAttributes(unit.environment), 'cairn.shadow', [
-            digestSpan(unit, digest),
-          ]),
+          otelResourceAttributes(unit.environment),
+          'cairn.shadow',
+          [digestSpan(unit, digest)],
         );
       } catch {
         throw new TrajectoryShadowError(

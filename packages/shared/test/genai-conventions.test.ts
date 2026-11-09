@@ -8,6 +8,7 @@ import {
   GENAI_ATTR,
   GENAI_OPERATION,
   invokeAgentAttributes,
+  langfuseTraceAttributes,
 } from '../src/genai-conventions.js';
 
 test('names the operations and the convention keys the issue relies on', () => {
@@ -67,13 +68,47 @@ test('builders emit only keys from the maps and drop absent values', () => {
   expect(attributes[1]?.[GENAI_ATTR.providerName]).toBe('p');
 });
 
-test('chat spans carry cost on the key Langfuse reads, and an unpriced turn carries none', () => {
+test('chat spans carry cost as Langfuse cost details, and an unpriced turn carries none', () => {
   const priced = chatAttributes({ model: 'gpt-6.1-sol', costUsd: 0.47806 }, {});
-  expect(priced[GENAI_ATTR.usageCost]).toEqual({ double: 0.47806 });
+  expect(priced['langfuse.observation.cost_details']).toBe('{"total":0.47806}');
+  expect(priced).not.toHaveProperty('gen_ai.usage.cost');
   expect(priced).not.toHaveProperty(CAIRN_ATTR.costUsd);
   const unpriced = chatAttributes({ model: 'glm-5.3', usage: { input: 10 }, costUsd: 0 }, {});
-  expect(unpriced).not.toHaveProperty(GENAI_ATTR.usageCost);
-  expect(chatAttributes({ model: 'm' }, {})).not.toHaveProperty(GENAI_ATTR.usageCost);
+  expect(unpriced).not.toHaveProperty('langfuse.observation.cost_details');
+  expect(chatAttributes({ model: 'm' }, {})).not.toHaveProperty(
+    'langfuse.observation.cost_details',
+  );
+});
+
+test('trace attributes carry the session on session.id only', () => {
+  const attributes = langfuseTraceAttributes({
+    name: 'build',
+    sessionId: 'todo-1',
+    tags: ['cairn'],
+    environment: 'dev',
+  });
+  expect(attributes['session.id']).toBe('todo-1');
+  expect(attributes).not.toHaveProperty('langfuse.session.id');
+  expect(attributes['langfuse.trace.name']).toBe('build');
+  expect(attributes['langfuse.environment']).toBe('dev');
+});
+
+test('the outcome cost on invoke_agent is a plain number', () => {
+  const attributes = invokeAgentAttributes({
+    buildId: 'b',
+    baseSha: 's',
+    harnessHash: 'h',
+    persona: null,
+    agentId: 'a',
+    ciFixRounds: 0,
+    sourceRef: null,
+    outcome: { merged: true, revertedWithin7d: null, fixedByLaterPr: false, costTotal: 2 },
+    attribution: null,
+  });
+  expect(attributes[CAIRN_ATTR.costUsd]).toBe(2);
+  expect(attributes[CAIRN_ATTR.outcomeMerged]).toBe(true);
+  expect(attributes).not.toHaveProperty(CAIRN_ATTR.outcomeRevertedWithin7d);
+  expect(attributes[CAIRN_ATTR.outcomeFixedByLaterPr]).toBe(false);
 });
 
 test('no other source file spells a gen_ai.* key', () => {

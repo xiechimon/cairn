@@ -76,7 +76,7 @@
     {
       "id": "B11",
       "title": "Peripheral surfaces",
-      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
+      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
     },
     {
       "id": "B12",
@@ -963,28 +963,34 @@
     {
       "id": "agent-computer",
       "name": "The agent's computer",
-      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and control in the web app.",
-      "states": "No computer, a computer with an empty command feed, commands streaming with exit codes, and the live screen enlarged with control.",
+      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.",
+      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
       "centrality": 1,
       "status": "partial",
       "code": {
         "web": [
           "apps/web/src/board/computer-feed.tsx",
-          "apps/web/src/board/computer-screen.tsx"
+          "apps/web/src/board/computer-screen.tsx",
+          "apps/web/src/board/machines-panel.tsx",
+          "apps/web/src/board/machine-capabilities.ts"
         ],
         "server": [
           "apps/server/src/routes-computers.ts",
           "apps/server/src/routes-computer-screen.ts",
           "apps/server/src/services/computer-control.ts",
-          "apps/server/src/services/computer-screen.ts"
+          "apps/server/src/services/computer-screen.ts",
+          "apps/server/src/services/computer-feed.ts"
         ],
         "daemon": [
-          "apps/daemon/src/computer"
+          "apps/daemon/src/computer",
+          "apps/daemon/src/orb/computer.ts",
+          "apps/daemon/src/machine-loop.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/computers",
+          "/api/computers/:id",
           "/api/computers/:id/commands",
           "/api/teams/:teamId/computers/**"
         ]
@@ -992,6 +998,7 @@
       "reach": [
         "open /app",
         "click testid:machines-button",
+        "click label:浏览器",
         "click testid:machine-screen-expand"
       ],
       "research": [
@@ -1000,15 +1007,20 @@
         "docs/research/user-computer-model-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "the computer feed, screen view and control handover have no design"
+        "gap": "the computer feed, screen view, browser toggle and control handover have no design"
       },
       "backendDesign": {
-        "gap": "no design for computer access grants, the guard and the screen channel"
+        "gap": "no design for computer access grants, the browser preference, the guard and the screen channel"
       },
       "evidence": [
         "apps/web/e2e/machines-computer-feed.spec.ts",
+        "apps/web/test/machine-capabilities.test.ts",
         "apps/server/test/computer-screen-routes.test.ts",
-        "apps/daemon/test/computer-guard.test.ts"
+        "apps/server/test/computer-feed-routes.test.ts",
+        "apps/daemon/test/computer-guard.test.ts",
+        "apps/daemon/test/computer-browser.test.ts",
+        "apps/daemon/test/machine-boot.test.ts",
+        "apps/daemon/test/orb-computer.test.ts"
       ],
       "batch": "B4"
     },
@@ -1067,6 +1079,8 @@
         "web": [
           "/app/resources/model-routing",
           "/app/resources/routing-settings",
+          "/app/team",
+          "/app/settings/team",
           "settings:routing",
           "settings:work-routing"
         ],
@@ -1573,9 +1587,9 @@
     },
     {
       "id": "project-files",
-      "name": "Project files and commits",
-      "summary": "The files tab of a project: the tree, file viewer and commit detail.",
-      "states": "A file tree with a viewer and a commit history with commit detail; unavailable for some project kinds.",
+      "name": "Project files",
+      "summary": "The remaining project file tree and viewer, pending retirement in #3479.",
+      "states": "A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -1599,17 +1613,15 @@
         ]
       },
       "reach": [
-        "open /app/project/<id of a project listed by the projects API>/files",
-        "click testid:history-message"
+        "open /app/project/<id of a project listed by the projects API>/files"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/project-files-drill.md",
-        ".claude/skills/verify-cairn/features/project-files-local.md",
-        ".claude/skills/verify-cairn/features/project-commit-detail.md"
+        ".claude/skills/verify-cairn/features/project-files-local.md"
       ],
-      "research": {
-        "gap": "no note on whether a files tab belongs in an agent product and how others show it"
-      },
+      "research": [
+        "docs/research/project-files-retirement-2026-11-09.md"
+      ],
       "frontendDesign": {
         "gap": "the files tab has no design"
       },
@@ -2177,14 +2189,13 @@
     {
       "id": "account-and-team",
       "name": "Account and team",
-      "summary": "The user's account, the team, its members and the PR attribution settings.",
-      "states": "Account details and language, the team with its members and the PR attribution settings.",
+      "summary": "The user's account, the team record and the PR attribution settings.",
+      "states": "Account details and language, and the PR attribution settings.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/routes/account-page.tsx",
-          "apps/web/src/routes/team-page.tsx"
+          "apps/web/src/routes/account-page.tsx"
         ],
         "server": [
           "apps/server/src/routes-core.ts",
@@ -2194,9 +2205,7 @@
       "routes": {
         "web": [
           "/app/account",
-          "/app/team",
-          "settings:account",
-          "settings:team"
+          "settings:account"
         ],
         "server": [
           "/api/user/me",
@@ -2206,8 +2215,7 @@
         ]
       },
       "reach": [
-        "settings account",
-        "settings team"
+        "settings account"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/avatars.md"
@@ -2408,32 +2416,38 @@
         ],
         "server": [
           "apps/server/src/services/backup-status.ts",
-          "apps/server/src/services/deploy-status.ts"
+          "apps/server/src/services/deploy-status.ts",
+          "apps/server/src/routes-deploy.ts",
+          "apps/server/src/services/deploy-lease.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/server/backup",
-          "/api/server/deploy"
+          "/api/server/deploy",
+          "/api/server/deploy/lease"
         ]
       },
       "reach": [
         "open /app",
         "click testid:backup-warning"
       ],
-      "research": {
-        "gap": "no note on how self-hosted products report backup and update health"
-      },
+      "research": [
+        "docs/research/deploy-drain-2026-11-09.md"
+      ],
       "frontendDesign": {
         "gap": "the banners have no design"
       },
-      "backendDesign": {
-        "gap": "no design for the backup and deploy probes"
-      },
+      "backendDesign": [
+        "docs/ops/deploy-drain-design.md"
+      ],
       "evidence": [
         "apps/web/e2e/chief-home-backup.spec.ts",
         "apps/server/test/backup-status.test.ts",
-        "apps/server/test/deploy-status.test.ts"
+        "apps/server/test/deploy-status.test.ts",
+        "apps/server/test/deploy-lease.test.ts",
+        "integration/test/deploy-server-restart.test.ts",
+        "scripts/ops/deploy-self.test.mjs"
       ],
       "batch": "B11"
     },
@@ -2473,46 +2487,6 @@
       "evidence": [
         "apps/web/e2e/account-feishu.spec.ts",
         "apps/server/test/feishu-config.test.ts"
-      ],
-      "batch": "B11"
-    },
-    {
-      "id": "feature-releases",
-      "name": "Feature flags and releases",
-      "summary": "Per-user feature flags and the account page list where the owner releases them.",
-      "states": "A list of flags in the account settings with a release action for the owner.",
-      "centrality": 4,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/routes/feature-releases.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-flags.ts",
-          "apps/server/src/services/feature-flags.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/flags",
-          "/api/flags/:key/release"
-        ]
-      },
-      "reach": [
-        "settings account"
-      ],
-      "research": {
-        "gap": "no note on per-user flags for a single-user product"
-      },
-      "frontendDesign": {
-        "gap": "the releases list has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for flag defaults and release"
-      },
-      "evidence": [
-        "apps/web/e2e/account-feature-releases.spec.ts",
-        "apps/server/test/feature-flags.test.ts"
       ],
       "batch": "B11"
     },

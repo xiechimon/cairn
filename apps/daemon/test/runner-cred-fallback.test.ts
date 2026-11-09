@@ -179,8 +179,10 @@ function fakeWorkspace(opts: {
   const ws: WorktreeOps = {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
+      const cwd = join(input.workspacesRoot, input.conversationId);
+      mkdirSync(cwd, { recursive: true });
       return {
-        cwd: join(input.workspacesRoot, input.conversationId),
+        cwd,
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
         branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',

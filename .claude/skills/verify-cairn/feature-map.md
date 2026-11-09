@@ -19,7 +19,6 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
 | `secrets` | `设置` (Settings) › `执行环境` (Execution) › `密钥` (Secrets) | [Secrets](#secrets) |
-| `team` | `设置` (Settings) › `团队与访问` (Team & access) › `团队` (Team) | [Account and team](#account-and-team) |
 | `api-keys` | `设置` (Settings) › `团队与访问` (Team & access) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `团队与访问` (Team & access) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 
@@ -27,23 +26,24 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 
 ### agent-computer
 
-**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and control in the web app.
+**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
 
-States: No computer, a computer with an empty command feed, commands streaming with exit codes, and the live screen enlarged with control.
+States: No computer; command feed empty, streaming, or settled; live screen enlarged with control; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.
 
 Reach:
 
 1. `open /app`
 2. `click testid:machines-button`
-3. `click testid:machine-screen-expand`
+3. `click label:浏览器`
+4. `click testid:machine-screen-expand`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-expand`
+- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view and control handover have no design
-- Backend design: **gap**: no design for computer access grants, the guard and the screen channel
-- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`
+- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
+- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/orb-computer.test.ts`
 
 ### coordinator-chat
 
@@ -59,7 +59,7 @@ Reach:
 
 - Web routes: `/app`
 - Keyboard shortcuts in its code: `Enter`
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-note`, `chief-outage`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `reply-quote`, `selection-reply`, `selection-reply-bar`, `tasks-attention-dot`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-note`, `chief-outage`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `reply-quote`, `selection-reply`, `selection-reply-bar`, `tasks-badge`, `tasks-toggle`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -294,7 +294,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`
+- Test ids in its code: `chief-composer-block`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`
 - Research: **gap**: the Codex CLI and t3code question patterns behind D85 and D119 were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](../../../docs/design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
 - Backend design: **gap**: no design for the question lifecycle: parking, late answers, cancel and resume
@@ -312,7 +312,7 @@ Reach:
 2. `click testid:routing-section`
 3. `settings work-routing`
 
-- Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`
+- Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
 - Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
@@ -415,7 +415,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `fail-raw-error`, `info-report`, `injected-skills`, `injected-skills-chip`, `made-empty`, `msg-actions`, `msg-stamp`, `queued-capsules-standalone`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `taskline`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-prs`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `worked-for-rule`
+- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `fail-raw-error`, `info-report`, `injected-skills`, `injected-skills-chip`, `made-empty`, `msg-actions`, `msg-stamp`, `queued-capsules-standalone`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `taskline`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `worked-for-rule`
 - Verify recipes: [.claude/skills/verify-cairn/features/detail-right-pane.md](features/detail-right-pane.md)
 - Research: [docs/research/r15-multica-run-rendering.md](../../../docs/research/r15-multica-run-rendering.md), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
@@ -615,19 +615,18 @@ Reach:
 
 ### account-and-team
 
-**Account and team** (shipped, centrality 3). The user's account, the team, its members and the PR attribution settings.
+**Account and team** (shipped, centrality 3). The user's account, the team record and the PR attribution settings.
 
-States: Account details and language, the team with its members and the PR attribution settings.
+States: Account details and language, and the PR attribution settings.
 
 Reach:
 
 1. `settings account`
-2. `settings team`
 
-- Web routes: `/app/account`, `/app/team`
-- Settings: `设置` (Settings) › `账号` (Account); `设置` (Settings) › `团队与访问` (Team & access) › `团队` (Team)
+- Web routes: `/app/account`
+- Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `team-agents-removed`
+- Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
@@ -836,20 +835,19 @@ Reach:
 
 ### project-files
 
-**Project files and commits** (shipped, centrality 3). The files tab of a project: the tree, file viewer and commit detail.
+**Project files** (shipped, centrality 3). The remaining project file tree and viewer, pending retirement in #3479.
 
-States: A file tree with a viewer and a commit history with commit detail; unavailable for some project kinds.
+States: A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.
 
 Reach:
 
 1. `open /app/project/<id of a project listed by the projects API>/files`
-2. `click testid:history-message`
 
 - Web routes: `/app/project/:id/files`
 - Keyboard shortcuts in its code: `A`, `D`, `P`, `R`, `T`
-- Test ids in its code: `history-message`, `history-meta`, `task-card`, `task-meta`, `task-row`, `task-status`
-- Verify recipes: [.claude/skills/verify-cairn/features/project-files-drill.md](features/project-files-drill.md), [.claude/skills/verify-cairn/features/project-files-local.md](features/project-files-local.md), [.claude/skills/verify-cairn/features/project-commit-detail.md](features/project-commit-detail.md)
-- Research: **gap**: no note on whether a files tab belongs in an agent product and how others show it
+- Test ids in its code: `task-card`, `task-meta`, `task-row`, `task-status`
+- Verify recipes: [.claude/skills/verify-cairn/features/project-files-drill.md](features/project-files-drill.md), [.claude/skills/verify-cairn/features/project-files-local.md](features/project-files-local.md)
+- Research: [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md)
 - Frontend design: **gap**: the files tab has no design
 - Backend design: **gap**: no design for reading files and commits from local and hosted repos
 - Evidence: `apps/web/e2e/project-files-tree.spec.ts`, `apps/web/e2e/project-commit-detail.spec.ts`
@@ -989,10 +987,10 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `backup-warning`
-- Research: **gap**: no note on how self-hosted products report backup and update health
+- Research: [docs/research/deploy-drain-2026-11-09.md](../../../docs/research/deploy-drain-2026-11-09.md)
 - Frontend design: **gap**: the banners have no design
-- Backend design: **gap**: no design for the backup and deploy probes
-- Evidence: `apps/web/e2e/chief-home-backup.spec.ts`, `apps/server/test/backup-status.test.ts`, `apps/server/test/deploy-status.test.ts`
+- Backend design: [docs/ops/deploy-drain-design.md](../../../docs/ops/deploy-drain-design.md)
+- Evidence: `apps/web/e2e/chief-home-backup.spec.ts`, `apps/server/test/backup-status.test.ts`, `apps/server/test/deploy-status.test.ts`, `apps/server/test/deploy-lease.test.ts`, `integration/test/deploy-server-restart.test.ts`, `scripts/ops/deploy-self.test.mjs`
 
 ### sidebar
 
@@ -1034,24 +1032,6 @@ Reach:
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
 - Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
-
-### feature-releases
-
-**Feature flags and releases** (shipped, centrality 4). Per-user feature flags and the account page list where the owner releases them.
-
-States: A list of flags in the account settings with a release action for the owner.
-
-Reach:
-
-1. `settings account`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: **gap**: no note on per-user flags for a single-user product
-- Frontend design: **gap**: the releases list has no design
-- Backend design: **gap**: no design for flag defaults and release
-- Evidence: `apps/web/e2e/account-feature-releases.spec.ts`, `apps/server/test/feature-flags.test.ts`
 
 ### feishu
 

@@ -1,0 +1,9 @@
+{
+  "finding": "Screenshot port isolation",
+  "review": "https://github.com/xiechimon/cairn/pull/3601#discussion_r4511561522",
+  "red": "6 failed on daff98d635ce1e0ff516f9c7db62ad09d7be9961",
+  "green": "6 concurrent config cases passed; 62 related runtime tests passed",
+  "live": "Two real config/admission processes per case; real installed Playwright rejects occupied leased HTTP port",
+  "mocked": "Minimal Playwright collection specs and a synthetic HTTP holder; no application screenshot in this local run",
+  "notCovered": "Native macOS and concurrent full live screenshot captures"
+}

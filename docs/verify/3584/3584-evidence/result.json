@@ -1,0 +1,13 @@
+{
+  "issue": 3584,
+  "base": "bd34577fd0b60d7eabbffc093d66c2f75b815537",
+  "admission_tests": 19,
+  "script_tests": 312,
+  "vitest_tests": 49,
+  "playwright_tests": 4,
+  "red_tests_failed": 13,
+  "namespace_negative_controls_failed": 2,
+  "cross_namespace_serialization": true,
+  "mocked": "Minimal test packages and synthetic foreign-owner records; real runner binaries and Unix sockets",
+  "not_covered": "Native macOS execution; pre-existing unupdated branches; arbitrary external config overrides"
+}
