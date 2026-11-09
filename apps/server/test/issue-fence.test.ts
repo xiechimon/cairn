@@ -292,7 +292,7 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
       `[wake:settle] ${provenance}${ref} 已合并完成（done）。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`,
     );
     expect(prompts).toContain(
-      `[wake:failed] ${provenance}${ref} 运行失败。先核实原因（machines 等工具），然后本轮必须落一个动作：用 message_thread 让它重试或换做法，或用 close_todos 关掉。本轮结束时任务若仍是同一个失败，系统会把它交给用户处理。`,
+      `[wake:failed] ${provenance}${ref} 运行失败。先核实原因（machines 等工具），然后本轮必须落一个动作：用 message_thread 让它重试或换做法，或用 update_todo 调整 blockedBy 后再用 message_thread 重启，让系统按依赖放行，或用 close_todos 关掉。本轮结束时任务若仍是同一个失败，系统会把它交给用户处理。`,
     );
     expect(
       prompts.some((p) =>
