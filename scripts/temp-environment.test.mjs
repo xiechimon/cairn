@@ -21,7 +21,8 @@ for (const runner of ['test-temp-run.mjs', 'temp-env-run.mjs']) {
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const allocation = fs.mkdtempSync(path.join(os.tmpdir(), 'raw-'));
+const allocation = path.join(os.tmpdir(), 'owned-child');
+fs.mkdirSync(allocation);
 console.log(JSON.stringify({ root: os.tmpdir(), allocation, slots: process.env.CAIRN_HEAVY_SLOTS_DIR }));
 fs.rmSync(allocation, { recursive: true });
 process.exitCode = 17;
