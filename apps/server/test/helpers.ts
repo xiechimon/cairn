@@ -69,6 +69,7 @@ export function bootServer(
     skillImportTimeoutMs?: number;
     webDir?: string | null;
     githubFetch?: AppContext['githubFetch'];
+    githubAppIdentity?: AppContext['githubAppIdentity'];
     logger?: AppContext['logger'];
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
@@ -147,6 +148,9 @@ export function bootServer(
         ? {}
         : { providerTestTimeoutMs: opts.providerTestTimeoutMs }),
       githubFetch: opts.githubFetch ?? rejectingGithubFetch,
+      ...(opts.githubAppIdentity !== undefined
+        ? { githubAppIdentity: opts.githubAppIdentity }
+        : {}),
       ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
       ...(opts.skillImportFetch !== undefined ? { skillImportFetch: opts.skillImportFetch } : {}),
       ...(opts.skillImportTimeoutMs !== undefined
