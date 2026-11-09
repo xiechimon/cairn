@@ -1,15 +1,17 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { redactSecrets, type TrajectoryPack, trajectoryPackSchema } from '@cairn/shared';
-import { OtlpTargetConfigError, type OtlpTracesRequest, parseOtlpTarget } from '@cairn/shared/otel';
-import { packToOtlp } from './trajectory-otlp.js';
+import {
+  type CairnSpan,
+  exportCairnSpans,
+  type OtlpTarget,
+  OtlpTargetConfigError,
+  otlpTraceIdOfBuild,
+  parseOtlpTarget,
+} from '@cairn/shared/otel';
+import { packToSpans, TRAJECTORY_PUSH_SCOPE } from './trajectory-otlp.js';
 
 export class TrajectoryPushError extends Error {}
-
-export interface OtlpTarget {
-  url: URL;
-  headers: Record<string, string>;
-}
 
 export function parsePacks(jsonl: string): TrajectoryPack[] {
   return jsonl
@@ -62,30 +64,22 @@ export async function pushPacks(
     } catch {}
   }
   for (const pack of packs) {
-    const cleaned = redactSecrets(packToOtlp(pack));
-    const request = cleaned.value as OtlpTracesRequest;
-    const spans = request.resourceSpans.flatMap((resource) =>
-      resource.scopeSpans.flatMap((scope) => scope.spans),
-    );
-    const traceId = spans[0]?.traceId ?? '';
+    const cleaned = redactSecrets(packToSpans(pack));
+    const spans = cleaned.value as CairnSpan[];
+    const traceId = otlpTraceIdOfBuild(pack.buildId);
     if (!options.force && alreadyPushed.has(traceId)) {
       result.skippedAlreadyPushed++;
       continue;
     }
-    let response: Response;
     try {
-      response = await fetch(target.url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...target.headers },
-        body: JSON.stringify(request),
-      });
-    } catch {
-      throw new TrajectoryPushError(`Endpoint unreachable after ${result.pushed} pushed`);
+      await exportCairnSpans(target, { 'service.name': 'cairn' }, TRAJECTORY_PUSH_SCOPE, spans);
+    } catch (error) {
+      const status =
+        error instanceof Error && 'code' in error && typeof error.code === 'number'
+          ? `replied HTTP ${error.code}`
+          : 'unreachable';
+      throw new TrajectoryPushError(`Endpoint ${status} after ${result.pushed} pushed`);
     }
-    if (!response.ok)
-      throw new TrajectoryPushError(
-        `Endpoint replied HTTP ${response.status} after ${result.pushed} pushed`,
-      );
     mkdirSync(dirname(options.ledgerPath), { recursive: true });
     appendFileSync(
       options.ledgerPath,

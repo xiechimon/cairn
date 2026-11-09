@@ -12,7 +12,6 @@ import {
   ShieldEllipsis,
   Smartphone,
   User,
-  Users,
   Waypoints,
   X,
 } from 'lucide-react';
@@ -36,7 +35,6 @@ import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
-import { TeamPage } from '../routes/team-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
 import { lastOutsideLocation, SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
@@ -116,7 +114,6 @@ const GROUPS: Group[] = [
   {
     heading: '团队与访问',
     sections: [
-      { id: 'team', label: '团队', Icon: Users, element: () => <TeamPage /> },
       { id: 'api-keys', label: 'API 密钥', Icon: KeyRound, element: () => <ApiKeysPage /> },
       {
         id: 'remote',

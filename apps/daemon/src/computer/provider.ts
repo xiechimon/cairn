@@ -23,9 +23,12 @@ export interface ComputerFileOptions {
 }
 
 export class ComputerRefusal extends Error {
-  constructor(message: string) {
+  readonly delivery: 'not_delivered' | 'unknown';
+
+  constructor(message: string, delivery: 'not_delivered' | 'unknown' = 'not_delivered') {
     super(message);
     this.name = 'ComputerRefusal';
+    this.delivery = delivery;
   }
 }
 

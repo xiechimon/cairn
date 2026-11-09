@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "56c0bea1-af5b-4966-bc58-1832471e50b9",
+  "id": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
   "prevId": "b875be75-f86b-4e0e-b2df-e0f143bdbe4c",
   "tables": {
     "agent_memory": {
@@ -1941,6 +1941,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "browserEnabled": {
+          "name": "browserEnabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -6171,14 +6179,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "''"
-        },
-        "correctionRequired": {
-          "name": "correctionRequired",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         },
         "phase": {
           "name": "phase",

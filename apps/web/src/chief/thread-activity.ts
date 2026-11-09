@@ -54,6 +54,7 @@ export function groupThreadEvents(
   let open: { activity: ThreadActivity } | null = null;
   for (const row of rows) {
     const { item } = row;
+    if (item.kind === 'thread-message' && item.by !== 'coordinator') continue;
     if (!isThreadEvent(item) || standalone(item)) {
       open = null;
       entries.push(row);

@@ -153,9 +153,32 @@ export const computerRecordSchema = z.object({
   scopeKey: z.string(),
   state: z.enum(COMPUTER_STATES),
   controlHolder: z.enum(COMPUTER_CONTROL_HOLDERS),
+  browserEnabled: z.boolean(),
   machine: z.object({ id: z.string(), name: z.string(), online: z.boolean() }),
 });
 export type ComputerRecord = z.infer<typeof computerRecordSchema>;
+
+export const computerPatchBodySchema = z.object({
+  browserEnabled: z.boolean(),
+});
+export type ComputerPatchBody = z.infer<typeof computerPatchBodySchema>;
+
+export const computerEnsureBodySchema = z.object({
+  machineId: z.string().min(1).max(128),
+  browserEnabled: z.boolean(),
+});
+export type ComputerEnsureBody = z.infer<typeof computerEnsureBodySchema>;
+
+export const COMPUTER_BROWSER_TOOLS = [
+  'browser_navigate',
+  'browser_snapshot',
+  'browser_act',
+] as const;
+export type ComputerBrowserTool = (typeof COMPUTER_BROWSER_TOOLS)[number];
+
+export function isComputerBrowserTool(name: string): name is ComputerBrowserTool {
+  return (COMPUTER_BROWSER_TOOLS as readonly string[]).includes(name);
+}
 
 export const COMPUTER_COMMANDS_LIMIT_DEFAULT = 50;
 export const COMPUTER_COMMANDS_LIMIT_MAX = 200;

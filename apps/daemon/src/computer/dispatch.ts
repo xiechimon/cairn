@@ -7,6 +7,7 @@ import {
 import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
+import { type BrowserToolName, runBrowserTool } from './browser.js';
 import { FramePoster } from './frame-poster.js';
 import {
   desktopProtectionGuardMessage,
@@ -26,6 +27,8 @@ import {
 export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provider';
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
 export const FILE_TRUNCATED_MARKER = '\n[file truncated]';
+export const BROWSER_TRUNCATED_MARKER = '\n[browser output truncated]';
+export const COMPUTER_FRAME_ERROR_MAX_CHARS = 4096;
 
 export const COMPUTER_COMMAND_TIMEOUT_MS = 5 * 60_000;
 export const COMPUTER_OUTPUT_CAP_CHARS = 2 * 1024 * 1024;
@@ -50,6 +53,15 @@ const ORB_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'list_files',
   'read_file',
   'write_file',
+  'browser_navigate',
+  'browser_snapshot',
+  'browser_act',
+]);
+
+const BROWSER_TOOLS: ReadonlySet<ComputerTool> = new Set([
+  'browser_navigate',
+  'browser_snapshot',
+  'browser_act',
 ]);
 
 interface Route {
@@ -373,6 +385,60 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     await poster.finish({ kind: 'done', text });
   }
 
+  function boundBrowserText(text: string): string {
+    if (text.length <= COMPUTER_FRAME_TEXT_MAX_CHARS) return text;
+    return (
+      text.slice(0, COMPUTER_FRAME_TEXT_MAX_CHARS - BROWSER_TRUNCATED_MARKER.length) +
+      BROWSER_TRUNCATED_MARKER
+    );
+  }
+
+  function boundBrowserError(message: string): string {
+    if (message.length <= COMPUTER_FRAME_ERROR_MAX_CHARS) return message;
+    return (
+      message.slice(0, COMPUTER_FRAME_ERROR_MAX_CHARS - BROWSER_TRUNCATED_MARKER.length) +
+      BROWSER_TRUNCATED_MARKER
+    );
+  }
+
+  async function handleBrowser(
+    call: ComputerCall,
+    route: Route,
+    controller: AbortController,
+  ): Promise<void> {
+    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
+      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    let text: string;
+    try {
+      text = await runBrowserTool(route.provider, call.tool as BrowserToolName, call.params, {
+        deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+        now,
+        signal: controller.signal,
+        session: call.scopeKey,
+      });
+    } catch (error) {
+      await poster.finish(
+        error instanceof ComputerRefusal
+          ? {
+              kind: 'error',
+              message: boundBrowserError(error.message),
+              delivery: error.delivery,
+            }
+          : {
+              kind: 'error',
+              message: 'The browser operation failed',
+              delivery: 'unknown',
+            },
+      );
+      return;
+    }
+    if (poster.abandoned) return;
+    await poster.finish({ kind: 'done', text: boundBrowserText(text) });
+  }
+
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
     if (call.tool === 'user_computer_observe' || call.tool === 'user_computer_act') {
       if (options.screen) await handleScreen(call, options.screen, controller);
@@ -386,6 +452,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (call.tool === 'shell' || call.tool === 'user_computer_shell') {
       await handleShell(call, route, controller);
+    } else if (BROWSER_TOOLS.has(call.tool)) {
+      await handleBrowser(call, route, controller);
     } else {
       await handleFile(call, route, controller);
     }

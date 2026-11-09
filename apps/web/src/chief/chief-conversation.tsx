@@ -18,7 +18,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useConnected } from '../api/connection-state.js';
-import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
+import { useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
@@ -175,7 +175,6 @@ export function ChiefConversation({
   const answerActive = mode === 'answer';
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
-  const membersQ = useMembers(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const skillsQ = useSkills(teamId, live);
   const machinesQ = useMachines(teamId, live);
@@ -186,14 +185,7 @@ export function ChiefConversation({
       seq: td.seqNum,
       subtitle: td.phase,
     })),
-    agent: (membersQ.data ?? [])
-      .filter((m) => m.memberType === 'agent')
-      .map((m) => ({
-        id: m.actorId,
-        label: (m.actor as { displayName?: string } | undefined)?.displayName ?? m.actorId,
-        subtitle:
-          (m.actor as { description?: string | null } | undefined)?.description ?? undefined,
-      })),
+    agent: [],
     project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
     skill: (skillsQ.data ?? []).map((s) => ({
       id: s.id,
