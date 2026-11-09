@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -163,6 +164,7 @@ function fakeWorkspace(cwd: string, diff: string | null) {
   const calls: string[] = [];
   const ws: WorktreeOps = {
     async prepare() {
+      mkdirSync(cwd, { recursive: true });
       calls.push('prepare');
       return {
         cwd,
