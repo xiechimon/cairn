@@ -36,10 +36,12 @@ import {
 import { setTodoPhase } from '../src/services/todos.js';
 import {
   bootServer,
+  pauseTeamForTest,
   postProject,
   seedRoute,
   seedSessionRoute,
   type TestServer,
+  teamPausedForTest,
 } from './helpers.js';
 
 const HEAD = 'a'.repeat(40);
@@ -878,8 +880,7 @@ test.each(['autonomy-paused', 'daily-cap'] as const)(
   '#1405 GitHub evaluation reads %s from current database policy',
   async (code) => {
     const w = await world();
-    if (code === 'autonomy-paused')
-      w.s.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, w.s.team.id)).run();
+    if (code === 'autonomy-paused') pauseTeamForTest(w.s.db, w.s.team.id);
     else {
       w.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
       const row = w.s.db.select().from(project).get();
@@ -922,7 +923,7 @@ test('closing the GitHub marker lifts autonomy-paused from server readiness', as
   const now = Date.now();
   const paused = await evaluateMergeGate(deps, buildId, { port: scriptedPort([]), now });
   expect(paused?.blockers.map((blocker) => blocker.code)).toContain('autonomy-paused');
-  expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(false);
+  expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
   markers = [];
   const resumed = await evaluateMergeGate(deps, buildId, {
     port: scriptedPort([]),

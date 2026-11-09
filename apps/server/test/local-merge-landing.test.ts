@@ -21,7 +21,7 @@ import * as appToken from '../src/services/github-app-token.js';
 import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
 import { claimStep } from '../src/services/machine-claim.js';
-import { bootServer, req, seedSessionRoute } from './helpers.js';
+import { bootServer, pauseTeamForTest, req, seedSessionRoute } from './helpers.js';
 
 const disposals: (() => void)[] = [];
 afterEach(() => {
@@ -403,7 +403,7 @@ test('a local project without a stored path fails closed instead of the legacy m
 
 test('#1405 paused local readiness blocks enqueue without task mutation', async () => {
   const f = await fixture();
-  f.s.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, f.s.team.id)).run();
+  pauseTeamForTest(f.s.db, f.s.team.id);
   const before = f.s.db.select().from(todo).all();
   const facts = await localGateFacts(f.deps, 'build', 'main');
   expect(facts?.readiness.blockers.map((b) => b.code)).toContain('autonomy-paused');
@@ -444,7 +444,7 @@ test('#1405 pause after local evaluation starts prevents issuance and announceme
     gitOps: {
       ...fakeGitOps,
       localCompareFiles: async () => {
-        f.s.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, f.s.team.id)).run();
+        pauseTeamForTest(f.s.db, f.s.team.id);
         return fakeGitOps.localCompareFiles();
       },
     },
@@ -480,7 +480,7 @@ test.each(['pause', 'cap'] as const)(
       tools: LOCAL_TOOLS,
     });
     await enqueueLocalMerge(f.deps, 'build', 'main');
-    if (brake === 'pause') f.s.db.update(team).set({ autonomyPaused: true }).run();
+    if (brake === 'pause') pauseTeamForTest(f.s.db, f.s.team.id);
     else f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
     if (brake === 'cap')
       f.s.db
@@ -508,7 +508,7 @@ test.each(['pause', 'cap'] as const)(
 test('#1405 a paused failed local card is not restored before rejecting the merge', async () => {
   const f = await fixture();
   f.s.db.update(todo).set({ phase: 'failed' }).run();
-  f.s.db.update(team).set({ autonomyPaused: true }).run();
+  pauseTeamForTest(f.s.db, f.s.team.id);
   const before = f.s.db.select().from(todo).all();
   await expect(requestMerge(f.deps, 'build')).rejects.toMatchObject({ status: 409 });
   expect(f.s.db.select().from(todo).all()).toEqual(before);
@@ -534,7 +534,7 @@ for (const brake of ['pause', 'cap'] as const) {
       tools: LOCAL_TOOLS,
     });
     await enqueueLocalMerge(f.deps, 'build', 'main');
-    if (brake === 'pause') f.s.db.update(team).set({ autonomyPaused: true }).run();
+    if (brake === 'pause') pauseTeamForTest(f.s.db, f.s.team.id);
     else
       await f.s.app.request(`/api/teams/${f.s.team.id}`, {
         method: 'PATCH',

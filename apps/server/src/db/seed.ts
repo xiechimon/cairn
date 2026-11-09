@@ -1,4 +1,4 @@
-import type { TeamRecord, UserRecord } from '@cairn/shared';
+import type { AutonomyPauseEntry, TeamRecord, UserRecord } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { Db } from './client.js';
@@ -41,7 +41,10 @@ export function toUserRecord(row: typeof user.$inferSelect): UserRecord {
   return { type: 'user', id: row.id, displayName: row.displayName, avatarUrl: row.avatarUrl };
 }
 
-export function toTeamRecord(row: typeof team.$inferSelect): TeamRecord {
+export function toTeamRecord(
+  row: typeof team.$inferSelect,
+  pauses?: AutonomyPauseEntry[],
+): TeamRecord {
   return {
     id: row.id,
     name: row.name,
@@ -49,8 +52,7 @@ export function toTeamRecord(row: typeof team.$inferSelect): TeamRecord {
     plan: row.plan,
     claudeUsage: row.claudeUsage,
     avatarStyle: row.avatarStyle,
-    autonomyPaused: row.autonomyPaused,
-    autonomyPauseReason: row.autonomyPauseReason,
+    ...(pauses === undefined ? {} : { autonomyPaused: pauses.length > 0, autonomyPauses: pauses }),
     coAuthorTrailer: row.coAuthorTrailer,
     requestInstructorReview: row.requestInstructorReview,
     maxAutonomousMergesPerDay: row.maxAutonomousMergesPerDay,

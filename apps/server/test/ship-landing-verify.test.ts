@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { build, machine, project, pushDelivery, step, team, todo } from '../src/db/schema.js';
+import { build, machine, project, pushDelivery, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from '../src/services/builds.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { finishStep } from '../src/services/machines.js';
 import { appendShipGateInstruction } from '../src/services/ship-gate.js';
-import { bootServer, insertMachine, seedSessionRoute } from './helpers.js';
+import { bootServer, insertMachine, seedSessionRoute, teamPausedForTest } from './helpers.js';
 
 const JUDGED = 'a'.repeat(40);
 const PUSHED = 'e'.repeat(40);
@@ -108,9 +108,7 @@ function world(pull: { merged: boolean; head: string }) {
 
 function expectMarkerBrake(w: { s: ReturnType<typeof world>['s']; markers: string[] }) {
   expect(w.markers).toEqual(['https://api.github.com/repos/octo/demo/issues']);
-  expect(w.s.db.select().from(team).where(eq(team.id, w.s.team.id)).get()?.autonomyPaused).toBe(
-    true,
-  );
+  expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(true);
 }
 
 function failure(s: ReturnType<typeof world>['s']) {
@@ -126,9 +124,7 @@ describe('the custom merge step is verified when it finishes', () => {
     const { s, machineId, deps } = world({ merged: true, head: JUDGED });
     await finishStep(deps, machineId, 'm1', { status: 'success' });
     expect(stepRow(s)?.status).toBe('done');
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
   });
 
   test('success reported with an unchanged head but no merge: the step fails without the brake', async () => {
@@ -136,9 +132,7 @@ describe('the custom merge step is verified when it finishes', () => {
     await finishStep(deps, machineId, 'm1', { status: 'success' });
     expect(stepRow(s)?.status).toBe('failed');
     expect(failure(s)).toMatch(/PR is not merged/);
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
   });
 
   test('a failed report with an unchanged unmerged head is an ordinary failure', async () => {
@@ -165,9 +159,7 @@ describe('the custom merge step is verified when it finishes', () => {
     const row = stepRow(s);
     expect(row?.status).toBe('failed');
     expect(failure(s)).toMatch(/head-moved/);
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
   });
 
   test('an unreadable PR cannot be verified: the step fails closed', async () => {
@@ -212,9 +204,7 @@ describe('an abandoned custom merge step is verified without a finish report', (
     abandon(s);
     await sweepAbandonedShipSteps(deps, Date.now());
     expect(stepRow(s)?.status).toBe('pending');
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
     expect(s.db.select().from(pushDelivery).all()).toHaveLength(0);
   });
 

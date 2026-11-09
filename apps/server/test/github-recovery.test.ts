@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { autonomousMergeAdmission, build, project, team, todo } from '../src/db/schema.js';
+import { autonomousMergeAdmission, build, project, todo } from '../src/db/schema.js';
 import type { AutonomousToken } from '../src/lib/github-token.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { prepareRecoveryBranch } from '../src/services/github-recovery.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer, postProject } from './helpers.js';
+import { bootServer, postProject, teamPausedForTest } from './helpers.js';
 
 test('recovery publishes one exact revert commit on a named branch and preserves later changes', async () => {
   const dir = makeTestTempDir('server-recovery-');
@@ -178,9 +178,7 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
           path: `/repos/${repo}/issues`,
           body: expect.objectContaining({ labels: ['autonomy-paused'] }),
         });
-      expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-        true,
-      );
+      expect(teamPausedForTest(s.db, s.team.id)).toBe(true);
       expect(identities.length).toBeGreaterThan(0);
       expect(identities.every(Boolean)).toBe(true);
       if (reason !== null) {

@@ -1,10 +1,11 @@
-import type { AutonomyPauseMarker } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import type { AutonomyPauseEntry, AutonomyPauseMarker, AutonomyPauseSource } from '@cairn/shared';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { project, team } from '../db/schema.js';
+import { autonomyPause, project } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubApiBaseUrl } from '../lib/github-api-base.js';
 import { type GithubWriteToken, githubTokenFetch } from '../lib/github-token.js';
+import { newRecordId } from '../lib/ids.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { type GithubTokenDeps, userTokenOrNull } from './github-connection.js';
@@ -101,35 +102,84 @@ export async function pauseGithubRepo(
   return number;
 }
 
-export function pauseTeamGithubRepos(deps: GithubTokenDeps, teamId: string): Promise<void> {
-  return pauseTeamGithubReposAutonomously(
-    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
-    teamId,
-    'Paused by the team owner.',
+type PauseDeps = GithubTokenDeps & {
+  db: Db;
+  githubWriteTokenForRepo?: (
+    teamId: string,
+    repo: { owner: string; repo: string },
+  ) => Promise<GithubWriteToken | null>;
+};
+
+export function openAutonomyPauses(db: Db, teamId: string): AutonomyPauseEntry[] {
+  return db
+    .select()
+    .from(autonomyPause)
+    .where(and(eq(autonomyPause.teamId, teamId), isNull(autonomyPause.resolvedAt)))
+    .orderBy(asc(autonomyPause.openedAt))
+    .all()
+    .map((row) => ({
+      id: row.id,
+      source: row.source,
+      reason: row.reason,
+      publishError: row.publishError,
+      openedAt: row.openedAt,
+    }));
+}
+
+export function teamAutonomyPaused(db: Pick<Db, 'select'>, teamId: string): boolean {
+  return (
+    db
+      .select({ id: autonomyPause.id })
+      .from(autonomyPause)
+      .where(and(eq(autonomyPause.teamId, teamId), isNull(autonomyPause.resolvedAt)))
+      .get() !== undefined
   );
 }
 
-export async function pauseTeamGithubReposAutonomously(
-  deps: GithubTokenDeps & {
-    db: Db;
-    githubWriteTokenForRepo?: (
-      teamId: string,
-      repo: { owner: string; repo: string },
-    ) => Promise<GithubWriteToken | null>;
-  },
+export function resumeAutonomyPauses(db: Db, teamId: string, now = Date.now()): void {
+  db.update(autonomyPause)
+    .set({ resolvedAt: now, resolvedBy: 'owner' })
+    .where(and(eq(autonomyPause.teamId, teamId), isNull(autonomyPause.resolvedAt)))
+    .run();
+}
+
+export function pauseTeamGithubRepos(deps: GithubTokenDeps, teamId: string): Promise<void> {
+  return pauseTeamAutonomy(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    teamId,
+    { source: 'settings', reason: 'Paused by the team owner.' },
+  );
+}
+
+export async function pauseTeamAutonomy(
+  deps: PauseDeps,
   teamId: string,
-  reason = 'Autonomous merging paused through Cairn.',
+  request: { source: AutonomyPauseSource; reason: string },
 ): Promise<void> {
-  const row = deps.db.select().from(team).where(eq(team.id, teamId)).get();
-  const prior =
-    row?.autonomyPaused === true && row.autonomyPauseReason !== null
-      ? { reason: row.autonomyPauseReason, markers: row.autonomyPauseMarkers ?? [] }
-      : null;
-  const reasonText = prior === null ? reason : `${prior.reason}\n${reason}`;
+  const duplicate = deps.db
+    .select({ id: autonomyPause.id })
+    .from(autonomyPause)
+    .where(
+      and(
+        eq(autonomyPause.teamId, teamId),
+        eq(autonomyPause.source, request.source),
+        eq(autonomyPause.reason, request.reason),
+        isNull(autonomyPause.resolvedAt),
+      ),
+    )
+    .get();
+  if (duplicate !== undefined) return;
+  const id = newRecordId();
   deps.db
-    .update(team)
-    .set({ autonomyPaused: true, autonomyPauseReason: reasonText, autonomyPauseMarkers: [] })
-    .where(eq(team.id, teamId))
+    .insert(autonomyPause)
+    .values({
+      id,
+      teamId,
+      source: request.source,
+      reason: request.reason,
+      markers: [],
+      openedAt: Date.now(),
+    })
     .run();
   const repos = teamGithubRepos(deps.db, teamId);
   const results = await Promise.allSettled(
@@ -142,7 +192,7 @@ export async function pauseTeamGithubReposAutonomously(
       const repo = `${ref.owner}/${ref.repo}`;
       return {
         repo,
-        number: await pauseGithubRepo(deps.githubFetch ?? fetch, token, repo, reason),
+        number: await pauseGithubRepo(deps.githubFetch ?? fetch, token, repo, request.reason),
       };
     }),
   );
@@ -151,32 +201,28 @@ export async function pauseTeamGithubReposAutonomously(
       ? [result.reason instanceof Error ? result.reason.message : String(result.reason)]
       : [],
   );
-  const published = results.flatMap((result) =>
-    result.status === 'fulfilled' ? [result.value] : [],
-  );
-  const clearable =
-    repos.length > 0 && failures.length === 0 && (prior === null || prior.markers.length > 0);
-  const markers = clearable
-    ? [...(prior?.markers ?? []), ...published].filter(
-        (marker, index, all) =>
-          all.findIndex((m) => m.repo === marker.repo && m.number === marker.number) === index,
-      )
-    : [];
+  const publishError =
+    repos.length === 0
+      ? 'the team has no GitHub repository to publish a marker to'
+      : failures.length > 0
+        ? failures.join('; ')
+        : null;
   deps.db
-    .update(team)
-    .set({
-      autonomyPaused: true,
-      autonomyPauseReason:
-        failures.length === 0
-          ? reasonText
-          : `${reasonText}\nCouldn't publish brake marker: ${failures.join('; ')}`,
-      autonomyPauseMarkers: markers,
-    })
-    .where(eq(team.id, teamId))
+    .update(autonomyPause)
+    .set(
+      publishError === null
+        ? {
+            markers: results.flatMap((result) =>
+              result.status === 'fulfilled' ? [result.value] : [],
+            ),
+          }
+        : { publishError },
+    )
+    .where(eq(autonomyPause.id, id))
     .run();
   if (failures.length > 0)
     throw new Error(
-      'Some GitHub pause markers could not be published; the team stays paused until resumed',
+      'Some GitHub pause markers could not be published; the pause stays until the owner resumes it',
     );
 }
 
@@ -214,22 +260,21 @@ async function markerClosed(
 }
 
 export async function syncAutonomyPauses(deps: GithubTokenDeps & { db: Db }): Promise<void> {
-  const paused = deps.db.select().from(team).where(eq(team.autonomyPaused, true)).all();
-  for (const row of paused) {
-    const markers = row.autonomyPauseMarkers ?? [];
-    if (markers.length === 0) continue;
-    const closed = await Promise.all(markers.map((marker) => markerClosed(deps, row.id, marker)));
+  const open = deps.db
+    .select()
+    .from(autonomyPause)
+    .where(and(isNull(autonomyPause.resolvedAt), isNull(autonomyPause.publishError)))
+    .all();
+  for (const entry of open) {
+    if (entry.markers.length === 0) continue;
+    const closed = await Promise.all(
+      entry.markers.map((marker) => markerClosed(deps, entry.teamId, marker)),
+    );
     if (!closed.every(Boolean)) continue;
     deps.db
-      .update(team)
-      .set({ autonomyPaused: false, autonomyPauseReason: null, autonomyPauseMarkers: null })
-      .where(
-        and(
-          eq(team.id, row.id),
-          eq(team.autonomyPaused, true),
-          eq(team.autonomyPauseReason, row.autonomyPauseReason ?? ''),
-        ),
-      )
+      .update(autonomyPause)
+      .set({ resolvedAt: Date.now(), resolvedBy: 'markers' })
+      .where(and(eq(autonomyPause.id, entry.id), isNull(autonomyPause.resolvedAt)))
       .run();
   }
 }

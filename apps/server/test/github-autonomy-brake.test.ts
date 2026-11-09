@@ -1,11 +1,18 @@
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { projectMergeConfigSchema } from '@cairn/shared';
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import { project } from '../src/db/schema.js';
 import type { AutonomousToken } from '../src/lib/github-token.js';
 import { autonomousMergePolicy } from '../src/services/autonomous-merge.js';
 import {
   pauseGithubRepo,
-  pauseTeamGithubReposAutonomously,
+  pauseTeamAutonomy,
   readGithubAutonomyPause,
   syncAutonomyPauses,
 } from '../src/services/github-autonomy-brake.js';
@@ -17,15 +24,19 @@ import { bootServer, req } from './helpers.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-function teamMarkersWorld(opts: { postsFail?: boolean } = {}) {
+function teamMarkersWorld() {
   const issues = new Map<string, { repo: string; number: number; open: boolean }>();
   let next = 7;
+  let postsFail = false;
+  const gates: (() => Promise<void>)[] = [];
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = new URL(String(input));
     const parts = url.pathname.split('/');
     const repo = parts.slice(2, 4).join('/');
     if (url.pathname.endsWith('/issues') && init?.method === 'POST') {
-      if (opts.postsFail === true) return new Response('', { status: 403 });
+      const gate = gates.shift();
+      if (gate !== undefined) await gate();
+      if (postsFail) return new Response('', { status: 403 });
       const marker = { repo, number: next++, open: true };
       issues.set(`${repo}#${marker.number}`, marker);
       return Response.json({ number: marker.number });
@@ -66,79 +77,181 @@ function teamMarkersWorld(opts: { postsFail?: boolean } = {}) {
   );
   stubGithubApp(null);
   const deps = { ...s.svc, box: s.secretBox, githubFetch: fetchImpl };
-  const localPaused = () =>
-    autonomousMergePolicy(
-      s.db,
-      s.team.id,
-      projectMergeConfigSchema.parse({ mergePolicy: 'autonomous' }),
-    ).autonomyPaused;
-  const closeAll = () => {
-    for (const issue of issues.values()) issue.open = false;
+  return {
+    s,
+    deps,
+    issues,
+    paused: () =>
+      autonomousMergePolicy(
+        s.db,
+        s.team.id,
+        projectMergeConfigSchema.parse({ mergePolicy: 'autonomous' }),
+      ).autonomyPaused,
+    closeAll: () => {
+      for (const issue of issues.values()) issue.open = false;
+    },
+    failPosts: (fail: boolean) => {
+      postsFail = fail;
+    },
+    holdNextPost: () => {
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      gates.push(() => held);
+      return release;
+    },
   };
-  return { s, deps, issues, localPaused, closeAll };
 }
 
-test('a team pause publishes a marker to every team repository and pauses local projects; closing the published markers resumes them all', async () => {
+test('main red in repo A pauses repo B and the local projects; closing every published marker resumes them', async () => {
   const w = teamMarkersWorld();
   try {
-    await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id, 'Main check failed in octo/alpha.');
+    await pauseTeamAutonomy(w.deps, w.s.team.id, {
+      source: 'main-red',
+      reason: 'Main check failed in octo/alpha.',
+    });
     expect([...w.issues.values()].map((issue) => issue.repo).sort()).toEqual([
       'octo/alpha',
       'octo/beta',
     ]);
-    expect(w.localPaused()).toBe(true);
+    expect(w.paused()).toBe(true);
     const first = [...w.issues.values()][0];
     if (first) first.open = false;
     await syncAutonomyPauses(w.deps);
-    expect(w.localPaused()).toBe(true);
+    expect(w.paused()).toBe(true);
     w.closeAll();
     await syncAutonomyPauses(w.deps);
-    expect(w.localPaused()).toBe(false);
+    expect(w.paused()).toBe(false);
   } finally {
     w.s.dispose();
   }
 });
 
-test('a rejected marker publication keeps the team paused with the reason, even when reads find no open marker', async () => {
-  const w = teamMarkersWorld({ postsFail: true });
+test('a rejected publication stays paused through empty reads until the owner resumes, and names the error', async () => {
+  const w = teamMarkersWorld();
   try {
+    w.failPosts(true);
     await expect(
-      pauseTeamGithubReposAutonomously(w.deps, w.s.team.id, 'Unjudged landing.'),
+      pauseTeamAutonomy(w.deps, w.s.team.id, { source: 'unjudged-landing', reason: 'Unjudged.' }),
     ).rejects.toThrow();
     await syncAutonomyPauses(w.deps);
     await syncAutonomyPauses(w.deps);
-    expect(w.localPaused()).toBe(true);
-    const record = await req(w.s.app, 'GET', '/api/teams');
-    expect(JSON.stringify(await record.json())).toContain("Couldn't publish brake marker");
+    expect(w.paused()).toBe(true);
+    const teams = (await (await req(w.s.app, 'GET', '/api/teams')).json()) as {
+      autonomyPaused: boolean;
+      autonomyPauses: { publishError: string | null }[];
+    }[];
+    expect(teams[0]?.autonomyPaused).toBe(true);
+    expect(teams[0]?.autonomyPauses[0]?.publishError).toContain('403');
+    expect(
+      (
+        await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, {
+          autonomyPaused: false,
+        })
+      ).status,
+    ).toBe(200);
+    expect(w.paused()).toBe(false);
   } finally {
     w.s.dispose();
   }
 });
 
-test('the owner resumes a pause whose markers could not be published', async () => {
-  const w = teamMarkersWorld({ postsFail: true });
-  try {
-    await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id).catch(() => undefined);
-    const resumed = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, {
-      autonomyPaused: false,
-    });
-    expect(resumed.status).toBe(200);
-    expect(w.localPaused()).toBe(false);
-  } finally {
-    w.s.dispose();
-  }
-});
-
-test('an unreadable published marker keeps the team paused', async () => {
+test('a successful pause finishing after a failed concurrent pause cannot resume the failed one', async () => {
   const w = teamMarkersWorld();
   try {
-    await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id);
+    const release = w.holdNextPost();
+    const slow = pauseTeamAutonomy(w.deps, w.s.team.id, {
+      source: 'main-red',
+      reason: 'Main check failed in octo/alpha.',
+    });
+    await vi.waitFor(() => expect(w.issues.size).toBe(1));
+    w.failPosts(true);
+    await expect(
+      pauseTeamAutonomy(w.deps, w.s.team.id, { source: 'unjudged-landing', reason: 'Unjudged.' }),
+    ).rejects.toThrow();
+    w.failPosts(false);
+    release();
+    await slow;
     w.closeAll();
-    w.issues.clear();
     await syncAutonomyPauses(w.deps);
-    expect(w.localPaused()).toBe(true);
+    expect(w.paused()).toBe(true);
   } finally {
     w.s.dispose();
+  }
+});
+
+test('after the owner resumes a failed pause, a new settings pause resumes once its markers close', async () => {
+  const w = teamMarkersWorld();
+  try {
+    w.failPosts(true);
+    await pauseTeamAutonomy(w.deps, w.s.team.id, {
+      source: 'settings',
+      reason: 'Paused by the team owner.',
+    }).catch(() => undefined);
+    await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, { autonomyPaused: false });
+    w.failPosts(false);
+    await pauseTeamAutonomy(w.deps, w.s.team.id, {
+      source: 'settings',
+      reason: 'Paused by the team owner.',
+    });
+    expect(w.paused()).toBe(true);
+    w.closeAll();
+    await syncAutonomyPauses(w.deps);
+    expect(w.paused()).toBe(false);
+  } finally {
+    w.s.dispose();
+  }
+});
+
+test('an unreadable published marker keeps the pause', async () => {
+  const w = teamMarkersWorld();
+  try {
+    await pauseTeamAutonomy(w.deps, w.s.team.id, { source: 'settings', reason: 'Paused.' });
+    w.issues.clear();
+    await syncAutonomyPauses(w.deps);
+    expect(w.paused()).toBe(true);
+  } finally {
+    w.s.dispose();
+  }
+});
+
+test('the migration turns a legacy team pause into an open entry the owner resume clears', () => {
+  const journal = JSON.parse(
+    readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+  ) as { entries: { tag: string }[] };
+  const directory = makeTestTempDir('cairn-autonomy-pause-migration-');
+  const sqlite = new Database(join(directory, 'db.sqlite'));
+  try {
+    const cut = journal.entries.findIndex((entry) => entry.tag.endsWith('_autonomy_pause_entries'));
+    expect(cut).toBeGreaterThan(0);
+    const prior = join(directory, 'prior');
+    mkdirSync(join(prior, 'meta'), { recursive: true });
+    const entries = journal.entries.slice(0, cut);
+    writeFileSync(join(prior, 'meta/_journal.json'), JSON.stringify({ ...journal, entries }));
+    for (const entry of entries)
+      copyFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(prior, `${entry.tag}.sql`));
+    const db = drizzle(sqlite);
+    migrate(db, { migrationsFolder: prior });
+    sqlite.exec(
+      "INSERT INTO team (id, name, createdAt, autonomyPaused) VALUES ('latched', 'Latched', 1, 1), ('open', 'Open', 1, 0)",
+    );
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(
+      sqlite
+        .prepare('SELECT teamId, source, reason, markers, resolvedAt FROM autonomy_pause')
+        .all(),
+    ).toEqual([
+      {
+        teamId: 'latched',
+        source: 'legacy',
+        reason: 'legacy pause (no marker)',
+        markers: '[]',
+        resolvedAt: null,
+      },
+    ]);
+  } finally {
+    sqlite.close();
   }
 });
 

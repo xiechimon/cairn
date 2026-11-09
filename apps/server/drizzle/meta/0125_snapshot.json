@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "31e54020-8ed4-4998-b1a4-8ba21e6617e2",
+  "id": "5589dc45-8664-4343-9192-4d8a87496bf0",
   "prevId": "e0041d67-d2f8-4b7a-b89e-62605646e562",
   "tables": {
     "agent_memory": {
@@ -422,6 +422,102 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "autonomy_pause": {
+      "name": "autonomy_pause",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "markers": {
+          "name": "markers",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "publishError": {
+          "name": "publishError",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "openedAt": {
+          "name": "openedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "resolvedAt": {
+          "name": "resolvedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolvedBy": {
+          "name": "resolvedBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "autonomy_pause_team_resolved_idx": {
+          "name": "autonomy_pause_team_resolved_idx",
+          "columns": [
+            "teamId",
+            "resolvedAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "autonomy_pause_teamId_team_id_fk": {
+          "name": "autonomy_pause_teamId_team_id_fk",
+          "tableFrom": "autonomy_pause",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -5559,28 +5655,6 @@
         },
         "avatarStyle": {
           "name": "avatarStyle",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "autonomyPaused": {
-          "name": "autonomyPaused",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "autonomyPauseReason": {
-          "name": "autonomyPauseReason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "autonomyPauseMarkers": {
-          "name": "autonomyPauseMarkers",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

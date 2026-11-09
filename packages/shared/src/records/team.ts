@@ -13,6 +13,23 @@ export const autonomyPauseMarkerSchema = z.object({
 });
 export type AutonomyPauseMarker = z.infer<typeof autonomyPauseMarkerSchema>;
 
+export const AUTONOMY_PAUSE_SOURCES = [
+  'settings',
+  'main-red',
+  'unjudged-landing',
+  'legacy',
+] as const;
+export type AutonomyPauseSource = (typeof AUTONOMY_PAUSE_SOURCES)[number];
+
+export const autonomyPauseEntrySchema = z.object({
+  id: z.string(),
+  source: z.enum(AUTONOMY_PAUSE_SOURCES),
+  reason: z.string(),
+  publishError: z.string().nullable(),
+  openedAt: epochMs,
+});
+export type AutonomyPauseEntry = z.infer<typeof autonomyPauseEntrySchema>;
+
 export const teamRecordSchema = z.object({
   id: recordId,
   name: z.string(),
@@ -21,7 +38,7 @@ export const teamRecordSchema = z.object({
   claudeUsage: claudeUsageSchema.optional(),
   avatarStyle: z.string().nullable(),
   autonomyPaused: z.boolean().optional(),
-  autonomyPauseReason: z.string().nullable().optional(),
+  autonomyPauses: z.array(autonomyPauseEntrySchema).optional(),
   coAuthorTrailer: z.boolean().default(true),
   requestInstructorReview: z.boolean().default(false),
   maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),

@@ -10,7 +10,7 @@ import { type AutonomousToken, isAppToken } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
-import { brakeRequest, pauseTeamGithubReposAutonomously } from './github-autonomy-brake.js';
+import { brakeRequest, pauseTeamAutonomy } from './github-autonomy-brake.js';
 
 export async function prepareRecoveryBranch(input: {
   url: string;
@@ -160,11 +160,10 @@ export async function recoverRedAutonomousMain(
       .filter((check) => check.name === 'check' && check.app?.slug === 'github-actions')
       .sort((a, b) => b.id - a.id)[0];
     if (latest?.status !== 'completed' || latest.conclusion !== 'failure') continue;
-    await pauseTeamGithubReposAutonomously(
-      { ...deps, githubFetch: fetchImpl },
-      row.admission.teamId,
-      `Main check failed at ${main} in ${repo}.`,
-    ).catch(() => undefined);
+    await pauseTeamAutonomy({ ...deps, githubFetch: fetchImpl }, row.admission.teamId, {
+      source: 'main-red',
+      reason: `Main check failed at ${main} in ${repo}.`,
+    }).catch(() => undefined);
     const pull = await githubPull(fetchImpl, token, target.owner, target.repo, row.build.prNumber);
     const reverted = pull?.pull?.mergeCommitSha;
     if (!reverted || !isFullSha(reverted)) continue;

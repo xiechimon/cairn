@@ -23,7 +23,14 @@ import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { type Answer, mergeGithubFake, type PullFake, type Recorded } from './fakes/github.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  pauseTeamForTest,
+  req,
+  seedSessionRoute,
+  type TestServer,
+  teamPausedForTest,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -1453,11 +1460,7 @@ describe('#1405 autonomy brakes at the GitHub write boundary', () => {
   test('a pause introduced during the PR read returns HTTP 409 without a PUT or task writes', async () => {
     const w = makeWorld();
     w.fake.onGet = () => {
-      w.s.db
-        .update(teamTable)
-        .set({ autonomyPaused: true })
-        .where(eq(teamTable.id, w.s.team.id))
-        .run();
+      pauseTeamForTest(w.s.db, w.s.team.id);
     };
     const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
     expect(response.status).toBe(409);
@@ -1491,11 +1494,7 @@ describe('#1405 autonomy brakes at the GitHub write boundary', () => {
 
   test('human policy remains available while paused and at a zero autonomous cap', async () => {
     const w = makeWorld({ mergePolicy: 'human' });
-    w.s.db
-      .update(teamTable)
-      .set({ autonomyPaused: true })
-      .where(eq(teamTable.id, w.s.team.id))
-      .run();
+    pauseTeamForTest(w.s.db, w.s.team.id);
     w.s.db
       .update(projectTable)
       .set({
@@ -1749,15 +1748,11 @@ test.each(['open', 'network', 'malformed'] as const)(
         : mode === 'network'
           ? 'network'
           : { status: 200, body: {} };
-    expect(
-      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
-    ).toBe(false);
+    expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(false);
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.message).toContain('autonomy-paused');
     expect(w.fake.puts()).toHaveLength(0);
-    expect(
-      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
-    ).toBe(false);
+    expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(false);
     expectUntouched(w);
   },
 );
