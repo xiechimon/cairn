@@ -14,6 +14,7 @@ queue_rules:
       - check-success = commit-author
       - check-success = @github-actions/review-gate
       - check-success = merge-route
+      - check-success = pr-size
       - or:
           - check-success = check
           - check-skipped = check
@@ -56,7 +57,9 @@ queue_rules:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
     merge_method: squash
-    batch_size: 5
+    batch_size:
+      min: 1
+      max: 4
     batch_max_wait_time: 0 s
     max_checks_retries: 1
     branch_protection_injection_mode: none
@@ -76,6 +79,7 @@ queue_rules:
       - check-success = commit-author
       - check-success = @github-actions/review-gate
       - check-success = merge-route
+      - check-success = pr-size
       - or:
           - check-success = check
           - check-skipped = check
@@ -118,7 +122,9 @@ queue_rules:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
     merge_method: squash
-    batch_size: 5
+    batch_size:
+      min: 1
+      max: 4
     batch_max_wait_time: 0 s
     max_checks_retries: 1
     branch_protection_injection_mode: none
@@ -128,9 +134,7 @@ merge_protections_settings:
 commands_restrictions:
   dequeue:
     conditions:
-      - or:
-          - sender-permission >= write
-          - sender = github-actions[bot]
+      - sender-permission >= write
 merge_queue:
   mode: parallel
   max_parallel_checks: 3
