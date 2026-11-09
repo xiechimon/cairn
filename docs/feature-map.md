@@ -15,14 +15,14 @@
 
 | Item | Count |
 |---|---|
-| Features | 54 |
-| status shipped | 45 |
+| Features | 53 |
+| status shipped | 44 |
 | status partial | 7 |
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 19 |
 | Research gaps | 17 |
-| Frontend design gaps | 23 |
-| Backend design gaps | 21 |
+| Frontend design gaps | 22 |
+| Backend design gaps | 20 |
 | notes cited but not on main | 21 |
 
 ## Coverage
@@ -70,8 +70,7 @@
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
 | [MCP servers](#mcp-servers) | 3 | shipped | gap | yes | yes | B9 |
-| [Project files](#project-files) | 3 | shipped | yes | gap | gap | B8 |
-| [Projects](#projects) | 3 | shipped | yes (not on main) | yes | yes |  |
+| [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
 | [Scheduled tasks](#schedules) | 3 | shipped | gap | gap | gap | B7 |
@@ -157,7 +156,6 @@ Everything typed or attached before a message is sent and the files a project sh
 |---|---|---|
 | [Attachments](#attachments) | 3 | Research: no note on attachment handling in reference products<br>Frontend design: attachment cards and previews have no design |
 | [Composer](#composer) | 3 | Research: no note comparing composers in claude.ai, Amp and t3code<br>Backend design: no design for server drafts (D110) and named prompts |
-| [Project files](#project-files) | 3 | Frontend design: the files tab has no design<br>Backend design: no design for reading files and commits from local and hosted repos |
 
 ### B9 · Execution settings: skills, MCP, harness profile, quota wait
 
@@ -260,9 +258,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.
+**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.
 
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md)
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 - Backend design: [docs/design/memory-backend.md](design/memory-backend.md), [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 
@@ -530,19 +528,11 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 
-### project-files
-
-**Project files** (shipped). The remaining project file tree and viewer, pending retirement in #3479.
-
-- Research: [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md)
-- Frontend design: **gap**: the files tab has no design
-- Backend design: **gap**: no design for reading files and commits from local and hosted repos
-
 ### projects
 
 **Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive and delete.
 
-- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main)
+- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 

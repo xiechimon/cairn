@@ -156,19 +156,9 @@ test('autonomy card: save failure is visible', async ({ page }) => {
   await expect(page.getByText('保存失败，请重试。')).toBeVisible();
 });
 
-test('project page: a github-backed project opens on the tasks tab, not the placeholder files tab', async ({
-  page,
-}) => {
+test('project tasks: a github-backed project has no file tab, even with a stale tab query', async ({ page }) => {
   await stubWorld(page);
-  await page.goto(`/app/project/${GITHUB_PROJECT_ID}/files`);
-  await expect(page.getByText('GitHub 仓库项目的文件在 GitHub 上查看')).toHaveCount(0);
-  await expect(page.locator('.page-tabs-group').getByRole('tab', { name: '任务' })).toHaveAttribute('aria-selected', 'true');
-});
-
-test('project page: an explicit ?tab=files still opens the files tab on a github-backed project', async ({
-  page,
-}) => {
-  await stubWorld(page);
-  await page.goto(`/app/project/${GITHUB_PROJECT_ID}/files?tab=files`);
-  await expect(page.locator('.page-tabs-group').getByRole('tab', { name: '文件' })).toHaveAttribute('aria-selected', 'true');
+  await page.goto(`/app/project/${GITHUB_PROJECT_ID}/tasks?tab=files`);
+  await expect(page.getByRole('textbox', { name: '搜索任务' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '文件', exact: true })).toHaveCount(0);
 });

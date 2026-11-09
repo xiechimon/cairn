@@ -1,4 +1,4 @@
-import { conversationBranch, type Phase } from '@cairn/shared';
+import { conversationBranch, type Phase, type StepPromptOrigin } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -14,6 +14,7 @@ import {
   CI_EMPTY_CHECKS_GRACE_MS,
   CI_FIX_PROMPT_HEAD,
   CI_MERGE_CONFLICT_PROMPT_HEAD,
+  CI_MERGE_CONFLICT_ROUNDS_MAX,
   createCiPoller,
 } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -198,7 +199,12 @@ interface World {
   phase(): Phase;
   setPhase(p: Phase): void;
   systemRows(): string[];
-  steps(): { kind: string; status: string; prompt: string | null }[];
+  steps(): {
+    kind: string;
+    status: string;
+    prompt: string | null;
+    promptOrigin: StepPromptOrigin | null;
+  }[];
   poller: ReturnType<typeof createCiPoller>;
 }
 
@@ -311,7 +317,12 @@ function makeWorld(
         .where(eq(stepTable.buildId, buildId))
         .all()
         .filter((r) => r.id !== `step-b-${rnd}`)
-        .map((r) => ({ kind: r.kind, status: r.status, prompt: r.prompt })),
+        .map((r) => ({
+          kind: r.kind,
+          status: r.status,
+          prompt: r.prompt,
+          promptOrigin: r.promptOrigin,
+        })),
   };
 }
 
@@ -651,6 +662,11 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(prompt).toContain('origin/main');
     expect(prompt).toContain('force-push');
     expect(prompt).toContain('PR #201');
+    expect(conflictSteps(w)[0]?.promptOrigin).toEqual({
+      kind: 'merge-conflict',
+      round: 1,
+      roundsMax: CI_MERGE_CONFLICT_ROUNDS_MAX,
+    });
     expect(fixSteps(w)).toEqual([]);
     expect(w.phase()).toBe('building');
   });

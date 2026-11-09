@@ -224,13 +224,16 @@
     {
       "id": "memory",
       "name": "Memory",
-      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.",
-      "states": "Coordinator settings list the memories in use; a memory can be deleted or promoted from project to team.",
+      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.",
+      "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned D123 replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-settings.tsx"
+          "apps/web/src/chief/chief-settings.tsx",
+          "apps/web/src/chief/memory-panel.tsx",
+          "apps/web/src/chief/memory-list.ts",
+          "apps/web/src/board/project-instructions-field.tsx"
         ],
         "server": [
           "apps/server/src/services/memory.ts",
@@ -250,7 +253,8 @@
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",
         "docs/research/research-loop-plan.md",
-        "docs/research/memory-2026-11-08.md"
+        "docs/research/memory-2026-11-08.md",
+        "docs/research/memory-inplace-edit-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/design/memory-inplace-edit.md"
@@ -260,6 +264,8 @@
         "docs/design/memory-inplace-edit.md"
       ],
       "evidence": [
+        "apps/web/e2e/chief-memory.spec.ts",
+        "apps/web/test/memory-list.test.ts",
         "apps/server/test/memory-consolidation.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"
@@ -1531,6 +1537,7 @@
       "code": {
         "web": [
           "apps/web/src/pages/project-new-page.tsx",
+          "apps/web/src/pages/project-page.tsx",
           "apps/web/src/pages/project-settings-page.tsx",
           "apps/web/src/board/project-home.tsx"
         ],
@@ -1543,6 +1550,7 @@
         "web": [
           "/app/project/new",
           "/app/project/:id",
+          "/app/project/:id/tasks",
           "/app/project/:id/settings"
         ],
         "server": [
@@ -1551,6 +1559,11 @@
           "/api/projects/:id/${action}",
           "/api/projects/:id/autonomy",
           "/api/projects/:id/branches",
+          "/api/projects/:id/file",
+          "/api/projects/:id/files",
+          "/api/projects/:id/tree",
+          "/api/projects/:id/commits",
+          "/api/projects/:id/commits/:sha",
           "/api/fs/list",
           "/api/fs/pick"
         ]
@@ -1558,6 +1571,7 @@
       "reach": [
         "open /app/project/new",
         "click testid:github-picker",
+        "open /app/project/<id of a project listed by the projects API>/tasks",
         "open /app/project/<id of a project listed by the projects API>/settings",
         "click testid:project-instructions-input"
       ],
@@ -1567,7 +1581,8 @@
         ".claude/skills/verify-cairn/features/local-repo-api.md"
       ],
       "research": [
-        "docs/research/project-coordinators.md"
+        "docs/research/project-coordinators.md",
+        "docs/research/project-files-retirement-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md",
@@ -1581,55 +1596,6 @@
         "apps/web/e2e/project-settings-autonomy.spec.ts",
         "apps/server/test/project-delete.test.ts"
       ]
-    },
-    {
-      "id": "project-files",
-      "name": "Project files",
-      "summary": "The remaining project file tree and viewer, pending retirement in #3479.",
-      "states": "A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.",
-      "centrality": 3,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/pages/project-page.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-projects.ts"
-        ]
-      },
-      "routes": {
-        "web": [
-          "/app/project/:id/files"
-        ],
-        "server": [
-          "/api/projects/:id/file",
-          "/api/projects/:id/files",
-          "/api/projects/:id/tree",
-          "/api/projects/:id/commits",
-          "/api/projects/:id/commits/:sha"
-        ]
-      },
-      "reach": [
-        "open /app/project/<id of a project listed by the projects API>/files"
-      ],
-      "verify": [
-        ".claude/skills/verify-cairn/features/project-files-drill.md",
-        ".claude/skills/verify-cairn/features/project-files-local.md"
-      ],
-      "research": [
-        "docs/research/project-files-retirement-2026-11-09.md"
-      ],
-      "frontendDesign": {
-        "gap": "the files tab has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for reading files and commits from local and hosted repos"
-      },
-      "evidence": [
-        "apps/web/e2e/project-files-tree.spec.ts",
-        "apps/web/e2e/project-commit-detail.spec.ts"
-      ],
-      "batch": "B8"
     },
     {
       "id": "github",

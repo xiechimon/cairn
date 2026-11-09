@@ -66,7 +66,7 @@ describe('spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wi
       title: '',
       spec: '394 占位标题探针\n\n现在的情况：第二行不进标题',
     });
-    await page.goto(`${server.url}/app/project/${projectId}/files?tab=tasks`);
+    await page.goto(`${server.url}/app/project/${projectId}/tasks`);
     await pexpect(page.getByRole('link', { name: '394 占位标题探针' })).toBeVisible({
       timeout: 30_000,
     });
