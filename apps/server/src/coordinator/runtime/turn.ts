@@ -3,6 +3,7 @@ import {
   estimateTokens,
   type MachineDoneBody,
   type ModelUsage,
+  type OtelObservation,
 } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage, ModelThinkingLevel } from '@earendil-works/pi-ai';
@@ -94,8 +95,9 @@ export async function runCoordinatorTurn(
 ): Promise<MachineDoneBody> {
   const { harness, api, context } = deps;
   const stepId = claimed.step.id;
+  let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
-    await api.done(stepId, body);
+    await api.done(stepId, body, observation);
     return body;
   };
   const provider = claimed.agent?.provider ?? null;
@@ -208,6 +210,28 @@ export async function runCoordinatorTurn(
         ? []
         : (await root.entries({ minEntryId: settled.entry }, 500, undefined, context)).items;
     await mirror.flush(turnEntries);
+    const ordered = [...turnEntries].sort((a, b) => Number(a.id) - Number(b.id));
+    observation = {
+      input: ordered.flatMap((entry) =>
+        (entry.model ?? [])
+          .filter((message) => message.role === 'user')
+          .map((message) => ({ role: message.role, content: message.content })),
+      ),
+      output: ordered
+        .flatMap((entry) =>
+          (entry.model ?? []).flatMap((message) =>
+            message.role === 'assistant' && message.stopReason !== 'aborted'
+              ? [
+                  {
+                    role: message.role,
+                    content: message.content.filter((block) => block.type === 'text'),
+                  },
+                ]
+              : [],
+          ),
+        )
+        .slice(-1),
+    };
     emitTurnSpans(
       { threadId: claimed.chief.threadId, stepId, provider, model: modelId },
       turnEntries,
