@@ -4,6 +4,7 @@ import {
   type Phase,
   parseVerifyPromptMeta,
   RESEARCH_STUCK_SOURCE_KIND,
+  type StepPromptOrigin,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -171,7 +172,12 @@ interface PrWorld {
   poller: ReturnType<typeof createCiPoller>;
   todoRow(): { phase: string; hasChanges: boolean; v: number };
   buildRow(): { prNumber: number | null; errorMessage: string | null };
-  fixRoundSteps(): { id: string; prompt: string | null; status: string }[];
+  fixRoundSteps(): {
+    id: string;
+    prompt: string | null;
+    status: string;
+    promptOrigin: StepPromptOrigin | null;
+  }[];
   allSteps(): { id: string; kind: string; status: string; prompt: string | null }[];
 }
 
@@ -701,6 +707,12 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
     expect(prompt).toContain('typecheck');
     expect(prompt).toContain(String(w.prNumber));
     expect(prompt).toContain('同一分支');
+    expect(rounds[0]?.promptOrigin).toEqual({
+      kind: 'ci-fix',
+      trigger: 'ci-checks',
+      round: 1,
+      roundsMax: CI_FIX_ROUNDS_MAX,
+    });
     expect(rounds[0]?.status).toBe('pending');
     expect(w.todoRow().phase).toBe('building');
   });
@@ -1403,6 +1415,12 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
         prompt: expect.stringContaining(hookOutput),
       });
       expect(w.fixRoundSteps().at(-1)?.prompt).toContain('same branch');
+      expect(w.fixRoundSteps().at(-1)?.promptOrigin).toEqual({
+        kind: 'ci-fix',
+        trigger: 'pre-push',
+        round: fixRounds + 1,
+        roundsMax: CI_FIX_ROUNDS_MAX,
+      });
     },
   );
 
