@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
@@ -86,6 +87,8 @@ class FakeClient implements MachineApi {
   uploadedTranscript = '';
   attachments: Record<string, unknown>[] = [];
 
+  constructor(private readonly uploadFailure?: 'reject' | 'unbound') {}
+
   async enroll(): Promise<never> {
     throw new Error('unused');
   }
@@ -103,7 +106,17 @@ class FakeClient implements MachineApi {
   async tool(_stepId: string, _call: ToolCallRecord) {}
   async transcriptDelta() {}
   async relayTool(_stepId: string, name: string, params: Record<string, unknown>) {
-    if (name === 'attach_file') this.attachments.push(params);
+    if (name === 'attach_file') {
+      this.attachments.push(params);
+      if (this.uploadFailure === 'reject') throw new Error('upload rejected');
+      if (this.uploadFailure === 'unbound') return '{}';
+      return JSON.stringify({
+        id: 'step-attachment',
+        sha256: createHash('sha256')
+          .update(Buffer.from(String(params.contentBase64), 'base64'))
+          .digest('hex'),
+      });
+    }
     return '{}';
   }
   async token() {
@@ -162,6 +175,8 @@ class FakeClient implements MachineApi {
 
 interface WorkspaceOptions {
   rewindError?: string;
+  rewindFailures?: number;
+  uploadFailure?: 'reject' | 'unbound';
   head?: string | null;
   reused?: boolean;
   run?: RunStepOptions;
@@ -169,6 +184,7 @@ interface WorkspaceOptions {
 }
 
 function fakeWorkspace(cwd: string, calls: string[], opts: WorkspaceOptions = {}): WorktreeOps {
+  let restoreAttempts = 0;
   return {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
@@ -201,7 +217,11 @@ function fakeWorkspace(cwd: string, calls: string[], opts: WorkspaceOptions = {}
     },
     async restoreCheckpoint(_cwd, commit) {
       calls.push(`restoreCheckpoint:${commit}`);
-      if (opts.rewindError !== undefined) throw new Error(opts.rewindError);
+      if (
+        opts.rewindError !== undefined &&
+        ++restoreAttempts <= (opts.rewindFailures ?? Number.POSITIVE_INFINITY)
+      )
+        throw new Error(opts.rewindError);
     },
     async cleanupOrphans() {
       return [];
@@ -268,7 +288,7 @@ async function setupWithBackend(
   const checkoutCwd = join(home, 'review-checkout');
   const paths = statePaths(home, join(home, 'workspaces'));
   const calls: string[] = [];
-  const client = new FakeClient();
+  const client = new FakeClient(opts.uploadFailure);
   client.calls = calls;
   const captured: SessionOpts[] = [];
   const deps = {
@@ -535,6 +555,12 @@ describe('out-of-tree verify execution', () => {
           await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
           await runGitOk(['commit', '-m', 'unwanted verifier commit'], { cwd: checkout, env });
           agentHead = await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout });
+          await expect(
+            runGitOk(['push', 'origin', 'HEAD:refs/heads/escaped-verification'], {
+              cwd: checkout,
+              env: opts.env,
+            }),
+          ).rejects.toThrow('cairn-readonly-workspace-denied');
           return {
             sessionId: 'verify-real-git',
             events: (async function* () {
@@ -595,7 +621,7 @@ describe('out-of-tree verify execution', () => {
       expect(runtime.finalHead).toBe(startHead);
       expect(runtime.worktreeStatus).toBe('');
       expect(runtime.originHeads).toBe(`${startHead} refs/heads/main`);
-      expect(client.doneBodies[0]?.body).toMatchObject({
+      expect(client.doneBodies[0]?.body, client.doneBodies[0]?.body.errorMessage).toMatchObject({
         status: 'success',
         commit: startHead,
         hasChanges: false,
@@ -663,6 +689,99 @@ describe('out-of-tree verify execution', () => {
         commit: 'abc123',
         hasChanges: false,
       });
+    },
+  );
+
+  test('final cleanup retries a transient checkpoint restore failure', async () => {
+    const { calls, client } = await setup(verify, {
+      rewindError: 'transient restore failure',
+      rewindFailures: 1,
+      reused: false,
+    });
+    expect(calls.filter((call) => call === 'restoreCheckpoint:abc123')).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+  });
+
+  test.each([
+    'missing',
+    'rejected',
+    'mismatched',
+    'empty',
+    'unbound',
+    'malformed',
+    'valid',
+  ] as const)(
+    'attachment verdict binds every evidence path to a successful upload (%s)',
+    async (scenario) => {
+      const claim = {
+        ...verify,
+        remoteTools: [{ name: 'attach_file', description: 'Attach evidence' }],
+      };
+      const { client } = await setupWithBackend(
+        claim,
+        {
+          uploadFailure:
+            scenario === 'rejected' ? 'reject' : scenario === 'unbound' ? 'unbound' : undefined,
+        },
+        (captured) => ({
+          ...capturingBackend(captured),
+          async createSession(opts) {
+            mkdirSync(join(opts.cwd, '.cairn-verify'), { recursive: true });
+            writeFileSync(join(opts.cwd, '.cairn-verify/proof.txt'), 'proof');
+            if (scenario !== 'missing') {
+              try {
+                await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/proof.txt' });
+              } catch {}
+            }
+            return {
+              sessionId: 'verify-upload',
+              events: (async function* () {
+                if (scenario === 'malformed') {
+                  yield {
+                    type: 'message_end',
+                    message: {
+                      role: 'assistant',
+                      content: JSON.stringify({
+                        passed: true,
+                        conclusion: 'Earlier draft',
+                        evidence: [{ path: '.cairn-verify/proof.txt' }],
+                      }),
+                    },
+                  } as const;
+                }
+                const verdict = JSON.stringify({
+                  passed: true,
+                  conclusion: 'Checked',
+                  evidence:
+                    scenario === 'empty'
+                      ? []
+                      : scenario === 'malformed'
+                        ? [{ path: '.cairn-verify/proof.txt' }, { path: null }]
+                        : [
+                            {
+                              path:
+                                scenario === 'mismatched'
+                                  ? '.cairn-verify/other.txt'
+                                  : '.cairn-verify/proof.txt',
+                            },
+                          ],
+                });
+                yield { type: 'text_delta', text: verdict } as const;
+                yield {
+                  type: 'message_end',
+                  message: { role: 'assistant', content: verdict },
+                } as const;
+                yield { type: 'done', usage: [] } as const;
+              })(),
+              async steer() {},
+              async stop() {},
+              usage: () => [],
+            };
+          },
+        }),
+      );
+      if (scenario === 'valid') expect(client.doneBodies[0]?.body.verifyVerdict?.passed).toBe(true);
+      else expect(client.doneBodies[0]?.body.verifyVerdict?.passed).not.toBe(true);
     },
   );
 

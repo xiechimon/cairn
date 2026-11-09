@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -74,6 +74,7 @@ import {
   workspaceHookRowContent,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
+import { z } from 'zod';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
 import { prepareFileAttachment } from './attach-file.js';
@@ -234,7 +235,7 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
 
 const READONLY_GIT_ENV: Record<string, string> = {
   GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied:.pushInsteadOf',
+  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied://.pushInsteadOf',
   GIT_CONFIG_VALUE_0: '',
 };
 
@@ -800,12 +801,12 @@ async function runClaimedStep(
     }
   }
 
+  const uploadedVerifyEvidence = new Set<string>();
   let verifyRewound = false;
   let verifyRewindError: string | null = null;
   const rewindAttachmentVerify = async (): Promise<string | null> => {
     if (!attachmentVerify) return null;
     if (verifyRewound) return verifyRewindError;
-    verifyRewound = true;
     if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
       verifyRewindError = 'Verify start checkpoint unavailable';
       return verifyRewindError;
@@ -813,6 +814,8 @@ async function runClaimedStep(
     try {
       rmSync(join(ws.cwd, '.cairn-verify'), { recursive: true, force: true });
       await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
+      verifyRewound = true;
+      verifyRewindError = null;
     } catch (error) {
       verifyRewindError = error instanceof Error ? error.message : String(error);
       logger.step(`verify rewind failed: ${verifyRewindError}`);
@@ -1050,7 +1053,7 @@ async function runClaimedStep(
     ...opts.env,
     ...temporary.env,
     ...stepGitEnv,
-    ...(readonlyWorkspace ? READONLY_GIT_ENV : {}),
+    ...(readonlyWorkspace || attachmentVerify ? READONLY_GIT_ENV : {}),
   };
   stepCleanups.push(() => {
     for (const key of Object.keys(stepGitEnv)) {
@@ -1083,7 +1086,20 @@ async function runClaimedStep(
           executeRemoteTool: (name, params) => {
             if (name === 'ask_user' && client.askUser) return runAskChannel(params);
             if (name === 'attach_file' && !isChief) {
-              return client.relayTool(stepId, name, prepareFileAttachment(cwd, params));
+              const prepared = prepareFileAttachment(cwd, params);
+              const upload = client.relayTool(stepId, name, prepared);
+              if (!attachmentVerify) return upload;
+              const path = resolve(cwd, String(params.path));
+              const sha256 = createHash('sha256')
+                .update(Buffer.from(String(prepared.contentBase64), 'base64'))
+                .digest('hex');
+              return upload.then((result) => {
+                z.object({ id: z.string().min(1), sha256: z.literal(sha256) }).parse(
+                  JSON.parse(result),
+                );
+                uploadedVerifyEvidence.add(path);
+                return result;
+              });
             }
             const def = remoteTools.find((t) => t.name === name);
             return client.relayTool(stepId, name, params, {
@@ -2254,7 +2270,22 @@ async function runClaimedStep(
   const reviewExtraction =
     claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
   const verifyExtraction =
-    claimed.step.kind === 'verify' ? extractVerifyVerdict(transcript.messages()) : null;
+    claimed.step.kind === 'verify'
+      ? extractVerifyVerdict(transcript.messages(), { strict: attachmentVerify })
+      : null;
+  if (attachmentVerify && verifyExtraction?.status === 'ok' && verifyExtraction.verdict.passed) {
+    const evidence = verifyExtraction.verdict.evidence;
+    if (
+      evidence.length === 0 ||
+      evidence.some((item) => !uploadedVerifyEvidence.has(resolve(cwd, item.path)))
+    ) {
+      verifyExtraction.verdict = {
+        ...verifyExtraction.verdict,
+        passed: false,
+        conclusion: `${verifyExtraction.verdict.conclusion}\nAttachment evidence is missing or was not successfully uploaded by this verification step.`,
+      };
+    }
+  }
   const sessionIdForDone = handle?.sessionId ?? continueId;
   const doneBody: MachineDoneBody = {
     status,
