@@ -429,7 +429,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'complete_todos',
     description:
-      'Mark todos done without a merge step. Rejected at the confirm/review gates: passing a gate is a human action (merge, or confirm on the board) - park the card at the gate and notify the user instead (#900).',
+      'Mark todos done without a merge step. Accepted for a review you own: one a review wake handed you (a research report, or a branch with no PR to merge) - that is how you accept it. Rejected at every other confirm/review gate: passing a gate the user owns is a human action (merge, or confirm on the board) - park the card there and notify the user instead (#900).',
     parameters: obj({ todoIds: idArr('Todo ids to complete.') }, ['todoIds']),
   },
   {

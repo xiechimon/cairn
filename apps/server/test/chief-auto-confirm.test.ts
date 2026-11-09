@@ -1,4 +1,5 @@
 import type { TodoRecord } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { wakeFacts } from '../src/services/chief.js';
 
@@ -48,6 +49,12 @@ describe('wakeFacts gate text', () => {
       expect(text).not.toContain('confirm_builds');
     },
   );
+
+  test('complete_todos documents that a review the Coordinator owns is accepted with it', () => {
+    const description = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'complete_todos')?.description;
+    expect(description).toContain('Accepted for a review you own');
+    expect(description).toContain('Rejected at every other confirm/review gate');
+  });
 
   test('settle unchanged', () => {
     const text = wakeFacts('settle', todo(), null);
