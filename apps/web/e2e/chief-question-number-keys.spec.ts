@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, THREAD } from './chief-home-mock';
+import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 for (const theme of ['light', 'dark'] as const) {
   test(`a focused answer owns digits even with a thread panel open (${theme})`, async ({ page }, testInfo) => {
@@ -13,6 +13,50 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(first).toHaveAttribute('aria-pressed', 'true');
     await expect(composer).toHaveValue('');
     await page.screenshot({ path: testInfo.outputPath(`question-${theme}.png`) });
+  });
+}
+
+for (const threadPanel of [false, true]) {
+  test(`a quoted chat reply keeps its digits with a pending question (thread panel: ${threadPanel})`, async ({ page }) => {
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: [
+        { id: 'request', role: 'user', content: 'Choose a deployment region', createdAt: 10 },
+        {
+          id: 'ask', role: 'assistant', createdAt: 11,
+          content: JSON.stringify({
+            kind: 'ask_user_question', requestId: 'req-quote-digits', status: 'pending', answers: null,
+            questions: [{ header: 'Region', question: 'Where should this run?', options: [{ label: 'Europe' }, { label: 'Asia' }] }],
+          }),
+        },
+      ],
+    }, (path, _route, json) => path === `/api/todos/${TASK.id}` ? json(TASK) : undefined);
+    await page.goto(threadPanel ? `/app?thread=${TASK.id}` : '/app');
+    const home = page.getByTestId('home-c');
+    const composer = home.getByTestId('chief-composer-input');
+    const second = home.getByTestId('chief-question-option-0-1');
+    await expect(second).toBeVisible();
+    await page.evaluate(() => {
+      const source = document.querySelector('[data-reply-source="request"]');
+      if (source === null) throw new Error('missing quote source');
+      const range = document.createRange();
+      range.selectNodeContents(source);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+    await page.getByTestId('selection-reply').click();
+    await expect(home.getByTestId('composer-reply-quote')).toBeVisible();
+    await expect(composer).toBeFocused();
+    await page.keyboard.press('2');
+    await expect(composer).toHaveValue('2');
+    await expect(second).toHaveAttribute('aria-pressed', 'false');
+    await composer.fill('');
+    await home.getByTestId('composer-reply-quote-remove').click();
+    await composer.focus();
+    await page.keyboard.press('2');
+    await expect(composer).toHaveValue('');
+    await expect(second).toHaveAttribute('aria-pressed', 'true');
   });
 }
 

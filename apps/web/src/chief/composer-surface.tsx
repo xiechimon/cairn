@@ -168,6 +168,7 @@ export function ComposerSurface({
           ref={attachComposer}
           data-testid={active ? 'chief-composer-input' : undefined}
           data-compose-target=""
+          data-question-answer={active && onAdvance !== undefined ? '' : undefined}
           aria-invalid={invalid ? true : undefined}
           className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
           readOnly={!editable}

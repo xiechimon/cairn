@@ -122,7 +122,7 @@ type Question = ChiefQuestionItem['questions'][number];
 function digitsReachCard(target: HTMLElement): boolean {
   if (target.isContentEditable) return false;
   if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-compose-target'))
-    return target.value === '';
+    return target.hasAttribute('data-question-answer') && target.value === '';
   return !/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 }
 
@@ -229,7 +229,7 @@ export function ChiefQuestionCard({
       const inCard = card.contains(target);
       const inAnswer =
         bound &&
-        target.hasAttribute('data-compose-target') &&
+        target.hasAttribute('data-question-answer') &&
         target.closest('[data-testid="chief-composer-block"]')?.contains(card) === true;
       if (!inCard && !inAnswer && !numberKeys) return;
       if (
