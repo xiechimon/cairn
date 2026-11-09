@@ -6,7 +6,6 @@ import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
   AGENT_TOOL_TAG,
-  MEMORY_INDEX_TITLE,
   type RequiredCapabilities,
 } from '@cairn/shared';
 import Database from 'better-sqlite3';
@@ -684,11 +683,7 @@ function compareCell(
     teamId: t,
     teamScoped: memoryOpsAreTeamScoped(kind),
   })
-    .flatMap((entry) =>
-      entry.title === MEMORY_INDEX_TITLE
-        ? entry.content.split('\n').map((line) => line.slice(2, line.indexOf('：')))
-        : [entry.title],
-    )
+    .map((entry) => entry.title)
     .sort();
   if (kind === 'verify') {
     same('verifier memory', seen, ['mem-role']);

@@ -1,5 +1,4 @@
-import { MEMORY_INDEX_TITLE } from '@cairn/shared';
-import { eq, isNull } from 'drizzle-orm';
+import { MEMORY_INDEX_ID_PREFIX, MEMORY_INDEX_TITLE } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import type { Db } from '../src/db/client.js';
 import { openMemoryDb } from '../src/db/client.js';
@@ -23,7 +22,7 @@ const PROJECT = 'project-1';
 const DAY = 24 * 60 * 60 * 1000;
 
 function insert(db: Db, over: Partial<typeof agentMemory.$inferInsert>): string {
-  const id = newRecordId();
+  const id = `${over.title === MEMORY_INDEX_TITLE ? MEMORY_INDEX_ID_PREFIX : ''}${newRecordId()}`;
   db.insert(agentMemory)
     .values({
       id,
@@ -32,8 +31,6 @@ function insert(db: Db, over: Partial<typeof agentMemory.$inferInsert>): string 
       title: 'title',
       content: 'content',
       projectId: null,
-      sourceTodoId: null,
-      sourceBuildId: null,
       createdAt: 1_000,
       updatedAt: 1_000,
       ...over,
@@ -42,9 +39,8 @@ function insert(db: Db, over: Partial<typeof agentMemory.$inferInsert>): string 
   return id;
 }
 
-function valid(db: Db) {
-  return db.select().from(agentMemory).where(isNull(agentMemory.invalidAt)).all();
-}
+const allRows = (db: Db) => db.select().from(agentMemory).all();
+const valid = (db: Db) => allRows(db).filter((row) => row.invalidAt === null);
 
 function indexOf(db: Db, projectId: string | null) {
   return valid(db).filter(
@@ -65,10 +61,13 @@ describe('MEMORY.md fold of legacy rows', () => {
 
     const team = indexOf(db, null);
     expect(team).toHaveLength(1);
-    expect(team[0]?.content).toBe('- 验证命令：推送前跑受影响的测试\n- 评审交接：写清验收证据');
-    expect(indexOf(db, PROJECT)[0]?.content).toBe('- 无障碍：检查焦点顺序');
+    expect(team[0]?.content.split('\n').map((line) => JSON.parse(line.slice(2)))).toMatchObject([
+      { id: a, title: '验证命令', content: '推送前跑受影响的测试' },
+      { id: b, title: '评审交接', content: '写清验收证据' },
+    ]);
+    expect(indexOf(db, PROJECT)[0]?.content).toContain(JSON.stringify('检查焦点顺序'));
     for (const id of [a, b, p]) {
-      const row = db.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
+      const row = allRows(db).find((row) => row.id === id);
       expect(row?.invalidAt).toBe(10_000);
       expect(row?.supersededBy).toBe(
         row?.projectId === null ? team[0]?.id : indexOf(db, PROJECT)[0]?.id,
@@ -87,9 +86,11 @@ describe('MEMORY.md fold of legacy rows', () => {
       title: '发布交接',
       content: '记录部署版本\n- 写明提交\n- 附截图',
     });
-    expect(indexOf(db, null)[0]?.content).toBe(
-      '- 发布交接：记录部署版本（详见记忆文件「发布交接」）',
-    );
+    expect(JSON.parse(indexOf(db, null)[0]!.content.slice(2))).toMatchObject({
+      title: '发布交接',
+      content: '记录部署版本',
+      fileId: file?.id,
+    });
   });
 
   test('turns log rows into memory files and leaves scratchpads and independent scopes apart', () => {
@@ -105,12 +106,8 @@ describe('MEMORY.md fold of legacy rows', () => {
 
     foldMemoryIndexes(db, 10_000);
 
-    expect(db.select().from(agentMemory).where(eq(agentMemory.id, log)).get()?.layer).toBe(
-      'searchable',
-    );
-    expect(
-      db.select().from(agentMemory).where(eq(agentMemory.id, pad)).get()?.invalidAt,
-    ).toBeNull();
+    expect(allRows(db).find((row) => row.id === log)?.layer).toBe('searchable');
+    expect(allRows(db).find((row) => row.id === pad)?.invalidAt).toBeNull();
     const independent = valid(db).filter((row) => row.independent);
     expect(independent).toHaveLength(1);
     expect(independent[0]).toMatchObject({ title: MEMORY_INDEX_TITLE, agentId: 'agent-2' });
@@ -121,9 +118,9 @@ describe('MEMORY.md fold of legacy rows', () => {
     const db = openMemoryDb();
     insert(db, { title: '验证命令', content: '推送前跑受影响的测试' });
     foldMemoryIndexes(db, 10_000);
-    const before = db.select().from(agentMemory).all();
+    const before = allRows(db);
     foldMemoryIndexes(db, 20_000);
-    expect(db.select().from(agentMemory).all()).toEqual(before);
+    expect(allRows(db)).toEqual(before);
   });
 });
 
@@ -146,60 +143,36 @@ describe('version retention', () => {
 
     purgeExpiredMemoryVersions(db, now);
 
-    const ids = db
-      .select({ id: agentMemory.id })
-      .from(agentMemory)
-      .all()
-      .map((row) => row.id);
+    const ids = allRows(db).map((row) => row.id);
     expect(ids).not.toContain(oldVersion);
     expect(ids).toContain(recentVersion);
     expect(
-      db
-        .select()
-        .from(agentMemory)
-        .where(eq(agentMemory.id, live))
-        .get()
+      allRows(db)
+        .find((row) => row.id === live)
         ?.history.map((entry) => entry.content),
     ).toEqual(['v2', 'v3']);
   });
 });
 
 describe('legacy weekly pass with MEMORY.md documents', () => {
-  test('never expires or merges a stale document even when a queued pass names its id', () => {
-    const db = openMemoryDb();
-    const content = '- release：Squash merges only.\n- review：Attach proof.';
-    const document = insert(db, { title: MEMORY_INDEX_TITLE, content });
-    const fact = insert(db, { content: 'Squash only.' });
-    const scope = { agentId: AGENT, teamId: TEAM };
-    const out = applyMemoryPass(
-      db,
-      scope,
-      {
-        merge: [
-          { keep: document, drop: [fact], content: 'Squash only.' },
-          { keep: fact, drop: [document], content: 'Squash merges only.' },
-        ],
-        expire: [document],
-      },
-      MEMORY_PASS_STALE_MS + 10_000,
-    );
-    expect(out).toEqual({ merged: 0, expired: 0, skipped: 3 });
-    expect(valid(db)).toHaveLength(2);
-    expect(valid(db).find((row) => row.id === document)?.content).toBe(content);
-  });
-
-  test('a stale document cannot be expired by a queued legacy pass', () => {
+  test.each(['merge', 'expire'])('a queued %s cannot change a stale document', (operation) => {
     const db = openMemoryDb();
     const content = '- release：Squash only.\n- review：Attach proof.';
     const document = insert(db, { title: MEMORY_INDEX_TITLE, content });
+    const fact = insert(db, { content: 'Squash only.' });
+    const raw =
+      operation === 'expire'
+        ? { expire: [document] }
+        : {
+            merge: [
+              { keep: document, drop: [fact], content: 'Squash only.' },
+              { keep: fact, drop: [document], content: 'Squash merges only.' },
+            ],
+          };
     expect(
-      applyMemoryPass(
-        db,
-        { agentId: AGENT, teamId: TEAM },
-        { expire: [document] },
-        MEMORY_PASS_STALE_MS + 10_000,
-      ),
-    ).toEqual({ merged: 0, expired: 0, skipped: 1 });
+      applyMemoryPass(db, { teamId: TEAM, agentId: AGENT }, raw, MEMORY_PASS_STALE_MS + 10_000),
+    ).toEqual({ merged: 0, expired: 0, skipped: operation === 'expire' ? 1 : 2 });
+    expect(valid(db)).toHaveLength(2);
     expect(valid(db).find((row) => row.id === document)?.content).toBe(content);
   });
 

@@ -428,8 +428,8 @@ test('a lesson already in memory is skipped, an overlapping one records the conf
   const index = after.memories.find(
     (row) => row.title === MEMORY_INDEX_TITLE && row.invalidAt === null,
   );
-  expect(index?.content).toBe(`- 本仓测试命令：${lesson('x').content}`);
-  expect(after.candidates).toMatchObject([{ conflictIds: [index?.id], status: 'pending' }]);
+  expect(index?.content).toContain(JSON.stringify(lesson('x').content));
+  expect(after.candidates).toMatchObject([{ conflictIds: ['mem-same'], status: 'pending' }]);
 });
 
 test('needs evidence from two different builds, then a successful recurrence promotes it', async () => {
@@ -465,7 +465,7 @@ test('needs evidence from two different builds, then a successful recurrence pro
   ]);
   expect(
     memories.find((row) => row.title === MEMORY_INDEX_TITLE && row.invalidAt === null)?.content,
-  ).toBe(`- 本仓测试命令：${lesson('x').content}`);
+  ).toContain(JSON.stringify(lesson('x').content));
 });
 
 test('human confirmation promotes only with two builds of evidence', async () => {

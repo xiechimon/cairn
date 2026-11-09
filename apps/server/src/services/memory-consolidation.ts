@@ -1,10 +1,10 @@
-import { chiefDigestThreadId, ISSUE_FENCE_OPEN, MEMORY_INDEX_TITLE } from '@cairn/shared';
+import { chiefDigestThreadId, ISSUE_FENCE_OPEN } from '@cairn/shared';
 import { and, eq, like } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agentMemory, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { listMemoryEntries, updateMemoryEntry } from './memory.js';
+import { isMemoryIndex, listStoredMemoryEntries, updateMemoryEntry } from './memory.js';
 
 export const MEMORY_PASS_MARK = '【记忆整理】';
 export const MEMORY_PASS_INTERVAL_MS = 7 * 24 * 60 * 60_000;
@@ -38,8 +38,8 @@ export interface MemoryPassResult {
 }
 
 function legacyCoreFacts(db: Db, teamId: string, agentId: string) {
-  return listMemoryEntries(db, { agentId, teamId }).filter(
-    (m) => m.layer === 'core' && m.title !== MEMORY_INDEX_TITLE,
+  return listStoredMemoryEntries(db, { agentId, teamId }).filter(
+    (m) => m.layer === 'core' && !isMemoryIndex(db, m.id),
   );
 }
 

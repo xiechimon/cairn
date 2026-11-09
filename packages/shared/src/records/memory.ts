@@ -8,6 +8,7 @@ export const MEMORY_LAYERS = ['core', 'scratchpad', 'searchable'] as const;
 export type MemoryLayer = (typeof MEMORY_LAYERS)[number];
 
 export const MEMORY_INDEX_TITLE = 'MEMORY.md';
+export const MEMORY_INDEX_ID_PREFIX = 'memory-index:';
 
 export const MEMORY_TOOLS = ['save_memory', 'update_memory', 'delete_memory', 'memories'] as const;
 

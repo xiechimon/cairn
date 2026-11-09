@@ -76,7 +76,7 @@ describe('applyFlush', () => {
       .find((row) => row.id === index?.id);
     expect(still).toMatchObject({
       invalidAt: null,
-      content: '- Merge：ian wants squash merges only.',
+      content: index?.content,
     });
   });
 
