@@ -240,7 +240,7 @@ describe('the done report carries time to first token', () => {
 });
 
 describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
-  test('flag off: no turn row is written and the meter keeps the cumulative total', async () => {
+  test('flag off: no turn row is written and the meter stays empty', async () => {
     setCoordinatorServerContextEnabled(false);
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-off');
@@ -249,10 +249,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
     });
     expect(turnRows()).toEqual([]);
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
-      tokens: 1000 + 7 + 800 + 3,
-      contextWindow: DEFAULT_CONTEXT_WINDOW,
-    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
   });
 
   test('flag on: the meter shows the last turn context the provider reported, not the running sum', async () => {
