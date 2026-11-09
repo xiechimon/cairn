@@ -307,7 +307,9 @@ export interface ResourcesContent {
 
 export interface DocSegment {
   text: string;
-  style?: 'code' | 'link' | 'mention' | 'strong';
+  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor';
+  href?: string;
+  strong?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;
 }
@@ -317,12 +319,18 @@ export interface DocBlock {
   segments: DocSegment[];
 }
 
+export interface FailFacts {
+  files: number | null;
+  commits: string[];
+  pr: number | null;
+}
+
 export type WorkStep =
   | { kind: 'think'; id: string; text: string; seconds: number | null }
   | {
       kind: 'call';
       id: string;
-      action: 'read' | 'search' | 'run' | 'edit' | 'tool';
+      action: 'read' | 'search' | 'run' | 'edit' | 'tool' | 'setup';
       label: string;
       target?: string;
       description?: string;
@@ -334,6 +342,7 @@ export type WorkStep =
       running: boolean;
       unfinished: boolean;
       cancelled?: boolean;
+      localized?: boolean;
       seconds: number | null;
     };
 
@@ -380,7 +389,15 @@ export type TranscriptItem =
   | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
   | { kind: 'automation-completed'; id: string }
   | { kind: 'chief' }
-  | { kind: 'fail'; title: string; body: string; createdAt?: number }
+  | {
+      kind: 'fail';
+      title: string;
+      body: string;
+      raw?: string;
+      facts?: FailFacts;
+      id?: string;
+      createdAt?: number;
+    }
   | {
       kind: 'question';
       id: string;
