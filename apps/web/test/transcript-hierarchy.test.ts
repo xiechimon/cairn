@@ -99,6 +99,15 @@ describe('task thread hierarchy', () => {
     expect(segments.map((segment) => segment.text).join('')).not.toContain('](');
   });
 
+  test('a link destination with balanced parentheses keeps its closing parenthesis', () => {
+    const segments = inlineSegments('see [docs](https://example.com/a_(b)) now');
+    expect(segments).toEqual([
+      { text: 'see ' },
+      { text: 'docs', style: 'anchor', href: 'https://example.com/a_(b)' },
+      { text: ' now' },
+    ]);
+  });
+
   test('a link target that is not http(s) or a mention stays literal text', () => {
     expect(inlineSegments('[x](javascript:alert(1))').some((s) => s.style === 'anchor')).toBe(
       false,
@@ -149,6 +158,24 @@ describe('task thread hierarchy', () => {
     expect(items.filter((item) => item.kind === 'note')).toEqual([
       expect.objectContaining({ text: REWORK }),
     ]);
+  });
+
+  test('a legacy failure reason with its own bullet lines is kept whole and shown once', () => {
+    const reason = `${GIT_ERROR}\n- hint: run git pull\n- hint: then retry`;
+    const legacy = LEGACY_FAILURE.replace(GIT_ERROR, reason);
+    const items = mapTranscript({
+      messages: rows([['system', legacy]]),
+      steps: [],
+      plans: [],
+      build: { ...FAILED_BUILD, errorMessage: reason },
+      todo: todo(1, 'failed'),
+      machineName: null,
+      userName: 'ian',
+      liveText: '',
+    });
+    const fails = items.filter((item) => item.kind === 'fail');
+    expect(fails).toHaveLength(1);
+    expect(fails[0]).toMatchObject({ raw: reason, body: '改动 2 个文件 · 提交 a1cfe71e8 · 未开 PR' });
   });
 
   test('a failed build without a failure row still shows its error once', () => {

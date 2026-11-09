@@ -386,9 +386,23 @@ export function pillOf(call: ToolCallRecord): string {
   return primary === '' ? call.name : `${call.name} ${primary}`;
 }
 
-const MARKDOWN_LINK = /\[([^\]\n]+?)\]\(([^)\s]+)\)/g;
+const LINK_LABEL = /\[([^\]\n]+?)\]\(/g;
 const MENTION_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
 const WEB_TARGET = /^https?:\/\/\S+$/;
+
+function linkDestinationEnd(text: string, from: number): number {
+  let depth = 0;
+  for (let at = from; at < text.length; at++) {
+    const char = text[at];
+    if (char === '\\') at++;
+    else if (char === '(') depth++;
+    else if (char === ')') {
+      if (depth === 0) return at;
+      depth--;
+    } else if (char === undefined || /\s/.test(char)) return -1;
+  }
+  return -1;
+}
 
 export function inlineSegments(text: string): DocSegment[] {
   const out: DocSegment[] = [];
@@ -408,12 +422,14 @@ export function inlineSegments(text: string): DocSegment[] {
       out.push(strong ? { text: slice, style: 'strong' } : { text: slice });
     };
     let cursor = 0;
-    MARKDOWN_LINK.lastIndex = 0;
+    LINK_LABEL.lastIndex = 0;
     for (;;) {
-      const m = MARKDOWN_LINK.exec(frag) as RegExpExecArray | null;
+      const m = LINK_LABEL.exec(frag) as RegExpExecArray | null;
       if (m === null) break;
+      const close = linkDestinationEnd(frag, m.index + m[0].length);
+      if (close < 0) continue;
       const label = m[1] ?? '';
-      const target = m[2] ?? '';
+      const target = frag.slice(m.index + m[0].length, close);
       const mention = MENTION_TARGET.exec(target);
       if (mention === null && !WEB_TARGET.test(target)) continue;
       pushText(frag.slice(cursor, m.index));
@@ -427,7 +443,8 @@ export function inlineSegments(text: string): DocSegment[] {
             }
           : { text: label, style: 'anchor', href: target, ...(strong ? { strong: true } : {}) },
       );
-      cursor = m.index + m[0].length;
+      cursor = close + 1;
+      LINK_LABEL.lastIndex = cursor;
     }
     if (cursor < frag.length) pushText(frag.slice(cursor));
   };

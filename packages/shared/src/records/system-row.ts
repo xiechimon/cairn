@@ -80,12 +80,16 @@ const LEGACY_CREDENTIAL = /^git 凭据来源：(integration|machine)（/;
 const LEGACY_FAILURE_HEAD = '构建步兜底报告：';
 const LEGACY_REWORK_REASON = '上一轮失败原因：';
 
+const LEGACY_FAILURE_LABELS = ['失败原因：', '已知改动：', 'Commit: ', 'PR：', '下一步：'];
+
 function legacyFailureField(text: string, label: string): string | null {
   const start = text.indexOf(`\n- ${label}`);
   if (start < 0) return null;
   const from = start + label.length + 3;
-  const next = text.indexOf('\n- ', from);
-  return text.slice(from, next < 0 ? undefined : next).trim();
+  const ends = LEGACY_FAILURE_LABELS.filter((other) => other !== label)
+    .map((other) => text.indexOf(`\n- ${other}`, from))
+    .filter((at) => at >= 0);
+  return text.slice(from, ends.length > 0 ? Math.min(...ends) : undefined).trim();
 }
 
 function legacySystemRow(text: string): SystemRow | null {
@@ -121,6 +125,7 @@ function legacySystemRow(text: string): SystemRow | null {
       reason: legacyFailureField(text, '失败原因：') ?? '',
       files: files === null || files === '没有改动记录' ? null : (fileList ?? []),
       commits: text
+        .slice(Math.max(0, text.indexOf('\n- 已知改动：')))
         .split('\n')
         .filter((line) => line.startsWith('- Commit: '))
         .map((line) => line.slice('- Commit: '.length).trim()),
