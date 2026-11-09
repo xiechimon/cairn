@@ -5,8 +5,11 @@ import {
   blockingThreads,
   blockRounds,
   decide,
+  deferredIssue,
+  deferredThreads,
   GATE_CHECK,
   HUMAN_LABEL,
+  markDeferrals,
   markPreExisting,
   preExistingThreads,
   QUEUED_LABEL,
@@ -30,6 +33,7 @@ const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cu
           startLine
           diffSide
           comments(first: 1) { nodes { author { login __typename } body url pullRequestReview { body } } }
+          replies: comments(last: 20) { nodes { body } }
         }
         pageInfo { hasNextPage endCursor }
       }
@@ -87,11 +91,32 @@ function loadThreads(repo, number) {
         body: first?.body ?? '',
         reviewBody: first?.pullRequestReview?.body ?? '',
         url: first?.url ?? '',
+        replies: (node.replies?.nodes ?? []).map((reply) => reply.body ?? ''),
       });
     }
     if (!page.pageInfo.hasNextPage) return threads;
     cursor = page.pageInfo.endCursor;
   }
+}
+
+function issueKind(repo, number) {
+  try {
+    const text = execFileSync('gh', ['api', '-i', `repos/${repo}/issues/${number}`], {
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const body = JSON.parse(text.slice(text.search(/\r?\n\r?\n/)).trim());
+    return body.pull_request ? 'pull' : 'issue';
+  } catch (error) {
+    if (/^HTTP\/[\d.]+ (404|410)\b/.test(String(error.stdout ?? ''))) return 'missing';
+    throw error;
+  }
+}
+
+function loadIssueKinds(repo, threads) {
+  const numbers = new Set(deferredThreads(threads).map(deferredIssue));
+  return new Map([...numbers].map((number) => [number, issueKind(repo, number)]));
 }
 
 function loadFiles(repo, pr) {
@@ -161,10 +186,12 @@ function evaluate(repo, number) {
   let files;
   let comments;
   let loaded;
+  let issueKinds;
   try {
     files = loadFiles(repo, pr);
     comments = listPaged(`repos/${repo}/issues/${number}/comments`);
     loaded = loadThreads(repo, number);
+    issueKinds = loadIssueKinds(repo, loaded);
   } catch (error) {
     console.error(error.message);
     writeCheck(repo, sha, check, {
@@ -178,8 +205,9 @@ function evaluate(repo, number) {
     return;
   }
   const stateEntry = trustedStateComment(comments);
-  const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
-  const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
+  const hasFindings =
+    blockingThreads(loaded).length + preExistingThreads(loaded).length + issueKinds.size > 0;
+  const threads = markDeferrals(hasFindings ? markPreExisting(loaded, files) : loaded, issueKinds);
   const retries = retryStatus(comments, sha, stateEntry?.comment ?? null);
   const start = attemptStart(comments, stateEntry, sha);
   const lastActivity = Math.max(check ? Date.parse(check.started_at) : 0, start?.time ?? 0);

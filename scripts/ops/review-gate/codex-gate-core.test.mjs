@@ -9,7 +9,9 @@ import {
   blockMarker,
   blockRounds,
   decide,
+  deferredIssue,
   LIMIT_RETRY_AFTER_MS,
+  markDeferrals,
   markPreExisting,
   parseState,
   REQUEST_AFTER_MS,
@@ -755,4 +757,45 @@ function receiptDecision(fixture, threads = []) {
 
 test('D88 accepts the live exact-head null verdict only with a fresh clean unambiguous SECURITY receipt and no open security threads', () => {
   assert.equal(receiptDecision(receiptFixture).conclusion, 'success');
+});
+
+test('the newest deferral reply names the issue, in any letter case', () => {
+  assert.equal(deferredIssue({ replies: [] }), null);
+  assert.equal(deferredIssue({ replies: ['fixed in abc123'] }), null);
+  assert.equal(
+    deferredIssue({
+      replies: [
+        'Valid, out of scope for this PR, tracked in #3.',
+        'valid, OUT OF SCOPE for this PR, tracked in #41',
+      ],
+    }),
+    41,
+  );
+  assert.equal(deferredIssue({ replies: ['out of scope for this PR, tracked in #12a'] }), null);
+});
+
+test('a deferral is judged on any Codex thread as soon as it is written, never on a human thread', () => {
+  const reply = { replies: ['valid, out of scope for this PR, tracked in #9'] };
+  const kinds = new Map([[9, 'missing']]);
+  const [open, human, resolved] = markDeferrals(
+    [
+      thread('P2', reply),
+      thread('P2', { ...reply, isResolved: true, authorLogin: 'someone', authorType: 'User' }),
+      thread('P2', { ...reply, isResolved: true }),
+    ],
+    kinds,
+  );
+  assert.match(open.deferral, /#9, which is not an issue/);
+  assert.equal(human.deferral, undefined);
+  assert.match(resolved.deferral, /#9, which is not an issue/);
+});
+
+test('an open P1 that also carries a deferral reply is counted once, as an open finding', () => {
+  const [marked] = markDeferrals(
+    [thread('P1', { replies: ['valid, out of scope for this PR, tracked in #9'] })],
+    new Map([[9, 'issue']]),
+  );
+  const result = decide(pr, done, [marked], noRetries);
+  assert.equal(result.title, '1 open P0/P1 Codex findings');
+  assert.equal(result.summary.match(/must be fixed\)/g)?.length, 1);
 });
