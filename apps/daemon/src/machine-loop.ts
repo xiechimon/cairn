@@ -45,7 +45,7 @@ import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineApiError, MachineClient } from './machine-client.js';
 import { enrollThroughBrowser } from './machine-enroll.js';
-import { ComputerOrbs } from './orb/computer.js';
+import { ComputerOrbs, computerImageOffersBrowser } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import { NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
 import { createOrbProvider } from './orb/select.js';
@@ -235,6 +235,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     codexLogin: readCodexLogin(paths.agentRuntimeDir),
     executor: orbProvider.kind,
     ...(orbComputer ? { computer: true as const } : {}),
+    ...(orbComputer && computerImageOffersBrowser() ? { browser: true as const } : {}),
     ...(hostComputer ? { ownComputer: true as const } : {}),
   });
 
