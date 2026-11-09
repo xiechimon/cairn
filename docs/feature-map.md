@@ -15,15 +15,15 @@
 
 | Item | Count |
 |---|---|
-| Features | 55 |
-| status shipped | 46 |
+| Features | 54 |
+| status shipped | 45 |
 | status partial | 7 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 17 |
-| Research gaps | 19 |
-| Frontend design gaps | 25 |
-| Backend design gaps | 25 |
-| notes cited but not on main | 20 |
+| research, frontend design and backend design all present or not applicable | 19 |
+| Research gaps | 17 |
+| Frontend design gaps | 23 |
+| Backend design gaps | 21 |
+| notes cited but not on main | 21 |
 
 ## Coverage
 
@@ -31,12 +31,12 @@
 |---|---|---|---|---|---|---|
 | [The agent's computer](#agent-computer) | 1 | partial | yes (not on main) | gap | gap | B4 |
 | [Coordinator chat](#coordinator-chat) | 1 | shipped | yes | yes | yes |  |
-| [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | gap | B1 |
+| [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | yes |  |
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Daily report and retro](#daily-report) | 1 | shipped | yes | gap | gap | B2 |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
-| [Memory](#memory) | 1 | shipped | yes | gap | gap | B1 |
+| [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
 | [Needs-you tray](#needs-you) | 1 | shipped | yes | gap | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
@@ -77,10 +77,9 @@
 | [Scheduled tasks](#schedules) | 3 | shipped | gap | gap | gap | B7 |
 | [Search and activity](#search-and-activity) | 3 | shipped | gap | yes | gap | B7 |
 | [Secrets](#secrets) | 3 | shipped | yes | gap | yes | B10 |
-| [Server backup and deploy status](#server-status) | 3 | shipped | gap | gap | gap | B11 |
+| [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
 | [Sidebar and thread list](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
-| [Feature flags and releases](#feature-releases) | 4 | shipped | gap | gap | gap | B11 |
 | [Feishu integration](#feishu) | 4 | shipped | gap | gap | gap | B11 |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
 | [Thread tags](#thread-tags) | 4 | shipped | gap | yes | yes | B11 |
@@ -88,15 +87,6 @@
 ## Gaps by batch
 
 Batches are ordered by how central their features are. One agent session researches and designs one batch.
-
-### B1 · Coordinator context and memory
-
-How the never-ending Coordinator conversation assembles each turn and what it remembers: the context budget, compaction, history tools, memory rows, promotion and invalidation. Design the data model and failure modes, and the memory view in Coordinator settings.
-
-| Feature | Centrality | Missing |
-|---|---|---|
-| [Coordinator context and compaction](#coordinator-context) | 1 | Backend design: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes |
-| [Memory](#memory) | 1 | Frontend design: the memory list in Coordinator settings has no design<br>Backend design: no design for memory keys, scope, consolidation, promotion and invalidation |
 
 ### B2 · What reaches ian: needs-you, questions, daily report, push
 
@@ -192,14 +182,13 @@ Who can do what and with which credentials: the secrets page, API keys with gran
 
 ### B11 · Peripheral surfaces
 
-Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
+Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
 
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository |
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
-| [Server backup and deploy status](#server-status) | 3 | Research: no note on how self-hosted products report backup and update health<br>Frontend design: the banners have no design<br>Backend design: no design for the backup and deploy probes |
-| [Feature flags and releases](#feature-releases) | 4 | Research: no note on per-user flags for a single-user product<br>Frontend design: the releases list has no design<br>Backend design: no design for flag defaults and release |
+| [Server backup and deploy status](#server-status) | 3 | Frontend design: the banners have no design |
 | [Feishu integration](#feishu) | 4 | Research: no note on why Feishu and what it delivers<br>Frontend design: the Feishu settings have no design<br>Backend design: no design for the Feishu delivery path |
 | [Thread tags](#thread-tags) | 4 | Research: no note on whether tags still earn their place after D58 |
 
@@ -233,9 +222,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Coordinator context and compaction** (shipped). Each Coordinator turn is assembled by the server within a token budget from recent messages, an index of older ones, history tools and ledger facts, so compaction is invisible to the user.
 
-- Research: [docs/research/coordinator-compaction-2026-11-07.md](research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md)
+- Research: [docs/research/coordinator-compaction-2026-11-07.md](research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/coordinator-context-2026-11-08.md](research/coordinator-context-2026-11-08.md)
 - Frontend design: n/a: compaction is invisible by design; the transcript keeps full history
-- Backend design: **gap**: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes
+- Backend design: [docs/design/coordinator-context-backend.md](design/coordinator-context-backend.md)
 
 ### coordinator-dispatch
 
@@ -273,9 +262,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.
 
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md)
-- Frontend design: **gap**: the memory list in Coordinator settings has no design
-- Backend design: **gap**: no design for memory keys, scope, consolidation, promotion and invalidation
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md)
+- Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
+- Backend design: [docs/design/memory-backend.md](design/memory-backend.md), [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 
 ### merge-gate
 
@@ -601,9 +590,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Server backup and deploy status** (shipped). Banners that warn when backups are stale or the deployed server lags main.
 
-- Research: **gap**: no note on how self-hosted products report backup and update health
+- Research: [docs/research/deploy-drain-2026-11-09.md](research/deploy-drain-2026-11-09.md)
 - Frontend design: **gap**: the banners have no design
-- Backend design: **gap**: no design for the backup and deploy probes
+- Backend design: [docs/ops/deploy-drain-design.md](ops/deploy-drain-design.md)
 
 ### sidebar
 
@@ -620,14 +609,6 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](spec/14-skills-execution-surface-injection.md)
-
-### feature-releases
-
-**Feature flags and releases** (shipped). Per-user feature flags and the account page list where the owner releases them.
-
-- Research: **gap**: no note on per-user flags for a single-user product
-- Frontend design: **gap**: the releases list has no design
-- Backend design: **gap**: no design for flag defaults and release
 
 ### feishu
 
@@ -657,6 +638,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 | Note | Where it is |
 |---|---|
+| `docs/design/memory-inplace-edit.md` | owner-approved design in PR #3677; layout implementation owned by PR #3666 |
 | `docs/design/pilot-coordinator-chat-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/design/qcard-variants/README.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/agent-machine-routing.md` | branch origin/claude/elegant-jones-a3e2a9 |

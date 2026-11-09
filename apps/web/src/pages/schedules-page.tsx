@@ -336,7 +336,7 @@ export function SchedulesPage() {
           testId="schedules-error"
           className="mt-6"
           icon={TriangleAlert}
-          title={t('Scheduled tasks could not be loaded.')}
+          title={t('Scheduled tasks could not be loaded')}
           action={{
             label: t('重试'),
             disabled: schedulesQ.isFetching,

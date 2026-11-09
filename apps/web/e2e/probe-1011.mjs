@@ -1,9 +1,10 @@
+import { homedir } from 'node:os';
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8411';
-const OUT = process.argv[3] ?? '/tmp/evidence-1011';
+const OUT = process.argv[3] ?? join(homedir(), '.cache/cairn-evidence/1011');
 const DSF = 4;
 mkdirSync(OUT, { recursive: true });
 

@@ -21,6 +21,7 @@ import {
   ASK_USER_QUESTION_KIND,
   askUserQuestionContentSchema,
   BRAND,
+  BUILD_FAILURE_ROW_KIND,
   CHIEF_TURN_ERROR_KIND,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
@@ -34,20 +35,25 @@ import {
   conversationBranch,
   DONE_ROW,
   GATE_ANNOUNCEMENTS,
+  GIT_CREDENTIAL_ROW_KIND,
   infoReportMessageSchema,
   MODEL_SOURCE_RUNTIME_LABELS,
   orchestratePromptHeadOf,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
   reviewVerdictSchema,
+  reworkNoteWithoutReason,
+  type SystemRow,
   stripAnsiEscapes,
   stripSkillRouteSection,
+  systemRowOf,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
   threadReportContentSchema,
   transcriptPromptRowId,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
+  WORKSPACE_HOOK_ROW_KIND,
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
 import { STATUS_WORDS } from '../board/status-words.js';
@@ -382,7 +388,23 @@ export function pillOf(call: ToolCallRecord): string {
   return primary === '' ? call.name : `${call.name} ${primary}`;
 }
 
-const MENTION_SCHEME = /\[([^\]\n]+?)\]\((agent|skill|project|machine|todo):([A-Za-z0-9_-]+)\)/g;
+const LINK_LABEL = /\[([^\]\n]+?)\]\(/g;
+const MENTION_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
+const WEB_TARGET = /^https?:\/\/\S+$/;
+
+function linkDestinationEnd(text: string, from: number): number {
+  let depth = 0;
+  for (let at = from; at < text.length; at++) {
+    const char = text[at];
+    if (char === '\\') at++;
+    else if (char === '(') depth++;
+    else if (char === ')') {
+      if (depth === 0) return at;
+      depth--;
+    } else if (char === undefined || /\s/.test(char)) return -1;
+  }
+  return -1;
+}
 
 export function inlineSegments(text: string): DocSegment[] {
   const out: DocSegment[] = [];
@@ -402,18 +424,29 @@ export function inlineSegments(text: string): DocSegment[] {
       out.push(strong ? { text: slice, style: 'strong' } : { text: slice });
     };
     let cursor = 0;
-    MENTION_SCHEME.lastIndex = 0;
+    LINK_LABEL.lastIndex = 0;
     for (;;) {
-      const m = MENTION_SCHEME.exec(frag) as RegExpExecArray | null;
+      const m = LINK_LABEL.exec(frag) as RegExpExecArray | null;
       if (m === null) break;
+      const close = linkDestinationEnd(frag, m.index + m[0].length);
+      if (close < 0) continue;
+      const label = m[1] ?? '';
+      const target = frag.slice(m.index + m[0].length, close).replace(/\\([!-/:-@[-`{-~])/g, '$1');
+      const mention = MENTION_TARGET.exec(target);
+      if (mention === null && !WEB_TARGET.test(target)) continue;
       pushText(frag.slice(cursor, m.index));
-      out.push({
-        text: m[1] ?? '',
-        style: 'mention',
-        mentionKind: m[2] as 'agent' | 'skill' | 'project' | 'machine' | 'todo',
-        mentionId: m[3],
-      });
-      cursor = m.index + m[0].length;
+      out.push(
+        mention !== null
+          ? {
+              text: label,
+              style: 'mention',
+              mentionKind: mention[1] as 'agent' | 'skill' | 'project' | 'machine' | 'todo',
+              mentionId: mention[2],
+            }
+          : { text: label, style: 'anchor', href: target, ...(strong ? { strong: true } : {}) },
+      );
+      cursor = close + 1;
+      LINK_LABEL.lastIndex = cursor;
     }
     if (cursor < frag.length) pushText(frag.slice(cursor));
   };
@@ -696,6 +729,18 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       continue;
     }
     if (m.role === 'system') {
+      const row = systemRowOf(m.content);
+      if (row !== null) {
+        entries.push({ at: m.createdAt, item: systemRowItem(row, m.id, m.createdAt) });
+        continue;
+      }
+      if (text.startsWith(REWORK_REUSE_HEAD)) {
+        entries.push({
+          at: m.createdAt,
+          item: { kind: 'note', text: reworkNoteWithoutReason(text), id: m.id },
+        });
+        continue;
+      }
       if (systemKindOf(m.content) !== null) {
         if (systemKindOf(m.content) === 'schedule-wake') {
           const wake = JSON.parse(m.content as string) as { stepId?: unknown };
@@ -905,7 +950,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({ kind: 'streaming', label: '执行中...' });
   }
 
-  if (build?.errorMessage && todo.phase === 'failed') {
+  if (
+    build?.errorMessage &&
+    todo.phase === 'failed' &&
+    !items.some(
+      (item) => item.kind === 'fail' && item.raw === stripAnsiEscapes(build.errorMessage ?? ''),
+    )
+  ) {
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
@@ -935,6 +986,73 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     folded.push({ kind: 'automation-completed', id: `completed-${item.stepId}` });
   }
   return folded;
+}
+
+const REWORK_REUSE_HEAD = '返工回到本分支继续';
+
+const CREDENTIAL_SOURCE_DETAIL = {
+  integration: 'integration：每步下发的 token',
+  machine: 'machine：执行机本机的 git 凭据',
+} as const;
+
+function systemRowItem(row: SystemRow, id: string, createdAt: number): TranscriptItem | ToolEntry {
+  switch (row.kind) {
+    case WORKSPACE_HOOK_ROW_KIND:
+      return {
+        kind: '__work__',
+        step: {
+          kind: 'call',
+          id,
+          action: 'setup',
+          label: `.agents/${row.name}`,
+          description: `.agents/${row.name} hook`,
+          output:
+            row.output === ''
+              ? null
+              : row.omittedChars > 0
+                ? `${row.output}\n… (${row.omittedChars})`
+                : row.output,
+          error: row.status !== 'ok',
+          running: false,
+          unfinished: false,
+          seconds: row.ms / 1000,
+        },
+      };
+    case GIT_CREDENTIAL_ROW_KIND:
+      return {
+        kind: '__work__',
+        step: {
+          kind: 'call',
+          id,
+          action: 'setup',
+          label: 'git',
+          description: 'git 凭据',
+          output: CREDENTIAL_SOURCE_DETAIL[row.source],
+          localized: true,
+          error: false,
+          running: false,
+          unfinished: false,
+          seconds: null,
+        },
+      };
+    case BUILD_FAILURE_ROW_KIND: {
+      const headline =
+        /^(.+?\(exit -?\d+\))/.exec(row.reason)?.[1] ?? row.reason.split('\n')[0] ?? '';
+      return {
+        kind: 'fail',
+        id,
+        createdAt,
+        title: stripAnsiEscapes(headline),
+        body: failGuidanceBody(classifyStepFailure(row.reason)),
+        facts: {
+          files: row.fileCount,
+          commits: row.commits.map((commit) => commit.slice(0, 9)),
+          pr: row.pr?.number ?? null,
+        },
+        raw: stripAnsiEscapes(row.reason),
+      };
+    }
+  }
 }
 
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {

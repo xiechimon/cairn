@@ -13,6 +13,8 @@ const CODE_SKIN: Record<string, string> = {
     'rounded-(--cds-radius-sm) bg-(--prose-code-fill) px-1 py-px font-prose-mono text-code-inline whitespace-pre-wrap [overflow-wrap:anywhere]',
   'doc-code': 'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code',
 };
+const ANCHOR_SKIN =
+  'text-inherit underline decoration-current/40 underline-offset-3 hover:decoration-current';
 const CODE_LINK_SKIN = 'bg-secondary text-content-secondary';
 
 interface SegmentsProps {
@@ -63,6 +65,16 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
       {segments.map((seg, j) =>
         seg.style === 'mention' ? (
           <MentionChip key={j} seg={seg} />
+        ) : seg.style === 'anchor' ? (
+          <a
+            key={j}
+            href={seg.href}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(ANCHOR_SKIN, seg.strong === true && 'font-semibold')}
+          >
+            {seg.text}
+          </a>
         ) : seg.style === 'strong' ? (
           <strong key={j}>{seg.text}</strong>
         ) : seg.style != null ? (

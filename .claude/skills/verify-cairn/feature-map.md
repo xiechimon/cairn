@@ -80,9 +80,9 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
-- Research: [docs/research/coordinator-compaction-2026-11-07.md](../../../docs/research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md)
+- Research: [docs/research/coordinator-compaction-2026-11-07.md](../../../docs/research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/coordinator-context-2026-11-08.md](../../../docs/research/coordinator-context-2026-11-08.md)
 - Frontend design: n/a: compaction is invisible by design; the transcript keeps full history
-- Backend design: **gap**: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes
+- Backend design: [docs/design/coordinator-context-backend.md](../../../docs/design/coordinator-context-backend.md)
 - Evidence: `integration/test/coordinator-context-assemble.test.ts`, `apps/server/test/chief-history.test.ts`, `apps/server/test/coordinator/compaction.test.ts`
 
 ### coordinator-dispatch
@@ -177,9 +177,9 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`, `memory-list`, `project-instructions-input`
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md)
-- Frontend design: **gap**: the memory list in Coordinator settings has no design
-- Backend design: **gap**: no design for memory keys, scope, consolidation, promotion and invalidation
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md)
+- Frontend design: [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
+- Backend design: [docs/design/memory-backend.md](../../../docs/design/memory-backend.md), [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
 - Evidence: `apps/web/e2e/chief-memory.spec.ts`, `apps/web/test/memory-list.test.ts`, `apps/server/test/memory-consolidation.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
 
 ### merge-gate
@@ -987,10 +987,10 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `backup-warning`
-- Research: **gap**: no note on how self-hosted products report backup and update health
+- Research: [docs/research/deploy-drain-2026-11-09.md](../../../docs/research/deploy-drain-2026-11-09.md)
 - Frontend design: **gap**: the banners have no design
-- Backend design: **gap**: no design for the backup and deploy probes
-- Evidence: `apps/web/e2e/chief-home-backup.spec.ts`, `apps/server/test/backup-status.test.ts`, `apps/server/test/deploy-status.test.ts`
+- Backend design: [docs/ops/deploy-drain-design.md](../../../docs/ops/deploy-drain-design.md)
+- Evidence: `apps/web/e2e/chief-home-backup.spec.ts`, `apps/server/test/backup-status.test.ts`, `apps/server/test/deploy-status.test.ts`, `apps/server/test/deploy-lease.test.ts`, `integration/test/deploy-server-restart.test.ts`, `scripts/ops/deploy-self.test.mjs`
 
 ### sidebar
 
@@ -1032,24 +1032,6 @@ Reach:
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
 - Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
-
-### feature-releases
-
-**Feature flags and releases** (shipped, centrality 4). Per-user feature flags and the account page list where the owner releases them.
-
-States: A list of flags in the account settings with a release action for the owner.
-
-Reach:
-
-1. `settings account`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: **gap**: no note on per-user flags for a single-user product
-- Frontend design: **gap**: the releases list has no design
-- Backend design: **gap**: no design for flag defaults and release
-- Evidence: `apps/web/e2e/account-feature-releases.spec.ts`, `apps/server/test/feature-flags.test.ts`
 
 ### feishu
 

@@ -48,6 +48,7 @@ import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
+import { readDeployLease } from './deploy-lease.js';
 import {
   capabilityGatePasses,
   machineRunningCount,
@@ -656,8 +657,9 @@ export async function claimStep(
   origin: string,
   signal?: AbortSignal,
   body?: MachineClaimBody,
-  stillAuthorized: () => boolean = () => true,
+  authorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
+  const stillAuthorized = () => authorized() && readDeployLease(deps.db).status === 'accepting';
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);

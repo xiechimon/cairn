@@ -492,7 +492,7 @@ export function ProvidersPage() {
                 <EmptyState
                   testId="providers-empty"
                   icon={Cpu}
-                  title={t('尚未添加服务商。')}
+                  title={t('尚未添加服务商')}
                   description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
                 />
               }
