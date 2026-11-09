@@ -7,6 +7,12 @@ import { userRecordSchema } from './user.js';
 
 export const teamPlanSchema = z.string();
 
+export const autonomyPauseMarkerSchema = z.object({
+  repo: z.string(),
+  number: z.number().int().positive(),
+});
+export type AutonomyPauseMarker = z.infer<typeof autonomyPauseMarkerSchema>;
+
 export const teamRecordSchema = z.object({
   id: recordId,
   name: z.string(),
@@ -15,6 +21,7 @@ export const teamRecordSchema = z.object({
   claudeUsage: claudeUsageSchema.optional(),
   avatarStyle: z.string().nullable(),
   autonomyPaused: z.boolean().optional(),
+  autonomyPauseReason: z.string().nullable().optional(),
   coAuthorTrailer: z.boolean().default(true),
   requestInstructorReview: z.boolean().default(false),
   maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),

@@ -848,6 +848,13 @@
       "when": 1794120000000,
       "tag": "0124_thread_pr_panel_read",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "6",
+      "when": 1794188009267,
+      "tag": "0125_team_autonomy_pause_record",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,8 @@ test('pause-only PATCH preserves every first-PR field, including dismissal and r
     expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()).toEqual({
       ...before,
       autonomyPaused: true,
+      autonomyPauseReason: 'Paused by the team owner.',
+      autonomyPauseMarkers: [],
     });
   } finally {
     s.dispose();

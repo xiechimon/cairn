@@ -9680,6 +9680,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "autonomyPauseReason": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "autonomyPaused": {
       "type": "boolean",
     },

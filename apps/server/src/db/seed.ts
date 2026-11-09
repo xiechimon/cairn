@@ -50,6 +50,7 @@ export function toTeamRecord(row: typeof team.$inferSelect): TeamRecord {
     claudeUsage: row.claudeUsage,
     avatarStyle: row.avatarStyle,
     autonomyPaused: row.autonomyPaused,
+    autonomyPauseReason: row.autonomyPauseReason,
     coAuthorTrailer: row.coAuthorTrailer,
     requestInstructorReview: row.requestInstructorReview,
     maxAutonomousMergesPerDay: row.maxAutonomousMergesPerDay,

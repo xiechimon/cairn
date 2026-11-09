@@ -13,25 +13,34 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { recentRecoveryTarget } from '../src/services/github-recovery.js';
 import { newGateReadCache } from '../src/services/merge-gate/github-facts.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer } from './helpers.js';
+import { bootServer, req } from './helpers.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-function teamMarkersWorld() {
-  const open = new Set<string>();
-  let readsFail = false;
-  const posted: string[] = [];
+function teamMarkersWorld(opts: { postsFail?: boolean } = {}) {
+  const issues = new Map<string, { repo: string; number: number; open: boolean }>();
+  let next = 7;
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = new URL(String(input));
-    const repo = url.pathname.split('/').slice(2, 4).join('/');
+    const parts = url.pathname.split('/');
+    const repo = parts.slice(2, 4).join('/');
     if (url.pathname.endsWith('/issues') && init?.method === 'POST') {
-      posted.push(repo);
-      open.add(repo);
-      return Response.json({ number: 7 });
+      if (opts.postsFail === true) return new Response('', { status: 403 });
+      const marker = { repo, number: next++, open: true };
+      issues.set(`${repo}#${marker.number}`, marker);
+      return Response.json({ number: marker.number });
     }
-    if (url.pathname.endsWith('/issues')) {
-      if (readsFail) return new Response('', { status: 502 });
-      return Response.json(open.has(repo) ? [{ number: 7 }] : []);
+    if (url.pathname.endsWith('/issues'))
+      return Response.json(
+        [...issues.values()]
+          .filter((issue) => issue.repo === repo && issue.open)
+          .map((issue) => ({ number: issue.number })),
+      );
+    if (parts[4] === 'issues' && parts[5] !== undefined) {
+      const issue = issues.get(`${repo}#${parts[5]}`);
+      return issue === undefined
+        ? new Response('', { status: 404 })
+        : Response.json({ state: issue.open ? 'open' : 'closed' });
     }
     return Response.json({ name: 'autonomy-paused' });
   };
@@ -63,28 +72,26 @@ function teamMarkersWorld() {
       s.team.id,
       projectMergeConfigSchema.parse({ mergePolicy: 'autonomous' }),
     ).autonomyPaused;
-  return {
-    s,
-    deps,
-    open,
-    posted,
-    localPaused,
-    failReads: () => {
-      readsFail = true;
-    },
+  const closeAll = () => {
+    for (const issue of issues.values()) issue.open = false;
   };
+  return { s, deps, issues, localPaused, closeAll };
 }
 
-test('an automatic pause in one repository pauses every team repository and the local projects; closing the markers resumes them all', async () => {
+test('a team pause publishes a marker to every team repository and pauses local projects; closing the published markers resumes them all', async () => {
   const w = teamMarkersWorld();
   try {
     await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id, 'Main check failed in octo/alpha.');
-    expect(w.posted.sort()).toEqual(['octo/alpha', 'octo/beta']);
+    expect([...w.issues.values()].map((issue) => issue.repo).sort()).toEqual([
+      'octo/alpha',
+      'octo/beta',
+    ]);
     expect(w.localPaused()).toBe(true);
-    w.open.delete('octo/alpha');
+    const first = [...w.issues.values()][0];
+    if (first) first.open = false;
     await syncAutonomyPauses(w.deps);
     expect(w.localPaused()).toBe(true);
-    w.open.clear();
+    w.closeAll();
     await syncAutonomyPauses(w.deps);
     expect(w.localPaused()).toBe(false);
   } finally {
@@ -92,12 +99,42 @@ test('an automatic pause in one repository pauses every team repository and the 
   }
 });
 
-test('an unreadable marker keeps the team paused', async () => {
+test('a rejected marker publication keeps the team paused with the reason, even when reads find no open marker', async () => {
+  const w = teamMarkersWorld({ postsFail: true });
+  try {
+    await expect(
+      pauseTeamGithubReposAutonomously(w.deps, w.s.team.id, 'Unjudged landing.'),
+    ).rejects.toThrow();
+    await syncAutonomyPauses(w.deps);
+    await syncAutonomyPauses(w.deps);
+    expect(w.localPaused()).toBe(true);
+    const record = await req(w.s.app, 'GET', '/api/teams');
+    expect(JSON.stringify(await record.json())).toContain("Couldn't publish brake marker");
+  } finally {
+    w.s.dispose();
+  }
+});
+
+test('the owner resumes a pause whose markers could not be published', async () => {
+  const w = teamMarkersWorld({ postsFail: true });
+  try {
+    await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id).catch(() => undefined);
+    const resumed = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, {
+      autonomyPaused: false,
+    });
+    expect(resumed.status).toBe(200);
+    expect(w.localPaused()).toBe(false);
+  } finally {
+    w.s.dispose();
+  }
+});
+
+test('an unreadable published marker keeps the team paused', async () => {
   const w = teamMarkersWorld();
   try {
     await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id);
-    w.open.clear();
-    w.failReads();
+    w.closeAll();
+    w.issues.clear();
     await syncAutonomyPauses(w.deps);
     expect(w.localPaused()).toBe(true);
   } finally {
