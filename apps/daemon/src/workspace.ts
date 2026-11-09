@@ -471,8 +471,39 @@ export class WorkspaceManager implements WorktreeOps {
     );
   }
 
-  async mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }> {
+  async mergeDefaultBranch(
+    cwd: string,
+    defaultBranch: string,
+    credentials: BoundGitCredentials | null,
+  ): Promise<{ output: string }> {
+    const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
+    const drift = readSetupDrift(driftFile);
+    const recorded = Object.keys(drift);
+    const current = await fingerprintsOf(cwd, recorded);
+    const setupDrift = recorded.filter((path) => drift[path] === current[path]);
+    if (setupDrift.length === 0) {
+      return { output: await gitPrim.mergeNoEdit(cwd, `origin/${defaultBranch}`) };
+    }
+    await gitPrim.resetPathsToHead(cwd, setupDrift);
+    writeFileSync(driftFile, JSON.stringify({}));
+    this.logger.workspace(`setup drift reset before merge: ${setupDrift.join(', ')}`);
     const output = await gitPrim.mergeNoEdit(cwd, `origin/${defaultBranch}`);
+    try {
+      await this.recordingSetupDrift(cwd, () =>
+        runWorkspaceHook({
+          cwd,
+          name: 'setup',
+          credentials,
+          timeoutMs: this.hookTimeoutMs,
+          log: (line) => this.logger.workspace(line),
+        }),
+      );
+    } catch (err) {
+      if (err instanceof WorkspaceHookError) {
+        throw new Error(workspaceHookErrorMessage(err.note), { cause: err });
+      }
+      throw err;
+    }
     return { output };
   }
 

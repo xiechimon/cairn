@@ -120,7 +120,11 @@ export interface WorktreeOps {
     credentials: BoundGitCredentials | null,
     publication: PushPublication,
   ): Promise<void>;
-  mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }>;
+  mergeDefaultBranch(
+    cwd: string,
+    defaultBranch: string,
+    credentials: BoundGitCredentials | null,
+  ): Promise<{ output: string }>;
   headCommit(cwd: string): Promise<string | null>;
   countAhead(cwd: string, defaultBranch: string): Promise<number>;
   commitsAhead?(cwd: string, defaultBranch: string): Promise<string[]>;
