@@ -47,6 +47,8 @@ export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
 export const COMPUTER_BROWSER_DISABLED =
   'browser tools are off for this computer; enable 浏览器 in the Computers panel';
+export const COMPUTER_BROWSER_UNAVAILABLE =
+  'this machine no longer reports browser capability; turn off 浏览器 or rebuild the computer image';
 
 const SHELL_TOOLS: ReadonlySet<ComputerTool> = new Set(['shell', 'user_computer_shell']);
 const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
@@ -718,6 +720,10 @@ export async function forwardComputerCall(
     const preferred = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
     if (preferred === undefined || !preferred.browserEnabled) {
       throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
+    }
+    const host = db.select().from(machine).where(eq(machine.id, preferred.machineId)).get();
+    if (host?.capabilities?.browser !== true) {
+      throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
     }
   }
   const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);

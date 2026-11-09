@@ -207,6 +207,39 @@ describe('orb routing', () => {
     }
   });
 
+  test('browser refusal messages are bounded to the error frame limit', async () => {
+    const fake = fakeClient();
+    const huge = `boom ${'y'.repeat(5_000)}`;
+    const provider: ComputerProvider = {
+      async execute() {
+        return (async function* () {
+          yield { kind: 'stderr' as const, text: huge };
+          yield { kind: 'exit' as const, code: 1 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: { forScope: () => provider, async killAll() {} },
+      ...FAST,
+    });
+    await dispatcher.dispatch(call('browser_snapshot', {}, { scopeKey: 'chief:c1' }));
+    const err = fake.frames.find((frame) => frame.kind === 'error');
+    expect(err?.kind).toBe('error');
+    if (err?.kind === 'error') {
+      expect(err.message.length).toBeLessThanOrEqual(4096);
+      expect(err.message.endsWith('[browser output truncated]')).toBe(true);
+    }
+  });
+
   test('the Orb shell keeps the desktop-protection guard but not the cairn host rules', async () => {
     const log: string[] = [];
     const fake = fakeClient();

@@ -168,11 +168,13 @@ function MachineCard({
   machine,
   coordinator,
   computer,
+  pinnedElsewhere,
   teamId,
 }: {
   machine: MachineRow;
   coordinator: boolean;
   computer: ComputerRecord | null;
+  pinnedElsewhere: boolean;
   teamId: string | undefined;
 }) {
   const { t } = useI18n();
@@ -191,16 +193,20 @@ function MachineCard({
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
   const browserEnabled = computer?.browserEnabled === true;
+  const browserPinnedElsewhere = pinnedElsewhere && computer === null;
   const canToggleBrowser =
     teamId !== undefined &&
     machine.id !== undefined &&
     !browserBusy &&
+    !browserPinnedElsewhere &&
     (browserInstalled || browserEnabled);
-  const browserHint = browserInstalled
-    ? t('让 agent 打开网页、点击和填表。')
-    : browserEnabled
-      ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
-      : t('这台机器还不支持浏览器。');
+  const browserHint = browserPinnedElsewhere
+    ? t('浏览器偏好已绑定到另一台机器。')
+    : browserInstalled
+      ? t('让 agent 打开网页、点击和填表。')
+      : browserEnabled
+        ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
+        : t('这台机器还不支持浏览器。');
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -279,6 +285,7 @@ function MachineCard({
   const onBrowserToggle = (checked: boolean) => {
     const machineId = machine.id;
     if (teamId === undefined || machineId === undefined || browserBusy) return;
+    if (browserPinnedElsewhere) return;
     if (checked && !browserInstalled) return;
     if (!checked && computer === null) return;
     const ownedTeamId = teamId;
@@ -289,6 +296,7 @@ function MachineCard({
         : ensureComputerBrowser(machineId, checked);
     void run
       .then(() => invalidateConverged(qc, { queryKey: ['computers', ownedTeamId] }))
+      .catch(() => invalidateConverged(qc, { queryKey: ['computers', ownedTeamId] }))
       .finally(() => setBrowserBusy(false));
   };
 
@@ -471,6 +479,9 @@ export function MachinesPanel({
               machine={machine}
               coordinator={machine === host}
               computer={computerFor(machine)}
+              pinnedElsewhere={computers.some(
+                (row) => machine.id !== undefined && row.machine.id !== machine.id,
+              )}
               teamId={teamId}
             />
           ))}

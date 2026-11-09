@@ -13,6 +13,7 @@ import {
 } from '../src/db/schema.js';
 import {
   COMPUTER_BROWSER_DISABLED,
+  COMPUTER_BROWSER_UNAVAILABLE,
   COMPUTER_BUSY,
   COMPUTER_EXECUTION_LEASE_MS,
   COMPUTER_NOT_CONNECTED,
@@ -45,7 +46,7 @@ afterEach(() => {
 function addMachine(
   s: TestServer,
   id: string,
-  capabilities: { computer?: true; ownComputer?: true },
+  capabilities: { computer?: true; ownComputer?: true; browser?: true },
   lastSeenAt = 1,
 ) {
   s.db
@@ -175,6 +176,42 @@ describe('forwardComputerCall target and presence', () => {
       }),
     ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_DISABLED });
     expect(s.db.select().from(computerTable).all()).toEqual([]);
+    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
+  });
+
+  test('browser tools refuse when the pinned machine no longer reports browser capability', async () => {
+    const { s, deps, chiefId } = boot();
+    addMachine(s, 'omarchy', { computer: true, browser: true });
+    connect(s, 'omarchy');
+    addStep(s, 'step-stale-browser', 'omarchy');
+    const now = Date.now();
+    s.db
+      .insert(computerTable)
+      .values({
+        id: 'comp-browser',
+        teamId: s.team.id,
+        scopeKey: `chief:${chiefId}`,
+        machineId: 'omarchy',
+        providerRef: computerMachineName(`chief:${chiefId}`),
+        state: 'stopped',
+        browserEnabled: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { mcpServers: [], skills: [], computer: true } })
+      .where(eq(machineTable.id, 'omarchy'))
+      .run();
+    await expect(
+      forwardComputerCall(deps, 'omarchy', 'step-stale-browser', {
+        computer: true,
+        name: 'browser_navigate',
+        toolCallId: 'browser-stale',
+        params: { url: 'https://example.com' },
+      }),
+    ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_UNAVAILABLE });
     expect(s.db.select().from(computerCallTable).all()).toEqual([]);
   });
 

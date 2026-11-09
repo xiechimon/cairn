@@ -28,6 +28,7 @@ export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provid
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
 export const FILE_TRUNCATED_MARKER = '\n[file truncated]';
 export const BROWSER_TRUNCATED_MARKER = '\n[browser output truncated]';
+export const COMPUTER_FRAME_ERROR_MAX_CHARS = 4096;
 
 export const COMPUTER_COMMAND_TIMEOUT_MS = 5 * 60_000;
 export const COMPUTER_OUTPUT_CAP_CHARS = 2 * 1024 * 1024;
@@ -392,6 +393,14 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     );
   }
 
+  function boundBrowserError(message: string): string {
+    if (message.length <= COMPUTER_FRAME_ERROR_MAX_CHARS) return message;
+    return (
+      message.slice(0, COMPUTER_FRAME_ERROR_MAX_CHARS - BROWSER_TRUNCATED_MARKER.length) +
+      BROWSER_TRUNCATED_MARKER
+    );
+  }
+
   async function handleBrowser(
     call: ComputerCall,
     route: Route,
@@ -413,7 +422,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     } catch (error) {
       await poster.finish(
         error instanceof ComputerRefusal
-          ? { kind: 'error', message: error.message, delivery: error.delivery }
+          ? {
+              kind: 'error',
+              message: boundBrowserError(error.message),
+              delivery: error.delivery,
+            }
           : {
               kind: 'error',
               message: 'The browser operation failed',

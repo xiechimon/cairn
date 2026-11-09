@@ -150,6 +150,7 @@ export const EN: Record<string, string> = {
   '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',
   '这台机器已不再报告浏览器能力；可关闭已保存的偏好。':
     'This machine no longer reports browser capability; you can turn off the saved preference.',
+  '浏览器偏好已绑定到另一台机器。': 'The browser preference is already bound to another machine.',
   '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
     'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',
