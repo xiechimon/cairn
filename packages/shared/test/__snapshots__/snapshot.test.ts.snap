@@ -6174,6 +6174,23 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "section": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "needs_input",
+                    "ready_for_review",
+                    "up_next",
+                    "working",
+                    "resolved",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "seqNum": {
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
@@ -7885,6 +7902,13 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/todos",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/tasks",
     "query": [
       "teamId",
     ],
@@ -10333,6 +10357,23 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             },
           },
           "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "section": {
+      "anyOf": [
+        {
+          "enum": [
+            "needs_input",
+            "ready_for_review",
+            "up_next",
+            "working",
+            "resolved",
+          ],
+          "type": "string",
         },
         {
           "type": "null",
