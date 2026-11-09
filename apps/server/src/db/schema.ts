@@ -2,6 +2,8 @@ import type {
   ActiveRun,
   AutonomyGateReason,
   AutonomyKind,
+  AutonomyPauseMarker,
+  AutonomyPauseSource,
   AutonomySettings,
   BlockerHandoffRecord,
   BuildEvidence,
@@ -75,7 +77,6 @@ export const team = sqliteTable('team', {
   plan: text('plan').notNull().default('free'),
   claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
   avatarStyle: text('avatarStyle'),
-  autonomyPaused: bool('autonomyPaused').notNull().default(false),
   coAuthorTrailer: bool('coAuthorTrailer').notNull().default(true),
   requestInstructorReview: bool('requestInstructorReview').notNull().default(false),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
@@ -85,6 +86,28 @@ export const team = sqliteTable('team', {
   firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
   namedPrompts: json<NamedPromptOverrides | null>('namedPrompts'),
 });
+
+export const autonomyPause = sqliteTable(
+  'autonomy_pause',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    source: text('source').$type<AutonomyPauseSource>().notNull(),
+    reason: text('reason').notNull(),
+    markers: json<AutonomyPauseMarker[]>('markers').notNull(),
+    publishError: text('publishError'),
+    openedAt: epochMs('openedAt').notNull(),
+    resolvedAt: epochMs('resolvedAt'),
+    resolvedBy: text('resolvedBy').$type<'markers' | 'owner'>(),
+    requestKey: text('requestKey'),
+  },
+  (t) => [
+    index('autonomy_pause_team_resolved_idx').on(t.teamId, t.resolvedAt),
+    uniqueIndex('autonomy_pause_team_request_key_idx').on(t.teamId, t.requestKey),
+  ],
+);
 
 export const project = sqliteTable('project', {
   id: text('id').primaryKey(),
