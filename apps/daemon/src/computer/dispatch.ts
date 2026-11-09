@@ -405,7 +405,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     let text: string;
     try {
       text = await runBrowserTool(route.provider, call.tool as BrowserToolName, call.params, {
-        timeoutMs: Math.max(0, call.deadlineAt - now() - FINAL_FRAME_MARGIN_MS),
+        deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+        now,
         signal: controller.signal,
         session: call.scopeKey,
       });

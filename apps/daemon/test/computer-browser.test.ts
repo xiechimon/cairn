@@ -179,4 +179,95 @@ describe('runBrowserTool', () => {
       ),
     ).rejects.toMatchObject({ delivery: 'unknown' } satisfies Partial<ComputerRefusal>);
   });
+
+  test('recomputes remaining time from one absolute deadline across the batch', async () => {
+    let clock = 1_000;
+    const timeouts: number[] = [];
+    const provider: ComputerProvider = {
+      async execute(request) {
+        timeouts.push(request.timeoutMs);
+        clock += 400;
+        return (async function* () {
+          if (request.argv.includes('snapshot')) {
+            yield { kind: 'stdout' as const, text: '- button "Go" [ref=e1]\n' };
+          } else {
+            yield { kind: 'stdout' as const, text: 'ok\n' };
+          }
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    await runBrowserTool(
+      provider,
+      'browser_act',
+      {
+        actions: [
+          { kind: 'click', ref: 'e1' },
+          { kind: 'click', ref: 'e1' },
+        ],
+      },
+      {
+        deadlineAt: 3_000,
+        now: () => clock,
+        signal: new AbortController().signal,
+      },
+    );
+    expect(timeouts).toEqual([2_000, 1_600, 1_200, 800]);
+  });
+
+  test('aborts later batch actions once the shared deadline elapses', async () => {
+    let clock = 1_000;
+    let starts = 0;
+    const provider: ComputerProvider = {
+      async execute(request) {
+        starts += 1;
+        clock += 600;
+        return (async function* () {
+          if (request.argv.includes('snapshot')) {
+            yield { kind: 'stdout' as const, text: '- button "Go" [ref=e1]\n' };
+          } else {
+            yield { kind: 'stdout' as const, text: 'ok\n' };
+          }
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    await expect(
+      runBrowserTool(
+        provider,
+        'browser_act',
+        {
+          actions: [
+            { kind: 'click', ref: 'e1' },
+            { kind: 'click', ref: 'e1' },
+          ],
+        },
+        {
+          deadlineAt: 2_500,
+          now: () => clock,
+          signal: new AbortController().signal,
+        },
+      ),
+    ).rejects.toMatchObject({
+      message: 'browser call deadline elapsed',
+      delivery: 'unknown',
+    } satisfies Partial<ComputerRefusal>);
+    expect(starts).toBe(3);
+  });
 });

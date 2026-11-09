@@ -35,10 +35,12 @@ const actParams = z.object({
 export type BrowserToolName = 'browser_navigate' | 'browser_snapshot' | 'browser_act';
 
 export interface BrowserRunOptions {
-  timeoutMs: number;
   signal: AbortSignal;
   session?: string;
   binary?: string;
+  deadlineAt?: number;
+  timeoutMs?: number;
+  now?: () => number;
 }
 
 export function browserSessionName(scopeKey: string | undefined): string {
@@ -63,14 +65,31 @@ function normalizeRef(ref: string): string {
   return `@${bareRef(ref)}`;
 }
 
+function browserDeadlineAt(options: BrowserRunOptions): number {
+  const clock = options.now ?? Date.now;
+  if (options.deadlineAt !== undefined) return options.deadlineAt;
+  if (options.timeoutMs !== undefined) return clock() + options.timeoutMs;
+  throw new ComputerRefusal('browser call needs a deadline', 'not_delivered');
+}
+
+function remainingTimeoutMs(deadlineAt: number, now: () => number): number {
+  return Math.max(0, deadlineAt - now());
+}
+
 async function collectExecute(
   provider: ComputerProvider,
   argv: readonly string[],
-  options: BrowserRunOptions,
+  options: BrowserRunOptions & { deadlineAt: number },
+  started: boolean,
 ): Promise<{ text: string; code: number | null }> {
+  const clock = options.now ?? Date.now;
+  const timeoutMs = remainingTimeoutMs(options.deadlineAt, clock);
+  if (timeoutMs <= 0) {
+    refuse('browser call deadline elapsed', started);
+  }
   const events = await provider.execute({
     argv: [...argv],
-    timeoutMs: options.timeoutMs,
+    timeoutMs,
     signal: options.signal,
   });
   let text = '';
@@ -133,11 +152,14 @@ export async function runBrowserTool(
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
   const session = browserSessionName(options.session);
   const prefix = [binary, ...sessionFlag(session), ...headedFlags()];
+  const deadlineAt = browserDeadlineAt(options);
+  const timed = { ...options, deadlineAt };
   let started = false;
 
   const execute = async (argv: readonly string[]) => {
+    const result = await collectExecute(provider, argv, timed, started);
     started = true;
-    return collectExecute(provider, argv, options);
+    return result;
   };
 
   if (tool === 'browser_navigate') {
