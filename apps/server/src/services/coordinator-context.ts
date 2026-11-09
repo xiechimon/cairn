@@ -6,12 +6,13 @@ import {
   resumeExpiresAtOf,
   retentionMsFor,
 } from '../coordinator/runtime/cold-slim.js';
+import { DEFAULT_CONTEXT_WINDOW } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import { chiefThread, chiefTurnUsage, coordinatorConversation, provider } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { coordinatorProfile } from './routing-rules.js';
 
-export const DEFAULT_CONTEXT_WINDOW = 128_000;
+export { DEFAULT_CONTEXT_WINDOW };
 
 let serverContextOn = false;
 let inServer = false;

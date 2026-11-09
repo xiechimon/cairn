@@ -554,6 +554,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
   });
 
   test('flag on: the window comes from the model that ran the last turn, from its provider catalog', async () => {
+    expect(DEFAULT_CONTEXT_WINDOW).toBe(200_000);
     H.s.db
       .insert(providerTable)
       .values({
@@ -564,7 +565,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
         baseUrl: 'https://example.invalid/v1',
         api: 'anthropic-messages',
         compat: {},
-        models: [{ id: 'stub-model', name: 'stub-model', contextWindow: 200_000 }],
+        models: [{ id: 'stub-model', name: 'stub-model' }],
         createdBy: H.userId,
         createdAt: 1,
         updatedAt: 1,
@@ -578,7 +579,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     });
     expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 110,
-      contextWindow: 200_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
     claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
