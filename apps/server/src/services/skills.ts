@@ -215,13 +215,13 @@ function assertFrontmatterCoherence(
   if (!fm.name) {
     throw new HttpError(
       400,
-      'invalid SKILL.md frontmatter: name is required (one line, plain value)',
+      'invalid SKILL.md frontmatter: name is required (non-empty YAML string scalar)',
     );
   }
   if (!fm.description) {
     throw new HttpError(
       400,
-      'invalid SKILL.md frontmatter: description is required (one line, plain value)',
+      'invalid SKILL.md frontmatter: description is required (non-empty YAML string scalar)',
     );
   }
   if (fm.name !== body.name) {

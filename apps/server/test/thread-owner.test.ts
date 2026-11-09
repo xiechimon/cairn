@@ -5,7 +5,9 @@ import { and, eq, like } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
+  chiefThread,
   gateState,
+  notification,
   plan as planTable,
   project as projectTable,
   step as stepTable,
@@ -13,7 +15,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import type { BuildDeps } from '../src/services/builds.js';
-import { transitionTodos } from '../src/services/chief-tools.js';
+import { executeChiefTool, transitionTodos } from '../src/services/chief-tools.js';
 import { listNeedsYou } from '../src/services/needs-you.js';
 import { reconcileOwners, seedOwnerCheckpoints } from '../src/services/owner.js';
 import { parkFailedBuild } from '../src/services/retry-parking.js';
@@ -537,6 +539,245 @@ describe('reconcileOwners (#3512)', () => {
     expect(w.notified()).toBe(before);
     const seeded = w.s.db.select().from(todoTable).all();
     expect(seeded.every((row) => row.lastNotifiedOwner !== null)).toBe(true);
+  });
+});
+
+describe('a Coordinator turn that changes nothing hands the task to the owner (task stall class 4)', () => {
+  const coordinatorActor = {
+    kind: 'agent' as const,
+    name: 'Coordinator',
+    stopActor: 'coordinator' as const,
+  };
+
+  function failedWorld(): World {
+    const w = openWorld({ phase: 'building', failure: 'repeated' });
+    w.s.db
+      .update(buildTable)
+      .set({ errorMessage: 'PR Auto-fix needs you: review round cap (3) reached' })
+      .where(eq(buildTable.id, w.buildId))
+      .run();
+    setTodoPhase(w.deps, w.todoId, 'failed');
+    reconcileOwners(w.deps);
+    return w;
+  }
+
+  function wakeStep(w: World) {
+    return w.s.db
+      .select()
+      .from(stepTable)
+      .where(and(eq(stepTable.kind, 'chief'), like(stepTable.prompt, `%watch:${w.todoId}%`)))
+      .all();
+  }
+
+  function endTurn(w: World, status: 'done' | 'failed' | 'stopped' = 'done'): void {
+    for (const row of wakeStep(w)) {
+      w.s.db
+        .update(stepTable)
+        .set({ status, finishedAt: nowMs() })
+        .where(eq(stepTable.id, row.id))
+        .run();
+    }
+  }
+
+  test.each(['done', 'failed', 'stopped'] as const)(
+    'a wake turn that ends %s with the failure unchanged hands it to the owner once',
+    (status) => {
+      const w = failedWorld();
+      expect(ownerNow(w)).toBe('coordinator');
+      expect(wakes(w)).toHaveLength(1);
+      const before = w.notified();
+      endTurn(w, status);
+      reconcileOwners(w.deps);
+      reconcileOwners(w.deps);
+      expect(ownerNow(w)).toBe('owner');
+      expect(w.notified()).toBe(before + 1);
+      expect(
+        w.s.db.select().from(notification).where(eq(notification.entityId, w.todoId)).get()?.type,
+      ).toBe('coordinator_handoff');
+      expect(wakes(w)).toHaveLength(1);
+      const inbox = listNeedsYou(w.deps, w.s.team.id).current;
+      expect(inbox.map((entry) => [entry.todo.id, entry.reason])).toEqual([[w.todoId, 'handoff']]);
+    },
+  );
+
+  test('a wake turn still running stays with the Coordinator', () => {
+    const w = failedWorld();
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('coordinator');
+  });
+
+  test('a wake never claimed after 30 minutes hands the task to the owner and cancels the wake', () => {
+    const w = failedWorld();
+    for (const row of wakeStep(w)) {
+      w.s.db
+        .update(stepTable)
+        .set({ createdAt: nowMs() - 31 * 60_000 })
+        .where(eq(stepTable.id, row.id))
+        .run();
+    }
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('owner');
+    expect(wakeStep(w).map((row) => row.status)).toEqual(['stopped']);
+  });
+
+  test.each(['pending', 'waiting_quota'] as const)(
+    'cancelling the last %s wake clears busy state and publishes the stopped step',
+    (status) => {
+      const w = failedWorld();
+      const wake = wakeStep(w)[0]!;
+      w.s.db
+        .update(stepTable)
+        .set({ status, createdAt: nowMs() - 31 * 60_000 })
+        .where(eq(stepTable.id, wake.id))
+        .run();
+      const publish = vi.spyOn(w.s.convHub, 'publishStep');
+      reconcileOwners(w.deps);
+      expect(
+        w.s.db.select().from(chiefThread).where(eq(chiefThread.id, wake.buildId)).get()?.activeRun,
+      ).toBeNull();
+      expect(publish).toHaveBeenCalledWith(
+        wake.buildId,
+        expect.objectContaining({ id: wake.id, status: 'stopped' }),
+      );
+    },
+  );
+
+  test('cancelling a stale wake keeps an active sibling busy', () => {
+    const w = failedWorld();
+    const wake = wakeStep(w)[0]!;
+    w.s.db
+      .update(stepTable)
+      .set({ createdAt: nowMs() - 31 * 60_000 })
+      .where(eq(stepTable.id, wake.id))
+      .run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: newRecordId(),
+        buildId: wake.buildId,
+        kind: 'chief',
+        status: 'claimed',
+        createdAt: nowMs(),
+        claimedAt: nowMs(),
+      })
+      .run();
+    reconcileOwners(w.deps);
+    expect(
+      w.s.db.select().from(chiefThread).where(eq(chiefThread.id, wake.buildId)).get()?.activeRun,
+    ).not.toBeNull();
+    expect(wakeStep(w)[0]?.status).toBe('stopped');
+  });
+
+  test.each(['done', 'failed', 'stopped'] as const)(
+    'needs_you preserves answer arguments after a question turn ends %s',
+    async (status) => {
+      const w = openWorld({ phase: 'building' });
+      const requestId = 'ask-handoff-answer';
+      await ask(w, requestId);
+      endTurn(w, status);
+      reconcileOwners(w.deps);
+      const wake = wakeStep(w)[0]!;
+      const thread = w.s.db
+        .select()
+        .from(chiefThread)
+        .where(eq(chiefThread.id, wake.buildId))
+        .get()!;
+      const deps = {
+        ...w.deps,
+        box: w.s.secretBox,
+        reposDir: w.s.reposDir,
+        attachmentsDir: w.s.attachmentsDir,
+        skillsDir: w.s.skillsDir,
+      };
+      const ctx = {
+        teamId: w.s.team.id,
+        userId: w.s.user.id,
+        chiefId: thread.chiefId,
+        threadId: thread.id,
+        chiefAgentId: null,
+        conversationId: thread.id,
+      };
+      const out = JSON.parse(await executeChiefTool(deps, ctx, 'needs_you', {}));
+      expect(out.items).toEqual([
+        expect.objectContaining({
+          todoId: w.todoId,
+          owner: 'owner',
+          kind: 'handoff',
+          questions: [
+            expect.objectContaining({
+              requestId,
+              items: [expect.objectContaining({ question: `Which scope for ${requestId}?` })],
+            }),
+          ],
+        }),
+      ]);
+      const answered = JSON.parse(
+        await executeChiefTool(deps, ctx, 'answer_question', {
+          todoId: w.todoId,
+          requestId,
+          answer: 'Small',
+        }),
+      );
+      expect(answered).toMatchObject({ todoId: w.todoId, requestId });
+    },
+  );
+
+  test('a wake the Coordinator is still running keeps the task, however long it runs', () => {
+    const w = failedWorld();
+    for (const row of wakeStep(w)) {
+      w.s.db
+        .update(stepTable)
+        .set({
+          status: 'claimed',
+          createdAt: nowMs() - 60 * 60_000,
+          claimedAt: nowMs() - 45 * 60_000,
+        })
+        .where(eq(stepTable.id, row.id))
+        .run();
+    }
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('coordinator');
+  });
+
+  test('a turn that acts on the failure changes the work and hands nothing over', () => {
+    const w = failedWorld();
+    setTodoPhase(w.deps, w.todoId, 'queued');
+    endTurn(w);
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe(null);
+  });
+
+  test('new work after a handoff wakes the Coordinator again', async () => {
+    const w = failedWorld();
+    endTurn(w);
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('owner');
+    setTodoPhase(w.deps, w.todoId, 'queued');
+    setTodoPhase(w.deps, w.todoId, 'building');
+    await ask(w, 'ask-00000c4a');
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('coordinator');
+    expect(wakes(w)).toHaveLength(2);
+  });
+
+  test('the Coordinator can still accept a review it handed over', () => {
+    const w = openWorld({ phase: 'building', policy: 'human', output: 'info' });
+    setTodoPhase(w.deps, w.todoId, 'review');
+    reconcileOwners(w.deps);
+    endTurn(w);
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('owner');
+    const out = transitionTodos(w.deps, w.s.team.id, [w.todoId], 'done', coordinatorActor);
+    expect(out.transitioned).toEqual([w.todoId]);
+  });
+
+  test('the failed wake names the settling actions and no longer allows a silent end', () => {
+    const w = failedWorld();
+    const [prompt] = wakes(w);
+    for (const tool of ['message_thread', 'close_todos']) {
+      expect(prompt).toContain(tool);
+    }
+    expect(prompt).not.toContain('否则不发消息');
   });
 });
 

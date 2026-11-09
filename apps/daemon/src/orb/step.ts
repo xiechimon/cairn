@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/shared';
+import {
+  type AgentSessionHandle,
+  type ClaimedStep,
+  type MachineDoneBody,
+  workspaceHookRowContent,
+} from '@cairn/shared';
 import { MachineApiError } from '../machine-client.js';
 import { writePrivateFile } from '../private-fs.js';
 import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
@@ -368,7 +373,7 @@ export async function relayOrbStopped(deps: RunStepDeps, handle: OrbHandle): Pro
   const row = {
     id: `orb-stopped-${handle.lastStepId}`,
     role: 'system' as const,
-    content: `.agents/${note.name} hook ok (${note.ms}ms)\n${note.output}`,
+    content: workspaceHookRowContent(note),
     createdAt: Date.now(),
   };
   await deps.client.transcriptRow?.(handle.lastStepId, row);

@@ -136,15 +136,17 @@ function fireDesktopNotification(record: NotificationRecord): void {
   const title =
     record.type === 'plan_ready'
       ? t('方案已就绪')
-      : record.type === 'build_review'
-        ? t('构建待审核')
-        : record.type === 'quota_wait'
-          ? t('等额度')
-          : record.type === 'model_fallback'
-            ? t('已换备用模型')
-            : record.type === 'no_machine'
-              ? t('没有机器能跑')
-              : record.entityRef.title;
+      : record.type === 'coordinator_handoff'
+        ? t('需要你决定')
+        : record.type === 'build_review'
+          ? t('构建待审核')
+          : record.type === 'quota_wait'
+            ? t('等额度')
+            : record.type === 'model_fallback'
+              ? t('已换备用模型')
+              : record.type === 'no_machine'
+                ? t('没有机器能跑')
+                : record.entityRef.title;
   const body =
     record.snippet ??
     (record.entityRef.seqNum !== null

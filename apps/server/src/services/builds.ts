@@ -20,7 +20,8 @@ import {
   AGENT_TOOL_PUSH,
   ANSWERS_CONTINUE_PROMPT,
   ASK_USER_QUESTION_KIND,
-  buildFallbackReport,
+  BUILD_FAILURE_ROW_KIND,
+  buildFailureRowContent,
   buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
   buildReplanPrompt,
@@ -57,6 +58,7 @@ import {
   SESSION_REWORK_BRIEF,
   STOP_MESSAGE,
   type StopAttribution,
+  systemRowOf,
   type TodoOutputKind,
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
@@ -1541,14 +1543,27 @@ export async function applyBuildStepAction(
             createdAt: now,
           });
         }
+        if (
+          reworkTarget.errorMessage !== null &&
+          !hasFailureRow(deps, reworkTarget.id, reworkTarget.errorMessage)
+        ) {
+          insertMessageRow(transcriptDeps, reworkTarget.id, {
+            id: newRecordId(),
+            role: 'system',
+            content: buildFailureRowContent({
+              reason: reworkTarget.errorMessage,
+              pr:
+                reworkTarget.prNumber !== null
+                  ? { number: reworkTarget.prNumber, url: reworkTarget.prUrl }
+                  : null,
+            }),
+            createdAt: now - 1,
+          });
+        }
         insertMessageRow(transcriptDeps, reworkTarget.id, {
           id: newRecordId(),
           role: 'system',
-          content: buildReworkReuseNote({
-            prNumber: reworkTarget.prNumber,
-            prUrl: reworkTarget.prUrl,
-            failureReason: reworkTarget.errorMessage,
-          }),
+          content: buildReworkReuseNote({ prNumber: reworkTarget.prNumber }),
           createdAt: now,
         });
         const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
@@ -2574,7 +2589,7 @@ export function applyStepFailure(
     insertMessageRow(deps, buildRow.id, {
       id: newRecordId(),
       role: 'system',
-      content: buildFallbackReport({
+      content: buildFailureRowContent({
         reason: errorMessage,
         ...(preservedCommits !== undefined ? { commits: preservedCommits } : {}),
         ...(files !== undefined ? { files } : {}),
@@ -3008,6 +3023,18 @@ function spokenText(content: unknown): string {
       return type === 'text' && typeof text === 'string' ? [text] : [];
     })
     .join('\n');
+}
+
+function hasFailureRow(deps: BuildDeps, buildId: string, reason: string): boolean {
+  return deps.db
+    .select({ content: message.content })
+    .from(message)
+    .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
+    .all()
+    .some((row) => {
+      const parsed = systemRowOf(row.content);
+      return parsed?.kind === BUILD_FAILURE_ROW_KIND && parsed.reason === reason;
+    });
 }
 
 function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {

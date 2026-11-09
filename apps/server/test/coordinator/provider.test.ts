@@ -31,6 +31,21 @@ describe('the provider of a claimed Coordinator step', () => {
     });
   });
 
+  it.each([
+    { input: undefined, expected: ['text', 'image'] },
+    { input: ['text'] as ('text' | 'image')[], expected: ['text'] },
+    { input: ['text', 'image'] as ('text' | 'image')[], expected: ['text', 'image'] },
+  ])(
+    'preserves declared input capabilities and allows images when unspecified: $input',
+    ({ input, expected }) => {
+      const models = createCoordinatorModels();
+      models.useStepProvider({ ...config, models: [{ ...config.models[0]!, input }] });
+      expect(models.models.getModel(config.providerId, config.models[0]!.id)?.input).toEqual(
+        expected,
+      );
+    },
+  );
+
   it('authenticates only with the key handed over for the step, never the process environment', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-from-env';
     const models = createCoordinatorModels();
