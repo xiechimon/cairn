@@ -25,10 +25,6 @@ export function pendingQuestions(stream: readonly ChiefStreamItem[]): ChiefQuest
   );
 }
 
-export function needsYouCount(todos: readonly TodoRecord[], pendingQuestionCount = 0): number {
-  return needsYouThreads(todos).length + pendingQuestionCount;
-}
-
 export const TRAY_PINNED = 3;
 
 export function trayWindow<T>(
