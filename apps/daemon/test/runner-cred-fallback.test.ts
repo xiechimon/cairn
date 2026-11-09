@@ -12,6 +12,7 @@ import type {
   TranscriptUpload,
   WorktreeOps,
 } from '@cairn/shared';
+import { GIT_CREDENTIAL_ROW_KIND, systemRowOf } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { gitPrim } from '../src/git.js';
@@ -317,7 +318,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(client.doneBodies[0]!.body.status).toBe('success');
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(row?.role).toBe('system');
-    expect(String(row?.content)).toContain('machine');
+    expect(systemRowOf(row?.content)).toEqual({ kind: GIT_CREDENTIAL_ROW_KIND, source: 'machine' });
     const allText = `${JSON.stringify(transcriptRows(client))}\n${lines.join('\n')}`;
     expect(allText).not.toContain(GITHUB_TOKEN.password);
     expect(lines.some((l) => l.includes('machine credentials'))).toBe(true);
@@ -361,7 +362,10 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     );
     expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED }]);
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(String(row?.content)).toContain('integration');
+    expect(systemRowOf(row?.content)).toEqual({
+      kind: GIT_CREDENTIAL_ROW_KIND,
+      source: 'integration',
+    });
     expect(client.doneBodies[0]!.body.status).toBe('success');
   }, 20_000);
 
@@ -386,7 +390,10 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(msg).toContain('machine credentials');
     expect(msg).toContain('could not read Username');
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(String(row?.content)).toContain('integration');
+    expect(systemRowOf(row?.content)).toEqual({
+      kind: GIT_CREDENTIAL_ROW_KIND,
+      source: 'integration',
+    });
     expect(`${msg}\n${JSON.stringify(transcriptRows(client))}`).not.toContain(
       GITHUB_TOKEN.password,
     );
@@ -439,7 +446,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(workspace.pushes).toHaveLength(0);
     expect(client.doneBodies[0]!.body.status).toBe('success');
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(String(row?.content)).toContain('machine');
+    expect(systemRowOf(row?.content)).toEqual({ kind: GIT_CREDENTIAL_ROW_KIND, source: 'machine' });
   }, 20_000);
 });
 

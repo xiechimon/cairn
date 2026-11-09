@@ -20,6 +20,7 @@ const DONE_VERBS = {
   run: '运行了',
   edit: '修改了',
   tool: '调用了',
+  setup: '准备了',
 };
 const RUNNING_VERBS = {
   read: '正在读取',
@@ -27,6 +28,7 @@ const RUNNING_VERBS = {
   run: '正在运行',
   edit: '正在修改',
   tool: '正在调用',
+  setup: '正在准备',
 };
 
 export function formatWorkDuration(seconds: number | null): string {
@@ -192,6 +194,7 @@ export function WorkTrace({
     else {
       if (step.action === 'read') readPaths.add((step.target ?? '').replace(/ L\d.*$/, ''));
       else if (step.action === 'edit') editPaths.add(step.target ?? '');
+      else if (step.action === 'setup') counts.setup = 1;
       else counts[step.action] += 1;
       if (step.error) counts.failed += 1;
       if (step.running) running = true;

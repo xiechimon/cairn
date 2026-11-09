@@ -12,7 +12,6 @@ import type {
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
-  GitCredentialSource,
   LocalToolDef,
   MachineAskBody,
   MachineDoneBody,
@@ -47,6 +46,7 @@ import {
   composeTaskPromptWithInstruction,
   conversationBranch,
   FIXED_TAGS,
+  gitCredentialRowContent,
   INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
   isBuildStepKind,
@@ -70,6 +70,7 @@ import {
   subscriptionKeyOf,
   transcriptPromptRowId,
   withCoAuthor,
+  workspaceHookRowContent,
 } from '@cairn/shared';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
@@ -123,12 +124,6 @@ import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
 import { localRepoUnreachableMessage } from './workspace.js';
-
-function gitCredentialSourceRowContent(source: GitCredentialSource): string {
-  return source === 'machine'
-    ? 'git 凭据来源：machine（执行机本机 git 凭据）'
-    : 'git 凭据来源：integration（per-step 下发 token）';
-}
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -1072,29 +1067,18 @@ async function runClaimedStep(
     });
   }
   for (const [index, hook] of [...(opts.hookNotes ?? []), ...(ws?.hooks ?? [])].entries()) {
-    const head =
-      hook.status === 'ok'
-        ? `.agents/${hook.name} hook ok (${hook.ms}ms)`
-        : hook.status === 'timeout'
-          ? `.agents/${hook.name} hook timed out after ${Math.round(hook.ms / 1000)}s — process group killed`
-          : `.agents/${hook.name} hook failed (exit ${hook.exitCode})`;
-    const truncated =
-      hook.totalChars > hook.output.length
-        ? `\n… output truncated (${hook.totalChars - hook.output.length} more chars)`
-        : '';
     const output =
       opts.hookNotes?.includes(hook) &&
       hook.output.startsWith('orb: started in') &&
       opts.orbStartedAt !== undefined
         ? `orb: started in ${Math.max(0, now() - opts.orbStartedAt)}ms`
         : hook.output;
-    const body = output.trim() === '' ? '' : `\n${output.trimEnd()}${truncated}`;
     transcript.upsert({
       id: opts.hookNotes?.includes(hook)
         ? `orb-hook-${index}-${stepId}`
         : `hook-${hook.name}-${stepId}`,
       role: 'system',
-      content: `${head}${body}`,
+      content: workspaceHookRowContent(hook, output),
       createdAt: now(),
     });
   }
@@ -1103,7 +1087,7 @@ async function runClaimedStep(
     transcript.upsert({
       id: `git-credential-${stepId}`,
       role: 'system',
-      content: gitCredentialSourceRowContent(ws.credentialSource ?? 'integration'),
+      content: gitCredentialRowContent(ws.credentialSource ?? 'integration'),
       createdAt: now(),
     });
   }
@@ -2045,7 +2029,7 @@ async function runClaimedStep(
           transcript.upsert({
             id: `git-credential-${stepId}`,
             role: 'system',
-            content: gitCredentialSourceRowContent('machine'),
+            content: gitCredentialRowContent('machine'),
             createdAt: now(),
           });
         }

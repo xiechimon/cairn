@@ -591,11 +591,14 @@ function FailRow({
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
-        {item.body !== '' && (
+        {item.body !== '' && item.raw === undefined && (
           <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
         )}
         {item.title !== '' && (
-          <p className={`${PARA} ${PARA_GAP} flex gap-3 text-meta text-(--text-tertiary)`}>
+          <p
+            className={`${PARA} ${PARA_GAP} flex flex-wrap gap-3 text-meta text-(--text-tertiary)`}
+          >
+            {item.raw !== undefined && item.body !== '' && <span>{item.body}</span>}
             <Button
               variant="ghost"
               className="h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary)"
@@ -612,7 +615,7 @@ function FailRow({
           className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
           data-testid="fail-raw-error"
         >
-          {item.title}
+          {item.raw ?? item.title}
         </pre>
       </DialogShell>
     </div>
