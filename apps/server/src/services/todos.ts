@@ -1,5 +1,6 @@
 import type {
   GithubRepoRef,
+  GitIdentity,
   Phase,
   RouteOverride,
   SecretBox,
@@ -76,6 +77,7 @@ export function abandonsQuestions(to: Phase): boolean {
 
 export interface TodoDeps {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   githubWriteTokenForRepo?: (
     teamId: string,
     repo: GithubRepoRef,

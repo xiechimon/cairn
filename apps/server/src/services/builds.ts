@@ -2,6 +2,7 @@ import type {
   BuildMergePermission,
   BuildRecord,
   GithubRepoRef,
+  GitIdentity,
   MachineDoneBody,
   MergeReadiness,
   Phase,
@@ -200,6 +201,7 @@ import {
 
 export interface BuildDeps {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
   db: Db;
   hub: TeamStreamHub;

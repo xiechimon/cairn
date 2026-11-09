@@ -11,6 +11,8 @@ test('worker instructions require overlap lookup before planning, building, tick
 });
 
 test('historical branch notes still strip from stored task prompts', () => {
-  const historicalNote = buildWorkBranchNote('lane/1834').split('\n')[0];
+  const historicalNote = buildWorkBranchNote('lane/1834')
+    .split('\n')[0]
+    ?.replace('[cairn 系统规则，不是用户的消息]', '');
   expect(stripWorkBranchNote(`task\n${historicalNote}`)).toBe('task');
 });

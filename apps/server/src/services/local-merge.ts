@@ -81,7 +81,7 @@ export async function enqueueLocalMerge(
         : `${todoRow.title}\n\nCloses ${source.owner}/${source.repo}#${source.issueNumber}`,
       coAuthor,
     ),
-    identity: (await softwareCommitIdentity(deps)) ?? localCommitIdentity(deps.user.displayName),
+    identity: softwareCommitIdentity(deps) ?? localCommitIdentity(deps.user.displayName),
   });
   deps.db.transaction(() => {
     claimAutonomousMerge(deps.db, buildId);

@@ -503,6 +503,29 @@ test('a hillclimb flow with no capability row still fails the generator', () => 
   assert.match(result.stderr, /hillclimb flow "orphan" has no capability row/);
 });
 
+test('the product plan retires the optional Cloudflare service without retiring core transport', () => {
+  const root = join(SCRIPTS, '..');
+  const registry = JSON.parse(readFileSync(join(root, REGISTRY), 'utf8'));
+  assert.equal(
+    registry.features.some(({ id }) => id === 'relay-service'),
+    false,
+  );
+  for (const id of ['ios-app', 'remote-access', 'step-claim', 'orb-isolation']) {
+    assert.ok(
+      registry.features.some((feature) => feature.id === id),
+      `${id} stays registered`,
+    );
+  }
+  const batch = registry.batches.find(({ id }) => id === 'B12');
+  assert.match(batch.title, /iOS app/);
+  for (const text of [
+    JSON.stringify(registry),
+    ...[MAP, SKILL_MAP].map((path) => readFileSync(join(root, path), 'utf8')),
+  ]) {
+    assert.doesNotMatch(text, /D104|relay-service|relay service|Cloudflare relay/i);
+  }
+});
+
 test('the real registry passes its own check', () => {
   const result = spawnSync(
     process.execPath,

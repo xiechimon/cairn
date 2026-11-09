@@ -490,7 +490,7 @@ test('shared matcher, badges and prompts preserve the ready boundary', () => {
   expect(note).toContain('Codex');
   expect(note).toContain('draft');
   expect(stripWorkBranchNote(`task\n${note}`)).toBe('task');
-  const old = note.slice(0, note.indexOf('\n开 PR 后'));
+  const old = note.slice(note.indexOf('工作分支注记'), note.indexOf('\n'));
   expect(stripWorkBranchNote(`task\n${old}`)).toBe('task');
   expect(buildReviewFindingsPrompt({ prNumber: 1, round: 1, findings: [] })).toContain(
     'addPullRequestReviewThreadReply',
