@@ -13,6 +13,11 @@ export interface RowPosition {
   rowid: number;
 }
 
+export interface SeedSummaryResult {
+  summary: string;
+  complete: boolean;
+}
+
 const conversational = (threadId: string) =>
   and(
     eq(chiefMessage.threadId, threadId),
@@ -40,10 +45,10 @@ export async function seedSummary(
   summarize: Summarize | null,
   onError: (error: unknown) => void,
   now: number,
-): Promise<string> {
+): Promise<SeedSummaryResult> {
   const prior = db.select().from(chiefSummary).where(eq(chiefSummary.threadId, threadId)).get();
   const previous = prior?.summary ?? '';
-  if (summarize === null || windowStart === null) return previous;
+  if (summarize === null || windowStart === null) return { summary: previous, complete: true };
   const gap = db
     .select({
       id: chiefMessage.id,
@@ -69,19 +74,38 @@ export async function seedSummary(
     .all()
     .reverse();
   const through = gap.at(-1);
-  if (through === undefined) return previous;
-  const batches = summaryBatches(chiefTranscriptLines(gap).map((line) => line.text)).slice(
-    -SEED_SUMMARY_MAX_BATCHES,
-  );
-  if (batches.length === 0) return previous;
+  if (through === undefined) return { summary: previous, complete: true };
+  const oldest = gap[0];
+  const olderRemain =
+    oldest !== undefined &&
+    db
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(
+        and(
+          conversational(threadId),
+          prior === undefined
+            ? undefined
+            : strictlyAfter({ at: prior.coveredAt, rowid: prior.coveredRowid }),
+          strictlyBefore({ at: oldest.createdAt, rowid: oldest.rowid }),
+        ),
+      )
+      .limit(1)
+      .get() !== undefined;
+  const allBatches = summaryBatches(chiefTranscriptLines(gap).map((line) => line.text));
+  const batchCapped = allBatches.length > SEED_SUMMARY_MAX_BATCHES;
+  const complete = !olderRemain && !batchCapped;
+  if (!complete) return { summary: previous, complete: false };
+  const batches = allBatches.slice(-SEED_SUMMARY_MAX_BATCHES);
+  if (batches.length === 0) return { summary: previous, complete: true };
   let folded: string;
   try {
     folded = await foldSummary(prior?.summary ?? null, batches, summarize);
   } catch (error) {
     onError(error);
-    return previous;
+    return { summary: previous, complete: false };
   }
-  if (folded.trim() === '') return previous;
+  if (folded.trim() === '') return { summary: previous, complete: false };
   const values = {
     summary: folded,
     coveredThroughId: through.id,
@@ -95,5 +119,5 @@ export async function seedSummary(
     .values({ threadId, ...values })
     .onConflictDoUpdate({ target: chiefSummary.threadId, set: values })
     .run();
-  return folded;
+  return { summary: folded, complete: true };
 }

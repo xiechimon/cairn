@@ -188,7 +188,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           .slice(0, SEED_MAX_ROWS)
           .reverse();
         const oldest = window[0];
-        const summary = await seedSummary(
+        const seeded = await seedSummary(
           db,
           threadId,
           oldest === undefined ? null : { at: oldest.message.createdAt, rowid: oldest.rowid },
@@ -209,6 +209,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           },
           nowMs(),
         );
+        const summary = seeded.summary;
         const rows = window.map(
           ({ message: m }): SeedRow => ({
             id: m.id,
@@ -360,9 +361,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       .where(eq(chiefTurnUsage.threadId, row.buildId))
       .orderBy(desc(chiefTurnUsage.createdAt))
       .get();
+    const routerModel = `${providers.router.provider}/${providers.router.modelId}`;
     const retentionMs = retentionMsFor(
       resolveCacheRetentionTier(),
-      lastUsage?.model ?? `${providers.router.provider}/${providers.router.modelId}`,
+      lastUsage?.model ?? routerModel,
     );
     const cold = isColdResume({
       now: nowMs(),
@@ -377,6 +379,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
               model: lastUsage.model,
             },
       retentionMs,
+      activeModel: routerModel,
     });
     const summaryHint =
       db.select().from(chiefSummary).where(eq(chiefSummary.threadId, row.buildId)).get()?.summary ??
@@ -432,7 +435,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     threadId: string,
     teamId: string,
     providers: CoordinatorProviders,
-  ): Promise<string | null> => {
+  ): Promise<{ summary: string | null; complete: boolean }> => {
     const newestFirst = db
       .select({
         at: chiefMessage.createdAt,
@@ -464,7 +467,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     } catch (error) {
       reportCompactionFailure({ threadId }, 'summary-model', error);
     }
-    return seedSummary(
+    const seeded = await seedSummary(
       db,
       threadId,
       windowStart,
@@ -482,6 +485,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       },
       nowMs(),
     );
+    return { summary: seeded.summary === '' ? null : seeded.summary, complete: seeded.complete };
   };
 
   const runStep = async (row: StepRow): Promise<void> => {
@@ -531,15 +535,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             prior.coveredAt < windowStart.at ||
             (prior.coveredAt === windowStart.at && prior.coveredRowid < windowStart.rowid));
         const beforeGeneration = prior?.generation ?? 0;
-        const summaryHint = await catchUpColdSummary(row.buildId, teamId, providers);
+        const caughtUp = await catchUpColdSummary(row.buildId, teamId, providers);
         const afterGeneration =
           db.select().from(chiefSummary).where(eq(chiefSummary.threadId, row.buildId)).get()
             ?.generation ?? 0;
         const catchUpAdvanced = afterGeneration > beforeGeneration;
-        if (lagging && !catchUpAdvanced) {
+        if (lagging && (!catchUpAdvanced || !caughtUp.complete)) {
           coldSlim = { cold: false, summaryHint: null };
         } else {
-          coldSlim = { cold: true, summaryHint };
+          coldSlim = { cold: true, summaryHint: caughtUp.summary };
         }
       }
       await runtime.runTurn({

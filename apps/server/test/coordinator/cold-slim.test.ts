@@ -130,6 +130,37 @@ describe('isColdResume', () => {
       }),
     ).toBe(false);
   });
+
+  it('is cold when the active router model differs from the last usage model', () => {
+    expect(
+      isColdResume({
+        now: 1_000,
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'anthropic/claude',
+        lastUsage: {
+          createdAt: 900,
+          cacheRead: 20_000,
+          input: 100,
+          contextTokens: 20_100,
+          model: 'openai/gpt',
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isColdResume({
+        now: 1_000,
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'openai/gpt',
+        lastUsage: {
+          createdAt: 900,
+          cacheRead: 20_000,
+          input: 100,
+          contextTokens: 20_100,
+          model: 'openai/gpt',
+        },
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('retentionMsFor', () => {
@@ -220,6 +251,29 @@ describe('stripConsumedImages', () => {
       ),
     ).toBe(true);
   });
+
+  it('keeps a real id from the image block when no companion token exists', () => {
+    const imageBlock = {
+      type: 'image' as const,
+      data: 'aaa',
+      mimeType: 'image/png',
+      attachmentId: 'att-from-block',
+    };
+    const messages: Message[] = [
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'see' }, imageBlock as never],
+        timestamp: 1,
+      },
+      user('latest'),
+    ];
+    const out = stripConsumedImages(messages, { keepRecentMessages: 1 });
+    if (out[0]?.role !== 'user' || typeof out[0].content === 'string') throw new Error('shape');
+    const note = out[0].content.find(
+      (block) => block.type === 'text' && block.text.includes('omitted'),
+    );
+    expect(note?.type === 'text' ? note.text : '').toBe(imageOmissionNote('att-from-block'));
+  });
 });
 
 describe('selectColdMessageWindow', () => {
@@ -257,37 +311,43 @@ describe('selectColdMessageWindow', () => {
       user('u0', 1),
       pureTool,
       tool('bash', 'noise', 3),
-      user('current', 4),
+      assistant('done after tools', 4),
+      user('current', 5),
     ];
     const out = selectColdMessageWindow(messages, 8);
-    expect(out.some((message) => message.role === 'assistant')).toBe(false);
+    expect(out.some((message) => isPureToolCallAssistant(message))).toBe(false);
     expect(out.some((message) => message.role === 'toolResult')).toBe(false);
     expect(out.filter((message) => message.role === 'user').map(userText)).toEqual([
       'u0',
       'current',
     ]);
+    expect(
+      out.some(
+        (message) => message.role === 'assistant' && JSON.stringify(message).includes('done'),
+      ),
+    ).toBe(true);
   });
 
   it('keeps pure tool-call assistants and results that belong to the active cold turn', () => {
     const historical = pureToolCall('c-hist', 'bash', { command: 'ls' }, 2);
-    const active = pureToolCall('c-active', 'bash', { command: 'pwd' }, 5);
+    const active = pureToolCall('c-active', 'bash', { command: 'pwd' }, 6);
     const messages: Message[] = [
       user('u0', 1),
       historical,
       tool('bash', 'hist-noise', 3),
-      user('current', 4),
+      assistant('closed hist', 4),
+      user('current', 5),
       active,
-      tool('bash', 'active-result', 6),
+      tool('bash', 'active-result', 7),
     ];
     const out = selectColdMessageWindow(messages, 8);
     expect(out.filter((message) => message.role === 'user').map(userText)).toEqual([
       'u0',
       'current',
     ]);
-    const assistants = out.filter((message) => message.role === 'assistant');
-    expect(assistants).toHaveLength(1);
-    expect(isPureToolCallAssistant(assistants[0]!)).toBe(true);
-    expect(JSON.stringify(assistants[0])).toContain('c-active');
+    const pure = out.filter((message) => isPureToolCallAssistant(message));
+    expect(pure).toHaveLength(1);
+    expect(JSON.stringify(pure[0])).toContain('c-active');
     const results = out.filter((message) => message.role === 'toolResult');
     expect(results).toHaveLength(1);
     expect(toolResultChars(results[0]!)).toBe('active-result');
@@ -313,6 +373,33 @@ describe('selectColdMessageWindow', () => {
       ),
     ).toBe(true);
     expect(out.some((message) => userText(message) === 'resume billing')).toBe(true);
+  });
+
+  it('keeps pre-steer tool trails with the original user when a mid-turn steer appends', () => {
+    const preSteer = pureToolCall('c-pre', 'bash', { command: 'ls' }, 2);
+    const messages: Message[] = [
+      user('hist', 0),
+      assistant('done', 1),
+      user('original', 2),
+      preSteer,
+      tool('bash', 'pre-steer-result', 3),
+      user('steer note', 4),
+    ];
+    const out = selectColdMessageWindow(messages, 8);
+    expect(out.filter((message) => message.role === 'user').map(userText)).toEqual([
+      'hist',
+      'original',
+      'steer note',
+    ]);
+    expect(
+      out.some((message) => message.role === 'assistant' && isPureToolCallAssistant(message)),
+    ).toBe(true);
+    expect(
+      out.some(
+        (message) =>
+          message.role === 'toolResult' && toolResultChars(message).includes('pre-steer-result'),
+      ),
+    ).toBe(true);
   });
 });
 

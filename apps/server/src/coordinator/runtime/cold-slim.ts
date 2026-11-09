@@ -54,6 +54,7 @@ export function contextResumeOf(args: {
   lastColdSlimAt: number | null;
   lastColdSlimStepId?: string | null;
   lastUsageStepId?: string | null;
+  activeModel?: string | null;
 }): ContextResume {
   if (args.lastUsage === null) return 'idle';
   const slimRecent =
@@ -77,6 +78,7 @@ export function contextResumeOf(args: {
       now: args.now,
       lastUsage: args.lastUsage,
       retentionMs: args.retentionMs,
+      activeModel: args.activeModel,
     })
   ) {
     return 'cold';
@@ -88,9 +90,12 @@ export function isColdResume(args: {
   now: number;
   lastUsage: TurnUsageSnapshot | null;
   retentionMs: number;
+  activeModel?: string | null;
 }): boolean {
   const { lastUsage, now, retentionMs } = args;
   if (lastUsage === null) return false;
+  const active = args.activeModel?.trim() ?? '';
+  if (active !== '' && lastUsage.model !== active) return true;
   if (now - lastUsage.createdAt >= retentionMs) return true;
   const size = lastUsage.contextTokens ?? lastUsage.input;
   return lastUsage.cacheRead === 0 && size >= COLD_CACHE_MISS_MIN_TOKENS;
@@ -257,6 +262,23 @@ function isSummaryUser(message: Message): boolean {
   return text.includes('<summary>') && text.includes('compacted');
 }
 
+export function activeTurnStartIndex(body: readonly Message[]): number {
+  let start = body.findLastIndex((message) => message.role === 'user');
+  if (start < 0) return start;
+  let sawTrail = false;
+  for (let i = start - 1; i >= 0; i--) {
+    const message = body[i];
+    if (message === undefined) break;
+    if (message.role === 'toolResult' || isPureToolCallAssistant(message)) {
+      sawTrail = true;
+      continue;
+    }
+    if (message.role === 'user' && sawTrail && !isWakeOnlyUser(message)) start = i;
+    break;
+  }
+  return start;
+}
+
 export function selectColdMessageWindow(
   messages: readonly Message[],
   recentExchanges = COLD_RECENT_EXCHANGES,
@@ -264,14 +286,20 @@ export function selectColdMessageWindow(
   const system = messages.filter((message) => message.role === 'system');
   const summaries = messages.filter(isSummaryUser);
   const body = messages.filter((message) => message.role !== 'system' && !isSummaryUser(message));
-  const currentUserIndex = body.findLastIndex((message) => message.role === 'user');
+  const turnStartIndex = activeTurnStartIndex(body);
   const kept: Message[] = [];
   let exchanges = 0;
   for (let i = body.length - 1; i >= 0; i--) {
     const message = body[i];
     if (message === undefined) continue;
-    if (message.role === 'user' && isWakeOnlyUser(message) && i !== currentUserIndex) continue;
-    const historical = currentUserIndex < 0 || i < currentUserIndex;
+    if (
+      message.role === 'user' &&
+      isWakeOnlyUser(message) &&
+      (turnStartIndex < 0 || i < turnStartIndex)
+    ) {
+      continue;
+    }
+    const historical = turnStartIndex < 0 || i < turnStartIndex;
     if (historical && isPureToolCallAssistant(message)) continue;
     if (historical && message.role === 'toolResult') {
       const owner = priorAssistant(body, i);
