@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -174,8 +175,10 @@ function recordingBackend(): { backend: AgentBackend; sessions: SessionOpts[] } 
 function fakeWorkspace(): WorktreeOps {
   return {
     async prepare(input) {
+      const cwd = join(input.workspacesRoot, input.conversationId);
+      mkdirSync(cwd, { recursive: true });
       return {
-        cwd: join(input.workspacesRoot, input.conversationId),
+        cwd,
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
         branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
