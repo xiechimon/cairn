@@ -8358,6 +8358,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "todo",
   "tag",
   "todo_tag",
+  "github_label",
+  "todo_github_label",
   "build",
   "step",
   "steer_pending",
