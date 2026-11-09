@@ -35,8 +35,41 @@ x-langfuse-env: &langfuse-env
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   REDIS_AUTH: ${REDIS_AUTH:?set REDIS_AUTH in .env}
+  HTTPS_PROXY: ${LANGFUSE_LLM_HTTPS_PROXY:-}
+  NO_PROXY: localhost,127.0.0.1,postgres,clickhouse,minio,redis,langfuse-web,langfuse-worker
+
+x-egress-relay: &egress-relay
+  image: docker.io/langfuse/langfuse-worker:4.68.0
+  restart: always
+  profiles: [egress-relay]
+  entrypoint: ["node", "/egress/egress-relay.mjs"]
+  user: "0:0"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging: *default-logging
 
 services:
+  egress-relay-host:
+    <<: *egress-relay
+    command: ["host"]
+    network_mode: host
+    environment:
+      EGRESS_UPSTREAM: ${EGRESS_UPSTREAM:-127.0.0.1:7890}
+    volumes:
+      - ./egress-relay.mjs:/egress/egress-relay.mjs:ro
+      - egress_socket:/run/egress
+
+  egress-relay:
+    <<: *egress-relay
+    command: ["bridge"]
+    depends_on: [egress-relay-host]
+    environment:
+      EGRESS_ALLOW: ${EGRESS_ALLOW:-api.anthropic.com:443}
+    volumes:
+      - ./egress-relay.mjs:/egress/egress-relay.mjs:ro
+      - egress_socket:/run/egress
+
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:4.68.0
     restart: always
@@ -157,3 +190,4 @@ volumes:
   clickhouse_logs:
   minio_data:
   redis_data:
+  egress_socket:
