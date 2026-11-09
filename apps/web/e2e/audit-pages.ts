@@ -78,11 +78,6 @@ export const PAGES: AuditPage[] = [
     ready: (p) => p.locator('.prj-set-avatar'),
   },
   {
-    name: 'team',
-    url: '/app/team?scenario=12',
-    ready: (p) => p.locator('[data-settings-section="work-routing"]'),
-  },
-  {
     name: 'machines',
     url: '/app/settings/machines?scenario=06',
     ready: (p) => p.getByTestId('machine-item').first(),

@@ -47,10 +47,6 @@
     "apps/web/src/pages/project-base-branch-select.tsx",
     "apps/web/src/pages/project-concurrency-select.tsx"
   ],
-  "team": [
-    "apps/web/src/settings/settings-redirect.tsx",
-    "apps/web/src/resources/routing-settings-page.tsx"
-  ],
   "machines": [
     "apps/web/src/resources/machines-page.tsx",
     "apps/web/src/resources/create-machine-dialog.tsx"
