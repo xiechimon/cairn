@@ -82,7 +82,7 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
-import { lastTurnContext, wakeCoordinator } from './coordinator-context.js';
+import { coordinatorRunsOnPi, lastTurnContext, wakeCoordinator } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoriesCapped, MEMORY_INJECT_TOKEN_CAP } from './memory.js';
@@ -239,7 +239,7 @@ export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetRespo
   return {
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
-    context: lastTurnContext(deps.db, row),
+    context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row) : null,
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
     orchestration: chiefOrchestration(deps, teamId),

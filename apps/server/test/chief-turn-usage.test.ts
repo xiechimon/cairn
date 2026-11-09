@@ -252,6 +252,21 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
   });
 
+  test('flag off after prior rows: retained turn usage does not keep the meter lit', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-prior');
+    await finishStep(deps(), machineId, 'turn-prior', {
+      status: 'success',
+      usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 1810,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    setCoordinatorServerContextEnabled(false);
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+  });
+
   test('flag on: the meter shows the last turn context the provider reported, not the running sum', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-a');
