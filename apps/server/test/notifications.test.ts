@@ -139,7 +139,7 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
     }
   });
 
-  test('entering done / entering failed emits todo_done / todo_failed unread events', async () => {
+  test('entering done emits todo_done; entering failed notifies no one because the Coordinator owns it', async () => {
     const s = await withRunningTodo({ withPlan: false, pingIntervalMs: 50 });
     const stream = await openStream(s.app, s.team.id);
     try {
@@ -166,12 +166,9 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
       startLegacyBuild(s, second.id, { withPlan: false });
       setTodoPhase(s.svc, second.id, 'building');
       setTodoPhase(s.svc, second.id, 'failed');
-      const failedFrame = notificationEventSchema.parse(await notificationFrames(stream)(3000));
-      expect(failedFrame.notification).toMatchObject({
-        type: 'todo_failed',
-        entityId: second.id,
-        readAt: null,
-      });
+      expect(
+        s.db.select().from(notification).where(eq(notification.entityId, second.id)).all(),
+      ).toEqual([]);
     } finally {
       stream.close();
     }

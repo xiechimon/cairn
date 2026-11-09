@@ -7,31 +7,31 @@ import {
   reviewFindingBadge,
   stripWorkBranchNote,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, ne } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, project, step, threadPr, todo } from '../src/db/schema.js';
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
 import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
 import { type AppToken, type AutonomousToken, registerAppToken } from '../src/lib/github-token.js';
+import { recordAnswer } from '../src/services/answer-delivery.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
-import { createPrWakes } from '../src/services/pr-wakes.js';
+import { CAP_REVIEW_FOCUS, createPrWakes, focusedCodexReview } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
-import {
-  answerPendingWorkerQuestions,
-  writeWorkerQuestion,
-} from '../src/services/worker-question-store.js';
+import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import * as serverHelpers from './helpers.js';
+import { req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   for (const s of servers.splice(0)) s.dispose();
 });
 
 function fixture() {
-  const s = bootServer();
+  const s = serverHelpers.bootServer();
   servers.push(s);
   s.db
     .insert(project)
@@ -95,9 +95,28 @@ function fixture() {
     apply: true,
     error: '',
     page: false,
+    commentFailures: 0,
+    token: 'fake',
+    poster: 'cairnwright[bot]',
+    foreignComments: [] as { user: { login: string }; body: string }[],
   };
   const queries: string[] = [];
+  const posted: string[] = [];
   const fetch = vi.fn<FetchLike>(async (url, init) => {
+    if (init?.body && /\/issues\/3377\/comments$/.test(String(url))) {
+      if (state.commentFailures > 0) {
+        state.commentFailures -= 1;
+        throw new Error('response lost');
+      }
+      posted.push((JSON.parse(init.body) as { body: string }).body);
+      return {
+        ok: true,
+        status: 201,
+        headers: { get: () => null },
+        json: async () => ({ id: posted.length }),
+        text: async () => '',
+      };
+    }
     if (!init?.body)
       return {
         ok: true,
@@ -114,7 +133,12 @@ function fixture() {
               }
             : String(url).includes('/check-runs')
               ? { check_runs: [] }
-              : [],
+              : /\/issues\/3377\/comments/.test(String(url))
+                ? [
+                    ...state.foreignComments,
+                    ...posted.map((body) => ({ user: { login: state.poster }, body })),
+                  ]
+                : [],
         text: async () => '',
       };
     if (!String(url).endsWith('/graphql')) {
@@ -226,7 +250,7 @@ function fixture() {
   const input = () => ({
     row: row(),
     fetch,
-    token: 'fake' as AutonomousToken,
+    token: state.token as AutonomousToken,
     owner: 'o',
     repo: 'r',
     now: 1000,
@@ -240,6 +264,7 @@ function fixture() {
         merged: false,
         draft: state.draft,
         title: 'change',
+        body: '',
         htmlUrl: null,
         headSha: 'abc',
         headRef: 'work',
@@ -249,7 +274,7 @@ function fixture() {
       },
       runs: [],
     });
-  return { s, state, queries, fetch, row, reconcile, wake };
+  return { s, state, queries, posted, fetch, row, reconcile, wake };
 }
 
 test.each(['P2', 'P3'])(
@@ -261,7 +286,7 @@ test.each(['P2', 'P3'])(
     await f.wake();
     await f.wake();
     expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(1);
-    expect(f.s.db.select().from(step).all()).toHaveLength(1);
+    expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
     expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
     expect(f.s.db.select().from(step).get()?.prompt).toContain('a.ts:7');
     expect(f.s.db.select().from(step).get()?.prompt).toContain(f.state.body);
@@ -381,12 +406,138 @@ test.each([true, false])(
     await f.wake();
     await f.wake();
     expect(f.state.draft).toBe(true);
-    expect(f.s.db.select().from(step).all()).toEqual([]);
+    expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toEqual([]);
     expect(JSON.stringify(f.s.db.select().from(message).all())).toContain(
       'Review round cap (3) reached; rethink or hand to the owner.',
     );
   },
 );
+
+test('the findings wake asks for whole-class fixes in one push, P0/P1 fixed, and P2/P3 deferral only with a new issue', () => {
+  const prompt = buildReviewFindingsPrompt({ prNumber: 1, round: 2, findings: [] });
+  expect(prompt).toContain('缺陷类别');
+  expect(prompt).toContain('只推送一次');
+  expect(prompt).toContain('P0/P1 必须修复');
+  expect(prompt).toContain('`valid, out of scope for this PR, tracked in #N`');
+  expect(prompt).toContain('先新建或复用一个跟踪它的 issue');
+  expect(prompt).not.toContain('@mergifyio');
+});
+
+test('the review round cap stops wakes, lists every finding class raised, and asks Codex once for a focused full-diff pass', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 2 }, createdAt: 1 })
+    .run();
+  await f.wake();
+  expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
+  f.state.findingId = 'RT_1b';
+  await f.wake();
+  expect(f.posted).toEqual([]);
+  f.s.db.update(step).set({ status: 'done' }).run();
+  f.state.findingId = 'RT_2';
+  f.state.body = '**<sub><sub>![P2 Badge](badge)</sub></sub>** Retry path skips the @owner check';
+  await f.wake();
+  await f.wake();
+  expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
+  expect(f.posted).toHaveLength(1);
+  const [comment] = f.posted;
+  expect(comment).toContain('- Fix this');
+  expect(comment).toContain('- Retry path skips the @\u200bowner check');
+  expect(comment?.split('\n').at(-1)).toBe(focusedCodexReview(CAP_REVIEW_FOCUS));
+  expect(comment?.match(/@codex/g)).toHaveLength(1);
+  f.state.head = 'def';
+  f.s.db.update(threadPr).set({ head: 'def' }).where(eq(threadPr.id, 'pr')).run();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a failed cap comment is retried on the next poll and then posted once', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.state.commentFailures = 1;
+  await f.wake();
+  expect(f.posted).toEqual([]);
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a cap request left pending by a restart is posted once, and a delivered marker is never reposted', async () => {
+  const f = fixture();
+  registerAppToken(
+    'staging-app' as AppToken,
+    Date.now() + 3600000,
+    (inner) => inner,
+    'cairn-staging',
+  );
+  f.state.token = 'staging-app';
+  f.state.poster = 'cairn-staging[bot]';
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({
+      id,
+      conversationId: id,
+      role: 'system',
+      content: { reviews: 3, capRequest: 'pending' },
+      createdAt: 1,
+    })
+    .run();
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+  f.s.db
+    .update(message)
+    .set({ content: { reviews: 3, capRequest: 'pending' } })
+    .where(eq(message.id, id))
+    .run();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a cap marker written by someone else does not count as delivered', async () => {
+  const f = fixture();
+  registerAppToken(
+    'staging-app' as AppToken,
+    Date.now() + 3600000,
+    (inner) => inner,
+    'cairn-staging',
+  );
+  f.state.token = 'staging-app';
+  f.state.poster = 'cairn-staging[bot]';
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.state.foreignComments.push(
+    { user: { login: 'drive-by' }, body: '<!-- cairn:review-cap --> fake' },
+    { user: { login: 'cairnwright[bot]' }, body: '<!-- cairn:review-cap --> other deployment' },
+  );
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('the cap is still delivered after the total wake cap turned Auto-fix off during the third round', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.s.db.update(threadPr).set({ autoFix: false }).where(eq(threadPr.id, 'pr')).run();
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+  expect(f.s.db.select().from(step).all()).toEqual([]);
+});
 
 test('autoFix off still holds, notifies and later releases', async () => {
   const f = fixture();
@@ -423,7 +574,7 @@ test('pending blocking worker question prevents release until answered', async (
   await f.reconcile();
   expect(f.state.draft).toBe(true);
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(false);
-  expect(answerPendingWorkerQuestions({ db: f.s.db }, 'b', 'Proceed')).toBe(true);
+  recordAnswer({ db: f.s.db }, 'b', 'question', { text: 'Proceed', by: 'person' });
   await f.reconcile();
   expect(f.state.draft).toBe(false);
   expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);
@@ -603,6 +754,11 @@ test('desiredAction covers every ordered rule and release blocker', () => {
 });
 
 test('each failed transition converges in exactly the remaining clean polls', async () => {
+  const boots = vi.spyOn(serverHelpers, 'bootServer');
+  const f = fixture();
+  const initial = structuredClone(f.state);
+  vi.useFakeTimers();
+  const now = Date.now();
   for (const operation of [
     'snapshot',
     'createLabel',
@@ -612,7 +768,8 @@ test('each failed transition converges in exactly the remaining clean polls', as
     'removeLabel',
   ]) {
     for (const kind of ['http', 'graphql', 'lost']) {
-      const f = fixture();
+      Object.assign(f.state, structuredClone(initial));
+      f.queries.length = 0;
       const poll = async (fails = false) => {
         const before = f.queries.length;
         if (fails && operation === 'snapshot') await expect(f.reconcile()).rejects.toThrow();
@@ -638,10 +795,13 @@ test('each failed transition converges in exactly the remaining clean polls', as
       for (let i = 0; i < remaining; i++) await poll();
       expect(f.state.draft).toBe(!f.state.resolved);
       expect(f.state.labels.includes(CAIRN_REVIEW_HOLD_LABEL)).toBe(!f.state.resolved);
-      f.s.dispose();
-      servers.splice(servers.indexOf(f.s), 1);
+      expect(f.s.db.select().from(step).all()).toEqual([]);
+      expect(f.s.db.select().from(message).all()).toEqual([]);
     }
   }
+  expect(boots).toHaveBeenCalledTimes(1);
+  expect(Date.now()).toBe(now);
+  expect(vi.getTimerCount()).toBe(0);
 });
 
 test('human label removal on a ready PR with findings re-adds the label and converts to draft', async () => {
@@ -816,14 +976,18 @@ test.each(['label', 'labels', 'changed', 'repeated', 'later-error'])(
   },
 );
 
-test.each(['createLabel', 'addLabel'])('failed %s preserves the review wake', async (operation) => {
-  for (const kind of ['http', 'graphql', 'lost']) {
-    const f = fixture();
-    if (operation === 'createLabel') f.state.labelId = null;
-    f.state.failure = { operation, kind };
-    await f.wake();
-    expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
-  }
+test.each(
+  ['createLabel', 'addLabel'].flatMap((operation) =>
+    ['http', 'graphql', 'lost'].map((kind) => ({ operation, kind })),
+  ),
+)('failed $operation preserves the review wake: $kind', async ({ operation, kind }) => {
+  const boots = vi.spyOn(serverHelpers, 'bootServer');
+  const f = fixture();
+  if (operation === 'createLabel') f.state.labelId = null;
+  f.state.failure = { operation, kind };
+  await f.wake();
+  expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
+  expect(boots).toHaveBeenCalledTimes(1);
 });
 
 test.each([false, true])(

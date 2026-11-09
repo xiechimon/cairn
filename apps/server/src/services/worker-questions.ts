@@ -4,6 +4,7 @@ import {
   type MachineAskBody,
   type MachineAskResponse,
   redactSecrets,
+  type TaskDecision,
   THREAD_REPORT_LINE_MAX,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -11,13 +12,13 @@ import { build, message, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
+import { recordAnswer } from './answer-delivery.js';
 import { postThreadReport } from './chief.js';
 import { ASK_PARK_MS } from './chief-questions.js';
-import { notifyTodoPhase } from './notifications.js';
-import { pushWorkerQuestion } from './thread-push.js';
-import { setTodoPhase, type TodoDeps } from './todos.js';
+import { reconcileOwners } from './owner.js';
+import { getTodo, type TodoDeps } from './todos.js';
 import {
-  answerPendingWorkerQuestions,
+  pendingWorkerQuestions,
   readWorkerQuestion,
   updateWorkerQuestion,
   writeWorkerQuestion,
@@ -26,7 +27,7 @@ import {
 const POLL_MS = 400;
 
 export const WORKER_ASK_PARKED_REASON =
-  'The user has not answered yet. The question is parked on this thread and the answer will arrive as the next message on this same session. Say briefly that you are waiting for the answer, then end the turn; do not keep waiting.';
+  'No answer yet. The question is parked under its requestId; when it is answered, this same session resumes with the answer. Say briefly what you are waiting for, then end the turn; do not keep waiting.';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -36,14 +37,6 @@ function todoOfBuild(deps: TodoDeps, buildId: string): typeof todo.$inferSelect 
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new HttpError(404, `todo ${buildRow.todoId}`);
   return todoRow;
-}
-
-const PUSH_BODY_MAX = 120;
-
-function safeBody(text: string | undefined): string {
-  if (text === undefined || text.trim() === '') return 'needs your decision';
-  const clean = (redactSecrets(text).value as string).replace(/\s+/g, ' ').trim();
-  return clean.length > PUSH_BODY_MAX ? `${clean.slice(0, PUSH_BODY_MAX - 1)}…` : clean;
 }
 
 function questionReportLine(text: string | undefined): string | undefined {
@@ -94,20 +87,12 @@ function openQuestion(
   if (!writeWorkerQuestion(deps, row.buildId, body.requestId, content, askedAt)) {
     throw new HttpError(409, 'question request id belongs to another message');
   }
-  const todoRow = todoOfBuild(deps, row.buildId);
-  const record = setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: true });
+  const todoId = todoOfBuild(deps, row.buildId).id;
+  reconcileOwners(deps, [todoId]);
+  const record = getTodo(deps, todoId);
   if (record !== null) {
-    notifyTodoPhase(deps, record, 'review', safeBody(body.questions[0]?.question));
+    deps.hub.publishTodoDoc(record.teamId, record);
     postThreadReport(deps, record, 'needs-you', questionReportLine(body.questions[0]?.question));
-    pushWorkerQuestion(
-      deps,
-      row.buildId,
-      safeBody(
-        body.questions
-          .map((q) => [q.question, ...q.options.map((o) => o.label)].join('\n'))
-          .join('\n'),
-      ),
-    );
   }
   return { content, askedAt };
 }
@@ -140,11 +125,58 @@ export async function askWorkerQuestion(
   }
 }
 
-export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string): void {
+export interface QuestionAnswer {
+  question: AskUserQuestionContent;
+  answer: string;
+  by: TaskDecision['by'];
+}
+
+export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string): number {
+  const answers = pendingWorkerQuestions(deps.db, buildId).map((question) => ({
+    question,
+    answer: text,
+    by: 'person' as const,
+  }));
+  settleQuestionAnswers(deps, buildId, answers);
+  return answers.length;
+}
+
+export function settleQuestionAnswers(
+  deps: TodoDeps,
+  buildId: string,
+  answers: readonly QuestionAnswer[],
+): void {
+  if (answers.length === 0) return;
+  for (const { question } of answers) {
+    if (readWorkerQuestion(deps.db, buildId, question.requestId)?.status !== 'pending') {
+      throw new HttpError(409, `requestId ${question.requestId} is no longer pending`);
+    }
+  }
+  for (const { question, answer, by } of answers) {
+    recordAnswer(deps, buildId, question.requestId, { text: answer, by });
+  }
   const todoRow = todoOfBuild(deps, buildId);
-  if (!todoRow.awaitingReply) return;
-  answerPendingWorkerQuestions(deps, buildId, text);
-  setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: false });
+  const at = nowMs();
+  deps.db
+    .update(todo)
+    .set({
+      decisions: [
+        ...todoRow.decisions,
+        ...answers.map(({ question, answer, by }) => ({
+          requestId: question.requestId,
+          question: question.questions.map((q) => q.question).join('\n'),
+          answer,
+          by,
+          at,
+        })),
+      ],
+      v: todoRow.v + 1,
+    })
+    .where(eq(todo.id, todoRow.id))
+    .run();
+  reconcileOwners(deps, [todoRow.id]);
+  const record = getTodo(deps, todoRow.id);
+  if (record) deps.hub.publishTodoDoc(record.teamId, record);
 }
 
 export function recordThreadReportLine(deps: TodoDeps, row: StepRow, line: unknown): string {

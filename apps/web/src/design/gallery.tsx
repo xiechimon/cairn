@@ -37,6 +37,7 @@ import {
   PrCardSection,
   PrListSection,
   ScheduledSection,
+  TaskRowSection,
 } from './components-threads.js';
 import type { GalleryTheme } from './design-doc.js';
 import {
@@ -124,6 +125,7 @@ const NAV = [
       ['pr-bar', 'Pull request bar'],
       ['pr-card', 'PR card'],
       ['pr-list', 'PR list'],
+      ['task-row', 'Task row'],
       ['scheduled', 'Scheduled task row'],
       ['schedule-detail', 'Scheduled task detail'],
       ['thread-automation', 'Thread automation badge'],
@@ -240,6 +242,7 @@ function GallerySections({ theme }: { theme: GalleryTheme }) {
       <PrBarSection />
       <PrCardSection />
       <PrListSection />
+      <TaskRowSection />
       <ScheduledSection />
       <ScheduleDetailSection />
       <AutomationSection />

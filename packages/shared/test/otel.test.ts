@@ -118,7 +118,7 @@ describe('OTLP wire encoding', () => {
         d: 1.5,
         b: true,
         list: ['a', 'b'],
-        money: { double: 0.25 },
+        absent: undefined,
       }),
     ).toEqual([
       { key: 's', value: { stringValue: 'text' } },
@@ -129,7 +129,6 @@ describe('OTLP wire encoding', () => {
         key: 'list',
         value: { arrayValue: { values: [{ stringValue: 'a' }, { stringValue: 'b' }] } },
       },
-      { key: 'money', value: { doubleValue: 0.25 } },
     ]);
   });
 

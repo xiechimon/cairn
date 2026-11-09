@@ -1,8 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
-import { PAGES } from '../e2e/audit-pages.js';
 import { RULE_IDS, RULES } from './rules.js';
 
-const TRIP_PAGE = PAGES.find((p) => p.name === 'team')!;
+const PAGE_URL = '/app/settings/work-routing?scenario=12';
 
 const MUTATIONS: Record<string, (page: Page) => Promise<void>> = {
   C1: (page) =>
@@ -107,8 +106,8 @@ test.describe.configure({ mode: 'parallel' });
 for (const [id, mutate] of Object.entries(MUTATIONS)) {
   test(`${id} reports a new finding after a violating change`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(TRIP_PAGE.url);
-    await expect(TRIP_PAGE.ready(page)).toBeVisible();
+    await page.goto(PAGE_URL);
+    await expect(page.getByTestId('routing-rule-new-coordinator')).toBeVisible();
     const before = new Set((await RULES[id]!(page)).map((f) => f.key));
     await mutate(page);
     const after = await RULES[id]!(page);

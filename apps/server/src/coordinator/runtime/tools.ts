@@ -2,10 +2,18 @@ import { createHash } from 'node:crypto';
 import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_ROUTER_TOOLS,
+  COMPUTER_REMOTE_TOOLS,
   type MachineAskBody,
   type RemoteToolDef,
 } from '@cairn/shared';
-import { defineExtension, defineTool, type ToolRegistration } from '@earendil-works/pi-durable';
+import {
+  defineExtension,
+  defineTool,
+  GenerationTask,
+  hook,
+  type ToolRegistration,
+} from '@earendil-works/pi-durable';
+import { boundCoordinatorImages, prepareCoordinatorImage } from './images.js';
 import type { MachineApi } from './machine-api.js';
 
 export class ShutdownInterrupt extends Error {
@@ -136,7 +144,25 @@ export function coordinatorTool(
         return { output: [{ type: 'text', text }] };
       }
       try {
-        const text = await channel.relayTool(stepId, def.name, params);
+        const text = await channel.relayTool(
+          stepId,
+          def.name,
+          params,
+          api.callId,
+          context.abortSignal,
+        );
+        if (def.name === 'attachment') {
+          const attachment = JSON.parse(text) as {
+            mimeType: string;
+            encoding: string;
+            content: string;
+          };
+          if (attachment.mimeType.startsWith('image/') && attachment.encoding === 'base64') {
+            return {
+              output: [await prepareCoordinatorImage(attachment.content, attachment.mimeType)],
+            };
+          }
+        }
         return { output: [{ type: 'text', text }] };
       } catch (error) {
         if (error instanceof ShutdownInterrupt) throw error;
@@ -154,10 +180,15 @@ export function coordinatorToolsExtension(
 ) {
   const defs =
     options.routerTools === false
-      ? CHIEF_REMOTE_TOOLS
-      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
+      ? [...CHIEF_REMOTE_TOOLS, ...COMPUTER_REMOTE_TOOLS]
+      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS];
   return defineExtension({
     name: 'cairn-coordinator-tools',
+    hooks: [
+      hook(GenerationTask, {
+        beforeRequest: ({ messages }) => ({ messages: boundCoordinatorImages(messages) }),
+      }),
+    ],
     tools: defs.map((def) => coordinatorTool(def, channel, gate, options.shuttingDown)),
   });
 }

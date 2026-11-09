@@ -14,6 +14,7 @@ import { CI_CLOSED_CONFIRM_MS } from './ci-loop.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { reconcileWorkAttribution } from './github-work-attribution.js';
+import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
 
@@ -289,6 +290,22 @@ export function createPrWatch(
         await reconcileWorkAttribution(deps, fetchImpl, token, target, head, now);
       } catch {
         run.logger?.info({ buildId: target.buildId }, 'PR attribution deferred');
+      }
+    }
+    const task = deps.db.select().from(todo).where(eq(todo.id, target.threadId)).get();
+    if (pull.state === 'open' && task !== undefined) {
+      try {
+        const body = await ensurePullClosesTaskIssue(
+          fetchImpl,
+          token,
+          target,
+          target.prNumber,
+          task,
+          pull.body,
+        );
+        if (body !== null) pulls.set(key, { etag: null, pull: { ...pull, body } });
+      } catch {
+        run.logger?.info({ buildId: target.buildId }, 'PR closing line deferred');
       }
     }
     let counted: CheckTally | null = null;

@@ -23,7 +23,12 @@ afterEach(async () => {
 });
 
 async function setup(
-  policy = { ownerLogin: LOGIN as string | null, selfTagged: false, allowedLogins: [] as string[] },
+  policy = {
+    ownerLogin: LOGIN as string | null,
+    selfTagged: false,
+    allowedLogins: [] as string[],
+    selfAddresses: [] as string[],
+  },
 ) {
   const s = bootServer({ authToken: TOKEN });
   const dir = makeTestTempDir('owner-');
@@ -126,6 +131,17 @@ test.each<Record<string, string>>([
   ).toBe(403);
 });
 
+test.each(['cross-site', 'same-site'])(
+  'a %s read with the owner identity is refused',
+  async (site) => {
+    const s = await setup();
+    expect(
+      (await call(s.socketPath, '/api/teams', 'GET', { ...identity, 'sec-fetch-site': site }))
+        .status,
+    ).toBe(403);
+  },
+);
+
 test.each<Record<string, string>>([{ 'sec-fetch-site': 'same-origin' }, { origin: ORIGIN }])(
   'owner can create pairing codes with CSRF proof %j',
   async (headers) => {
@@ -150,7 +166,12 @@ test('Bearer authentication is exempt from ambient CSRF', async () => {
 });
 
 test('A6: missing owner metadata fails closed, explicit allowlist is fallback, owner metadata takes priority', async () => {
-  const s = await setup({ ownerLogin: null, selfTagged: false, allowedLogins: [] });
+  const s = await setup({
+    ownerLogin: null,
+    selfTagged: false,
+    allowedLogins: [],
+    selfAddresses: [],
+  });
   expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
   s.policy.allowedLogins.push(LOGIN);
   expect((await call(s.socketPath, '/api/teams')).status).toBe(200);

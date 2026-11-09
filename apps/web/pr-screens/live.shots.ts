@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { testRunPort } from '../../../scripts/test-admission.mjs';
 import { ONLY, prepare, record, recordError, slugOf, THEMES } from './capture-core.js';
 import { FROZEN_AT } from './frozen-time.mjs';
 import { type LiveState, STATE_PAGES } from './state-pages.js';
 
 const PORTS = {
-  empty: Number(process.env.PR_SCREENS_EMPTY_PORT ?? 8441),
-  seeded: Number(process.env.PR_SCREENS_SEEDED_PORT ?? 8443),
+  empty: await testRunPort(process.env.PR_SCREENS_EMPTY_PORT ?? 8441),
+  seeded: await testRunPort(process.env.PR_SCREENS_SEEDED_PORT ?? 8443),
 };
 
 const EMPTY_STATE: LiveState = { teamId: '', projectId: '', todoIds: {} };

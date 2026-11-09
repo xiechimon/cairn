@@ -4,6 +4,7 @@ import {
   type SearchFilterResult,
   type SearchIsState,
   type SearchResponse,
+  WAITING_PHASES,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, not, or, type SQL, sql } from 'drizzle-orm';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
@@ -24,7 +25,7 @@ export function containsLike(column: AnySQLiteColumn, pattern: string) {
 
 const IS_CONDITIONS: Record<SearchIsState, SQL> = {
   failed: sql`${todo.phase} = 'failed'`,
-  waiting: sql`${todo.phase} IN ('confirm', 'review')`,
+  waiting: inArray(todo.phase, [...WAITING_PHASES]),
   review: sql`${todo.phase} = 'review'`,
   running: sql`${todo.phase} IN ('queued', 'planning', 'building')`,
   done: sql`${todo.phase} IN ('done', 'closed')`,

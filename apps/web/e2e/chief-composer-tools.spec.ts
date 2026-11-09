@@ -6,12 +6,10 @@ const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 
-/** The three-agent roster the inline list is written against (labels are
- *  deliberately fuzzy-separable: "bu" hits only builder). */
-const AGENTS = [
-  { id: 'agent-1', displayName: 'builder', description: 'Builds features' },
-  { id: 'agent-2', displayName: 'reviewer', description: 'Reviews PRs' },
-  { id: 'agent-3', displayName: 'deploy-bot', description: 'Ships to prod' },
+const SKILLS = [
+  { id: 'skill-1', name: 'verify-cairn', description: 'Live stack' },
+  { id: 'skill-2', name: 'frontend-design', description: 'UI craft' },
+  { id: 'skill-3', name: 'deploy-check', description: 'Ship gate' },
 ];
 
 const T_BUILDER = '[builder](agent:agent-1)';
@@ -62,26 +60,10 @@ async function stubBoot(page: Page) {
   );
 }
 
-/** The five mention-group sources (canonical projections, todo-detail-page
- *  shape) plus the empty thread list = the fresh-thread view whose send
- *  opens a new chief thread. */
 async function stubMentionSources(page: Page) {
-  const members = [
-    { id: 'member-user', teamId: TEAM_ID, actorId: USER.id, memberType: 'user', actor: USER },
-    ...AGENTS.map((a, i) => ({
-      id: `member-agent-${i}`,
-      teamId: TEAM_ID,
-      actorId: a.id,
-      memberType: 'agent',
-      actor: a,
-    })),
-  ];
-  await page.route(`**/api/teams/${TEAM_ID}/members`, (route) => route.fulfill({ json: members }));
   await page.route('**/api/todos?*', (route) => route.fulfill({ json: [WIRE_CARD] }));
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
-  await page.route('**/api/skills?*', (route) =>
-    route.fulfill({ json: [{ id: 'skill-1', name: 'verify-cairn', description: 'Live stack' }] }),
-  );
+  await page.route('**/api/skills?*', (route) => route.fulfill({ json: SKILLS }));
   await page.route(`**/api/teams/${TEAM_ID}/machines`, (route) =>
     route.fulfill({ json: [{ id: 'machine-1', name: 'xmonsMac' }] }),
   );
@@ -95,11 +77,11 @@ async function stubMentionSources(page: Page) {
 async function openChief(page: Page) {
   await stubBoot(page);
   await stubMentionSources(page);
-  const membersLoaded = page.waitForResponse(
-    (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
+  const skillsLoaded = page.waitForResponse(
+    (r) => r.url().includes('/api/skills') && r.status() === 200,
   );
   await page.goto('/app');
-  await membersLoaded;
+  await skillsLoaded;
   const coordinator = page.getByTestId('home-c');
   await expect(coordinator).toBeVisible();
   const input = page.getByTestId('chief-composer-input');
@@ -227,10 +209,10 @@ test('trigger: @ opens the inline listbox inside the coordinator; arrows + Enter
   const { input, listbox, rows } = await openChief(page);
   const sent = await countChiefSends(page);
 
-  await input.fill('@bu');
+  await input.fill('@ver');
   await expect(listbox).toBeVisible();
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('builder');
+  await expect(rows.first()).toContainText('verify-cairn');
 
   // Combobox wiring while open (the textarea keeps DOM focus).
   await expect(input).toHaveAttribute('role', 'combobox');
@@ -243,7 +225,7 @@ test('trigger: @ opens the inline listbox inside the coordinator; arrows + Enter
   await input.press('Enter');
 
   // Whole @query consumed, trailing space landed, nothing sent (FM10).
-  await expect(input).toHaveValue('@builder ');
+  await expect(input).toHaveValue('@verify-cairn ');
   await expect(listbox).toBeHidden();
   expect(sent).toHaveLength(0);
   await expect(input).toBeFocused();
@@ -255,7 +237,7 @@ test('mouse: hover highlights and the row click inserts without stealing focus (
 }) => {
   const { input, listbox, rows } = await openChief(page);
 
-  await input.fill('@bu');
+  await input.fill('@ver');
   await expect(listbox).toBeVisible();
   await rows.first().hover();
   await expect(rows.first()).toHaveClass(/mention-inline-row--active/);
@@ -263,7 +245,7 @@ test('mouse: hover highlights and the row click inserts without stealing focus (
   await expect(input).toHaveAttribute('aria-activedescendant', rowId as string);
 
   await rows.first().click();
-  await expect(input).toHaveValue('@builder ');
+  await expect(input).toHaveValue('@verify-cairn ');
   await expect(listbox).toBeHidden();
   await expect(input).toBeFocused();
 });
@@ -298,12 +280,12 @@ test('geometry: the listbox anchors above the composer wrap, left-aligned and no
 test('Esc closes the listbox and the coordinator survives (#146 ladder, FM9)', async ({ page }) => {
   const { coordinator, input, listbox } = await openChief(page);
 
-  await input.fill('@bu');
+  await input.fill('@ver');
   await expect(listbox).toBeVisible();
   await input.press('Escape');
   await expect(listbox).toBeHidden();
   await expect(coordinator).toBeVisible();
-  await expect(input).toHaveValue('@bu');
+  await expect(input).toHaveValue('@ver');
 });
 
 // —— clipboard paste face (FM6/FM10) ——

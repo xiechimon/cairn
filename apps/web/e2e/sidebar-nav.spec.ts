@@ -58,8 +58,8 @@ test('settings sections hop client-side', async ({ page }) => {
   await expect(page).toHaveURL('/app/settings/skills?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 
-  await settings.getByRole('link', { name: '团队' }).click();
-  await expect(page).toHaveURL('/app/settings/team?scenario=01');
+  await settings.getByRole('link', { name: '规则与策略' }).click();
+  await expect(page).toHaveURL('/app/settings/work-routing?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
 

@@ -23,7 +23,14 @@ import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { type Answer, mergeGithubFake, type PullFake, type Recorded } from './fakes/github.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  pauseTeamForTest,
+  req,
+  seedSessionRoute,
+  type TestServer,
+  teamPausedForTest,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -455,12 +462,12 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     [
       'an issue of the same repository',
       { kind: 'github-issue', ref: 'github:octo/demo#77' },
-      'closes #77',
+      'Closes #77',
     ],
     [
       'a self-created issue, owner and repo in another case',
       { kind: 'github-issue-self', ref: 'github:Octo/DEMO#78' },
-      'closes #78',
+      'Closes #78',
     ],
     ['an issue of another repository', { kind: 'github-issue', ref: 'github:other/demo#77' }, null],
     [
@@ -475,14 +482,66 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ],
     ['a malformed issue ref', { kind: 'github-issue', ref: 'github:octo/demo#x' }, null],
     ['no source', null, null],
-  ] as const)('[2b-D2] closing line for %s', async (_name, source, line) => {
-    const w = makeWorld({ source });
+  ] as const)(
+    '[2b-D2] closing line for %s goes into the PR body before the merge, never the commit',
+    async (_name, source, line) => {
+      const w = makeWorld({ source });
+      await requestMerge(w.deps, w.buildId);
+      const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
+        string,
+        unknown
+      >;
+      expect(body.commit_message).toBe(PLAIN_BODY);
+      expect(w.fake.bodyEdits()).toEqual(
+        line === null ? [] : [`${line}\n\n## What\n\nThe change.`],
+      );
+      const order = w.fake.requests
+        .map((r) => r.method)
+        .filter((m) => m === 'PATCH' || m === 'PUT');
+      expect(order).toEqual(line === null ? ['PUT'] : ['PATCH', 'PUT']);
+    },
+  );
+
+  test('[2b-D2b] a PR body that already closes the task issue is not edited', async () => {
+    const w = makeWorld({
+      source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' },
+      pull: { body: 'Fixes: #77' },
+    });
     await requestMerge(w.deps, w.buildId);
-    const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
-      string,
-      unknown
-    >;
-    expect(body.commit_message).toBe(line ?? PLAIN_BODY);
+    expect(w.fake.bodyEdits()).toEqual([]);
+    expect(w.fake.puts()).toHaveLength(1);
+  });
+
+  test('[2b-D2d] the task is cancelled while the body edit is in flight → refused, no merge PUT', async () => {
+    const w = makeWorld({ source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' } });
+    w.deps.githubFetch = async (input, init) => {
+      const res = await w.fake.fetch(input, init);
+      if (init?.method === 'PATCH') {
+        w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
+      }
+      return res;
+    };
+    await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow('closed -> done');
+    expect(w.fake.bodyEdits()).toHaveLength(1);
+    expect(w.fake.puts()).toHaveLength(0);
+  });
+
+  test('[2b-D2c] the body edit fails → 409, no merge PUT', async () => {
+    const w = makeWorld({ source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' } });
+    w.deps.githubFetch = async (input, init) =>
+      init?.method === 'PATCH'
+        ? {
+            ok: false,
+            status: 502,
+            headers: { get: () => null },
+            json: async () => ({}),
+            text: async () => '',
+          }
+        : w.fake.fetch(input, init);
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(w.fake.puts()).toHaveLength(0);
+    expectUntouched(w);
   });
 
   test.each([
@@ -505,7 +564,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         unknown
       >;
       expect(body.commit_title).toBe('Merge pull request #201');
-      expect(body.commit_message).toBe('closes #77');
+      expect(body.commit_message).toBe(PLAIN_BODY);
       expect(w.phase()).toBe('done');
     },
   );
@@ -531,7 +590,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     },
   );
 
-  test('[2b-D43] the self-created issue is recorded while the PR read is in flight → the closing line reads the re-read todo', async () => {
+  test('[2b-D43] the self-created issue is recorded while the PR read is in flight → the closing line names it', async () => {
     const w = makeWorld();
     w.s.db
       .update(todoTable)
@@ -546,11 +605,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         .run();
     };
     await requestMerge(w.deps, w.buildId);
-    const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
-      string,
-      unknown
-    >;
-    expect(body.commit_message).toBe('closes #88');
+    expect(w.fake.bodyEdits()).toEqual(['Closes #88\n\n## What\n\nThe change.']);
   });
 
   test('[2b-D42] no closing line → commit_message is still sent (cairn’s own line), so the repository default (the PR body) is not used', async () => {
@@ -1453,11 +1508,7 @@ describe('#1405 autonomy brakes at the GitHub write boundary', () => {
   test('a pause introduced during the PR read returns HTTP 409 without a PUT or task writes', async () => {
     const w = makeWorld();
     w.fake.onGet = () => {
-      w.s.db
-        .update(teamTable)
-        .set({ autonomyPaused: true })
-        .where(eq(teamTable.id, w.s.team.id))
-        .run();
+      pauseTeamForTest(w.s.db, w.s.team.id);
     };
     const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
     expect(response.status).toBe(409);
@@ -1491,11 +1542,7 @@ describe('#1405 autonomy brakes at the GitHub write boundary', () => {
 
   test('human policy remains available while paused and at a zero autonomous cap', async () => {
     const w = makeWorld({ mergePolicy: 'human' });
-    w.s.db
-      .update(teamTable)
-      .set({ autonomyPaused: true })
-      .where(eq(teamTable.id, w.s.team.id))
-      .run();
+    pauseTeamForTest(w.s.db, w.s.team.id);
     w.s.db
       .update(projectTable)
       .set({
@@ -1749,18 +1796,24 @@ test.each(['open', 'network', 'malformed'] as const)(
         : mode === 'network'
           ? 'network'
           : { status: 200, body: {} };
-    expect(
-      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
-    ).toBe(false);
+    expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(false);
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.message).toContain('autonomy-paused');
     expect(w.fake.puts()).toHaveLength(0);
-    expect(
-      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
-    ).toBe(true);
+    expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(false);
     expectUntouched(w);
   },
 );
+
+test('a closed GitHub marker resumes the merge that an open marker refused', async () => {
+  const w = makeWorld();
+  w.fake.markerAnswer = { status: 200, body: [{ number: 7 }] };
+  await refusal(requestMerge(w.deps, w.buildId));
+  w.fake.markerAnswer = { status: 200, body: [] };
+  expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+  expect(w.fake.puts()).toHaveLength(1);
+  expect(w.phase()).toBe('done');
+});
 
 test('#1405 a card closed during the uncached marker read cannot merge', async () => {
   const w = makeWorld();

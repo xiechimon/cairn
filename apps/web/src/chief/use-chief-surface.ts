@@ -15,8 +15,8 @@ import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordina
 import {
   useApiMutations,
   useChief,
-  useChiefMessages,
   useChiefThreads,
+  useConversationMessages,
   useNotifications,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
@@ -26,6 +26,7 @@ import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
+import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/fixtures.js';
@@ -51,15 +52,9 @@ import {
 
 export type { ChiefView };
 
-export interface ChiefEarlier {
-  loading: boolean;
-  failed: boolean;
-  onLoad: () => void;
-}
-
 export interface ChiefSurface {
   load: CoordinatorLoad;
-  earlier?: ChiefEarlier;
+  earlier?: EarlierPages;
   retry: () => void;
   chiefView: ChiefView;
   setChiefView: (view: ChiefView) => void;
@@ -150,7 +145,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     setChiefView,
     place,
   ]);
-  const { query: chiefMessagesQ, messages: chiefMessages } = useChiefMessages(
+  const { query: chiefMessagesQ, messages: chiefMessages } = useConversationMessages(
     live ? (activeThread?.id ?? null) : null,
     live,
   );
@@ -211,7 +206,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const loadEarlier = useCallback(() => {
     void fetchNextPage();
   }, [fetchNextPage]);
-  const earlier: ChiefEarlier | undefined = live
+  const earlier: EarlierPages | undefined = live
     ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
     : undefined;
 

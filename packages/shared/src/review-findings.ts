@@ -10,6 +10,18 @@ export function reviewFindingBadge(body: string): string | null {
   return /^\s*\*\*<sub><sub>!\[(P[0-3]) Badge\]/.exec(body)?.[1] ?? null;
 }
 
+export function reviewFindingTitle(body: string): string {
+  for (const line of body.split('\n')) {
+    const text = line
+      .replace(/<\/?sub>/g, '')
+      .replace(/!\[P[0-3] Badge\]\([^)]*\)/g, '')
+      .replace(/\*\*/g, '')
+      .trim();
+    if (text) return text;
+  }
+  return '';
+}
+
 export interface PrReviewFinding {
   id: string;
   path: string;

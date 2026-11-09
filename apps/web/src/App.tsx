@@ -45,7 +45,11 @@ export const router = createBrowserRouter([
               { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
               { path: '/app/project/:id/files', element: <ProjectPage /> },
               { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
-              { path: '/app/team', element: <SettingsRedirect section="team" /> },
+              { path: '/app/team', element: <SettingsRedirect section="work-routing" /> },
+              {
+                path: `${SETTINGS_HREF}/team`,
+                element: <SettingsRedirect section="work-routing" />,
+              },
               { path: '/app/account', element: <SettingsRedirect section="account" /> },
               { path: '/app/api-keys', element: <SettingsRedirect section="api-keys" /> },
               { path: SKILLS_HREF, element: <SettingsRedirect section="skills" /> },

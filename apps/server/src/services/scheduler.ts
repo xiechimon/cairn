@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { ENV_VARS, type Scheduler } from '@cairn/shared';
+import { ENV_VARS, type Scheduler, WAITING_PHASES } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { ServerConfig } from '../config.js';
 import { build, chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
@@ -51,6 +51,7 @@ import {
 import { sweepStaleMachines } from './machines.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
+import { reconcileOwners } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
 import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
@@ -75,6 +76,7 @@ import {
 } from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 import { sweepSnoozeExpiry } from './snooze.js';
+import { createTaskIssueSync } from './task-issue-sync.js';
 import { insertMessageRow } from './transcript.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 
@@ -205,7 +207,7 @@ export function trajectoryReflectCurateRunOf(
   };
 }
 
-const SCHEDULE_GATE_PHASES = new Set(['confirm', 'review']);
+const SCHEDULE_GATE_PHASES: ReadonlySet<string> = new Set(WAITING_PHASES);
 
 export function createScheduler(
   deps: BuildDeps,
@@ -231,6 +233,7 @@ export function createScheduler(
         })
       : null;
   const prWatch = ci ? createPrWatch(deps, ci) : null;
+  const taskIssueSync = ci ? createTaskIssueSync(deps, ci) : null;
   const correctionIntake = intake
     ? createIssueIntake(deps, { ...intake, label: 'correction' })
     : null;
@@ -516,6 +519,7 @@ export function createScheduler(
     sweepQuotaWaitSteps(deps, now);
     sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
+    reconcileOwners(deps);
     const digestTimes = opts.pushDigestTimes ?? [];
     if (digestTimes.length > 0 && !digestSweeping) {
       const due = digestSlotsDue(now, digestTimes, lastDigestRun);
@@ -692,6 +696,7 @@ export function createScheduler(
       },
       'pr-watch': async () => {
         await watchPrs();
+        await taskIssueSync?.sweep();
       },
       intake: async () => {
         await issueIntake?.sweep();

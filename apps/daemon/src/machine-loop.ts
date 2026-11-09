@@ -9,6 +9,7 @@ import type {
   MachineCapabilities,
 } from '@cairn/shared';
 import {
+  appendAnswers,
   CLAIM_BACKOFF_CAP_MS,
   CLAIM_POLL_INTERVAL_MS,
   type ClaudeLogin,
@@ -44,7 +45,7 @@ import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineApiError, MachineClient } from './machine-client.js';
 import { enrollThroughBrowser } from './machine-enroll.js';
-import { ComputerOrbs } from './orb/computer.js';
+import { ComputerOrbs, computerImageOffersBrowser } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import { NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
 import { createOrbProvider } from './orb/select.js';
@@ -234,6 +235,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     codexLogin: readCodexLogin(paths.agentRuntimeDir),
     executor: orbProvider.kind,
     ...(orbComputer ? { computer: true as const } : {}),
+    ...(orbComputer && computerImageOffersBrowser() ? { browser: true as const } : {}),
     ...(hostComputer ? { ownComputer: true as const } : {}),
   });
 
@@ -616,8 +618,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
-      const content = await client.steer(stepId);
-      if (content === null) return;
+      const fetched = await client.steer(stepId);
+      const answers = fetched?.answers ?? [];
+      const content = appendAnswers(fetched?.content ?? '', answers);
+      if (content === '') return;
       let deliveryText = content;
       let images: DeliveredImage[] | undefined;
       try {
@@ -657,7 +661,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         return;
       }
       await live.steer(deliveryText, images);
-      await client.steerAck?.(stepId);
+      await client.steerAck?.(
+        stepId,
+        answers.length > 0
+          ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' }
+          : undefined,
+      );
       logger.step(`steer delivered step=${stepId}`);
     } catch (err) {
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);

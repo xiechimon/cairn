@@ -7,6 +7,7 @@ export interface StubResponse {
   usage?: { prompt: number; completion: number; cached?: number };
   toolCall?: { id?: string; name: string; arguments: Record<string, unknown> };
   status?: number;
+  errorMessage?: string;
 }
 
 export interface StubRequest {
@@ -28,8 +29,37 @@ function chunk(payload: object): string {
   return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
+export type StubResponseSource =
+  | readonly StubResponse[]
+  | ((request: StubRequest, index: number) => StubResponse);
+
+const EXECUTOR_PLAN_MARKER = 'Implementation plan (written by the planner model)';
+
+export function handoffStubResponses(
+  planner: readonly StubResponse[],
+  executor: readonly StubResponse[],
+): StubResponseSource {
+  let plannerTurns = 0;
+  let executorTurns = 0;
+  return (request) => {
+    const executorPhase = JSON.stringify(request.messages).includes(EXECUTOR_PLAN_MARKER);
+    if (!executorPhase) {
+      const rsp = planner[Math.min(plannerTurns, Math.max(planner.length - 1, 0))] ?? {
+        content: 'ok',
+      };
+      plannerTurns += 1;
+      return rsp;
+    }
+    const rsp = executor[Math.min(executorTurns, Math.max(executor.length - 1, 0))] ?? {
+      content: 'ok',
+    };
+    executorTurns += 1;
+    return rsp;
+  };
+}
+
 export async function startStubLlm(
-  responses: StubResponse[],
+  responses: StubResponseSource,
   opts: { onConsumed?: () => void } = {},
 ): Promise<StubLlm> {
   const requests: StubRequest[] = [];
@@ -46,9 +76,14 @@ export async function startStubLlm(
     });
     req.on('end', () => {
       requestTimes.push(Date.now());
-      requests.push(JSON.parse(body) as StubRequest);
-      const rsp = responses[Math.min(next, responses.length - 1)] ?? { content: 'ok' };
+      const request = JSON.parse(body) as StubRequest;
+      requests.push(request);
+      const index = next;
       next += 1;
+      const rsp =
+        typeof responses === 'function'
+          ? responses(request, index)
+          : (responses[Math.min(index, responses.length - 1)] ?? { content: 'ok' });
       const usage = rsp.usage ?? DEFAULT_USAGE;
       const send = () => {
         // pi-ai session-level auto_retry matches errorMessage against
@@ -58,7 +93,11 @@ export async function startStubLlm(
         if (rsp.status !== undefined && rsp.status >= 400) {
           const errType = rsp.status >= 500 ? 'server_error' : 'invalid_request_error';
           res.writeHead(rsp.status, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: { message: 'stub provider error', type: errType } }));
+          res.end(
+            JSON.stringify({
+              error: { message: rsp.errorMessage ?? 'stub provider error', type: errType },
+            }),
+          );
           opts.onConsumed?.();
           return;
         }

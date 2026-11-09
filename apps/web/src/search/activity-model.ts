@@ -4,6 +4,7 @@ import type {
   SearchFilterResult,
   SearchIsState,
 } from '@cairn/shared';
+import { isWaitingPhase } from '@cairn/shared';
 import { usageCostKnown } from '../api/mappers.js';
 import type { TodoRecord } from '../fixtures/records.js';
 
@@ -108,7 +109,7 @@ export function pageRows(rows: readonly ActivityRow[], pages: number): ActivityR
 
 const IS_PHASES: Record<SearchIsState, (todo: TodoRecord) => boolean> = {
   failed: (todo) => todo.phase === 'failed',
-  waiting: (todo) => todo.phase === 'confirm' || todo.phase === 'review',
+  waiting: (todo) => isWaitingPhase(todo.phase),
   review: (todo) => todo.phase === 'review',
   running: (todo) => ['queued', 'planning', 'building'].includes(todo.phase),
   done: (todo) => todo.phase === 'done' || todo.phase === 'closed',

@@ -317,7 +317,7 @@ export const boardChiefProbes: FixtureSet = {
       'failed',
       CHIEF_NOW - 5 * HOUR_MS - 2 * 60_000,
     ),
-    { ...legacyReview, phaseAt: CHIEF_NOW - 5 * HOUR_MS - 2 * 60_000, awaitingReply: false },
+    { ...legacyReview, phaseAt: CHIEF_NOW - 5 * HOUR_MS - 2 * 60_000 },
     chiefProbe(
       13,
       '给 README.md 增加「项目结构」一节并链接贡献指南',
@@ -367,11 +367,8 @@ export const boardInbox: FixtureSet = {
       'inbox-reply',
       101,
       'bug 票自动复现：要不要把复现脚本放进 e2e？',
-      'review',
+      'needs_input',
       40 * 60_000,
-      {
-        awaitingReply: true,
-      },
     ),
     inboxProbe(
       'inbox-confirm',

@@ -1,7 +1,7 @@
 import { canOrchestrate } from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useChiefThreads, usePrs } from '../api/hooks.js';
+import { useApiMutations, useBuildGate, useChiefThreads, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
@@ -11,7 +11,7 @@ import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
-import { mergeRejectCopy } from '../detail/merge-gate.js';
+import { mergePreselected, mergeRejectCopy } from '../detail/merge-gate.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -24,7 +24,7 @@ export type ThreadActionKind = 'start' | 'approve' | 'finish' | 'retry' | 'unarc
 
 export function threadActionOf(todo: TodoRecord, running: boolean): ThreadActionKind | null {
   if (todo.archivedAt != null) return 'unarchive';
-  if (todo.awaitingReply === true || running) return null;
+  if (todo.phase === 'needs_input' || running) return null;
   switch (todo.phase) {
     case 'todo':
       return 'start';
@@ -76,6 +76,7 @@ export function useThreadActions({
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
+  const gate = useBuildGate(buildId, live && dialog === 'accept' && pr !== undefined).data?.state;
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
 
@@ -292,6 +293,7 @@ export function useThreadActions({
           live ? substantiveChangesOf(chat.changes.reported, chat.changes.settled) : null
         }
         mergeLocked={phase === 'failed'}
+        mergeByDefault={!live || mergePreselected({ hasPr: pr !== undefined, gate: gate ?? null })}
         infoOutput={chat.infoOutput}
         {...(pr !== undefined ? { pr: { number: pr.number, url: pr.url } } : {})}
         confirming={mutations.mergeBuild.isPending || mutations.patchTodo.isPending}

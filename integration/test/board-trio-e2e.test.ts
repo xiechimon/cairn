@@ -313,7 +313,7 @@ describe('#1216 task UI reliability triple defect (real web dist + real server +
       (s) => s.buildId === rerunBuildId && s.kind === 'session',
     );
     await doneStep(tokens.m1, buildStep.id, 'success', { hasChanges: false });
-    await waitFor(() => server.todoPhase(seeded.id) === 'failed', 15_000);
+    await waitFor(() => server.todoPhase(seeded.id) === 'needs_input', 15_000);
   }, 180_000);
 
   test('③ failed card detail deletable; missing/failed detail shows an explained state, not an empty shell', async () => {

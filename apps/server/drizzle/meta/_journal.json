@@ -855,6 +855,55 @@
       "when": 1794158279965,
       "tag": "0125_build_stop",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "6",
+      "when": 1794192748183,
+      "tag": "0126_autonomy_pause_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "6",
+      "when": 1794196194315,
+      "tag": "0127_task_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "6",
+      "when": 1794196195565,
+      "tag": "0128_needs_input_phase",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "6",
+      "when": 1794198018500,
+      "tag": "0129_task_issue_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "6",
+      "when": 1794200191199,
+      "tag": "0130_thread_owner_checkpoint",
+      "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "6",
+      "when": 1794210968508,
+      "tag": "0131_project_group",
+      "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "6",
+      "when": 1794216000000,
+      "tag": "0132_computer_browser_enabled",
+      "breakpoints": true
     }
   ]
 }

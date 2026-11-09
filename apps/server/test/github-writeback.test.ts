@@ -1,14 +1,26 @@
 import { rm } from 'node:fs/promises';
 import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import {
+  taskIssueClose as taskIssueCloseTable,
+  team as teamTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
+import { transitionTodos } from '../src/services/chief-tools.js';
 import {
   deleteGithubConnection,
   upsertGithubConnection,
 } from '../src/services/github-connection.js';
-import { flushSelfIssueWrites } from '../src/services/todos.js';
+import {
+  createTaskIssueSync,
+  TASK_ISSUE_RETRY_MS,
+  TASK_ISSUE_WRITES_PER_SWEEP,
+} from '../src/services/task-issue-sync.js';
+import { flushSelfIssueWrites, setTodoPhase } from '../src/services/todos.js';
 import {
   bootServer,
   issueApiKey,
@@ -600,6 +612,12 @@ describe('GET /api/todos/{id}/github-issue read-only echo (D family)', () => {
 });
 
 describe('moving a task with a self-created issue to another project (#2009)', () => {
+  const sweepIssues = (s: TestServer, fetch: FetchLike) =>
+    createTaskIssueSync(
+      { ...s.svc, box: s.secretBox, githubFetch: fetch },
+      { githubFetch: fetch },
+    ).sweep();
+
   test('the old issue gets a comment and is closed as not planned, and a new issue opens in the new repo', async () => {
     const BETA = 'octo/beta';
     const mock = ghMock({
@@ -622,7 +640,8 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     });
     expect(moved.status).toBe(200);
     await flushSelfIssueWrites();
-    await vi.waitFor(() => expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1));
+    await sweepIssues(s, mock.impl);
+    expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1);
     expect(JSON.parse(mock.callsTo('PATCH', issuePath(101))[0]!.body!)).toEqual({
       state: 'closed',
       state_reason: 'not_planned',
@@ -661,7 +680,9 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     mock.set(`POST /repos/${BETA}/issues`, { status: 201, body: { ...CREATED_ISSUE, number: 7 } });
     const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
     expect(retry.status).toBe(200);
-    await vi.waitFor(() => expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1));
+    await flushSelfIssueWrites();
+    await sweepIssues(s, mock.impl);
+    expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1);
     expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${BETA}#7`);
     s.dispose();
   });
@@ -698,6 +719,7 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     await flushSelfIssueWrites();
     await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: beta } });
     await flushSelfIssueWrites();
+    await sweepIssues(s, mock.impl);
     const close = mock.callsTo('PATCH', issuePath(101));
     expect(close).toHaveLength(1);
     expect(close[0]!.headers.authorization).toBe(`Bearer ${ROTATED}`);
@@ -717,10 +739,449 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     const created = await createTask(s.app, alpha);
     await flushSelfIssueWrites();
     await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: local } });
-    await vi.waitFor(() => expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1));
+    await sweepIssues(s, mock.impl);
+    expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1);
     const after = await getTodo(s.app, created.id);
     expect(after.sourceKind).toBeNull();
     expect(after.sourceRef).toBeNull();
+    s.dispose();
+  });
+});
+
+describe('task issue sync: the self-created issue follows the task row (#3505)', () => {
+  function lifecycleMock(state: 'open' | 'closed' = 'open') {
+    return ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
+      [`GET ${issuePath(101)}`]: { status: 200, body: { ...CREATED_ISSUE, state } },
+      [`PATCH ${issuePath(101)}`]: { status: 200, body: { number: 101, state: 'closed' } },
+      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
+    });
+  }
+
+  function syncOf(s: TestServer, fetch: FetchLike) {
+    return createTaskIssueSync(
+      { ...s.svc, box: s.secretBox, githubFetch: fetch },
+      { githubFetch: fetch },
+    );
+  }
+
+  async function startedTask(mock: GhMock) {
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await flushSelfIssueWrites();
+    expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#101`);
+    return { s, id: created.id, projectId, sync: syncOf(s, mock.impl) };
+  }
+
+  function writes(mock: GhMock) {
+    return mock.callsTo('PATCH', issuePath(101)).map((c) => JSON.parse(c.body ?? '{}'));
+  }
+
+  function comments(mock: GhMock) {
+    return mock
+      .callsTo('POST', `${issuePath(101)}/comments`)
+      .map((c) => (JSON.parse(c.body ?? '{}') as { body: string }).body);
+  }
+
+  const setRow = (s: TestServer, id: string, values: Partial<typeof todoTable.$inferInsert>) =>
+    s.db.update(todoTable).set(values).where(eq(todoTable.id, id)).run();
+
+  test('an active task needs nothing: the sweep makes no GitHub call', async () => {
+    const mock = lifecycleMock();
+    const { s, sync } = await startedTask(mock);
+    const before = mock.calls.length;
+    await sync.sweep();
+    expect(mock.calls.length).toBe(before);
+    s.dispose();
+  });
+
+  test('cancelling on the board closes the issue as not planned, with the reason, once', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    expect(
+      (await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'closed' } })).status,
+    ).toBe(200);
+    await sync.sweep();
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock)).toEqual(['Cairn：这个任务已取消，这里的 issue 关闭（未计划）。']);
+    s.dispose();
+  });
+
+  test('archiving an unfinished task closes the issue as not planned', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    expect((await call(s.app, 'POST', `/api/todos/${id}/archive`)).status).toBe(200);
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock)).toEqual(['Cairn：这个任务已归档，这里的 issue 关闭（未计划）。']);
+    s.dispose();
+  });
+
+  test('archiving a done task whose issue is still open closes it as completed', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { phase: 'done' });
+    await call(s.app, 'POST', `/api/todos/${id}/archive`);
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'completed' }]);
+    s.dispose();
+  });
+
+  test('an issue a merge already closed is recorded, with no write and no comment', async () => {
+    const mock = lifecycleMock('closed');
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { phase: 'done' });
+    await call(s.app, 'POST', `/api/todos/${id}/archive`);
+    await sync.sweep();
+    await sync.sweep();
+    expect(writes(mock)).toEqual([]);
+    expect(comments(mock)).toEqual([]);
+    expect(mock.callsTo('GET', issuePath(101))).toHaveLength(1);
+    s.dispose();
+  });
+
+  test('a task the Coordinator closes as superseded links the successor issue', async () => {
+    const mock = lifecycleMock();
+    const { s, id, projectId, sync } = await startedTask(mock);
+    mock.set(`POST ${ISSUES_PATH}`, { status: 201, body: { ...CREATED_ISSUE, number: 102 } });
+    const successor = await createTask(s.app, projectId, '换一种做法');
+    await flushSelfIssueWrites();
+    const result = transitionTodos(
+      s.svc,
+      s.team.id,
+      [id],
+      'closed',
+      { kind: 'agent', name: 'Coordinator', stopActor: 'coordinator' },
+      { supersededBy: successor.id },
+    );
+    expect(result.transitioned).toEqual([id]);
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock)).toEqual(['Cairn：这个任务被 #102 取代，这里的 issue 关闭（未计划）。']);
+    s.dispose();
+  });
+
+  test('a superseded task waits until the successor issue exists', async () => {
+    const mock = lifecycleMock();
+    const { s, id, projectId, sync } = await startedTask(mock);
+    const successor = await createTask(s.app, projectId, '换一种做法');
+    await flushSelfIssueWrites();
+    setRow(s, successor.id, { sourceRef: null });
+    setRow(s, id, { phase: 'closed', supersededBy: successor.id });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([]);
+    setRow(s, successor.id, { sourceRef: `github:${REPO}#102` });
+    await sync.sweep();
+    expect(comments(mock)).toEqual(['Cairn：这个任务被 #102 取代，这里的 issue 关闭（未计划）。']);
+    s.dispose();
+  });
+
+  test('a failed task keeps its issue open', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { phase: 'building' });
+    setTodoPhase(s.svc, id, 'failed');
+    await sync.sweep();
+    expect(writes(mock)).toEqual([]);
+    s.dispose();
+  });
+
+  test('deleting the task closes its issue through the tombstone', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    expect((await call(s.app, 'DELETE', `/api/todos/${id}`)).status).toBeLessThan(300);
+    await sync.sweep();
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock)).toEqual(['Cairn：这个任务已删除，这里的 issue 关闭（未计划）。']);
+    expect(s.db.select().from(taskIssueCloseTable).all()).toEqual([]);
+    s.dispose();
+  });
+
+  test('a tombstone whose close fails stays for the next sweep', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    await call(s.app, 'DELETE', `/api/todos/${id}`);
+    mock.set(`PATCH ${issuePath(101)}`, { status: 502, body: { message: 'bad gateway' } });
+    await sync.sweep(1_000);
+    expect(s.db.select().from(taskIssueCloseTable).all()).toHaveLength(1);
+    mock.set(`PATCH ${issuePath(101)}`, { status: 200, body: { number: 101, state: 'closed' } });
+    await sync.sweep(1_000 + TASK_ISSUE_RETRY_MS);
+    expect(s.db.select().from(taskIssueCloseTable).all()).toEqual([]);
+    s.dispose();
+  });
+
+  test('a close whose comment fails changes nothing, and the next sweep posts the comment and closes', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { phase: 'closed' });
+    mock.set(`POST ${issuePath(101)}/comments`, { status: 502, body: { message: 'bad gateway' } });
+    await sync.sweep(1_000);
+    expect(writes(mock)).toEqual([]);
+    mock.set(`POST ${issuePath(101)}/comments`, { status: 201, body: { id: 1 } });
+    await sync.sweep(1_000 + TASK_ISSUE_RETRY_MS);
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock).at(-1)).toBe('Cairn：这个任务已取消，这里的 issue 关闭（未计划）。');
+    s.dispose();
+  });
+
+  test('a done task forgets its recorded state, so reactivating it reopens the issue its merge closed', async () => {
+    const mock = lifecycleMock('closed');
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { phase: 'done', lastRunAt: 5 });
+    await sync.sweep();
+    expect(s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.issueState).toBeNull();
+    expect((await call(s.app, 'POST', `/api/todos/${id}/reset`, { body: {} })).status).toBeLessThan(
+      300,
+    );
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'open', state_reason: 'reopened' }]);
+    s.dispose();
+  });
+
+  test('failed writes count against the per-sweep budget', async () => {
+    const mock = lifecycleMock();
+    const { s, sync } = await startedTask(mock);
+    for (let n = 0; n < TASK_ISSUE_WRITES_PER_SWEEP + 10; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-${n}`,
+          teamId: s.team.id,
+          sourceRef: `github:${REPO}#101`,
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+    }
+    mock.set(`PATCH ${issuePath(101)}`, { status: 502, body: { message: 'bad gateway' } });
+    await sync.sweep();
+    expect(comments(mock)).toHaveLength(TASK_ISSUE_WRITES_PER_SWEEP);
+    s.dispose();
+  });
+
+  test('tombstones of a team without a GitHub token do not block another team', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    s.db.insert(teamTable).values({ id: 'team-b', name: 'B', createdAt: 1 }).run();
+    for (let n = 0; n < TASK_ISSUE_WRITES_PER_SWEEP + 5; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-b-${n}`,
+          teamId: 'team-b',
+          sourceRef: 'github:other/repo#9',
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+    }
+    setRow(s, id, { phase: 'closed' });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    s.dispose();
+  });
+
+  test('items that keep failing back off, so later items get their turn', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    for (let n = 0; n < TASK_ISSUE_WRITES_PER_SWEEP; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-${n}`,
+          teamId: s.team.id,
+          sourceRef: `github:${REPO}#9${n}`,
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+      mock.set(`POST ${issuePath(Number(`9${n}`))}/comments`, {
+        status: 502,
+        body: { message: 'bad gateway' },
+      });
+    }
+    setRow(s, id, { phase: 'closed' });
+    await sync.sweep(1_000);
+    expect(writes(mock)).toEqual([]);
+    await sync.sweep(30_000);
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    s.dispose();
+  });
+
+  test('a rate limit stops the sweep at once', async () => {
+    const mock = lifecycleMock();
+    const { s, sync } = await startedTask(mock);
+    for (let n = 0; n < 5; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-${n}`,
+          teamId: s.team.id,
+          sourceRef: `github:${REPO}#101`,
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+    }
+    mock.set(`POST ${issuePath(101)}/comments`, {
+      status: 429,
+      body: { message: 'rate limited' },
+      headers: { 'retry-after': '60' },
+    });
+    await sync.sweep();
+    expect(mock.callsTo('POST', `${issuePath(101)}/comments`)).toHaveLength(1);
+    s.dispose();
+  });
+
+  test('an issue GitHub reports gone (410) is recorded and not retried', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    await call(s.app, 'DELETE', `/api/todos/${id}`);
+    mock.set(`GET ${issuePath(101)}`, { status: 410, body: { message: 'This issue was deleted' } });
+    mock.set(`POST ${issuePath(101)}/comments`, { status: 410, body: { message: 'gone' } });
+    mock.set(`PATCH ${issuePath(101)}`, { status: 410, body: { message: 'gone' } });
+    await sync.sweep();
+    expect(s.db.select().from(taskIssueCloseTable).all()).toEqual([]);
+    s.dispose();
+  });
+
+  test('deleting while the issue is still being created closes it once it exists', async () => {
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const mock = lifecycleMock();
+    const fetch: FetchLike = async (input, init) => {
+      if ((init?.method ?? 'GET') === 'POST' && new URL(String(input)).pathname === ISSUES_PATH)
+        await gate;
+      return mock.impl(input, init);
+    };
+    const s = bootServer({ githubFetch: fetch });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await call(s.app, 'DELETE', `/api/todos/${created.id}`);
+    release();
+    await flushSelfIssueWrites();
+    await syncOf(s, fetch).sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock)).toEqual(['Cairn：这个任务已删除，这里的 issue 关闭（未计划）。']);
+    s.dispose();
+  });
+
+  test('cancel then reopen before the sweep leaves the issue alone', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'closed' } });
+    await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'todo' } });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([]);
+    s.dispose();
+  });
+
+  test('reopening a cancelled task reopens its issue', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'closed' } });
+    await sync.sweep();
+    mock.set(`GET ${issuePath(101)}`, { status: 200, body: { ...CREATED_ISSUE, state: 'closed' } });
+    await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'todo' } });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([
+      { state: 'closed', state_reason: 'not_planned' },
+      { state: 'open', state_reason: 'reopened' },
+    ]);
+    s.dispose();
+  });
+
+  test('resetting a cancelled started task reopens its issue', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { lastRunAt: 5 });
+    await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'closed' } });
+    await sync.sweep();
+    mock.set(`GET ${issuePath(101)}`, { status: 200, body: { ...CREATED_ISSUE, state: 'closed' } });
+    expect((await call(s.app, 'POST', `/api/todos/${id}/reset`, { body: {} })).status).toBeLessThan(
+      300,
+    );
+    await sync.sweep();
+    expect(writes(mock)).toEqual([
+      { state: 'closed', state_reason: 'not_planned' },
+      { state: 'open', state_reason: 'reopened' },
+    ]);
+    s.dispose();
+  });
+
+  test('a creation retry that succeeds after the task was cancelled closes the new issue', async () => {
+    const mock = lifecycleMock();
+    mock.set(`POST ${ISSUES_PATH}`, { status: 404, body: { message: 'no' } });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await flushSelfIssueWrites();
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { phase: 'closed' } });
+    const sync = syncOf(s, mock.impl);
+    await sync.sweep();
+    mock.set(`POST ${ISSUES_PATH}`, { status: 201, body: CREATED_ISSUE });
+    expect((await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`)).status).toBe(
+      200,
+    );
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    s.dispose();
+  });
+
+  test('negative control: a path that writes phase straight into the table is still reconciled', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, id)).run();
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    s.dispose();
+  });
+
+  test('an imported issue is never closed when its task is cancelled', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { sourceKind: 'github-issue' });
+    await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'closed' } });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([]);
+    s.dispose();
+  });
+
+  test('a person who closes an active task issue on GitHub is not overruled', async () => {
+    const mock = lifecycleMock('closed');
+    const { s, sync } = await startedTask(mock);
+    await sync.sweep();
+    expect(writes(mock)).toEqual([]);
+    s.dispose();
+  });
+
+  test('a sweep writes at most the per-sweep budget', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    for (let n = 0; n < TASK_ISSUE_WRITES_PER_SWEEP + 3; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-${n}`,
+          teamId: s.team.id,
+          sourceRef: `github:${REPO}#101`,
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+    }
+    setRow(s, id, { phase: 'closed' });
+    const tally = await sync.sweep();
+    expect(tally.written + tally.recorded).toBe(TASK_ISSUE_WRITES_PER_SWEEP);
+    expect(s.db.select().from(taskIssueCloseTable).all()).toHaveLength(3);
     s.dispose();
   });
 });

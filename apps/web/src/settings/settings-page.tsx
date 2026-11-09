@@ -12,11 +12,10 @@ import {
   ShieldEllipsis,
   Smartphone,
   User,
-  Users,
   Waypoints,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -36,7 +35,6 @@ import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
-import { TeamPage } from '../routes/team-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
 import { lastOutsideLocation, SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
@@ -95,10 +93,10 @@ const GROUPS: Group[] = [
     heading: '模型与账户',
     sections: [
       { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
-      { id: 'routing', label: '模型路由', Icon: Route, element: () => <ModelRoutingPage /> },
+      { id: 'routing', label: '用量与连接', Icon: Route, element: () => <ModelRoutingPage /> },
       {
         id: 'work-routing',
-        label: '工作路由',
+        label: '规则与策略',
         Icon: Waypoints,
         element: () => <RoutingSettingsPage />,
       },
@@ -116,7 +114,6 @@ const GROUPS: Group[] = [
   {
     heading: '团队与访问',
     sections: [
-      { id: 'team', label: '团队', Icon: Users, element: () => <TeamPage /> },
       { id: 'api-keys', label: 'API 密钥', Icon: KeyRound, element: () => <ApiKeysPage /> },
       {
         id: 'remote',
@@ -159,7 +156,7 @@ export function SettingsPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
-  useEffect(() => {
+  useLayoutEffect(() => {
     windowRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;

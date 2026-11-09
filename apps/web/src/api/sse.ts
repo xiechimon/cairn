@@ -230,6 +230,9 @@ export function startConversationStream(
           }
           void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
           void invalidateConverged(qc, { queryKey: ['plans'] });
+          if (isChiefConversationId(conversationId)) {
+            void invalidateConverged(qc, { queryKey: ['tasks'] });
+          }
           onMessage?.(row);
           break;
         }

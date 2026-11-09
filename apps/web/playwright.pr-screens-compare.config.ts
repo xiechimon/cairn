@@ -1,4 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { admitTestRun } from '../../scripts/test-admission.mjs';
+
+await admitTestRun();
 
 const BASE = process.env.PR_SCREENS_BASE ?? 'pr-screens-base';
 

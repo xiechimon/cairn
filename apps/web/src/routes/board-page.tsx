@@ -8,6 +8,7 @@ import {
   useProjects,
   useSchedules,
   useSearchResults,
+  useTasks,
   useTeams,
   useTodos,
 } from '../api/hooks.js';
@@ -25,6 +26,7 @@ import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/proje
 import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
+import { tasksFromFixture, tasksFromQuery } from '../board/tasks-sections.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
 import { useChiefRoot } from '../chief/chief-root.js';
@@ -42,6 +44,7 @@ export function BoardPage() {
   const { chiefView, setChiefView, chiefData } = chief;
 
   const todosQ = useTodos(teamId, live);
+  const tasksQ = useTasks(teamId, live);
   const schedulesQ = useSchedules(live);
   const projectsQ = useProjects(teamId, live);
   const machinesQ = useMachines(teamId, live);
@@ -98,6 +101,13 @@ export function BoardPage() {
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
   const todos = live ? liveTodos : fixtureTodos;
+  const tasks = useMemo(
+    () =>
+      live
+        ? tasksFromQuery(tasksQ.data)
+        : tasksFromFixture(fixtureTodos, fixture.chief?.stream ?? []),
+    [live, tasksQ.data, fixtureTodos, fixture],
+  );
   const machines = useMemo(
     () => (live ? mapMachines(machinesQ.data ?? []) : fixture.resources?.machines),
     [live, machinesQ.data, fixture],
@@ -188,11 +198,7 @@ export function BoardPage() {
       <div className={`board-sheet ${SHEET_PANEL}`}>
         <div className="relative flex min-h-0 min-w-0 flex-1">
           {chiefView === 'settings' ? (
-            <ChiefSettings
-              chief={chiefData}
-              onBack={() => setChiefView('none')}
-              machines={fixture.resources?.machines}
-            />
+            <ChiefSettings chief={chiefData} onBack={() => setChiefView('none')} />
           ) : projectLookup === 'loading' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <ProjectsLoading />
@@ -245,10 +251,10 @@ export function BoardPage() {
               banner={homeBanner}
               machines={machines}
               coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
-              schedules={schedules}
               machinesQuery={live ? machinesQ : undefined}
               todosQuery={live ? todosQ : undefined}
-              schedulesQuery={live ? schedulesQ : undefined}
+              tasks={tasks}
+              tasksQuery={live ? tasksQ : undefined}
             />
           )}
         </div>
