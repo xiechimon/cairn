@@ -207,6 +207,16 @@ export function preExistingThreads(threads) {
   return openCodexFindings(threads).filter((thread) => thread.preExisting);
 }
 
+export function writerReplies(comments) {
+  return comments
+    .filter(
+      (comment) =>
+        WRITE_ASSOCIATIONS.has(comment?.authorAssociation) ||
+        (comment?.author?.__typename === 'Bot' && stripBot(comment.author.login) === 'cairnwright'),
+    )
+    .map((comment) => comment.body ?? '');
+}
+
 export function deferredIssue(thread) {
   for (const body of [...(thread.replies ?? [])].reverse()) {
     const match = DEFERRAL_RE.exec(body ?? '');

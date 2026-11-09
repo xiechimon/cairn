@@ -19,6 +19,7 @@ import {
   shouldSkip,
   trustedStateComment,
   usageLimitHit,
+  writerReplies,
 } from './codex-gate-core.mjs';
 
 const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
@@ -32,8 +33,7 @@ const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cu
           line
           startLine
           diffSide
-          comments(first: 1) { nodes { author { login __typename } body url pullRequestReview { body } } }
-          replies: comments(last: 20) { nodes { body } }
+          comments(first: 100) { totalCount nodes { author { login __typename } authorAssociation body url pullRequestReview { body } } }
         }
         pageInfo { hasNextPage endCursor }
       }
@@ -78,7 +78,12 @@ function loadThreads(repo, number) {
     if (cursor) args.push('-f', `cursor=${cursor}`);
     const page = ghJson(args).data.repository.pullRequest.reviewThreads;
     for (const node of page.nodes) {
-      const first = node.comments.nodes[0];
+      const [first, ...replies] = node.comments.nodes;
+      if (
+        Number.isInteger(node.comments.totalCount) &&
+        node.comments.totalCount > node.comments.nodes.length
+      )
+        throw new Error('A review thread has more comments than one page');
       threads.push({
         isResolved: node.isResolved,
         isOutdated: node.isOutdated,
@@ -91,7 +96,7 @@ function loadThreads(repo, number) {
         body: first?.body ?? '',
         reviewBody: first?.pullRequestReview?.body ?? '',
         url: first?.url ?? '',
-        replies: (node.replies?.nodes ?? []).map((reply) => reply.body ?? ''),
+        replies: writerReplies(replies),
       });
     }
     if (!page.pageInfo.hasNextPage) return threads;

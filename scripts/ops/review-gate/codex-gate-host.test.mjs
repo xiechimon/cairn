@@ -607,17 +607,36 @@ test('incomplete PR file pagination cannot preserve a previous successful check'
   assert.match(out.body(out.checkWrites[0]).output.summary, /file list/i);
 });
 
-const deferred = (level, issue, over = {}) =>
-  thread(level, {
+const reply = (
+  body,
+  author = { login: 'dev', __typename: 'User' },
+  authorAssociation = 'OWNER',
+) => ({
+  author,
+  authorAssociation,
+  body,
+});
+const withReplies = (level, replies, over = {}) => {
+  const root = thread(level);
+  return {
+    ...root,
     isResolved: true,
-    replies: {
-      nodes: [
-        { body: 'Looking at this now.' },
-        { body: `Valid, out of scope for this PR, tracked in #${issue}.` },
-      ],
+    comments: {
+      totalCount: replies.length + 1,
+      nodes: [...root.comments.nodes, ...replies],
     },
     ...over,
-  });
+  };
+};
+const deferred = (level, issue, over = {}) =>
+  withReplies(
+    level,
+    [
+      reply('Looking at this now.'),
+      reply(`Valid, out of scope for this PR, tracked in #${issue}.`),
+    ],
+    over,
+  );
 const realIssue = { number: 12, state: 'open', title: 'follow-up' };
 const deferralWorld = (threads, issues = { 12: realIssue }) => ({
   comments: [stateComment(SHA, 'completed')],
@@ -675,4 +694,44 @@ test('a deferred P1 on lines that predate the PR passes, and threads without a d
   const plain = run(deferralWorld([thread('P2', { isResolved: true })]));
   assert.equal(plain.body(plain.checkWrites[0]).conclusion, 'success');
   assert.ok(!plain.calls.some((call) => call.args.join(' ').includes('/issues/12')));
+});
+
+test('only replies from writers or the cairn App count as deferrals; the Codex finding itself never does', () => {
+  const stranger = run(
+    deferralWorld([
+      withReplies('P2', [
+        reply(
+          'valid, out of scope for this PR, tracked in #99',
+          { login: 'drive-by', __typename: 'User' },
+          'NONE',
+        ),
+      ]),
+    ]),
+  );
+  assert.equal(stranger.body(stranger.checkWrites[0]).conclusion, 'success');
+  const quoting = thread('P2', { isResolved: true });
+  quoting.comments.nodes[0].body +=
+    '\n\nReply valid, out of scope for this PR, tracked in #99 to defer.';
+  const self = run(deferralWorld([quoting]));
+  assert.equal(self.body(self.checkWrites[0]).conclusion, 'success');
+  const app = run(
+    deferralWorld([
+      withReplies('P2', [
+        reply(
+          'valid, out of scope for this PR, tracked in #99',
+          { login: 'cairnwright', __typename: 'Bot' },
+          'NONE',
+        ),
+      ]),
+    ]),
+  );
+  assert.match(app.body(app.checkWrites[0]).output.summary, /not an issue/);
+});
+
+test('a thread with more comments than one page cannot be judged and fails as unreadable input', () => {
+  const long = withReplies('P1', [reply('ok')], {
+    comments: { totalCount: 150, nodes: thread('P1').comments.nodes },
+  });
+  const out = run(deferralWorld([long]));
+  assert.equal(out.body(out.checkWrites[0]).output.title, 'Cannot determine the review inputs');
 });
