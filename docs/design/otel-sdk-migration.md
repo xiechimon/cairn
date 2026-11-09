@@ -1,6 +1,6 @@
 # Tracing through the OpenTelemetry SDK
 
-Status: proposed, waiting for ian's acceptance. Prior art and the live spike: `docs/research/otel-sdk-migration-2026-11-08.md`. Trigger: #3470, where one hand-written key kept Langfuse cost at 0.
+Status: proposed. The seam move under Protected paths was approved by the orchestrator on 2026-11-09. The temporary coexistence under Rollout waits for ian's decision. Prior art and the live spike: `docs/research/otel-sdk-migration-2026-11-08.md`. Trigger: #3470, where one hand-written key kept Langfuse cost at 0.
 
 ## Choice
 
@@ -40,7 +40,7 @@ Deleted, with no second path left: `OtlpValue`, `OtlpAttribute`, `OtlpSpan`, `Ot
 ## Protected paths
 
 - The eval ruler is untouched: `trajectory-export.ts`, `trajectory-export-cli.ts`, `trajectory-outcome.ts`, `trajectory-pack.ts`, `integration/eval/**` and `.claude/hillclimb/**`; none of them imports the OTel code. `packToOtlp` carries the outcome fields `cairn.outcome.merged`, `cairn.outcome.reverted_within_7d`, `cairn.outcome.fixed_by_later_pr` and `cairn.cost_usd`. Their keys and values stay. The only change is integer costs going out as `intValue`, which Langfuse stores as the same metadata string (`实测`). A golden test pins the decoded attribute map.
-- These protected paths do change: `packages/shared/package.json` and `pnpm-lock.yaml` (dependencies ian approved; committed with `CAIRN_ALLOW_LOCKFILE_CHANGE=1`), and `biome.json`. Its seam rule allows `@opentelemetry/*` only in `apps/daemon/src/backend/otel.ts`; it moves to `packages/shared/src/otel.ts`, the one bridge that both apps use, with `@langfuse/core` added to the same rule. **ian: accepting this design accepts that seam move.**
+- These protected paths do change: `packages/shared/package.json` and `pnpm-lock.yaml` (dependencies ian approved; committed with `CAIRN_ALLOW_LOCKFILE_CHANGE=1`), and `biome.json`. Its seam rule allows `@opentelemetry/*` only in `apps/daemon/src/backend/otel.ts`; it moves to `packages/shared/src/otel.ts`, the one bridge that both apps use, with `@langfuse/core` added to the same rule. Approved by the orchestrator on 2026-11-09.
 
 ## Failure modes and red-first tests
 
