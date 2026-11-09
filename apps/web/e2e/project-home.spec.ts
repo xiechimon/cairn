@@ -43,11 +43,12 @@ test('a thread row opens that thread in the side chat over the project home', as
   await expect(page.getByTestId('project-home')).toBeVisible();
 });
 
-test('the project home links to files and project settings', async ({ page }) => {
+test('the project home links to tasks and project settings without a files entry', async ({ page }) => {
   await page.goto(projectHome());
   const links = page.getByTestId('project-home-links');
-  await links.getByRole('link', { name: 'Files' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/files`));
+  await expect(links.getByRole('link', { name: 'Files' })).toHaveCount(0);
+  await links.getByRole('link', { name: 'Tasks' }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/tasks`));
   await page.goBack();
   await links.getByRole('link', { name: 'Project settings' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/settings`));

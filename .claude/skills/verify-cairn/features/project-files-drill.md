@@ -18,9 +18,9 @@
 
 ## Driving it with drive-1097-folder-drill.mjs
 
-Preconditions: `launch.mjs` already started the isolated stack; proxy env all unset; the local machine has `git`.
+Preconditions: this probe is stale because #3479 retired the file page. It is archived under `docs/verify/1097/` and is not current acceptance coverage.
 
-- One-command two phases: `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/drive-1097-folder-drill.mjs` -> console 20 PASS/FAIL + `evidence:<dir>` (result.json + responses.json + 7 screenshots).
+- One-command two phases: `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node docs/verify/1097/drive-1097-folder-drill.mjs` -> console 20 PASS/FAIL + `evidence:<dir>` (result.json + responses.json + 7 screenshots).
 - Phase H: hosted bare repo push nested real content (root README.md + docs/README.md same-name control + docs/setup.md + docs/guide/deep.md three levels) -> REST tree?path= level by level + browser drill/breadcrumb/same-name-no-cross/deep-nest full chain.
 - Phase L: local true repo (default branch trunk) same nest -> drill-down + viewer stacked on chip=HEAD.
 - The script builds and self-reaps its props (mkdtemp real repo / hosted clone); the hosted push goes through the REST-created git API key (Basic auth).

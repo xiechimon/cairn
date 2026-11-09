@@ -11,6 +11,7 @@ import type {
   SecretBox,
   StepJournalRow,
   StepKind,
+  StepPromptOrigin,
   StepRecord,
   TriggerSource,
   UserRecord,
@@ -408,6 +409,8 @@ export async function sendBuildSteer(
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
   }
+  const afterCommit: (() => void)[] = [];
+  const transcriptDeps = { ...deps, afterCommit };
   let sent: BuildSteerResult;
   try {
     sent = db.transaction((): BuildSteerResult => {
@@ -462,7 +465,7 @@ export async function sendBuildSteer(
             createdAt: now,
           })
           .run();
-        insertMessageRow(deps, targetBuildId, {
+        insertMessageRow(transcriptDeps, targetBuildId, {
           id: newRecordId(),
           role: 'system',
           content:
@@ -477,7 +480,15 @@ export async function sendBuildSteer(
           createdAt: now,
         });
       }
-      if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
+      if (!continuationOptions.schedule)
+        insertMessageRow(
+          transcriptDeps,
+          targetBuildId,
+          messageRow,
+          body.queuedMessageId === undefined
+            ? undefined
+            : { conversationId, messageId: body.queuedMessageId },
+        );
       if (running && !answered) {
         db.insert(steerPending)
           .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
@@ -536,7 +547,7 @@ export async function sendBuildSteer(
               .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
               .where(eq(step.id, continuedStep.id))
               .run();
-            insertMessageRow(deps, targetBuildId, {
+            insertMessageRow(transcriptDeps, targetBuildId, {
               id: `schedule-wake-${continuedStep.id}`,
               role: 'system',
               content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
@@ -565,6 +576,7 @@ export async function sendBuildSteer(
   } catch (error) {
     return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
   }
+  for (const publish of afterCommit) publish();
   const fromUser =
     continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
   if (fromUser && !continuationOptions.schedule) endSnoozeOn(deps, buildRow.todoId, 'user-message');
@@ -1017,6 +1029,7 @@ export function enqueueStep(
   prompt?: string,
   freshSession?: boolean,
   byPerson?: boolean,
+  promptOrigin?: StepPromptOrigin,
 ): StepRecord {
   const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (byPerson !== true && current && retryIsParked(current.errorMessage ?? ''))
@@ -1032,6 +1045,7 @@ export function enqueueStep(
       machineId: null,
       status: 'pending',
       prompt: prompt ?? null,
+      promptOrigin: promptOrigin ?? null,
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
@@ -1103,6 +1117,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
     ...(r.status === 'waiting_quota' && r.quotaBlock !== null
       ? { quotaWait: toQuotaWait(r.quotaBlock) }
       : {}),
+    ...(r.promptOrigin !== null ? { promptOrigin: r.promptOrigin } : {}),
   }));
 }
 
@@ -1512,7 +1527,9 @@ export async function applyBuildStepAction(
     const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
     const prClosed: 'merged' | 'closed' | null =
       reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
-    return deps.db.transaction(() => {
+    const afterCommit: (() => void)[] = [];
+    const transcriptDeps = { ...deps, afterCommit };
+    deps.db.transaction(() => {
       const current = getTodo(deps, row.todoId);
       if (
         !current ||
@@ -1539,7 +1556,7 @@ export async function applyBuildStepAction(
         const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
         recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
         if (feedbackText !== null) {
-          insertMessageRow(deps, reworkTarget.id, {
+          insertMessageRow(transcriptDeps, reworkTarget.id, {
             id: newRecordId(),
             role: 'user',
             content: feedbackText,
@@ -1550,7 +1567,7 @@ export async function applyBuildStepAction(
           reworkTarget.errorMessage !== null &&
           !hasFailureRow(deps, reworkTarget.id, reworkTarget.errorMessage)
         ) {
-          insertMessageRow(deps, reworkTarget.id, {
+          insertMessageRow(transcriptDeps, reworkTarget.id, {
             id: newRecordId(),
             role: 'system',
             content: buildFailureRowContent({
@@ -1563,7 +1580,7 @@ export async function applyBuildStepAction(
             createdAt: now - 1,
           });
         }
-        insertMessageRow(deps, reworkTarget.id, {
+        insertMessageRow(transcriptDeps, reworkTarget.id, {
           id: newRecordId(),
           role: 'system',
           content: buildReworkReuseNote({ prNumber: reworkTarget.prNumber }),
@@ -1627,7 +1644,7 @@ export async function applyBuildStepAction(
         })
         .run();
       if (feedbackText !== null) {
-        insertMessageRow(deps, newId, {
+        insertMessageRow(transcriptDeps, newId, {
           id: newRecordId(),
           role: 'user',
           content: feedbackText,
@@ -1635,7 +1652,7 @@ export async function applyBuildStepAction(
         });
       }
       if (prClosed !== null && reworkTarget !== null) {
-        insertMessageRow(deps, newId, {
+        insertMessageRow(transcriptDeps, newId, {
           id: newRecordId(),
           role: 'system',
           content: buildReworkNewBranchNote({
@@ -1666,6 +1683,8 @@ export async function applyBuildStepAction(
       publishBuild(deps, newRow);
       return;
     });
+    for (const publish of afterCommit) publish();
+    return;
   }
 
   if (body.action === 'confirm') {
@@ -1762,6 +1781,7 @@ export async function applyBuildStepAction(
       `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
       false,
       origin === 'person',
+      { kind: 'rework' },
     );
     return;
   }

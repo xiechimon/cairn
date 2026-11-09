@@ -1125,12 +1125,13 @@
       "recipe": "features/project-files-drill.md",
       "cases": {
         "folder-drill": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1097-folder-drill.mjs",
+          "script": "docs/verify/1097/drive-1097-folder-drill.mjs",
           "args": [],
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
+          "note": "The project files page was retired in #3479. This historical probe no longer applies.",
           "purpose": "Project Files folder drill-down for hosted and local repos: tree?path= REST values, breadcrumbs, same-name files kept apart, 3-level nesting, and no file read sent on a folder click.",
           "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
         }

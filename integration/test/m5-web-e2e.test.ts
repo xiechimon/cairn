@@ -143,7 +143,7 @@ function collectConvStream(buildId: string): { types: Set<string>; stop(): void 
 }
 
 async function openProjectTasks(projectId: string): Promise<void> {
-  await page.goto(`${server.url}/app/project/${projectId}/files?tab=tasks`);
+  await page.goto(`${server.url}/app/project/${projectId}/tasks`);
   await pexpect(
     page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
   ).toBeVisible({ timeout: 30_000 });

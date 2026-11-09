@@ -23,6 +23,7 @@ import type {
   SkillInjectionFacts,
   TranscriptUpload,
   WorkspaceHookNoteData,
+  WorktreeCheckpoint,
   WorktreeOps,
 } from '@cairn/shared';
 import {
@@ -794,9 +795,15 @@ async function runClaimedStep(
 
   const stepStartMs = Date.now();
   let headAtStart: string | null = null;
+  let verificationCheckpoint: WorktreeCheckpoint | null = null;
   if (ws !== null && ws.readonly !== true && deps.workspace) {
     try {
-      headAtStart = await deps.workspace.headCommit(ws.cwd);
+      if (attachmentVerify) {
+        verificationCheckpoint = (await deps.workspace.captureCheckpoint?.(ws.cwd)) ?? null;
+        headAtStart = verificationCheckpoint?.commit ?? null;
+      } else {
+        headAtStart = await deps.workspace.headCommit(ws.cwd);
+      }
     } catch {
       headAtStart = null;
     }
@@ -814,7 +821,11 @@ async function runClaimedStep(
     }
     try {
       rmSync(join(ws.cwd, '.cairn-verify'), { recursive: true, force: true });
-      await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
+      await deps.workspace.restoreCheckpoint(
+        ws.cwd,
+        headAtStart,
+        verificationCheckpoint ?? undefined,
+      );
       verifyRewound = true;
       verifyRewindError = null;
     } catch (error) {

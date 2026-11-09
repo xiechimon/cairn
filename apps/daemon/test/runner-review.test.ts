@@ -212,6 +212,12 @@ function fakeWorkspace(cwd: string, calls: string[], opts: WorkspaceOptions = {}
       calls.push('headCommit');
       return opts.head === undefined ? 'abc123' : opts.head;
     },
+    async captureCheckpoint() {
+      const commit = opts.head === undefined ? 'abc123' : opts.head;
+      return commit === null
+        ? null
+        : { commit, branch: 'cairn/conv-conv-1', refs: {}, headReflog: [] };
+    },
     async countAhead() {
       return 1;
     },
@@ -511,126 +517,218 @@ describe('out-of-tree verify execution', () => {
     expect(client.doneBodies[0]?.body).toMatchObject({ commit: 'abc123', hasChanges: false });
   });
 
-  test.each(['', '.cairn-verify/', '.*', 'tracked'])(
-    'real worktree uploads evidence before discarding agent commits and scratch files (ignore=%s)',
-    async (ignore) => {
-      const root = testTempDir('cairn-verify-worktree-');
-      const origin = join(root, 'origin.git');
-      const seed = join(root, 'seed');
-      const env = commitEnv({ name: 'test-agent', email: 'test@example.com' });
-      await runGitOk(['init', '--bare', '--initial-branch=main', origin]);
-      await runGitOk(['clone', origin, seed]);
-      writeFileSync(join(seed, 'delivery.txt'), 'delivered\n');
-      writeFileSync(join(seed, '.gitignore'), `${ignore}\n`);
-      if (ignore === 'tracked') {
-        mkdirSync(join(seed, '.cairn-verify'));
-        writeFileSync(join(seed, '.cairn-verify/keep.txt'), 'original scratch\n');
-        await runGitOk(['add', '.cairn-verify/keep.txt'], { cwd: seed });
+  test.each([
+    '',
+    '.cairn-verify/',
+    '.*',
+    'tracked',
+    'switched-branch',
+    'detached-head',
+    'starting-detached',
+    'refs-and-index',
+    'concurrent-inspection',
+    'deleted-starting-branch',
+  ])('real worktree restores verification state (case=%s)', async (ignore) => {
+    const root = testTempDir('cairn-verify-worktree-');
+    const origin = join(root, 'origin.git');
+    const seed = join(root, 'seed');
+    const env = commitEnv({ name: 'test-agent', email: 'test@example.com' });
+    await runGitOk(['init', '--bare', '--initial-branch=main', origin]);
+    await runGitOk(['clone', origin, seed]);
+    writeFileSync(join(seed, 'delivery.txt'), 'delivered\n');
+    writeFileSync(join(seed, '.gitignore'), `${ignore}\n`);
+    if (ignore === 'tracked') {
+      mkdirSync(join(seed, '.cairn-verify'));
+      writeFileSync(join(seed, '.cairn-verify/keep.txt'), 'original scratch\n');
+      await runGitOk(['add', '.cairn-verify/keep.txt'], { cwd: seed });
+    }
+    await runGitOk(['add', '-f', 'delivery.txt', '.gitignore'], { cwd: seed });
+    await runGitOk(['commit', '-m', 'seed'], { cwd: seed, env });
+    await runGitOk(['push', 'origin', 'main'], { cwd: seed });
+    const startHead = (await runGitOk(['rev-parse', 'HEAD'], { cwd: seed })).trim();
+    const workspace = new WorkspaceManager({ logger: captureLogger() });
+    const prepare = workspace.prepare.bind(workspace);
+    let originalBranch = '';
+    let originalRefs = '';
+    let originalStash = '';
+    let concurrentRef: string | null = null;
+    workspace.prepare = async (input) => {
+      const prepared = await prepare(input);
+      originalBranch = prepared.branch;
+      if (ignore === 'starting-detached')
+        await runGitOk(['checkout', '--detach', 'HEAD'], { cwd: prepared.cwd });
+      if (ignore === 'refs-and-index') {
+        await runGitOk(['branch', 'existing-user', 'HEAD'], { cwd: prepared.cwd });
+        writeFileSync(join(prepared.cwd, 'delivery.txt'), 'pre-existing stash\n');
+        await runGitOk(['stash', 'push', '-m', 'pre-existing stash'], { cwd: prepared.cwd, env });
+        originalStash = await runGitOk(['reflog', 'show', '--format=%H', 'refs/stash'], {
+          cwd: prepared.cwd,
+        });
       }
-      await runGitOk(['add', '-f', 'delivery.txt', '.gitignore'], { cwd: seed });
-      await runGitOk(['commit', '-m', 'seed'], { cwd: seed, env });
-      await runGitOk(['push', 'origin', 'main'], { cwd: seed });
-      const startHead = (await runGitOk(['rev-parse', 'HEAD'], { cwd: seed })).trim();
-      const workspace = new WorkspaceManager({ logger: captureLogger() });
-      let checkout = '';
-      let agentHead: string | null = null;
-      const claim: ClaimedStep = {
-        ...verify,
-        project: { id: 'p1', name: 'demo', repo: { kind: 'hosted', cloneUrl: origin } },
-        instruction: JSON.stringify({
-          kind: 'verify',
-          expectedHeadSha: startHead,
-          evidence: 'attachments',
-          evidenceDirectory: '.cairn-verify/1/',
-        }),
-        remoteTools: [{ name: 'attach_file', description: 'Attach verification evidence' }],
-      };
-      const { client } = await setupWithBackend(claim, { workspace }, (captured) => ({
-        ...capturingBackend(captured),
-        async createSession(opts) {
-          checkout = opts.cwd;
-          expect(opts.prompt).not.toContain('工作分支注记');
-          mkdirSync(join(checkout, '.cairn-verify/1'), { recursive: true });
-          writeFileSync(join(checkout, '.cairn-verify/1/proof.txt'), 'checked delivery\n');
-          await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/1/proof.txt' });
-          writeFileSync(join(checkout, 'delivery.txt'), 'agent modification\n');
+      originalRefs = await runGitOk(
+        ['for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads'],
+        { cwd: prepared.cwd },
+      );
+      return prepared;
+    };
+    let checkout = '';
+    let agentHead: string | null = null;
+    const claim: ClaimedStep = {
+      ...verify,
+      project: { id: 'p1', name: 'demo', repo: { kind: 'hosted', cloneUrl: origin } },
+      instruction: JSON.stringify({
+        kind: 'verify',
+        expectedHeadSha: startHead,
+        evidence: 'attachments',
+        evidenceDirectory: '.cairn-verify/1/',
+      }),
+      remoteTools: [{ name: 'attach_file', description: 'Attach verification evidence' }],
+    };
+    const { client } = await setupWithBackend(claim, { workspace }, (captured) => ({
+      ...capturingBackend(captured),
+      async createSession(opts) {
+        checkout = opts.cwd;
+        expect(opts.prompt).not.toContain('工作分支注记');
+        mkdirSync(join(checkout, '.cairn-verify/1'), { recursive: true });
+        writeFileSync(join(checkout, '.cairn-verify/1/proof.txt'), 'checked delivery\n');
+        await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/1/proof.txt' });
+        writeFileSync(join(checkout, 'delivery.txt'), 'agent modification\n');
+        await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
+        await runGitOk(['commit', '-m', 'unwanted verifier commit'], { cwd: checkout, env });
+        agentHead = await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout });
+        if (
+          ignore === 'switched-branch' ||
+          ignore === 'starting-detached' ||
+          ignore === 'deleted-starting-branch'
+        )
+          await runGitOk(
+            ['checkout', '-b', ignore === 'starting-detached' ? 'null' : 'verifier-inspection'],
+            { cwd: checkout },
+          );
+        if (ignore === 'deleted-starting-branch')
+          await runGitOk(['branch', '-D', originalBranch], { cwd: checkout });
+        if (ignore === 'detached-head')
+          await runGitOk(['checkout', '--detach', 'HEAD'], { cwd: checkout });
+        if (ignore === 'concurrent-inspection') {
+          const peer = join(root, 'peer');
+          await runGitOk(['worktree', 'add', '-b', 'concurrent-other', peer, startHead], {
+            cwd: checkout,
+          });
+          writeFileSync(join(peer, 'delivery.txt'), 'concurrent delivery\n');
+          await runGitOk(['add', 'delivery.txt'], { cwd: peer });
+          await runGitOk(['commit', '-m', 'concurrent delivery'], { cwd: peer, env });
+          concurrentRef = await runGitOk(['rev-parse', 'HEAD'], { cwd: peer });
+          await runGitOk(['worktree', 'remove', peer], { cwd: checkout });
+          await runGitOk(['checkout', 'concurrent-other'], { cwd: checkout });
+        }
+        if (ignore === 'refs-and-index') {
+          await runGitOk(['branch', 'verifier-one', 'HEAD'], { cwd: checkout });
+          await runGitOk(['branch', 'verifier-two', 'HEAD'], { cwd: checkout });
+          await runGitOk(['branch', 'concurrent-other', startHead], { cwd: checkout });
+          await runGitOk(['checkout', 'existing-user'], { cwd: checkout });
+          writeFileSync(join(checkout, 'delivery.txt'), 'verifier changed another branch\n');
           await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
-          await runGitOk(['commit', '-m', 'unwanted verifier commit'], { cwd: checkout, env });
-          agentHead = await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout });
-          await expect(
-            runGitOk(['push', 'origin', 'HEAD:refs/heads/escaped-verification'], {
-              cwd: checkout,
-              env: opts.env,
-            }),
-          ).rejects.toThrow('cairn-readonly-workspace-denied');
-          return {
-            sessionId: 'verify-real-git',
-            events: (async function* () {
-              yield {
-                type: 'message_end',
-                message: {
-                  role: 'assistant',
-                  content: JSON.stringify({
-                    passed: true,
-                    conclusion: 'Checked delivery',
-                    evidence: [{ path: '.cairn-verify/1/proof.txt' }],
-                  }),
-                },
-              } as const;
-              yield { type: 'done', usage: [] } as const;
-            })(),
-            async steer() {},
-            async stop() {},
-            usage: () => [],
-          };
-        },
-      }));
-      const runtime = {
-        startHead,
-        agentHead,
-        finalHead: await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout }),
-        delivery: readFileSync(join(checkout, 'delivery.txt'), 'utf8'),
-        scratchPresent: existsSync(join(checkout, '.cairn-verify')),
-        worktreeStatus: await runGitOk(['status', '--porcelain'], { cwd: checkout }),
-        originHeads: await runGitOk(['show-ref', '--heads'], { cwd: origin }),
-        uploads: client.attachments.map((attachment) => ({
-          fileName: attachment.fileName,
-          content: Buffer.from(String(attachment.contentBase64), 'base64').toString('utf8'),
-        })),
-        done: client.doneBodies[0]?.body,
-      };
-      const evidenceDirectory = process.env.VERIFY_EVIDENCE_DIR;
-      if (evidenceDirectory !== undefined) {
-        mkdirSync(evidenceDirectory, { recursive: true });
+          await runGitOk(['commit', '-m', 'unwanted verifier branch commit'], {
+            cwd: checkout,
+            env,
+          });
+          writeFileSync(join(checkout, 'delivery.txt'), 'staged verifier residue\n');
+          await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
+        }
+        await expect(
+          runGitOk(['push', 'origin', 'HEAD:refs/heads/escaped-verification'], {
+            cwd: checkout,
+            env: opts.env,
+          }),
+        ).rejects.toThrow('cairn-readonly-workspace-denied');
+        return {
+          sessionId: 'verify-real-git',
+          events: (async function* () {
+            yield {
+              type: 'message_end',
+              message: {
+                role: 'assistant',
+                content: JSON.stringify({
+                  passed: true,
+                  conclusion: 'Checked delivery',
+                  evidence: [{ path: '.cairn-verify/1/proof.txt' }],
+                }),
+              },
+            } as const;
+            yield { type: 'done', usage: [] } as const;
+          })(),
+          async steer() {},
+          async stop() {},
+          usage: () => [],
+        };
+      },
+    }));
+    const runtime = {
+      startHead,
+      agentHead,
+      finalHead: await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout }),
+      finalBranch: await runGitOk(['branch', '--show-current'], { cwd: checkout }),
+      localRefs: await runGitOk(
+        ['for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads'],
+        { cwd: checkout },
+      ),
+      delivery: readFileSync(join(checkout, 'delivery.txt'), 'utf8'),
+      scratchPresent: existsSync(join(checkout, '.cairn-verify')),
+      worktreeStatus: await runGitOk(['status', '--porcelain'], { cwd: checkout }),
+      originHeads: await runGitOk(['show-ref', '--heads'], { cwd: origin }),
+      uploads: client.attachments.map((attachment) => ({
+        fileName: attachment.fileName,
+        content: Buffer.from(String(attachment.contentBase64), 'base64').toString('utf8'),
+      })),
+      done: client.doneBodies[0]?.body,
+    };
+    const evidenceDirectory = process.env.VERIFY_EVIDENCE_DIR;
+    if (evidenceDirectory !== undefined) {
+      mkdirSync(evidenceDirectory, { recursive: true });
+      writeFileSync(
+        join(evidenceDirectory, 'daemon-runtime.json'),
+        JSON.stringify(runtime, null, 2),
+      );
+      if (!['', '.cairn-verify/', '.*', 'tracked'].includes(ignore))
         writeFileSync(
-          join(evidenceDirectory, 'daemon-runtime.json'),
+          join(evidenceDirectory, `branch-state-${ignore}.json`),
           JSON.stringify(runtime, null, 2),
         );
-      }
-      expect(client.attachments).toEqual([
-        {
-          fileName: 'proof.txt',
-          contentBase64: Buffer.from('checked delivery\n').toString('base64'),
-        },
-      ]);
-      expect(runtime.delivery).toBe('delivered\n');
-      expect(runtime.scratchPresent).toBe(ignore === 'tracked');
-      expect(existsSync(join(checkout, '.cairn-verify/1/proof.txt'))).toBe(false);
-      if (ignore === 'tracked')
-        expect(readFileSync(join(checkout, '.cairn-verify/keep.txt'), 'utf8')).toBe(
-          'original scratch\n',
-        );
-      expect(runtime.finalHead).toBe(startHead);
-      expect(runtime.worktreeStatus).toBe('');
-      expect(runtime.originHeads).toBe(`${startHead} refs/heads/main`);
-      expect(client.doneBodies[0]?.body, client.doneBodies[0]?.body.errorMessage).toMatchObject({
-        status: 'success',
-        commit: startHead,
-        hasChanges: false,
-        verifyVerdict: { passed: true },
-      });
-    },
-  );
+    }
+    expect(client.attachments).toEqual([
+      {
+        fileName: 'proof.txt',
+        contentBase64: Buffer.from('checked delivery\n').toString('base64'),
+      },
+    ]);
+    expect(runtime.delivery).toBe('delivered\n');
+    expect(runtime.scratchPresent).toBe(ignore === 'tracked');
+    expect(existsSync(join(checkout, '.cairn-verify/1/proof.txt'))).toBe(false);
+    if (ignore === 'tracked')
+      expect(readFileSync(join(checkout, '.cairn-verify/keep.txt'), 'utf8')).toBe(
+        'original scratch\n',
+      );
+    expect(runtime.finalHead).toBe(startHead);
+    expect(runtime.finalBranch).toBe(ignore === 'starting-detached' ? '' : originalBranch);
+    const expectedRefs = originalRefs.split('\n');
+    if (concurrentRef !== null) expectedRefs.push(`refs/heads/concurrent-other ${concurrentRef}`);
+    if (ignore === 'refs-and-index') {
+      expectedRefs.push(`refs/heads/concurrent-other ${startHead}`);
+      expect(
+        await runGitOk(['reflog', 'show', '--format=%H', 'refs/stash'], { cwd: checkout }),
+      ).toBe(originalStash);
+    }
+    expect(runtime.localRefs.split('\n').sort()).toEqual(expectedRefs.sort());
+    expect(await runGitOk(['diff', '--cached', '--name-only'], { cwd: checkout })).toBe('');
+    expect(runtime.worktreeStatus).toBe('');
+    expect(runtime.originHeads).toBe(`${startHead} refs/heads/main`);
+    expect(client.doneBodies[0]?.body, client.doneBodies[0]?.body.errorMessage).toMatchObject({
+      status: 'success',
+      commit: startHead,
+      hasChanges: false,
+      verifyVerdict: { passed: true },
+    });
+  });
 
   test('attachments verify fails closed when restoring its checkpoint fails', async () => {
     const { calls, client } = await setup(verify, { rewindError: 'restore failed' });
