@@ -173,6 +173,7 @@ describe('applyFlush', () => {
 describe('flush before a real compaction', () => {
   it('saves the facts, survives a failing flush, and the next turn sees the saved fact', async () => {
     const w = await world('Please remember: ian wants squash merges only.');
+    const memoryScope = { teamId: w.teamId, agentId: coordinatorProfile(w.s.db, w.teamId)!.id };
     const faux = fauxProvider({
       provider: 'stub',
       models: [{ id: 'm', contextWindow: 20_000 }],
@@ -196,10 +197,10 @@ describe('flush before a real compaction', () => {
     coordinator.wake(w.threadId);
     await coordinator.idle();
     const deadline = Date.now() + 8_000;
-    while (Date.now() < deadline && w.s.db.select().from(agentMemory).all().length === 0) {
+    while (Date.now() < deadline && listMemoryEntries(w.s.db, memoryScope).length === 0) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    const rows = w.s.db.select().from(agentMemory).all();
+    const rows = listMemoryEntries(w.s.db, memoryScope);
     expect(rows.map((r) => r.content)).toEqual(['ian wants squash merges only.']);
     expect(rows[0]?.source).toBe(FLUSH_SOURCE);
     expect(prompts).toHaveLength(1);
@@ -208,6 +209,7 @@ describe('flush before a real compaction', () => {
 
   it('a failing flush call never blocks the summary fold', async () => {
     const w = await world('Please remember: ian wants squash merges only.');
+    const memoryScope = { teamId: w.teamId, agentId: coordinatorProfile(w.s.db, w.teamId)!.id };
     const faux = fauxProvider({
       provider: 'stub',
       models: [{ id: 'm', contextWindow: 20_000 }],
@@ -235,7 +237,7 @@ describe('flush before a real compaction', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     expect(folded).toBeGreaterThan(0);
-    expect(w.s.db.select().from(agentMemory).all()).toEqual([]);
+    expect(listMemoryEntries(w.s.db, memoryScope)).toEqual([]);
   }, 20_000);
 });
 

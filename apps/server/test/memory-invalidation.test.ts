@@ -204,7 +204,8 @@ describe('memory read-surface semantics consistent', () => {
 
     expect(prompt).toContain('这条在用');
     expect(prompt).not.toContain('这条已被推翻');
-    expect(rowOf(live).lastInjectedAt).toEqual(expect.any(Number));
+    expect(rowOf(rowOf(live).supersededBy!).lastInjectedAt).toEqual(expect.any(Number));
+    expect(rowOf(live).lastInjectedAt).toBeNull();
     expect(rowOf(retired).lastInjectedAt).toBeNull();
     expect(
       H.s.db

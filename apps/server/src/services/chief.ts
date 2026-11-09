@@ -87,7 +87,7 @@ import {
 import { coordinatorRunsOnPi, lastTurnContext, wakeCoordinator } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { injectMemoriesCapped, MEMORY_INJECT_TOKEN_CAP } from './memory.js';
+import { injectMemoryDocuments } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { ownershipOf } from './owner.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
@@ -1404,17 +1404,13 @@ export function buildChiefSystemPrompt(
   const projects = deps.db.select().from(project).where(eq(project.teamId, teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
   const injected = coordinator
-    ? injectMemoriesCapped(
-        deps.db,
-        {
-          agentId: coordinator.id,
-          teamId,
-          threadId: threadId ?? undefined,
-          projectId: null,
-        },
-        MEMORY_INJECT_TOKEN_CAP,
-      )
-    : { memories: [], omitted: 0 };
+    ? injectMemoryDocuments(deps.db, {
+        agentId: coordinator.id,
+        teamId,
+        threadId: threadId ?? undefined,
+        projectId: null,
+      })
+    : { memories: [], omitted: 0, fileCount: 0 };
   const memories = injected.memories;
 
   const digestRows = deps.db
@@ -1458,7 +1454,8 @@ export function buildChiefSystemPrompt(
     '- wake 轮（提示以 [wake:…] 起头，由事件而不是用户触发）默认安静：你在这一轮写的普通文字不会送到用户面前。只有需要用户知道或决定时，才调 notify_user 或 ask_user，并把提示首行 provenance= 后面的值原样填进 provenance 参数；不需要用户时什么都不发，直接结束本轮。failed wake 先调 machines 等工具核实环境，需要用户时再做法证式说明（失败原因/定性/工作保全位置/环境建议）。',
     '- ask_user 选项：把你推荐的那个选项设 recommended: true（卡片会把它放第一个并标「推荐」）；卡片自带「用我自己的话回答」，不用再加「其他」选项。',
     '- 正文内联实体引用用自定义 URI markdown：[#n](todo:<id>)。',
-    '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory（配额 100 条）。',
+    '- MEMORY.md 每项保持简短一行；细节移到记忆文件，合并或删除过时的行。',
+    '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory。',
     '- 对话续接：create_todo 前先查同类进行中的 todo（threads）；若存在，用 message_thread 把新信息发给那条 thread，不重复 create_todo。',
     '- 状态问答：回答进度/合并/运行状态前必须先调 todos、pull_requests、workflow_runs 或 machines 取当前状态，不凭记忆回答。',
     '- 对话摘要：摘要只记对话，任务状态以工具查到的为准，两者对不上时信任务状态。用户问起以前的决定时，先从摘要里找，再用 todos 查任务现状，只回答，不建任务。',
@@ -1494,9 +1491,7 @@ export function buildChiefSystemPrompt(
     memories.length > 0
       ? memories.map((m) => `- ${m.title}：${m.content}`).join('\n')
       : '（尚无记忆）',
-    ...(injected.omitted > 0
-      ? [`（另有 ${injected.omitted} 条团队记忆因篇幅未显示；用 memories 工具带 query 搜索）`]
-      : []),
+    `记忆文件：${injected.fileCount} 个；用 memories 按需读取。`,
     '',
   ];
   const digestSectionLines: string[] =
