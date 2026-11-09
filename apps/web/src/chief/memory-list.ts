@@ -2,24 +2,40 @@ import type { MemoryLayer, MemoryRecord, ProjectRecord } from '@cairn/shared';
 
 export type MemoryScope = 'team' | 'project' | 'unknown-project';
 
-export interface MemoryGroup {
+export interface MemorySection {
   key: string;
   scope: MemoryScope;
   projectName: string | null;
-  rows: MemoryRecord[];
+  project: Pick<ProjectRecord, 'id' | 'name' | 'instructions'> | null;
+  injected: MemoryRecord[];
+  lookup: MemoryRecord[];
 }
 
-export function groupMemories(
+export function isAutoInjected(layer: MemoryLayer | undefined): boolean {
+  return layer === undefined || layer === 'core';
+}
+
+function section(
+  key: string,
+  scope: MemoryScope,
+  project: Pick<ProjectRecord, 'id' | 'name' | 'instructions'> | null,
+  rows: MemoryRecord[],
+): MemorySection {
+  return {
+    key,
+    scope,
+    projectName: project?.name ?? null,
+    project,
+    injected: rows.filter((row) => isAutoInjected(row.layer)),
+    lookup: rows.filter((row) => !isAutoInjected(row.layer)),
+  };
+}
+
+export function memorySections(
   memories: MemoryRecord[],
-  projects: Pick<ProjectRecord, 'id' | 'name'>[],
-): MemoryGroup[] {
+  projects: Pick<ProjectRecord, 'id' | 'name' | 'instructions'>[],
+): MemorySection[] {
   const team = memories.filter((memory) => memory.projectId === null);
-  const known = projects.map((project) => ({
-    key: project.id,
-    scope: 'project' as const,
-    projectName: project.name,
-    rows: memories.filter((memory) => memory.projectId === project.id),
-  }));
   const knownIds = new Set(projects.map((project) => project.id));
   const unknownIds = [
     ...new Set(
@@ -28,17 +44,25 @@ export function groupMemories(
         .filter((id): id is string => id !== null && !knownIds.has(id)),
     ),
   ];
-  const unknown = unknownIds.map((id) => ({
-    key: id,
-    scope: 'unknown-project' as const,
-    projectName: null,
-    rows: memories.filter((memory) => memory.projectId === id),
-  }));
   return [
-    { key: 'team', scope: 'team' as const, projectName: null, rows: team },
-    ...known,
-    ...unknown,
-  ].filter((group) => group.rows.length > 0);
+    ...(team.length > 0 ? [section('team', 'team', null, team)] : []),
+    ...projects.map((project) =>
+      section(
+        project.id,
+        'project',
+        project,
+        memories.filter((memory) => memory.projectId === project.id),
+      ),
+    ),
+    ...unknownIds.map((id) =>
+      section(
+        id,
+        'unknown-project',
+        null,
+        memories.filter((memory) => memory.projectId === id),
+      ),
+    ),
+  ];
 }
 
 export function splitMemoryContent(content: string): { summary: string; details: string[] } {
@@ -48,8 +72,4 @@ export function splitMemoryContent(content: string): { summary: string; details:
     .filter((line) => line !== '');
   const [summary = '', ...rest] = lines;
   return { summary, details: rest.map((line) => line.replace(/^[-*]\s+/, '')) };
-}
-
-export function isAutoInjected(layer: MemoryLayer | undefined): boolean {
-  return layer === undefined || layer === 'core';
 }

@@ -1161,13 +1161,22 @@ export const EN: Record<string, string> = {
   '尚无记忆。': 'No memories yet.',
   'Coordinator 会在工作中将值得沉淀的经验存入此处。':
     'The Coordinator stores experience worth keeping here as it works.',
-  '已存 {n} 条，上限 {max} 条 · 不是每条都会自动注入':
-    '{n} of {max} stored · not every entry is injected automatically',
+  '{name} 的项目说明': 'Instructions for {name}',
+  '保存 {name} 的项目说明': 'Save instructions for {name}',
+  'Coordinator 在所有项目里都会用到的笔记。': 'Notes the Coordinator uses across every project.',
+  '像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。':
+    'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
+  自动记忆: 'Auto memory',
+  'Coordinator 在这个项目里工作时自己写下的笔记。':
+    'Notes the Coordinator writes itself as it works in this project.',
+  'Coordinator 还没有在这个项目里记下笔记。':
+    'The Coordinator has not written notes in this project yet.',
+  '每个 thread 都会读': 'Read every thread',
+  按需查阅: 'Looked up when needed',
   '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
   正在加载记忆: 'Loading memories',
   已移除的项目: 'Removed project',
   '打开记忆：{title}': 'Open memory: {title}',
-  可检索: 'Searchable',
   '可检索 · 不自动注入': 'Searchable · not injected automatically',
   核心: 'Core',
   '更新于 {date}': 'Updated {date}',

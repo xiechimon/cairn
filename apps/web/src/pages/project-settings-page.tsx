@@ -1,4 +1,4 @@
-import { isGithubRepoRef, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
+import { isGithubRepoRef } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
@@ -6,6 +6,7 @@ import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { ProjectIconPicker } from '../board/project-icon-picker.js';
+import { ProjectInstructionsField } from '../board/project-instructions-field.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
   SETTINGS_HINT_CLS,
@@ -19,7 +20,6 @@ import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Spinner } from '../components/ui/spinner.js';
-import { Textarea } from '../components/ui/textarea.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { isDeleted, markDeleted } from '../fixtures/deletions.js';
@@ -52,7 +52,6 @@ export function ProjectSettingsPage() {
   const [accelDraft, setAccelDraft] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState<string | null>(null);
-  const [rulesDraft, setRulesDraft] = useState<string | null>(null);
   const [convRepo, setConvRepo] = useState('');
   const [convPathDraft, setConvPathDraft] = useState<string | null>(null);
   const [convError, setConvError] = useState<string | null>(null);
@@ -328,37 +327,11 @@ export function ProjectSettingsPage() {
               hint={t('本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。')}
               valueClassName="flex-col items-stretch gap-2"
             >
-              <Textarea
-                aria-label={t('项目说明')}
-                data-testid="project-instructions-input"
-                className="min-h-28 w-full"
-                maxLength={PROJECT_INSTRUCTIONS_MAX}
-                placeholder={t('例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。')}
-                value={rulesDraft ?? wireProject.instructions ?? ''}
-                onChange={(event) => setRulesDraft(event.target.value)}
+              <ProjectInstructionsField
+                project={wireProject}
+                teamId={teamId}
+                testId="project-instructions-input"
               />
-              <Button
-                className={cn(DIALOG_PRIMARY_BUTTON, 'self-end')}
-                aria-label={t('保存项目说明')}
-                disabled={
-                  mutations.patchProject.isPending ||
-                  (rulesDraft ?? wireProject.instructions ?? '') ===
-                    (wireProject.instructions ?? '')
-                }
-                onClick={() => {
-                  if (id === undefined) return;
-                  const next = (rulesDraft ?? '').trim();
-                  mutations.patchProject.mutate(
-                    { id, body: { instructions: next === '' ? null : next } },
-                    {
-                      onSuccess: () => setRulesDraft(null),
-                      onError: (error) => toastError(t('项目说明保存失败，请重试。'), error),
-                    },
-                  );
-                }}
-              >
-                {t('保存')}
-              </Button>
             </SettingsRow>
           )}
         </SettingsCard>

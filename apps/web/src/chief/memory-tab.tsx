@@ -3,6 +3,7 @@ import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import { useApiMutations, useMemories, useProjects } from '../api/hooks.js';
+import { ProjectInstructionsField } from '../board/project-instructions-field.js';
 import { EmptyState } from '../components/empty-state.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
@@ -12,14 +13,16 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { FileText } from '../icons/index.js';
 import {
-  groupMemories,
   isAutoInjected,
-  type MemoryGroup,
+  type MemorySection,
+  memorySections,
   splitMemoryContent,
 } from './memory-list.js';
 
 const ROW_GRID_CLS =
-  'grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-0.5 sm:grid-cols-[11rem_minmax(0,1fr)_auto]';
+  'grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]';
+const SUBHEAD_CLS = 'text-ui font-normal text-foreground';
+const HINT_CLS = 'mt-1 text-ui text-content-secondary';
 
 const updatedOn = (at: number, t: TFunc) => {
   const date = new Date(at);
@@ -30,9 +33,9 @@ const updatedOn = (at: number, t: TFunc) => {
   });
 };
 
-function groupHeading(group: MemoryGroup, t: TFunc) {
-  if (group.scope === 'team') return t('团队');
-  return group.projectName ?? t('已移除的项目');
+function sectionHeading(section: MemorySection, t: TFunc) {
+  if (section.scope === 'team') return t('团队');
+  return section.projectName ?? t('已移除的项目');
 }
 
 export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | undefined }) {
@@ -112,7 +115,9 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
         </div>
       );
     }
-    if (memories.length === 0) {
+    const projects = (projectsQ.data ?? []).filter((project) => project.archivedAt == null);
+    const sections = memorySections(memories, projects);
+    if (sections.length === 0) {
       return (
         <EmptyState
           className="mt-8"
@@ -122,58 +127,89 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
         />
       );
     }
-    return (
-      <div ref={listRef} data-testid="memory-list" className="mt-2">
-        {groupMemories(memories, projectsQ.data ?? []).map((group) => (
-          <section key={group.key} aria-labelledby={`memory-group-${group.key}`}>
-            <h2
-              id={`memory-group-${group.key}`}
-              className="flex items-baseline gap-2 px-3 pt-4 pb-1 text-meta font-medium text-content-secondary"
-            >
-              {groupHeading(group, t)}
-              {group.scope !== 'team' && (
-                <span className="font-normal text-content-tertiary">{t('项目')}</span>
-              )}
-            </h2>
-            <ul className="border-t border-border">
-              {group.rows.map((memory) => (
+    const rows = (heading: string, list: MemoryRecord[]) =>
+      list.length === 0 ? null : (
+        <div className="mt-5">
+          <h3 className={SUBHEAD_CLS}>{heading}</h3>
+          <ul className="-mx-3 mt-2 border-t border-border">
+            {list.map((memory) => {
+              const summary = splitMemoryContent(memory.content).summary;
+              return (
                 <li key={memory.id} className="border-b border-border">
                   <Button
                     variant="ghost"
                     data-slot="memory-row"
                     aria-label={t('打开记忆：{title}', { title: memory.title })}
-                    className="h-auto min-h-11 w-full justify-start rounded-none border-0 px-3 py-2.5 text-left text-ui font-normal whitespace-normal"
+                    className="h-auto min-h-11 w-full justify-start rounded-none border-0 px-3 py-3 text-left text-ui font-normal whitespace-normal"
                     onClick={() => setOpenId(memory.id)}
                   >
                     <span className={ROW_GRID_CLS}>
                       <span
                         data-slot="memory-title"
-                        className="col-start-1 row-start-1 flex min-w-0 items-baseline gap-2"
+                        className="col-start-1 row-start-1 min-w-0 truncate text-foreground underline decoration-content-tertiary underline-offset-4"
                       >
-                        <span className="truncate text-foreground">{memory.title}</span>
-                        {!isAutoInjected(memory.layer) && (
-                          <span className="flex-none text-meta text-content-tertiary">
-                            {t('可检索')}
-                          </span>
-                        )}
+                        {memory.title}
                       </span>
                       <span
                         data-slot="memory-summary"
                         className="col-span-2 row-start-2 truncate text-content-secondary sm:col-span-1 sm:col-start-2 sm:row-start-1"
                       >
-                        {splitMemoryContent(memory.content).summary}
+                        {summary}
                       </span>
                       <span
                         data-slot="memory-date"
-                        className="col-start-2 row-start-1 text-meta whitespace-nowrap text-content-tertiary sm:col-start-3"
+                        className="col-start-2 row-start-1 whitespace-nowrap text-content-secondary sm:col-start-3"
                       >
                         {t('更新于 {date}', { date: updatedOn(memory.updatedAt, t) })}
                       </span>
                     </span>
                   </Button>
                 </li>
-              ))}
-            </ul>
+              );
+            })}
+          </ul>
+        </div>
+      );
+    return (
+      <div ref={listRef} data-testid="memory-list">
+        {sections.map((section) => (
+          <section
+            key={section.key}
+            aria-labelledby={`memory-section-${section.key}`}
+            className="mt-8"
+          >
+            <h2
+              id={`memory-section-${section.key}`}
+              className="text-card-title font-medium text-foreground"
+            >
+              {sectionHeading(section, t)}
+            </h2>
+            {section.scope === 'team' && (
+              <p className={HINT_CLS}>{t('Coordinator 在所有项目里都会用到的笔记。')}</p>
+            )}
+            {section.project !== null && (
+              <>
+                <div className="mt-5">
+                  <h3 className={SUBHEAD_CLS}>{t('项目说明')}</h3>
+                  <p className={HINT_CLS}>
+                    {t('像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。')}
+                  </p>
+                  <div className="mt-3">
+                    <ProjectInstructionsField project={section.project} teamId={teamId} named />
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <h3 className={SUBHEAD_CLS}>{t('自动记忆')}</h3>
+                  <p className={HINT_CLS}>
+                    {section.injected.length + section.lookup.length > 0
+                      ? t('Coordinator 在这个项目里工作时自己写下的笔记。')
+                      : t('Coordinator 还没有在这个项目里记下笔记。')}
+                  </p>
+                </div>
+              </>
+            )}
+            {rows(t('每个 thread 都会读'), section.injected)}
+            {rows(t('按需查阅'), section.lookup)}
           </section>
         ))}
       </div>
@@ -183,18 +219,20 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
   const content = open === null ? null : splitMemoryContent(open.content);
   return (
     <div>
-      <p
-        ref={summaryRef}
-        tabIndex={-1}
-        className="mt-4 text-meta text-content-tertiary outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-(--focus-ring)"
-      >
-        {memories.length > 0
-          ? t('已存 {n} 条，上限 {max} 条 · 不是每条都会自动注入', {
-              n: memories.length,
-              max: MEMORY_QUOTA_PER_TEAM,
-            })
-          : t('记忆')}
-      </p>
+      <div className="mt-6 flex items-baseline justify-between gap-4">
+        <p
+          ref={summaryRef}
+          tabIndex={-1}
+          className="text-card-title text-foreground outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-(--focus-ring)"
+        >
+          {t('记忆')}
+        </p>
+        {memoriesQ.data !== undefined && (
+          <span data-testid="memory-count" className="text-meta tabular-nums text-content-tertiary">
+            {`${memories.length} / ${MEMORY_QUOTA_PER_TEAM}`}
+          </span>
+        )}
+      </div>
       {!connected && (
         <p className="mt-1 text-meta text-content-secondary">
           {t('离线中。记忆只能查看，重新连接后才能删除。')}

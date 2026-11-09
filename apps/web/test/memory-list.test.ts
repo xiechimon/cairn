@@ -1,6 +1,6 @@
 import type { MemoryRecord } from '@cairn/shared';
 import { expect, test } from 'vitest';
-import { groupMemories, isAutoInjected, splitMemoryContent } from '../src/chief/memory-list.js';
+import { isAutoInjected, memorySections, splitMemoryContent } from '../src/chief/memory-list.js';
 
 const memory = (
   id: string,
@@ -20,35 +20,35 @@ const memory = (
   ...(layer === undefined ? {} : { layer }),
 });
 
-test('team memories come first, then one group per project in project order', () => {
-  const groups = groupMemories(
-    [memory('a', 'p2'), memory('b', null), memory('c', 'p1'), memory('d', 'p2')],
+test('team comes first only when it has memories, then every project, then removed projects', () => {
+  const sections = memorySections(
+    [memory('a', 'p2'), memory('b', null), memory('c', 'p2', 'searchable'), memory('d', 'gone')],
     [
       { id: 'p1', name: 'Field Notes' },
       { id: 'p2', name: 'Harbor API' },
     ],
   );
-  expect(groups.map((group) => [group.projectName, group.rows.map((row) => row.id)])).toEqual([
-    [null, ['b']],
-    ['Field Notes', ['c']],
-    ['Harbor API', ['a', 'd']],
+  expect(
+    sections.map((section) => [
+      section.key,
+      section.scope,
+      section.projectName,
+      section.injected.map((row) => row.id),
+      section.lookup.map((row) => row.id),
+    ]),
+  ).toEqual([
+    ['team', 'team', null, ['b'], []],
+    ['p1', 'project', 'Field Notes', [], []],
+    ['p2', 'project', 'Harbor API', ['a'], ['c']],
+    ['gone', 'unknown-project', null, ['d'], []],
   ]);
 });
 
-test('a memory whose project is not in the list still shows, after the known projects', () => {
-  const groups = groupMemories(
-    [memory('a', 'gone'), memory('b', 'p1')],
-    [{ id: 'p1', name: 'Field Notes' }],
-  );
-  expect(groups.map((group) => [group.key, group.projectName])).toEqual([
-    ['p1', 'Field Notes'],
-    ['gone', null],
+test('no team section without team memories', () => {
+  expect(memorySections([memory('a', 'p1')], [{ id: 'p1', name: 'Field Notes' }]).map((s) => s.key)).toEqual([
+    'p1',
   ]);
-  expect(groups.map((group) => group.scope)).toEqual(['project', 'unknown-project']);
-});
-
-test('empty input yields no groups', () => {
-  expect(groupMemories([], [])).toEqual([]);
+  expect(memorySections([], [])).toEqual([]);
 });
 
 test('content splits into a one-line summary and every remaining line as a detail', () => {

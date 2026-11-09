@@ -44,9 +44,15 @@ type ListReply = 'ok' | 'fail' | 'hang';
 async function openMemory(page: Page, options: { list?: ListReply; projects?: ListReply; refresh?: Promise<void>; deleteFails?: boolean; memories?: typeof MEMORIES } = {}) {
   const memories = structuredClone(options.memories ?? MEMORIES);
   const deleted: string[] = [];
+  const projectPatches: unknown[] = [];
   let listReply = options.list ?? 'ok';
   let projectsReply = options.projects ?? 'ok';
   await mockLive(page, { threads: [THREAD], messages: [], projects: PROJECTS }, (p, route: Route, json) => {
+    if (p.startsWith('/api/projects/') && route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON() as { instructions: string | null };
+      projectPatches.push(body);
+      return json({ ...PROJECTS.find((project) => p.endsWith(project.id)), ...body });
+    }
     if (p === '/api/projects') {
       if (projectsReply === 'hang') return new Promise<void>(() => {});
       if (projectsReply === 'fail') return json({ error: 'boom' }, 500);
@@ -74,6 +80,7 @@ async function openMemory(page: Page, options: { list?: ListReply; projects?: Li
   await page.getByRole('tab', { name: '记忆' }).click();
   return {
     deleted,
+    projectPatches,
     recover: () => {
       listReply = 'ok';
       projectsReply = 'ok';
@@ -95,23 +102,37 @@ const settled = (page: Page) =>
 const memoryRow = (page: Page, title: string) =>
   page.getByRole('button', { name: `打开记忆：${title}` });
 
-test('the list groups rows by scope under thin dividers, team first, with summary and date', async ({
+test('the tab follows the Claude Code memory page: count, sections per scope, read-every-thread and lookup rows', async ({
   page,
 }) => {
   await openMemory(page);
   const list = page.getByTestId('memory-list');
   await expect(list).toBeVisible();
-  await expect(page.getByText('已存 5 条，上限 100 条 · 不是每条都会自动注入')).toBeVisible();
-  const headings = list.getByRole('heading', { level: 2 });
-  await expect(headings).toHaveText(['团队', /Field Notes\s*项目/, /Harbor API\s*项目/]);
+  await expect(page.getByTestId('memory-count')).toHaveText('5 / 100');
+  await expect(page.getByText(/已存 \d+ 条/)).toHaveCount(0);
+  await expect(list.getByRole('heading', { level: 2 })).toHaveText(['团队', 'Field Notes', 'Harbor API']);
+
   const team = list.getByRole('region', { name: '团队' });
+  await expect(team.getByRole('heading', { level: 3 })).toHaveText(['每个 thread 都会读']);
   await expect(team.getByRole('button')).toHaveText([/验证命令/, /评审交接/]);
+  await expect(team.getByRole('textbox')).toHaveCount(0);
+
+  const notes = list.getByRole('region', { name: 'Field Notes' });
+  await expect(notes.getByRole('heading', { level: 3 })).toHaveText([
+    '项目说明',
+    '自动记忆',
+    '每个 thread 都会读',
+    '按需查阅',
+  ]);
+  await expect(notes.getByRole('textbox', { name: 'Field Notes 的项目说明' })).toHaveValue('');
+  await expect(notes.getByText('0 / 16,000')).toBeVisible();
+  await expect(notes.getByRole('button', { name: /打开记忆/ })).toHaveText([/无障碍检查/, /发布交接/]);
+
   const verify = memoryRow(page, '验证命令');
   await expect(verify).toContainText('推送代码前先跑受影响的测试。');
   await expect(verify).not.toContainText('单测用');
   await expect(verify).toContainText('更新于 11月8日');
-  await expect(memoryRow(page, '发布交接')).toContainText('可检索');
-  await expect(memoryRow(page, '无障碍检查')).not.toContainText('可检索');
+  await expect(list.getByText('可检索', { exact: true })).toHaveCount(0);
   await expect(
     page.getByTestId('chief-settings-col').locator('[data-slot="list-card"], [data-slot="card"]'),
   ).toHaveCount(0);
@@ -127,6 +148,18 @@ test('the list groups rows by scope under thin dividers, team first, with summar
   expect(await verify.evaluate((el) => getComputedStyle(el).boxShadow)).toBe(geometry.shadow);
   await settled(page);
   await evidenceShot(page, 'memory-list-hover.png');
+});
+
+test('project instructions save from the memory tab through the project API', async ({ page }) => {
+  const { projectPatches } = await openMemory(page);
+  const notes = page.getByTestId('memory-list').getByRole('region', { name: 'Field Notes' });
+  const input = notes.getByRole('textbox', { name: 'Field Notes 的项目说明' });
+  const save = notes.getByRole('button', { name: '保存 Field Notes 的项目说明' });
+  await expect(save).toBeDisabled();
+  await input.fill('  仓库内容用英文。  ');
+  await expect(notes.getByText('12 / 16,000')).toBeVisible();
+  await save.click();
+  await expect.poll(() => projectPatches).toEqual([{ instructions: '仓库内容用英文。' }]);
 });
 
 test('a row opens the detail dialog: updated, summary, details, with Delete in the header', async ({
@@ -172,7 +205,7 @@ test('delete confirms first, then removes the row and closes both dialogs', asyn
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(deleted).toEqual(['m-a11y']);
   await expect(memoryRow(page, '无障碍检查')).toHaveCount(0);
-  await expect(page.getByText('已存 4 条，上限 100 条 · 不是每条都会自动注入')).toBeVisible();
+  await expect(page.getByTestId('memory-count')).toHaveText('4 / 100');
 });
 
 test('a failed delete keeps the row and says so in the confirmation', async ({ page }) => {
@@ -208,12 +241,26 @@ test('a failed read says so and retries, never claiming the list is empty', asyn
   await expect(page.getByTestId('memory-list')).toBeVisible();
 });
 
-test('empty shows one sentence and no count line', async ({ page }) => {
+test('with no memories each project still shows its instructions and an empty auto memory line', async ({
+  page,
+}) => {
   await openMemory(page, { memories: [] });
-  await expect(page.getByRole('heading', { name: '尚无记忆。' })).toBeVisible();
-  await expect(page.getByText(/已存 \d+ 条/)).toHaveCount(0);
+  const notes = page.getByTestId('memory-list').getByRole('region', { name: 'Field Notes' });
+  await expect(notes.getByRole('textbox', { name: 'Field Notes 的项目说明' })).toBeVisible();
+  await expect(notes.getByText('Coordinator 还没有在这个项目里记下笔记。')).toBeVisible();
+  await expect(page.getByTestId('memory-list').getByRole('region', { name: '团队' })).toHaveCount(0);
+  await expect(page.getByTestId('memory-count')).toHaveText('0 / 100');
   await settled(page);
   await evidenceShot(page, 'memory-empty.png');
+});
+
+test('with no memories and no projects the tab is one empty state', async ({ page }) => {
+  await mockLive(page, { threads: [THREAD], messages: [], projects: [] }, (p, _route, json) =>
+    p === '/api/teams/t1/memories' ? json([]) : undefined,
+  );
+  await page.goto('/app?chief=settings');
+  await page.getByRole('tab', { name: '记忆' }).click();
+  await expect(page.getByRole('heading', { name: '尚无记忆。' })).toBeVisible();
 });
 
 test('on a phone each row is two lines and nothing scrolls sideways', async ({ page }) => {
@@ -236,7 +283,7 @@ test('on a phone each row is two lines and nothing scrolls sideways', async ({ p
 
 test('project loading keeps memories in the loading state without claiming projects were removed', async ({ page }) => {
   await openMemory(page, { projects: 'hang' });
-  await expect(page.getByText('已存 5 条，上限 100 条 · 不是每条都会自动注入')).toBeVisible();
+  await expect(page.getByTestId('memory-count')).toHaveText('5 / 100');
   await expect(page.getByRole('status', { name: '正在加载记忆' })).toBeVisible();
   await expect(page.getByTestId('memory-list')).toHaveCount(0);
   await expect(page.getByText('已移除的项目')).toHaveCount(0);
@@ -252,7 +299,7 @@ test('project lookup failure offers retry and recovers the list with real projec
   await evidenceShot(page, 'memory-project-error.png');
   control.recover();
   await alert.getByRole('button', { name: '重试' }).click();
-  await expect(page.getByTestId('memory-list').getByRole('heading', { name: /Field Notes/ })).toBeVisible();
+  await expect(page.getByTestId('memory-list').getByRole('heading', { name: 'Field Notes' })).toBeVisible();
   await memoryRow(page, '无障碍检查').click();
   await expect(page.getByRole('dialog').getByText('Field Notes · 核心')).toBeVisible();
 });
@@ -290,7 +337,8 @@ test('delete waits for closure and focuses the summary when no rows remain', asy
   await memoryRow(page, '验证命令').click();
   await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '删除记忆' }).click();
-  await expect(page.getByRole('heading', { name: '尚无记忆。' })).toBeVisible();
+  await expect(page.getByTestId('memory-count')).toHaveText('0 / 100');
+  await expect(page.getByRole('button', { name: /打开记忆/ })).toHaveCount(0);
   await settled(page);
   await expect(page.getByRole('paragraph').filter({ hasText: /^记忆$/ })).toBeFocused();
 });
