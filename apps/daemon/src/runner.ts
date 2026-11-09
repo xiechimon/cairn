@@ -59,6 +59,7 @@ import {
   PLAN_FILE_NAME,
   parseRetryAfterMs,
   parseReviewPromptMeta,
+  parseVerifyPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
   REPORT_FILE_NAME,
   type ReviewGate,
@@ -258,7 +259,8 @@ function degradedFreshPrompt(claimed: ClaimedStep, plansDir: string, convId: str
   if (
     (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
-      claimed.step.kind === 'verify') &&
+      (claimed.step.kind === 'verify' &&
+        parseVerifyPromptMeta(claimed.instruction ?? null)?.evidence !== 'attachments')) &&
     (claimed.project?.repo ?? null) !== null
   ) {
     text = appendWorkBranchNote(
@@ -387,15 +389,15 @@ export async function runStep(
   }, deps.heartbeatIntervalMs ?? 30_000);
   if (heartbeat.unref) heartbeat.unref();
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
-  const credentialCleanups: (() => void)[] = [];
+  const stepCleanups: (() => void | Promise<void>)[] = [];
   const errors: unknown[] = [];
   try {
-    await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, credentialCleanups);
+    await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, stepCleanups);
   } catch (error) {
     errors.push(error);
   }
   for (const cleanup of [
-    ...credentialCleanups.reverse(),
+    ...stepCleanups.reverse(),
     () => deps.sessionHandles?.delete(stepId),
     () => clearInterval(heartbeat),
     () => deps.stepImageSupport?.delete(stepId),
@@ -404,7 +406,7 @@ export async function runStep(
     () => stop.settle(),
   ]) {
     try {
-      cleanup();
+      await cleanup();
     } catch (error) {
       errors.push(error);
     }
@@ -426,7 +428,7 @@ async function runClaimedStep(
   heartbeat: ReturnType<typeof setInterval>,
   stop: RunStop,
   provenance: MachineHeartbeatBody,
-  credentialCleanups: (() => void)[],
+  stepCleanups: (() => void | Promise<void>)[],
 ): Promise<void> {
   let { client, journal, logger } = deps;
   const now = deps.now ?? (() => Date.now());
@@ -481,6 +483,8 @@ async function runClaimedStep(
   const isChief = claimed.step.kind === 'chief';
   const isReview = claimed.step.kind === 'review';
   const isVerify = claimed.step.kind === 'verify';
+  const attachmentVerify =
+    isVerify && parseVerifyPromptMeta(claimed.instruction ?? null)?.evidence === 'attachments';
   const reviewGate: ReviewGate =
     (isReview ? parseReviewPromptMeta(claimed.instruction ?? null)?.gate : undefined) ?? 'confirm';
   const basePrompt =
@@ -508,7 +512,7 @@ async function runClaimedStep(
     !isInfoBuild &&
     (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
-      claimed.step.kind === 'verify') &&
+      (claimed.step.kind === 'verify' && !attachmentVerify)) &&
     (claimed.project?.repo ?? null) !== null
       ? appendWorkBranchNote(
           promptWithPlanNote,
@@ -586,7 +590,7 @@ async function runClaimedStep(
 
   const tokenRes = await client.token(stepId);
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
-  credentialCleanups.push(() => clearCredentials(creds));
+  stepCleanups.push(() => clearCredentials(creds));
   const credentialValues = [creds.claudeSubscriptionToken, creds.git?.password];
   const redactors = [credentialRedactor(...credentialValues)];
   const redact = <T>(value: T): T => redactors.reduce((result, next) => next(result), value);
@@ -613,7 +617,7 @@ async function runClaimedStep(
           () => logger.step('App credential timer refresh failed; retrying next minute'),
         )
       : null;
-  if (appCredential !== null) credentialCleanups.push(() => appCredential.dispose());
+  if (appCredential !== null) stepCleanups.push(() => appCredential.dispose());
   const refreshGit = async () => {
     if (appCredential === null) throw new Error('App credential refresh unavailable');
     return appCredential.refresh();
@@ -794,6 +798,34 @@ async function runClaimedStep(
     } catch {
       headAtStart = null;
     }
+  }
+
+  let verifyRewound = false;
+  let verifyRewindError: string | null = null;
+  const rewindAttachmentVerify = async (): Promise<string | null> => {
+    if (!attachmentVerify) return null;
+    if (verifyRewound) return verifyRewindError;
+    verifyRewound = true;
+    if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
+      verifyRewindError = 'Verify start checkpoint unavailable';
+      return verifyRewindError;
+    }
+    try {
+      await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
+    } catch (error) {
+      verifyRewindError = error instanceof Error ? error.message : String(error);
+      logger.step(`verify rewind failed: ${verifyRewindError}`);
+    }
+    return verifyRewindError;
+  };
+  if (attachmentVerify) {
+    if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
+      await failStep(deps, heartbeat, stepId, 'Verify start checkpoint unavailable');
+      return;
+    }
+    stepCleanups.push(async () => {
+      await rewindAttachmentVerify();
+    });
   }
 
   const systemPrompt =
@@ -1012,14 +1044,14 @@ async function runClaimedStep(
     );
     return;
   }
-  credentialCleanups.push(temporary.cleanup);
+  stepCleanups.push(temporary.cleanup);
   const stepEnv: Record<string, string> = {
     ...opts.env,
     ...temporary.env,
     ...stepGitEnv,
     ...(readonlyWorkspace ? READONLY_GIT_ENV : {}),
   };
-  credentialCleanups.push(() => {
+  stepCleanups.push(() => {
     for (const key of Object.keys(stepGitEnv)) {
       delete stepEnv[key];
       delete stepGitEnv[key];
@@ -1573,8 +1605,14 @@ async function runClaimedStep(
       if (await retryWithoutImages(message)) continue;
       flushDeltas();
       flushThinking();
+      const rewindFailure = await rewindAttachmentVerify();
       clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, message);
+      await failStep(
+        deps,
+        heartbeat,
+        stepId,
+        rewindFailure === null ? message : `${message}; verify rewind failed: ${rewindFailure}`,
+      );
       return;
     }
     logger.raw(continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
@@ -1927,6 +1965,7 @@ async function runClaimedStep(
   if (!sawDone && handle !== null) usage = handle.usage();
 
   const rewindToStepStart = async (): Promise<string | null> => {
+    if (attachmentVerify) return rewindAttachmentVerify();
     if (ws?.readonly === true) return null;
     if (ws === null || !deps.workspace || headAtStart === null) return '步起点 commit 不可得';
     try {
@@ -1945,14 +1984,17 @@ async function runClaimedStep(
     }
   }
 
-  if (checkout) {
+  if (checkout || attachmentVerify) {
     const failed = await rewindToStepStart();
     if (failed !== null) {
-      logger.step(`review rewind failed: ${failed}`);
+      if (attachmentVerify) lastError = `Verify checkpoint restore failed: ${failed}`;
+      logger.step(`${attachmentVerify ? 'verify' : 'review'} rewind failed: ${failed}`);
       transcript.upsert({
-        id: `review-rewind-${stepId}`,
+        id: `${attachmentVerify ? 'verify' : 'review'}-rewind-${stepId}`,
         role: 'system',
-        content: `审核检出未能回退到本轮起点（${failed}）——本轮审核对工作区的写入可能残留，合并前请确认工作区状态`,
+        content: attachmentVerify
+          ? `Verification checkout could not restore its start checkpoint: ${failed}. Evidence may remain in the worktree; this verification failed.`
+          : `审核检出未能回退到本轮起点（${failed}）——本轮审核对工作区的写入可能残留，合并前请确认工作区状态`,
         createdAt: now(),
       });
     }
@@ -1966,10 +2008,10 @@ async function runClaimedStep(
         coAuthor: tokenRes.coAuthor ?? null,
       });
     });
-  let headCommit: string | null = null;
+  let headCommit: string | null = attachmentVerify ? headAtStart : null;
   let branchDrift: { expected: string; actual: string } | null = null;
   let artifactBranches: string[] = [];
-  let hasChanges = isReview ? false : sawChangeTool;
+  let hasChanges = isReview || attachmentVerify ? false : sawChangeTool;
   if (readonlyWorkspace) hasChanges = false;
   if (
     ws !== null &&
@@ -1977,7 +2019,8 @@ async function runClaimedStep(
     deps.workspace &&
     lastError === null &&
     !stopped &&
-    !isReview
+    !isReview &&
+    !attachmentVerify
   ) {
     const git = deps.workspace;
     try {
@@ -2143,7 +2186,8 @@ async function runClaimedStep(
     repo !== null &&
     (lastError === null || preservedCommits.length > 0) &&
     !stopped &&
-    !isReview
+    !isReview &&
+    !attachmentVerify
   ) {
     const ghRef = repo.kind === 'github' ? githubRepoRefOf(repo.cloneUrl) : null;
     if (ghRef !== null) {

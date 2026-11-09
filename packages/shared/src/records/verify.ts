@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { DocumentDiffFile } from './document-diff.js';
+import { type EvidenceStore, evidenceStoreSchema } from './project.js';
 import {
   MOTION_TOKEN_PATHS,
   RECORDING_EXTENSIONS,
@@ -24,6 +25,7 @@ export type VerifyVerdict = z.infer<typeof verifyVerdictSchema>;
 export const verifyPromptMetaSchema = z.object({
   kind: z.literal('verify'),
   expectedHeadSha: z.string().optional(),
+  evidence: evidenceStoreSchema.optional(),
 });
 export type VerifyPromptMeta = z.infer<typeof verifyPromptMetaSchema>;
 
@@ -48,9 +50,24 @@ export function buildVerifyStepPrompt(args: {
   pr: { number: number; url: string | null } | null;
   changes?: readonly DocumentDiffFile[];
   expectedHeadSha?: string;
+  evidenceStore?: EvidenceStore;
 }): string {
-  const prSection =
-    args.pr !== null
+  const attachments = args.evidenceStore === 'attachments';
+  const evidenceDirectory = attachments
+    ? `.cairn-verify/${args.ticketRef}/`
+    : `docs/verify/${args.ticketRef}/`;
+  const recordingFormats = attachments ? '.gif' : RECORDING_EXTENSIONS.join(', ');
+  const recordingPublication = attachments
+    ? 'upload it with attach_file'
+    : 'link it in the PR body';
+  const prSection = attachments
+    ? [
+        '## 本轮交付',
+        args.pr !== null
+          ? `Verify PR #${args.pr.number}${args.pr.url !== null ? ` (${args.pr.url})` : ''}. Cairn publishes the verdict; do not edit the PR or post a comment yourself.`
+          : 'No GitHub PR is attached. Upload the evidence to this task with attach_file.',
+      ].join('\n')
+    : args.pr !== null
       ? [
           '## 本轮交付',
           `PR #${args.pr.number}${args.pr.url !== null ? `（${args.pr.url}）` : ''}——验证产物回贴它的 body（gh pr edit，机器 gh 凭据），证据目录随分支提交推送。`,
@@ -79,9 +96,19 @@ export function buildVerifyStepPrompt(args: {
       : [];
   const sections = [
     ...(args.expectedHeadSha !== undefined
-      ? [JSON.stringify({ kind: 'verify', expectedHeadSha: args.expectedHeadSha })]
-      : []),
-    `Verify this round's delivery of the task below. **Verify step**: the code is read-only — do not modify the deliverables and do not change any file outside docs/verify/${args.ticketRef}/. Bring up the real stack on the session branch and run e2e / key paths, land the evidence (screenshots, API JSON, database rows, log excerpts) in docs/verify/${args.ticketRef}/, paste it back into the PR body, and end with a verdict per the contract below. Only the evidence directory is writable: evidence files go through git add / commit / push as usual.`,
+      ? [
+          JSON.stringify({
+            kind: 'verify',
+            expectedHeadSha: args.expectedHeadSha,
+            ...(attachments ? { evidence: 'attachments' } : {}),
+          }),
+        ]
+      : attachments
+        ? [JSON.stringify({ kind: 'verify', evidence: 'attachments' })]
+        : []),
+    attachments
+      ? `Verify this round's delivery of the task below. **Verify step**: the code is read-only. Write evidence only under ${evidenceDirectory}, run the real stack and verify the key paths, then upload every evidence file with attach_file before your final verdict. Files must be at most 10 MiB; recordings must be real .gif files of at most 5 MiB. Do not commit, push, change repository files or edit the PR. The daemon discards all worktree changes after this step.`
+      : `Verify this round's delivery of the task below. **Verify step**: the code is read-only — do not modify the deliverables and do not change any file outside docs/verify/${args.ticketRef}/. Bring up the real stack on the session branch and run e2e / key paths, land the evidence (screenshots, API JSON, database rows, log excerpts) in docs/verify/${args.ticketRef}/, paste it back into the PR body, and end with a verdict per the contract below. Only the evidence directory is writable: evidence files go through git add / commit / push as usual.`,
     '',
     '## 输出契约',
     '本步以单一 JSON 对象结尾输出 verdict —— 你的最后一条消息内容必须是下列',
@@ -93,7 +120,9 @@ export function buildVerifyStepPrompt(args: {
         conclusion: '<一句话：跑通了什么、对账结果>',
         evidence: [
           {
-            path: 'docs/verify/1250/<证据文件>',
+            path: attachments
+              ? `${evidenceDirectory}<evidence-file>`
+              : 'docs/verify/1250/<证据文件>',
             note: '<可选：这份证据证明了什么>',
             ...(items.length > 0 ? { item: 1 } : {}),
           },
@@ -103,7 +132,9 @@ export function buildVerifyStepPrompt(args: {
       2,
     ),
     '```',
-    '注意：passed 如实报——验证发现缺陷时传 false 并在 conclusion 写明，这是有效结论不是本步失败；evidence.path 必须是仓内真实落盘的路径。',
+    attachments
+      ? 'Report passed truthfully. If verification or any attach_file upload fails, report passed: false and explain the failure in conclusion. Every evidence.path must name a file you actually uploaded; preserve its checklist item number.'
+      : '注意：passed 如实报——验证发现缺陷时传 false 并在 conclusion 写明，这是有效结论不是本步失败；evidence.path 必须是仓内真实落盘的路径。',
     '',
     '## 待验证任务',
     args.taskText,
@@ -114,7 +145,7 @@ export function buildVerifyStepPrompt(args: {
     changesSection,
     ...(args.changes === undefined
       ? [
-          `Inspect the added lines of the delivery diff under apps/web/src/ for transition, animation, @keyframes, motion, a drag or hover handler (onDrag, onPointerMove, onMouseEnter, onMouseDown, draggable), hover:, scroll-behavior: smooth, and a scripted .style.transform / .style.scrollBehavior assignment; a change to ${MOTION_TOKEN_PATHS.join(', ')} also counts. If any trigger matches, include a real ${RECORDING_EXTENSIONS.join(', ')} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under docs/verify/${args.ticketRef}/ in the verdict evidence list and link it in the PR body. Record navigation with node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms>; record the affected interactions with Playwright recordVideo when navigation alone is insufficient.`,
+          `Inspect the added lines of the delivery diff under apps/web/src/ for transition, animation, @keyframes, motion, a drag or hover handler (onDrag, onPointerMove, onMouseEnter, onMouseDown, draggable), hover:, scroll-behavior: smooth, and a scripted .style.transform / .style.scrollBehavior assignment; a change to ${MOTION_TOKEN_PATHS.join(', ')} also counts. If any trigger matches, include a real ${recordingFormats} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under ${evidenceDirectory} in the verdict evidence list and ${recordingPublication}. ${attachments ? `Record only under ${evidenceDirectory}, convert the recording to .gif and upload it before finishing.` : 'Record navigation with node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms>; record the affected interactions with Playwright recordVideo when navigation alone is insufficient.'}`,
         ]
       : []),
     ...(recordingRequirements(
@@ -125,7 +156,7 @@ export function buildVerifyStepPrompt(args: {
       })),
     ).required
       ? [
-          `Animated or interactive UI changed. Include a real ${RECORDING_EXTENSIONS.join(', ')} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under docs/verify/${args.ticketRef}/ in the verdict evidence list and link it in the PR body. Use node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms> to record the live route; drive the affected interactions in a recording-enabled Playwright context when navigation alone does not demonstrate them.`,
+          `Animated or interactive UI changed. Include a real ${recordingFormats} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under ${evidenceDirectory} in the verdict evidence list and ${recordingPublication}. ${attachments ? `Record only under ${evidenceDirectory}, convert the recording to .gif and upload it before finishing.` : 'Use node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms> to record the live route; drive the affected interactions in a recording-enabled Playwright context when navigation alone does not demonstrate them.'}`,
         ]
       : []),
   ];

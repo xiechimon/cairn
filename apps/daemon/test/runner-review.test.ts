@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -15,11 +15,13 @@ import type {
 import { buildReviewStepPrompt, type DocumentDiffFile } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { builtinToolNames, PI_CAPABILITIES, sessionToolNames } from '../src/backend/pi.js';
+import { commitEnv, runGitOk } from '../src/git.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
-import { runStep } from '../src/runner.js';
+import { type RunStepOptions, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const HOSTED_REPO = { kind: 'hosted' as const, cloneUrl: 'http://localhost:9/git/t/r.git' };
@@ -82,6 +84,7 @@ class FakeClient implements MachineApi {
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   uploadedTranscript = '';
+  attachments: Record<string, unknown>[] = [];
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -99,7 +102,8 @@ class FakeClient implements MachineApi {
   async heartbeat() {}
   async tool(_stepId: string, _call: ToolCallRecord) {}
   async transcriptDelta() {}
-  async relayTool() {
+  async relayTool(_stepId: string, name: string, params: Record<string, unknown>) {
+    if (name === 'attach_file') this.attachments.push(params);
     return '{}';
   }
   async token() {
@@ -156,11 +160,15 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-function fakeWorkspace(
-  cwd: string,
-  calls: string[],
-  opts: { rewindError?: string } = {},
-): WorktreeOps {
+interface WorkspaceOptions {
+  rewindError?: string;
+  head?: string | null;
+  reused?: boolean;
+  run?: RunStepOptions;
+  workspace?: WorktreeOps;
+}
+
+function fakeWorkspace(cwd: string, calls: string[], opts: WorkspaceOptions = {}): WorktreeOps {
   return {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
@@ -170,7 +178,7 @@ function fakeWorkspace(
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
         branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
-        reused: true,
+        reused: opts.reused ?? true,
       };
     },
     async commitAll() {
@@ -186,7 +194,7 @@ function fakeWorkspace(
     },
     async headCommit() {
       calls.push('headCommit');
-      return 'abc123';
+      return opts.head === undefined ? 'abc123' : opts.head;
     },
     async countAhead() {
       return 1;
@@ -247,13 +255,13 @@ function scriptedBackend(captured: SessionOpts[], script: unknown[]): AgentBacke
   };
 }
 
-async function setup(claimed: ClaimedStep, opts: { rewindError?: string } = {}) {
+async function setup(claimed: ClaimedStep, opts: WorkspaceOptions = {}) {
   return setupWithBackend(claimed, opts, (captured) => capturingBackend(captured));
 }
 
 async function setupWithBackend(
   claimed: ClaimedStep,
-  opts: { rewindError?: string },
+  opts: WorkspaceOptions,
   backendFor: (captured: SessionOpts[]) => AgentBackend,
 ) {
   const home = testTempDir('cairn-runner-review-');
@@ -269,12 +277,12 @@ async function setupWithBackend(
     backendFor: () => backendFor(captured),
     logger: captureLogger(),
     paths,
-    workspace: fakeWorkspace(checkoutCwd, calls, opts),
+    workspace: opts.workspace ?? fakeWorkspace(checkoutCwd, calls, opts),
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
   };
-  await runStep(deps, claimed);
+  await runStep(deps, claimed, opts.run);
   return { client, calls, captured, checkoutCwd };
 }
 
@@ -459,5 +467,197 @@ describe('chief digest execution surface (#1939)', () => {
         localTools: ['create_tag'],
       }),
     ).toEqual(['todos']);
+  });
+});
+
+describe('out-of-tree verify execution', () => {
+  const base = claimedReview('review', HOSTED_REPO);
+  const verify: ClaimedStep = {
+    ...base,
+    step: { ...base.step, kind: 'verify' },
+    instruction: JSON.stringify({
+      kind: 'verify',
+      expectedHeadSha: 'abc123',
+      evidence: 'attachments',
+    }),
+  };
+
+  test('attachments verify restores the start checkpoint, never commits or pushes, and reports the start head', async () => {
+    const { calls, client } = await setup(verify, { reused: false });
+    expect(calls).toContain('restoreCheckpoint:abc123');
+    expect(calls).not.toContain('commitAll');
+    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
+    expect(client.doneBodies[0]?.body).toMatchObject({ commit: 'abc123', hasChanges: false });
+  });
+
+  test('real worktree uploads evidence before discarding agent commits and scratch files', async () => {
+    const root = testTempDir('cairn-verify-worktree-');
+    const origin = join(root, 'origin.git');
+    const seed = join(root, 'seed');
+    const env = commitEnv({ name: 'test-agent', email: 'test@example.com' });
+    await runGitOk(['init', '--bare', '--initial-branch=main', origin]);
+    await runGitOk(['clone', origin, seed]);
+    writeFileSync(join(seed, 'delivery.txt'), 'delivered\n');
+    await runGitOk(['add', 'delivery.txt'], { cwd: seed });
+    await runGitOk(['commit', '-m', 'seed'], { cwd: seed, env });
+    await runGitOk(['push', 'origin', 'main'], { cwd: seed });
+    const startHead = (await runGitOk(['rev-parse', 'HEAD'], { cwd: seed })).trim();
+    const workspace = new WorkspaceManager({ logger: captureLogger() });
+    let checkout = '';
+    let agentHead: string | null = null;
+    const claim: ClaimedStep = {
+      ...verify,
+      project: { id: 'p1', name: 'demo', repo: { kind: 'hosted', cloneUrl: origin } },
+      instruction: JSON.stringify({
+        kind: 'verify',
+        expectedHeadSha: startHead,
+        evidence: 'attachments',
+      }),
+      remoteTools: [{ name: 'attach_file', description: 'Attach verification evidence' }],
+    };
+    const { client } = await setupWithBackend(claim, { workspace }, (captured) => ({
+      ...capturingBackend(captured),
+      async createSession(opts) {
+        checkout = opts.cwd;
+        expect(opts.prompt).not.toContain('工作分支注记');
+        mkdirSync(join(checkout, '.cairn-verify'), { recursive: true });
+        writeFileSync(join(checkout, '.cairn-verify/proof.txt'), 'checked delivery\n');
+        await opts.executeRemoteTool?.('attach_file', { path: '.cairn-verify/proof.txt' });
+        writeFileSync(join(checkout, 'delivery.txt'), 'agent modification\n');
+        await runGitOk(['add', 'delivery.txt'], { cwd: checkout });
+        await runGitOk(['commit', '-m', 'unwanted verifier commit'], { cwd: checkout, env });
+        agentHead = await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout });
+        return {
+          sessionId: 'verify-real-git',
+          events: (async function* () {
+            yield {
+              type: 'message_end',
+              message: {
+                role: 'assistant',
+                content: JSON.stringify({
+                  passed: true,
+                  conclusion: 'Checked delivery',
+                  evidence: [{ path: '.cairn-verify/proof.txt' }],
+                }),
+              },
+            } as const;
+            yield { type: 'done', usage: [] } as const;
+          })(),
+          async steer() {},
+          async stop() {},
+          usage: () => [],
+        };
+      },
+    }));
+    const runtime = {
+      startHead,
+      agentHead,
+      finalHead: await runGitOk(['rev-parse', 'HEAD'], { cwd: checkout }),
+      delivery: readFileSync(join(checkout, 'delivery.txt'), 'utf8'),
+      scratchPresent: existsSync(join(checkout, '.cairn-verify')),
+      worktreeStatus: await runGitOk(['status', '--porcelain'], { cwd: checkout }),
+      originHeads: await runGitOk(['show-ref', '--heads'], { cwd: origin }),
+      uploads: client.attachments.map((attachment) => ({
+        fileName: attachment.fileName,
+        content: Buffer.from(String(attachment.contentBase64), 'base64').toString('utf8'),
+      })),
+      done: client.doneBodies[0]?.body,
+    };
+    const evidenceDirectory = process.env.VERIFY_EVIDENCE_DIR;
+    if (evidenceDirectory !== undefined) {
+      mkdirSync(evidenceDirectory, { recursive: true });
+      writeFileSync(
+        join(evidenceDirectory, 'daemon-runtime.json'),
+        JSON.stringify(runtime, null, 2),
+      );
+    }
+    expect(client.attachments).toEqual([
+      {
+        fileName: 'proof.txt',
+        contentBase64: Buffer.from('checked delivery\n').toString('base64'),
+      },
+    ]);
+    expect(runtime.delivery).toBe('delivered\n');
+    expect(runtime.scratchPresent).toBe(false);
+    expect(runtime.finalHead).toBe(startHead);
+    expect(runtime.worktreeStatus).toBe('');
+    expect(runtime.originHeads).toBe(`${startHead} refs/heads/main`);
+    expect(client.doneBodies[0]?.body).toMatchObject({
+      status: 'success',
+      commit: startHead,
+      hasChanges: false,
+      verifyVerdict: { passed: true },
+    });
+  });
+
+  test('attachments verify fails closed when restoring its checkpoint fails', async () => {
+    const { calls, client } = await setup(verify, { rewindError: 'restore failed' });
+    expect(calls).not.toContain('commitAll');
+    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+  });
+
+  test('attachments verify cannot start an agent without a restorable head', async () => {
+    const { calls, client, captured } = await setup(verify, { head: null, reused: false });
+    expect(captured).toHaveLength(0);
+    expect(calls).not.toContain('commitAll');
+    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+  });
+
+  test('attachments verify rewinds after an agent error and reports the original head', async () => {
+    const { calls, client } = await setupWithBackend(verify, { reused: false }, (captured) =>
+      scriptedBackend(captured, [
+        { type: 'error', error: { message: 'verification failed', retryable: false } },
+      ]),
+    );
+    expect(calls).toContain('restoreCheckpoint:abc123');
+    expect(calls).not.toContain('commitAll');
+    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
+    expect(client.doneBodies[0]?.body).toMatchObject({
+      status: 'failed',
+      commit: 'abc123',
+      hasChanges: false,
+    });
+  });
+
+  test('attachments verify rewinds even when opening the session throws', async () => {
+    const { calls, client } = await setupWithBackend(verify, { reused: false }, (captured) => ({
+      ...capturingBackend(captured),
+      async createSession() {
+        throw new Error('session could not start');
+      },
+    }));
+    expect(calls).toContain('restoreCheckpoint:abc123');
+    expect(calls).not.toContain('commitAll');
+    expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+  });
+
+  test.each([false, true])(
+    'attachments verify rewinds on stop with discard=%s',
+    async (discard) => {
+      const { calls, client } = await setup(verify, {
+        reused: false,
+        run: { stopRequest: { discard } },
+      });
+      expect(calls).toContain('restoreCheckpoint:abc123');
+      expect(calls).not.toContain('commitAll');
+      expect(calls.some((call) => call.startsWith('push:'))).toBe(false);
+      expect(client.doneBodies[0]?.body).toMatchObject({
+        status: 'stopped',
+        commit: 'abc123',
+        hasChanges: false,
+      });
+    },
+  );
+
+  test('repository verify retains the existing commit and push path', async () => {
+    const { calls } = await setup({
+      ...verify,
+      instruction: JSON.stringify({ kind: 'verify', expectedHeadSha: 'abc123' }),
+    });
+    expect(calls).toContain('commitAll');
+    expect(calls.some((call) => call.startsWith('push:'))).toBe(true);
   });
 });

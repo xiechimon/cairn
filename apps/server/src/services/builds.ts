@@ -1233,17 +1233,33 @@ export function maybeEnqueueVerifyStep(
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined) return;
   if (githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (projectRow === undefined) return;
   const planRow = latestPlanRow(deps, buildId);
-  const prompt = buildVerifyStepPrompt({
-    ticketRef: ticketRefOf(todoRow),
-    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
-    planText: planRow?.content ?? '',
-    verificationItems: planVerificationItems(planRow?.content ?? ''),
-    pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
-    expectedHeadSha,
+  deps.db.transaction(() => {
+    deps.db
+      .update(build)
+      .set({ evidenceStore: projectRow.evidenceStore })
+      .where(and(eq(build.id, buildId), isNull(build.evidenceStore)))
+      .run();
+    const snapshot = deps.db
+      .select({ evidenceStore: build.evidenceStore })
+      .from(build)
+      .where(eq(build.id, buildId))
+      .get();
+    if (snapshot?.evidenceStore == null) throw new Error('Verify evidence snapshot unavailable');
+    const prompt = buildVerifyStepPrompt({
+      ticketRef: ticketRefOf(todoRow),
+      taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
+      planText: planRow?.content ?? '',
+      verificationItems: planVerificationItems(planRow?.content ?? ''),
+      pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+      expectedHeadSha,
+      evidenceStore: snapshot.evidenceStore,
+    });
+    insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
+    enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
   });
-  insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
-  enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
 }
 
 const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
