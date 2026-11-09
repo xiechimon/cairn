@@ -1,22 +1,15 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import {
-  createOtlpSender,
-  OTLP_SPAN_KIND,
-  OTLP_STATUS_ERROR,
   type OtlpTarget,
   OtlpTargetConfigError,
-  otlpAttributes,
-  otlpNanos,
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
   otlpTraceIdOfStep,
   otlpTraceIdOfTurn,
-  otlpTraceparent,
-  otlpTracesRequest,
   parseOtlpTarget,
-  postOtlpTraces,
   stepOtelContext,
+  traceparentFor,
 } from '../src/otel.js';
 
 describe('deterministic trace and span ids (same derivation as trajectory packs)', () => {
@@ -34,7 +27,7 @@ describe('deterministic trace and span ids (same derivation as trajectory packs)
   });
 
   test('traceparent carries trace id, step span id and sampled flag', () => {
-    expect(otlpTraceparent('c8e7752b66c5938fc686748fdc429fb0', '68de601387c7a961')).toBe(
+    expect(traceparentFor('c8e7752b66c5938fc686748fdc429fb0', '68de601387c7a961')).toBe(
       '00-c8e7752b66c5938fc686748fdc429fb0-68de601387c7a961-01',
     );
   });
@@ -92,7 +85,7 @@ describe('parseOtlpTarget', () => {
 });
 
 describe('stepOtelContext', () => {
-  test('derives ids and exposes both raw traces URL and SDK exporter forms', () => {
+  test('derives ids and exposes only the configured traces target', () => {
     const target = parseOtlpTarget({
       CAIRN_OTEL_ENDPOINT: 'http://pk:sk@127.0.0.1:3000/api/public/otel',
       CAIRN_OTEL_HEADERS: 'x-langfuse-ingestion-version=4',
@@ -101,93 +94,8 @@ describe('stepOtelContext', () => {
     expect(ctx.traceId).toBe('c8e7752b66c5938fc686748fdc429fb0');
     expect(ctx.stepSpanId).toBe('68de601387c7a961');
     expect(ctx.tracesUrl).toBe('http://127.0.0.1:3000/api/public/otel/v1/traces');
-    expect(ctx.exporterEndpoint).toBe('http://127.0.0.1:3000/api/public/otel');
-    expect(ctx.exporterHeaders).toContain('x-langfuse-ingestion-version=4');
-    expect(ctx.exporterHeaders).toContain(
-      `authorization=Basic ${Buffer.from('pk:sk').toString('base64')}`,
-    );
-  });
-});
-
-describe('OTLP wire encoding', () => {
-  test('encodes attribute value kinds', () => {
-    expect(
-      otlpAttributes({
-        s: 'text',
-        i: 42,
-        d: 1.5,
-        b: true,
-        list: ['a', 'b'],
-        absent: undefined,
-      }),
-    ).toEqual([
-      { key: 's', value: { stringValue: 'text' } },
-      { key: 'i', value: { intValue: '42' } },
-      { key: 'd', value: { doubleValue: 1.5 } },
-      { key: 'b', value: { boolValue: true } },
-      {
-        key: 'list',
-        value: { arrayValue: { values: [{ stringValue: 'a' }, { stringValue: 'b' }] } },
-      },
-    ]);
-  });
-
-  test('converts epoch milliseconds to unix nanos', () => {
-    expect(otlpNanos(1_700_000_000_123)).toBe('1700000000123000000');
-  });
-
-  test('builds a resourceSpans envelope', () => {
-    const request = otlpTracesRequest({ 'service.name': 'cairn' }, 'cairn.daemon', [
-      {
-        traceId: 'c8e7752b66c5938fc686748fdc429fb0',
-        spanId: '68de601387c7a961',
-        name: 'step plan',
-        kind: OTLP_SPAN_KIND.internal,
-        startTimeUnixNano: '1',
-        endTimeUnixNano: '2',
-        attributes: [],
-      },
-    ]);
-    expect(request.resourceSpans).toHaveLength(1);
-    expect(request.resourceSpans[0]?.resource.attributes).toEqual([
-      { key: 'service.name', value: { stringValue: 'cairn' } },
-    ]);
-    expect(request.resourceSpans[0]?.scopeSpans[0]?.scope.name).toBe('cairn.daemon');
-    expect(request.resourceSpans[0]?.scopeSpans[0]?.spans[0]?.name).toBe('step plan');
-    expect(OTLP_STATUS_ERROR).toBe(2);
-  });
-});
-
-describe('postOtlpTraces', () => {
-  test('posts JSON to the traces URL with configured headers', async () => {
-    const seen: { url: string; init: RequestInit }[] = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, init: RequestInit) => {
-        seen.push({ url: String(url), init });
-        return new Response('{}', { status: 200 });
-      }),
-    );
-    const target = parseOtlpTarget({
-      CAIRN_OTEL_ENDPOINT: 'http://pk:sk@127.0.0.1:3000/api/public/otel',
-    });
-    await postOtlpTraces(target as OtlpTarget, { resourceSpans: [] });
-    expect(seen).toHaveLength(1);
-    const sentHeaders = (seen[0]?.init.headers ?? {}) as Record<string, string>;
-    expect(seen[0]?.url).toBe('http://127.0.0.1:3000/api/public/otel/v1/traces');
-    expect(sentHeaders.authorization).toBe(`Basic ${Buffer.from('pk:sk').toString('base64')}`);
-    expect(sentHeaders['content-type']).toBe('application/json');
-  });
-
-  test('throws when the endpoint replies non-2xx', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('nope', { status: 500 })),
-    );
-    const target = parseOtlpTarget({ CAIRN_OTEL_ENDPOINT: 'http://127.0.0.1:9/otel' });
-    await expect(postOtlpTraces(target as OtlpTarget, { resourceSpans: [] })).rejects.toThrow(
-      'HTTP 500',
-    );
+    expect(ctx.headers['x-langfuse-ingestion-version']).toBe('4');
+    expect(ctx.headers.authorization).toBe(`Basic ${Buffer.from('pk:sk').toString('base64')}`);
   });
 });
 
@@ -200,48 +108,5 @@ describe('turn trace ids', () => {
       otlpTraceIdOfBuild('b1'),
     );
     expect(otlpTraceIdOfTurn('s1')).not.toBe(otlpTraceIdOfTurn('s2'));
-  });
-});
-
-describe('createOtlpSender', () => {
-  const target: OtlpTarget = { url: new URL('http://127.0.0.1:1/v1/traces'), headers: {} };
-  const request = otlpTracesRequest({ 'service.name': 'cairn' }, 'test', []);
-
-  test('bounds in-flight and queued exports and drops the overflow without throwing', async () => {
-    const release: (() => void)[] = [];
-    const fetchStub = vi.fn(
-      () =>
-        new Promise<Response>((resolve) => {
-          release.push(() => resolve(new Response('{}', { status: 200 })));
-        }),
-    );
-    vi.stubGlobal('fetch', fetchStub);
-    const sender = createOtlpSender({ concurrency: 1, queue: 2, timeoutMs: 1000 });
-    const accepted = [1, 2, 3, 4, 5].map(() => sender.send(target, request));
-    expect(accepted).toEqual([true, true, true, false, false]);
-    expect(sender.dropped()).toBe(2);
-    expect(fetchStub).toHaveBeenCalledTimes(1);
-    release.shift()?.();
-    await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(2));
-    vi.unstubAllGlobals();
-  });
-
-  test('a collector that never answers is cut off by the timeout and frees its slot', async () => {
-    const fetchStub = vi.fn(
-      (_url: unknown, init: RequestInit) =>
-        new Promise<Response>((_resolve, reject) => {
-          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
-        }),
-    );
-    vi.stubGlobal('fetch', fetchStub);
-    const failures: unknown[] = [];
-    const sender = createOtlpSender({ concurrency: 1, queue: 4, timeoutMs: 20 }, (e) =>
-      failures.push(e),
-    );
-    sender.send(target, request);
-    sender.send(target, request);
-    await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() => expect(failures).toHaveLength(2));
-    vi.unstubAllGlobals();
   });
 });
