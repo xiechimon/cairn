@@ -3965,6 +3965,25 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
     {
       "additionalProperties": false,
       "properties": {
+        "conversationId": {
+          "type": "string",
+        },
+        "deliveredQueue": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string",
+            },
+            "messageId": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "conversationId",
+            "messageId",
+          ],
+          "type": "object",
+        },
         "message": {
           "additionalProperties": {},
           "properties": {
