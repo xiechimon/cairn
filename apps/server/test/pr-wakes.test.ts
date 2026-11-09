@@ -857,7 +857,7 @@ test.each(['claimed', 'done'] as const)(
       { holdMs: 0 },
     );
     f.s.db.update(stepTable).set({ status }).run();
-    f.s.db.update(todoTable).set({ phase: 'review' }).run();
+    f.s.db.update(todoTable).set({ phase: 'needs_input' }).run();
     const before = readWorkerQuestion(f.s.db, f.t.buildId, 'parked-question');
     f.fail(1);
     f.comment(1);
@@ -866,10 +866,7 @@ test.each(['claimed', 'done'] as const)(
     expect(rows(f.s)[0]?.wakeRounds).toBe(0);
     expect(f.steps()).toHaveLength(1);
     expect(f.s.db.select().from(steerPending).get()).toBeUndefined();
-    expect(f.s.db.select().from(todoTable).get()).toMatchObject({
-      phase: 'review',
-      awaitingReply: true,
-    });
+    expect(f.s.db.select().from(todoTable).get()).toMatchObject({ phase: 'needs_input' });
     expect(readWorkerQuestion(f.s.db, f.t.buildId, 'parked-question')).toEqual(before);
     expect(
       f.s.db

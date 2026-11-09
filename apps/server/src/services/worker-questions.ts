@@ -4,6 +4,7 @@ import {
   type MachineAskBody,
   type MachineAskResponse,
   redactSecrets,
+  type TaskDecision,
   THREAD_REPORT_LINE_MAX,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -15,9 +16,10 @@ import { postThreadReport } from './chief.js';
 import { ASK_PARK_MS } from './chief-questions.js';
 import { notifyTodoPhase } from './notifications.js';
 import { pushWorkerQuestion } from './thread-push.js';
-import { setTodoPhase, type TodoDeps } from './todos.js';
+import { getTodo, type TodoDeps } from './todos.js';
 import {
-  answerPendingWorkerQuestions,
+  answerWorkerQuestionsById,
+  pendingWorkerQuestions,
   readWorkerQuestion,
   updateWorkerQuestion,
   writeWorkerQuestion,
@@ -26,7 +28,7 @@ import {
 const POLL_MS = 400;
 
 export const WORKER_ASK_PARKED_REASON =
-  'The user has not answered yet. The question is parked on this thread and the answer will arrive as the next message on this same session. Say briefly that you are waiting for the answer, then end the turn; do not keep waiting.';
+  'No answer yet. The question is parked under its requestId; when it is answered, this same session resumes with the answer. Say briefly what you are waiting for, then end the turn; do not keep waiting.';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -94,8 +96,7 @@ function openQuestion(
   if (!writeWorkerQuestion(deps, row.buildId, body.requestId, content, askedAt)) {
     throw new HttpError(409, 'question request id belongs to another message');
   }
-  const todoRow = todoOfBuild(deps, row.buildId);
-  const record = setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: true });
+  const record = getTodo(deps, todoOfBuild(deps, row.buildId).id);
   if (record !== null) {
     notifyTodoPhase(deps, record, 'review', safeBody(body.questions[0]?.question));
     postThreadReport(deps, record, 'needs-you', questionReportLine(body.questions[0]?.question));
@@ -140,11 +141,59 @@ export async function askWorkerQuestion(
   }
 }
 
+export interface QuestionAnswer {
+  question: AskUserQuestionContent;
+  answer: string;
+  by: TaskDecision['by'];
+}
+
 export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string): void {
+  settleQuestionAnswers(
+    deps,
+    buildId,
+    pendingWorkerQuestions(deps.db, buildId).map((question) => ({
+      question,
+      answer: text,
+      by: 'person' as const,
+    })),
+  );
+}
+
+export function settleQuestionAnswers(
+  deps: TodoDeps,
+  buildId: string,
+  answers: readonly QuestionAnswer[],
+): void {
+  if (answers.length === 0) return;
+  for (const { question } of answers) {
+    if (readWorkerQuestion(deps.db, buildId, question.requestId)?.status !== 'pending') {
+      throw new HttpError(409, `requestId ${question.requestId} is no longer pending`);
+    }
+  }
+  for (const { question, answer } of answers) {
+    answerWorkerQuestionsById(deps, buildId, [question.requestId], answer);
+  }
   const todoRow = todoOfBuild(deps, buildId);
-  if (!todoRow.awaitingReply) return;
-  answerPendingWorkerQuestions(deps, buildId, text);
-  setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: false });
+  const at = nowMs();
+  deps.db
+    .update(todo)
+    .set({
+      decisions: [
+        ...todoRow.decisions,
+        ...answers.map(({ question, answer, by }) => ({
+          requestId: question.requestId,
+          question: question.questions.map((q) => q.question).join('\n'),
+          answer,
+          by,
+          at,
+        })),
+      ],
+      v: todoRow.v + 1,
+    })
+    .where(eq(todo.id, todoRow.id))
+    .run();
+  const record = getTodo(deps, todoRow.id);
+  if (record) deps.hub.publishTodoDoc(record.teamId, record);
 }
 
 export function recordThreadReportLine(deps: TodoDeps, row: StepRow, line: unknown): string {

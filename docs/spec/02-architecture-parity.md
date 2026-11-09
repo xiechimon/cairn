@@ -14,7 +14,7 @@
 | A2 | Tenant simplification | Single-user seed + auto-login; the `team` table and `teamId` path segments keep their shape with exactly one row forever; real-person invites not implemented |
 | A3 | Paid touchpoints | Pro walls / upgrade popups / machine-slot limits **not replicated at all**; the `plan` field shape is kept; the concurrency-cap concept is removed wholesale with #503 (machines claim work with no cap) |
 | A4 | repo hosting | Hosted = the server's own local bare repo (`git http-backend`); connected = GitHub (PR/CI surfaces); two shapes |
-| A5 | phase enum | **Nine-value authority**: `todo/queued/planning/confirm/building/review/done/failed/closed`; the board's 6 columns = a folded view |
+| A5 | phase enum | **Ten-value authority**: `todo/queued/planning/confirm/building/needs_input/review/done/failed/closed`; the board's 6 columns = a folded view |
 | A6 | Orchestration timeline | The step queue is held by the server, machines claim three step kinds; merge = `202 delegated` executed by the machine (github shape, when the build records a PR: the server merges the PR via GitHub REST, #1403 segment 2b); failures rerun only manually |
 | A7 | Chief | = a special Agent instance (its memory also shares the bound Agent); structural contract + strategy-layer measurement (r5: remoteTools 49-vocabulary/watch-wake/responsibility dispatch), see §4.3 |
 | A8 | memory | Minimal mechanism: per-Agent entry set (quota 100 + provenance) + per-step systemPrompt injection [inference kept] + the `save_memory` write tool (instruction-triggered + Agent discretion), see §4.4 |
@@ -85,7 +85,7 @@ Transcript upload = `upload-urls/<stepId>` presigned upload (r3 §1.6, observed 
 
 ## 4. Orchestration state machine and timeline (A5–A8)
 
-### 4.1 The nine-value phase authority (A5, **locked**)
+### 4.1 The ten-value phase authority (A5, **locked**)
 
 A todo is always in exactly one phase (the `[docs_concepts]` and `[docs_todos]` tables agree, r1 §7.4). Internal names take the docs ordering:
 
@@ -96,6 +96,7 @@ A todo is always in exactly one phase (the `[docs_concepts]` and `[docs_todos]` 
 | `planning` | reading the repo, writing the plan | `规划中` | docs table (this also substantiates r3's "planning not captured [same-family inference]") |
 | `confirm` | the plan is ready, waiting for you | `待确认` | docs table + the UI "confirm plan" button measured (r3 §3.4) |
 | `building` | making changes | `执行中` | docs table; r3's `exec` guess is voided, the correct name is `building` |
+| `needs_input` | a thread asked a question and waits for an answer routed by its requestId; the step has ended | `待处理` | cairn addition (task-stall redesign, #3512): replaces `review` plus the old `awaitingReply` flag, so `review` means only a deliverable waiting for acceptance |
 | `review` | changes ready, waiting for you | `待验收` | API measured; `待验收 ≡ 审核` are the same phase (CONTEXT.md ruling inherited) |
 | `done` | accepted, merged if you chose so | `已完成` (last 7 days) | API measured + changelog "Done (last 7 days)" |
 | `failed` | the run stopped on an error | pinned to the top of the `执行中` column | docs table + changelog original text (r1 §7.4) |

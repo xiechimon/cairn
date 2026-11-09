@@ -16,7 +16,7 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
       todo(1, 'confirm'),
       todo(2, 'review'),
       todo(3, 'failed'),
-      todo(4, 'building', true),
+      todo(4, 'needs_input'),
       todo(5, 'building'),
       todo(6, 'done'),
       todo(7, 'todo'),
