@@ -18,6 +18,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { SETTINGS_HREF } from './settings-href.js';
+import { type InFlightIds, startUnarchive } from './unarchive-requests.js';
 
 interface ArchivedProject {
   id: string;
@@ -32,7 +33,7 @@ export function ArchivedProjectsSection() {
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const mutations = useApiMutations(teamId);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [inFlight, setInFlight] = useState<InFlightIds>(() => new Set());
   const archived: ArchivedProject[] = (
     live
       ? (projectsQ.data ?? []).flatMap((p) =>
@@ -41,16 +42,10 @@ export function ArchivedProjectsSection() {
       : (fixture.archivedProjects ?? [])
   ).toSorted((a, b) => b.archivedAt - a.archivedAt);
   const now = Date.now();
-  const unarchive = (id: string) => {
-    setPendingId(id);
-    mutations.setProjectArchived.mutate(
-      { id, archived: false },
-      {
-        onError: (error) => toastError(t('无法取消归档项目。'), error),
-        onSettled: () => setPendingId(null),
-      },
+  const unarchive = (id: string) =>
+    startUnarchive(id, inFlight, setInFlight, mutations.setProjectArchived, (error) =>
+      toastError(t('无法取消归档项目。'), error),
     );
-  };
   return (
     <PageShell route={`${SETTINGS_HREF}/projects`} title={t('项目')} fixture={fixture}>
       <QueryBoundary
@@ -80,7 +75,7 @@ export function ArchivedProjectsSection() {
                 <Button
                   variant="outline"
                   data-testid="archived-project-unarchive"
-                  disabled={!live || pendingId === project.id}
+                  disabled={!live || inFlight.has(project.id)}
                   onClick={() => unarchive(project.id)}
                 >
                   {t('取消归档')}
