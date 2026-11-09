@@ -1,6 +1,6 @@
 # Memory in-place edit and the MEMORY.md shape
 
-Status: design draft, revision 2, for #3664. No product code is included.
+Status: approved for implementation, revision 2, for #3664 (plan decision D123). The owner approved the recommendations and the coordinator approved implementation on 2026-11-09. The PRs that touch the migration, `machine-claim.ts` or `machine-relay.ts` keep `coordinator-hold`. This page contains no product code.
 
 The owner decided on #3677 (2026-11-09):
 
@@ -127,6 +127,17 @@ Ours mirrors that, model-facing only:
 
 This change touches `machine-claim.ts` and `machine-relay.ts` (the owner-routed machine surface) and migrates persisted state, so coordinator review comes before code.
 
-## 8. Open questions for the owner
+## 8. Decisions (D123, 2026-11-09)
 
-1. Invalidated versions are kept for 90 days for `改回去` (recommended), then purged. ChatGPT states no window.
+1. **Superseded and invalidated versions** are kept for 90 days for `改回去`, then purged.
+2. **The memory-edit turn** sees memory and the owner's sentence only, never the main conversation.
+
+## 9. Implementation order
+
+Each PR branches off `main`, is red-first, and deletes what it replaces.
+
+1. Storage shape and the migration.
+2. Injection.
+3. Tools.
+4. The memory-edit side thread.
+5. The page input.
