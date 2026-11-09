@@ -510,8 +510,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
             c.req.param('stepId'),
             relay.name,
             relay.params,
-            undefined,
-            c.req.raw.signal,
           );
           return c.json({ text });
         }

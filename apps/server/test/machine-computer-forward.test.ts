@@ -630,6 +630,20 @@ describe('stop and finish', () => {
     expect(callRow(ctx.s, id).state).toBe('cancelled');
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
   });
+
+  test('without a relay signal a transport abort does not cancel the dispatched call', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const transport = new AbortController();
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('sleep 99'));
+    const id = computerCallId('step-a', 'tc-1');
+    transport.abort();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(callRow(ctx.s, id).state).toBe('dispatched');
+    ctx.s.machineHub.stopSignal(ctx.s.team.id, 'step-a');
+    expect((await result).text).toContain('cancelled');
+  });
 });
 
 describe('leases', () => {
