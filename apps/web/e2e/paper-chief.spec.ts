@@ -126,7 +126,7 @@ for (const theme of ['light', 'dark'] as const) {
     );
 
     await page.goto(SETTINGS('103'));
-    await expect(page.getByRole('heading', { name: '尚无记忆。' }), 'S3').toBeVisible();
+    await expect(page.getByRole('heading', { name: '自动记忆' }), 'S3').toBeVisible();
     await expect(page.getByTestId('chief-settings-col').locator('.settings-card'), 'S3').toHaveCount(0);
 
     await page.goto(SETTINGS('104'));

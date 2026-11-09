@@ -1,6 +1,6 @@
 import { PROJECT_INSTRUCTIONS_MAX, type ProjectRecord } from '@cairn/shared';
 import { useState } from 'react';
-import { useApiMutations } from '../api/hooks.js';
+import { usePatchProject } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Textarea } from '../components/ui/textarea.js';
@@ -17,7 +17,7 @@ export function ProjectInstructionsField({
   testId?: string;
 }) {
   const { t } = useI18n();
-  const mutations = useApiMutations(teamId);
+  const patchProject = usePatchProject(teamId);
   const [draft, setDraft] = useState<string | null>(null);
   const saved = project.instructions ?? '';
   const value = draft ?? saved;
@@ -39,13 +39,13 @@ export function ProjectInstructionsField({
         <Button
           className={DIALOG_PRIMARY_BUTTON}
           aria-label={t('保存项目说明')}
-          disabled={mutations.patchProject.isPending || value === saved}
+          disabled={patchProject.isPending || value === saved}
           onClick={() => {
             const next = value.trim();
-            mutations.patchProject.mutate(
+            patchProject.mutate(
               { id: project.id, body: { instructions: next === '' ? null : next } },
               {
-                onSuccess: () => setDraft(null),
+                onSuccess: () => setDraft((current) => (current === value ? null : current)),
                 onError: (error) => toastError(t('项目说明保存失败，请重试。'), error),
               },
             );

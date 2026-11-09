@@ -6,6 +6,7 @@ import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { ProjectIconPicker } from '../board/project-icon-picker.js';
+import { ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
 import { MemoryPanel } from '../chief/memory-panel.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
@@ -77,6 +78,7 @@ export function ProjectSettingsPage() {
         }
       : undefined
     : fixture.project;
+  const memoryProject = live ? wireProject : { id: id ?? '', name: project?.name ?? '' };
   const rowIds = live
     ? (projectsQ.data ?? []).map((p) => p.id)
     : Object.keys(fixture.projectNames ?? {});
@@ -138,11 +140,24 @@ export function ProjectSettingsPage() {
           <TabGroup tabs={TABS} tab={tab} onTab={setTab} />
         </div>
         {tab === 'memory' ? (
-          <MemoryPanel
-            live={live}
-            teamId={teamId}
-            project={wireProject ?? { id: id ?? '', name: project?.name ?? '' }}
-          />
+          live && memoryProject === undefined ? (
+            projectsQ.isError ? (
+              <ProjectsFailed
+                retrying={projectsQ.isFetching}
+                onRetry={() => void projectsQ.refetch()}
+              />
+            ) : projectsQ.data === undefined ? (
+              <div className="flex min-h-28">
+                <ProjectsLoading />
+              </div>
+            ) : (
+              <p role="alert" className="text-ui text-content-secondary">
+                {t('找不到这个项目')}
+              </p>
+            )
+          ) : (
+            <MemoryPanel live={live} teamId={teamId} project={memoryProject ?? null} />
+          )
         ) : (
           <>
             <SettingsCard className="prj-set-card">

@@ -57,6 +57,11 @@ type ListReply = 'ok' | 'fail' | 'hang';
 
 interface MockOptions {
   list?: ListReply;
+  projects?: ListReply;
+  archived?: boolean;
+  projectRefreshFails?: boolean;
+  patchGate?: Promise<void>;
+  refreshFails?: boolean;
   refresh?: Promise<void>;
   deleteFails?: boolean;
   memories?: typeof MEMORIES;
@@ -67,19 +72,32 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
   const deleted: string[] = [];
   const projectPatches: unknown[] = [];
   let listReply = options.list ?? 'ok';
+  let projectsReply = options.projects ?? 'ok';
+  const projects = PROJECTS.map(project => ({ ...project, instructions: '保留已保存的项目说明。' as string | null, archivedAt: options.archived ? NOV_8 : null }));
   await mockLive(
     page,
     { threads: [THREAD], messages: [], projects: PROJECTS },
     (p, route: Route, json) => {
+      if (p === '/api/projects') {
+        if (projectsReply === 'hang') return new Promise<void>(() => {});
+        if (projectsReply === 'fail' || (options.projectRefreshFails && projectPatches.length > 0)) return json({ error: 'boom' }, 500);
+        return json(projects);
+      }
       if (p.startsWith('/api/projects/') && route.request().method() === 'PATCH') {
         const body = route.request().postDataJSON() as { instructions: string | null };
         projectPatches.push(body);
-        return json({ ...PROJECTS.find((project) => p.endsWith(project.id)), ...body });
+        const index = projects.findIndex((project) => p.endsWith(project.id));
+        const project = projects[index];
+        if (project === undefined) return json({ error: 'missing project' }, 404);
+        const result = { ...project, ...body };
+        projects[index] = result;
+        return options.patchGate === undefined ? json(result) : options.patchGate.then(() => json(result));
       }
       if (p.endsWith('/branches')) {
         return json({ defaultBranch: 'main', branches: [{ name: 'main', isDefault: true }] });
       }
       if (p === '/api/teams/t1/memories') {
+        if (deleted.length > 0 && options.refreshFails) return json({ error: 'boom' }, 500);
         if (deleted.length > 0 && options.refresh !== undefined)
           return options.refresh.then(() => json(memories));
         if (listReply === 'hang') return new Promise<void>(() => {});
@@ -104,6 +122,7 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
     projectPatches,
     recover: () => {
       listReply = 'ok';
+      projectsReply = 'ok';
     },
   };
 }
@@ -142,7 +161,7 @@ test('Coordinator settings lists team memory only, with no scope headings or cou
   await openMemory(page);
   const list = page.getByTestId('memory-list');
   await expect(list).toBeVisible();
-  await expect(list.getByRole('heading')).toHaveText(['自动记忆', '每个 thread 都会读', '记忆文件']);
+  await expect(list.getByRole('heading')).toHaveText(['自动记忆', '可自动注入', '记忆文件']);
   await expect(page.getByRole('heading', { name: /团队|Field Notes|Harbor API/ })).toHaveCount(0);
   await expect(page.getByText('记忆', { exact: true })).toHaveCount(1);
   await expect(page.getByText(/\d+ \/ \d+/)).toHaveCount(0);
@@ -182,12 +201,12 @@ test('project settings has a 记忆 tab laid out like the Claude Code project me
   await expect(list.getByRole('heading')).toHaveText([
     '项目说明',
     '自动记忆',
-    '每个 thread 都会读',
+    '可自动注入',
     '记忆文件',
   ]);
   await expect(list.getByRole('heading', { name: 'Field Notes' })).toHaveCount(0);
-  await expect(list.getByRole('textbox', { name: '项目说明' })).toHaveValue('');
-  await expect(list.getByText('0 / 16,000')).toBeVisible();
+  await expect(list.getByRole('textbox', { name: '项目说明' })).toHaveValue('保留已保存的项目说明。');
+  await expect(list.getByText('11 / 16,000')).toBeVisible();
   await expect(list.getByRole('button', { name: /打开记忆/ })).toHaveText([/无障碍检查/, /发布交接/]);
   await expect(page.getByTestId('project-instructions-input')).toHaveCount(1);
   await settled(page);
@@ -344,33 +363,93 @@ test('on a phone each row is two lines and nothing scrolls sideways', async ({ p
 });
 
 for (const last of [false, true]) {
-  test(`delete waits for the refreshed list and focuses ${last ? 'the auto memory heading after the last row' : 'a surviving row'}`, async ({
-    page,
-  }) => {
+  test(`successful deletion settles despite a hanging refresh, last=${last}`, async ({ page }) => {
     let release = () => {};
-    const refresh = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const refresh = new Promise<void>(resolve => { release = resolve; });
     await openMemory(page, { memories: MEMORIES.slice(0, last ? 1 : 2), refresh });
     await memoryRow(page, '验证命令').click();
     await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
-    const confirm = page.getByRole('alertdialog');
-    const refreshed = page.waitForRequest(
-      (request) =>
-        request.method() === 'GET' && new URL(request.url()).pathname === '/api/teams/t1/memories',
-    );
-    await confirm.getByRole('button', { name: '删除记忆' }).click();
+    const refreshed = page.waitForRequest(request => request.method() === 'GET' && new URL(request.url()).pathname === '/api/teams/t1/memories');
+    await page.getByRole('alertdialog').getByRole('button', { name: '删除记忆' }).click();
     await refreshed;
     try {
-      await expect(confirm.getByRole('button', { name: '正在删除…' })).toBeVisible();
-    } finally {
-      release();
-    }
-    await expect(confirm).toBeHidden();
+      await expect(page.getByRole('alertdialog')).toBeHidden();
+      await expect(memoryRow(page, '验证命令')).toHaveCount(0);
+      await settled(page);
+      await expect(last ? page.getByRole('heading', { name: '自动记忆' }) : memoryRow(page, '评审交接')).toBeFocused();
+    } finally { release(); }
+  });
+
+  test(`a failed post-delete refresh cannot restore a deleted row, last=${last}`, async ({ page }) => {
+    const { deleted } = await openMemory(page, { memories: MEMORIES.slice(0, last ? 1 : 2), refreshFails: true });
+    await memoryRow(page, '验证命令').click();
+    await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
+    const failed = page.waitForResponse(response => response.request().method() === 'GET' && new URL(response.url()).pathname === '/api/teams/t1/memories' && response.status() === 500);
+    await page.getByRole('alertdialog').getByRole('button', { name: '删除记忆' }).click();
+    await failed;
+    await expect(page.getByRole('alertdialog')).toBeHidden();
     await expect(memoryRow(page, '验证命令')).toHaveCount(0);
     await settled(page);
-    await expect(
-      last ? page.getByRole('heading', { name: '自动记忆' }) : memoryRow(page, '评审交接'),
-    ).toBeFocused();
+    await expect(last ? page.getByRole('heading', { name: '自动记忆' }) : memoryRow(page, '评审交接')).toBeFocused();
+    expect(deleted).toEqual(['m-verify']);
   });
 }
+
+for (const projects of ['hang', 'fail'] as const) {
+  test(`project instructions wait for the real project when lookup is ${projects}`, async ({ page }) => {
+    const control = await openProjectMemory(page, { projects });
+    if (projects === 'fail') await expect(page.getByRole('heading', { name: '项目没能加载' })).toBeVisible({ timeout: 15000 });
+    else await expect(page.getByLabel('正在加载项目').last()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: '项目说明' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '保存项目说明' })).toHaveCount(0);
+    if (projects === 'fail') {
+      control.recover();
+      await page.getByTestId('project-load-error').getByRole('button', { name: '重试' }).click();
+      await expect(page.getByRole('textbox', { name: '项目说明' })).toHaveValue('保留已保存的项目说明。');
+    }
+  });
+}
+
+test('team memory does not depend on project lookup or claim a removed project', async ({ page }) => {
+  await openMemory(page, { projects: 'hang' });
+  await expect(memoryRow(page, '验证命令')).toBeVisible();
+  await expect(page.getByText('已移除的项目')).toHaveCount(0);
+});
+
+test('an archived project keeps its instructions, memory and scope name', async ({ page }) => {
+  await openProjectMemory(page, { archived: true });
+  await expect(page.getByRole('textbox', { name: '项目说明' })).toHaveValue('保留已保存的项目说明。');
+  await memoryRow(page, '无障碍检查').click();
+  await expect(page.getByRole('dialog').getByText('Field Notes · 核心')).toBeVisible();
+  await expect(page.getByText('已移除的项目')).toHaveCount(0);
+});
+
+test('saved instructions survive a failed projects refresh and a tab remount', async ({ page }) => {
+  await openProjectMemory(page, { projectRefreshFails: true });
+  const input = page.getByRole('textbox', { name: '项目说明' });
+  await input.fill('  保存后仍然显示。  ');
+  const failed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/projects' && response.status() === 500);
+  await page.getByRole('button', { name: '保存项目说明' }).click();
+  await failed;
+  await expect(input).toHaveValue('保存后仍然显示。');
+  await expect(page.getByRole('button', { name: '保存项目说明' })).toBeDisabled();
+  await page.getByRole('tab', { name: '基本信息' }).click();
+  await page.getByRole('tab', { name: '记忆' }).click();
+  await expect(input).toHaveValue('保存后仍然显示。');
+});
+
+
+test('edits made while instructions are saving remain a draft', async ({ page }) => {
+  let release = () => {};
+  const patchGate = new Promise<void>(resolve => { release = resolve; });
+  await openProjectMemory(page, { patchGate });
+  const input = page.getByRole('textbox', { name: '项目说明' });
+  await input.fill('本次保存的内容。');
+  const pending = page.waitForRequest(request => request.method() === 'PATCH');
+  await page.getByRole('button', { name: '保存项目说明' }).click();
+  await pending;
+  await input.fill('保存期间补充的草稿。');
+  release();
+  await expect(page.getByRole('button', { name: '保存项目说明' })).toBeEnabled();
+  await expect(input).toHaveValue('保存期间补充的草稿。');
+});

@@ -1165,7 +1165,7 @@ export const EN: Record<string, string> = {
   'Coordinator 还没有记下团队笔记。': 'The Coordinator has not written team notes yet.',
   'Coordinator 还没有在这个项目里记下笔记。':
     'The Coordinator has not written notes in this project yet.',
-  '每个 thread 都会读': 'Read every thread',
+  可自动注入: 'Eligible for automatic injection',
   记忆文件: 'Memory files',
   '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
   正在加载记忆: 'Loading memories',

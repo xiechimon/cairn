@@ -48,7 +48,6 @@ export function MemoryPanel({
   const { injected, lookup } = memoriesByLayer(memories, project?.id ?? null);
   const open = [...injected, ...lookup].find((memory) => memory.id === openId) ?? null;
   const deleting = mutations.deleteMemory;
-  const deletePending = deleting.isPending || (deleting.isSuccess && memoriesQ.isFetching);
   const scopeLabel = project?.name ?? t('团队');
   const layerLabel = (memory: MemoryRecord) =>
     isAutoInjected(memory.layer) ? t('核心') : t('可检索 · 不自动注入');
@@ -58,12 +57,11 @@ export function MemoryPanel({
     setConfirming(true);
   };
   const confirmDelete = () => {
-    if (open === null || deletePending) return;
+    if (open === null || deleting.isPending) return;
     deleting.mutate(
       { memoryId: open.id },
       {
-        onSuccess: async () => {
-          await memoriesQ.refetch({ cancelRefetch: false });
+        onSuccess: () => {
           setConfirming(false);
           setOpenId(null);
         },
@@ -147,7 +145,7 @@ export function MemoryPanel({
     }
     return (
       <>
-        {rows(t('每个 thread 都会读'), injected)}
+        {rows(t('可自动注入'), injected)}
         {rows(t('记忆文件'), lookup)}
       </>
     );
@@ -165,6 +163,7 @@ export function MemoryPanel({
           </p>
           <div className="mt-3">
             <ProjectInstructionsField
+              key={project.id}
               project={project}
               teamId={teamId}
               testId="project-instructions-input"
@@ -245,22 +244,20 @@ export function MemoryPanel({
         finalFocus={() => {
           if (open !== null) return true;
           return (
-            (memoriesQ.isFetching || memoriesQ.isError
-              ? null
-              : listRef.current?.querySelector<HTMLElement>('[data-slot="memory-row"]')) ??
+            listRef.current?.querySelector<HTMLElement>('[data-slot="memory-row"]') ??
             autoHeadingRef.current
           );
         }}
         onClose={() => {
-          if (!deletePending) setConfirming(false);
+          if (!deleting.isPending) setConfirming(false);
         }}
         footer={
           <AlertDialogActions
             cancelLabel={t('取消')}
-            confirmLabel={deletePending ? t('正在删除…') : t('删除记忆')}
-            confirmDisabled={deletePending}
+            confirmLabel={deleting.isPending ? t('正在删除…') : t('删除记忆')}
+            confirmDisabled={deleting.isPending}
             onCancel={() => {
-              if (!deletePending) setConfirming(false);
+              if (!deleting.isPending) setConfirming(false);
             }}
             onConfirm={confirmDelete}
           />
