@@ -1757,10 +1757,20 @@ test.each(['open', 'network', 'malformed'] as const)(
     expect(w.fake.puts()).toHaveLength(0);
     expect(
       w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
-    ).toBe(true);
+    ).toBe(false);
     expectUntouched(w);
   },
 );
+
+test('a closed GitHub marker resumes the merge that an open marker refused', async () => {
+  const w = makeWorld();
+  w.fake.markerAnswer = { status: 200, body: [{ number: 7 }] };
+  await refusal(requestMerge(w.deps, w.buildId));
+  w.fake.markerAnswer = { status: 200, body: [] };
+  expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+  expect(w.fake.puts()).toHaveLength(1);
+  expect(w.phase()).toBe('done');
+});
 
 test('#1405 a card closed during the uncached marker read cannot merge', async () => {
   const w = makeWorld();

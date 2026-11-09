@@ -911,6 +911,26 @@ test('an open GitHub marker blocks server readiness with autonomy-paused', async
   expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('autonomy-paused');
 });
 
+test('closing the GitHub marker lifts autonomy-paused from server readiness', async () => {
+  const { s, buildId } = await world();
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, login: 'owner', accessToken: 'token', scope: 'repo' },
+  );
+  let markers: { number: number }[] = [{ number: 7 }];
+  const deps = { ...s.svc, box: s.secretBox, githubFetch: async () => Response.json(markers) };
+  const now = Date.now();
+  const paused = await evaluateMergeGate(deps, buildId, { port: scriptedPort([]), now });
+  expect(paused?.blockers.map((blocker) => blocker.code)).toContain('autonomy-paused');
+  expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(false);
+  markers = [];
+  const resumed = await evaluateMergeGate(deps, buildId, {
+    port: scriptedPort([]),
+    now: now + 61_000,
+  });
+  expect(resumed?.blockers.map((blocker) => blocker.code)).not.toContain('autonomy-paused');
+});
+
 async function reviewPushWorld(policy: 'human' | 'autonomous') {
   const w = await world();
   const { s, buildId, stepId } = w;

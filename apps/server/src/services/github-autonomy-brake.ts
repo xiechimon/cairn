@@ -107,18 +107,18 @@ export async function pauseTeamGithubReposAutonomously(
   },
   teamId: string,
 ): Promise<void> {
-  deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, teamId)).run();
+  const latchTeam = () =>
+    deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, teamId)).run();
+  const targets = deps.db
+    .select()
+    .from(project)
+    .where(eq(project.teamId, teamId))
+    .all()
+    .map((row) => githubRepoOfProject(row));
   const repos = new Set(
-    deps.db
-      .select()
-      .from(project)
-      .where(eq(project.teamId, teamId))
-      .all()
-      .flatMap((row) => {
-        const repo = githubRepoOfProject(row);
-        return repo === null ? [] : [`${repo.owner}/${repo.repo}`];
-      }),
+    targets.flatMap((repo) => (repo === null ? [] : [`${repo.owner}/${repo.repo}`])),
   );
+  if (repos.size === 0 || targets.includes(null)) latchTeam();
   if (repos.size === 0) return;
   const results = await Promise.allSettled(
     [...repos].map(async (repo) => {
@@ -137,10 +137,12 @@ export async function pauseTeamGithubReposAutonomously(
       );
     }),
   );
-  if (results.some((result) => result.status === 'rejected'))
+  if (results.some((result) => result.status === 'rejected')) {
+    latchTeam();
     throw new Error(
       'Some GitHub pause markers could not be published; the local team remains paused',
     );
+  }
 }
 
 export async function readGithubAutonomyPause(

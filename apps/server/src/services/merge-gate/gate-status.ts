@@ -33,7 +33,7 @@ export function gateStatusFor(r: MergeReadiness): GateStatusValue {
     return { state: 'success', description: hex ? `ready, patch ${hex}` : 'ready' };
   }
   return {
-    state: r.blockers.some((b) => b.class !== 'transient') ? 'failure' : 'pending',
+    state: r.blockers.some((b) => b.class === 'human') ? 'failure' : 'pending',
     description: capped(
       `${first.label} (${first.code})${rest.length > 0 ? ` +${rest.length}` : ''}`,
     ),

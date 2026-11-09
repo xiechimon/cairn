@@ -160,12 +160,16 @@ export async function recoverRedAutonomousMain(
       .filter((check) => check.name === 'check' && check.app?.slug === 'github-actions')
       .sort((a, b) => b.id - a.id)[0];
     if (latest?.status !== 'completed' || latest.conclusion !== 'failure') continue;
-    deps.db
-      .update(team)
-      .set({ autonomyPaused: true })
-      .where(eq(team.id, row.admission.teamId))
-      .run();
-    await pauseGithubRepo(fetchImpl, token, repo, `Main check failed at ${main}.`);
+    await pauseGithubRepo(fetchImpl, token, repo, `Main check failed at ${main}.`).catch(
+      (err: unknown) => {
+        deps.db
+          .update(team)
+          .set({ autonomyPaused: true })
+          .where(eq(team.id, row.admission.teamId))
+          .run();
+        throw err;
+      },
+    );
     const pull = await githubPull(fetchImpl, token, target.owner, target.repo, row.build.prNumber);
     const reverted = pull?.pull?.mergeCommitSha;
     if (!reverted || !isFullSha(reverted)) continue;

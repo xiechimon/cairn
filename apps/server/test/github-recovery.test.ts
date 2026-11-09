@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { autonomousMergeAdmission, build, project, todo } from '../src/db/schema.js';
+import { autonomousMergeAdmission, build, project, team, todo } from '../src/db/schema.js';
 import type { AutonomousToken } from '../src/lib/github-token.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -163,6 +163,13 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
       await poller.sweep();
       await poller.sweep();
       expect(labelAttempts).toBe(2);
+      expect(writes).toContainEqual({
+        path: '/repos/owner/repo/issues',
+        body: expect.objectContaining({ labels: ['autonomy-paused'] }),
+      });
+      expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
+        false,
+      );
       expect(identities.length).toBeGreaterThan(0);
       expect(identities.every(Boolean)).toBe(true);
       if (reason !== null) {

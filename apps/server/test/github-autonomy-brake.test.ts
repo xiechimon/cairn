@@ -1,8 +1,15 @@
+import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
+import { project, team } from '../src/db/schema.js';
 import type { AutonomousToken } from '../src/lib/github-token.js';
-import { pauseGithubRepo, readGithubAutonomyPause } from '../src/services/github-autonomy-brake.js';
+import {
+  pauseGithubRepo,
+  pauseTeamGithubReposAutonomously,
+  readGithubAutonomyPause,
+} from '../src/services/github-autonomy-brake.js';
 import { recentRecoveryTarget } from '../src/services/github-recovery.js';
 import { newGateReadCache } from '../src/services/merge-gate/github-facts.js';
+import { bootServer } from './helpers.js';
 
 test('marker pause creates the label and issue once, and never closes a marker', async () => {
   const calls: { url: string; method: string; body: unknown }[] = [];
@@ -119,3 +126,44 @@ test('marker lookup paginates past labelled pull requests', async () => {
   ).toBe(true);
   expect(pages).toHaveLength(2);
 });
+
+test.each([
+  { name: 'every marker is published', repo: 'octo/alpha', publishes: true, latched: false },
+  { name: 'a marker cannot be published', repo: 'octo/alpha', publishes: false, latched: true },
+  { name: 'the team has no GitHub repository', repo: null, publishes: true, latched: true },
+])(
+  'an automatic pause writes the team flag only when $name',
+  async ({ repo, publishes, latched }) => {
+    const fetchImpl: typeof fetch = async (input, init) => {
+      if (!publishes && init?.method === 'POST') return new Response('', { status: 500 });
+      return String(input).includes('/issues?') ? Response.json([]) : Response.json({ number: 7 });
+    };
+    const s = bootServer({ githubFetch: fetchImpl });
+    try {
+      s.db
+        .insert(project)
+        .values({
+          id: 'brake-project',
+          teamId: s.team.id,
+          name: 'brake',
+          repoKind: repo === null ? 'local' : 'github',
+          githubRepo: repo,
+        })
+        .run();
+      await pauseTeamGithubReposAutonomously(
+        {
+          ...s.svc,
+          box: s.secretBox,
+          githubFetch: fetchImpl,
+          githubWriteTokenForRepo: async () => 'token' as AutonomousToken,
+        },
+        s.team.id,
+      ).catch(() => undefined);
+      expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
+        latched,
+      );
+    } finally {
+      s.dispose();
+    }
+  },
+);
