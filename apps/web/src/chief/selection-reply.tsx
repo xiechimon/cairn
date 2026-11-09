@@ -123,7 +123,7 @@ export function SelectionReply({
     };
   }, [enabled, containerRef]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (target === null) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || isEditable(event.target)) return;
