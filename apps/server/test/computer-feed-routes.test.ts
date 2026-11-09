@@ -163,7 +163,17 @@ describe('computer feed routes', () => {
 
   test('PATCH enables and disables browser tools on the owned computer', async () => {
     const s = boot();
-    addMachine(s, s.team.id, 'm1');
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'm1',
+        teamId: s.team.id,
+        name: 'name-m1',
+        online: true,
+        lastSeenAt: 1,
+        capabilities: { mcpServers: [], skills: [], browser: true },
+      })
+      .run();
     addComputer(s, s.team.id, 'c1', 'm1');
     const on = await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: true });
     expect(on.status).toBe(200);
@@ -196,6 +206,17 @@ describe('computer feed routes', () => {
         capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
       })
       .run();
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'm2',
+        teamId: s.team.id,
+        name: 'other',
+        online: true,
+        lastSeenAt: 1,
+        capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
+      })
+      .run();
     const created = await req(s.app, 'POST', '/api/computers', {
       machineId: 'm1',
       browserEnabled: true,
@@ -208,10 +229,10 @@ describe('computer feed routes', () => {
         machine: { id: 'm1', online: false },
       },
     });
-    const listed = await req(s.app, 'GET', '/api/computers');
-    expect(await listed.json()).toMatchObject({
-      computers: [{ browserEnabled: true, state: 'stopped', machine: { id: 'm1' } }],
-    });
+    expect(
+      (await req(s.app, 'POST', '/api/computers', { machineId: 'm2', browserEnabled: true }))
+        .status,
+    ).toBe(409);
     const again = await req(s.app, 'POST', '/api/computers', {
       machineId: 'm1',
       browserEnabled: false,
@@ -223,6 +244,29 @@ describe('computer feed routes', () => {
       (await req(s.app, 'POST', '/api/computers', { machineId: 'missing', browserEnabled: true }))
         .status,
     ).toBe(404);
+  });
+
+  test('POST and PATCH refuse enabling without explicit browser capability', async () => {
+    const s = boot();
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'm1',
+        teamId: s.team.id,
+        name: 'old-orb',
+        online: true,
+        lastSeenAt: 1,
+        capabilities: { mcpServers: [], skills: [], computer: true },
+      })
+      .run();
+    expect(
+      (await req(s.app, 'POST', '/api/computers', { machineId: 'm1', browserEnabled: true }))
+        .status,
+    ).toBe(404);
+    addComputer(s, s.team.id, 'c1', 'm1');
+    expect((await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: true })).status).toBe(
+      404,
+    );
   });
 
   test('another team computer and calls are never returned', async () => {

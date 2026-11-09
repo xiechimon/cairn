@@ -34,15 +34,21 @@ describe('machine computer capability badges', () => {
     expect(desktopControlInstalled(machine(), computer())).toBe(true);
   });
 
-  it('browser is installed from computer capability or a computer row', () => {
+  it('browser is installed only when the machine reports browser capability', () => {
     expect(browserCapabilityInstalled(machine(), null)).toBe(false);
     expect(
       browserCapabilityInstalled(
         machine({ capabilities: { mcpServers: [], skills: [], computer: true } }),
         null,
       ),
+    ).toBe(false);
+    expect(
+      browserCapabilityInstalled(
+        machine({ capabilities: { mcpServers: [], skills: [], browser: true } }),
+        null,
+      ),
     ).toBe(true);
-    expect(browserCapabilityInstalled(machine(), computer())).toBe(true);
+    expect(browserCapabilityInstalled(machine(), computer())).toBe(false);
   });
 
   it('desktop control is online only while the machine and computer can show a screen', () => {

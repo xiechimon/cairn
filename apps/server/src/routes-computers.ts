@@ -1,7 +1,7 @@
 import { computerEnsureBodySchema, computerPatchBodySchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { notFound, parseWith } from './lib/errors.js';
+import { conflict, notFound, parseWith } from './lib/errors.js';
 import { ownedPrivateComputer } from './services/computer-access.js';
 import {
   clampCommandsLimit,
@@ -18,15 +18,20 @@ export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/computers', async (c) => {
     const body = parseWith(computerEnsureBodySchema, await c.req.json(), 'body');
-    const computer = ensureComputerBrowserEnabled(
+    const result = ensureComputerBrowserEnabled(
       ctx.db,
       ctx.team.id,
       ctx.user.id,
       body.machineId,
       body.browserEnabled,
     );
-    if (!computer) throw notFound(`machine ${body.machineId}`);
-    return c.json({ computer });
+    if (!result.ok) {
+      if (result.reason === 'machine_mismatch') {
+        throw conflict('browser preference belongs to another machine for this Coordinator');
+      }
+      throw notFound(`machine ${body.machineId}`);
+    }
+    return c.json({ computer: result.computer });
   });
 
   app.patch('/api/computers/:id', async (c) => {

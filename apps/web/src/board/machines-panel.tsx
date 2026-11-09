@@ -190,12 +190,17 @@ function MachineCard({
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
-  const canToggleBrowser =
-    browserInstalled && teamId !== undefined && machine.id !== undefined && !browserBusy;
   const browserEnabled = computer?.browserEnabled === true;
+  const canToggleBrowser =
+    teamId !== undefined &&
+    machine.id !== undefined &&
+    !browserBusy &&
+    (browserInstalled || browserEnabled);
   const browserHint = browserInstalled
     ? t('让 agent 打开网页、点击和填表。')
-    : t('这台机器还不支持浏览器。');
+    : browserEnabled
+      ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
+      : t('这台机器还不支持浏览器。');
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -273,7 +278,9 @@ function MachineCard({
 
   const onBrowserToggle = (checked: boolean) => {
     const machineId = machine.id;
-    if (teamId === undefined || machineId === undefined || browserBusy || !browserInstalled) return;
+    if (teamId === undefined || machineId === undefined || browserBusy) return;
+    if (checked && !browserInstalled) return;
+    if (!checked && computer === null) return;
     const ownedTeamId = teamId;
     setBrowserBusy(true);
     const run =
