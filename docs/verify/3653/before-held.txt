@@ -1,0 +1,16 @@
+$ curl -s -X GET 'http://127.0.0.1:34221/api/todos/QlmhOWgtqm3Obn4-85p41'
+HTTP 200
+{"id":"QlmhOWgtqm3Obn4-85p41","teamId":"jyQeBs4uaZVbzv3SnUd1D","projectId":"Fveh9BhPK5EPkYgnRYht1","title":"Implement dependent task","spec":"Wait for the prerequisite.","phase":"todo","phaseAt":1794233397136,"archivedAt":null,"snoozedUntil":null,"snoozeMode":null,"seqNum":2,"orderIndex":1,"tagIds":[],"latestBuildId":null,"lastRunAt":null,"hasChanges":false,"hasPlan":false,"buildHistory":[],"sourceTodo":null,"blockedBy":null,"v":1,"createdBy":null,"ownerId":"oO72Kcr6DIu4UgIEiYN9R","sourceBuildId":"chief-oO72Kcr6DIu4UgIEiYN9R-jyQeBs4uaZVbzv3SnUd1D","sourceKind":"orchestration","sourceRef":"chief:evidence-jyQeBs4uaZVbzv3SnUd1D","output":"code","owner":null,"section":"up_next","quotaWait":null}
+
+$ curl -s -X GET 'http://127.0.0.1:43993/api/todos/XXqB8h_ALJcJhNUi9BtOk'
+HTTP 200
+{"id":"XXqB8h_ALJcJhNUi9BtOk","teamId":"Q_Zn_jsREjXJFUEt0HpCM","projectId":"2hiIe4fgsg-ko8kuBoK9j","title":"Implement dependent task","spec":"Wait for the prerequisite.","phase":"queued","phaseAt":1794233397164,"archivedAt":null,"snoozedUntil":null,"snoozeMode":null,"seqNum":2,"orderIndex":0,"tagIds":[],"latestBuildId":"01a1c0a4-efaa-77b0-aca6-795800e65dbb","lastRunAt":1794233397162,"hasChanges":false,"hasPlan":false,"buildHistory":[{"buildId":"01a1c0a4-efaa-77b0-aca6-795800e65dbb","createdAt":1794233397162}],"sourceTodo":null,"blockedBy":["wLWaSli3rqn1WZWNkSVGB"],"v":2,"createdBy":null,"ownerId":"2Bck4_RyQAeCYcRMPnjsN","sourceBuildId":"chief-2Bck4_RyQAeCYcRMPnjsN-Q_Zn_jsREjXJFUEt0HpCM","sourceKind":"orchestration","sourceRef":"chief:evidence-Q_Zn_jsREjXJFUEt0HpCM","output":"code","owner":null,"section":"working","waitingOn":{"on":"machine","retryAt":null},"quotaWait":null}
+rows before: [{"kind":"session","status":"pending","holdReason":"blocked-by"}]
+rows after:  [{"kind":"session","status":"pending","holdReason":"blocked-by"}]
+
+$ curl -s -X PATCH 'http://127.0.0.1:43993/api/todos/wLWaSli3rqn1WZWNkSVGB' -H 'content-type: application/json' -d '{"phase":"done"}'
+HTTP 200
+{"id":"wLWaSli3rqn1WZWNkSVGB","teamId":"Q_Zn_jsREjXJFUEt0HpCM","projectId":"2hiIe4fgsg-ko8kuBoK9j","title":"Approve prerequisite","spec":"Finish the prerequisite.","phase":"done","phaseAt":1794233397479,"archivedAt":null,"snoozedUntil":null,"snoozeMode":null,"seqNum":1,"orderIndex":0,"tagIds":[],"latestBuildId":"01a1c0a4-efa0-7aec-a986-c007e7906da6","lastRunAt":1794233397152,"hasChanges":false,"hasPlan":false,"buildHistory":[{"buildId":"01a1c0a4-efa0-7aec-a986-c007e7906da6","createdAt":1794233397152}],"sourceTodo":null,"blockedBy":null,"v":3,"createdBy":null,"ownerId":"2Bck4_RyQAeCYcRMPnjsN","sourceBuildId":"chief-2Bck4_RyQAeCYcRMPnjsN-Q_Zn_jsREjXJFUEt0HpCM","sourceKind":"orchestration","sourceRef":"chief:evidence-Q_Zn_jsREjXJFUEt0HpCM","output":"code","owner":null,"section":"resolved","verified":false,"quotaWait":null}
+rows before: [{"kind":"session","status":"pending","holdReason":"blocked-by"}]
+rows after:  [{"kind":"session","status":"pending","holdReason":"blocked-by"}]
+
