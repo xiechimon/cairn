@@ -1,0 +1,26 @@
+$ curl -s -X GET 'http://127.0.0.1:18792/api/server/deploy/lease'
+HTTP 404
+{"error":"Not found"}
+
+$ curl -s -X PUT 'http://127.0.0.1:18791/api/server/deploy/lease' -H 'content-type: application/json' -d '{"owner":"00000000-0000-4000-8000-000000000001","ttlMs":60000}'
+HTTP 200
+{"owner":"00000000-0000-4000-8000-000000000001","status":"draining","expiresAt":1794216646605}
+rows before: []
+rows after:  [{"owner":"00000000-0000-4000-8000-000000000001","status":"draining","expiresAt":1794216646605}]
+
+$ curl -s -X GET 'http://127.0.0.1:18791/api/server/deploy/lease'
+HTTP 200
+{"owner":"00000000-0000-4000-8000-000000000001","status":"draining","expiresAt":1794216646605}
+rows before: [{"owner":"00000000-0000-4000-8000-000000000001","status":"draining","expiresAt":1794216646605}]
+rows after:  [{"owner":"00000000-0000-4000-8000-000000000001","status":"draining","expiresAt":1794216646605}]
+
+$ curl -s -X DELETE 'http://127.0.0.1:18791/api/server/deploy/lease' -H 'content-type: application/json' -d '{"owner":"00000000-0000-4000-8000-000000000001"}'
+HTTP 200
+{"owner":"00000000-0000-4000-8000-000000000001","status":"accepting","expiresAt":0}
+rows before: [{"owner":"00000000-0000-4000-8000-000000000001","status":"draining","expiresAt":1794216646605}]
+rows after:  [{"owner":"00000000-0000-4000-8000-000000000001","status":"accepting","expiresAt":0}]
+
+$ curl -s -X GET 'http://127.0.0.1:18791/api/server/deploy/lease'
+HTTP 200
+{"owner":"00000000-0000-4000-8000-000000000001","status":"accepting","expiresAt":0}
+
