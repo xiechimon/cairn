@@ -260,8 +260,9 @@ export function selectColdMessageWindow(
     const message = body[i];
     if (message === undefined) continue;
     if (message.role === 'user' && isWakeOnlyUser(message) && i !== currentUserIndex) continue;
-    if (isPureToolCallAssistant(message)) continue;
-    if (message.role === 'toolResult') {
+    const historical = currentUserIndex < 0 || i < currentUserIndex;
+    if (historical && isPureToolCallAssistant(message)) continue;
+    if (historical && message.role === 'toolResult') {
       const owner = priorAssistant(body, i);
       if (owner !== undefined && isPureToolCallAssistant(owner)) continue;
     }

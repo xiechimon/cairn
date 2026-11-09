@@ -49,6 +49,29 @@ const tool = (name: string, text: string, timestamp = 1): ToolResultMessage => (
   timestamp,
 });
 
+const pureToolCall = (
+  id: string,
+  name: string,
+  args: { [key: string]: string | number | boolean | null },
+  timestamp = 1,
+): Message => ({
+  role: 'assistant',
+  content: [{ type: 'toolCall', id, name, arguments: args }],
+  api: 'anthropic-messages',
+  provider: 'anthropic',
+  model: 'm',
+  usage: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  },
+  stopReason: 'toolUse',
+  timestamp,
+});
+
 describe('isColdResume', () => {
   it('is warm when last turn is fresh with cache hits', () => {
     expect(
@@ -227,24 +250,8 @@ describe('selectColdMessageWindow', () => {
     expect(users.at(-1)).toContain('[history id: user-abc]');
   });
 
-  it('drops pure tool-call assistants and their tool results from the cold window', () => {
-    const pureTool: Message = {
-      role: 'assistant',
-      content: [{ type: 'toolCall', id: 'c1', name: 'bash', arguments: { command: 'ls' } }],
-      api: 'anthropic-messages',
-      provider: 'anthropic',
-      model: 'm',
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: 'toolUse',
-      timestamp: 2,
-    };
+  it('drops pure tool-call assistants and their tool results from completed historical exchanges', () => {
+    const pureTool = pureToolCall('c-hist', 'bash', { command: 'ls' }, 2);
     expect(isPureToolCallAssistant(pureTool)).toBe(true);
     const messages: Message[] = [
       user('u0', 1),
@@ -259,6 +266,53 @@ describe('selectColdMessageWindow', () => {
       'u0',
       'current',
     ]);
+  });
+
+  it('keeps pure tool-call assistants and results that belong to the active cold turn', () => {
+    const historical = pureToolCall('c-hist', 'bash', { command: 'ls' }, 2);
+    const active = pureToolCall('c-active', 'bash', { command: 'pwd' }, 5);
+    const messages: Message[] = [
+      user('u0', 1),
+      historical,
+      tool('bash', 'hist-noise', 3),
+      user('current', 4),
+      active,
+      tool('bash', 'active-result', 6),
+    ];
+    const out = selectColdMessageWindow(messages, 8);
+    expect(out.filter((message) => message.role === 'user').map(userText)).toEqual([
+      'u0',
+      'current',
+    ]);
+    const assistants = out.filter((message) => message.role === 'assistant');
+    expect(assistants).toHaveLength(1);
+    expect(isPureToolCallAssistant(assistants[0]!)).toBe(true);
+    expect(JSON.stringify(assistants[0])).toContain('c-active');
+    const results = out.filter((message) => message.role === 'toolResult');
+    expect(results).toHaveLength(1);
+    expect(toolResultChars(results[0]!)).toBe('active-result');
+  });
+
+  it('projectColdMessages preserves active-turn tool call and result on the next generation', () => {
+    const active = pureToolCall('c-active', 'todos', { projectId: 'p1' }, 3);
+    const messages: Message[] = [
+      user('old', 1),
+      assistant('done', 2),
+      user('resume billing', 3),
+      active,
+      tool('todos', '[{"id":"t1","title":"ship"}]', 4),
+    ];
+    const out = projectColdMessages(messages, { summaryHint: 'billing pause' });
+    expect(out.some((message) => userText(message).includes('<summary>'))).toBe(true);
+    expect(
+      out.some((message) => message.role === 'assistant' && isPureToolCallAssistant(message)),
+    ).toBe(true);
+    expect(
+      out.some(
+        (message) => message.role === 'toolResult' && toolResultChars(message).includes('ship'),
+      ),
+    ).toBe(true);
+    expect(out.some((message) => userText(message) === 'resume billing')).toBe(true);
   });
 });
 
