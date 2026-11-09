@@ -210,7 +210,7 @@ What cairn borrows:
    }
    ```
 
-   `decision` is one of `route`, `ask`, `answer` and `hold`. `blockedBy` lists edges between part indexes and is scored only after #3653 merges.
+   `decision` is one of `route`, `ask` and `answer`. The reviewed design removes the historical `hold` alias: both old no-dispatch reply outcomes normalize to `answer`; invalid or mixed effects remain unscored. `blockedBy` lists edges between part indexes and is scored only after #3653 merges.
 5. **World snapshot.** Replay needs the projects that existed at the time of the turn. Today the turn trace does not carry them (`实测`: no project list in the `coordinator turn` metadata). Each item's `input` therefore carries `projects: [{ name, description }]` and the optional `chip`, filled during curation. A small production change, a `cairn.projects` attribute on the turn root, would make this automatic (PR 4). `推断`
 6. **Seed set.** The 16 project-routing cases and the 20 chief-dispatch `hold` cases are imported once by ian as items tagged `metadata.origin = "synthetic-2026-11"`, so the first runs have coverage while harvested cases accumulate. The 44 stale `dispatch` cases are dropped. memory-regression is paused.
 
@@ -235,7 +235,7 @@ What cairn borrows:
   - It runs from the **ruler** (main) checkout, never from the PR's copy.
   - It waits until every item of both arms has every `routing.*` score, or a timeout passes, polling scores with VIEWER.
   - It reads `eval.template.version` per score and fails if the two arms were scored by different evaluator versions.
-  - It fails on missing or ungraded items, and on any item that passed in `baselineRun` and now fails beyond its repeat noise (k = 3).
+  - It fails on missing or ungraded items. The design supersedes the historical per-item regression proposal with one exact case-cluster sign test (alpha 0.05), using three repeats per arm and reporting its limited power; see design section 3.
   - It reports an aggregate pass rate with a Wilson 95% interval.
 - **Quota:** the expected turn count is asserted at the end. A quota or rate-limit stop exits as `incomplete` with no verdict. The trigger is the label `eval-coordinator` on PRs that touch the Coordinator prompt or tools, plus a weekly `schedule` run on main on the self-hosted `cairn-eval` runner.
 
