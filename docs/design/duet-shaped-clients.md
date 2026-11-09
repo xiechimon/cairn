@@ -109,7 +109,7 @@ The server computes one more field next to `owner`, `section`, in one function `
 | `up_next` | phase `todo` | `Up next` | ink glyph |
 | `working` | everything else open: `queued`, `planning`, `building`, a `needs_input` or `failed` task owned by the Coordinator, a `review` waiting on the merge queue | `Working`, then who is on it (`Coordinator is on it.` when `owner = 'coordinator'`, else the run phrase from `status-words.ts`) | 6px green dot only while a run is active |
 
-`section` is nullable on `TodoRecord`; clients drop `null` rows. The Tasks list reads `GET /api/todos?teamId=` (unarchived) plus the archived rows of the last 7 days, through one server query that returns both and computes `section` on each, so no client merges two lists. Today `listTodos` returns either unarchived or archived rows, never both (Read, `apps/server/src/services/todos.ts`, `filter.archived`); PR 2 adds the combined read. An archived task that never finished drops out of Tasks, as archiving means "stop showing me this". Inferred.
+`section` is nullable on `TodoRecord`; clients drop `null` rows. The Tasks list reads `GET /api/tasks?teamId=`. Its single `entries` list combines unarchived tasks, rows archived in the last 7 days and pending standalone Coordinator questions. Each entry has `kind` (`todo` or `question`) and `section`; question entries come first. Todo entries carry the complete `TodoRecord`; question entries carry `requestId`, `threadId`, `projectId`, the first question header as `title`, `createdAt` and the question content. No client merges lists. The existing `GET /api/todos` reads retain their array contract for callers outside Tasks (Read, `apps/server/src/routes-todos.ts`). An archived task that never finished drops out of Tasks, as archiving means "stop showing me this". Inferred.
 
 Read: `ownerOf` returns `owner` or `coordinator` with a reason from `question`, `confirm`, `review` (owner) or `question`, `failed`, `review` (Coordinator) (`apps/server/src/services/owner.ts`, `packages/shared/src/records/needs-you.ts`); phases are `todo`, `queued`, `planning`, `confirm`, `building`, `needs_input`, `review`, `done`, `failed`, `closed` (`packages/shared/src/phase.ts`).
 
@@ -308,13 +308,15 @@ The desktop borrows from Duet rather than copying it: it keeps the wide web layo
 
 ## 6. Order of small PRs
 
+Row 2 implementation: [#3586](https://github.com/xiechimon/cairn/pull/3586).
+
 Each PR is independent off `main` unless it says otherwise, and each ends with screenshots from a live verify stack.
 
 | # | PR | Area | Depends on |
 |---|---|---|---|
 | 1 | `docs`: update `mobile-information-architecture.md` to Chat and Tasks, `section`, drawer, deep links | docs | this document accepted |
 | 2 | `server`: `sectionOf` and a nullable `section` on `TodoRecord`; one Tasks read returning unarchived rows, rows archived in the last 7 days and pending standalone Coordinator questions; table test over phase, owner, reason, archive and age | server, shared | — |
-| 3 | `server`: `project.group` column; `projectId` written on owner messages sent from a project view and on task-card messages; test that a project filter returns them | server | — |
+| 3 | [#3581](https://github.com/xiechimon/cairn/pull/3581) `server`: `project.group` column; `projectId` written on owner messages sent from a project view and on task-card messages; test that a project filter returns them | server | — |
 | 4 | `web`: Tasks panel with Active and Up next, sections from `section`, badge on the toggle (lands the useful part of the a326b prototype) | web | 2 |
 | 5 | `web`: sidebar with Coordinator row, project dots, groups and `Move to group`; task rows removed from the sidebar | web | 3, 4 |
 | 6 | `web`: project lens on the Coordinator conversation, composer preset, task cards | web | 3 |

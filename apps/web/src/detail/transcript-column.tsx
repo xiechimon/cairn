@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import {
@@ -33,6 +34,8 @@ interface TranscriptColumnProps {
   running?: boolean;
   settled?: boolean;
   threadKey?: string;
+  hasEarlier?: boolean;
+  earlier?: EarlierPages;
 }
 
 export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptColumnProps>(
@@ -58,6 +61,8 @@ function TranscriptColumnInner({
   running,
   settled = true,
   threadKey,
+  hasEarlier = false,
+  earlier,
   handleRef,
 }: Omit<TranscriptColumnProps, 'autoScroll'> & {
   handleRef: React.ForwardedRef<TranscriptColumnHandle>;
@@ -67,16 +72,18 @@ function TranscriptColumnInner({
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const anchoredKey = useRef<string | undefined>(undefined);
+  const [openedKey, setOpenedKey] = useState<string | undefined>(undefined);
   const anchor = running === undefined || !settled ? null : openingAnchor(running, transcript);
   useEffect(() => {
     if (anchor === null || anchoredKey.current === threadKey) return;
     anchoredKey.current = threadKey;
     if (anchor === 'end') {
-      void scrollToEnd();
-      return;
+      scrollToEnd();
+    } else {
+      const bubbles = viewportRef.current?.querySelectorAll('[data-testid="user-bubble"]');
+      bubbles?.item(bubbles.length - 1)?.scrollIntoView({ block: 'start' });
     }
-    const bubbles = viewportRef.current?.querySelectorAll('[data-testid="user-bubble"]');
-    bubbles?.item(bubbles.length - 1)?.scrollIntoView({ block: 'start' });
+    setOpenedKey(threadKey);
   }, [anchor, threadKey, scrollToEnd]);
   return (
     <MessageScroller className={ROOT_CLS}>
@@ -100,6 +107,14 @@ function TranscriptColumnInner({
         <ArrowDown width={16} height={16} />
         <span className="sr-only">{t('滚动到最新')}</span>
       </JumpToLatestButton>
+      {earlier !== undefined && settled && (openedKey === threadKey || transcript.length === 0) && (
+        <EarlierLoader
+          earlier={earlier}
+          hasEarlier={hasEarlier}
+          rowCount={transcript.length}
+          viewportRef={viewportRef}
+        />
+      )}
     </MessageScroller>
   );
 }

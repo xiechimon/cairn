@@ -7,6 +7,7 @@ import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { Key, Monitor, Settings } from '../icons/index.js';
+import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { settingsHref } from '../settings/settings-href.js';
 import {
   coordinatorCanAnswer,
@@ -21,11 +22,7 @@ const CHIP_CLS =
 
 const CODE_CLS = 'rounded bg-(--menu-hover) px-1 py-px font-mono text-meta text-(--text-secondary)';
 
-export function ComposerSetupHint({
-  onOpenCoordinatorSettings,
-}: {
-  onOpenCoordinatorSettings: () => void;
-}) {
+export function ComposerSetupHint() {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const providersQ = useProviders(teamId, live);
@@ -60,15 +57,15 @@ export function ComposerSetupHint({
     },
     coordinator: {
       icon: <Settings width={14} height={14} />,
-      label: t('设置 Coordinator'),
-      hint: t('给 Coordinator 选一个 Agent，它才能回答'),
+      label: t('打开工作路由'),
+      hint: t('先创建 Coordinator 规则，它才能回答你的消息。'),
     },
   };
   const { icon, label, hint } = copy[next];
-  const chipProps =
+  const href =
     next === 'coordinator'
-      ? { onClick: onOpenCoordinatorSettings }
-      : { render: <Link to={settingsHref(next === 'model-source' ? 'providers' : 'machines')} /> };
+      ? COORDINATOR_ROUTING_HREF
+      : settingsHref(next === 'model-source' ? 'providers' : 'machines');
   return (
     <>
       <Button
@@ -76,7 +73,7 @@ export function ComposerSetupHint({
         data-testid="composer-setup-chip"
         data-step={next}
         className={CHIP_CLS}
-        {...chipProps}
+        render={<Link to={href} />}
       >
         {icon}
         {label}

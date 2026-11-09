@@ -110,6 +110,31 @@ describe('task thread hierarchy', () => {
     ]);
   });
 
+  test.each([
+    [String.raw`a\)b`, 'a)b'],
+    [String.raw`a\(b`, 'a(b'],
+    [String.raw`a\\b`, String.raw`a\b`],
+    [String.raw`a\!b`, 'a!b'],
+    [String.raw`a\_b`, 'a_b'],
+  ])('a link destination decodes Markdown punctuation escapes: %s', (path, decoded) => {
+    expect(inlineSegments(`see [docs](https://example.com/${path}) now`)).toEqual([
+      { text: 'see ' },
+      { text: 'docs', style: 'anchor', href: `https://example.com/${decoded}` },
+      { text: ' now' },
+    ]);
+  });
+
+  test('a destination preserves non-punctuation escapes and percent encoding', () => {
+    expect(inlineSegments(String.raw`[docs](https://example.com/a\zb%29)`)).toEqual([
+      { text: 'docs', style: 'anchor', href: String.raw`https://example.com/a\zb%29` },
+    ]);
+  });
+
+  test('escaped destinations inside code stay literal', () => {
+    const code = String.raw`[docs](https://example.com/a\)b)`;
+    expect(inlineSegments('`' + code + '`')).toEqual([{ text: code, style: 'code' }]);
+  });
+
   test('a link target that is not http(s) or a mention stays literal text', () => {
     expect(inlineSegments('[x](javascript:alert(1))').some((s) => s.style === 'anchor')).toBe(
       false,

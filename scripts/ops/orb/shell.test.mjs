@@ -1164,8 +1164,19 @@ test('computer image builds from the base with the host mirrorlist read-only and
       'utf8',
     );
     assert.match(agent, /^User=agent$/m);
+    assert.match(agent, /^Environment=DISPLAY=:1$/m);
+    assert.match(agent, /^Environment=AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium$/m);
     assert.match(agent, /^Restart=always$/m);
     assert.match(agent, /^ExecStartPre=.*-S \/run\/cairn\/computer\.sock/m);
+    assert.ok(
+      nspawn.some(
+        (call) =>
+          call.includes('npm') &&
+          call.includes('install') &&
+          call.some((arg) => /^agent-browser@/.test(arg)) &&
+          !call.includes('runuser'),
+      ),
+    );
     assert.match(
       agent,
       /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli\.mjs orb-computer --socket \/run\/cairn\/computer\.sock$/m,

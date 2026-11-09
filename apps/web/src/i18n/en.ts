@@ -159,6 +159,10 @@ export const EN: Record<string, string> = {
     'Lets agents operate apps on this computer. macOS needs Accessibility permission.',
   浏览器: 'Browser',
   '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
+  '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',
+  '这台机器已不再报告浏览器能力；可关闭已保存的偏好。':
+    'This machine no longer reports browser capability; you can turn off the saved preference.',
+  '浏览器偏好已绑定到另一台机器。': 'The browser preference is already bound to another machine.',
   '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
     'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',
@@ -210,8 +214,6 @@ export const EN: Record<string, string> = {
   连接一台机器: 'Connect a machine',
   运行: 'Run',
   连接这台机器: 'to connect this machine',
-  '设置 Coordinator': 'Set up the Coordinator',
-  '给 Coordinator 选一个 Agent，它才能回答': 'Pick an Agent for the Coordinator so it can answer',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
   '点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。':
     'Use the button below the box to connect a model source, a machine and the Coordinator, then send again.',
@@ -395,7 +397,7 @@ export const EN: Record<string, string> = {
   面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
-  '搜索任务、项目、成员…': 'Search todos, projects, members…',
+  '搜索任务、项目…': 'Search todos, projects…',
   最近: 'Recent',
   '{dir} 里的仓库': 'Repositories in {dir}',
   查找文件夹或粘贴路径: 'Find a folder or paste a path',
@@ -559,17 +561,11 @@ export const EN: Record<string, string> = {
   历史: 'History',
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
-  '尚无提交历史。': 'No commits yet.',
   // #1097 files-pane folder drill-down
   目录导航: 'Directory navigation',
   根目录: 'Root',
   '此目录为空。': 'This folder is empty.',
   '文件树读取失败。': 'Failed to read the file tree.',
-  // #1102 commit detail pane
-  请选择一个提交查看: 'Select a commit to view',
-  提交详情加载失败: 'Failed to load the commit details',
-  '该提交没有可显示的改动。': 'This commit has no changes to display.',
-  关闭提交详情: 'Close commit details',
   '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
@@ -596,14 +592,6 @@ export const EN: Record<string, string> = {
   // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
   // 步只等它上线不自动改派）。
   模型: 'Model',
-  // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
-  归属机: 'Home machine',
-  ' · 归属机 {machine}': ' · on {machine}',
-  模型与归属机: 'Model & home machine',
-  '跟随绑定 Agent：模型 {model} · 归属机 {machine}':
-    'Follows the bound Agent: model {model} · home {machine}',
-
-  未设归属机: 'no home machine',
   接入机器: 'Connect a machine',
   在线: 'Online',
   '迁移到…': 'Migrate to…',
@@ -746,7 +734,7 @@ export const EN: Record<string, string> = {
   主题: 'Thread',
   新主题: 'New thread',
   'Coordinator 设置': 'Coordinator settings',
-  '请先为 Coordinator 选择一个 Agent。': 'Choose an Agent for the Coordinator first.',
+  '请先在工作路由里配置 Coordinator。': 'Configure the Coordinator in work routing first.',
   '有什么可以帮你的？': 'How can I help?',
   章程: 'Charter',
   记忆: 'Memory',
@@ -757,8 +745,6 @@ export const EN: Record<string, string> = {
   '尚无章程。点击编辑，为 Coordinator 添加常设指示。':
     'No charter yet. Click edit to give the Coordinator standing instructions.',
   编辑: 'Edit',
-  '尚未选择 Agent。请先在「Agent」页选定 Agent，记忆将保存在该 Agent 上。':
-    'No Agent selected yet. Pick an Agent on the "Agent" tab first; memories are saved on that Agent.',
   '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。':
     'Nothing being watched yet. When the Coordinator watches a todo, or promises to check back at a set time, it is listed here by thread.',
   // #811 关注 tab：无备注 wake 行的回退文案（有备注显示备注原文）。
@@ -1184,8 +1170,9 @@ export const EN: Record<string, string> = {
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
-  '尚无记忆。Agent 会在工作中将值得沉淀的经验存入此处。':
-    'No memories yet. The Agent stores experience worth keeping here as it works.',
+  '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。':
+    'No memories yet. The Coordinator stores experience worth keeping here as it works.',
+  模型与机器: 'Model & machine',
 
   // —— #499 记忆 tab 的搜索与排序（配额头 + 搜索框 + 排序档）——
   // `记忆 · {n} / {max}`：{max} = shared MEMORY_QUOTA_PER_AGENT 插值，不写死
@@ -1456,6 +1443,13 @@ export const EN: Record<string, string> = {
   用途: 'Uses',
   连接: 'Connections',
   模型路由: 'Model routing',
+  用量与连接: 'Usage & connections',
+  正在加载用量与连接: 'Loading usage & connections',
+  用量与连接没能加载: 'Usage & connections did not load',
+  规则与策略: 'Rules & policies',
+  正在加载规则与策略: 'Loading rules & policies',
+  规则与策略没能加载: 'Rules & policies did not load',
+  打开工作路由: 'Open work routing',
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
@@ -1557,7 +1551,6 @@ export const EN: Record<string, string> = {
   没有匹配的设置: 'No matching settings',
   只影响这台设备: 'Applies to this device only',
   模型与账户: 'Models & accounts',
-  工作路由: 'Work routing',
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
   '还没有路由规则。': 'No routing rules yet.',
@@ -1573,10 +1566,6 @@ export const EN: Record<string, string> = {
   '把固定在这台机器上的路由规则一起迁到另一台机器。':
     'Move the routing rules pinned to this machine to another machine.',
   引文检查: 'Citation check',
-  'Agent 已由路由规则取代': 'Agents are replaced by routing rules',
-  '模型、机器和权限现在由工作路由规则与工作策略决定。':
-    'Models, machines and permissions are now set by work routing rules and work policies.',
-  打开工作路由: 'Open work routing',
   模型与首选机器: 'Model and preferred machine',
   首选机器: 'Preferred machine',
   不固定: 'Any machine',
@@ -1781,9 +1770,6 @@ export const EN: Record<string, string> = {
   已复制链接: 'Link copied',
   显示更多: 'Show more',
   'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
-  拉取请求: 'Pull requests',
-  'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
-  '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
   '这台机器在 Coordinator 里的角色': "This machine's role for the Coordinator",
   '这台机器上能接任务的执行器，以及它们的登录状态。':
     'The runtimes that can take tasks on this machine, and their sign-in state.',
@@ -1821,8 +1807,6 @@ export const EN: Record<string, string> = {
   机器没能加载: 'Machines did not load',
   正在加载模型服务: 'Loading providers',
   模型服务没能加载: 'Providers did not load',
-  正在加载工作路由: 'Loading work routing',
-  工作路由没能加载: 'Work routing did not load',
   正在加载命令记录: 'Loading command history',
   命令记录没能加载: 'Command history did not load',
   '正在加载 Coordinator 的电脑': "Loading the Coordinator's computer",
@@ -1878,4 +1862,33 @@ export const EN: Record<string, string> = {
     'Until you sign in again, these machines and subscriptions take no new tasks.',
   查看机器: 'View machines',
   查看订阅: 'View subscriptions',
+  待你审阅: 'Ready for review',
+  待你回答: 'Needs input',
+  已解决: 'Resolved',
+  'PR #{n} 有 {f} 项检查没过': 'PR #{n} has {f} failing checks',
+  'PR #{n} 检查还在跑': 'Checks are still running on PR #{n}',
+  'PR #{n} 检查 {p}/{t} 通过': 'PR #{n}: all checks passed ({p}/{t})',
+  'PR #{n} 已合并': 'PR #{n} merged',
+  改动写好了: 'The changes are ready',
+  '到 PR 卡合并': 'Merge on the PR card',
+  到任务里看改动: 'Review the changes in the task',
+  计划写好了: 'The plan is written',
+  到任务里批准计划: 'Approve the plan in the task',
+  在问你一个问题: 'Asked you a question',
+  到任务里回答: 'Answer in the task',
+  'Coordinator 在跟进': 'Coordinator is on it',
+  'Coordinator 建任务前先问你': 'Coordinator asks before creating a task',
+  在问题卡里选: 'Choose on the question card',
+  还没开始: 'Not started',
+  现在没有任务: 'No tasks right now',
+  '跟 Coordinator 说一件事，它会在这里出现。':
+    'Tell the Coordinator about something and it shows up here.',
+  '给 Coordinator 发消息': 'Message the Coordinator',
+  '待开始 {n}': 'Up next {n}',
+  没有待开始的任务: 'Nothing up next',
+  '任务，{n} 件等你': 'Tasks, {n} waiting on you',
+  拉取请求: 'Pull requests',
+  'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
+  '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
+  '失败了，等自动重试': 'Failed; an automatic retry is coming',
 };

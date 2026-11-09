@@ -74,7 +74,6 @@ import type {
   ModelOption,
   PlanDiffContent,
   PlanVersion,
-  ProjectCommitRow,
   ReviewFinding,
   RunHistoryRow,
   SkillRow,
@@ -208,6 +207,9 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
+    owner: w.owner,
+    output: w.output,
+    section: w.section ?? null,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
@@ -429,7 +431,7 @@ export function inlineSegments(text: string): DocSegment[] {
       const close = linkDestinationEnd(frag, m.index + m[0].length);
       if (close < 0) continue;
       const label = m[1] ?? '';
-      const target = frag.slice(m.index + m[0].length, close);
+      const target = frag.slice(m.index + m[0].length, close).replace(/\\([!-/:-@[-`{-~])/g, '$1');
       const mention = MENTION_TARGET.exec(target);
       if (mention === null && !WEB_TARGET.test(target)) continue;
       pushText(frag.slice(cursor, m.index));
@@ -593,23 +595,15 @@ export interface TranscriptInput {
   stopping?: boolean;
   activity?: StepActivity | null;
   agentTodo?: AgentTodo | null;
+  hasEarlier?: boolean;
 }
 
-export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
-  const {
-    messages,
-    steps,
-    plans,
-    build,
-    todo,
-    machineName,
-    userName,
-    liveText,
-    liveThinking = '',
-    stopping = false,
-    activity = null,
-    agentTodo = null,
-  } = input;
+function transcriptHead(
+  messages: TranscriptInput['messages'],
+  steps: TranscriptInput['steps'],
+  build: TranscriptInput['build'],
+  machineName: TranscriptInput['machineName'],
+): TranscriptItem[] {
   const head: TranscriptItem[] = [];
   if (
     build?.triggerSource === 'schedule' &&
@@ -638,6 +632,26 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       });
     }
   }
+  return head;
+}
+
+export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
+  const {
+    messages,
+    steps,
+    plans,
+    build,
+    todo,
+    machineName,
+    userName,
+    liveText,
+    liveThinking = '',
+    stopping = false,
+    activity = null,
+    agentTodo = null,
+    hasEarlier = false,
+  } = input;
+  const head = hasEarlier ? [] : transcriptHead(messages, steps, build, machineName);
 
   const toolNameByResult = new Map<string, string>();
   for (const m of messages) {
@@ -833,9 +847,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
   }
 
-  entries.sort((a, b) => a.at - b.at);
+  const loadedFrom = hasEarlier
+    ? (messages[0]?.createdAt ?? Number.POSITIVE_INFINITY)
+    : Number.NEGATIVE_INFINITY;
+  const loaded = entries.filter((entry) => entry.at >= loadedFrom).sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
-  for (const entry of entries) {
+  for (const entry of loaded) {
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
       if (previous?.kind === 'work') {
@@ -1216,24 +1233,6 @@ export function mapBranchInfo(
     machine: machine?.name ?? '—',
     directory: `~/${BRAND.homeDirName}/workspaces/${buildId}`,
   };
-}
-
-export function mapCommits(
-  commits: {
-    sha: string;
-    shortSha: string;
-    message: string;
-    authorName: string;
-    at: number;
-  }[],
-): ProjectCommitRow[] {
-  return commits.map((c) => ({
-    id: c.sha,
-    shortSha: c.shortSha,
-    message: c.message,
-    authorName: c.authorName,
-    at: c.at,
-  }));
 }
 
 export function mapRunHistory(

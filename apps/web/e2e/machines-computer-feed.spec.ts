@@ -26,6 +26,7 @@ const computer = (patch: Record<string, unknown> = {}) => ({
   scopeKey: 'private:u1',
   state: 'running',
   controlHolder: 'none',
+  browserEnabled: false,
   machine: { id: 'm1', name: 'omarchy', online: true },
   ...patch,
 });
@@ -37,8 +38,17 @@ interface Feed {
 }
 
 async function open(page: Page, feed: Feed, machines: unknown[] = []) {
-  await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, _route, json) => {
-    if (path === '/api/computers') return json({ computers: feed.computers });
+  await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, route, json) => {
+    if (path === '/api/computers' && route.request().method() === 'GET') {
+      return json({ computers: feed.computers });
+    }
+    if (path === '/api/computers/comp-1' && route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON() as { browserEnabled?: boolean };
+      const current = (feed.computers[0] ?? computer()) as Record<string, unknown>;
+      const updated = { ...current, browserEnabled: body.browserEnabled === true };
+      feed.computers = [updated];
+      return json({ computer: updated });
+    }
     if (path === '/api/computers/comp-1/commands') {
       return (feed.holdCommands ?? Promise.resolve()).then(() =>
         json({ commands: feed.commands }),
@@ -473,7 +483,15 @@ test('with a machine listed the panel still shows its card and the screen placeh
   const panel = await open(
     page,
     { computers: [computer()], commands: [command(1)] },
-    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+    [
+      {
+        id: 'm1',
+        name: 'omarchy',
+        online: true,
+        runningSteps: 0,
+        capabilities: { browser: true },
+      },
+    ],
   );
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(2);
   const card = panel.locator('[data-slot="list-card"]').nth(1);
@@ -481,7 +499,11 @@ test('with a machine listed the panel still shows its card and the screen placeh
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
-  await expect(card.getByRole('switch', { name: '浏览器' })).toBeDisabled();
+  const browser = card.getByRole('switch', { name: '浏览器' });
+  await expect(browser).toBeEnabled();
+  await expect(browser).not.toBeChecked();
+  await browser.click();
+  await expect(browser).toBeChecked();
 });
 
 test('an offline Coordinator machine reads offline in the chip and the card, with no running count', async ({

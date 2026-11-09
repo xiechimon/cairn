@@ -7,25 +7,27 @@ const madePanel = (page: Page) => page.getByRole('complementary', { name: '成�
 const tasksButton = (page: Page) => page.getByTestId('home-c').getByRole('button', { name: '任务' });
 const madeButton = (page: Page) => page.getByTestId('home-c').getByRole('button', { name: '成果' });
 
-test('the Tasks button opens one list grouped as needs you, in progress, idle', async ({
+test('the Tasks toggle carries the needs-you count and opens sections in Duet order', async ({
   page,
 }) => {
   await page.goto(HOME);
   await expect(panel(page)).toHaveCount(0);
-  await expect(tasksButton(page).getByTestId('tasks-attention-dot')).toBeVisible();
+  await expect(page.getByTestId('tasks-badge')).toHaveText('3');
   await tasksButton(page).click();
   await expect(panel(page)).toBeVisible();
   await expect(page).toHaveURL(/[?&]pane=tasks/);
-  await expect(panel(page).getByRole('tab')).toHaveCount(0);
-  const groups = panel(page).locator('[data-slot="stone-group"]');
-  await expect(groups).toHaveCount(3);
-  await expect(groups.nth(0)).toHaveAttribute('data-tone', 'waiting');
-  await expect(groups.nth(1)).toHaveAttribute('data-tone', 'working');
-  await expect(groups.nth(2)).toHaveAttribute('data-tone', 'idle');
-  await expect(groups.nth(0)).toContainText('Connect a Claude subscription token');
-  await expect(groups.nth(1)).toContainText('Orb canary round 7');
-  await expect(groups.nth(2)).toContainText('Sidebar status groups');
-  await expect(panel(page)).not.toContainText('Unread dot on threads');
+  const sections = panel(page).getByTestId('tasks-section');
+  await expect(sections).toHaveCount(4);
+  await expect(sections.nth(0)).toHaveAttribute('data-section', 'ready_for_review');
+  await expect(sections.nth(1)).toHaveAttribute('data-section', 'needs_input');
+  await expect(sections.nth(2)).toHaveAttribute('data-section', 'working');
+  await expect(sections.nth(3)).toHaveAttribute('data-section', 'resolved');
+  await expect(sections.nth(0)).toContainText('Fold finished turns into purpose and duration');
+  await expect(sections.nth(1)).toContainText('Connect a Claude subscription token');
+  await expect(sections.nth(2)).toContainText('Orb canary round 7');
+  await expect(sections.nth(2)).toContainText('Rerun the relay probe');
+  await expect(sections.nth(3).locator('[data-slot="task-row"]')).toHaveCount(0);
+  await expect(panel(page)).not.toContainText('Sidebar status groups');
 
   await page.reload();
   await expect(panel(page)).toBeVisible();
@@ -34,24 +36,65 @@ test('the Tasks button opens one list grouped as needs you, in progress, idle', 
   await expect(page).not.toHaveURL(/pane=/);
 });
 
-test('an idle row opens its thread in the side chat', async ({ page }) => {
+test('every row waiting on the owner says what is waiting and where to act', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
-  await panel(page).getByText('Sidebar status groups').click();
-  await expect(page).toHaveURL(/[?&]thread=home-c-idle/);
-  await expect(page.getByTestId('side-chat')).toContainText('Sidebar status groups');
+  const waiting = panel(page).locator('[data-slot="task-row"][data-waiting]');
+  await expect(waiting).toHaveCount(3);
+  for (const row of await waiting.all()) {
+    await expect(row.locator('[data-slot="task-row-where"]')).toBeVisible();
+    await expect(row).not.toContainText('已就绪，等你审阅');
+  }
+  const question = panel(page)
+    .locator('[data-section="needs_input"] [data-slot="task-row"]')
+    .first();
+  await expect(question).toContainText('Credential relay · #74');
+  await expect(question).toContainText('在问题卡里选');
+  await expect(
+    panel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Connect a Claude' }),
+  ).toContainText('到任务里批准计划');
+  await expect(
+    panel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Fold finished turns' }),
+  ).toContainText('到任务里看改动');
+  const working = panel(page).locator('[data-section="working"] [data-slot="task-row"]');
+  await expect(working.locator('[data-slot="task-row-where"]')).toHaveCount(0);
+  await expect(working.locator('[data-slot="task-row-running"]')).toHaveCount(3);
 });
 
-test('a schedule sits in idle once, never beside its own running or idle task, and links to the full schedules page', async ({ page }) => {
+test('Resolved opens on demand and Up next lists tasks not started', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
-  const idle = panel(page).locator('[data-slot="stone-group"][data-tone="idle"]');
-  await expect(idle.locator('[data-slot="thread-row"]').filter({ hasText: '#1' })).toHaveCount(1);
-  await expect(
-    idle.locator('[data-slot="thread-row"]').filter({ hasText: 'Sidebar status groups' }),
-  ).toHaveCount(1);
-  await expect(idle.locator('[data-slot="thread-row"]')).toHaveCount(2);
-  await expect(idle).not.toContainText('Orb canary round 7');
+  await panel(page).getByRole('button', { name: /^已解决/ }).click();
+  await expect(panel(page).locator('[data-section="resolved"]')).toContainText(
+    'Unread dot on threads',
+  );
+  await panel(page).getByRole('tab', { name: /待开始/ }).click();
+  const next = panel(page).locator('[data-section="up_next"] [data-slot="task-row"]');
+  await expect(next).toHaveCount(1);
+  await expect(next).toContainText('Sidebar status groups');
+});
+
+test('a row opens its thread in the side chat', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByText('Orb canary round 7').click();
+  await expect(page).toHaveURL(/[?&]thread=home-c-working-c/);
+  await expect(page.getByTestId('side-chat')).toContainText('Orb canary round 7');
+});
+
+test('the plus button focuses the Coordinator composer', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByTestId('tasks-new').click();
+  await expect(page.locator('.chief-composer textarea')).toBeFocused();
+});
+
+test('Manage schedules links to the schedules page', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
   await panel(page).getByRole('link', { name: '管理定时' }).click();
   await expect(page).toHaveURL(/\/app\/schedules/);
+});
+
+test('with no tasks the panel shows one sentence and the toggle has no badge', async ({ page }) => {
+  await page.goto('/app?scenario=home-c-empty&pane=tasks');
+  await expect(panel(page).getByTestId('tasks-empty')).toBeVisible();
+  await expect(page.getByTestId('tasks-badge')).toHaveCount(0);
 });
 
 test('the Made button swaps the panel to finished work', async ({ page }) => {
@@ -93,13 +136,4 @@ test('at phone width the panel overlays without horizontal overflow', async ({ p
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
     0,
   );
-});
-
-test('a group header folds its rows', async ({ page }) => {
-  await page.goto(`${HOME}&pane=tasks`);
-  const waiting = panel(page).locator('[data-slot="stone-group"][data-tone="waiting"]');
-  await expect(waiting.locator('[data-slot="thread-row"]')).toHaveCount(3);
-  await waiting.getByRole('button', { name: /^等你处理/ }).click();
-  await expect(waiting.locator('[data-slot="thread-row"]')).toHaveCount(0);
-  await expect(panel(page)).toContainText('Orb canary round 7');
 });

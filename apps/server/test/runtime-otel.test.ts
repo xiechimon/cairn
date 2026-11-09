@@ -186,7 +186,7 @@ describe('emitRuntimeStepSpan', () => {
       expect(captured).toHaveLength(1);
       const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
       const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
-      expect(attrs['langfuse.session.id']).toEqual({ stringValue: todoId });
+      expect(attrs['langfuse.session.id']).toBeUndefined();
       expect(attrs['session.id']).toEqual({ stringValue: todoId });
       expect(attrs['langfuse.trace.name']).toBeUndefined();
       expect(attrs['langfuse.trace.tags']).toBeUndefined();
@@ -457,7 +457,7 @@ describe('Coordinator turn export', () => {
     expect(span.name).toBe('coordinator turn');
     const attrs = attrsOf(span);
     expect(attrs['langfuse.trace.name']).toEqual({ stringValue: 'coordinator turn' });
-    expect(attrs['langfuse.session.id']).toEqual({ stringValue: 'chief-thread-9' });
+    expect(attrs['langfuse.session.id']).toBeUndefined();
     expect(attrs['session.id']).toEqual({ stringValue: 'chief-thread-9' });
     expect(attrs['langfuse.trace.tags']).toEqual({
       arrayValue: { values: [{ stringValue: 'cairn' }, { stringValue: 'coordinator' }] },
@@ -577,10 +577,9 @@ describe('Coordinator turn export', () => {
     emitRuntimeStepSpan(s.db, stepId, withEnv);
     const root = attrsOf(captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
     expect(root['langfuse.trace.name']).toEqual({ stringValue: 'build' });
-    expect(root['langfuse.session.id']).toEqual({ stringValue: expect.stringMatching(/^todo-/) });
+    expect(root['session.id']).toEqual({ stringValue: expect.stringMatching(/^todo-/) });
     expect(root['langfuse.environment']).toEqual({ stringValue: 'prod' });
     const stepAttrs = attrsOf(captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
-    expect(stepAttrs['langfuse.session.id']).toEqual(root['langfuse.session.id']);
     expect(stepAttrs['session.id']).toEqual(root['session.id']);
     expect(stepAttrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
     expect(stepAttrs['langfuse.trace.name']).toBeUndefined();

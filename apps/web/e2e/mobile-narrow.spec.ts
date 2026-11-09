@@ -85,12 +85,12 @@ for (const width of [360, 390]) {
         '/app/resources/mcp-servers?scenario=07',
         '/app/resources/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_',
         '/app/resources/providers?scenario=10',
-        '/app/team?scenario=12',
+        '/app/settings/work-routing?scenario=12',
         '/app?scenario=101',
       ];
       for (const url of pages) {
         await page.goto(url);
-        await page.locator('.settings-card, [data-testid="team-agents-removed"], [data-testid="chief-settings-col"]').first().waitFor();
+        await page.locator('.settings-card, [data-testid="routing-settings-empty"], [data-testid="chief-settings-col"]').first().waitFor();
         const report = await page.evaluate(() => {
           const rail = document.querySelector('.board-sidebar--collapsed')?.getBoundingClientRect();
           const railRight = rail?.right ?? 0;

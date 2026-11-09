@@ -1,0 +1,326 @@
+✖ two direct Vitest runs serialize with one slot (696.865566ms)
+✖ direct Vitest reclaims a dead lease before starting its worker (453.422211ms)
+✖ CI with an existing directory queues instead of bypassing the holder (15070.963742ms)
+✖ Playwright admission precedes webServer startup and spans the test run (1512.67348ms)
+✔ CI skips admission only for an absent slot directory (383.766607ms)
+✖ package-local Vitest admission: packages/shared (322.74924ms)
+✖ package-local Vitest admission: apps/server (363.451147ms)
+✖ package-local Vitest admission: apps/web (344.069825ms)
+✖ package-local Vitest admission: apps/daemon (322.646021ms)
+✖ package-local Vitest admission: integration (344.470269ms)
+✖ alternate Playwright admission: playwright.pr-screens.config.ts (404.397246ms)
+✖ alternate Playwright admission: playwright.pr-screens-live.config.ts (444.138588ms)
+✖ alternate Playwright admission: playwright.pr-screens-trip.config.ts (586.879849ms)
+✖ alternate Playwright admission: playwright.pr-screens-compare.config.ts (484.879535ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 1
+ℹ fail 13
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21795.500515
+
+✖ failing tests:
+
+test at scripts/test-admission.test.mjs:76:1
+✖ two direct Vitest runs serialize with one slot (696.865566ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:83:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:90:1
+✖ direct Vitest reclaims a dead lease before starting its worker (453.422211ms)
+  AssertionError [ERR_ASSERTION]:
+   RUN  v5.0.1 /tmp/ct-25e3b41c-heavy-admission-LEd0t4
+
+   ❯ |fixture| test/admission.test.ts (1 test | 1 failed) 5ms
+     × actual worker admission 4ms
+
+  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+   FAIL  |fixture| test/admission.test.ts > actual worker admission
+  AssertionError: expected 120 not to be 120 // Object.is equality
+   ❯ test/admission.test.ts:8:26
+        6|   if (process.env.DEAD_PID) {
+        7|     const lock = JSON.parse(readFileSync(process.env.CAIRN_HEAVY_SLOTS…
+        8|     expect(lock.pid).not.toBe(Number(process.env.DEAD_PID));
+         |                          ^
+        9|   }
+       10|   writeFileSync(process.env.MARKER, 'started');
+
+  ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+   Test Files  1 failed (1)
+        Tests  1 failed (1)
+     Start at  00:17:17
+     Duration  125ms (transform 51%, import 32%, tests 10%, worker 6%)
+
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:96:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:101:1
+✖ CI with an existing directory queues instead of bypassing the holder (15070.963742ms)
+  AssertionError [ERR_ASSERTION]: CI bypassed the shared host queue
+
+   RUN  v5.0.1 /tmp/ct-25e3b41c-heavy-admission-tjy5hq
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:106:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:110:1
+✖ Playwright admission precedes webServer startup and spans the test run (1512.67348ms)
+  AssertionError [ERR_ASSERTION]: Playwright started its server without admission
+  Error: Timed out waiting 1000ms from config.webServer.
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:127:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:146:3
+✖ package-local Vitest admission: packages/shared (322.74924ms)
+  AssertionError [ERR_ASSERTION]: package command bypassed admission
+
+   RUN  v5.0.1 /tmp/ct-25e3b41c-heavy-admission-e9lLqT/packages/shared
+
+
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+     Start at  00:17:35
+     Duration  95ms (transform 50%, import 31%, worker 11%, tests 7%)
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:157:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:146:3
+✖ package-local Vitest admission: apps/server (363.451147ms)
+  AssertionError [ERR_ASSERTION]: package command bypassed admission
+
+   RUN  v5.0.1 /tmp/ct-25e3b41c-heavy-admission-KkXFze/apps/server
+
+
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+     Start at  00:17:35
+     Duration  91ms (transform 53%, setup 16%, import 13%, worker 11%, tests 7%)
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:157:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:146:3
+✖ package-local Vitest admission: apps/web (344.069825ms)
+  AssertionError [ERR_ASSERTION]: package command bypassed admission
+
+   RUN  v5.0.1 /tmp/ct-25e3b41c-heavy-admission-w8tmjV/apps/web
+
+
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+     Start at  00:17:35
+     Duration  96ms (transform 55%, import 29%, worker 10%, tests 6%)
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:157:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:146:3
+✖ package-local Vitest admission: apps/daemon (322.646021ms)
+  AssertionError [ERR_ASSERTION]: package command bypassed admission
+
+   RUN  v5.0.1 /tmp/ct-25e3b41c-heavy-admission-FJKTcC/apps/daemon
+
+
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+     Start at  00:17:36
+     Duration  93ms (transform 53%, import 27%, worker 12%, tests 7%)
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:157:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:146:3
+✖ package-local Vitest admission: integration (344.470269ms)
+  AssertionError [ERR_ASSERTION]: package command bypassed admission
+
+   RUN  v5.0.1 /tmp/ct-25e3b41c-heavy-admission-z4V95O/integration
+
+
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+     Start at  00:17:36
+     Duration  93ms (transform 55%, setup 17%, import 12%, worker 9%, tests 6%)
+
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:157:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:162:3
+✖ alternate Playwright admission: playwright.pr-screens.config.ts (404.397246ms)
+  AssertionError [ERR_ASSERTION]: alternate config bypassed admission
+
+  Error: No tests found
+  Listing tests:
+  Total: 0 tests in 0 files
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:169:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:162:3
+✖ alternate Playwright admission: playwright.pr-screens-live.config.ts (444.138588ms)
+  AssertionError [ERR_ASSERTION]: alternate config bypassed admission
+
+  Error: No tests found
+  Listing tests:
+  Total: 0 tests in 0 files
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:169:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:162:3
+✖ alternate Playwright admission: playwright.pr-screens-trip.config.ts (586.879849ms)
+  AssertionError [ERR_ASSERTION]: alternate config bypassed admission
+
+  Error: No tests found
+  Listing tests:
+  Total: 0 tests in 0 files
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:169:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/test-admission.test.mjs:162:3
+✖ alternate Playwright admission: playwright.pr-screens-compare.config.ts (484.879535ms)
+  AssertionError [ERR_ASSERTION]: alternate config bypassed admission
+
+  Error: No tests found
+  Listing tests:
+  Total: 0 tests in 0 files
+
+      at until (file://<checkout>/scripts/test-admission.test.mjs:69:12)
+      at async TestContext.<anonymous> (file://<checkout>/scripts/test-admission.test.mjs:169:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

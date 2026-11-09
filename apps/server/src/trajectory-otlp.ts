@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { TrajectoryPack } from '@cairn/shared';
 import {
   chatAttributes,
@@ -10,12 +9,10 @@ import {
   stepAttributes,
 } from '@cairn/shared';
 import {
-  OTLP_SPAN_KIND,
-  OTLP_STATUS_ERROR,
-  type OtlpSpan,
-  type OtlpTracesRequest,
-  otlpAttributes,
-  otlpNanos,
+  type CairnSpan,
+  otlpChildSpanIdOfBuild,
+  otlpRootSpanIdOfBuild,
+  otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
 } from '@cairn/shared/otel';
 import {
@@ -28,31 +25,17 @@ import {
   toolOutcomesOf,
 } from './trajectory-transcript.js';
 
-const SPAN_KIND_INTERNAL = OTLP_SPAN_KIND.internal;
-const SPAN_KIND_CLIENT = OTLP_SPAN_KIND.client;
-const STATUS_ERROR = OTLP_STATUS_ERROR;
-
-const nanos = otlpNanos;
-
-function derivedId(bytes: number, ...parts: (string | number)[]): string {
-  return createHash('sha256')
-    .update(JSON.stringify(parts))
-    .digest('hex')
-    .slice(0, bytes * 2);
-}
-
-const spanIdOf = (buildId: string, ...path: (string | number)[]) =>
-  derivedId(8, 'span', buildId, ...path);
-
 function jsonText(value: unknown): string {
   return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
 }
 
-export function packToOtlp(pack: TrajectoryPack): OtlpTracesRequest {
+export const TRAJECTORY_PUSH_SCOPE = 'cairn.trajectory-push';
+
+export function packToSpans(pack: TrajectoryPack): CairnSpan[] {
   const { buildId } = pack;
   const traceId = otlpTraceIdOfBuild(buildId);
   const fallbackModel: ProviderModelRef = splitModelId(pack.input.model);
-  const spans: OtlpSpan[] = [];
+  const spans: CairnSpan[] = [];
   let clock = 0;
   let earliest: number | undefined;
   let latest = 0;
@@ -64,12 +47,13 @@ export function packToOtlp(pack: TrajectoryPack): OtlpTracesRequest {
     return clock;
   };
 
-  const rootId = spanIdOf(buildId, 'root');
+  const rootId = otlpRootSpanIdOfBuild(buildId);
   for (const step of pack.process.steps) {
-    const stepSpanId = spanIdOf(buildId, 'step', step.stepId);
+    const stepSpanId = otlpStepSpanIdOfBuild(buildId, step.stepId);
+    const parent = { traceId, spanId: stepSpanId };
     const rows = step.transcript.filter(isRecord);
     const outcomes = toolOutcomesOf(rows);
-    const children: OtlpSpan[] = [];
+    const children: CairnSpan[] = [];
     let stepStart: number | undefined;
     rows.forEach((row, rowIndex) => {
       const at = advance(num(row.timestamp));
@@ -79,100 +63,82 @@ export function packToOtlp(pack: TrajectoryPack): OtlpTracesRequest {
       const failedTurn = finishReason === 'error';
       const model = str(row.model);
       children.push({
-        traceId,
-        spanId: spanIdOf(buildId, 'step', step.stepId, 'chat', rowIndex),
-        parentSpanId: stepSpanId,
+        spanId: otlpChildSpanIdOfBuild(buildId, step.stepId, 'chat', rowIndex),
+        parent,
         name: `${GENAI_OPERATION.chat} ${model ?? fallbackModel.model ?? ''}`.trim(),
-        kind: SPAN_KIND_CLIENT,
-        startTimeUnixNano: nanos(at),
-        endTimeUnixNano: nanos(at),
-        attributes: otlpAttributes(
-          chatAttributes(
-            {
-              provider: str(row.provider),
-              model,
-              responseModel: str(row.responseModel),
-              finishReason,
-              rawFinishReason: str(row.rawStopReason),
-              usage: tokenCounts(row.usage),
-              costUsd: costUsd(row.usage),
-            },
-            fallbackModel,
-          ),
+        kind: 'client',
+        startMs: at,
+        endMs: at,
+        attributes: chatAttributes(
+          {
+            provider: str(row.provider),
+            model,
+            responseModel: str(row.responseModel),
+            finishReason,
+            rawFinishReason: str(row.rawStopReason),
+            usage: tokenCounts(row.usage),
+            costUsd: costUsd(row.usage),
+          },
+          fallbackModel,
         ),
-        ...(failedTurn
-          ? { status: { code: STATUS_ERROR, message: str(row.errorMessage) ?? 'error' } }
-          : {}),
+        ...(failedTurn ? { error: str(row.errorMessage) ?? 'error' } : {}),
       });
       toolCallsOf(row.content).forEach((call, callIndex) => {
         const outcome = call.id === undefined ? undefined : outcomes.get(call.id);
         const end = Math.max(at, outcome?.at ?? at);
         advance(end);
         children.push({
-          traceId,
-          spanId: spanIdOf(buildId, 'step', step.stepId, 'tool', rowIndex, callIndex),
-          parentSpanId: stepSpanId,
+          spanId: otlpChildSpanIdOfBuild(buildId, step.stepId, 'tool', rowIndex, callIndex),
+          parent,
           name: `${GENAI_OPERATION.executeTool} ${call.name}`,
-          kind: SPAN_KIND_INTERNAL,
-          startTimeUnixNano: nanos(at),
-          endTimeUnixNano: nanos(end),
-          attributes: otlpAttributes(
-            executeToolAttributes({
-              name: call.name,
-              callId: call.id,
-              arguments: call.arguments === undefined ? undefined : jsonText(call.arguments),
-              result: outcome === undefined ? undefined : jsonText(outcome.result),
-            }),
-          ),
-          ...(outcome?.failed ? { status: { code: STATUS_ERROR, message: 'tool error' } } : {}),
+          kind: 'internal',
+          startMs: at,
+          endMs: end,
+          attributes: executeToolAttributes({
+            name: call.name,
+            callId: call.id,
+            arguments: call.arguments === undefined ? undefined : jsonText(call.arguments),
+            result: outcome === undefined ? undefined : jsonText(outcome.result),
+          }),
+          ...(outcome?.failed ? { error: 'tool error' } : {}),
         });
       });
     });
     const start = stepStart ?? advance(undefined);
-    const stepSpan: OtlpSpan = {
-      traceId,
+    const stepSpan: CairnSpan = {
       spanId: stepSpanId,
-      parentSpanId: rootId,
+      parent: { traceId, spanId: rootId },
       name: `step ${step.kind}`,
-      kind: SPAN_KIND_INTERNAL,
-      startTimeUnixNano: nanos(start),
-      endTimeUnixNano: nanos(Math.max(start, clock)),
-      attributes: otlpAttributes(stepAttributes(step)),
+      kind: 'internal',
+      startMs: start,
+      endMs: Math.max(start, clock),
+      attributes: stepAttributes(step),
     };
     spans.push(stepSpan, ...children);
   }
 
   const rootStart = earliest ?? 0;
-  const root: OtlpSpan = {
+  const root: CairnSpan = {
     traceId,
     spanId: rootId,
     name: GENAI_OPERATION.invokeAgent,
-    kind: SPAN_KIND_INTERNAL,
-    startTimeUnixNano: nanos(rootStart),
-    endTimeUnixNano: nanos(Math.max(rootStart, latest)),
-    attributes: otlpAttributes(
-      invokeAgentAttributes({
-        buildId,
-        baseSha: pack.input.baseSha,
-        harnessHash: pack.input.harnessHash,
-        persona: pack.input.persona,
-        agentId: pack.input.agentId,
-        provider: fallbackModel.provider,
-        model: fallbackModel.model,
-        ciFixRounds: pack.judgments.ciFixRounds,
-        sourceRef: pack.input.sourceRef,
-        outcome: pack.outcome,
-        attribution: pack.attribution,
-      }),
-    ),
+    kind: 'internal',
+    startMs: rootStart,
+    endMs: Math.max(rootStart, latest),
+    attributes: invokeAgentAttributes({
+      buildId,
+      baseSha: pack.input.baseSha,
+      harnessHash: pack.input.harnessHash,
+      persona: pack.input.persona,
+      agentId: pack.input.agentId,
+      provider: fallbackModel.provider,
+      model: fallbackModel.model,
+      ciFixRounds: pack.judgments.ciFixRounds,
+      sourceRef: pack.input.sourceRef,
+      outcome: pack.outcome,
+      attribution: pack.attribution,
+    }),
   };
 
-  return {
-    resourceSpans: [
-      {
-        resource: { attributes: otlpAttributes({ 'service.name': 'cairn' }) },
-        scopeSpans: [{ scope: { name: 'cairn.trajectory-push' }, spans: [root, ...spans] }],
-      },
-    ],
-  };
+  return [root, ...spans];
 }

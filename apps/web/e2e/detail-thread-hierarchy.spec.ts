@@ -236,6 +236,17 @@ test('the agent answer links its issue reference', async ({ page }) => {
   await expect(answer).not.toContainText('](https://');
 });
 
+test('an escaped link destination navigates to the decoded path', async ({ page }) => {
+  await stubWorld(page, {
+    messages: [msg('assistant', String.raw`see [docs](https://example.com/a\)b) now`, 10_000)],
+    steps: SETUP_ONLY_STEPS,
+    phase: 'review',
+  });
+  const link = page.getByTestId('agent-text').getByRole('link', { name: 'docs', exact: true });
+  await expect(link).toHaveAttribute('href', 'https://example.com/a)b');
+  expect(await link.evaluate((node: HTMLAnchorElement) => node.href)).toBe('https://example.com/a)b');
+});
+
 test('hook output and the credential line stay folded inside the work group', async ({ page }) => {
   await stubWorld(page);
   const col = page.getByTestId('transcript-col');
