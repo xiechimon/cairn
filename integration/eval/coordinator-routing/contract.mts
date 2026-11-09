@@ -15,16 +15,11 @@ export const replayInput = z
     'Duplicate project names',
   );
 export type ReplayInput = z.infer<typeof replayInput>;
-export function normalize(
-  status: string,
-  projects: readonly string[],
-  asked: boolean,
-  text: string,
-) {
-  if (projects.length && asked) throw new Error('Mixed routing effects');
+export function normalize(status: string, placed: readonly string[], asked: boolean, text: string) {
+  if (placed.length && asked) throw new Error('Mixed routing effects');
   if (asked && ['done', 'claimed'].includes(status)) return 'ask';
   if (status !== 'done') throw new Error('Turn did not complete');
-  if (projects.length) return 'route';
+  if (placed.length) return 'route';
   if (text.trim()) return 'answer';
   throw new Error('Empty turn');
 }

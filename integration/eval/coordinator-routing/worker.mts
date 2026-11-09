@@ -33,11 +33,10 @@ import { useModelSocket } from './proxy.mts';
 const chunks: Buffer[] = [];
 for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
 try {
-  const { input, provider, key, thinking, socket } = z
+  const { input, provider, thinking, socket } = z
     .object({
       input: replayInput,
       provider: providerConfigSchema,
-      key: z.string().min(1),
       thinking: z.enum(['low', 'medium', 'high']),
       socket: z.string().min(1),
     })
@@ -70,7 +69,7 @@ try {
         ...provider,
         baseUrl: provider.baseUrl ?? '',
         api: provider.api ?? 'openai-responses',
-        apiKey: key,
+        apiKey: `e30.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'eval-placeholder' } })).toString('base64')}.placeholder`,
         label: 'Eval model',
       },
     },

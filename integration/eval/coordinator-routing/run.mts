@@ -3,7 +3,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { type ExperimentClient, openExperimentClient } from '@cairn/shared/langfuse';
 import { z } from 'zod';
 import { evalCodexKey } from '../../../apps/daemon/src/backend/eval-auth.js';
@@ -24,6 +23,9 @@ const manifestSchema = z
   })
   .strict();
 export type Manifest = z.infer<typeof manifestSchema>;
+function checkoutSha(cwd: string): string {
+  return execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
+}
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value !== null && typeof value === 'object')
@@ -33,9 +35,8 @@ function canonical(value: unknown): string {
       .join(',')}}`;
   return JSON.stringify(value);
 }
-export function fingerprint(value: unknown): string {
-  return createHash('sha256').update(canonical(value)).digest('hex');
-}
+export const fingerprint = (value: unknown): string =>
+  createHash('sha256').update(canonical(value)).digest('hex');
 async function within<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -64,8 +65,11 @@ export async function runExperiment(
     .sort((a, b) => a.id.localeCompare(b.id));
   if (!items.length || items.length > 60 || new Set(items.map((i) => i.id)).size !== items.length)
     throw new Error('incomplete: expected 1..60 distinct active items');
-  if (items.some((item) => !item.sourceTraceId || !item.datasetId))
-    throw new Error('incomplete: missing harvested provenance');
+  if (
+    items.some((item) => !item.sourceTraceId || !item.datasetId) ||
+    new Set(items.map((item) => item.sourceTraceId)).size !== items.length
+  )
+    throw new Error('incomplete: missing or duplicate harvested provenance');
   const inputs = items.map((item) => replayInput.parse(item.input));
   const hash = fingerprint({
     ...manifest,
@@ -107,7 +111,7 @@ export async function runExperiment(
   return result;
 }
 
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   process.env.CAIRN_TEST_TEMP_ROOT ??= join(homedir(), '.cache/codex-scratch/eval-langfuse');
   mkdirSync(process.env.CAIRN_TEST_TEMP_ROOT, { recursive: true });
   const deadline = setTimeout(() => process.exit(124), 3_600_000);
@@ -115,35 +119,31 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   try {
     const manifest = manifestSchema.parse(JSON.parse(readFileSync(process.argv[2] ?? '', 'utf8')));
     const checkout = resolve(process.argv[3] ?? '.');
-    const sha = execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: checkout,
-      encoding: 'utf8',
-    }).trim();
+    const sha = checkoutSha(checkout);
     if (sha !== manifest.candidateSha) throw new Error('Candidate head changed');
-    const dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {
-      cwd: checkout,
-      encoding: 'utf8',
-    });
-    const ignored = execFileSync(
-      'git',
-      [
-        'ls-files',
-        '--others',
-        '--ignored',
-        '--exclude-standard',
-        '--',
-        '.',
-        ':!:node_modules/**',
-        ':!:**/node_modules/**',
-      ],
-      { cwd: checkout, encoding: 'utf8' },
-    );
-    if (dirty.trim() || ignored.trim())
-      throw new Error('Candidate must contain only clean public sources and dependencies');
-    const runnerSha = execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: resolve(import.meta.dirname, '../../..'),
-      encoding: 'utf8',
-    }).trim();
+    for (const cwd of [checkout, resolve(import.meta.dirname, '../../..')]) {
+      const dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+        cwd,
+        encoding: 'utf8',
+      });
+      const ignored = execFileSync(
+        'git',
+        [
+          'ls-files',
+          '--others',
+          '--ignored',
+          '--exclude-standard',
+          '--',
+          '.',
+          ':!:node_modules/**',
+          ':!:**/node_modules/**',
+        ],
+        { cwd, encoding: 'utf8' },
+      );
+      if (dirty.trim() || ignored.trim())
+        throw new Error('Checkouts must contain only clean public sources and dependencies');
+    }
+    const runnerSha = checkoutSha(resolve(import.meta.dirname, '../../..'));
     const promptSha = createHash('sha256')
       .update(readFileSync(join(checkout, 'apps/server/src/services/chief.ts')))
       .digest('hex');
@@ -193,5 +193,6 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
         process.exitCode = 1;
       });
     clearTimeout(deadline);
+    process.exit(process.exitCode ?? 0);
   }
 }

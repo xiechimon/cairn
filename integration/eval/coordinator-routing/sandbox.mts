@@ -1,11 +1,20 @@
 import { realpathSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import type { ProviderConfig } from '@cairn/shared';
 import { spawnOwned } from '../../../scripts/owned-process.mjs';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { decisionOutput, type ReplayInput, replayInput } from './contract.mts';
+
+export const CANDIDATE_COORDINATOR_PATHS = [
+  'apps/server/src/coordinator/runtime',
+  'apps/server/src/services/chief.ts',
+  'apps/server/src/services/chief-tools.ts',
+  'apps/server/src/services/chief-router-tools.ts',
+  'packages/shared/src/protocol/chief-tools.ts',
+];
+const ruler = resolve(import.meta.dirname, '../../..');
 
 export async function runSandboxedTurn(
   input: ReplayInput,
@@ -15,6 +24,7 @@ export async function runSandboxedTurn(
   thinking = 'low',
   checkout = resolve(import.meta.dirname, '../../..'),
 ): Promise<unknown> {
+  provider = { ...provider, apiKey: undefined };
   replayInput.parse(input);
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 600_000)
     throw new Error('Invalid turn deadline');
@@ -43,6 +53,11 @@ export async function runSandboxedTurn(
       const headers = { ...req.headers };
       delete headers.host;
       delete headers['content-length'];
+      headers.authorization = `Bearer ${key}`;
+      if (!provider.baseUrl)
+        headers['chatgpt-account-id'] = JSON.parse(
+          Buffer.from(key.split('.')[1] ?? '', 'base64url').toString(),
+        )['https://api.openai.com/auth'].chatgpt_account_id;
       const upstream = await fetch(target, {
         method: req.method,
         headers: headers as Record<string, string>,
@@ -74,9 +89,11 @@ export async function runSandboxedTurn(
         '/lib',
         '/lib64',
         '/etc/ssl/certs',
-        realpathSync(checkout),
-        realpathSync(join(checkout, 'node_modules')),
-        dirname(dirname(realpathSync(process.execPath))),
+        ...['apps', 'packages', 'integration', 'scripts', 'package.json'].map((p) =>
+          join(ruler, p),
+        ),
+        realpathSync(join(ruler, 'node_modules')),
+        realpathSync(process.execPath),
       ]),
     ];
     owned = spawnOwned(
@@ -85,6 +102,12 @@ export async function runSandboxedTurn(
         '--die-with-parent',
         '--unshare-all',
         ...paths.flatMap((p) => ['--ro-bind', p, p]),
+        ...CANDIDATE_COORDINATOR_PATHS.flatMap((p) => {
+          const source = realpathSync(join(checkout, p));
+          if (!source.startsWith(`${realpathSync(checkout)}/`))
+            throw new Error('Candidate source escaped checkout');
+          return ['--ro-bind', source, join(ruler, p)];
+        }),
         '--proc',
         '/proc',
         '--dev',
@@ -100,7 +123,7 @@ export async function runSandboxedTurn(
         process.execPath,
         '--import',
         import.meta.resolve('tsx'),
-        join(checkout, 'integration/eval/coordinator-routing/worker.mts'),
+        join(ruler, 'integration/eval/coordinator-routing/worker.mts'),
       ],
       {
         env: {
@@ -129,7 +152,7 @@ export async function runSandboxedTurn(
         void active.stop();
       }
     });
-    owned.child.stdin.end(JSON.stringify({ input, provider, key, thinking, socket }));
+    owned.child.stdin.end(JSON.stringify({ input, provider, thinking, socket }));
     const result = await owned.exited;
     if (timedOut || denied || overflow || result.code !== 0)
       throw new Error(

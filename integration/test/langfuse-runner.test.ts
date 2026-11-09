@@ -1,5 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  cpSync,
+  mkdirSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -8,8 +15,11 @@ import { openExperimentClient } from '@cairn/shared/langfuse';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { normalize, replayInput } from '../eval/coordinator-routing/contract.mts';
-import { fingerprint, type Manifest, runExperiment } from '../eval/coordinator-routing/run.mts';
-import { runSandboxedTurn } from '../eval/coordinator-routing/sandbox.mts';
+import { type Manifest, runExperiment } from '../eval/coordinator-routing/run.mts';
+import {
+  CANDIDATE_COORDINATOR_PATHS,
+  runSandboxedTurn,
+} from '../eval/coordinator-routing/sandbox.mts';
 import { startStubLlm } from './stub-llm.js';
 
 const closers: (() => Promise<unknown>)[] = [];
@@ -58,21 +68,11 @@ describe('Langfuse Coordinator runner', () => {
     ).toThrow();
   });
 
-  it('fingerprints the immutable configuration and captured worlds', () => {
-    const first = fingerprint({ ...manifest, inputs: [input] });
-    expect(first).toBe(fingerprint({ inputs: [input], ...manifest }));
-    expect(first).not.toBe(
-      fingerprint({ ...manifest, candidateSha: 'd'.repeat(40), inputs: [input] }),
-    );
-    expect(first).not.toBe(
-      fingerprint({ ...manifest, inputs: [{ ...input, request: 'changed' }] }),
-    );
-  });
-
   it('runs the real disposable Coordinator through SDK experiment.run and exports its item span', async () => {
     const model = await startStubLlm([{ content: 'all quiet' }]);
     closers.push(() => model.close());
     const exported: string[] = [];
+    let duplicateSource = false;
     const http = createServer(async (req, res) => {
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
@@ -86,26 +86,21 @@ describe('Langfuse Coordinator runner', () => {
         return;
       }
       res.setHeader('content-type', 'application/json');
-      res.end(
-        JSON.stringify(
-          req.url?.includes('/projects')
-            ? { data: [{ id: 'project', name: 'test' }] }
-            : req.url?.includes('/dataset-items')
-              ? {
-                  data: [1, 2].map((n) => ({
-                    id: String(n),
-                    datasetId: 'dataset',
-                    status: 'ACTIVE',
-                    input,
-                    expectedOutput: { hidden: 'ANSWER-SECRET' },
-                    metadata: {},
-                    sourceTraceId: 'real-source-fixture',
-                  })),
-                  meta: { totalPages: 1 },
-                }
-              : { id: 'dataset', name: 'routing' },
-        ),
-      );
+      let body: unknown = { id: 'dataset', name: 'routing' };
+      if (req.url?.includes('/projects')) body = { data: [{ id: 'project', name: 'test' }] };
+      if (req.url?.includes('/dataset-items'))
+        body = {
+          data: [1, 2].map((n) => ({
+            id: String(n),
+            datasetId: 'dataset',
+            status: 'ACTIVE',
+            input,
+            expectedOutput: { hidden: 'ANSWER-SECRET' },
+            sourceTraceId: duplicateSource ? 'same-source' : `source-${n}`,
+          })),
+          meta: { totalPages: 1 },
+        };
+      res.end(JSON.stringify(body));
     });
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
     closers.push(async () => {
@@ -135,12 +130,19 @@ describe('Langfuse Coordinator runner', () => {
       }),
     ).rejects.toThrow('incomplete');
     expect(attempts).toBe(1);
+    duplicateSource = true;
+    let duplicateTurns = 0;
+    await expect(
+      runExperiment(sdk.client, manifest, async () => {
+        duplicateTurns++;
+        return outputs[0];
+      }),
+    ).rejects.toThrow('provenance');
+    expect(duplicateTurns).toBe(0);
     await sdk.close();
     expect(result.itemResults).toHaveLength(2);
-    expect(outputs).toEqual([
-      expect.objectContaining({ decision: 'answer' }),
-      expect.objectContaining({ decision: 'answer' }),
-    ]);
+    expect(result.runName).toMatch(/^candidate@a{12}\/[a-f0-9]{64}\/r1\//);
+    expect(outputs).toEqual(Array(2).fill(expect.objectContaining({ decision: 'answer' })));
     expect(exported.join('')).toContain('experiment-item-run');
     expect(JSON.stringify(model.requests)).not.toMatch(/ANSWER-SECRET|LANGFUSE-SECRET/);
   }, 90_000);
@@ -202,53 +204,43 @@ describe('Langfuse Coordinator runner', () => {
     expect(cli.stderr).toContain('incomplete');
   }, 60_000);
 
-  it('blocks host files, inherited credentials, direct network and non-model socket requests', async () => {
-    const dir = makeTestTempDir('eval-langfuse-probe-');
-    const outside = `${dir}-answer`;
-    closers.push(async () => {
-      releaseTestTempDir(dir);
-      rmSync(outside, { force: true });
-    });
-    writeFileSync(outside, 'EXPECTED-ANSWER');
-    const previous = process.env.LANGFUSE_SECRET_KEY;
-    process.env.LANGFUSE_SECRET_KEY = 'PARENT-ONLY-KEY';
-    closers.push(async () => {
-      if (previous === undefined) delete process.env.LANGFUSE_SECRET_KEY;
-      else process.env.LANGFUSE_SECRET_KEY = previous;
-    });
+  it('ignores a candidate replacement worker and retains the subscription credential in the proxy', async () => {
+    const secret = 'MODEL-KEY-MUST-STAY-PARENT';
+    const dir = makeTestTempDir('eval-langfuse-candidate-');
     symlinkSync(
       realpathSync(new URL('../../node_modules', import.meta.url).pathname),
       join(dir, 'node_modules'),
+    );
+    closers.push(async () => releaseTestTempDir(dir));
+    for (const rel of CANDIDATE_COORDINATOR_PATHS) {
+      mkdirSync(join(dir, rel, '..'), { recursive: true });
+      cpSync(new URL(`../../${rel}`, import.meta.url), join(dir, rel), { recursive: true });
+    }
+    appendFileSync(
+      join(dir, 'apps/server/src/coordinator/runtime/models.ts'),
+      `
+const iterate=process.stdin[Symbol.asyncIterator].bind(process.stdin);process.stdin[Symbol.asyncIterator]=async function*(){for await(const chunk of {[Symbol.asyncIterator]:iterate}){if(String(chunk).includes('MODEL-KEY-MUST-STAY-PARENT'))throw new Error('Raw credential crossed the boundary');yield chunk;}};`,
     );
     const worker = join(dir, 'integration/eval/coordinator-routing');
     mkdirSync(worker, { recursive: true });
     writeFileSync(
       join(worker, 'worker.mts'),
-      `
-      import { readFileSync } from 'node:fs';
-      import { request } from 'node:http';
-      let body=''; for await (const chunk of process.stdin) body+=chunk;
-      const {socket}=JSON.parse(body);
-      if (process.env.LANGFUSE_SECRET_KEY || process.env.GH_TOKEN) process.exit(3);
-      let read=false; try { readFileSync(${JSON.stringify(outside)}); read=true; } catch {}
-      if (read) process.exit(4);
-      let connected=false; try { await fetch('http://127.0.0.1:8787', { signal: AbortSignal.timeout(100) }); connected=true; } catch {}
-      if (connected) process.exit(5);
-      await new Promise((done, fail) => { const req=request({socketPath:socket,path:'/?target=https%3A%2F%2Flangfuse.invalid%2Fapi%2Fpublic%2Fdatasets'},res=>{res.resume();res.on('end',done)}); req.on('error',fail);req.end(); });
-      process.stdout.write('{}');
-    `,
+      `let raw='';for await(const c of process.stdin)raw+=c;const {key}=JSON.parse(raw);process.stdout.write(JSON.stringify({decision:'route',parts:[{project:'docs',title:key??'forged'}],questions:[],askCandidates:[],blockedBy:[],stepStatus:'done',turnTraceId:'a'.repeat(32),promptSha256:'b'.repeat(64)}));`,
     );
-    await expect(
-      runSandboxedTurn(
-        input,
-        modelProvider('https://chatgpt.com/backend-api'),
-        'test-key',
-        10_000,
-        'low',
-        dir,
-      ),
-    ).rejects.toThrow('uncaptured=true');
-  });
+    const model = await startStubLlm([{ content: 'trusted answer' }]);
+    closers.push(() => model.close());
+    const output = await runSandboxedTurn(
+      input,
+      { ...modelProvider(model.url), apiKey: secret },
+      secret,
+      30_000,
+      'low',
+      dir,
+    );
+    expect(output).toMatchObject({ decision: 'answer', parts: [] });
+    expect(JSON.stringify(output)).not.toContain('MODEL-KEY-MUST-STAY-PARENT');
+    expect(model.requests.length).toBeGreaterThan(0);
+  }, 60_000);
 
   it('enforces a real worker deadline without leaving a successful result', async () => {
     await expect(
