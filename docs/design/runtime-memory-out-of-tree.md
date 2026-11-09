@@ -18,7 +18,7 @@ Keep worker runtime instructions, team memory and skill catalogs in the existing
 
 ## 3. Single path
 
-Delete runtime block writing, reconciliation and cleanup. Keep the existing backend brief composer as a pure in-memory composer; pass its result through systemPrompt. Pi retains SDK repository-context loading. Claude retains native CLAUDE.md loading and the existing AGENTS.md fallback, now read-only. Historical marker detection remains an independent leak diagnostic.
+Delete runtime block writing, reconciliation and cleanup. Keep the existing backend brief composer as a pure in-memory composer; pass its result through systemPrompt. Pi retains the SDK base prompt and repository-context loading through appendSystemPromptOverride. The existing runtime envelope is retained in memory so prompt identity extraction stops before SDK-added context. Claude retains native CLAUDE.md loading and the existing AGENTS.md fallback, now read-only. Historical marker detection remains an independent leak diagnostic.
 
 ## 4. Lockfile cause
 
