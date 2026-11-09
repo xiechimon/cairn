@@ -201,6 +201,9 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
+    owner: w.owner,
+    output: w.output,
+    section: w.section ?? null,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };

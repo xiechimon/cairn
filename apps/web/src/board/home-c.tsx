@@ -6,10 +6,11 @@ import {
   PackageCheck,
   Settings2,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
+import { questionDockState } from '../chief/question-dock-state.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -18,12 +19,7 @@ import type { QueryLike } from '../components/query-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { Button } from '../components/ui/button.js';
-import type {
-  ChiefStreamItem,
-  MachineRow,
-  ScheduleRecord,
-  TodoRecord,
-} from '../fixtures/records.js';
+import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { GitBranch, History, ListLines, Puzzle } from '../icons/index.js';
 import { ComposerSetupHint } from './composer-setup-hint.js';
@@ -33,9 +29,20 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { needsYouThreads } from './needs-you.js';
 import { NeedsYouTray } from './needs-you-tray.js';
 import { composeRequest } from './open-composer.js';
+import { TasksPanel } from './tasks-panel.js';
+import {
+  needsYouBadge,
+  type QuestionTarget,
+  type QuestionThreadView,
+  questionOpenStep,
+  scopeTasks,
+  type TasksView,
+} from './tasks-sections.js';
 import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
+
+const CHIEF_PARAM = 'chief';
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
@@ -86,11 +93,11 @@ interface HomeCProps {
   projectName: string | null;
   banner?: ReactNode;
   machines?: readonly MachineRow[];
-  schedules?: readonly ScheduleRecord[];
   coordinatorMachineId?: string | null;
   machinesQuery?: QueryLike;
   todosQuery?: QueryLike;
-  schedulesQuery?: QueryLike;
+  tasks: TasksView;
+  tasksQuery?: QueryLike;
 }
 
 function projectHomeSearch(params: URLSearchParams): string {
@@ -107,11 +114,11 @@ export function HomeC({
   projectName,
   banner,
   machines,
-  schedules = [],
   coordinatorMachineId = null,
   machinesQuery,
   todosQuery,
-  schedulesQuery,
+  tasks,
+  tasksQuery,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -167,6 +174,45 @@ export function HomeC({
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
   const entries = needsYouThreads(scoped);
+  const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
+  const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
+  const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const questionView: QuestionThreadView = {
+    threadId: chiefData.threadId ?? null,
+    stream: chiefData.stream ?? [],
+    hasEarlier: chiefData.hasEarlier === true,
+    loadingEarlier: surface.earlier?.loading === true,
+    failedEarlier: surface.earlier?.failed === true,
+    dismissing: questionDockState.isDismissing,
+  };
+  const openQuestion = (target: QuestionTarget) => {
+    const step = questionOpenStep(target, questionView);
+    if (step.kind === 'open-thread') {
+      const params = new URLSearchParams(searchParams);
+      params.set(CHIEF_PARAM, step.threadId);
+      setSearchParams(params, { replace: true, state: location.state });
+    }
+    setQuestionTarget(target);
+  };
+  const questionStep =
+    questionTarget === null || !loaded ? null : questionOpenStep(questionTarget, questionView);
+  const stepKind = questionStep?.kind ?? null;
+  const focusAt = questionStep?.kind === 'focus' ? questionStep.at : -1;
+  const loadEarlier = surface.earlier?.onLoad;
+  useEffect(() => {
+    if (questionTarget === null) return;
+    if (stepKind === 'focus') {
+      questionDockState.setFocus(focusAt);
+      if (questionDockState.isCollapsed(questionTarget.requestId))
+        questionDockState.toggleCollapsed(questionTarget.requestId);
+      setQuestionTarget(null);
+    } else if (stepKind === 'load-earlier') {
+      loadEarlier?.();
+    } else if (stepKind === 'missing') {
+      setQuestionTarget(null);
+    }
+  }, [questionTarget, stepKind, focusAt, loadEarlier]);
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
@@ -286,25 +332,28 @@ export function HomeC({
         loading={machinesQuery?.isPending === true}
       />
       <IconTooltip
-        label={t('任务')}
+        label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
         side="bottom"
         trigger={
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="sm"
+            data-testid="tasks-toggle"
             aria-pressed={pane === 'tasks' && threadId === null}
             onClick={() => togglePane('tasks')}
-            className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+            className="h-7.5 gap-1.5 px-2 text-meta font-normal text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
           />
         }
       >
         <ListChecks aria-hidden="true" />
-        {entries.length > 0 && (
+        {t('任务')}
+        {badge > 0 && (
           <span
-            data-testid="tasks-attention-dot"
-            aria-hidden="true"
-            className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
-          />
+            data-testid="tasks-badge"
+            className="min-w-5 rounded-full bg-(--card-button) px-1.5 text-center text-caption leading-4 font-semibold tabular-nums text-(--text-on-accent)"
+          >
+            {badge}
+          </span>
         )}
       </IconTooltip>
       <IconTooltip
@@ -328,22 +377,26 @@ export function HomeC({
   const workPanel =
     threadId !== null ? null : pane === 'machines' ? (
       <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
+    ) : pane === 'tasks' ? (
+      <TasksPanel
+        entries={scopedTasks.entries}
+        questions={scopedTasks.questions}
+        projectId={projectId}
+        now={now}
+        onClose={() => showPane(null)}
+        onOpenThread={openThread}
+        onOpenQuestion={openQuestion}
+        onNewTask={() => composerRef.current?.focus()}
+        query={tasksQuery}
+      />
     ) : (
       pane !== null && (
         <WorkPanel
-          pane={pane}
           todos={scoped}
-          projectId={projectId}
-          schedules={
-            projectId === null
-              ? schedules
-              : schedules.filter((schedule) => schedule.projectId === projectId)
-          }
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}
           todosQuery={todosQuery}
-          schedulesQuery={schedulesQuery}
         />
       )
     );

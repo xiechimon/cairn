@@ -69,7 +69,12 @@ import type {
   UpdateSkillBody,
   UserRecord,
 } from '@cairn/shared';
-import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
+import {
+  backupHealthSchema,
+  backupNotice,
+  SKILL_ENTRY_FILE,
+  tasksQuerySchema,
+} from '@cairn/shared';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -181,6 +186,13 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useTasks = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['tasks', teamId],
+    queryFn: async () => tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}`)),
     enabled: enabled && teamId !== undefined,
   });
 
