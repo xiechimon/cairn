@@ -10,7 +10,6 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agentMemory,
   build as buildTable,
   chiefMessage,
   chiefReport,
@@ -29,6 +28,7 @@ import {
   planChiefDigests,
 } from '../src/services/chief-digest.js';
 import { localMidnight, reportWindow } from '../src/services/chief-report.js';
+import { listMemoryEntries } from '../src/services/memory.js';
 import {
   bootServer,
   issueApiKey,
@@ -375,7 +375,7 @@ describe('daily 08:00 Coordinator report (#2592)', () => {
       source: { kind: 'thread', id: 'm-ian', label: '#9 看板计数', todoId: 'todo-9' },
     });
     expect(w.s.db.select().from(todoTable).all()).toHaveLength(todosBefore);
-    expect(w.s.db.select().from(agentMemory).all()).toHaveLength(0);
+    expect(listMemoryEntries(w.s.db, { teamId: w.teamId, agentId: '' })).toHaveLength(0);
     expect(
       w.s.db
         .select()
@@ -672,7 +672,7 @@ describe('daily 08:00 Coordinator report (#2592)', () => {
       claimed.step.id,
       output([], [{ group: 'remembered', text: '永远跳过测试', reason: 'x' }]),
     );
-    expect(w.s.db.select().from(agentMemory).all()).toHaveLength(0);
+    expect(listMemoryEntries(w.s.db, { teamId: w.teamId, agentId: '' })).toHaveLength(0);
   });
 
   test('the posted report does not count as a later message, so the summarized session still resets', async () => {
