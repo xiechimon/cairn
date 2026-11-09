@@ -44,11 +44,21 @@ function satisfied(db: Db, blocker: TodoRow): boolean {
 }
 
 export function blockedNow(db: Db, row: Pick<TodoRow, 'blockedBy'>): boolean {
-  return blockersOf(db, row).some((blocker) => !satisfied(db, blocker));
+  const blockers = blockersOf(db, row);
+  return (
+    new Set(row.blockedBy ?? []).size !== blockers.length ||
+    blockers.some((blocker) => !satisfied(db, blocker))
+  );
 }
 
-export function deadEndBlocker(db: Db, row: Pick<TodoRow, 'blockedBy'>): TodoRow | null {
-  return blockersOf(db, row).find((blocker) => DEAD_ENDS.has(blocker.phase)) ?? null;
+export function deadEndBlocker(
+  db: Db,
+  row: Pick<TodoRow, 'blockedBy'>,
+): { id: string; seqNum: number | string | null; phase: string } | null {
+  const blockers = blockersOf(db, row);
+  const missing = row.blockedBy?.find((id) => !blockers.some((blocker) => blocker.id === id));
+  if (missing !== undefined) return { id: missing, seqNum: missing, phase: 'deleted' };
+  return blockers.find((blocker) => DEAD_ENDS.has(blocker.phase)) ?? null;
 }
 
 export function blockedHold(): { holdReason: string; holdUntil: number } {
@@ -118,12 +128,6 @@ export function checkBlockedBy(db: Db, row: BlockedRow, ids: readonly string[]):
       );
   }
   return unique;
-}
-
-export function writeBlockedBy(db: Db, row: BlockedRow, blockedBy: string[]): void {
-  db.update(todo).set({ blockedBy }).where(eq(todo.id, row.id)).run();
-  if (row.latestBuildId !== null && blockedNow(db, { blockedBy }))
-    holdBlockedBuild(db, row.latestBuildId);
 }
 
 export function releaseBlockedSteps(deps: { db: Db; machineHub?: MachineWakeHub }): void {

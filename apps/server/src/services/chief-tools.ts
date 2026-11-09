@@ -36,7 +36,6 @@ import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
-import { checkBlockedBy, writeBlockedBy } from './blockers.js';
 import { applyBuildStepAction, cancelBuild, stopActiveStepsAfterExit } from './builds.js';
 import {
   addChiefWatch,
@@ -504,11 +503,7 @@ export async function executeChiefTool(
       const projectId = str(params, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
       const output = optTodoOutput(params, 'output');
-      const requested = optStrArr(params, 'blockedBy');
-      const blockedBy =
-        requested === undefined
-          ? undefined
-          : checkBlockedBy(db, { id: '', teamId: ctx.teamId, latestBuildId: null }, requested);
+      const blockedBy = optStrArr(params, 'blockedBy');
       const record = createAutonomousTodo(svc, {
         teamId: ctx.teamId,
         projectId,
@@ -521,9 +516,9 @@ export async function executeChiefTool(
         ownerId: ctx.userId,
         orchestration: { threadId: ctx.threadId },
         ...(output !== undefined ? { output } : {}),
+        ...(blockedBy !== undefined ? { blockedBy } : {}),
       });
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
-      if (blockedBy !== undefined) writeBlockedBy(db, record, blockedBy);
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
         actor: 'Coordinator',
@@ -532,10 +527,10 @@ export async function executeChiefTool(
     }
     case 'update_todo': {
       const todoId = str(params, 'todoId');
-      const owned = requireTeamTodo(db, todoId, ctx.teamId);
-      const requested = optStrArr(params, 'blockedBy');
-      const blockedBy = requested === undefined ? undefined : checkBlockedBy(db, owned, requested);
+      requireTeamTodo(db, todoId, ctx.teamId);
+      const blockedBy = optStrArr(params, 'blockedBy');
       const record = updateAutonomousTodo(svc, todoId, {
+        ...(blockedBy !== undefined ? { blockedBy } : {}),
         ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
         ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
         ...(params.tagIds !== undefined ? { tagIds: strArr(params, 'tagIds') } : {}),
@@ -544,9 +539,7 @@ export async function executeChiefTool(
           : {}),
       });
       if (!record) throw new HttpError(404, `todo ${todoId}`);
-      if (blockedBy === undefined) return json(record);
-      writeBlockedBy(db, owned, blockedBy);
-      return json(getTodo(svc, todoId));
+      return json(record);
     }
     case 'delete_todos': {
       const ids = strArr(params, 'todoIds');

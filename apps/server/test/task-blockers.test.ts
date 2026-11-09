@@ -1,12 +1,12 @@
 import { and, eq, like } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { build, step, todo } from '../src/db/schema.js';
 import { BLOCKED_BY_HOLD, releaseBlockedSteps } from '../src/services/blockers.js';
 import { enqueueStep } from '../src/services/builds.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
-import { seedSessionRoute } from './helpers.js';
+import { req, seedSessionRoute } from './helpers.js';
 
 registerChiefHarness();
 
@@ -93,6 +93,39 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     const id = await create();
     await relay('update_todo', { todoId: id, blockedBy: [blocker] });
     expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+  });
+
+  test.each(['tool', 'rest'] as const)(
+    'deleting a blocker through %s keeps its dependent held and owned',
+    async (route) => {
+      const blocker = await create();
+      const id = await create({ blockedBy: [blocker] });
+      if (route === 'tool') await relay('delete_todos', { todoIds: [blocker] });
+      else expect((await req(H.s.app, 'DELETE', `/api/todos/${blocker}`)).status).toBe(204);
+      releaseBlockedSteps(toolDeps());
+      reconcileOwners(toolDeps());
+      expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+      expect(getTodo(toolDeps(), id)?.owner).toBe('coordinator');
+      const record = getTodo(toolDeps(), id)!;
+      enqueueStep(toolDeps(), record.latestBuildId!, 'session', H.teamId, 'Continue.');
+      expect(sessions(id).every((entry) => entry.holdReason === BLOCKED_BY_HOLD)).toBe(true);
+      await relay('update_todo', { todoId: id, blockedBy: [] });
+      releaseBlockedSteps(toolDeps());
+      expect(sessions(id).every((entry) => entry.holdReason === null)).toBe(true);
+    },
+  );
+
+  test('a blocker-only update publishes the new dependency with an increased version', async () => {
+    const blocker = await create();
+    const id = await create();
+    const before = row(id).v;
+    const publish = vi.spyOn(H.s.hub, 'publishTodoDoc');
+    await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+    expect(row(id).v).toBeGreaterThan(before);
+    expect(publish).toHaveBeenCalledWith(
+      H.teamId,
+      expect.objectContaining({ id, blockedBy: [blocker], v: row(id).v }),
+    );
   });
 
   test('a step enqueued later on a blocked task is held at insert', async () => {

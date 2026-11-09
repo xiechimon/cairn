@@ -2,9 +2,9 @@ import { quoteIssueLines, RESEARCH_BEFORE_PLAN_SOURCE_KIND } from '@cairn/shared
 import { eq } from 'drizzle-orm';
 import { todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { checkBlockedBy, writeBlockedBy } from './blockers.js';
 import type { BuildDeps } from './builds.js';
 import { openResearchThread } from './research-thread.js';
+import { updateAutonomousTodo } from './todos.js';
 
 const TIER2_CHARS = 4_000;
 
@@ -32,11 +32,7 @@ function priorQuestion(title: string, spec: string | null): string {
   return lines.join('\n');
 }
 
-export function holdCodeThreadForPriorResearch(
-  deps: BuildDeps,
-  codeTodoId: string,
-  buildId: string,
-): void {
+export function holdCodeThreadForPriorResearch(deps: BuildDeps, codeTodoId: string): void {
   const row = deps.db.select().from(todo).where(eq(todo.id, codeTodoId)).get();
   if (row === undefined) return;
   if (researchBeforePlanReason(row.title, row.spec) === null) return;
@@ -55,10 +51,5 @@ export function holdCodeThreadForPriorResearch(
     if (error instanceof HttpError && (error.status === 409 || error.status === 404)) return;
     throw error;
   }
-  const target = { ...row, latestBuildId: buildId };
-  writeBlockedBy(
-    deps.db,
-    target,
-    checkBlockedBy(deps.db, target, [...(row.blockedBy ?? []), researchId]),
-  );
+  updateAutonomousTodo(deps, codeTodoId, { blockedBy: [...(row.blockedBy ?? []), researchId] });
 }

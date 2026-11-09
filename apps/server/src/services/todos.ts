@@ -43,7 +43,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { releaseBlockedSteps } from './blockers.js';
+import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
 import { triggerChiefWakes } from './chief.js';
 import { assertCorrectionDone } from './correction.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
@@ -320,6 +320,7 @@ export function createAutonomousTodo(
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
+    blockedBy?: string[];
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -338,6 +339,10 @@ export function createAutonomousTodo(
     .get();
   const now = nowMs();
   const id = newRecordId();
+  const blockedBy =
+    input.blockedBy === undefined
+      ? undefined
+      : checkBlockedBy(db, { id, teamId: input.teamId, latestBuildId: null }, input.blockedBy);
   const title =
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
   const selfIssue =
@@ -358,6 +363,7 @@ export function createAutonomousTodo(
       hasChanges: false,
       hasPlan: false,
       sourceTodo: null,
+      blockedBy,
       v: 1,
       createdBy: input.createdBy,
       ownerId: input.ownerId,
@@ -415,6 +421,7 @@ export function updateAutonomousTodo(
     orderIndex?: number;
     projectId?: string;
     routeOverride?: RouteOverride | null;
+    blockedBy?: string[];
   },
   opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
 ): TodoRecord | null {
@@ -423,6 +430,7 @@ export function updateAutonomousTodo(
   if (!row) return null;
 
   const sets: Partial<TodoRow> = {};
+  if (patch.blockedBy !== undefined) sets.blockedBy = checkBlockedBy(db, row, patch.blockedBy);
   const move =
     patch.projectId !== undefined && patch.projectId !== row.projectId
       ? planProjectMove(deps, row, patch.projectId, patch.tagIds ?? [])
@@ -496,6 +504,8 @@ export function updateAutonomousTodo(
     insertGateAnnouncement(deps, row.latestBuildId, DONE_ANNOUNCEMENT, deps.user.displayName);
   }
 
+  if (sets.blockedBy !== undefined && row.latestBuildId !== null)
+    holdBlockedBuild(db, row.latestBuildId);
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
