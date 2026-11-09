@@ -5,6 +5,7 @@ import { parseGithubRepoRef } from './project.js';
 import { routeOverrideSchema } from './routing-rule.js';
 import { snoozeModeSchema } from './snooze.js';
 import { quotaWaitSchema } from './step.js';
+import { taskRequestSchema } from './task-request.js';
 
 export const buildHistoryEntrySchema = z.object({
   buildId: recordId,
@@ -130,6 +131,10 @@ export const todoRecordSchema = z.object({
   verified: z.boolean().optional(),
   decisions: z.array(taskDecisionSchema).optional(),
   routeOverride: routeOverrideSchema.nullable().optional(),
+  request: z
+    .lazy(() => taskRequestSchema)
+    .nullable()
+    .optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoOwner = TodoRecord['owner'];

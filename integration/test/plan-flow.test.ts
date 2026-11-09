@@ -56,7 +56,7 @@ function extractProjectId(messages: unknown[]): string | null {
 }
 
 async function startPlanStub(opts: {
-  specs: string[];
+  cards: number;
   prose?: string;
 }): Promise<{ url: string; close: () => Promise<void> }> {
   let turn = 0;
@@ -131,14 +131,9 @@ async function startPlanStub(opts: {
     };
     if (turn === 1) {
       emitTool('projects', {});
-    } else if (turn <= 1 + opts.specs.length) {
+    } else if (turn <= 1 + opts.cards) {
       const projectId = extractProjectId(parsed.messages ?? []) ?? 'missing-project';
-      const spec = opts.specs[turn - 2] ?? opts.specs[0]!;
-      emitTool('create_todo', {
-        projectId,
-        title: `Plan card ${turn - 1}`,
-        spec,
-      });
+      emitTool('create_todo', { projectId });
     } else {
       const text = opts.prose ?? 'Plan written.';
       response.write(chunk({ ...base, choices: [{ index: 0, delta: { content: text } }] }));
@@ -279,11 +274,13 @@ describe('plan flow runner', () => {
     if (passCase === undefined) throw new Error('no plan case');
     const home = makeTestTempDir('cairn-plan-flow-');
     homes.push(home);
-    copyPlanFlow(home, [{ ...passCase, id: 'plan-pass' }], dataset.roster);
+    copyPlanFlow(
+      home,
+      [{ ...passCase, id: 'plan-pass', prompt: `${passCase.prompt} Add a regression test.` }],
+      dataset.roster,
+    );
     const stub = await startPlanStub({
-      specs: [
-        'Fix the download attribute on the Safari blob url export path and add a regression test.',
-      ],
+      cards: 1,
     });
     try {
       const { code, output } = await runRunner(home, {

@@ -77,18 +77,29 @@ test.each(['fresh', 'empty upgrade', 'configured upgrade'])(
         'plan',
         'notification',
         'push_subscription',
-      ];
+      ].map((table) => ({
+        table,
+        columns: sqlite
+          .prepare(`PRAGMA table_info(${table})`)
+          .all()
+          .map((column) => (column as { name: string }).name)
+          .join(', '),
+      }));
       const before =
         mode === 'fresh'
           ? []
-          : retainedTables.map((table) => sqlite.prepare(`SELECT * FROM ${table}`).all());
+          : retainedTables.map(({ table, columns }) =>
+              sqlite.prepare(`SELECT ${columns} FROM ${table}`).all(),
+            );
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
       expect(
         sqlite.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'feishu_binding%'").all(),
       ).toEqual([]);
       if (mode !== 'fresh')
         expect(
-          retainedTables.map((table) => sqlite.prepare(`SELECT * FROM ${table}`).all()),
+          retainedTables.map(({ table, columns }) =>
+            sqlite.prepare(`SELECT ${columns} FROM ${table}`).all(),
+          ),
         ).toEqual(before);
       const migrations = sqlite.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get();
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });

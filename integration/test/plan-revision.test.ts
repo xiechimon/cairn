@@ -3,6 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { TRANSCRIPT_PROMPT_ROW_ID_PREFIX } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import type { RosterAgent } from '../eval/chief-dispatch/grade.mts';
@@ -108,6 +109,25 @@ function extractTodoId(messages: unknown[], titleNeedle: string): string | null 
           return (item as { id: string }).id;
         }
       }
+    } catch {}
+  }
+  return null;
+}
+
+function ownerMessageIdFromHistory(messages: unknown[]): string | null {
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') continue;
+    const row = message as { role?: string; content?: unknown };
+    if (row.role !== 'tool' || typeof row.content !== 'string') continue;
+    try {
+      const parsed = JSON.parse(row.content) as { hits?: { id?: unknown; role?: unknown }[] };
+      const hit = parsed.hits?.find(
+        (h) =>
+          h.role === 'user' &&
+          typeof h.id === 'string' &&
+          !h.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX),
+      );
+      if (hit !== undefined) return hit.id as string;
     } catch {}
   }
   return null;
@@ -225,17 +245,11 @@ async function startRevisionStub(opts: {
     } else if (loggingId === null) {
       emitTool('todos', { projectId });
     } else if (opts.mode === 'adaptive' && wantsRevision && hasFeedback && loggingId !== null) {
-      emitTool('update_todo', {
-        todoId: loggingId,
-        title: 'Fix Safari export',
-        spec: 'Fix the download attribute on a blob url; keep the existing regression test card.',
-      });
+      const feedbackId = ownerMessageIdFromHistory(messages);
+      if (feedbackId === null) emitTool('search_history', { query: 'blob url' });
+      else emitTool('create_todo', { projectId, messageIds: [feedbackId] });
     } else if (opts.mode === 'adaptive' && wantsRevision && !hasFeedback && loggingId !== null) {
-      emitTool('update_todo', {
-        todoId: loggingId,
-        title: 'Add logging',
-        spec: 'Add logging to the export handler.',
-      });
+      emitTool('create_todo', { projectId });
     } else {
       const text = 'Acknowledged.';
       response.write(chunk({ ...base, choices: [{ index: 0, delta: { content: text } }] }));

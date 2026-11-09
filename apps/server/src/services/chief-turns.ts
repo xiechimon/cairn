@@ -258,9 +258,24 @@ export function steerChiefMessage(
   return { steered: true };
 }
 
+export function addTurnOwnerMessage(db: Db, threadId: string, messageId: string): void {
+  const running = liveChiefSteps(db, threadId).find((row) => row.status === 'claimed');
+  if (running === undefined) return;
+  const current = running.ownerMessageIds ?? [];
+  if (current.includes(messageId)) return;
+  db.update(step)
+    .set({ ownerMessageIds: [...current, messageId] })
+    .where(eq(step.id, running.id))
+    .run();
+}
+
 export function takeChiefSteer(db: Db, threadId: string): boolean {
   const live = liveChiefSteps(db, threadId);
   if (live.some((row) => row.holdReason === STEER_SENT_HOLD)) return false;
+  for (const waiting of live) {
+    if (waiting.status !== 'pending' || waiting.holdReason !== STEERED_HOLD) continue;
+    for (const id of waiting.ownerMessageIds ?? []) addTurnOwnerMessage(db, threadId, id);
+  }
   db.update(step)
     .set({ holdReason: STEER_SENT_HOLD })
     .where(
@@ -275,6 +290,10 @@ export function takeChiefSteer(db: Db, threadId: string): boolean {
 }
 
 export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {
+  return steeredMessages(db, running).map((message) => message.projectId);
+}
+
+function steeredMessages(db: Db, running: StepRow): { id: string; projectId: string | null }[] {
   if (running.claimedAt === null) return [];
   const claimedAt = running.claimedAt;
   return db
@@ -296,8 +315,7 @@ export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[
         .where(eq(step.id, message.id))
         .get();
       return queued === undefined || STEER_HOLDS.includes(queued.holdReason ?? '');
-    })
-    .map((message) => message.projectId);
+    });
 }
 
 export function ackChiefSteer(

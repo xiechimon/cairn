@@ -166,6 +166,7 @@ describe('a Coordinator turn records its project scope as data (D74 P3)', () => 
         threadId: H.threadId,
         requestId: 'ask-scope',
         questions: [{ header: 'scope', question: 'Which pages?', options: [] }],
+        askedFor: [],
       },
     );
     const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-scope')).get();

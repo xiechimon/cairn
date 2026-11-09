@@ -23,6 +23,7 @@ import {
   watchProvenance,
 } from '../src/services/chief.js';
 import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
+import { seedOwnerMessage } from './owner-message.js';
 
 async function call(
   app: Hono,
@@ -123,17 +124,21 @@ async function setup(): Promise<World> {
       return call(s.app, 'POST', `/api/machine/ask/${stepId}?holdMs=0`, { cred: token, body });
     },
     userTurn(prompt) {
-      enqueueChiefStep(
+      const ownerMessageId = seedOwnerMessage(s.db, thread.id, prompt);
+      const id = enqueueChiefStep(
         { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user },
         thread.id,
-        { prompt, trigger: 'user' },
+        { prompt, trigger: 'user', ownerMessageIds: [ownerMessageId] },
       );
+      expect(
+        s.db.select().from(stepTable).where(eq(stepTable.id, id)).get()?.ownerMessageIds,
+      ).toEqual([ownerMessageId]);
     },
     wake(provenance) {
       enqueueChiefStep(
         { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user },
         thread.id,
-        { prompt: '任务 #1 运行失败。', trigger: 'failed', provenance },
+        { prompt: '任务 #1 运行失败。', trigger: 'failed', provenance, ownerMessageIds: [] },
       );
     },
   };

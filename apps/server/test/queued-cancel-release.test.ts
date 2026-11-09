@@ -15,7 +15,7 @@ import {
   sweepZombieQueuedTodos,
 } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
 import { bootServer, pinSessionRoute, seedSessionRoute, type TestServer } from './helpers.js';
 
 registerChiefHarness();
@@ -47,11 +47,7 @@ describe('#1219 the chief cancel -> re-dispatch chain', () => {
   test('cancel a queued build: the todo falls back + a later open_thread succeeds + the new step is claimed within seconds', async () => {
     insertMachine(H.s, 'machine-rerun');
     pinSessionRoute(H.s, 'machine-rerun');
-    const todoRec = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: '被取消后重派',
-      spec: 's',
-    })) as { id: string };
+    const todoRec = (await relay('create_todo', ownerTodo('被取消后重派'))) as { id: string };
     const started = (await relay('open_thread', { todoId: todoRec.id })) as { buildId: string };
     const buildId = started.buildId;
 

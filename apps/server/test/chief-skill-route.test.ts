@@ -150,6 +150,7 @@ describe('claim-surface skill routing (#823)', () => {
       prompt: '任务 #1 已合并完成（done）。请向用户汇报。',
       trigger: 'settle',
       provenance: 'watch:test',
+      ownerMessageIds: [],
     });
     const claimed = await claim(await claimToken());
     expect(claimed.chief?.systemPrompt).not.toContain('发送后自动检测');
