@@ -269,6 +269,22 @@ describe('projectColdMessages', () => {
     expect(out.some((message) => userText(message).includes('<summary>'))).toBe(true);
     expect(out.some((message) => userText(message) === 'now')).toBe(true);
   });
+
+  it('replaces a stale durable summary when catch-up supplies a newer hint', () => {
+    const stale: Message = {
+      role: 'user',
+      content:
+        'Earlier turns were compacted into the following summary:\n\n<summary>\nstale seed</summary>\n\nOlder detail is in the summary, todos, and read_history.',
+      timestamp: 1,
+    };
+    const out = projectColdMessages([stale, user('old'), assistant('a'), user('now')], {
+      summaryHint: 'catch-up folded later turns',
+    });
+    const summaries = out.filter((message) => userText(message).includes('<summary>'));
+    expect(summaries).toHaveLength(1);
+    expect(userText(summaries[0]!)).toContain('catch-up folded later turns');
+    expect(userText(summaries[0]!)).not.toContain('stale seed');
+  });
 });
 
 describe('coldWindowStartFromRows', () => {

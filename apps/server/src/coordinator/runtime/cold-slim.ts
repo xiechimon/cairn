@@ -261,15 +261,15 @@ export function selectColdMessageWindow(
 export function injectSummaryHint(messages: readonly Message[], summary: string): Message[] {
   const text = summary.trim();
   if (text === '') return [...messages];
-  if (messages.some(isSummaryUser)) return [...messages];
   const hint: Message = {
     role: 'user',
     content: `Earlier turns were compacted into the following summary:\n\n<summary>\n${text}\n</summary>\n\nOlder detail is in the summary, todos, and read_history.`,
     timestamp: Date.now(),
   };
-  const firstNonSystem = messages.findIndex((message) => message.role !== 'system');
-  if (firstNonSystem < 0) return [...messages, hint];
-  return [...messages.slice(0, firstNonSystem), hint, ...messages.slice(firstNonSystem)];
+  const withoutStale = messages.filter((message) => !isSummaryUser(message));
+  const firstNonSystem = withoutStale.findIndex((message) => message.role !== 'system');
+  if (firstNonSystem < 0) return [...withoutStale, hint];
+  return [...withoutStale.slice(0, firstNonSystem), hint, ...withoutStale.slice(firstNonSystem)];
 }
 
 export function projectColdMessages(

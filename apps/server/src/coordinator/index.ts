@@ -501,8 +501,46 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (payload === null) throw new Error('Coordinator step has no chief thread');
       let coldSlim = payload.coldSlim;
       if (coldSlim.cold) {
+        const prior = db
+          .select()
+          .from(chiefSummary)
+          .where(eq(chiefSummary.threadId, row.buildId))
+          .get();
+        const newestFirst = db
+          .select({
+            at: chiefMessage.createdAt,
+            rowid: sql<number>`rowid`,
+            role: chiefMessage.role,
+          })
+          .from(chiefMessage)
+          .where(
+            and(
+              eq(chiefMessage.threadId, row.buildId),
+              ne(chiefMessage.role, 'system'),
+              not(like(chiefMessage.id, 'chief-digest-%')),
+              not(like(chiefMessage.id, 'chief-report-%')),
+            ),
+          )
+          .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+          .limit(COLD_RECENT_EXCHANGES * 4)
+          .all();
+        const windowStart = coldWindowStartFromRows(newestFirst);
+        const lagging =
+          windowStart !== null &&
+          (prior === undefined ||
+            prior.coveredAt < windowStart.at ||
+            (prior.coveredAt === windowStart.at && prior.coveredRowid < windowStart.rowid));
+        const beforeGeneration = prior?.generation ?? 0;
         const summaryHint = await catchUpColdSummary(row.buildId, teamId, providers);
-        coldSlim = { cold: true, summaryHint };
+        const afterGeneration =
+          db.select().from(chiefSummary).where(eq(chiefSummary.threadId, row.buildId)).get()
+            ?.generation ?? 0;
+        const catchUpAdvanced = afterGeneration > beforeGeneration;
+        if (lagging && !catchUpAdvanced) {
+          coldSlim = { cold: false, summaryHint: null };
+        } else {
+          coldSlim = { cold: true, summaryHint };
+        }
       }
       await runtime.runTurn({
         claimed: payload.claimed,
