@@ -13,14 +13,12 @@ import { build, message, project, step, threadPr, todo } from '../src/db/schema.
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
 import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
 import { type AppToken, type AutonomousToken, registerAppToken } from '../src/lib/github-token.js';
+import { recordAnswer } from '../src/services/answer-delivery.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
 import { CAP_REVIEW_FOCUS, createPrWakes, focusedCodexReview } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
-import {
-  answerWorkerQuestionsById,
-  writeWorkerQuestion,
-} from '../src/services/worker-question-store.js';
+import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
 import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
@@ -574,7 +572,7 @@ test('pending blocking worker question prevents release until answered', async (
   await f.reconcile();
   expect(f.state.draft).toBe(true);
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(false);
-  answerWorkerQuestionsById({ db: f.s.db }, 'b', ['question'], 'Proceed');
+  recordAnswer({ db: f.s.db }, 'b', 'question', { text: 'Proceed', by: 'person' });
   await f.reconcile();
   expect(f.state.draft).toBe(false);
   expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);

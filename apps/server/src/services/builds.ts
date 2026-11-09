@@ -18,6 +18,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  ANSWERS_CONTINUE_PROMPT,
   ASK_USER_QUESTION_KIND,
   buildFallbackReport,
   buildPlanContractRewritePrompt,
@@ -111,6 +112,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
@@ -437,7 +439,9 @@ export async function sendBuildSteer(
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
       if (continuationOptions.answer !== undefined)
         settleQuestionAnswers(deps, conversationId, [continuationOptions.answer]);
-      else if (human) settleWorkerReply(deps, conversationId, body.content);
+      const answered =
+        continuationOptions.answer !== undefined ||
+        (human && settleWorkerReply(deps, conversationId, body.content) > 0);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
@@ -472,7 +476,7 @@ export async function sendBuildSteer(
         });
       }
       if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
-      if (running) {
+      if (running && !answered) {
         db.insert(steerPending)
           .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
           .onConflictDoUpdate({
@@ -520,7 +524,7 @@ export async function sendBuildSteer(
                 ? 'session'
                 : 'build',
             todoRow.teamId,
-            body.content,
+            answered ? ANSWERS_CONTINUE_PROMPT : body.content,
             false,
             human && !continuationOptions.schedule,
           );
@@ -3132,6 +3136,26 @@ export function completeStep(
 
   finishScheduledStep(deps, stepRow);
 
+  if (
+    receivesAnswers(stepRow.kind) &&
+    pendingWorkerQuestions(deps.db, stepRow.buildId).length === 0 &&
+    undeliveredAnswers(deps.db, stepRow.buildId).length > 0
+  ) {
+    const working = stepRow.kind === 'plan' ? 'planning' : 'building';
+    if (todoRow.phase !== working && canTransitionPhase(todoRow.phase, working)) {
+      setTodoPhase(deps, todoRow.id, working);
+    }
+    enqueueStep(
+      deps,
+      stepRow.buildId,
+      stepRow.kind,
+      todoRow.teamId,
+      ANSWERS_CONTINUE_PROMPT,
+      false,
+      true,
+    );
+    return;
+  }
   if (stepRow.kind === 'plan') {
     const planDoc = deps.db
       .select({ id: planTable.id })

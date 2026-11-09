@@ -12,12 +12,12 @@ import { build, message, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
+import { recordAnswer } from './answer-delivery.js';
 import { postThreadReport } from './chief.js';
 import { ASK_PARK_MS } from './chief-questions.js';
 import { reconcileOwners } from './owner.js';
 import { getTodo, type TodoDeps } from './todos.js';
 import {
-  answerWorkerQuestionsById,
   pendingWorkerQuestions,
   readWorkerQuestion,
   updateWorkerQuestion,
@@ -131,16 +131,14 @@ export interface QuestionAnswer {
   by: TaskDecision['by'];
 }
 
-export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string): void {
-  settleQuestionAnswers(
-    deps,
-    buildId,
-    pendingWorkerQuestions(deps.db, buildId).map((question) => ({
-      question,
-      answer: text,
-      by: 'person' as const,
-    })),
-  );
+export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string): number {
+  const answers = pendingWorkerQuestions(deps.db, buildId).map((question) => ({
+    question,
+    answer: text,
+    by: 'person' as const,
+  }));
+  settleQuestionAnswers(deps, buildId, answers);
+  return answers.length;
 }
 
 export function settleQuestionAnswers(
@@ -154,8 +152,8 @@ export function settleQuestionAnswers(
       throw new HttpError(409, `requestId ${question.requestId} is no longer pending`);
     }
   }
-  for (const { question, answer } of answers) {
-    answerWorkerQuestionsById(deps, buildId, [question.requestId], answer);
+  for (const { question, answer, by } of answers) {
+    recordAnswer(deps, buildId, question.requestId, { text: answer, by });
   }
   const todoRow = todoOfBuild(deps, buildId);
   const at = nowMs();

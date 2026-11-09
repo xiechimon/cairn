@@ -1,9 +1,10 @@
+import { ANSWERS_CONTINUE_PROMPT } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build, message, project, steerPending, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
-import { claimStep } from '../src/services/machines.js';
+import { ackSteer, claimStep, fetchSteer } from '../src/services/machines.js';
 import { listNeedsYou, sweepFailedRetries } from '../src/services/needs-you.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
@@ -178,8 +179,16 @@ describe('a parked question is its own phase and wakes the Coordinator', () => {
     });
     const [resumed] = pendingWork(buildId);
     if (resumed === undefined) throw new Error('no resumed step');
-    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, resumed.id)).run();
+    H.s.db
+      .update(step)
+      .set({ status: 'claimed', machineId: stepRow.machineId })
+      .where(eq(step.id, resumed.id))
+      .run();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    ackSteer(deps(), { id: stepRow.machineId, teamId: H.teamId }, resumed.id, {
+      answerIds: [zeroChangeId(buildId)],
+      via: 'session-start',
+    });
     endStep(resumed.id, { hasChanges: false });
     expect(phaseOf(todoId)).toBe('review');
     const asked = H.s.db
@@ -207,7 +216,7 @@ describe('answer_question answers one request id on the same build', () => {
     const resumed = pendingWork(buildId).filter((row) => row.kind !== 'chief');
     expect(resumed).toHaveLength(1);
     expect(resumed[0]?.freshSession).toBe(false);
-    expect(resumed[0]?.prompt).toContain('Repo rule wins');
+    expect(resumed[0]?.prompt).toBe(ANSWERS_CONTINUE_PROMPT);
   });
 
   test('a failed task with a pending question resumes on the same build instead of restarting', async () => {
@@ -339,13 +348,12 @@ describe('answer_question answers one request id on the same build', () => {
       answer: 'Repo rule wins.',
     })) as { delivered: string };
     expect(out.delivered).toBe('steer');
-    const steer = H.s.db
-      .select()
-      .from(steerPending)
-      .where(eq(steerPending.conversationId, buildId))
-      .get();
-    expect(steer?.stepId).toBe(stepRow.id);
-    expect(steer?.content).toContain('Repo rule wins.');
+    expect(
+      H.s.db.select().from(steerPending).where(eq(steerPending.conversationId, buildId)).get(),
+    ).toBeUndefined();
+    expect(fetchSteer(deps(), { id: stepRow.machineId }, stepRow.id).answers).toEqual([
+      { requestId: REQUEST_A, text: 'Repo rule wins.' },
+    ]);
   });
 
   test('the Coordinator cannot answer a pending question by free text: message_thread points at answer_question', async () => {
