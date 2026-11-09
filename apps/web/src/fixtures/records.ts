@@ -323,6 +323,12 @@ export interface DocBlock {
   segments: DocSegment[];
 }
 
+export interface FailFacts {
+  files: number | null;
+  commit: string | null;
+  pr: number | null;
+}
+
 export type WorkStep =
   | { kind: 'think'; id: string; text: string; seconds: number | null }
   | {
@@ -386,7 +392,15 @@ export type TranscriptItem =
   | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
   | { kind: 'automation-completed'; id: string }
   | { kind: 'chief' }
-  | { kind: 'fail'; title: string; body: string; raw?: string; id?: string; createdAt?: number }
+  | {
+      kind: 'fail';
+      title: string;
+      body: string;
+      raw?: string;
+      facts?: FailFacts;
+      id?: string;
+      createdAt?: number;
+    }
   | {
       kind: 'question';
       id: string;

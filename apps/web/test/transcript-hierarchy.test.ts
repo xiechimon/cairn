@@ -151,8 +151,9 @@ describe('task thread hierarchy', () => {
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
     expect(fails[0]).toMatchObject({
-      title: '本步异常结束：git commit failed (exit 1)',
-      body: '改动 2 个文件 · 提交 a1cfe71e8 · 未开 PR',
+      title: 'git commit failed (exit 1)',
+      body: '',
+      facts: { files: 2, commit: 'a1cfe71e8', pr: null },
       raw: GIT_ERROR,
     });
     expect(items.filter((item) => item.kind === 'note')).toEqual([
@@ -175,7 +176,30 @@ describe('task thread hierarchy', () => {
     });
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
-    expect(fails[0]).toMatchObject({ raw: reason, body: '改动 2 个文件 · 提交 a1cfe71e8 · 未开 PR' });
+    expect(fails[0]).toMatchObject({ raw: reason, facts: { files: 2, commit: 'a1cfe71e8', pr: null } });
+  });
+
+  test('a structured failure keeps the recovery guidance for its failure class', () => {
+    const offline = JSON.stringify({
+      kind: 'build-failure',
+      reason: 'request timed out talking to the model',
+      files: null,
+      commits: [],
+      pr: null,
+    });
+    const items = mapTranscript({
+      messages: rows([['system', offline]]),
+      steps: [],
+      plans: [],
+      build: { ...FAILED_BUILD, errorMessage: 'request timed out talking to the model' },
+      todo: todo(1, 'failed'),
+      machineName: null,
+      userName: 'ian',
+      liveText: '',
+    });
+    const fails = items.filter((item) => item.kind === 'fail');
+    expect(fails).toHaveLength(1);
+    expect(fails[0]).toMatchObject({ body: '请将其重新上线，或重新运行任务以改派其他机器。' });
   });
 
   test('a failed build without a failure row still shows its error once', () => {

@@ -87,6 +87,14 @@ export const EN: Record<string, string> = {
   '已加载 {n} 个技能': 'Skills loaded: {n}',
   '还有 {n} 行': '{n## more line|# more lines}',
   无输出: 'No output',
+  '本步异常结束：{reason}': 'This step ended abnormally: {reason}',
+  '改动 {n} 个文件': 'Changed {n#1 file|# files}',
+  '提交 {sha}': 'Commit {sha}',
+  'PR #{n}': 'PR #{n}',
+  '未开 PR': 'No PR',
+  'git 凭据': 'git credentials',
+  'integration：每步下发的 token': 'integration: a token issued for each step',
+  'machine：执行机本机的 git 凭据': "machine: the executor machine's own git credentials",
   未完成: 'Not finished',
 
   // —— shared chrome / sidebar (r2 §1.1) ——

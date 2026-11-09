@@ -974,8 +974,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
 const REWORK_REUSE_HEAD = '返工回到本分支继续';
 
 const CREDENTIAL_SOURCE_DETAIL = {
-  integration: 'per-step 下发 token',
-  machine: '执行机本机 git 凭据',
+  integration: 'integration：每步下发的 token',
+  machine: 'machine：执行机本机的 git 凭据',
 } as const;
 
 function systemRowItem(row: SystemRow, id: string, createdAt: number): TranscriptItem | ToolEntry {
@@ -1009,7 +1009,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           id,
           action: 'setup',
           label: 'git',
-          description: `git 凭据 · ${row.source}`,
+          description: 'git 凭据',
           output: CREDENTIAL_SOURCE_DETAIL[row.source],
           error: false,
           running: false,
@@ -1024,14 +1024,13 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
         kind: 'fail',
         id,
         createdAt,
-        title: `本步异常结束：${stripAnsiEscapes(headline)}`,
-        body: [
-          row.files !== null ? `改动 ${row.files.length} 个文件` : null,
-          row.commits[0] !== undefined ? `提交 ${row.commits[0].slice(0, 9)}` : null,
-          row.pr !== null ? `PR #${row.pr.number}` : '未开 PR',
-        ]
-          .filter((part): part is string => part !== null)
-          .join(' · '),
+        title: stripAnsiEscapes(headline),
+        body: failGuidanceBody(classifyStepFailure(row.reason)),
+        facts: {
+          files: row.files?.length ?? null,
+          commit: row.commits[0]?.slice(0, 9) ?? null,
+          pr: row.pr?.number ?? null,
+        },
         raw: stripAnsiEscapes(row.reason),
       };
     }

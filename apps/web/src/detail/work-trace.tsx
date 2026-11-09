@@ -48,7 +48,14 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
   const [open, setOpen] = useState(false);
   const [animate] = useState(enter);
   const call = step.kind === 'call' ? step : null;
-  const lines = call ? (call.output ?? t('无输出')).split('\n') : [];
+  const lines = call
+    ? (call.output === null
+        ? t('无输出')
+        : call.action === 'setup'
+          ? t(call.output)
+          : call.output
+      ).split('\n')
+    : [];
   const changes = call?.changes;
   const changeLines = changes
     ? [
@@ -86,6 +93,8 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             >
               {preview}
             </span>
+          ) : call.action === 'setup' ? (
+            t(stepTarget(call))
           ) : (
             stepTarget(call)
           )
