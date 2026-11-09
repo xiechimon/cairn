@@ -143,8 +143,8 @@ export const todo = sqliteTable(
     sourceRef: text('sourceRef'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
     awaitingReply: bool('awaitingReply').notNull().default(false),
-    lastNotifiedOwner: text('lastNotifiedOwner').$defaultFn(() => 'none'),
-    lastNotifiedWork: text('lastNotifiedWork').$defaultFn(() => ''),
+    lastNotifiedOwner: text('lastNotifiedOwner').default('none'),
+    lastNotifiedWork: text('lastNotifiedWork').default(''),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()

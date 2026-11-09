@@ -6169,14 +6169,16 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'none'"
         },
         "lastNotifiedWork": {
           "name": "lastNotifiedWork",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

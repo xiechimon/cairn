@@ -464,7 +464,7 @@
           "apps/server/src/routes-push.ts",
           "apps/server/src/services/push.ts",
           "apps/server/src/services/push-alerts.ts",
-          "apps/server/src/services/thread-push.ts"
+          "apps/server/src/services/owner.ts"
         ]
       },
       "routes": {
