@@ -6,7 +6,7 @@ import {
   redactSecrets,
   threadMessageBodySchema,
 } from '@cairn/shared';
-import { and, desc, eq, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
@@ -16,7 +16,7 @@ import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
 import { PhaseTransitionError } from './phase.js';
-import { messageThreadAsUser, startThreadBuild } from './thread-message.js';
+import { answerTaskQuestion, messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 type Params = Record<string, unknown>;
@@ -26,6 +26,7 @@ const TITLE_MAX = 160;
 const LINE_MAX = 200;
 const QUESTION_TEXT_MAX = 400;
 const OPTION_LABELS_MAX = 8;
+const ANSWER_MAX = 20_000;
 
 const ROUTER_TOOLS: ReadonlySet<string> = new Set(CHIEF_ROUTER_TOOL_NAMES);
 const REMOVED_TOOLS: ReadonlyMap<string, string> = new Map(
@@ -114,6 +115,25 @@ async function messageThread(
   );
 }
 
+async function answerQuestion(
+  deps: ChiefToolDeps,
+  ctx: ChiefToolCtx,
+  params: Params,
+): Promise<string> {
+  const answer = str(params, 'answer');
+  if (answer.length > ANSWER_MAX) {
+    throw new HttpError(400, `invalid params.answer: at most ${ANSWER_MAX} characters`);
+  }
+  return json(
+    await answerTaskQuestion(
+      deps,
+      ctx.teamId,
+      { todoId: str(params, 'todoId'), requestId: str(params, 'requestId'), answer },
+      'coordinator',
+    ),
+  );
+}
+
 function stopThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
   const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
   str(params, 'reason');
@@ -161,7 +181,6 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
       title: tidy(row.title, TITLE_MAX),
       projectId: row.projectId,
       phase: row.phase,
-      awaitingReply: row.awaitingReply,
       line: line === null || line === undefined ? null : tidy(line, LINE_MAX),
       stopped:
         stop === null || stop === undefined ? null : { actor: stop.actor, reason: stop.reason },
@@ -189,13 +208,13 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
       and(
         eq(todo.teamId, ctx.teamId),
         isNull(todo.archivedAt),
-        eq(todo.awaitingReply, true),
-        ne(todo.phase, 'closed'),
+        inArray(todo.phase, ['needs_input', 'failed', 'building', 'planning']),
         isNotNull(todo.latestBuildId),
       ),
     )
     .orderBy(desc(todo.phaseAt))
-    .all();
+    .all()
+    .filter((row) => pendingWorkerQuestions(db, row.latestBuildId as string).length > 0);
   const askingIds = new Set(asking.map((row) => row.id));
   const questions = asking.map((row) => ({
     todoId: row.id,
@@ -238,6 +257,8 @@ export async function executeRouterTool(
       return messageThread(deps, ctx, params);
     case 'stop_thread':
       return stopThread(deps, ctx, params);
+    case 'answer_question':
+      return answerQuestion(deps, ctx, params);
     case 'threads':
       return threads(deps.db, ctx, params);
     case 'needs_you':

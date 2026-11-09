@@ -5,6 +5,7 @@ import {
   isChiefConversationId,
   isChiefDigestThreadId,
   orchestrationSourceRef,
+  WAITING_PHASES,
 } from '@cairn/shared';
 import { and, asc, desc, eq, exists, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -333,7 +334,7 @@ export async function executeThreadMcpTool(
           and(
             eq(todo.teamId, teamId),
             eq(project.teamId, teamId),
-            inArray(todo.phase, ['confirm', 'review', 'failed']),
+            inArray(todo.phase, [...WAITING_PHASES, 'failed']),
             sql`${todo.archivedAt} is null`,
             or(eq(todo.ownerId, deps.user.id), sql`${todo.ownerId} is null`),
             projectId === undefined ? undefined : eq(todo.projectId, projectId),

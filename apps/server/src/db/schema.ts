@@ -45,6 +45,7 @@ import type {
   SnoozeMode,
   SplitPolicy,
   StepKind,
+  TaskDecision,
   TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
@@ -167,7 +168,7 @@ export const todo = sqliteTable(
     issueState: text('issueState').$type<'open' | 'closed' | null>(),
     supersededBy: text('supersededBy'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
-    awaitingReply: bool('awaitingReply').notNull().default(false),
+    decisions: json<TaskDecision[]>('decisions').notNull().default(sql`'[]'`),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()

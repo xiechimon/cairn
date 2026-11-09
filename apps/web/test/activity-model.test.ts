@@ -203,6 +203,12 @@ describe('searchTodosLocally', () => {
   const search = (query: string) =>
     searchTodosLocally(todos, (id) => projects.get(id), parseSearchQuery(query, NOON));
 
+  test('is:waiting includes a task waiting for an answer', () => {
+    const asking = [make('asking-cairn', 'needs_input', 'p1', HOUR, 0)];
+    const result = searchTodosLocally(asking, (id) => projects.get(id), parseSearchQuery('is:waiting', NOON));
+    expect(result.todos.map((t) => t.id)).toEqual(['asking-cairn']);
+  });
+
   test('is: maps to phases', () => {
     expect(ids('is:failed')).toEqual(['failed-cairn', 'failed-docs']);
     expect(ids('is:waiting')).toEqual(['review-cairn']);

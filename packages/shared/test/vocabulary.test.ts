@@ -52,14 +52,15 @@ import {
   WORKER_MEMORY_REMOTE_TOOLS,
 } from '../src/index.js';
 
-describe('phase nine values authoritative single source (02 §4.1, locked)', () => {
-  it('is exactly the nine docs-ordered values', () => {
+describe('phase ten values authoritative single source (02 §4.1, locked)', () => {
+  it('is exactly the ten docs-ordered values', () => {
     expect(PHASE_VALUES).toEqual([
       'todo',
       'queued',
       'planning',
       'confirm',
       'building',
+      'needs_input',
       'review',
       'done',
       'failed',

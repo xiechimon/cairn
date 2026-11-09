@@ -20,7 +20,7 @@ describe('the side chat action card', () => {
   });
 
   it('leaves a question from the thread to the composer', () => {
-    expect(threadActionOf(todo({ phase: 'review', awaitingReply: true }), false)).toBeNull();
+    expect(threadActionOf(todo({ phase: 'needs_input' }), false)).toBeNull();
   });
 
   it('asks to unarchive before anything else', () => {

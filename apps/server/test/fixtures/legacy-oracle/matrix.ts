@@ -502,6 +502,13 @@ function same(label: string, actual: unknown, expected: unknown): void {
   check(a === e, `${label}: after ${a} but legacy ${e}`);
 }
 
+const ROUTED_TASK_COLUMNS = {
+  teamId: schema.todo.teamId,
+  sourceKind: schema.todo.sourceKind,
+  routeOverride: schema.todo.routeOverride,
+  createdBy: schema.todo.createdBy,
+};
+
 function compareCell(
   db: ReturnType<typeof openDbWithHandle>['db'],
   _legacyDb: Database.Database,
@@ -540,7 +547,7 @@ function compareCell(
       .where(and(eq(schema.routingRule.teamId, t), eq(schema.routingRule.use, 'coordinator')))
       .get();
     const imported = db
-      .select()
+      .select(ROUTED_TASK_COLUMNS)
       .from(schema.todo)
       .where(eq(schema.todo.id, `todo-chief-${t}`))
       .get();
@@ -548,7 +555,7 @@ function compareCell(
     return;
   }
   const todoRow = db
-    .select()
+    .select(ROUTED_TASK_COLUMNS)
     .from(schema.todo)
     .where(eq(schema.todo.id, `todo-${t}`))
     .get();
@@ -556,7 +563,7 @@ function compareCell(
   if (todoRow === undefined) return;
   if (cell.role === 'citation') {
     const citation = db
-      .select()
+      .select(ROUTED_TASK_COLUMNS)
       .from(schema.todo)
       .where(eq(schema.todo.id, `todoc-${t}`))
       .get();
