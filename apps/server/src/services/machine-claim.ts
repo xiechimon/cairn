@@ -89,12 +89,12 @@ import { recordStepRoute, routedModelRunsOn } from './step-route.js';
 import { listProjectTagVocab } from './tags.js';
 import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
-import { decidedSpecOf, setTodoPhase } from './todos.js';
+import { setTodoPhase } from './todos.js';
 
 function workerSkillInjection(
   deps: MachineDeps,
   agentRow: { defaultSkill: string | null; skillsAllowlist: readonly string[] | null },
-  todoRow: Pick<typeof todo.$inferSelect, 'title' | 'spec' | 'decisions'>,
+  todoRow: { title: string; spec: string },
 ): SkillInjectionRecord {
   const scanned = new Map(scanLocalSkills(deps.skillsDir).map((s) => [s.id, s]));
   const granted =
@@ -107,10 +107,7 @@ function workerSkillInjection(
       ? { id, name: id, description: null }
       : { id: s.id, name: s.name, description: s.description };
   });
-  const hits = selectSkillsForTask(
-    buildTaskPromptText(todoRow.title, decidedSpecOf(todoRow)),
-    candidates,
-  );
+  const hits = selectSkillsForTask(buildTaskPromptText(todoRow.title, todoRow.spec), candidates);
   return { hits };
 }
 
@@ -588,7 +585,8 @@ async function tryClaim(
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,
         title: cand.todoRow.title,
-        spec: decidedSpecOf(cand.todoRow),
+        spec: cand.todoRow.spec,
+        ...(cand.todoRow.decisions.length > 0 ? { decisions: cand.todoRow.decisions } : {}),
         ...(taskMeta !== undefined ? { meta: taskMeta } : {}),
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,

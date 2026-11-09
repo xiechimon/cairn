@@ -346,7 +346,7 @@ describe('answer_question answers one request id on the same build', () => {
 });
 
 describe('decisions are stored on the task and survive restarts', () => {
-  test('a restart after a ruling carries the ruling in the new build first claimed spec', async () => {
+  test('a restart after a ruling claims the unchanged brief with the ruling as a separate decisions field', async () => {
     const machineId = insertMachine(H.s);
     const { todoId, stepRow } = await askAndPark();
     endStep(stepRow.id);
@@ -379,7 +379,10 @@ describe('decisions are stored on the task and survive restarts', () => {
     H.s.db.delete(step).where(eq(step.kind, 'chief')).run();
     const claimed = await claimStep(deps() as never, machineId, H.teamId, 0, 'http://localhost');
     expect(claimed?.conversationId).toBe(restarted);
-    expect(claimed?.todo?.spec).toContain('Repo rule wins; rewrite the banned string.');
+    expect(claimed?.todo?.spec).toBe('Copy the onboarding text byte-for-byte.');
+    expect(claimed?.todo?.decisions).toEqual([
+      expect.objectContaining({ answer: 'Repo rule wins; rewrite the banned string.' }),
+    ]);
   });
 });
 

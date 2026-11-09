@@ -152,32 +152,6 @@ afterEach(async () => {
 });
 
 describe('verification dispatch driven by the routing rules', () => {
-  test('the verify prompt judges against the brief with its recorded decisions', async () => {
-    world = await setup();
-    const w = world;
-    const buildId = await w.startBuild();
-    const author = await w.claim();
-    await w.done(author.stepId, { status: 'success', hasChanges: true, commit: HEAD });
-    w.s.db
-      .update(todoTable)
-      .set({
-        decisions: [
-          {
-            requestId: 'ask-1',
-            question: 'Which wins?',
-            answer: 'Repo rule wins.',
-            by: 'person',
-            at: 1,
-          },
-        ],
-      })
-      .where(eq(todoTable.id, w.todoId))
-      .run();
-    w.enqueueVerify(buildId);
-    const queued = w.stepsOf(buildId).find((row) => row.kind === 'verify');
-    expect(queued?.prompt).toContain('Repo rule wins.');
-  });
-
   test('a delivered build queues one verify step bound to its head; the verifier claims it and the verdict lands', async () => {
     world = await setup();
     const w = world;

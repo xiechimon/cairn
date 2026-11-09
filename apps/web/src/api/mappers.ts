@@ -203,7 +203,6 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
-    ...(w.decisions !== undefined ? { decisions: w.decisions } : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
 }

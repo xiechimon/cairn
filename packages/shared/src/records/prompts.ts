@@ -4,6 +4,7 @@ import { PLAN_FILE_NAME } from './plan.js';
 import { REPORT_FILE_NAME } from './report.js';
 import { parseReviewPromptMeta } from './review.js';
 import type { StepKind } from './step.js';
+import type { TaskDecision } from './todo.js';
 import { parseGithubIssueSourceRef } from './todo.js';
 
 export interface TaskSource {
@@ -74,15 +75,28 @@ export function buildTaskPromptText(title: string, spec: string, source?: TaskSo
   return isIssueSourcedTask(source) ? fenceIssueText(source?.sourceRef, text) : text;
 }
 
-export function specWithDecisions(
-  spec: string,
-  decisions: readonly { requestId: string; question: string; answer: string }[],
+const DECISIONS_NOTE_HEAD =
+  'Decisions already made on this task. They override the brief where the two conflict; do not ask them again:';
+const DECISIONS_NOTE_TAIL = 'End of decisions.';
+
+export function appendDecisionsNote(
+  prompt: string,
+  decisions: readonly TaskDecision[] | undefined,
 ): string {
-  if (decisions.length === 0) return spec;
+  if (decisions === undefined || decisions.length === 0) return prompt;
   const lines = decisions.map(
     (d) => `- Question (${d.requestId}): ${d.question}\n  Decision: ${d.answer}`,
   );
-  return `${spec}\n\nDecisions already made on this task. They override the brief where the two conflict; do not ask them again:\n${lines.join('\n')}`;
+  const note = [DECISIONS_NOTE_HEAD, ...lines, DECISIONS_NOTE_TAIL].join('\n');
+  return prompt === '' ? note : `${prompt}\n\n${note}`;
+}
+
+function stripDecisionsNote(text: string): string {
+  const idx = text.lastIndexOf(`\n\n${DECISIONS_NOTE_HEAD}`);
+  if (idx === -1) return text;
+  return wrappedBy(text.slice(idx + 2), DECISIONS_NOTE_HEAD, DECISIONS_NOTE_TAIL)
+    ? text.slice(0, idx)
+    : text;
 }
 
 export const TRANSCRIPT_PROMPT_ROW_ID_PREFIX = 'user-';
@@ -440,7 +454,7 @@ function stripTaskDeliveryNotes(text: string): string {
         : wrappedBy(cur.slice(reportIdx + 1), REPORT_NOTE_HEAD, REPORT_NOTE_TAIL)
           ? cur.slice(0, reportIdx)
           : cur;
-    const next = stripConfirmedPlanNote(stripWorkBranchNote(withoutReport));
+    const next = stripDecisionsNote(stripConfirmedPlanNote(stripWorkBranchNote(withoutReport)));
     if (next === cur) return cur;
     cur = next;
   }
@@ -543,27 +557,12 @@ export type UserTextKind = 'task-prompt' | 'synthetic' | 'user';
 
 export function classifyUserText(
   rawText: string,
-  task: {
-    title: string;
-    spec: string;
-    decisions?: readonly { requestId: string; question: string; answer: string }[];
-  } & TaskSource,
+  task: { title: string; spec: string } & TaskSource,
 ): UserTextKind {
   const text = stripBlockerHandoff(rawText);
-  const decisions = task.decisions ?? [];
-  const taskTexts = [
-    ...new Set(
-      decisions
-        .map((_, index) =>
-          specWithDecisions(task.spec, decisions.slice(0, decisions.length - index)),
-        )
-        .concat(task.spec)
-        .flatMap((spec) => [
-          buildTaskPromptText(task.title, spec, task).trim(),
-          buildTaskPromptText(task.title, spec).trim(),
-        ]),
-    ),
-  ];
+  const raw = buildTaskPromptText(task.title, task.spec).trim();
+  const delivered = buildTaskPromptText(task.title, task.spec, task).trim();
+  const taskTexts = delivered === raw ? [raw] : [delivered, raw];
   for (const taskText of taskTexts) {
     if (text === taskText) return 'task-prompt';
     if (stripTaskDeliveryNotes(text) === taskText) return 'task-prompt';

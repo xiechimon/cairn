@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   appendBlockerHandoff,
+  appendDecisionsNote,
   appendWorkBranchNote,
   BLOCKER_HANDOFF_MAX_FILES,
   BLOCKER_HANDOFF_SUMMARY_MAX_CHARS,
@@ -14,7 +15,6 @@ import {
   clipHandoffFiles,
   clipHandoffSummary,
   composeTaskPromptWithInstruction,
-  specWithDecisions,
   stripBlockerHandoff,
   type TrajectoryPack,
   trajectoryPackSchema,
@@ -162,26 +162,15 @@ describe('H5 web presentation layer: delivery sections do not turn task text int
     expect(stripBlockerHandoff(TASK)).toBe(TASK);
   });
 
-  test('prompts sent before later decisions stay task-prompt once more decisions are recorded', () => {
-    const decisions = [
-      { requestId: 'ask-1', question: 'Which wins?', answer: 'Repo rule' },
-      { requestId: 'ask-2', question: 'Which file?', answer: 'README' },
-    ];
-    const withLater = { ...task, decisions };
-    expect(classifyUserText(buildTaskPromptText(task.title, task.spec), withLater)).toBe(
-      'task-prompt',
-    );
-    const first = buildTaskPromptText(
-      task.title,
-      specWithDecisions(task.spec, decisions.slice(0, 1)),
-    );
-    expect(classifyUserText(first, withLater)).toBe('task-prompt');
-  });
-
-  test('a first prompt carrying the task decisions -> task-prompt', () => {
-    const decisions = [{ requestId: 'ask-1', question: 'Which wins?', answer: 'Repo rule' }];
-    const decided = buildTaskPromptText(task.title, specWithDecisions(task.spec, decisions));
-    expect(classifyUserText(decided, { ...task, decisions })).toBe('task-prompt');
+  test('a task prompt sent before a decision and one sent after it both classify as the task prompt', () => {
+    const before = buildTaskPromptText(task.title, task.spec);
+    const after = appendDecisionsNote(before, [
+      { requestId: 'ask-1', question: 'Which wins?', answer: 'Repo rule', by: 'person', at: 1 },
+    ]);
+    expect(after).toContain('Repo rule');
+    expect(classifyUserText(before, task)).toBe('task-prompt');
+    expect(classifyUserText(after, task)).toBe('task-prompt');
+    expect(classifyUserText(appendWorkBranchNote(after, 'cairn/conv-1'), task)).toBe('task-prompt');
   });
 
   test('task text + delivery section -> task-prompt', () => {

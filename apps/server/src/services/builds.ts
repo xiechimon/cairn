@@ -176,7 +176,6 @@ import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import {
   abandonsQuestions,
   childrenOfTodo,
-  decidedSpecOf,
   getTodo,
   setTodoPhase,
   settleSplitOnDone,
@@ -1231,7 +1230,7 @@ export function maybeEnqueueVerifyStep(
   const planRow = latestPlanRow(deps, buildId);
   const prompt = buildVerifyStepPrompt({
     ticketRef: ticketRefOf(todoRow),
-    taskText: buildTaskPromptText(todoRow.title, decidedSpecOf(todoRow), todoRow),
+    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
     verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
