@@ -9,7 +9,7 @@ import {
   transcriptPromptRowId,
   withHistoryMarker,
 } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, ne, not, sql } from 'drizzle-orm';
 import {
   chief,
   chiefMessage,
@@ -36,9 +36,17 @@ import {
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { createMemoryFlush } from './memory-flush.js';
-import { isColdResume, resolveCacheRetentionTier, retentionMsFor } from './runtime/cold-slim.js';
+import {
+  COLD_RECENT_EXCHANGES,
+  coldWindowStartFromRows,
+  isColdResume,
+  resolveCacheRetentionTier,
+  retentionMsFor,
+} from './runtime/cold-slim.js';
+import { summarizerFor } from './runtime/compaction.js';
 import { reportCompactionFailure, setFailureSink } from './runtime/failure-report.js';
 import type { MachineApi } from './runtime/machine-api.js';
+import { createCoordinatorModels } from './runtime/models.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
 import type { SeedRow } from './runtime/seed.js';
 import {
@@ -420,6 +428,62 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     };
   };
 
+  const catchUpColdSummary = async (
+    threadId: string,
+    teamId: string,
+    providers: CoordinatorProviders,
+  ): Promise<string | null> => {
+    const newestFirst = db
+      .select({
+        at: chiefMessage.createdAt,
+        rowid: sql<number>`rowid`,
+        role: chiefMessage.role,
+      })
+      .from(chiefMessage)
+      .where(
+        and(
+          eq(chiefMessage.threadId, threadId),
+          ne(chiefMessage.role, 'system'),
+          not(like(chiefMessage.id, 'chief-digest-%')),
+          not(like(chiefMessage.id, 'chief-report-%')),
+        ),
+      )
+      .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+      .limit(COLD_RECENT_EXCHANGES * 4)
+      .all();
+    const windowStart = coldWindowStartFromRows(newestFirst);
+    const models = createCoordinatorModels(options.fixedProviders ?? []);
+    const summaryBind = binding(teamId, providers.summary);
+    models.useProvider(summaryBind.config, summaryBind.resolveKey);
+    let summarize = null as ReturnType<typeof summarizerFor> | null;
+    try {
+      summarize = summarizerFor(models.models, {
+        provider: providers.summary.provider,
+        modelId: providers.summary.modelId,
+      });
+    } catch (error) {
+      reportCompactionFailure({ threadId }, 'summary-model', error);
+    }
+    return seedSummary(
+      db,
+      threadId,
+      windowStart,
+      summarize,
+      (error) => {
+        const message = scrubProviderError(
+          { db, box: machine.box },
+          teamId,
+          [providers.router.provider, providers.summary.provider],
+          String(error),
+        );
+        const scrubbed = new Error(message);
+        scrubbed.name = error instanceof Error ? error.name : 'Error';
+        reportCompactionFailure({ threadId }, 'seed-summary', scrubbed);
+      },
+      nowMs(),
+    );
+  };
+
   const runStep = async (row: StepRow): Promise<void> => {
     const teamId = threadTeam(row.buildId);
     if (teamId === null) return;
@@ -435,10 +499,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (providers === null) throw new Error('Coordinator route resolves to no keyed provider');
       const payload = claimedPayload(row, providers);
       if (payload === null) throw new Error('Coordinator step has no chief thread');
+      let coldSlim = payload.coldSlim;
+      if (coldSlim.cold) {
+        const summaryHint = await catchUpColdSummary(row.buildId, teamId, providers);
+        coldSlim = { cold: true, summaryHint };
+      }
       await runtime.runTurn({
         claimed: payload.claimed,
         volatileText: payload.volatileText,
-        coldSlim: payload.coldSlim,
+        coldSlim,
         router: binding(teamId, providers.router),
         summary: binding(teamId, providers.summary),
       });

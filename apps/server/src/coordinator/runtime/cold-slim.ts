@@ -196,3 +196,26 @@ export function projectColdMessages(
 export function projectWarmMessages(messages: readonly Message[]): Message[] {
   return stripConsumedImages(truncateOldToolResults(messages), { keepRecentMessages: 2 });
 }
+
+export interface ColdWindowRow {
+  at: number;
+  rowid: number;
+  role: string;
+}
+
+export function coldWindowStartFromRows(
+  newestFirst: readonly ColdWindowRow[],
+  recentExchanges = COLD_RECENT_EXCHANGES,
+): { at: number; rowid: number } | null {
+  const kept: ColdWindowRow[] = [];
+  let exchanges = 0;
+  for (const row of newestFirst) {
+    kept.push(row);
+    if (row.role === 'user') {
+      exchanges += 1;
+      if (exchanges >= recentExchanges) break;
+    }
+  }
+  const oldest = kept.at(-1);
+  return oldest === undefined ? null : { at: oldest.at, rowid: oldest.rowid };
+}
