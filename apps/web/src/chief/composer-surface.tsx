@@ -298,11 +298,13 @@ export function ComposerSurface({
         >
           <Plus width={16} height={16} />
         </IconTooltip>
-        <ContextMeterRing
-          percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
-          mock={contextPercent == null}
-          resume={contextResume}
-        />
+        {(!live || contextPercent != null) && (
+          <ContextMeterRing
+            percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
+            mock={contextPercent == null}
+            resume={contextResume}
+          />
+        )}
         {tools}
         {running && turnElapsed != null && (
           <span
