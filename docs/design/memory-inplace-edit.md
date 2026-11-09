@@ -1,129 +1,132 @@
-# Memory in-place edit
+# Memory in-place edit and the MEMORY.md shape
 
-Status: design draft for #3664. It waits for the owner's discussion and coordinator review, and contains no product code. Baseline `bc4ead8dd`; the UI baseline is the memory list in #3666. Research: [memory in-place edit prior art](../research/memory-inplace-edit-2026-11-09.md). Backend it extends: `memory-backend.md` and `memory.md` from #3640. Prototype: [memory-inplace-prototype](memory-inplace-prototype/README.md).
+Status: design draft, revision 2, for #3664. No product code is included.
 
-Problem: the owner reads a wrong or stale fact on `Coordinator 设置` → `记忆` and wants to say what to change right there. The v2 prototype sent that text into the main Coordinator thread, and the owner rejected it (`它完全就不是同一个行为，直接到了我的主对话里`).
+The owner decided on #3677 (2026-11-09):
 
-Success means the owner:
+- Changes apply directly. There is no proposal step and no apply or discard buttons (`我选择相信模型`).
+- There is no undo or promote button. To revert or change scope, the owner tells the Coordinator, and the model picks the scope itself.
+- Memory moves to the Claude Code shape: one `MEMORY.md` per scope, always injected and kept short by the model, plus unlimited memory files. There is no owner-facing size limit.
 
-- types one sentence on the memory page;
-- sees exactly which entries change and how;
-- applies or drops the change, and can undo it;
-- never leaves the page and never finds the exchange in the main conversation.
+Baseline `bc4ead8dd`. The page layout follows the #3666 restyle: a `每个线程都会读` section for `MEMORY.md` and a `记忆文件` section. Research: [prior art, revision 2](../research/memory-inplace-edit-2026-11-09.md). This page replaces the row model in `memory-backend.md` and `memory.md` (#3640). Prototype: [memory-inplace-prototype](memory-inplace-prototype/README.md).
 
 ## 1. Interaction
 
 | Moment | What the owner sees |
 |---|---|
-| Input | A composer is pinned under the list, with the placeholder `告诉 Coordinator 要改什么`. It is the Coordinator composer surface (`ComposerSurface`) without attachments, mentions or slash commands. In the detail dialog the same composer sits in the footer and is scoped to that entry: the request carries the entry's id, and the placeholder reads `告诉 Coordinator 这条要怎么改`. |
-| Working | A card attached above the composer, drawn like the question card (#3580), shows the owner's sentence and `Coordinator 正在看记忆 · 0:04`. A Stop button takes the send slot. The list stays readable and does not change yet. |
-| Clarification or nothing to change | The card shows the Coordinator's short reply, for example `你说的“发布交接”有两条，改哪一条？`. The composer reads `回复 Coordinator…`, and the next sentence revises the same request. |
-| Proposed | The card becomes `建议修改 N 处`, with one block per affected entry. Each block has a muted text tag (`修改`, `新增`, `删除`), the title and scope, and a word diff of the content. Removed words are struck through on `--diff-del-word-bg` and added words sit on `--diff-add-word-bg`, computed with the installed `diff` package as in `detail/word-diff.ts`. A delete shows the whole fact struck through; a create shows all of it as added. The footer has a primary `应用修改` and a ghost `放弃`. Typing in the composer revises the proposal instead of starting a new one. |
-| Applied | The card shrinks to one line: `已修改 3 条记忆` with `撤销`. Changed rows show `刚刚更新`, created rows appear in their scope group, and deleted rows are gone. Focus moves to the status line. |
-| Undone | `已撤销，记忆恢复到修改前。` Undo is offered for the newest applied change only, for 24 hours or until another change is applied (open question 2). |
-| Errors | Raw error text never shows (C5). The cases:<br>- Run failed: `Coordinator 这次没有给出修改，记忆没有变。` with `重试`.<br>- Apply conflict: `有 1 条记忆在你确认前被改过，没有应用任何修改。`, naming the entry, with `按最新内容重新生成`.<br>- Undo conflict: `这条记忆之后又被改过，不能撤销。`<br>- Quota: the proposal itself names the limit: `已到 100 条上限：先删掉一条，或让 Coordinator 合并`.<br>- Offline: the composer is disabled with `离线中。重新连接后才能让 Coordinator 修改。` (C7). |
+| Input | A composer pinned under the page, placeholder `告诉 Coordinator 要改什么`. It is the Coordinator composer surface without attachments, mentions or slash commands. In a file's detail dialog the same composer sits in the footer, scoped to that file. |
+| Working | A card attached above the composer, like the question card (#3580). It shows the owner's sentence and `Coordinator 正在改记忆 · 0:04`. Stop takes the send slot. |
+| Applied | The page refreshes in place: changed lines and files show `刚刚更新`. The card shows `已按你的话改了 N 处` and a read-only word diff of each change (the `MEMORY.md` lines and files touched). The card has no buttons. It stays until the next sentence or until the owner leaves the page. |
+| Question back | When the instruction is ambiguous, the card shows the Coordinator's short question. The next sentence continues the same run. |
+| Error | `Coordinator 这次没有改成，记忆没有变。` The owner's sentence is put back in the composer so a second send retries. Raw error text never shows (C5). Offline: the composer is disabled with `离线中。重新连接后才能让 Coordinator 修改。` (C7). |
 
-A team has one request at a time. While a request is working or proposed, a second tab shows the same card. Leaving the page keeps it, because the card is server state, not component state.
+Reverting (`把刚才的改回去`), moving a fact between team and project, and deleting all go through the same box. The page keeps the existing hard Delete for a file, and no other mutation control.
 
-## 2. Backend
+## 2. Storage: MEMORY.md plus memory files
 
-### Changeset
-
-A new table `memory_edit` holds one request. Its columns:
-
-- `id`, `teamId`, `chiefId`, `userId`.
-- `status`: `working`, `proposed`, `applied`, `undone`, `discarded` or `failed`.
-- `turns`: the owner's sentences and the Coordinator's replies, in order.
-- `focusIds`: the entries the owner scoped the request to.
-- `ops`: staged `create | update | delete`. Each op carries its base version `{id, updatedAt}` and the before and after title, content, scope and layer.
-- `applied`: created ids, successor ids and snapshots of deleted rows.
-- `undoOf`, plus timestamps.
-
-A partial unique index allows one `working` or `proposed` row per team.
-
-### Scoped turn
-
-The request runs on a side Coordinator thread, `chief-memory-<chiefId>`, built the way the digest thread is (`services/chief-digest.ts`):
-
-- It is excluded from the one-main-thread index, thread lists, seeding, digests and reports.
-- Each new request starts a fresh session; follow-up sentences continue it.
-- The prompt holds the owner's sentence, the focused entries in full, and the team and project titles. The system prompt says it may only change memory.
-
-The main thread receives nothing. Its next turn simply sees the updated injected memory.
-
-### Tools
-
-Claim sends exactly four tools with `remoteToolsOnly`: `memories`, `save_memory`, `update_memory` and `delete_memory`. That means no MCP, no shell and no ask. Relay rejects any other tool name on this thread with 403, next to `assertChiefDigestTool`.
-
-On this thread the three write tools do not touch `agent_memory`. Each one stages an op on the open changeset after running the same checks as a real write:
-
-- text validation;
-- the active-entry quota, counting staged creates;
-- exact duplicates and overlap candidates;
-- that the base row is still valid.
-
-Errors return to the model as they do today. Scratchpad rows are invisible and cannot be staged. The run ends with `status=proposed` when ops exist; otherwise its reply is shown as a clarification.
-
-### Apply, discard and undo
-
-Routes, all behind `requireTeam`:
-
-- `POST /api/teams/:id/memory-edits` with `text`, optional `focusIds`, and optional `editId` to revise an open request.
-- `GET …/memory-edits/current`.
-- `POST …/:eid/apply`, `…/discard`, `…/stop` and `…/undo`.
-
-**Apply** first checks each op's base `{id, updatedAt}`; an id alone would miss an in-place promotion. It then runs every op in one transaction through `updateMemoryEntry`, `saveMemoryEntry` and `deleteMemoryEntry`. A version mismatch, missing row, quota failure or duplicate rolls everything back and returns 409 with the affected ids, so nothing is partially applied.
-
-**Undo** builds the inverse changeset from `applied` and applies it with the same version check:
-
-- an update goes back to the predecessor text as a new successor;
-- created rows are deleted;
-- deleted rows are re-created from their snapshots under new ids.
-
-Invalidated rows are never revived. Snapshots are cleared when the undo window closes.
-
-Every mutation pushes the existing team event, so `['memories', teamId]` and the changeset query refetch.
-
-## 3. Every path that reads or writes memory
-
-| Path | Reads/writes | Behavior with a pending or applied changeset |
+| Today (`agent_memory.layer`) | New shape | Injected |
 |---|---|---|
-| Main Coordinator `save_memory`, `update_memory`, `delete_memory` (`chief-tools.ts`) | write | Unchanged. If it touches a staged base, apply returns a conflict. Undoing an entry it changed also returns a conflict. |
-| Worker memory tools (`executeWorkerMemoryTool`) | write | Same as the main Coordinator tools. |
-| Settings Delete (#3666) | write | Same; the card shows the conflict on apply. |
-| Settings Promote (`promoteMemoryEntry`, in place) | write | It changes `updatedAt`, so the `{id, updatedAt}` check catches it. |
-| Weekly consolidation | write | Successors and invalidations make the base stale, so apply returns a conflict. |
-| Pre-compaction flush (`memory-flush.ts`) | write | An update causes a conflict. A new duplicate of a staged create causes an apply-time duplicate 409. |
-| Expiry | write | An invalidated base causes a conflict. |
-| Memory-edit staging tools | read, stage | They never write `agent_memory`. Their scope is the team plus its projects, with no scratchpads. |
-| Apply and undo routes | write | One transaction, version-checked, all or nothing. |
-| Injection into Coordinator and worker prompts | read | Only committed valid rows. Staged ops are never injected, and a turn sees the state before or after an apply, never half of it. |
-| Settings list `GET …/memories` | read | Committed rows only; the proposal is drawn from the changeset. |
-| Project or team deletion | write | Base rows vanish, so apply returns 404 and the card shows a conflict. Team deletion cascades to the changeset. |
-| Run failure, stop, server restart | none | The changeset becomes `failed` or `discarded`; nothing staged was ever written. A step left claimed by a restart is swept like other chief steps, and its changeset is marked `failed`. |
+| `core` rows, team (`projectId` null) | Lines of the team `MEMORY.md` | Every Coordinator turn and every worker claim |
+| `core` rows of project P | Lines of P's `MEMORY.md` | Turns routed to P and workers on P |
+| `searchable`, `log` rows | Memory files `<name>.md` in their scope | Never; read through `memories` |
+| `scratchpad` rows | Unchanged | With the matching thread |
 
-## 4. What this deletes or replaces
+The table stays `agent_memory`, with layers `index`, `file` and `scratchpad`:
 
-- **The v2 prototype path that posted the instruction into the main Coordinator thread (#3640 prototype).** This includes its `已发到 Coordinator 对话。` status and the detail line telling the owner to ask in the main conversation.
-- **Two lines in the #3640 design docs.** In `memory-backend.md`, "No public write API for editing … correction path through conversation" is replaced by this design. So is "Inline Edit is not added … correction remains available through the Coordinator's tools" in `memory.md`.
-- **The scattered `chief-digest-` prefix checks.** They sit in the schema index, seeding, `coordinator/index.ts`, `chief.ts`, `mcp-threads.ts` and consolidation. In the same change they become one side-thread predicate that covers both the digest and memory-edit threads.
-- **Any second edit path.** There is no hand-edit form and no free-text PATCH; every content change goes through a changeset.
+- One valid `index` row per (team, project), titled `MEMORY.md`.
+- A `file` row's title is its file name, unique among valid files in its scope.
+- Every content change keeps the versioning that exists today: a successor row plus `history`, with the predecessor invalidated in one transaction. A stale base returns 409.
 
-## 5. Tests to write first
+**No size limit for the owner.** There is no cap, counter or save rejection anywhere in the product, and no limit text on the page. Keeping `MEMORY.md` short is the model's job, as in Claude Code.
 
-1. Sending on the memory page creates no `chief_message` row in the main thread. This test is red on the v2 prototype behavior.
-2. A memory-edit turn that calls any tool outside the four gets 403, and its write tools leave `agent_memory` unchanged.
-3. Apply with one stale base (a successor, a promotion or a deletion) applies nothing and returns the affected ids.
-4. Undo right after apply restores the visible text. Undo after a later change is a conflict, and nothing invalid is revived.
-5. Quota and duplicate checks count staged creates. Two tabs see one changeset, and a second request while one is open is rejected.
-6. UI: every state in §1 at 1440 and 390, light and dark, is axe clean. Focus moves to the status line after apply and back to the composer after discard.
+What Claude Code does (`实测`, research §0a):
+- It loads the first 200 lines or 25 KB of `MEMORY.md`, whichever comes first, and drops the rest at load.
+- Near the limit, it reminds the model to keep one line per entry and move detail into topic files.
+- Over the limit, the write still succeeds, and the model gets an error telling it to rewrite the index.
 
-Implementation touches `services/machine-claim.ts` and `services/machine-relay.ts`, which are on the owner-routed machine surface. It also adds a persisted table. So this page needs coordinator review before code. The turn uses the team's Coordinator router model; no new model is added.
+Ours mirrors that, model-facing only:
+- **Prompt.** The system prompt and the `update_memory` description tell the model to keep each `MEMORY.md` to short one-line entries, move detail into files, and merge or drop stale lines.
+- **Load bound.** The injection path silently truncates each `MEMORY.md` at the same bound Claude Code uses (200 lines or 25 KB). It appends a note to the model: `（MEMORY.md 后面还有 N 行没有加载；用 memories 读全文，并把细节移到记忆文件）`. This bound is a server constant. It is never shown to the owner and never rejects a write.
+- **Write reminder.** A write that leaves the index past the bound succeeds. Its tool result carries the same reminder, so the model tidies the index on its own.
 
-## 6. Open questions for the owner
+**Files.** There is no count limit. A full read of a very large file is paged, so the result stays under the 32 KB Coordinator tool-output cap (`COORDINATOR_TOOL_OUTPUT_MAX_BYTES`); `memories` takes an optional `offset`. Nothing caps the size of a file.
 
-1. **Confirm, or apply at once?** Recommended: propose and confirm. It costs one click, and an edit can rewrite team-wide facts that every lane reads. The alternative is to apply at once with undo, which is what ChatGPT and claude.ai appear to do.
-2. **How long is undo offered?** Recommended: 24 hours, or until the next change. Deleted text is kept that long so undo can restore it.
-3. **What context does the turn see?** Recommended: only memory and the owner's sentence, not the main conversation. The cost: an instruction like "change it the way I said earlier" will not work.
-4. **Can a proposal change scope?** Recommended: no. Moving a fact from a project to the team stays with the existing Promote button, rather than a create plus a delete.
-5. **Walk claude.ai on the owner's account?** Its "Tell Claude what to change" box could be tested with a harmless fact, added and then removed, to see what happens after sending.
+**Deleted.** `MEMORY_QUOTA_PER_TEAM` and `MEMORY_QUOTA_PER_AGENT`, the overlap/candidate check and the `memory_save_conflict` table go away. A document model edits text in place, so there is no duplicate fact to arbitrate. Exact duplicate file names are rejected.
+
+**Tools.** The four names in `MEMORY_TOOLS` stay; their parameters change to the Anthropic memory-tool shape (`实测`, research §1):
+
+| Tool | Parameters | Behavior |
+|---|---|---|
+| `memories` | `scope?`, `file?`, `offset?`, `query?`, `versions?` | With no arguments, lists both `MEMORY.md` files and the file names with first lines. With `file`, reads the full text. With `query`, searches. With `versions`, returns that document's earlier versions (used for `改回去`). |
+| `save_memory` | `scope`, `file`, `content` | Creates a file. Returns 409 if the name exists. |
+| `update_memory` | `scope`, `file` (`MEMORY.md` allowed), then either `old_str` + `new_str` or `content`, plus optional `moveTo` scope and optional `baseVersion` | Writes a successor version. Errors: "not found verbatim", "multiple occurrences", stale base (409 naming the successor). No size error. `moveTo` re-scopes a file as a successor version in the target scope, which replaces Promote. |
+| `delete_memory` | `scope`, `file` | Invalidates the file and keeps its versions (so `改回去` can restore it as a new version). `MEMORY.md` cannot be deleted, only emptied. |
+
+## 3. In-place edit backend
+
+- **Thread.** The edit runs on a side Coordinator thread, `chief-memory-<chiefId>`, built like the digest thread. It is outside the main-thread index, thread lists, seeding, digests and reports.
+- **Session and prompt.** Each sentence from the page starts or continues one run in a fresh session. The prompt holds both `MEMORY.md` texts, the focused file if any, and the owner's sentence. It does not include the main conversation (owner question 3; no reference documents otherwise).
+- **Tools.** Claim sends only the four memory tools, with `remoteToolsOnly`. Relay returns 403 on any other name for this thread.
+- **Writes.** They apply directly through the same services as the main thread. Each write carries the version the model read, so a concurrent change comes back as 409 and the model re-reads.
+- **Run record.** A new `memory_edit` row holds the instruction, status (`working`, `done`, `failed`, `stopped`), the Coordinator's reply, and the before and after version ids of every document it changed. The card's diff is drawn from it. One `working` row is allowed per team. The main thread gets no message; its next turn simply sees the new `MEMORY.md`.
+- **Routes**, all behind `requireTeam`:
+  - `POST /api/teams/:id/memory-edits` (`text`, optional `file`, optional `editId` to continue);
+  - `GET …/memory-edits/current`;
+  - `POST …/:eid/stop`;
+  - `GET /api/teams/:id/memories`, which now returns the documents.
+
+  `POST …/memories/:mid/promote` is deleted. `DELETE` stays for files.
+
+## 4. Every path that reads or writes memory
+
+| Path | Today | New behavior; failure |
+|---|---|---|
+| Coordinator system prompt (`chief.ts` `buildChiefSystemPrompt`) | `injectMemoriesCapped` core rows, team, `MEMORY_INJECT_TOKEN_CAP` | Team `MEMORY.md` (silent load bound with a model-facing note), plus the thread scratchpad and a one-line file count. Missing index: empty section. |
+| Coordinator step claim (`coordinator-steps.ts`) | Same cap, `recordUse` off for the digest | Same as the system prompt. |
+| Project context (`project-instructions.ts` `projectTurnContextTraced`) | Project core rows, capped, omitted count | That project's `MEMORY.md`, with the same silent load bound. |
+| Worker claim (`machine-claim.ts`, `injectMemories`) | **Uncapped** core rows, team plus project | Team plus project `MEMORY.md`, each under the silent load bound, plus the todo scratchpad. This also closes today's unbounded worker injection. |
+| `save_memory`, `update_memory`, `delete_memory`, main Coordinator (`chief-tools.ts`) | Row save with quota, candidates and conflict fingerprint; successor update; hard delete | §2 tools. A stale base returns 409. A write is never rejected for size; a long index returns a tidy reminder to the model. Delete invalidates. |
+| Same tools, workers (`executeWorkerMemoryTool`) | Same, with independent agent memory | Same as the Coordinator, scope from the todo. Independent agent memory (`teamScoped:false`) follows `legacy/agent-layer` retirement and is not migrated here. |
+| `memories` tool | List and search rows | List, read, search and versions (§2). |
+| Memory-edit side thread | none | Four tools only, direct writes, run record (§3). |
+| Pre-compaction flush (`memory-flush.ts`) | Saves or updates rows | Appends lines to the scope's `MEMORY.md` or writes a file through `update_memory`. When the index is long, it writes detail into a file instead, following the prompt. A failure is reported and compaction proceeds. |
+| Weekly consolidation (`memory-consolidation.ts`) | Merges and expires rows by `lastInjectedAt` | Replaced by a tidy pass: when a `MEMORY.md` passes the load bound, the digest asks the Coordinator to move detail into files and drop stale lines. The owner sees nothing. Row merge and expiry are deleted. |
+| Settings `GET …/memories` | Valid team rows | `MEMORY.md` per scope, plus files with name, first line and `updatedAt`. |
+| Settings Delete | Hard delete of a row | Hard delete of a file and its versions (explicit erasure), with a confirmation. |
+| Settings Promote | In-place `projectId` change | Deleted; `update_memory` `moveTo`. |
+| Project deletion | Rows remain orphaned | The project's `MEMORY.md` and files are deleted with the project. |
+
+## 5. Migration (one transaction per team, idempotent)
+
+1. For each (team, project) scope, take valid `core` rows by `createdAt`. Write one `index` row whose content is one line per row: `- **<title>**：<first line>`.
+   - When a row has more than one line, or the index would pass the load bound, the row becomes a file `<title>.md`. The index line then links to it: `- [<title>](<title>.md)：<first line>`.
+2. `searchable` and `log` rows become files named from the title. A name collision gets ` (2)`.
+3. Old rows are invalidated with `supersededBy` pointing at the new document, so their history is kept and `memories` `versions` can reach it. `memory_save_conflict` is dropped.
+4. A dry-run report for the operator (not the owner) lists, for each team, the line count and bytes of each index and the number of files. The test fixture includes a team past the load bound.
+
+## 6. What this deletes
+
+- The proposal and confirm step, apply/discard/undo routes and buttons, and the staged changeset from revision 1.
+- The v2 prototype path into the main thread.
+- The Promote route, `promoteMemoryEntry` and its button.
+- `MEMORY_QUOTA_*`, `memory_save_conflict`, overlap candidates and `force`. No size cap replaces them.
+- `capMemories`, `MEMORY_INJECT_TOKEN_CAP` and `lastInjectedAt`-based expiry.
+- Consolidation merge and expiry.
+- The `记忆 · {n} / {max}` count in `chief-settings.tsx`.
+- The scattered `chief-digest-` prefix checks. They become one side-thread predicate that covers digest and memory-edit.
+
+## 7. Tests to write first
+
+1. A sentence on the memory page writes no `chief_message` row in the main thread, and the change is visible in the next main-thread prompt.
+2. A memory-edit turn gets 403 for any non-memory tool.
+3. A stale `baseVersion` returns 409 and nothing is written.
+4. `改回去` after an update or delete restores the text as a new version.
+5. An index past the load bound is truncated silently at load, with the model note, in all four injection paths. The settings page and the save path show no limit and reject nothing. Worker injection is bounded.
+6. Migration covers: multi-line core rows become files; a team past the load bound spills into files; `searchable` rows become files; it is idempotent on a second run.
+7. UI: input, working, applied and error states at 1440 and 390 px, light and dark, axe clean.
+
+This change touches `machine-claim.ts` and `machine-relay.ts` (the owner-routed machine surface) and migrates persisted state, so coordinator review comes before code.
+
+## 8. Open questions for the owner
+
+1. Invalidated versions are kept for 90 days for `改回去` (recommended), then purged. ChatGPT states no window.

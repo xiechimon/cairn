@@ -1,6 +1,6 @@
 # Prior art: telling the agent what to change about memory, on the memory page
 
-Status: research, 2026-11-09, for #3664. No code changed. Feeds [memory in-place edit design](../design/memory-inplace-edit.md).
+Status: research, 2026-11-09, revision 2 for #3664 (after the owner's decisions on #3677: apply directly, no undo or promote button, Claude Code memory shape). No code changed. Feeds [memory in-place edit design](../design/memory-inplace-edit.md).
 
 Question (ian, on the v2 memory prototype, 2026-11-09): the owner wants to type "what to change" on the memory page and have the Coordinator change memory there. The v2 prototype routed the text into the main Coordinator thread; ian rejected that: `它完全就不是同一个行为，直接到了我的主对话里`. What do other products do after the instruction is sent: is it applied or proposed, is a diff shown, is there undo or history, where does the transcript live, which operations may the model use, and how are conflicts handled?
 
@@ -9,11 +9,38 @@ Labels: `实测` = read first-hand in a primary source or in cairn code this ses
 ## 0. Answers
 
 1. **Nobody bounces the owner into a chat thread from the memory page.** ChatGPT (`实测`: a text box at the bottom of the memory summary, "it will update accordingly") and claude.ai (`实测`: a "Tell Claude what to change or remove" box on the Manage page) keep the instruction on the memory surface. Devin is the counter-example: its memory page is read-only and every change goes through a session (`实测`), which is exactly the behavior ian rejected.
-2. **Owner-initiated edits are applied directly everywhere we could read.** ChatGPT, claude.ai legacy, Letta `/remember` and Devin apply without a confirmation step (`实测` or `推断`). Approval exists only for memories the model generates on its own (Cursor 1.2, `实测`). Our design still proposes before applying (design §1, open question 1) because a Coordinator edit can rewrite team-wide facts that steer every lane; that is a deliberate departure, not prior art.
+2. **Owner-initiated edits are applied directly everywhere we could read.** ChatGPT, claude.ai legacy, Letta `/remember` and Devin apply without a confirmation step (`实测` or `推断`). Approval exists only for memories the model generates on its own (Cursor 1.2, `实测`). The owner chose the same on #3677: apply directly, no proposal step.
 3. **History with restore is common; a diff before apply is not.** ChatGPT restores prior versions (`实测`, Oct 2025), Letta keeps git history and linear undo/redo checkpoints (`实测`, source), Mem0 stores old value, new value and the input that caused the change (`实测`). Only Devin shows "what changed", after the fact, as a card in the session (`实测`).
 4. **The change record is the transcript.** Mem0 keeps the triggering input on the history row (`实测`); Devin links each note to its session (`实测`). This supports storing the owner's instruction with the changeset instead of a chat thread.
 5. **Stale writes are rejected, not overwritten.** Devin rejects and retries stale writes (`实测`); Letta uses an optimistic version column (`实测`, source). cairn's own `updateMemoryEntry` already returns 409 for a superseded predecessor (`实测`, `apps/server/src/services/memory.ts`).
 6. **Tool surface.** The Anthropic memory tool and Letta both expose create / str_replace / insert / delete / rename and return "not verbatim" and "multiple occurrences" errors to the model (`实测`). cairn already has `save_memory`, `update_memory`, `delete_memory` and `memories` with candidate/duplicate/quota errors (`实测`, `apps/server/src/services/chief-tools.ts`); no new tool vocabulary is needed.
+
+## 0a. Revision 2: undo, storage shape and edit context (all fetched 2026-11-09)
+
+**Undo in the references.**
+
+| Product | Undo or restore | Window | Label and source |
+|---|---|---|---|
+| ChatGPT | Saved memories: "view and restore prior versions" | None stated | `实测`, release notes Oct 15, 2025, https://help.openai.com/en/articles/6825453-chatgpt-release-notes |
+| ChatGPT | Memory FAQ lists "version history" among saved-memory controls, no steps | None stated | `实测`, https://help.openai.com/en/articles/8590148-memory-faq |
+| ChatGPT | Deleted saved memories: logs kept "up to 30 days for safety and debugging" | Not user-recoverable | `实测`, same FAQ; `推断`: not an undo |
+| ChatGPT | Memory-summary text box (Jun 12, 2026): no undo or history mentioned for it | n/a | `实测` (absence), release notes |
+| claude.ai | No undo, revert or history for topics or "Tell Claude what to change" edits | n/a | `实测` (absence), https://support.claude.com/en/articles/11817273 and /12123587 |
+| claude.ai | Reset all memory: "this cannot be undone" | Irreversible | `实测`, article 11817273 |
+| claude.ai | Revert by telling Claude: "remember, change, or forget", applies to the next conversation | n/a | `实测`, article 11817273; `推断`: reverting is just another instruction |
+| Claude Code | No undo; memory is plain markdown "you can edit or delete at any time" | n/a | `实测`, https://code.claude.com/docs/en/memory |
+
+Conclusion (`推断`): neither reference offers an undo button on the memory surface. ChatGPT alone keeps restorable versions of saved memories, with no stated window. This supports the owner's call: no undo button, server-side versions, and `改回去` as an ordinary instruction the model carries out from history.
+
+**Claude Code memory shape** (`实测`, https://code.claude.com/docs/en/memory):
+
+- Auto memory lives in `~/.claude/projects/<project>/memory/`: a `MEMORY.md` index, "one line per memory", plus topic files.
+- Load limit: "The first 200 lines of `MEMORY.md`, or the first 25KB, whichever comes first, are loaded at the start of every conversation." Content past the limit is not loaded.
+- Over the limit, "the write still succeeds", and Claude Code returns an error telling Claude to rewrite the index. Near the limit it reminds Claude to keep one line per entry, move detail into topic files, and merge or drop stale entries.
+- Topic files are not loaded at startup; Claude "reads them on demand using its standard file tools". No count limit is documented (`推断`: unlimited).
+- Scope is per repository, shared across worktrees. User-level memory is CLAUDE.md, written by the user.
+
+**Edit context (owner question 3).** Claude Code edits memory inside the working conversation, with that conversation's context (`实测`: "When you ask Claude to remember something … Claude saves it to auto memory"). For the memory-page boxes of claude.ai and ChatGPT, no source says whether the edit sees other chats (`实测` absence). No reference documents a memory-page edit that reads the main conversation, so the recommendation stands: the memory-edit turn sees memory and the owner's sentence only (`推断`).
 
 ## 0b. Prior art inside cairn (`实测`, code at `bc4ead8dd`)
 

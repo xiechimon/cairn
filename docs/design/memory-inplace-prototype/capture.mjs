@@ -8,7 +8,7 @@ const { chromium, expect } = require('@playwright/test');
 const { default: AxeBuilder } = require('@axe-core/playwright');
 const output = process.env.MEMORY_INPLACE_SCREEN_DIR ?? `${homedir()}/.cache/ui-refs/memory-inplace-2026-11-09`;
 await mkdir(output, { recursive: true });
-const states = ['input', 'working', 'clarify', 'proposed', 'applied', 'undone', 'error-run', 'error-conflict', 'offline', 'detail-input', 'detail-proposed'];
+const states = ['input', 'working', 'applied', 'error'];
 const url = (state, theme) => `http://127.0.0.1:8796/docs/design/memory-inplace-prototype/index.html?state=${state}&theme=${theme}`;
 const browser = await chromium.launch({ headless: true });
 const results = [];
@@ -32,23 +32,22 @@ try {
         await page.evaluate(() => document.fonts.ready);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${label}: R1 horizontal overflow`);
         const card = page.getByTestId('memory-edit-card');
-        if (['input', 'offline', 'detail-input'].includes(state)) await expect(card).toHaveCount(0);
-        else await expect(card).toBeVisible();
-        if (state === 'proposed') {
-          await expect(page.locator('[data-slot=memory-op]')).toHaveCount(3);
-          assert.equal(await page.locator('[data-slot=memory-diff] del').count() > 0, true);
-          assert.equal(await page.locator('[data-slot=memory-diff] ins').count() > 0, true);
-          await expect(page.getByRole('button', { name: '应用修改' })).toBeVisible();
+        if (state === 'input') await expect(card).toHaveCount(0);
+        else {
+          await expect(card).toBeVisible();
+          await expect(card.getByRole('button')).toHaveCount(0);
         }
+        for (const banned of ['应用修改', '放弃', '撤销', '提升为团队记忆', '删除…']) await expect(page.getByRole('button', { name: banned })).toHaveCount(0);
+        assert.doesNotMatch(await page.locator('body').innerText(), /上限|\d+\s*\/\s*\d+\s*(条|行)|KB/, `${label}: no owner-facing size limit or counter`);
+        await expect(page.getByRole('heading', { name: '每个线程都会读' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '记忆文件' })).toBeVisible();
         if (state === 'working') await expect(page.getByRole('button', { name: '停止 Coordinator 这次修改' })).toBeVisible();
-        if (state === 'offline') await expect(page.getByRole('textbox')).toBeDisabled();
         if (state === 'applied') {
-          await expect(page.getByRole('button', { name: '撤销' })).toBeVisible();
+          await expect(page.locator('[data-slot=memory-change]')).toHaveCount(2);
+          assert.equal(await page.locator('[data-slot=memory-diff] ins').count() > 0, true);
           await expect(page.getByText('刚刚更新')).toHaveCount(2);
-          await expect(page.getByRole('button', { name: '打开记忆：接口版本' })).toHaveCount(0);
         }
-        if (state === 'error-conflict') await expect(page.getByRole('alert')).toContainText('没有应用任何修改');
-        if (state.startsWith('detail')) await expect(page.getByRole('dialog')).toBeVisible();
+        if (state === 'error') await expect(page.getByRole('alert')).toContainText('记忆没有变');
         if (width === 390) {
           for (const button of await page.getByRole('button').all()) {
             if (!(await button.isVisible()) || (await button.getAttribute('data-chrome')) != null) continue;
