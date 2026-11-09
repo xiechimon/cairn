@@ -80,9 +80,9 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
-- Research: [docs/research/coordinator-compaction-2026-11-07.md](../../../docs/research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md)
+- Research: [docs/research/coordinator-compaction-2026-11-07.md](../../../docs/research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/coordinator-context-2026-11-08.md](../../../docs/research/coordinator-context-2026-11-08.md)
 - Frontend design: n/a: compaction is invisible by design; the transcript keeps full history
-- Backend design: **gap**: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes
+- Backend design: [docs/design/coordinator-context-backend.md](../../../docs/design/coordinator-context-backend.md)
 - Evidence: `integration/test/coordinator-context-assemble.test.ts`, `apps/server/test/chief-history.test.ts`, `apps/server/test/coordinator/compaction.test.ts`
 
 ### coordinator-dispatch
@@ -177,9 +177,9 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md)
-- Frontend design: **gap**: the memory list in Coordinator settings has no design
-- Backend design: **gap**: no design for memory keys, scope, consolidation, promotion and invalidation
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md)
+- Frontend design: [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
+- Backend design: [docs/design/memory-backend.md](../../../docs/design/memory-backend.md), [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
 - Evidence: `apps/server/test/memory-consolidation.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
 
 ### merge-gate
