@@ -68,7 +68,6 @@ import type {
   ModelOption,
   PlanDiffContent,
   PlanVersion,
-  ProjectCommitRow,
   ReviewFinding,
   RunHistoryRow,
   SkillRow,
@@ -1113,24 +1112,6 @@ export function mapBranchInfo(
     machine: machine?.name ?? '—',
     directory: `~/${BRAND.homeDirName}/workspaces/${buildId}`,
   };
-}
-
-export function mapCommits(
-  commits: {
-    sha: string;
-    shortSha: string;
-    message: string;
-    authorName: string;
-    at: number;
-  }[],
-): ProjectCommitRow[] {
-  return commits.map((c) => ({
-    id: c.sha,
-    shortSha: c.shortSha,
-    message: c.message,
-    authorName: c.authorName,
-    at: c.at,
-  }));
 }
 
 export function mapRunHistory(
