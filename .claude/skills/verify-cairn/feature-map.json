@@ -225,12 +225,15 @@
       "id": "memory",
       "name": "Memory",
       "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.",
-      "states": "Coordinator settings list the memories in use; a memory can be deleted or promoted from project to team.",
+      "states": "Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-settings.tsx"
+          "apps/web/src/chief/chief-settings.tsx",
+          "apps/web/src/chief/memory-panel.tsx",
+          "apps/web/src/chief/memory-list.ts",
+          "apps/web/src/board/project-instructions-field.tsx"
         ],
         "server": [
           "apps/server/src/services/memory.ts",
@@ -260,6 +263,8 @@
         "docs/design/memory-inplace-edit.md"
       ],
       "evidence": [
+        "apps/web/e2e/chief-memory.spec.ts",
+        "apps/web/test/memory-list.test.ts",
         "apps/server/test/memory-consolidation.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"
