@@ -176,6 +176,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
       threadId,
       requestId: 'question-one',
       questions: [{ header: 'Scope', question: 'Which API?', options: [] }],
+      askedFor: [],
     });
     insertWork(s, projectId, 'needs-review');
     insertWork(s, projectId, 'needs-answer', 'needs_input');
@@ -556,6 +557,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
       threadId: foreign,
       requestId: 'foreign-question',
       questions: [{ header: 'Private', question: 'Private decision', options: [] }],
+      askedFor: [],
     });
     s.db
       .insert(todo)
@@ -719,6 +721,7 @@ describe('Thread wait, interrupt and search through an MCP client', () => {
         threadId,
         requestId: 'mid-wait',
         questions: [{ header: 'Scope', question: 'Which API?', options: [] }],
+        askedFor: [],
       });
     }, 300);
     const result = await call<WaitResponse>(client, 'wait_thread', {

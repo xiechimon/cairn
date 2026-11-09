@@ -25,16 +25,16 @@ import {
   chiefDigestThreadId,
   chiefIdFormat,
   chiefTurnErrorContentSchema,
-  fenceIssueText,
+  fencedTitle,
   ISSUE_FENCE_OPEN,
   isBackendRuntimeId,
   isChiefDigestThreadId,
-  isIssueSourcedTask,
   newChiefThreadId,
   orchestratedTodoIdOf,
   redactSecrets,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
+  titleAuthor,
 } from '@cairn/shared';
 import {
   and,
@@ -45,7 +45,6 @@ import {
   isNotNull,
   isNull,
   like,
-  lte,
   ne,
   notInArray,
   sql,
@@ -69,15 +68,15 @@ import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import { answerQuestion, askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
+import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
 import {
+  addTurnOwnerMessage,
   CHIEF_ABANDONED_STEP_MS,
   chiefOutage,
   chiefPendingMessages,
   chiefThreadFallbackModel,
   settleChiefActiveRun,
   steerChiefMessage,
-  steeredMessages,
 } from './chief-turns.js';
 import {
   claimClientMessage,
@@ -652,6 +651,7 @@ export function submitChiefMessage(
   deps: ChiefDeps,
   teamId: string,
   body: ChiefSendBody,
+  opts: { ownerWords?: boolean } = {},
 ): { result: ChiefSendResult; replayed: boolean } {
   const chiefRow = ensureChief(deps, teamId);
   const replay = replayedChiefSend(deps, teamId, chiefRow, body);
@@ -706,6 +706,7 @@ export function submitChiefMessage(
         prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
         trigger: 'user',
         id: message.id,
+        ownerMessageIds: opts.ownerWords === false ? [] : [message.id],
         scopeProjectId: picked?.id ?? null,
       });
       completeClientMessage(deps.db, threadRow.id, body.clientMessageId, {
@@ -732,8 +733,9 @@ export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
   body: ChiefSendBody,
+  opts: { ownerWords?: boolean } = {},
 ): ChiefSendResult {
-  return submitChiefMessage(deps, teamId, body).result;
+  return submitChiefMessage(deps, teamId, body, opts).result;
 }
 
 export function sendChiefMessageFromComposer(
@@ -758,7 +760,9 @@ export function answerChiefQuestion(
     .where(and(eq(chiefMessage.id, input.requestId), eq(chiefMessage.threadId, input.threadId)))
     .get();
   if (askQuestionContentOf(waiting?.content)?.parkedAt === undefined) {
-    return answerQuestion(deps, input);
+    const answered = answerQuestion(deps, input);
+    addTurnOwnerMessage(deps.db, input.threadId, answered.requestId);
+    return answered;
   }
   const threadRow = getChiefThread(deps, input.threadId);
   if (!threadRow) throw new HttpError(404, `chief thread ${input.threadId}`);
@@ -786,7 +790,7 @@ function enqueueResumedTurn(
     return `- ${question.header}：${question.question}\n  答复：${text}`;
   });
   enqueueChiefStep(deps, threadId, {
-    id: `${ASK_RESUME_STEP_PREFIX}${answered.requestId}`,
+    ownerMessageIds: [...(answered.askedFor ?? []), answered.requestId],
     prompt: promptWithPickedProject(
       pickedProjectOf(deps.db, teamId, projectId),
       `你之前用 ask_user 提的问题，用户现在答复了：\n${lines.join('\n')}\n请从这里继续。`,
@@ -836,7 +840,12 @@ export function requireTurnProvenance(
 export function enqueueChiefStep(
   deps: ChiefDeps,
   threadId: string,
-  opts: { prompt: string; id?: string; scopeProjectId?: string | null } & ChiefStepTrigger,
+  opts: {
+    prompt: string;
+    id?: string;
+    scopeProjectId?: string | null;
+    ownerMessageIds: string[];
+  } & ChiefStepTrigger,
 ): string {
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) throw new HttpError(404, `chief thread ${threadId}`);
@@ -855,6 +864,7 @@ export function enqueueChiefStep(
       status: 'pending',
       prompt,
       scopeProjectId: opts.scopeProjectId ?? null,
+      ownerMessageIds: opts.ownerMessageIds,
       createdAt: nowMs(),
     })
     .run();
@@ -952,6 +962,7 @@ export function rewindChiefThread(
   enqueueChiefStep(deps, threadId, {
     prompt: promptWithPickedProject(pickedProjectOf(deps.db, teamId, anchor.projectId), content),
     trigger: 'user',
+    ownerMessageIds: [anchor.id],
     scopeProjectId: anchor.projectId,
   });
   const fresh = getChiefThread(deps, threadId);
@@ -1094,6 +1105,7 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
         prompt: wakeFacts('settle', todoRecord, null),
         trigger: 'settle',
         provenance: watchProvenance(todoRecord.id),
+        ownerMessageIds: [],
         scopeProjectId: todoRecord.projectId,
       });
     }
@@ -1161,6 +1173,7 @@ export function enqueueOwnershipWake(
     prompt,
     trigger: reason === 'failed' ? 'failed' : 'wake',
     provenance: watchProvenance(record.id),
+    ownerMessageIds: [],
     scopeProjectId: record.projectId,
   });
 }
@@ -1179,6 +1192,7 @@ function enqueueGateWake(
     prompt: `${facts}\n${metadata}`,
     trigger: 'gate',
     provenance: watchProvenance(record.id),
+    ownerMessageIds: [],
     scopeProjectId: record.projectId,
   });
   if (retry) deps.db.update(step).set({ freshSession: true }).where(eq(step.id, id)).run();
@@ -1220,12 +1234,12 @@ export function wakeFacts(
   todo: TodoRecord,
   errorMessage: string | null,
 ): string {
-  if (!isIssueSourcedTask(todo)) {
+  if (titleAuthor(todo) !== 'third-party') {
     return wakeFactText(kind, todo, `#${todo.seqNum}「${todo.title}」`, errorMessage);
   }
   const ref = `#${todo.seqNum}（标题出自 GitHub issue，原文在下方围栏里）`;
   const facts = wakeFactText(kind, todo, ref, errorMessage);
-  return `${facts}\n${fenceIssueText(todo.sourceRef, todo.title)}`;
+  return `${facts}\n${fencedTitle(todo.title, todo)}`;
 }
 
 function wakeFactText(
@@ -1314,6 +1328,7 @@ function fireChiefWake(
       prompt: `${note}。请回头核实相关任务状态；只有需要用户知道或决定时，才用 notify_user 或 ask_user 告诉用户。`,
       trigger: 'wake',
       provenance: wakeProvenance(String(wake.id)),
+      ownerMessageIds: [],
       scopeProjectId: wakeTodoProjectId(deps.db, teamId, wake.todoId),
     });
   });
@@ -1526,86 +1541,6 @@ export function chiefClaimContext(
     sessionId: threadRow.sessionId !== '' ? threadRow.sessionId : null,
     trigger: 'user',
   };
-}
-
-const ASK_RESUME_STEP_PREFIX = 'resume-';
-
-export function turnOwnerMessageIds(db: Db, running: typeof step.$inferSelect): string[] {
-  const own = turnAnchorMessageId(db, running);
-  return [
-    ...new Set([
-      ...(own === null ? [] : [own]),
-      ...steeredMessages(db, running).map((m) => m.id),
-      ...turnOwnerAnswerIds(db, running),
-    ]),
-  ];
-}
-
-function turnOwnerAnswerIds(db: Db, running: typeof step.$inferSelect): string[] {
-  const resumed = running.id.startsWith(ASK_RESUME_STEP_PREFIX)
-    ? running.id.slice(ASK_RESUME_STEP_PREFIX.length)
-    : null;
-  const since = running.claimedAt;
-  const answered = db
-    .select({
-      id: chiefMessage.id,
-      content: chiefMessage.content,
-      createdAt: chiefMessage.createdAt,
-    })
-    .from(chiefMessage)
-    .where(and(eq(chiefMessage.threadId, running.buildId), eq(chiefMessage.role, 'assistant')))
-    .all()
-    .filter((row) => {
-      const question = askQuestionContentOf(row.content);
-      if (question === null || !isOwnerAnswered(question)) return false;
-      if (row.id === resumed) return true;
-      return since !== null && (question.answeredAt ?? 0) >= since;
-    });
-  const asked = answered.find((row) => row.id === resumed);
-  const request =
-    asked === undefined
-      ? undefined
-      : db
-          .select({ id: chiefMessage.id })
-          .from(chiefMessage)
-          .where(
-            and(
-              eq(chiefMessage.threadId, running.buildId),
-              eq(chiefMessage.role, 'user'),
-              lte(chiefMessage.createdAt, asked.createdAt),
-            ),
-          )
-          .orderBy(desc(chiefMessage.createdAt))
-          .get();
-  return [...(request === undefined ? [] : [request.id]), ...answered.map((row) => row.id)];
-}
-
-function turnAnchorMessageId(db: Db, running: typeof step.$inferSelect): string | null {
-  const own = db
-    .select({ id: chiefMessage.id })
-    .from(chiefMessage)
-    .where(and(eq(chiefMessage.id, running.id), eq(chiefMessage.role, 'user')))
-    .get();
-  if (own !== undefined) return own.id;
-  if (parseChiefTrigger(running.prompt) !== 'user') return null;
-  const latest = db
-    .select({ id: chiefMessage.id, content: chiefMessage.content })
-    .from(chiefMessage)
-    .where(
-      and(
-        eq(chiefMessage.threadId, running.buildId),
-        eq(chiefMessage.role, 'user'),
-        lte(chiefMessage.createdAt, running.createdAt),
-      ),
-    )
-    .orderBy(desc(chiefMessage.createdAt))
-    .get();
-  return latest !== undefined &&
-    typeof latest.content === 'string' &&
-    latest.content !== '' &&
-    (running.prompt ?? '').endsWith(latest.content)
-    ? latest.id
-    : null;
 }
 
 export function parseChiefTrigger(prompt: string | null): 'user' | ChiefWakeKind | 'wake' {

@@ -323,6 +323,7 @@ describe('Coordinator page filter and cursor', () => {
       prompt: 'gate facts',
       trigger: 'gate',
       provenance: 'watch:test',
+      ownerMessageIds: [],
     });
     H.s.db
       .update(stepTable)

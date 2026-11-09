@@ -20,6 +20,7 @@ import {
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
+  renderTaskText,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -191,6 +192,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
         }
       : {}),
     ...(row.routeOverride != null ? { routeOverride: row.routeOverride } : {}),
+    ...(row.request != null ? { request: row.request } : {}),
   };
 }
 
@@ -400,9 +402,11 @@ export function updateTodo(
     { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
     id,
     patch,
-    opts,
+    { ...opts, textWriter: { ownerEdit: deps.user.id } },
   );
 }
+
+export type TodoTextWriter = 'request-service' | { ownerEdit: string };
 
 export function updateAutonomousTodo(
   deps: TodoDeps,
@@ -416,11 +420,25 @@ export function updateAutonomousTodo(
     projectId?: string;
     routeOverride?: RouteOverride | null;
   },
-  opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
+  opts: {
+    manualPhase?: boolean;
+    userSpecAttachmentIds?: string[];
+    textWriter?: TodoTextWriter;
+  } = {},
 ): TodoRecord | null {
   const { db, hub } = deps;
   const row = getRow(deps, id);
   if (!row) return null;
+  if (
+    row.request !== null &&
+    (patch.title !== undefined || patch.spec !== undefined) &&
+    opts.textWriter === undefined
+  ) {
+    throw new HttpError(
+      409,
+      `todo ${id} carries the owner's cited words; edit it in the board, or send owner messages through the Coordinator`,
+    );
+  }
 
   const sets: Partial<TodoRow> = {};
   const move =
@@ -432,6 +450,21 @@ export function updateAutonomousTodo(
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
     sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
+    const editor = opts.textWriter;
+    if (row.request !== null && editor !== undefined && editor !== 'request-service') {
+      sets.request = {
+        ...row.request,
+        segments: [
+          {
+            source: { kind: 'edit', userId: editor.ownerEdit, at: nowMs(), span: 'whole' },
+            author: 'owner',
+            sourceRef: null,
+            text: patch.spec,
+          },
+        ],
+      };
+      sets.spec = renderTaskText(sets.request);
+    }
   }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
   if (patch.routeOverride !== undefined) {

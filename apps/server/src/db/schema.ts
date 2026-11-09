@@ -280,6 +280,7 @@ export const step = sqliteTable(
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
     scopeProjectId: text('scopeProjectId'),
+    ownerMessageIds: json<string[]>('ownerMessageIds'),
     byPerson: bool('byPerson').notNull().default(false),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),

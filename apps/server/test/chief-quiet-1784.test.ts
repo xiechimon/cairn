@@ -126,14 +126,14 @@ async function setup(): Promise<World> {
       enqueueChiefStep(
         { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user },
         thread.id,
-        { prompt, trigger: 'user' },
+        { prompt, trigger: 'user', ownerMessageIds: [] },
       );
     },
     wake(provenance) {
       enqueueChiefStep(
         { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user },
         thread.id,
-        { prompt: '任务 #1 运行失败。', trigger: 'failed', provenance },
+        { prompt: '任务 #1 运行失败。', trigger: 'failed', provenance, ownerMessageIds: [] },
       );
     },
   };

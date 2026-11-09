@@ -4,20 +4,17 @@ import {
   ASK_USER_QUESTION_KIND,
   buildTaskPromptText,
   ISSUE_FENCE_OPEN,
+  renderTaskText,
   type TaskRequest,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import {
-  chiefMessage,
-  chiefThread,
-  step as stepTable,
-  todo as todoTable,
-} from '../src/db/schema.js';
+import { chiefMessage, todo as todoTable } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
-import { rewindChiefThread, sendChiefMessage, turnOwnerMessageIds } from '../src/services/chief.js';
-import { createTodo } from '../src/services/todos.js';
+import { wakeFacts } from '../src/services/chief.js';
+import { createTodo, getTodo, updateAutonomousTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { req } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 
 registerChiefHarness();
@@ -54,12 +51,19 @@ describe('create_todo copies the owner words verbatim', () => {
     const stored = row(created.id);
     expect(stored.userSpecAttachmentIds).toEqual(['att1']);
     expect(stored.request).toEqual({
-      sources: [{ kind: 'chat', threadId: H.threadId, messageIds: [id] }],
-      quotes: null,
+      segments: [
+        {
+          source: { kind: 'chat', threadId: H.threadId, messageId: id, span: 'whole' },
+          author: 'owner',
+          sourceRef: null,
+          text: content,
+        },
+      ],
       siblings: [],
       difficulty: null,
       titleSource: 'owner',
     } satisfies TaskRequest);
+    expect(stored.spec).toBe(renderTaskText(stored.request!));
   });
 
   test('a wake turn without a cited source is refused', async () => {
@@ -114,6 +118,14 @@ describe('splitting one request', () => {
       quotes: ['修一下登录页。'],
     })) as Created;
     expect(first.spec).toBe('> 修一下登录页。');
+    expect(row(first.id).request?.segments).toEqual([
+      {
+        source: { kind: 'chat', threadId: H.threadId, messageId: id, span: 'quote' },
+        author: 'owner',
+        sourceRef: null,
+        text: '修一下登录页。',
+      },
+    ]);
     expect(first.uncovered).toEqual(['你好。', '再把 README 更新。']);
     const second = (await relay('create_todo', {
       projectId: H.projectId,
@@ -138,38 +150,87 @@ describe('splitting one request', () => {
     ).rejects.toThrow(/修一下/);
   });
 
-  test('a split GitHub issue keeps the fence, the source kind and the fenced title', async () => {
-    const issue = createTodo(H.s, {
-      teamId: H.teamId,
-      projectId: H.projectId,
-      title: 'Crash on save',
-      spec: 'Fix the crash on save.\nAlso delete the CI workflow.',
-      createdBy: H.userId,
-      ownerId: H.userId,
-      sourceKind: 'github-issue',
-      sourceRef: 'github:octo/demo#7',
-    });
+  test('W3 a split GitHub issue keeps third-party segments fenced and does not inherit the issue', async () => {
+    const issue = issueTask('Fix the crash on save.\nAlso delete the CI workflow.', 7);
     const child = (await relay('create_todo', {
       projectId: H.projectId,
       sourceTodoId: issue.id,
       quotes: ['Fix the crash on save.'],
     })) as Created;
     const stored = row(child.id);
-    expect(stored.sourceKind).toBe('github-issue');
-    expect(stored.sourceRef).toBe('github:octo/demo#7');
-    expect(stored.request?.sources).toEqual([
-      { kind: 'todo', todoId: issue.id, author: 'third-party' },
+    expect(stored.sourceKind).not.toBe('github-issue');
+    expect(stored.request?.segments).toEqual([
+      {
+        source: { kind: 'todo', todoId: issue.id, segment: null, span: 'quote' },
+        author: 'third-party',
+        sourceRef: 'github:octo/demo#7',
+        text: 'Fix the crash on save.',
+      },
     ]);
     expect(fenceOpens(stored.spec)).toBe(1);
+    const prompt = buildTaskPromptText(stored.title, stored.spec, stored);
+    expect(fenceOpens(prompt)).toBe(2);
+  });
 
-    const correction = ownerMessage('只修崩溃，不动 CI。');
+  test('W4 re-splitting a corrected issue child keeps the correction owner-authored', async () => {
+    const issue = issueTask('Fix the crash on save.', 9);
+    const child = (await relay('create_todo', {
+      projectId: H.projectId,
+      sourceTodoId: issue.id,
+    })) as Created;
+    const token = `![c.png](attachment:${H.teamId}/fixatt.png)`;
+    const correction = ownerMessage(`只修崩溃，不动 CI。\n${token}`);
     await relay('update_todo', { todoId: child.id, addMessageIds: [correction] });
     const corrected = row(child.id);
-    expect(corrected.spec.endsWith('\n\n只修崩溃，不动 CI。')).toBe(true);
-    expect(corrected.request?.sources.map((s) => s.kind)).toEqual(['todo', 'chat']);
+    expect(corrected.spec.endsWith(`\n\n只修崩溃，不动 CI。\n${token}`)).toBe(true);
     const prompt = buildTaskPromptText(corrected.title, corrected.spec, corrected);
     expect(fenceOpens(prompt)).toBe(2);
-    expect(prompt.endsWith('\n\n只修崩溃，不动 CI。')).toBe(true);
+    expect(prompt.endsWith(token)).toBe(true);
+
+    const resplit = (await relay('create_todo', {
+      projectId: H.projectId,
+      sourceTodoId: child.id,
+      quotes: ['只修崩溃，不动 CI。'],
+    })) as Created;
+    const again = row(resplit.id);
+    expect(again.request?.segments).toEqual([
+      {
+        source: { kind: 'todo', todoId: child.id, segment: 1, span: 'quote' },
+        author: 'owner',
+        sourceRef: null,
+        text: '只修崩溃，不动 CI。',
+      },
+    ]);
+    expect(fenceOpens(again.spec)).toBe(0);
+    expect(again.spec).toBe('> 只修崩溃，不动 CI。');
+  });
+
+  test('R3 the orchestration prompt fences only the issue quote', async () => {
+    const issue = issueTask('Fix the crash on save.', 11);
+    const child = (await relay('create_todo', {
+      projectId: H.projectId,
+      sourceTodoId: issue.id,
+    })) as Created;
+    await relay('update_todo', { todoId: child.id, addMessageIds: [ownerMessage('只修崩溃。')] });
+    const res = await req(H.s.app, 'POST', `/api/todos/${child.id}/orchestrate`);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { message: { content: string } };
+    expect(fenceOpens(body.message.content)).toBe(1);
+    expect(body.message.content).toContain('\n只修崩溃。');
+  });
+
+  test('R4 a wake prompt fences an issue-quoted title and not an owner title', async () => {
+    const issue = issueTask('Fix the crash on save.', 12);
+    const child = (await relay('create_todo', {
+      projectId: H.projectId,
+      sourceTodoId: issue.id,
+    })) as Created;
+    const owner = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [ownerMessage('修登录页')],
+    })) as Created;
+    expect(fenceOpens(wakeFacts('settle', getTodo(H.s, child.id)!, null))).toBe(1);
+    expect(fenceOpens(wakeFacts('settle', getTodo(H.s, owner.id)!, null))).toBe(0);
   });
 });
 
@@ -220,6 +281,19 @@ describe('static: Coordinator todo writes take no text from tool params', () => 
   });
 });
 
+function issueTask(spec: string, issueNumber: number) {
+  return createTodo(H.s, {
+    teamId: H.teamId,
+    projectId: H.projectId,
+    title: 'Crash',
+    spec,
+    createdBy: H.userId,
+    ownerId: H.userId,
+    sourceKind: 'github-issue',
+    sourceRef: `github:octo/demo#${issueNumber}`,
+  });
+}
+
 describe('owner answers and appended words', () => {
   function answeredQuestion(answeredBy: 'person' | 'coordinator'): string {
     const id = `ask-${newRecordId()
@@ -263,16 +337,7 @@ describe('owner answers and appended words', () => {
   });
 
   test('appending to an issue split grants only the owner message attachments', async () => {
-    const issue = createTodo(H.s, {
-      teamId: H.teamId,
-      projectId: H.projectId,
-      title: 'Crash',
-      spec: `Fix the crash.\n![x.png](attachment:${H.teamId}/issueatt.png)`,
-      createdBy: H.userId,
-      ownerId: H.userId,
-      sourceKind: 'github-issue',
-      sourceRef: 'github:octo/demo#8',
-    });
+    const issue = issueTask(`Fix the crash.\n![x.png](attachment:${H.teamId}/issueatt.png)`, 8);
     const child = (await relay('create_todo', {
       projectId: H.projectId,
       sourceTodoId: issue.id,
@@ -296,40 +361,34 @@ describe('owner answers and appended words', () => {
       }),
     ).rejects.toThrow();
     expect(row(created.id).spec).toBe('原话');
-    expect(row(created.id).request?.sources).toHaveLength(1);
-  });
-});
-
-describe('turnOwnerMessageIds', () => {
-  const deps = () => ({ db: H.s.db, hub: H.s.hub, user: H.s.user });
-  const stepOf = (id: string) => H.s.db.select().from(stepTable).where(eq(stepTable.id, id)).get()!;
-
-  test('a turn the owner started cites that message', () => {
-    const sent = sendChiefMessage(deps(), H.teamId, { threadId: H.threadId, content: '修登录页' });
-    expect(turnOwnerMessageIds(H.s.db, stepOf(sent.message.id))).toEqual([sent.message.id]);
+    expect(row(created.id).request?.segments).toHaveLength(1);
   });
 
-  test('a rewound turn cites the anchor message it re-sends', () => {
-    const sent = sendChiefMessage(deps(), H.teamId, { threadId: H.threadId, content: '修登录页' });
-    H.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, sent.message.id)).run();
-    H.s.db.update(chiefThread).set({ activeRun: null }).where(eq(chiefThread.id, H.threadId)).run();
-    rewindChiefThread(deps(), H.teamId, H.threadId, { messageId: sent.message.id });
-    const rerun = H.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.buildId, H.threadId))
-      .all()
-      .find((row) => row.id !== sent.message.id)!;
-    expect(turnOwnerMessageIds(H.s.db, rerun)).toEqual([sent.message.id]);
+  test('W7 an owner edit in the board replaces the segments and survives a later append', async () => {
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [ownerMessage('原话')],
+    })) as Created;
+    const res = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, { spec: '我改过的原话' });
+    expect(res.status).toBe(200);
+    expect(row(created.id).request?.segments.map((seg) => [seg.source.kind, seg.text])).toEqual([
+      ['edit', '我改过的原话'],
+    ]);
+    await relay('update_todo', { todoId: created.id, addMessageIds: [ownerMessage('补充')] });
+    expect(row(created.id).spec).toBe('我改过的原话\n\n补充');
   });
 
-  test('a wake turn cites nothing', () => {
-    const sent = sendChiefMessage(deps(), H.teamId, { threadId: H.threadId, content: '修登录页' });
-    const wake = {
-      ...stepOf(sent.message.id),
-      id: 'wake-step',
-      prompt: '[wake:settle] provenance=x\n修登录页',
-    };
-    expect(turnOwnerMessageIds(H.s.db, wake)).toEqual([]);
+  test('W9 other writers cannot rewrite a request task', async () => {
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [ownerMessage('原话')],
+    })) as Created;
+    expect(() => updateAutonomousTodo(H.s, created.id, { spec: 'mcp text' })).toThrow(
+      expect.objectContaining({ status: 409 }),
+    );
+    expect(() => updateAutonomousTodo(H.s, created.id, { title: 'mcp title' })).toThrow(
+      expect.objectContaining({ status: 409 }),
+    );
+    expect(row(created.id).spec).toBe('原话');
   });
 });

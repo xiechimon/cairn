@@ -143,6 +143,7 @@ export function createOrGetQuestion(
     requestId: string;
     questions: AskUserQuestion[];
     provenance?: string;
+    askedFor: string[];
   },
 ): { content: AskUserQuestionContent; created: boolean } {
   if (!isChiefConversationId(input.threadId)) {
@@ -157,6 +158,7 @@ export function createOrGetQuestion(
     questions: input.questions,
     answers: null,
     ...(input.provenance !== undefined ? { provenance: input.provenance } : {}),
+    askedFor: input.askedFor,
   };
   const threadRow = deps.db
     .select()

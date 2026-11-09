@@ -732,6 +732,7 @@ export async function executeChiefTool(
           requestId,
           questions,
           provenance,
+          askedFor: [...(ctx.turnMessageIds ?? [])],
         },
       );
       return json({

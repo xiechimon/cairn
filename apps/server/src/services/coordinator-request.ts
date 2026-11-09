@@ -1,20 +1,21 @@
 import {
-  assembleRequestSpec,
+  type CitedSegment,
   type CoordinatorCreateTodoParams,
   type CoordinatorUpdateTodoParams,
   derivePlaceholderTitle,
   isIssueSourcedTask,
   orchestratedTodoIdOf,
   PLACEHOLDER_TITLE_FALLBACK,
+  quoteSegments,
   RequestQuoteError,
-  type RequestSourceText,
+  renderTaskText,
+  segmentKey,
   type TaskRequest,
-  type TaskRequestQuote,
-  type TaskRequestSource,
+  type TaskSegment,
   type TodoRecord,
-  uncoveredRequestText,
+  uncoveredText,
 } from '@cairn/shared';
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -30,104 +31,113 @@ export interface RequestCtx {
   turnMessageIds?: readonly string[];
 }
 
-interface CitedSource {
-  source: TaskRequestSource;
-  text: RequestSourceText;
-  inherits: { sourceKind: 'github-issue'; sourceRef: string | null } | null;
-}
-
 const NO_OWNER_WORDS =
   "create_todo needs the owner's words: cite owner messages of this thread with messageIds, or a todo with sourceTodoId. Ask the owner with ask_user when there is nothing to cite.";
 
-function ownerAnswersText(content: unknown): string | null {
-  const question = askQuestionContentOf(content);
-  if (question === null || !isOwnerAnswered(question)) return null;
-  return (question.answers ?? [])
-    .map((answer) => answer.text ?? answer.choices?.join('、') ?? '')
-    .filter((text) => text !== '')
-    .join('\n');
-}
-
-function ownerMessagesText(db: Db, ctx: RequestCtx, messageIds: readonly string[]): string {
+function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): CitedSegment[] {
   const rows = db
     .select()
     .from(chiefMessage)
     .where(and(eq(chiefMessage.threadId, ctx.threadId), inArray(chiefMessage.id, [...messageIds])))
     .all();
   const byId = new Map(rows.map((row) => [row.id, row]));
-  return messageIds
-    .map((id) => {
-      const row = byId.get(id);
-      const answers = row === undefined ? null : ownerAnswersText(row.content);
-      if (answers !== null) return answers;
-      if (row === undefined || row.role !== 'user' || typeof row.content !== 'string') {
-        throw new HttpError(400, `message ${id} is not an owner message of this thread`);
-      }
-      const orchestrated = orchestratedTodoIdOf(row.content);
-      if (orchestrated !== null) {
-        throw new HttpError(
-          400,
-          `message ${id} is an orchestration request for todo ${orchestrated}: open_thread on it, or split it with sourceTodoId`,
-        );
-      }
-      return row.content;
-    })
-    .join('\n\n');
+  return messageIds.map((id) => {
+    const row = byId.get(id);
+    const question = row === undefined ? null : askQuestionContentOf(row.content);
+    if (question !== null && isOwnerAnswered(question)) {
+      const text = (question.answers ?? [])
+        .map((answer) => answer.text ?? answer.choices?.join('、') ?? '')
+        .filter((line) => line !== '')
+        .join('\n');
+      const source = {
+        kind: 'answer' as const,
+        threadId: ctx.threadId,
+        requestId: id,
+        span: 'whole' as const,
+      };
+      return { segment: { source, author: 'owner', sourceRef: null, text }, quoteSource: source };
+    }
+    if (row === undefined || row.role !== 'user' || typeof row.content !== 'string') {
+      throw new HttpError(400, `message ${id} is not an owner message of this thread`);
+    }
+    const orchestrated = orchestratedTodoIdOf(row.content);
+    if (orchestrated !== null) {
+      throw new HttpError(
+        400,
+        `message ${id} is an orchestration request for todo ${orchestrated}: open_thread on it, or split it with sourceTodoId`,
+      );
+    }
+    const source = {
+      kind: 'chat' as const,
+      threadId: ctx.threadId,
+      messageId: id,
+      span: 'whole' as const,
+    };
+    return {
+      segment: { source, author: 'owner', sourceRef: null, text: row.content },
+      quoteSource: source,
+    };
+  });
 }
 
-function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): CitedSource {
-  return {
-    source: { kind: 'chat', threadId: ctx.threadId, messageIds: [...messageIds] },
-    text: { author: 'owner', text: ownerMessagesText(db, ctx, messageIds), sourceRef: null },
-    inherits: null,
-  };
-}
-
-function citedTodo(db: Db, ctx: RequestCtx, todoId: string): CitedSource {
+function citedTodo(db: Db, ctx: RequestCtx, todoId: string): CitedSegment[] {
   const row = db
     .select()
     .from(todo)
     .where(and(eq(todo.id, todoId), eq(todo.teamId, ctx.teamId)))
     .get();
   if (row === undefined) throw new HttpError(404, `todo ${todoId}`);
+  if (row.request !== null) {
+    return row.request.segments.map((segment, index) => ({
+      segment,
+      quoteSource: { kind: 'todo', todoId, segment: index, span: 'whole' },
+    }));
+  }
   const thirdParty = isIssueSourcedTask(row);
-  return {
-    source: { kind: 'todo', todoId, author: thirdParty ? 'third-party' : 'owner' },
-    text: {
-      author: thirdParty ? 'third-party' : 'owner',
-      text: row.spec,
-      sourceRef: row.sourceRef,
+  const source = { kind: 'todo' as const, todoId, segment: null, span: 'whole' as const };
+  return [
+    {
+      segment: {
+        source,
+        author: thirdParty ? 'third-party' : 'owner',
+        sourceRef: thirdParty ? row.sourceRef : null,
+        text: row.spec,
+      },
+      quoteSource: source,
     },
-    inherits: thirdParty ? { sourceKind: 'github-issue', sourceRef: row.sourceRef } : null,
-  };
+  ];
 }
 
-function assembled(texts: readonly RequestSourceText[], quotes: TaskRequestQuote[] | null): string {
+function quoted(cited: readonly CitedSegment[], quotes: readonly string[]): TaskSegment[] {
   try {
-    return assembleRequestSpec(texts, quotes);
+    return quoteSegments(cited, quotes);
   } catch (error) {
     if (error instanceof RequestQuoteError) throw new HttpError(400, error.message);
     throw error;
   }
 }
 
-const sameOrigin = (a: TaskRequestSource | undefined, b: TaskRequestSource) =>
-  a !== undefined && JSON.stringify(a) === JSON.stringify(b);
+function ownerGrants(segments: readonly TaskSegment[], teamId: string): string[] {
+  return [
+    ...new Set(
+      segments
+        .filter((segment) => segment.author === 'owner')
+        .flatMap((segment) => attachmentIdsInUserText(segment.text, teamId)),
+    ),
+  ];
+}
 
-function splitSiblings(db: Db, teamId: string, origin: TaskRequestSource): TodoRow[] {
-  const key = origin.kind === 'chat' ? origin.messageIds[0] : origin.todoId;
+function splitSiblings(db: Db, teamId: string, keys: ReadonlySet<string>): TodoRow[] {
   return db
     .select()
     .from(todo)
-    .where(
-      and(
-        eq(todo.teamId, teamId),
-        isNotNull(todo.request),
-        sql`${todo.request} like ${`%"${key}"%`}`,
-      ),
-    )
+    .where(and(eq(todo.teamId, teamId), isNotNull(todo.request)))
     .all()
-    .filter((row) => row.request?.quotes != null && sameOrigin(row.request.sources[0], origin));
+    .filter((row) =>
+      (row.request?.segments ?? []).some(
+        (segment) => segment.source.span === 'quote' && keys.has(segmentKey(segment.source)),
+      ),
+    );
 }
 
 function requireTeamTodos(db: Db, teamId: string, ids: readonly string[]): void {
@@ -156,13 +166,13 @@ export function createRequestTodo(
     params.sourceTodoId !== undefined
       ? citedTodo(db, ctx, params.sourceTodoId)
       : citedMessages(db, ctx, messageIds);
-  const quotes = params.quotes?.map((text) => ({ source: 0, text })) ?? null;
-  const spec = assembled([cited.text], quotes);
+  const segments =
+    params.quotes === undefined ? cited.map((c) => c.segment) : quoted(cited, params.quotes);
   requireTeamTodos(db, ctx.teamId, params.dependsOn ?? []);
-  const siblings = quotes === null ? [] : splitSiblings(db, ctx.teamId, cited.source);
+  const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
+  const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
   const request: TaskRequest = {
-    sources: [cited.source],
-    quotes,
+    segments,
     siblings: siblings.map((row) => row.id),
     difficulty: params.difficulty ?? null,
     titleSource: 'owner',
@@ -170,22 +180,13 @@ export function createRequestTodo(
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,
     projectId: params.projectId,
-    title:
-      derivePlaceholderTitle(quotes?.[0]?.text ?? cited.text.text) || PLACEHOLDER_TITLE_FALLBACK,
-    spec,
+    title: derivePlaceholderTitle(segments[0]?.text ?? '') || PLACEHOLDER_TITLE_FALLBACK,
+    spec: renderTaskText(request),
     createdBy: provenance.createdBy,
     ownerId: provenance.ownerId,
     orchestration: { threadId: ctx.threadId },
     request,
-    ...(cited.inherits !== null
-      ? {
-          sourceKind: cited.inherits.sourceKind,
-          ...(cited.inherits.sourceRef !== null ? { sourceRef: cited.inherits.sourceRef } : {}),
-        }
-      : {}),
-    ...(cited.text.author === 'owner'
-      ? { userSpecAttachmentIds: attachmentIdsInUserText(cited.text.text, ctx.teamId) }
-      : {}),
+    userSpecAttachmentIds: ownerGrants(segments, ctx.teamId),
     ...(params.dependsOn !== undefined ? { blockedBy: params.dependsOn } : {}),
     ...(params.priority === 'first' ? { orderFirst: true } : {}),
     ...(params.output !== undefined ? { output: params.output } : {}),
@@ -197,12 +198,9 @@ export function createRequestTodo(
       .where(eq(todo.id, sibling.id))
       .run();
   }
-  if (quotes === null) return record;
-  const allQuotes = [
-    ...siblings.flatMap((row) => (row.request?.quotes ?? []).filter((q) => q.source === 0)),
-    ...quotes,
-  ];
-  return { ...record, uncovered: uncoveredRequestText([cited.text], allQuotes) };
+  if (params.quotes === undefined) return record;
+  const allQuoted = [...siblings.flatMap((row) => row.request?.segments ?? []), ...segments];
+  return { ...record, uncovered: uncoveredText(cited, allQuoted) };
 }
 
 function appendableRow(
@@ -239,29 +237,24 @@ export function updateRequestTodo(
   const { db } = deps;
   if (params.addMessageIds !== undefined) appendableRow(db, ctx, params.todoId);
   const added =
-    params.addMessageIds === undefined ? null : citedMessages(db, ctx, params.addMessageIds);
+    params.addMessageIds === undefined
+      ? null
+      : citedMessages(db, ctx, params.addMessageIds).map((c) => c.segment);
   const routed = updateAutonomousTodo(deps, params.todoId, {
     ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
     ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
   });
   if (added === null || routed === null) return routed;
   const row = appendableRow(db, ctx, params.todoId);
-  const grants = [
-    ...new Set([
-      ...row.userSpecAttachmentIds,
-      ...attachmentIdsInUserText(added.text.text, ctx.teamId),
-    ]),
-  ];
+  const request: TaskRequest = { ...row.request, segments: [...row.request.segments, ...added] };
+  const grants = [...new Set([...row.userSpecAttachmentIds, ...ownerGrants(added, ctx.teamId)])];
   return db.transaction(() => {
-    db.update(todo)
-      .set({ request: { ...row.request, sources: [...row.request.sources, added.source] } })
-      .where(eq(todo.id, row.id))
-      .run();
+    db.update(todo).set({ request }).where(eq(todo.id, row.id)).run();
     return updateAutonomousTodo(
       deps,
       row.id,
-      { spec: `${row.spec}\n\n${added.text.text}` },
-      { userSpecAttachmentIds: grants },
+      { spec: renderTaskText(request) },
+      { userSpecAttachmentIds: grants, textWriter: 'request-service' },
     );
   });
 }

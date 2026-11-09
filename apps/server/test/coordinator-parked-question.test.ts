@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, step as stepTable } from '../src/db/schema.js';
-import { turnOwnerMessageIds } from '../src/services/chief.js';
 import {
   ASK_PARK_MS,
   ASK_PARKED_REASON,
@@ -31,7 +30,7 @@ async function askFromProjectTurn(projectId: string, ageMs: number) {
     .run();
   createOrGetQuestion(
     { db: H.s.db },
-    { threadId: H.threadId, requestId: 'ask-q', questions: QUESTIONS },
+    { threadId: H.threadId, requestId: 'ask-q', questions: QUESTIONS, askedFor: [stepId] },
   );
   H.s.db
     .update(chiefMessage)
@@ -116,7 +115,7 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     const res = await answer();
     expect(res.status).toBe(200);
     const running = chiefSteps().find((s) => s.id === asker)!;
-    expect(turnOwnerMessageIds(H.s.db, running)).toEqual([asker, 'ask-q']);
+    expect(running.ownerMessageIds).toEqual([asker, 'ask-q']);
   });
 
   test('a parked question survives the end of its turn and answers hours later start a new turn', async () => {
@@ -133,7 +132,7 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     expect(resumed[0]?.prompt).toContain(`demo（id: ${H.projectId}）`);
     expect(resumed[0]?.prompt).toContain('Which pages?');
     expect(resumed[0]?.prompt).toContain('only the board');
-    expect(turnOwnerMessageIds(H.s.db, resumed[0]!)).toEqual([asker, 'ask-q']);
+    expect(resumed[0]?.ownerMessageIds).toEqual([asker, 'ask-q']);
   });
 
   test('while a question is parked another project turn runs and finishes', async () => {
