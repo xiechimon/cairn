@@ -1,11 +1,11 @@
 import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { loadDaemonConfig } from '../../daemon/src/config.js';
 import { ensureStateDirs, statePaths } from '../../daemon/src/state.js';
 import { project } from '../src/db/schema.js';
-import { runGit } from '../src/lib/git.js';
+import { runGit, systemGitOps } from '../src/lib/git.js';
 import { localWorkspaceRoot } from '../src/lib/workspace-root.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { readFile } from '../src/services/git.js';
@@ -33,6 +33,7 @@ async function bindRepo(kind: 'github' | 'local' | 'hosted') {
     .update(project)
     .set({
       repoKind: kind,
+      baseBranch: 'main',
       githubRepo: kind === 'github' ? 'fixture/repository' : null,
       localPath: kind === 'hosted' ? null : dir,
       repoName: kind === 'hosted' ? 'docs' : null,
@@ -172,6 +173,97 @@ describe('Coordinator repository reads', () => {
     expect(() => deps.workspacesDir).toThrow();
   });
 
+  for (const kind of ['local', 'github'] as const) {
+    test(`${kind}: omitted ref reads configured base, not the feature checkout`, async () => {
+      const dir = await bindRepo(kind);
+      const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim();
+      H.s.db.update(project).set({ baseBranch: 'main' }).where(eq(project.id, H.projectId)).run();
+      expect((await runGit(['checkout', '-b', 'feature'], { cwd: dir })).code).toBe(0);
+      writeFileSync(join(dir, 'scripts/owned-process.mjs'), 'feature source\n');
+      expect((await runGit(['add', '.'], { cwd: dir })).code).toBe(0);
+      expect(
+        (
+          await runGit(
+            [
+              '-c',
+              'user.name=Fixture',
+              '-c',
+              'user.email=fixture@example.test',
+              'commit',
+              '-m',
+              'feature',
+            ],
+            { cwd: dir },
+          )
+        ).code,
+      ).toBe(0);
+      expect((await docs(['scripts/owned-process.mjs'])).files[0]).toMatchObject({
+        commit,
+        content: 'export const spawn = true;\n',
+      });
+      expect((await docs(['scripts/owned-process.mjs'], 'feature')).files[0]?.content).toBe(
+        'feature source\n',
+      );
+      H.s.db.update(project).set({ baseBranch: null }).where(eq(project.id, H.projectId)).run();
+      expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toContain(
+        'default branch is unknown',
+      );
+      expect(
+        (await runGit(['update-ref', 'refs/remotes/origin/main', commit], { cwd: dir })).code,
+      ).toBe(0);
+      expect(
+        (
+          await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main'], {
+            cwd: dir,
+          })
+        ).code,
+      ).toBe(0);
+      expect((await docs(['scripts/owned-process.mjs'])).files[0]?.commit).toBe(commit);
+    });
+  }
+
+  test('preflights oversized blobs and bounds aggregate serialized document output', async () => {
+    const dir = await bindRepo('local');
+    writeFileSync(join(dir, 'large.bin'), Buffer.alloc(1024 * 1024));
+    writeFileSync(join(dir, 'medium.txt'), '\\'.repeat(16 * 1024));
+    expect((await runGit(['add', 'large.bin', 'medium.txt'], { cwd: dir })).code).toBe(0);
+    expect(
+      (
+        await runGit(
+          [
+            '-c',
+            'user.name=Fixture',
+            '-c',
+            'user.email=fixture@example.test',
+            'commit',
+            '-m',
+            'artifacts',
+          ],
+          { cwd: dir },
+        )
+      ).code,
+    ).toBe(0);
+    const read = vi.spyOn(systemGitOps, 'readFileAt');
+    try {
+      const result = await docs(['large.bin']);
+      expect(result.files[0]?.error).toMatch(/limit|too large/i);
+      expect(read).not.toHaveBeenCalled();
+      const batch = await relay('docs', {
+        projectId: H.projectId,
+        paths: Array(24).fill('medium.txt'),
+      });
+      expect(Buffer.byteLength(JSON.stringify(batch))).toBeLessThanOrEqual(128 * 1024);
+      expect((batch as Docs).files.some((file) => file.error !== undefined)).toBe(true);
+      expect(read.mock.calls.length).toBeLessThan(24);
+      for (const file of (batch as Docs).files) {
+        if (file.error !== undefined) expect(file.content).toBeUndefined();
+        else expect(file.content).toBe('\\'.repeat(16 * 1024));
+      }
+    } finally {
+      read.mockRestore();
+    }
+  });
+
   test('github without a local binding reports the actual missing repository', async () => {
     H.s.db
       .update(project)
@@ -253,7 +345,7 @@ describe('Coordinator repository reads', () => {
       .set({ repoKind: 'github', githubRepo: 'xiechimon/cairn', localPath: resolve('.') })
       .where(eq(project.id, H.projectId))
       .run();
-    const result = await docs(['scripts/owned-process.mjs']);
+    const result = await docs(['scripts/owned-process.mjs'], 'HEAD');
     expect(result.files[0]?.content).toBe(readFileSync('scripts/owned-process.mjs', 'utf8'));
     expect(result.files[0]?.commit).toBe(
       (await runGit(['rev-parse', 'HEAD'])).stdout.toString().trim(),

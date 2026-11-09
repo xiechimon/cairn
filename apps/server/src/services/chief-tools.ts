@@ -265,6 +265,10 @@ function requireUnarchivedTargets(db: Db, teamId: string, name: string, params: 
 }
 
 const DOCS_MAX_PATHS = 24;
+const DOCS_MAX_FILE_BYTES = 64 * 1024;
+const DOCS_MAX_RESPONSE_BYTES = 128 * 1024;
+const DOCS_MAX_JSON_EXPANSION = 6;
+const DOCS_FILE_METADATA_RESERVE_BYTES = 2048;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
@@ -439,6 +443,23 @@ export async function executeChiefTool(
             projectId,
             p,
             ref,
+            {
+              defaultBranch: true,
+              maxBytes: Math.max(
+                0,
+                Math.min(
+                  DOCS_MAX_FILE_BYTES,
+                  Math.floor(
+                    (DOCS_MAX_RESPONSE_BYTES -
+                      Buffer.byteLength(
+                        json({ projectId, name: row.name, files, omitted: paths.length }),
+                      ) -
+                      DOCS_FILE_METADATA_RESERVE_BYTES) /
+                      DOCS_MAX_JSON_EXPANSION,
+                  ),
+                ),
+              ),
+            },
           );
           files.push({
             path: f.path,
@@ -448,14 +469,34 @@ export async function executeChiefTool(
             content: f.content,
           });
         } catch (err) {
-          files.push({ path: p, error: err instanceof Error ? err.message : String(err) });
+          files.push({
+            path: p.slice(0, 512),
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 1024),
+          });
+        }
+        if (
+          Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
+          DOCS_MAX_RESPONSE_BYTES
+        ) {
+          files.pop();
+          files.push({
+            path: p.slice(0, 512),
+            error: 'repository document response limit exceeded',
+          });
+          if (
+            Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
+            DOCS_MAX_RESPONSE_BYTES
+          ) {
+            files.pop();
+            break;
+          }
         }
       }
       return json({
         projectId,
         name: row.name,
         files,
-        ...(paths.length > capped.length ? { omitted: paths.length - capped.length } : {}),
+        ...(paths.length > files.length ? { omitted: paths.length - files.length } : {}),
       });
     }
     case 'usage': {

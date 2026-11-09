@@ -314,6 +314,7 @@ export async function readFile(
   projectId: string,
   path: string,
   refParam?: string,
+  options: { defaultBranch?: boolean; maxBytes?: number } = {},
 ): Promise<ProjectFileResponse> {
   if (!isSafeRepoPath(path)) throw new HttpError(400, `invalid query path: ${path}`);
   const dir = await requireRepoReadDir(ctx, projectId);
@@ -336,7 +337,45 @@ export async function readFile(
       ref = head.stdout.toString('utf8').trim();
     }
   }
+  if (
+    refParam === undefined &&
+    options.defaultBranch === true &&
+    !(ctx.workspacesDir !== undefined && dir === join(ctx.workspacesDir, projectId, 'repo'))
+  ) {
+    const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+    if (row?.baseBranch != null) {
+      ref = `refs/heads/${row.baseBranch}`;
+    } else if (row?.repoKind !== 'hosted') {
+      const remoteHead = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
+        cwd: dir,
+        timeoutMs: 15000,
+      });
+      if (remoteHead.code === 0) {
+        ref = remoteHead.stdout.toString('utf8').trim();
+      } else {
+        throw new HttpError(
+          409,
+          'repository default branch is unknown; configure baseBranch or supply ref',
+        );
+      }
+    }
+  }
   const commit = await resolveCommitOr404(dir, ref);
+  if (options.maxBytes !== undefined) {
+    const sizeResult = await runGit(['cat-file', '-s', `${commit}:${path}`], {
+      cwd: dir,
+      timeoutMs: 15000,
+    });
+    if (sizeResult.code !== 0) throw notFound(`file ${path} at ref ${ref}`);
+    const size = Number(sizeResult.stdout.toString('utf8').trim());
+    if (!Number.isSafeInteger(size) || size < 0)
+      throw new HttpError(409, 'invalid repository blob size');
+    if (size > options.maxBytes)
+      throw new HttpError(
+        413,
+        `repository document too large: ${size} bytes exceeds limit ${options.maxBytes}`,
+      );
+  }
   const file = await systemGitOps.readFileAt(dir, commit, path);
   if (file === null) throw notFound(`file ${path} at ref ${ref}`);
   const binary = looksBinary(file.content);
