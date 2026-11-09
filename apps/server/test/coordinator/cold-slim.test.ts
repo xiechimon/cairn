@@ -511,6 +511,24 @@ describe('contextResumeOf', () => {
       }),
     ).toBe('compacted');
   });
+
+  it('is cold when the active router model differs from the last usage model', () => {
+    expect(
+      contextResumeOf({
+        now: 10_000,
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'anthropic/claude',
+        lastUsage: {
+          createdAt: 9_000,
+          cacheRead: 12_000,
+          input: 100,
+          contextTokens: 12_100,
+          model: 'openai/gpt',
+        },
+        lastColdSlimAt: null,
+      }),
+    ).toBe('cold');
+  });
 });
 
 describe('resumeExpiresAtOf', () => {

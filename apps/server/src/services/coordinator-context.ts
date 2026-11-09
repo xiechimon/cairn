@@ -60,8 +60,10 @@ function contextWindowOf(db: Db, teamId: string, usageModel: string): number {
 
 function activeRouterModel(db: Db, teamId: string): string | null {
   const profile = coordinatorProfile(db, teamId);
-  if (profile?.provider == null || profile.modelId == null || profile.modelId === '') return null;
-  return `${profile.provider}/${profile.modelId}`;
+  const providerId = profile?.provider?.trim() ?? '';
+  const modelId = profile?.modelId?.trim() ?? '';
+  if (providerId === '' || modelId === '') return null;
+  return `${providerId}/${modelId}`;
 }
 
 export function lastTurnContext(
