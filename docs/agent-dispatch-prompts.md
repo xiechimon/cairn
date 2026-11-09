@@ -39,7 +39,7 @@ No stacked PRs by default. Measured on 81 merged PRs (`docs/research/pr-flow-spe
 Add this block to every implementation brief:
 
 ```text
-Review convergence: for each Codex finding, name its bug class, find every other instance in this PR's diff and the entry paths it touches, and fix them all in one push. Reply on each thread with the class and the sites changed, then resolve it. P0/P1 must be fixed. A real P2/P3 outside this change: open an issue, reply "valid, out of scope for this PR, tracked in #N", resolve the thread. Not a defect: reply with the reason, resolve. Push once per round. After round 3 with findings open, stop and hand the PR to the coordinator with the class list.
+Review convergence: for each Codex finding, name its bug class, find every other instance in this PR's diff and the entry paths it touches, and fix them all in one push. Reply on each thread with the class and the sites changed, then resolve it. P0/P1 must be fixed. A real P2/P3 outside this change: open or reuse an issue that tracks it, reply "valid, out of scope for this PR, tracked in #N", resolve the thread. Not a defect: reply with the reason, resolve. Push once per round. After round 3 with findings open, stop and hand the PR to the coordinator with the class list.
 Design first: for persisted state, a protocol or concurrency, write a one-page design listing every read and write path and get it reviewed before code.
 Queue: never post Mergify commands. If the PR is green but not queued after 10 minutes, read the "Mergify Merge Queue" check run and fix the unmet condition.
 Stacking: branch from origin/main. If your task depends on an open PR, wait for it to merge or keep your work local until it does.
