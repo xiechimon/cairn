@@ -1029,7 +1029,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
         body: failGuidanceBody(classifyStepFailure(row.reason)),
         facts: {
           files: row.fileCount,
-          commit: row.commits[0]?.slice(0, 9) ?? null,
+          commits: row.commits.map((commit) => commit.slice(0, 9)),
           pr: row.pr?.number ?? null,
         },
         raw: stripAnsiEscapes(row.reason),

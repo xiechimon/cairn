@@ -325,7 +325,7 @@ export interface DocBlock {
 
 export interface FailFacts {
   files: number | null;
-  commit: string | null;
+  commits: string[];
   pr: number | null;
 }
 

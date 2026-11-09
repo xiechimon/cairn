@@ -17,6 +17,7 @@ import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
+import { shouldExpandLastWork } from './work-expansion.js';
 import { InjectedSkills, WorkTrace } from './work-trace.js';
 
 export interface LiveStep {
@@ -591,7 +592,9 @@ function FailRow({
       ? ''
       : [
           item.facts.files !== null ? t('改动 {n} 个文件', { n: item.facts.files }) : null,
-          item.facts.commit !== null ? t('提交 {sha}', { sha: item.facts.commit }) : null,
+          item.facts.commits.length > 0
+            ? t('提交 {shas}', { shas: item.facts.commits.join(', ') })
+            : null,
           item.facts.pr !== null ? t('PR #{n}', { n: item.facts.pr }) : t('未开 PR'),
         ]
           .filter((part): part is string => part !== null)
@@ -687,7 +690,7 @@ export function Transcript({
   useEffect(() => {
     previous.current = { live, ids };
   });
-  const lastWork = workItems.at(-1);
+  const lastWork = shouldExpandLastWork(workItems) ? workItems.at(-1) : undefined;
 
   return (
     <>

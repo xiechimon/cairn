@@ -89,7 +89,7 @@ export const EN: Record<string, string> = {
   无输出: 'No output',
   '本步异常结束：{reason}': 'This step ended abnormally: {reason}',
   '改动 {n} 个文件': 'Changed {n#1 file|# files}',
-  '提交 {sha}': 'Commit {sha}',
+  '提交 {shas}': 'Commit {shas}',
   'PR #{n}': 'PR #{n}',
   '未开 PR': 'No PR',
   'git 凭据': 'git credentials',

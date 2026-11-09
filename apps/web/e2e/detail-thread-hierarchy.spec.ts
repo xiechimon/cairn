@@ -161,20 +161,35 @@ const MESSAGES = [
   ),
 ];
 
-async function stubWorld(page: Page) {
+const SETUP_ONLY_MESSAGES = [
+  msg('user', '哪个 pr', 10_000),
+  msg('system', HOOK_ROW, 10_100),
+  msg('system', 'git 凭据来源：integration（per-step 下发 token）', 10_200),
+  msg('assistant', [{ type: 'text', text: ANSWER }], 10_500),
+];
+
+const SETUP_ONLY_STEPS = [
+  { id: 'step-th-1', buildId: BUILD_ID, kind: 'build', machineId: null, createdAt: 9_000, status: 'done' },
+];
+
+async function stubWorld(
+  page: Page,
+  world: { messages: unknown[]; steps: unknown[]; phase: string } | null = null,
+) {
   const json = (body: unknown, status = 200) => ({
     status,
     contentType: 'application/json',
     body: JSON.stringify(body),
   });
+  const card = world === null ? WIRE_CARD : { ...WIRE_CARD, phase: world.phase };
   await page.route((url) => url.pathname.startsWith('/api/'), (route, request) => {
     const path = new URL(request.url()).pathname;
     if (request.method() !== 'GET') return route.fulfill(json({ error: 'e2e stub' }, 500));
     if (path === '/api/teams') return route.fulfill(json([TEAM]));
     if (path === '/api/user/me') return route.fulfill(json(USER));
     if (path === '/api/projects') return route.fulfill(json([PROJECT]));
-    if (path === '/api/todos') return route.fulfill(json([WIRE_CARD]));
-    if (path === `/api/todos/${CARD_ID}`) return route.fulfill(json(WIRE_CARD));
+    if (path === '/api/todos') return route.fulfill(json([card]));
+    if (path === `/api/todos/${CARD_ID}`) return route.fulfill(json(card));
     if (path === `/api/teams/${TEAM_ID}/members`) {
       return route.fulfill(
         json([{ id: 'member-user', teamId: TEAM_ID, actorId: USER_ID, memberType: 'user', actor: USER }]),
@@ -184,10 +199,12 @@ async function stubWorld(page: Page) {
     if (path === `/api/builds/${BUILD_ID}`) return route.fulfill(json(WIRE_BUILD));
     if (path === `/api/builds/${BUILD_ID}/steps`) {
       return route.fulfill(
-        json([
-          { id: 'step-th-1', buildId: BUILD_ID, kind: 'build', machineId: null, createdAt: 9_000, status: 'failed' },
-          { id: STEP_ID, buildId: BUILD_ID, kind: 'build', machineId: null, createdAt: 10_650, status: 'claimed' },
-        ]),
+        json(
+          world?.steps ?? [
+            { id: 'step-th-1', buildId: BUILD_ID, kind: 'build', machineId: null, createdAt: 9_000, status: 'failed' },
+            { id: STEP_ID, buildId: BUILD_ID, kind: 'build', machineId: null, createdAt: 10_650, status: 'claimed' },
+          ],
+        ),
       );
     }
     if (path === `/api/builds/${BUILD_ID}/plans`) return route.fulfill(json([]));
@@ -195,7 +212,7 @@ async function stubWorld(page: Page) {
     if (path === `/api/builds/${BUILD_ID}/changes`) return route.fulfill(json({ files: [] }));
     if (path === `/api/conversations/${BUILD_ID}/messages`) {
       return route.fulfill(
-        json({ messages: MESSAGES, chips: [], historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null }),
+        json({ messages: world?.messages ?? MESSAGES, chips: [], historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null }),
       );
     }
     return route.fulfill(json({ error: 'e2e stub: not the surface under test' }, 500));
@@ -242,6 +259,15 @@ test('the failure reason shows once, behind the raw-error control', async ({ pag
   );
   await page.getByRole('button', { name: '查看原始错误' }).click();
   await expect(page.getByTestId('fail-raw-error')).toContainText(DIVERGED);
+});
+
+test('a finished turn whose only work is hook and credential rows stays folded', async ({ page }) => {
+  await stubWorld(page, { messages: SETUP_ONLY_MESSAGES, steps: SETUP_ONLY_STEPS, phase: 'review' });
+  const col = page.getByTestId('transcript-col');
+  await expect(col.getByTestId('agent-text').filter({ hasText: '还没有 PR' })).toBeVisible();
+  await expect(page.getByTestId('work-summary').first()).toHaveAttribute('aria-expanded', 'false');
+  await expect(col).not.toContainText('Scope: all 7 workspace projects');
+  await expect(col).not.toContainText('git 凭据来源');
 });
 
 for (const theme of ['light', 'dark'] as const) {

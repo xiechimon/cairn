@@ -1,5 +1,6 @@
 import type { BuildRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { shouldExpandLastWork } from '../src/detail/work-expansion.js';
 import { inlineSegments, type MessageRow, mapTranscript } from '../src/api/mappers.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
@@ -179,7 +180,7 @@ describe('task thread hierarchy', () => {
     expect(fails[0]).toMatchObject({
       title: 'git commit failed (exit 1)',
       body: '',
-      facts: { files: 2, commit: 'a1cfe71e8', pr: null },
+      facts: { files: 2, commits: ['a1cfe71e8'], pr: null },
       raw: GIT_ERROR,
     });
     expect(items.filter((item) => item.kind === 'note')).toEqual([
@@ -202,7 +203,7 @@ describe('task thread hierarchy', () => {
     });
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
-    expect(fails[0]).toMatchObject({ raw: reason, facts: { files: 2, commit: 'a1cfe71e8', pr: null } });
+    expect(fails[0]).toMatchObject({ raw: reason, facts: { files: 2, commits: ['a1cfe71e8'], pr: null } });
   });
 
   test('a structured failure keeps the recovery guidance for its failure class', () => {
@@ -227,6 +228,60 @@ describe('task thread hierarchy', () => {
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
     expect(fails[0]).toMatchObject({ body: '请将其重新上线，或重新运行任务以改派其他机器。' });
+  });
+
+  test('a failure with several preserved commits carries every one, oldest first', () => {
+    const second = 'b2d4f6a8c0e1234567890abcdef1234567890abc';
+    const failure = JSON.stringify({
+      kind: 'build-failure',
+      reason: GIT_ERROR,
+      files: null,
+      fileCount: null,
+      commits: ['a1cfe71e8377706ddd9aff08a6e90f97b7b40d8a', second],
+      pr: null,
+    });
+    const fails = render(rows([['system', failure]])).filter((item) => item.kind === 'fail');
+    expect(fails[0]).toMatchObject({ facts: { commits: ['a1cfe71e8', 'b2d4f6a8c'] } });
+  });
+
+  test('a legacy failure with several Commit lines carries every one', () => {
+    const legacy = LEGACY_FAILURE.replace(
+      '- PR：无',
+      '- Commit: b2d4f6a8c0e1234567890abcdef1234567890abc\n- PR：无',
+    );
+    const fails = render(rows([['system', legacy]])).filter((item) => item.kind === 'fail');
+    expect(fails[0]).toMatchObject({ facts: { commits: ['a1cfe71e8', 'b2d4f6a8c'] } });
+  });
+
+  test('a work group made only of setup rows is not expanded by default', () => {
+    const setupOnly = render(
+      rows([
+        ['user', '哪个 pr'],
+        ['system', STRUCTURED_HOOK],
+        ['system', STRUCTURED_CREDENTIAL],
+        ['assistant', [{ type: 'text', text: '还没有 PR。' }]],
+      ]),
+      'failed',
+    ).filter((item) => item.kind === 'work');
+    expect(setupOnly).toHaveLength(1);
+    expect(shouldExpandLastWork(setupOnly)).toBe(false);
+  });
+
+  test('the last work group with agent calls is still expanded by default', () => {
+    const withCall = render(
+      rows([
+        ['system', STRUCTURED_HOOK],
+        [
+          'assistant',
+          {
+            kind: 'toolcall',
+            call: { id: 'c1', name: 'Bash', arguments: { command: 'ls' }, result: 'x', startedAt: 0, endedAt: 100 },
+          },
+        ],
+      ]),
+      'building',
+    ).filter((item) => item.kind === 'work');
+    expect(shouldExpandLastWork(withCall)).toBe(true);
   });
 
   test('a failed build without a failure row still shows its error once', () => {
