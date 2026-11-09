@@ -43,12 +43,12 @@ import {
 } from './services/claude-subscriptions.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
-import { isOwner } from './services/feature-flags.js';
 import {
   deleteGithubConnection,
   readGithubConnectionStatus,
   teamGithubToken,
 } from './services/github-connection.js';
+import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
 import {

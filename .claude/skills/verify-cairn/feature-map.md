@@ -1033,24 +1033,6 @@ Reach:
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
 - Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
 
-### feature-releases
-
-**Feature flags and releases** (shipped, centrality 4). Per-user feature flags and the account page list where the owner releases them.
-
-States: A list of flags in the account settings with a release action for the owner.
-
-Reach:
-
-1. `settings account`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: **gap**: no note on per-user flags for a single-user product
-- Frontend design: **gap**: the releases list has no design
-- Backend design: **gap**: no design for flag defaults and release
-- Evidence: `apps/web/e2e/account-feature-releases.spec.ts`, `apps/server/test/feature-flags.test.ts`
-
 ### feishu
 
 **Feishu integration** (shipped, centrality 4). Team settings for a Feishu bot connection.
