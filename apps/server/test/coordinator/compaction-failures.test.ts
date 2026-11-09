@@ -1,7 +1,9 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { parseFlushOutput } from '../../src/coordinator/memory-flush.js';
 import {
@@ -21,6 +23,7 @@ import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js
 import { coordinatorToolsExtension, createStepGate } from '../../src/coordinator/runtime/tools.js';
 import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import { step } from '../../src/db/schema.js';
+import { flushRuntimeOtel, shutdownRuntimeOtel } from '../../src/runtime-otel.js';
 import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 import { boot, stub, world } from './runner-world.js';
 
@@ -46,24 +49,38 @@ beforeEach(() => {
     log: (fields, message) => logs.push({ fields: fields as Record<string, unknown>, message }),
     stepOf: () => null,
   });
-  vi.stubEnv('CAIRN_OTEL_ENDPOINT', 'http://127.0.0.1:4318/v1/traces');
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_url: string, init: RequestInit) => {
-      const body = JSON.parse(String(init.body)) as {
+  vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
+});
+
+let collector: Server | undefined;
+let endpoint = '';
+
+beforeAll(async () => {
+  collector = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
         resourceSpans: { scopeSpans: { spans: Span[] }[] }[];
       };
       for (const resource of body.resourceSpans) {
         for (const scope of resource.scopeSpans) spans.push(...scope.spans);
       }
-      return new Response('{}', { status: 200 });
-    }),
-  );
+      res.setHeader('content-type', 'application/json');
+      res.end('{}');
+    });
+  });
+  await new Promise<void>((done) => collector?.listen(0, '127.0.0.1', done));
+  endpoint = `http://127.0.0.1:${(collector.address() as AddressInfo).port}/v1/traces`;
+});
+
+afterAll(async () => {
+  await shutdownRuntimeOtel();
+  collector?.close();
 });
 
 afterEach(() => {
   setFailureSink(null);
-  vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   for (const d of dirs.splice(0)) releaseTestTempDir(d);
 });
@@ -73,7 +90,8 @@ const attr = (span: Span, key: string) =>
   span.attributes.find((a) => a.key === key)?.value.stringValue;
 
 async function flushSpans(): Promise<void> {
-  await vi.waitFor(() => expect(spans.length).toBeGreaterThan(0));
+  await flushRuntimeOtel();
+  expect(spans.length).toBeGreaterThan(0);
 }
 
 describe('compaction failures are never silent', () => {

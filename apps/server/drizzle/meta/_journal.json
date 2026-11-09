@@ -901,8 +901,22 @@
     {
       "idx": 132,
       "version": "6",
-      "when": 1794214029654,
-      "tag": "0132_evidence_store",
+      "when": 1794216000000,
+      "tag": "0132_computer_browser_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "6",
+      "when": 1794232077552,
+      "tag": "0133_deploy_lease",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "6",
+      "when": 1794232077553,
+      "tag": "0134_evidence_store",
       "breakpoints": true
     }
   ]

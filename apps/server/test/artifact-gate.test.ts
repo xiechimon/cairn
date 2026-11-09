@@ -215,7 +215,9 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
       expect(w.buildRow(buildId).errorMessage).toBeNull();
       expect(w.stepRow(buildStep.step.id).status).toBe('done');
       expect(
-        w.messagesOf(buildId).some((m) => String(JSON.stringify(m.content)).includes('No changes')),
+        w
+          .messagesOf(buildId)
+          .some((m) => String(JSON.stringify(m.content)).includes('Not delivered')),
       ).toBe(true);
     } finally {
       w.s.dispose();

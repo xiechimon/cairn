@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import {
+  closeSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -9,16 +12,27 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { runOwned } from './owned-process.mjs';
+import { ownerChain, runOwned } from './owned-process.mjs';
 
 const DEFAULT_SLOTS = 2;
 const POLL_MS = 250;
 const PARTIAL_WRITE_GRACE_MS = 2_000;
 const DEFAULT_E2E_PORT = 8398;
 const PORT_STRIDE = 10;
+const LOCK_SCRIPT = `
+import errno, fcntl, sys
+try:
+    fcntl.flock(3, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError as error:
+    if error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+        raise
+    sys.exit(75)
+`;
+const PID_NAMESPACE = process.platform === 'linux' ? readlinkSync('/proc/self/ns/pid') : 'host';
 
 export function slotCount(env) {
   const raw = env.CAIRN_HEAVY_SLOTS;
@@ -31,7 +45,14 @@ export function slotCount(env) {
 }
 
 export function skipsQueue(env) {
-  return env.CI !== undefined && env.CI !== '' && env.CI !== 'false' && env.CI !== '0';
+  if (env.CI === undefined || env.CI === '' || env.CI === 'false' || env.CI === '0') return false;
+  try {
+    statSync(slotLockDir(env));
+    return false;
+  } catch (error) {
+    if (error.code === 'ENOENT') return true;
+    throw error;
+  }
 }
 
 export function slotResources(slot, env) {
@@ -40,38 +61,6 @@ export function slotResources(slot, env) {
     port: base + (slot - 1) * PORT_STRIDE,
     distDir: join(tmpdir(), `cairn-heavy-slot-${slot}`, 'web-dist'),
   };
-}
-
-export function writeSlotPlaywrightConfig({ slot, env, webDir }) {
-  const { port, distDir } = slotResources(slot, env);
-  const slotDir = join(tmpdir(), `cairn-heavy-slot-${slot}`);
-  mkdirSync(slotDir, { recursive: true });
-  const path = join(slotDir, 'playwright.slot.config.ts');
-  const buildFlags = `--outDir ${distDir}`;
-  writeFileSync(
-    path,
-    `import { resolve } from 'node:path';
-import base from ${JSON.stringify(join(webDir, 'playwright.config.ts'))};
-
-const webServer = base.webServer;
-const command = webServer.command
-  .replace('vite build --mode fixture', 'vite build --mode fixture ${buildFlags} --emptyOutDir')
-  .replace('vite preview', 'vite preview ${buildFlags}')
-  .replace(/--port \\d+/, '--port ${port}');
-if (!command.includes('${buildFlags} --emptyOutDir') || !command.includes('preview ${buildFlags}'))
-  throw new Error('playwright.config.ts webServer command no longer matches the slot rewrite');
-
-export default {
-  ...base,
-  testDir: ${JSON.stringify(join(webDir, 'e2e'))},
-  globalSetup: base.globalSetup && resolve(${JSON.stringify(webDir)}, base.globalSetup),
-  outputDir: ${JSON.stringify(join(slotDir, 'test-results'))},
-  use: { ...base.use, baseURL: 'http://127.0.0.1:${port}' },
-  webServer: { ...webServer, command, cwd: ${JSON.stringify(webDir)}, url: 'http://127.0.0.1:${port}/app', reuseExistingServer: false },
-};
-`,
-  );
-  return { path, port, distDir };
 }
 
 export function leaseEnv(lease, env = process.env) {
@@ -149,7 +138,7 @@ function isAlive(pid) {
   }
 }
 
-function holderState(path) {
+async function holderState(path, legacyPid) {
   let text;
   let modified;
   try {
@@ -159,22 +148,48 @@ function holderState(path) {
     if (error.code === 'ENOENT') return { state: 'free' };
     throw error;
   }
-  let pid;
+  let record = { pid: legacyPid };
   try {
-    pid = JSON.parse(text).pid;
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') record = parsed;
   } catch {}
-  if (Number.isInteger(pid)) return { state: isAlive(pid) ? 'held' : 'stale', pid };
-  return { state: Date.now() - modified < PARTIAL_WRITE_GRACE_MS ? 'held' : 'stale' };
-}
-
-function createExclusive(path) {
-  try {
-    writeFileSync(path, JSON.stringify({ pid: process.pid }), { flag: 'wx' });
-    return true;
-  } catch (error) {
-    if (error.code === 'EEXIST') return false;
-    throw error;
+  let { pid, cwd } = record;
+  if (Number.isInteger(pid) && pid > 0) {
+    if (typeof cwd !== 'string') {
+      try {
+        cwd = readlinkSync(`/proc/${pid}/cwd`);
+      } catch {
+        cwd = 'unknown';
+      }
+    }
+    const alive =
+      typeof record.probe === 'string'
+        ? await new Promise((done, reject) => {
+            const connection = createConnection(record.probe);
+            connection.once('connect', () => {
+              connection.destroy();
+              done(true);
+            });
+            connection.once('error', (error) => {
+              if (error.code === 'ENOENT' || error.code === 'ECONNREFUSED') done(false);
+              else reject(error);
+            });
+          })
+        : isAlive(pid);
+    if (
+      !alive &&
+      typeof record.token === 'string' &&
+      record.probe === join('/tmp', `cairn-heavy-${record.token}.sock`)
+    ) {
+      try {
+        unlinkSync(record.probe);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+    }
+    return { ...record, state: alive ? 'held' : 'stale', pid, cwd };
   }
+  return { state: Date.now() - modified < PARTIAL_WRITE_GRACE_MS ? 'held' : 'stale' };
 }
 
 export function slotLockDir(
@@ -205,55 +220,113 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
   const inherited = Number(env.CAIRN_HEAVY_SLOT);
   const owner = Number(env.CAIRN_HEAVY_SLOT_OWNER);
   if (Number.isInteger(inherited) && inherited >= 1 && inherited <= count) {
-    const holder = holderState(slotPath(inherited));
-    if (holder.state === 'held' && holder.pid === owner)
+    const holder = await holderState(slotPath(inherited));
+    if (
+      holder.state === 'held' &&
+      holder.pid === owner &&
+      (holder.namespace === undefined || holder.namespace === PID_NAMESPACE) &&
+      (owner === process.pid || ownerChain(process.pid).some((entry) => entry.pid === owner))
+    )
       return { slot: inherited, owner, release() {} };
   }
 
-  const claim = () => {
+  const token = randomUUID();
+  const probe = join('/tmp', `cairn-heavy-${token}.sock`);
+  const server = createServer((connection) => connection.destroy());
+  await new Promise((done, reject) => {
+    server.once('error', reject);
+    server.listen(probe, () => {
+      server.off('error', reject);
+      done();
+    });
+  });
+  server.unref();
+  let probeClosed = false;
+  const closeProbe = () => {
+    if (probeClosed) return;
+    probeClosed = true;
+    process.off('exit', closeProbe);
+    server.close();
+  };
+  process.once('exit', closeProbe);
+  const record = { pid: process.pid, cwd: process.cwd(), namespace: PID_NAMESPACE, probe, token };
+  let claimed = false;
+  const claim = async () => {
     for (let slot = 1; slot <= count; slot++) {
       const path = slotPath(slot);
-      if (!createExclusive(path)) {
-        if (holderState(path).state !== 'stale') continue;
-        const reclaiming = `${path}.reclaiming`;
-        if (!createExclusive(reclaiming)) {
-          if (holderState(reclaiming).state === 'stale') unlinkSync(reclaiming);
-          continue;
-        }
-        try {
-          if (holderState(path).state === 'stale') unlinkSync(path);
-          if (!createExclusive(path)) continue;
-        } finally {
-          unlinkSync(reclaiming);
-        }
+      const descriptor = openSync(`${path}.guard`, 'a');
+      let retained = false;
+      try {
+        const lock = spawnSync('python3', ['-I', '-c', LOCK_SCRIPT], {
+          env: { ...process.env, ...env },
+          encoding: 'utf8',
+          stdio: ['ignore', 'ignore', 'pipe', descriptor],
+        });
+        if (lock.error) throw lock.error;
+        if (lock.status === 75) continue;
+        if (lock.status !== 0)
+          throw new Error(
+            `heavy-slots: kernel lock failed (${lock.signal ?? lock.status}): ${lock.stderr?.trim() ?? ''}`,
+          );
+        if ((await holderState(path)).state === 'held') continue;
+        writeFileSync(path, JSON.stringify(record));
+        let released = false;
+        const release = () => {
+          if (released) return;
+          released = true;
+          process.off('exit', release);
+          try {
+            try {
+              if (JSON.parse(readFileSync(path, 'utf8')).token === token) unlinkSync(path);
+            } catch (error) {
+              if (error.code !== 'ENOENT') throw error;
+            }
+          } finally {
+            closeSync(descriptor);
+            closeProbe();
+          }
+        };
+        retained = true;
+        claimed = true;
+        process.once('exit', release);
+        log(`[heavy-slots] acquired slot ${slot}/${count}`);
+        return { slot, owner: process.pid, release };
+      } finally {
+        if (!retained) closeSync(descriptor);
       }
-      const release = () => {
-        if (holderState(path).pid === process.pid) unlinkSync(path);
-      };
-      process.once('exit', release);
-      log(`[heavy-slots] acquired slot ${slot}/${count}`);
-      return { slot, owner: process.pid, release };
     }
     return null;
   };
-  if (!wait) return claim();
+  if (!wait) {
+    try {
+      return await claim();
+    } finally {
+      if (!claimed) closeProbe();
+    }
+  }
 
-  const ticket = `queue-${String(Date.now()).padStart(15, '0')}-${String(process.pid).padStart(10, '0')}`;
+  const ticket = `queue-${String(Date.now()).padStart(15, '0')}-${String(process.pid).padStart(10, '0')}-${token}`;
   const dropTicket = () => {
     try {
       unlinkSync(join(dir, ticket));
     } catch {}
   };
-  writeFileSync(join(dir, ticket), '');
+  try {
+    writeFileSync(join(dir, ticket), JSON.stringify(record));
+  } catch (error) {
+    closeProbe();
+    throw error;
+  }
   process.once('exit', dropTicket);
   let announced = 0;
   try {
     for (;;) {
       const waiting = [];
       for (const name of readdirSync(dir)) {
-        const ticketOwner = /^queue-\d+-(\d+)$/.exec(name);
+        const ticketOwner = /^queue-\d+-(\d+)(?:-[a-f0-9-]+)?$/.exec(name);
         if (!ticketOwner) continue;
-        if (isAlive(Number(ticketOwner[1]))) waiting.push(name);
+        if ((await holderState(join(dir, name), Number(ticketOwner[1]))).state !== 'stale')
+          waiting.push(name);
         else
           try {
             unlinkSync(join(dir, name));
@@ -262,19 +335,33 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
       const position = waiting.sort().indexOf(ticket) + 1;
       let freeSlots = 0;
       for (let slot = 1; slot <= count; slot++)
-        if (holderState(slotPath(slot)).state !== 'held') freeSlots++;
+        if ((await holderState(slotPath(slot))).state !== 'held') freeSlots++;
       if (position <= freeSlots) {
-        const lease = claim();
+        const lease = await claim();
         if (lease) return lease;
       }
       if (position !== announced) {
-        log(`[heavy-slots] queued, position ${position} (all ${count} slots are busy)`);
+        const holders = (
+          await Promise.all(
+            Array.from({ length: count }, async (_, index) => {
+              const holder = await holderState(slotPath(index + 1));
+              return holder.state === 'held'
+                ? `slot ${index + 1}: pid ${holder.pid ?? 'writing'}, cwd ${holder.cwd ?? 'unknown'}`
+                : null;
+            }),
+          )
+        ).filter(Boolean);
+        log(
+          `[heavy-slots] queued, position ${position} (all ${count} slots are busy); ${holders.join('; ')}`,
+        );
         announced = position;
       }
       await sleep(POLL_MS);
     }
   } finally {
+    process.off('exit', dropTicket);
     dropTicket();
+    if (!claimed) closeProbe();
   }
 }
 

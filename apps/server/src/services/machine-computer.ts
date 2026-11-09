@@ -8,6 +8,7 @@ import {
   type ComputerFrame,
   type ComputerRelayResult,
   type ComputerTool,
+  isComputerBrowserTool,
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   redactSecrets,
@@ -44,6 +45,10 @@ export const COMPUTER_BUSY = 'the computer is busy with another Coordinator turn
 export const COMPUTER_USER_CONTROL = 'ian has control of this computer';
 export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was not retried';
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
+export const COMPUTER_BROWSER_DISABLED =
+  'browser tools are off for this computer; enable 浏览器 in the Computers panel';
+export const COMPUTER_BROWSER_UNAVAILABLE =
+  'this machine no longer reports browser capability; turn off 浏览器 or rebuild the computer image';
 
 const SHELL_TOOLS: ReadonlySet<ComputerTool> = new Set(['shell', 'user_computer_shell']);
 const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
@@ -628,18 +633,17 @@ function acquireExecutionLease(
 }
 
 async function waitForCall(
+  deps: Pick<MachineDeps, 'db'> & { machineHub?: MachineWakeHub },
   pending: PendingCall,
+  stepId: string,
   signal: AbortSignal | undefined,
 ): Promise<ComputerRelayResult> {
   if (!signal) return pending.result;
-  let onAbort = (): void => {};
-  const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(new Error('computer request aborted'));
-    if (signal.aborted) onAbort();
-    else signal.addEventListener('abort', onAbort, { once: true });
-  });
+  const onAbort = () => stopStepComputer(deps, stepId);
+  if (signal.aborted) onAbort();
+  else signal.addEventListener('abort', onAbort, { once: true });
   try {
-    return await Promise.race([pending.result, aborted]);
+    return await pending.result;
   } finally {
     signal.removeEventListener('abort', onAbort);
   }
@@ -656,7 +660,7 @@ export const refuseOwnComputerUntilGated: OwnComputerGate = () => {
 
 export async function forwardComputerCall(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   body: MachineComputerRelayBody,
   opts: { signal?: AbortSignal; ownComputerGate?: OwnComputerGate } = {},
@@ -685,7 +689,7 @@ export async function forwardComputerCall(
     throw new HttpError(409, `tool call ${body.toolCallId} was already used for ${existing.tool}`);
   }
   const live = pendingCalls.get(callId);
-  if (live) return waitForCall(live, opts.signal);
+  if (live) return waitForCall(deps, live, stepId, opts.signal);
 
   if (existing && !existing.replaySafe) {
     if (!isFinalState(existing.state)) {
@@ -710,6 +714,17 @@ export async function forwardComputerCall(
     return resultOfRow(existing);
   }
 
+  if (isComputerBrowserTool(tool)) {
+    const scopeKey = `chief:${thread.chiefId}`;
+    const preferred = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
+    if (preferred === undefined || !preferred.browserEnabled) {
+      throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
+    }
+    const host = db.select().from(machine).where(eq(machine.id, preferred.machineId)).get();
+    if (host?.capabilities?.browser !== true) {
+      throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
+    }
+  }
   const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);
@@ -785,5 +800,5 @@ export async function forwardComputerCall(
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishFeed(db, deps.hub, row);
-  return waitForCall(pending, opts.signal);
+  return waitForCall(deps, pending, stepId, opts.signal);
 }

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "275a608b-c6dc-4a7c-b483-75f6aa264f38",
+  "id": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
   "prevId": "b875be75-f86b-4e0e-b2df-e0f143bdbe4c",
   "tables": {
     "agent_memory": {
@@ -864,13 +864,6 @@
         },
         "reportLine": {
           "name": "reportLine",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "evidenceStore": {
-          "name": "evidenceStore",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1948,6 +1941,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "browserEnabled": {
+          "name": "browserEnabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -3939,14 +3940,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'human'"
-        },
-        "evidenceStore": {
-          "name": "evidenceStore",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'attachments'"
         },
         "description": {
           "name": "description",

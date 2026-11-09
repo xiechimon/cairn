@@ -8,7 +8,7 @@ import { CAIRN_BENCH_TASKS } from '../eval/routing/bench.mts';
 import { type RoutingRunRow, runRoutingRun } from '../eval/routing/driver.mts';
 import { type RoleBoundary, sessionTools } from '../eval/routing/session-tools.mts';
 import { REFERENCE_FILES } from './routing-reference.js';
-import { type StubLlm, type StubResponse, startStubLlm } from './stub-llm.js';
+import { handoffStubResponses, type StubLlm, type StubResponse, startStubLlm } from './stub-llm.js';
 
 const nativeToolchain =
   process.platform === 'linux' &&
@@ -47,7 +47,9 @@ async function runOnce(opts: {
 }): Promise<RoutingRunRow> {
   const task = slugify();
   if (!task) throw new Error('Missing slugify task');
-  stub = await startStubLlm([...(opts.planner ?? []), ...opts.executor]);
+  stub = await startStubLlm(
+    opts.planner ? handoffStubResponses(opts.planner, opts.executor) : opts.executor,
+  );
   return runRoutingRun({
     task,
     arm: opts.arm,

@@ -48,3 +48,21 @@ test('migration initializes only existing cairn projects and never reassigns mod
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('evidence migration upgrades the latest main database without replacing its schema', () => {
+  const directory = makeTestTempDir('cairn-evidence-main-upgrade-');
+  const sqlite = new Database(join(directory, 'db.sqlite'));
+  try {
+    migrateUpTo(sqlite, directory, '0133_deploy_lease');
+    migrateAll(sqlite);
+    expect(sqlite.prepare('SELECT evidenceStore FROM project').all()).toEqual([]);
+    expect(sqlite.prepare('SELECT evidenceStore FROM build').all()).toEqual([]);
+    expect(sqlite.prepare('SELECT browserEnabled FROM computer').all()).toEqual([]);
+    expect(
+      sqlite.prepare('SELECT name FROM sqlite_master WHERE name = ?').get('deploy_lease'),
+    ).toBeDefined();
+  } finally {
+    sqlite.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
