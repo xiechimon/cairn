@@ -66,6 +66,7 @@ import type {
   ThreadMessageResult,
   TodoRecord,
   TokenUsage,
+  TranscriptRow,
   UpdateSkillBody,
   UserRecord,
 } from '@cairn/shared';
@@ -88,6 +89,7 @@ import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { useAuth } from './auth.js';
 import { api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
+import { cacheUserMessage } from './message-cache.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
@@ -627,6 +629,20 @@ export const useProjectFile = (
     enabled: projectId !== undefined && path !== undefined,
   });
 
+export function usePatchProject(teamId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; body: PatchProjectBody }) =>
+      api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
+    onSuccess: (record) => {
+      qc.setQueryData<ProjectRecord[]>(['projects', teamId], (records) =>
+        records?.map((project) => (project.id === record.id ? record : project)),
+      );
+      void qc.invalidateQueries();
+    },
+  });
+}
+
 export function useApiMutations(teamId: string | undefined) {
   const qc = useQueryClient();
   const invalidateAll = () => {
@@ -838,11 +854,7 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<ProjectRecord>('/api/projects', { ...body, ...(teamId ? { teamId } : {}) }),
       onSuccess: invalidateAll,
     }),
-    patchProject: useMutation({
-      mutationFn: (input: { id: string; body: PatchProjectBody }) =>
-        api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
-      onSuccess: invalidateAll,
-    }),
+    patchProject: usePatchProject(teamId),
     patchAutonomy: useMutation({
       mutationFn: (input: { id: string; body: PatchAutonomyBody }) =>
         api.patch<AutonomyRecord>(`/api/projects/${input.id}/autonomy`, input.body),
@@ -878,13 +890,26 @@ export function useApiMutations(teamId: string | undefined) {
           ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
         };
         return input.threadId === null
-          ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, body)
-          : api.post<{ thread: ChiefThread }>(
+          ? api.post<{ thread: ChiefThread; message: TranscriptRow }>(
+              `/api/teams/${teamId}/chief/threads`,
+              body,
+            )
+          : api.post<{ thread: ChiefThread; message: TranscriptRow }>(
               `/api/conversations/${input.threadId}/messages`,
               body,
             );
       },
-      onSuccess: invalidateAll,
+      onSuccess: (result) => {
+        void qc.cancelQueries({ queryKey: ['chiefThreads', teamId] });
+        qc.setQueryData<ChiefThread[]>(['chiefThreads', teamId], (threads) => {
+          const current = threads ?? [];
+          return current.some((thread) => thread.id === result.thread.id)
+            ? current.map((thread) => (thread.id === result.thread.id ? result.thread : thread))
+            : [...current, result.thread];
+        });
+        cacheUserMessage(qc, result.thread.id, result.message);
+        invalidateAll();
+      },
     }),
     chiefRewind: useMutation({
       mutationFn: (input: { threadId: string; messageId: string }) =>
@@ -1019,7 +1044,12 @@ export function useApiMutations(teamId: string | undefined) {
     deleteMemory: useMutation({
       mutationFn: (input: { memoryId: string }) =>
         api.del<void>(`/api/teams/${teamId}/memories/${input.memoryId}`),
-      onSuccess: invalidateAll,
+      onSuccess: (_data, input) => {
+        qc.setQueryData<MemoryRecord[]>(['memories', teamId], (records) =>
+          records?.filter((record) => record.id !== input.memoryId),
+        );
+        invalidateAll();
+      },
     }),
     sendSteer: useMutation({
       mutationFn: (input: {
@@ -1032,7 +1062,7 @@ export function useApiMutations(teamId: string | undefined) {
         queuedMessageId?: string;
         clientMessageId?: string;
       }) =>
-        api.post<{ message: { id: string } }>(
+        api.post<{ conversationId?: string; message?: unknown }>(
           `/api/conversations/${input.conversationId}/messages`,
           {
             content: input.content,
@@ -1047,7 +1077,18 @@ export function useApiMutations(teamId: string | undefined) {
       onError: (_error, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
       },
-      onSuccess: (_data, input) => {
+      onSuccess: (data, input) => {
+        cacheUserMessage(
+          qc,
+          data.conversationId ?? input.conversationId,
+          data.message,
+          input.queuedMessageId === undefined
+            ? undefined
+            : {
+                conversationId: input.conversationId,
+                messageId: input.queuedMessageId,
+              },
+        );
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });

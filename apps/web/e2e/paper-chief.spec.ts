@@ -74,7 +74,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(toolRow, 'W5').toHaveCSS('font-size', '13px');
   });
 
-  test(`settings: Paper top bar, one settings card, empty rows in the card (${theme})`, async ({
+  test(`settings: Paper top bar, routing card and tab-specific empty states (${theme})`, async ({
     page,
   }) => {
     await setTheme(page, theme);
@@ -125,13 +125,12 @@ for (const theme of ['light', 'dark'] as const) {
       await probe(page, 'backgroundColor', 'var(--primary)'),
     );
 
-    for (const [tab, copy] of [
-      ['103', /尚无记忆/],
-      ['104', /暂无跟进事项/],
-    ] as const) {
-      await page.goto(SETTINGS(tab));
-      await expect(page.locator('.settings-card').getByText(copy), 'S3').toBeVisible();
-    }
+    await page.goto(SETTINGS('103'));
+    await expect(page.getByRole('heading', { name: '自动记忆' }), 'S3').toBeVisible();
+    await expect(page.getByTestId('chief-settings-col').locator('.settings-card'), 'S3').toHaveCount(0);
+
+    await page.goto(SETTINGS('104'));
+    await expect(page.locator('.settings-card').getByText(/暂无跟进事项/), 'S3').toBeVisible();
   });
 
   test(`question card: card face, status triad, type keys (${theme})`, async ({ page }) => {

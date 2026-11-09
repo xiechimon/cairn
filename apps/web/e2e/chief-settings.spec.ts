@@ -61,17 +61,14 @@ test('fixture charter save closes the dialog (accept law)', async ({ page }) => 
   await expect(dialog).toBeHidden();
 });
 
-test('empty-state card centered and growth-proof: memo matches watches (#772)', async ({ page }) => {
+test('watches empty-state card is centered and growth-proof (#772)', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('cairn.locale', 'en');
     localStorage.setItem('cairn-locale', 'en');
     localStorage.setItem('cairn-theme', 'light');
   });
 
-  for (const [scenario, copy] of [
-    ['103', /No memories yet/],
-    ['104', /Nothing being watched yet/],
-  ] as const) {
+  for (const [scenario, copy] of [['104', /Nothing being watched yet/]] as const) {
     await page.goto(`/app?scenario=${scenario}`);
     const card = page.getByText(copy);
     await expect(card).toBeVisible();

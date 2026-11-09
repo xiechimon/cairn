@@ -12,8 +12,6 @@ export const MEMORY_INDEX_ID_PREFIX = 'memory-index:';
 
 export const MEMORY_TOOLS = ['save_memory', 'update_memory', 'delete_memory', 'memories'] as const;
 
-export const MEMORY_EMPTY_COPY = '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。';
-
 export const memoryRecordSchema = z.object({
   id: recordId,
   agentId: recordId,
