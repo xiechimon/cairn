@@ -13,7 +13,7 @@ import { newUuidv7 } from '../src/lib/ids.js';
 import { enqueueChiefStep, triggerChiefWakes, upsertChiefMessage } from '../src/services/chief.js';
 import { dueSchedules } from '../src/services/schedules.js';
 import { getTodo } from '../src/services/todos.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
 
 registerChiefHarness();
@@ -386,11 +386,7 @@ describe('Coordinator page filter and cursor', () => {
   });
 
   test('a worker report carries its task project', async () => {
-    const created = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: 'watched',
-      spec: '> watched',
-    })) as { id: string };
+    const created = (await relay('create_todo', ownerTodo('watched'))) as { id: string };
     await relay('watch_todos', { todoIds: [created.id] });
     H.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, created.id)).run();
     const deps = { db: H.s.db, hub: H.s.hub, user: H.s.user };
@@ -529,17 +525,11 @@ describe('archived projects stay read-only for the Coordinator', () => {
   });
 
   test('Coordinator tool writes targeting an archived project are refused; reads still work', async () => {
-    const created = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: 'kept',
-      spec: '> kept',
-    })) as { id: string };
+    const created = (await relay('create_todo', ownerTodo('kept'))) as { id: string };
     await archive(H.projectId);
-    await expect(
-      relay('create_todo', { projectId: H.projectId, title: 'new', spec: '> new' }),
-    ).rejects.toThrow(/archived/);
+    await expect(relay('create_todo', ownerTodo('new'))).rejects.toThrow(/archived/);
     await expect(relay('close_todos', { todoIds: [created.id] })).rejects.toThrow(/archived/);
-    await expect(relay('update_todo', { todoId: created.id, title: 'renamed' })).rejects.toThrow(
+    await expect(relay('update_todo', { todoId: created.id, tagIds: [] })).rejects.toThrow(
       /archived/,
     );
     await expect(
@@ -550,11 +540,7 @@ describe('archived projects stay read-only for the Coordinator', () => {
       relay('save_memory', { title: 't', content: 'c', sourceTodoId: created.id }),
     ).rejects.toThrow(/archived/);
     const other = await postProject(H.s.app, 'cairn-site');
-    const otherTodo = (await relay('create_todo', {
-      projectId: other,
-      title: 'other',
-      spec: '> other',
-    })) as { id: string };
+    const otherTodo = (await relay('create_todo', ownerTodo('other', other))) as { id: string };
     await expect(
       relay('update_todo', { todoId: otherTodo.id, projectId: H.projectId }),
     ).rejects.toThrow(/archived/);

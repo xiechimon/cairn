@@ -616,6 +616,138 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "null",
           ],
         },
+        "request": {
+          "additionalProperties": false,
+          "properties": {
+            "difficulty": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "easy",
+                    "standard",
+                    "hard",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "quotes": {
+              "anyOf": [
+                {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "source": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "text": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "source",
+                      "text",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "siblings": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "sources": {
+              "items": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "chat",
+                        "type": "string",
+                      },
+                      "messageIds": {
+                        "items": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                      },
+                      "threadId": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "threadId",
+                      "messageIds",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "author": {
+                        "enum": [
+                          "owner",
+                          "third-party",
+                        ],
+                        "type": "string",
+                      },
+                      "kind": {
+                        "const": "todo",
+                        "type": "string",
+                      },
+                      "todoId": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "todoId",
+                      "author",
+                    ],
+                    "type": "object",
+                  },
+                ],
+              },
+              "minItems": 1,
+              "type": "array",
+            },
+            "titleSource": {
+              "enum": [
+                "owner",
+                "worker",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "sources",
+            "quotes",
+            "siblings",
+            "difficulty",
+            "titleSource",
+          ],
+          "type": "object",
+        },
         "seqNum": {
           "maximum": 9007199254740991,
           "minimum": -9007199254740991,
@@ -1318,6 +1450,138 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                     "string",
                     "null",
                   ],
+                },
+                "request": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "difficulty": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "easy",
+                            "standard",
+                            "hard",
+                          ],
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "quotes": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "source": {
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "text": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "source",
+                              "text",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "siblings": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "sources": {
+                      "items": {
+                        "oneOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "const": "chat",
+                                "type": "string",
+                              },
+                              "messageIds": {
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                                "minItems": 1,
+                                "type": "array",
+                              },
+                              "threadId": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "kind",
+                              "threadId",
+                              "messageIds",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "author": {
+                                "enum": [
+                                  "owner",
+                                  "third-party",
+                                ],
+                                "type": "string",
+                              },
+                              "kind": {
+                                "const": "todo",
+                                "type": "string",
+                              },
+                              "todoId": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "kind",
+                              "todoId",
+                              "author",
+                            ],
+                            "type": "object",
+                          },
+                        ],
+                      },
+                      "minItems": 1,
+                      "type": "array",
+                    },
+                    "titleSource": {
+                      "enum": [
+                        "owner",
+                        "worker",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "sources",
+                    "quotes",
+                    "siblings",
+                    "difficulty",
+                    "titleSource",
+                  ],
+                  "type": "object",
                 },
                 "seqNum": {
                   "maximum": 9007199254740991,

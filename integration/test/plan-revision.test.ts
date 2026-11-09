@@ -113,6 +113,20 @@ function extractTodoId(messages: unknown[], titleNeedle: string): string | null 
   return null;
 }
 
+function ownerMessageIdFromHistory(messages: unknown[]): string | null {
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') continue;
+    const row = message as { role?: string; content?: unknown };
+    if (row.role !== 'tool' || typeof row.content !== 'string') continue;
+    try {
+      const parsed = JSON.parse(row.content) as { hits?: { id?: unknown; role?: unknown }[] };
+      const hit = parsed.hits?.find((h) => h.role === 'user' && typeof h.id === 'string');
+      if (hit !== undefined) return hit.id as string;
+    } catch {}
+  }
+  return null;
+}
+
 function toolNamesInMessages(messages: unknown[]): Set<string> {
   const names = new Set<string>();
   for (const message of messages) {
@@ -225,17 +239,11 @@ async function startRevisionStub(opts: {
     } else if (loggingId === null) {
       emitTool('todos', { projectId });
     } else if (opts.mode === 'adaptive' && wantsRevision && hasFeedback && loggingId !== null) {
-      emitTool('update_todo', {
-        todoId: loggingId,
-        title: 'Fix Safari export',
-        spec: 'Fix the download attribute on a blob url; keep the existing regression test card.',
-      });
+      const feedbackId = ownerMessageIdFromHistory(messages);
+      if (feedbackId === null) emitTool('search_history', { query: 'blob url' });
+      else emitTool('create_todo', { projectId, messageIds: [feedbackId] });
     } else if (opts.mode === 'adaptive' && wantsRevision && !hasFeedback && loggingId !== null) {
-      emitTool('update_todo', {
-        todoId: loggingId,
-        title: 'Add logging',
-        spec: 'Add logging to the export handler.',
-      });
+      emitTool('create_todo', { projectId });
     } else {
       const text = 'Acknowledged.';
       response.write(chunk({ ...base, choices: [{ index: 0, delta: { content: text } }] }));

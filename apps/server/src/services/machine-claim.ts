@@ -598,6 +598,7 @@ async function tryClaim(
         ...(taskMeta !== undefined ? { meta: taskMeta } : {}),
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,
+        ...(cand.todoRow.request !== null ? { request: cand.todoRow.request } : {}),
         ...(blockerHandoff !== null ? { blockerHandoff } : {}),
         output: cand.todoRow.output,
       },

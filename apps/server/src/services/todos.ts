@@ -4,6 +4,7 @@ import type {
   Phase,
   RouteOverride,
   SecretBox,
+  TaskRequest,
   TodoOutputKind,
   TodoRecord,
   TodoSourceKind,
@@ -20,7 +21,7 @@ import {
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -312,6 +313,9 @@ export function createAutonomousTodo(
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
+    request?: TaskRequest;
+    blockedBy?: string[];
+    orderFirst?: boolean;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -324,7 +328,7 @@ export function createAutonomousTodo(
     .get();
   const seqNum = (seqRow?.n ?? 0) + 1;
   const orderRow = db
-    .select({ n: max(todo.orderIndex) })
+    .select({ n: input.orderFirst === true ? min(todo.orderIndex) : max(todo.orderIndex) })
     .from(todo)
     .where(and(eq(todo.projectId, input.projectId), eq(todo.phase, 'todo')))
     .get();
@@ -344,7 +348,7 @@ export function createAutonomousTodo(
       phase: 'todo',
       phaseAt: now,
       seqNum,
-      orderIndex: (orderRow?.n ?? -1) + 1,
+      orderIndex: input.orderFirst === true ? (orderRow?.n ?? 1) - 1 : (orderRow?.n ?? -1) + 1,
       latestBuildId: null,
       lastRunAt: null,
       hasChanges: false,
@@ -369,6 +373,10 @@ export function createAutonomousTodo(
       output: input.output ?? 'code',
       ...(input.userSpecAttachmentIds !== undefined
         ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
+        : {}),
+      ...(input.request !== undefined ? { request: input.request } : {}),
+      ...(input.blockedBy !== undefined && input.blockedBy.length > 0
+        ? { blockedBy: input.blockedBy }
         : {}),
     })
     .run();

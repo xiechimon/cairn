@@ -55,7 +55,7 @@ export function holdCodeThreadForPriorResearch(
       projectId: row.projectId,
       title: `Research: ${row.title}`.slice(0, 100),
       question: priorQuestion(row.title, row.spec),
-      tier: (row.spec ?? '').length >= TIER2_CHARS ? 2 : 1,
+      tier: row.request?.difficulty === 'hard' || (row.spec ?? '').length >= TIER2_CHARS ? 2 : 1,
       source: { kind: RESEARCH_BEFORE_PLAN_SOURCE_KIND, ref },
     }).todoId;
   } catch (error) {

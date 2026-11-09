@@ -21,7 +21,7 @@ import { mergedCatalogModels } from './model-liveness.js';
 
 type StepRouteRow = typeof stepRoute.$inferSelect;
 type RoutedTodo = Pick<typeof todo.$inferSelect, 'teamId'> &
-  Partial<Pick<typeof todo.$inferSelect, 'title' | 'spec'>>;
+  Partial<Pick<typeof todo.$inferSelect, 'title' | 'spec' | 'request'>>;
 
 export interface RouteConstraints {
   machineId: string | null;
@@ -133,7 +133,11 @@ export function decideStepRoute(
   stepId: string | null,
   constraints: RouteConstraints,
 ): RouteWorkDecision {
-  const difficulty = classifyDifficulty({ title: todoRow.title ?? '', spec: todoRow.spec ?? null });
+  const difficulty = classifyDifficulty({
+    title: todoRow.title ?? '',
+    spec: todoRow.spec ?? null,
+    request: todoRow.request ?? null,
+  });
   const stored = stepId === null ? null : storedStepRoute(db, stepId);
   if (
     stored !== null &&

@@ -46,6 +46,7 @@ import type {
   SplitPolicy,
   StepKind,
   TaskDecision,
+  TaskRequest,
   TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
@@ -175,6 +176,7 @@ export const todo = sqliteTable(
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
       .default(sql`'[]'`),
+    request: json<TaskRequest | null>('request'),
   },
   (t) => [index('todo_phase_idx').on(t.phase)],
 );

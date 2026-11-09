@@ -275,6 +275,13 @@ export function takeChiefSteer(db: Db, threadId: string): boolean {
 }
 
 export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {
+  return steeredMessages(db, running).map((message) => message.projectId);
+}
+
+export function steeredMessages(
+  db: Db,
+  running: StepRow,
+): { id: string; projectId: string | null }[] {
   if (running.claimedAt === null) return [];
   const claimedAt = running.claimedAt;
   return db
@@ -296,8 +303,7 @@ export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[
         .where(eq(step.id, message.id))
         .get();
       return queued === undefined || STEER_HOLDS.includes(queued.holdReason ?? '');
-    })
-    .map((message) => message.projectId);
+    });
 }
 
 export function ackChiefSteer(

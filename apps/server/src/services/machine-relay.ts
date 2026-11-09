@@ -13,7 +13,7 @@ import { build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { attachWorkerFile } from './agent-attachments.js';
 import { NotFoundError } from './builds.js';
-import { requireTurnProvenance } from './chief.js';
+import { requireTurnProvenance, turnOwnerMessageIds } from './chief.js';
 import { assertChiefDigestTool } from './chief-digest.js';
 import {
   ASK_HOLD_MS,
@@ -142,6 +142,7 @@ export async function executeRelayToolCall(
       chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
       conversationId: threadId,
       turnPrompt: row.prompt,
+      turnMessageIds: turnOwnerMessageIds(deps.db, row),
       turnScopeProjectId: stepScopeProjectId(row),
       turnScopeMixed: steeredFromAnotherScope(deps, row),
     },
