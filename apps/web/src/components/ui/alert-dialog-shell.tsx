@@ -30,6 +30,7 @@ interface AlertDialogShellProps {
   hint?: ReactNode;
   className?: string;
   size?: DialogSize;
+  finalFocus?: AlertDialogPrimitive.Popup.Props['finalFocus'];
 }
 
 export function AlertDialogShell({
@@ -43,6 +44,7 @@ export function AlertDialogShell({
   hint,
   className,
   size = 's',
+  finalFocus,
 }: AlertDialogShellProps) {
   const { t } = useI18n();
   useEscClose(onClose, open);
@@ -61,6 +63,7 @@ export function AlertDialogShell({
           onClick={onClose}
         />
         <AlertDialogPrimitive.Popup
+          finalFocus={finalFocus}
           role="alertdialog"
           data-slot="alert-dialog-content"
           data-size={size}
