@@ -799,8 +799,6 @@ describe('F-C1 credentials and grants are owner-only', () => {
     ['POST', '/api/teams/{team}/claude-subscriptions', { name: 'c' }],
     ['DELETE', '/api/teams/{team}/claude-subscriptions/any', undefined],
     ['POST', '/api/teams/{team}/claude-subscriptions/any/verify', {}],
-    ['PUT', '/api/teams/{team}/feishu', {}],
-    ['DELETE', '/api/teams/{team}/feishu', undefined],
     ['PATCH', '/api/machines/any', { name: 'm' }],
     ['DELETE', '/api/machines/any', undefined],
     ['POST', '/api/machines/any/revoke', {}],

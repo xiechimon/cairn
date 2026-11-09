@@ -15,14 +15,14 @@
 
 | Item | Count |
 |---|---|
-| Features | 55 |
-| status shipped | 46 |
+| Features | 54 |
+| status shipped | 45 |
 | status partial | 7 |
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 17 |
-| Research gaps | 20 |
-| Frontend design gaps | 25 |
-| Backend design gaps | 25 |
+| Research gaps | 19 |
+| Frontend design gaps | 24 |
+| Backend design gaps | 24 |
 | notes cited but not on main | 20 |
 
 ## Coverage
@@ -81,7 +81,6 @@
 | [Sidebar and thread list](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
 | [Feature flags and releases](#feature-releases) | 4 | shipped | gap | gap | gap | B11 |
-| [Feishu integration](#feishu) | 4 | shipped | gap | gap | gap | B11 |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
 | [Thread tags](#thread-tags) | 4 | shipped | gap | yes | yes | B11 |
 
@@ -192,7 +191,7 @@ Who can do what and with which credentials: the secrets page, API keys with gran
 
 ### B11 · Peripheral surfaces
 
-Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
+Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
 
 | Feature | Centrality | Missing |
 |---|---|---|
@@ -200,7 +199,6 @@ Small surfaces that work today without research or design: the Coordinator MCP f
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
 | [Server backup and deploy status](#server-status) | 3 | Research: no note on how self-hosted products report backup and update health<br>Frontend design: the banners have no design<br>Backend design: no design for the backup and deploy probes |
 | [Feature flags and releases](#feature-releases) | 4 | Research: no note on per-user flags for a single-user product<br>Frontend design: the releases list has no design<br>Backend design: no design for flag defaults and release |
-| [Feishu integration](#feishu) | 4 | Research: no note on why Feishu and what it delivers<br>Frontend design: the Feishu settings have no design<br>Backend design: no design for the Feishu delivery path |
 | [Thread tags](#thread-tags) | 4 | Research: no note on whether tags still earn their place after D58 |
 
 ### B12 · Phase 3: iOS app
@@ -628,14 +626,6 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Research: **gap**: no note on per-user flags for a single-user product
 - Frontend design: **gap**: the releases list has no design
 - Backend design: **gap**: no design for flag defaults and release
-
-### feishu
-
-**Feishu integration** (shipped). Team settings for a Feishu bot connection.
-
-- Research: **gap**: no note on why Feishu and what it delivers
-- Frontend design: **gap**: the Feishu settings have no design
-- Backend design: **gap**: no design for the Feishu delivery path
 
 ### ios-app
 

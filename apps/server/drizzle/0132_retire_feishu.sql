@@ -1,0 +1,1 @@
+DROP TABLE `feishu_binding`;

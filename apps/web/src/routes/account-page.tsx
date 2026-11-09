@@ -34,7 +34,6 @@ import {
 } from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { FeatureReleases } from './feature-releases.js';
-import { FeishuSettings } from './feishu-settings.js';
 
 export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
@@ -231,7 +230,6 @@ export function AccountPage() {
           </SettingsCard>
         )}
         {live && <FeatureReleases />}
-        {live && teamId && <FeishuSettings key={teamId} teamId={teamId} />}
       </div>
     </PageShell>
   );

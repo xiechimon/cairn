@@ -76,7 +76,7 @@
     {
       "id": "B11",
       "title": "Peripheral surfaces",
-      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
+      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
     },
     {
       "id": "B12",
@@ -2433,45 +2433,6 @@
         "apps/web/e2e/chief-home-backup.spec.ts",
         "apps/server/test/backup-status.test.ts",
         "apps/server/test/deploy-status.test.ts"
-      ],
-      "batch": "B11"
-    },
-    {
-      "id": "feishu",
-      "name": "Feishu integration",
-      "summary": "Team settings for a Feishu bot connection.",
-      "states": "Not connected, connected, or failing, in the account settings.",
-      "centrality": 4,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/routes/feishu-settings.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-feishu.ts",
-          "apps/server/src/services/feishu.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/teams/:id/feishu"
-        ]
-      },
-      "reach": [
-        "settings account"
-      ],
-      "research": {
-        "gap": "no note on why Feishu and what it delivers"
-      },
-      "frontendDesign": {
-        "gap": "the Feishu settings have no design"
-      },
-      "backendDesign": {
-        "gap": "no design for the Feishu delivery path"
-      },
-      "evidence": [
-        "apps/web/e2e/account-feishu.spec.ts",
-        "apps/server/test/feishu-config.test.ts"
       ],
       "batch": "B11"
     },
