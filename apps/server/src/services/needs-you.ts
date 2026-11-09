@@ -1,5 +1,5 @@
 import type { NeedsYouQuery, NeedsYouReason } from '@cairn/shared';
-import { isProviderAuthFailure } from '@cairn/shared';
+import { isProviderAuthFailure, WAITING_PHASES } from '@cairn/shared';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
@@ -94,7 +94,7 @@ export function listNeedsYou(
       and(
         eq(todo.teamId, teamId),
         isNull(todo.archivedAt),
-        inArray(todo.phase, ['confirm', 'review', 'failed']),
+        inArray(todo.phase, [...WAITING_PHASES, 'failed']),
       ),
     )
     .all();
@@ -121,7 +121,8 @@ export function listNeedsYou(
   const entries: { todoId: string; reason: NeedsYouReason; phaseAt: number }[] = [];
   for (const row of rows) {
     let reason: NeedsYouReason | null = null;
-    if (row.phase === 'confirm') reason = 'confirm';
+    if (row.phase === 'needs_input') reason = 'question';
+    else if (row.phase === 'confirm') reason = 'confirm';
     else if (row.phase === 'review') {
       const projectRow = projectById.get(row.projectId);
       const policy =

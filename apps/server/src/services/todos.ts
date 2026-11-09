@@ -19,6 +19,7 @@ import {
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
+  specWithDecisions,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -67,6 +68,10 @@ const QUESTION_ABANDONING_PHASES: readonly Phase[] = ['todo', 'done', 'closed'];
 
 export function abandonsQuestions(to: Phase): boolean {
   return QUESTION_ABANDONING_PHASES.includes(to);
+}
+
+export function decidedSpecOf(row: Pick<TodoRow, 'spec' | 'decisions'>): string {
+  return specWithDecisions(row.spec, row.decisions);
 }
 
 export interface TodoDeps {

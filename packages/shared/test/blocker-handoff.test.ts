@@ -14,6 +14,7 @@ import {
   clipHandoffFiles,
   clipHandoffSummary,
   composeTaskPromptWithInstruction,
+  specWithDecisions,
   stripBlockerHandoff,
   type TrajectoryPack,
   trajectoryPackSchema,
@@ -159,6 +160,12 @@ describe('H5 web presentation layer: delivery sections do not turn task text int
   test('stripBlockerHandoff restores task text; without a delivery section the original is returned', () => {
     expect(stripBlockerHandoff(withHandoff)).toBe(TASK);
     expect(stripBlockerHandoff(TASK)).toBe(TASK);
+  });
+
+  test('a first prompt carrying the task decisions -> task-prompt', () => {
+    const decisions = [{ requestId: 'ask-1', question: 'Which wins?', answer: 'Repo rule' }];
+    const decided = buildTaskPromptText(task.title, specWithDecisions(task.spec, decisions));
+    expect(classifyUserText(decided, { ...task, decisions })).toBe('task-prompt');
   });
 
   test('task text + delivery section -> task-prompt', () => {

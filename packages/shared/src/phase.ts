@@ -28,6 +28,12 @@ export const PHASE_SEMANTICS: Readonly<Record<Phase, string>> = {
 
 export const IN_PROGRESS_PHASES = ['queued', 'planning', 'building'] as const;
 
+export const WAITING_PHASES = ['confirm', 'needs_input', 'review'] as const;
+
+export function isWaitingPhase(phase: string): boolean {
+  return (WAITING_PHASES as readonly string[]).includes(phase);
+}
+
 export interface TodoStartState {
   phase: string;
   latestBuildId: string | null;

@@ -10,6 +10,7 @@ import {
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
+  isWaitingPhase,
   MEMORY_LAYERS,
   MERGE_HUMAN_ONLY_COPY,
   type MemoryLayer,
@@ -941,11 +942,7 @@ export function transitionTodos(
       skipped.push(id);
       continue;
     }
-    if (
-      to === 'done' &&
-      actor.kind === 'agent' &&
-      (owned.phase === 'review' || owned.phase === 'confirm')
-    ) {
+    if (to === 'done' && actor.kind === 'agent' && isWaitingPhase(owned.phase)) {
       skipped.push(id);
       reasons[id] =
         '待确认/审核关口的 done 落地必须由人过闸（发起合并，或用户在看板确认）。把卡停在当前关口，用 notify_user 唤醒用户处理。';

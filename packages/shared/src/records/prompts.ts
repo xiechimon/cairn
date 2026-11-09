@@ -543,11 +543,16 @@ export type UserTextKind = 'task-prompt' | 'synthetic' | 'user';
 
 export function classifyUserText(
   rawText: string,
-  task: { title: string; spec: string } & TaskSource,
+  task: {
+    title: string;
+    spec: string;
+    decisions?: readonly { requestId: string; question: string; answer: string }[];
+  } & TaskSource,
 ): UserTextKind {
   const text = stripBlockerHandoff(rawText);
-  const raw = buildTaskPromptText(task.title, task.spec).trim();
-  const delivered = buildTaskPromptText(task.title, task.spec, task).trim();
+  const spec = specWithDecisions(task.spec, task.decisions ?? []);
+  const raw = buildTaskPromptText(task.title, spec).trim();
+  const delivered = buildTaskPromptText(task.title, spec, task).trim();
   const taskTexts = delivered === raw ? [raw] : [delivered, raw];
   for (const taskText of taskTexts) {
     if (text === taskText) return 'task-prompt';

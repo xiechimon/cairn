@@ -39,6 +39,7 @@ import {
   hasBlockingFinding,
   isBuildStepKind,
   isPlanContractRewritePrompt,
+  isWaitingPhase,
   MERGE_ANNOUNCEMENT,
   PLAN_PRIOR_ART_RULE,
   type PlanContractCheck,
@@ -175,6 +176,7 @@ import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import {
   abandonsQuestions,
   childrenOfTodo,
+  decidedSpecOf,
   getTodo,
   setTodoPhase,
   settleSplitOnDone,
@@ -413,10 +415,7 @@ export async function sendBuildSteer(
         if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
           throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
         }
-        if (
-          wake.createdBy.startsWith('worker:') &&
-          ['confirm', 'needs_input', 'review'].includes(todoRow?.phase ?? '')
-        ) {
+        if (wake.createdBy.startsWith('worker:') && isWaitingPhase(todoRow?.phase ?? '')) {
           throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
         }
       }
@@ -1232,7 +1231,7 @@ export function maybeEnqueueVerifyStep(
   const planRow = latestPlanRow(deps, buildId);
   const prompt = buildVerifyStepPrompt({
     ticketRef: ticketRefOf(todoRow),
-    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
+    taskText: buildTaskPromptText(todoRow.title, decidedSpecOf(todoRow), todoRow),
     planText: planRow?.content ?? '',
     verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,

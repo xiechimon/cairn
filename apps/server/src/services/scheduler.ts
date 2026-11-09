@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { ENV_VARS, type Scheduler } from '@cairn/shared';
+import { ENV_VARS, type Scheduler, WAITING_PHASES } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { ServerConfig } from '../config.js';
 import { build, chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
@@ -205,7 +205,7 @@ export function trajectoryReflectCurateRunOf(
   };
 }
 
-const SCHEDULE_GATE_PHASES = new Set(['confirm', 'needs_input', 'review']);
+const SCHEDULE_GATE_PHASES: ReadonlySet<string> = new Set(WAITING_PHASES);
 
 export function createScheduler(
   deps: BuildDeps,

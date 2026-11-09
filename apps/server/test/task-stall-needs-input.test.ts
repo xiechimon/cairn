@@ -2,8 +2,9 @@ import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build, message, project, steerPending, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
+import { transitionTodos } from '../src/services/chief-tools.js';
 import { claimStep } from '../src/services/machines.js';
-import { sweepFailedRetries } from '../src/services/needs-you.js';
+import { listNeedsYou, sweepFailedRetries } from '../src/services/needs-you.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -379,5 +380,29 @@ describe('decisions are stored on the task and survive restarts', () => {
     const claimed = await claimStep(deps() as never, machineId, H.teamId, 0, 'http://localhost');
     expect(claimed?.conversationId).toBe(restarted);
     expect(claimed?.todo?.spec).toContain('Repo rule wins; rewrite the banned string.');
+  });
+});
+
+describe('every surface that lists work waiting on a person includes needs_input', () => {
+  test('the needs-you inbox lists a needs_input task as a question', async () => {
+    const { todoId, stepRow } = await askAndPark();
+    endStep(stepRow.id);
+    const waiting = listNeedsYou({ db: H.s.db }, H.teamId);
+    expect(waiting.current.map((entry) => [entry.todo.id, entry.reason])).toEqual([
+      [todoId, 'question'],
+    ]);
+  });
+
+  test('an agent cannot complete a task that waits for an answer', async () => {
+    const { todoId, buildId, stepRow } = await askAndPark();
+    endStep(stepRow.id);
+    const out = transitionTodos(deps() as never, H.teamId, [todoId], 'done', {
+      kind: 'agent',
+      name: 'Coordinator',
+      stopActor: 'coordinator',
+    } as never);
+    expect(out.skipped).toEqual([todoId]);
+    expect(phaseOf(todoId)).toBe('needs_input');
+    expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
   });
 });

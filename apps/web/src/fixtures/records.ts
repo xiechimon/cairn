@@ -19,6 +19,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type TagRecord,
+  type TaskDecision,
   type ThreadMessageContent,
   type ThreadReportContent,
   type UsageCost,
@@ -73,6 +74,7 @@ export interface TodoRecord {
   sourceRef?: string | null;
   usageCost?: UsageCost;
   verified?: boolean;
+  decisions?: TaskDecision[];
   routeOverride?: {
     machineId?: string;
     requiredCapabilities?: {
