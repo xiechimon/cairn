@@ -68,18 +68,37 @@ test('⌘K focuses the input — direct typing produces results', async ({ page 
   await expect(panel(page).getByText('前往', { exact: true })).toHaveCount(0);
 });
 
-test('mid-exit reopen refocuses the retained input', async ({ page }) => {
+test('a reopen as the exit runs out keeps the input focused', async ({ page }) => {
   await page.goto(BOARD);
   await openPanel(page);
   await expect(input(page)).toBeFocused();
 
-  // reopen inside the 150ms retained-mount window: the input never
-  // detaches, so the mount-time focus path can't fire — the open
-  // transition must refocus (#137 regression guard; if the window is
-  // missed the remount path refocuses instead and the assertion still
-  // holds, so the guard is timing-robust)
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Meta+k');
+  const reopenedMidExit = await page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const popup = document.querySelector<HTMLElement>('[data-slot="dialog-content"]');
+        if (popup === null) {
+          resolve(false);
+          return;
+        }
+        const tick = () => {
+          const exit = popup.getAnimations()[0];
+          if (exit === undefined) {
+            if (popup.isConnected) requestAnimationFrame(tick);
+            else resolve(false);
+            return;
+          }
+          window.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }),
+          );
+          exit.finish();
+          resolve(popup.isConnected);
+        };
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        requestAnimationFrame(tick);
+      }),
+  );
+  expect(reopenedMidExit).toBe(true);
   await expect(input(page)).toBeFocused();
 });
 

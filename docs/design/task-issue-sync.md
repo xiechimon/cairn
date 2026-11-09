@@ -8,7 +8,8 @@ cairn opens one GitHub issue per task in a GitHub-linked project (`sourceKind = 
 
 - Every open PR of a task whose own issue lives in the PR's repository carries a `Closes #N` line. GitHub closes the issue when that PR merges into the default branch, on every route: cairn's REST merge, the Mergify squash queue, or a human merge.
 - `ensurePullClosesTaskIssue` (`apps/server/src/services/pr-closing-line.ts`) is the only writer. The PR watch runs it on every sweep of an open PR. The REST merge runs it once more before the merge `PUT`, then rechecks the merge gate.
-- Fenced code, HTML comments and inline code do not count as a keyword. The body is reread right before the `PATCH`.
+- When no effective keyword exists, prepend `Closes #N` on its own line, with a blank line before existing prose. This keeps a new keyword outside any trailing unclosed fence or HTML comment. Preserve an existing effective keyword wherever it appears; do not move it or add a duplicate. This is cairn's placement convention, not a GitHub requirement; see the research's §3–4 correction.
+- Fenced code, HTML comments and inline code do not count as a keyword. The body is reread right before the `PATCH`; a keyword added in the meantime prevents the write.
 - A PR whose base is not the default branch never closes the issue. That PR has not landed on the default branch, so this is by design.
 
 ## Not landing: one level-triggered reconciler
