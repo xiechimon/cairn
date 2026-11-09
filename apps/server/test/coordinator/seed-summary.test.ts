@@ -37,7 +37,7 @@ describe('seed summary built on demand', () => {
   test('rows older than the seed window are folded and the cursor moves to the newest of them', async () => {
     rows(40);
     const prompts: string[] = [];
-    const summary = await seedSummary(
+    const out = await seedSummary(
       H.s.db,
       H.threadId,
       { at: BASE + 30, rowid: 31 },
@@ -48,7 +48,7 @@ describe('seed summary built on demand', () => {
       noError,
       BASE + 1000,
     );
-    expect(summary).toBe('Decided: ship #12.');
+    expect(out).toEqual({ summary: 'Decided: ship #12.', complete: true });
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toContain('message 29');
     expect(prompts[0]).not.toContain('message 30\n');
@@ -94,7 +94,7 @@ describe('seed summary built on demand', () => {
     };
     expect(
       await seedSummary(H.s.db, H.threadId, { at: BASE, rowid: 1 }, summarize, noError, 1),
-    ).toBe('');
+    ).toEqual({ summary: '', complete: true });
     expect(stored()).toBeUndefined();
   });
 
@@ -119,7 +119,7 @@ describe('seed summary built on demand', () => {
       (error) => errors.push(error),
       2,
     );
-    expect(out).toBe('kept');
+    expect(out).toEqual({ summary: 'kept', complete: false });
     expect(errors).toHaveLength(1);
     expect(stored()).toMatchObject({ summary: 'kept', generation: 1, coveredThroughId: 'm0019' });
   });
@@ -134,7 +134,7 @@ describe('seed summary built on demand', () => {
       noError,
       1,
     );
-    expect(out).toBe('');
+    expect(out).toEqual({ summary: '', complete: false });
     expect(stored()).toBeUndefined();
   });
 
@@ -143,7 +143,10 @@ describe('seed summary built on demand', () => {
     const summarize = async () => {
       throw new Error('must not be called');
     };
-    expect(await seedSummary(H.s.db, H.threadId, null, summarize, noError, 1)).toBe('');
+    expect(await seedSummary(H.s.db, H.threadId, null, summarize, noError, 1)).toEqual({
+      summary: '',
+      complete: true,
+    });
     expect(stored()).toBeUndefined();
   });
 
@@ -151,26 +154,64 @@ describe('seed summary built on demand', () => {
     rows(40);
     expect(
       await seedSummary(H.s.db, H.threadId, { at: BASE + 30, rowid: 31 }, null, noError, 1),
-    ).toBe('');
+    ).toEqual({ summary: '', complete: true });
     expect(stored()).toBeUndefined();
   });
 
-  test('a huge backlog costs at most the batch cap in model calls', async () => {
+  test('a batch-capped backlog folds the earliest chunk and advances coverage', async () => {
     rows(300, 0, (i) => `message ${i} ${'x'.repeat(20_000)}`);
     let calls = 0;
-    await seedSummary(
+    const out = await seedSummary(
       H.s.db,
       H.threadId,
       { at: BASE + 300, rowid: 301 },
       async () => {
         calls += 1;
-        return 'folded';
+        return `partial-${calls}`;
       },
       noError,
       1,
     );
     expect(calls).toBe(SEED_SUMMARY_MAX_BATCHES);
-    expect(stored()).toMatchObject({ coveredThroughId: 'm0299' });
+    expect(out.complete).toBe(false);
+    expect(out.summary).toBe(`partial-${SEED_SUMMARY_MAX_BATCHES}`);
+    const first = stored();
+    expect(first).toMatchObject({
+      summary: `partial-${SEED_SUMMARY_MAX_BATCHES}`,
+      generation: 1,
+    });
+    expect(first?.coveredThroughId).toMatch(/^m0/);
+    expect(first!.coveredThroughId < 'm0299').toBe(true);
+    expect(first!.compactedMessages).toBeGreaterThan(0);
+    expect(first!.compactedMessages).toBeLessThan(300);
+  });
+
+  test('repeated catch-up on a capped gap eventually covers the window', async () => {
+    rows(300, 0, (i) => `message ${i} ${'x'.repeat(20_000)}`);
+    let calls = 0;
+    let out = { summary: '', complete: false };
+    for (let round = 0; round < 40 && !out.complete; round += 1) {
+      out = await seedSummary(
+        H.s.db,
+        H.threadId,
+        { at: BASE + 300, rowid: 301 },
+        async () => {
+          calls += 1;
+          return `fold-${calls}`;
+        },
+        noError,
+        round + 1,
+      );
+    }
+    expect(out.complete).toBe(true);
+    expect(out.summary).toMatch(/^fold-/);
+    expect(stored()).toMatchObject({
+      coveredThroughId: 'm0299',
+      compactedMessages: 300,
+      generation: expect.any(Number),
+    });
+    expect(stored()!.generation).toBeGreaterThan(1);
+    expect(calls).toBeGreaterThan(SEED_SUMMARY_MAX_BATCHES);
   });
 
   test('digest rows, report rows and system rows never reach the summarizer', async () => {

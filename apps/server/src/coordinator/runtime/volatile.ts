@@ -1,17 +1,26 @@
 import { shortEvent, transcriptPromptRowId, withHistoryMarker } from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
 import { defineExtension, GenerationTask, hook } from '@earendil-works/pi-durable';
+import { projectColdMessages, projectWarmMessages } from './cold-slim.js';
+
+export interface ColdSlimPlan {
+  cold: boolean;
+  summaryHint?: string | null;
+}
 
 export interface VolatileContext {
   set(conversationId: string, text: string | null): void;
   get(conversationId: string): string | undefined;
   setStep(conversationId: string, stepId: string | null): void;
   step(conversationId: string): string | undefined;
+  setColdSlim(conversationId: string, plan: ColdSlimPlan | null): void;
+  coldSlim(conversationId: string): ColdSlimPlan | undefined;
 }
 
 export function createVolatileContext(): VolatileContext {
   const sections = new Map<string, string>();
   const steps = new Map<string, string>();
+  const coldSlims = new Map<string, ColdSlimPlan>();
   return {
     setStep: (conversationId, stepId) => {
       if (stepId === null) steps.delete(conversationId);
@@ -23,6 +32,11 @@ export function createVolatileContext(): VolatileContext {
       else sections.set(conversationId, text);
     },
     get: (conversationId) => sections.get(conversationId),
+    setColdSlim: (conversationId, plan) => {
+      if (plan === null) coldSlims.delete(conversationId);
+      else coldSlims.set(conversationId, plan);
+    },
+    coldSlim: (conversationId) => coldSlims.get(conversationId),
   };
 }
 
@@ -72,19 +86,28 @@ export function shortenEarlierEvents(
   });
 }
 
+export function applyContextProjection(
+  messages: readonly Message[],
+  plan: ColdSlimPlan | undefined,
+): Message[] {
+  if (plan?.cold === true) {
+    return projectColdMessages(messages, { summaryHint: plan.summaryHint });
+  }
+  return projectWarmMessages(messages);
+}
+
 export function volatileContextExtension(volatile: VolatileContext) {
   return defineExtension({
     name: 'cairn-coordinator-volatile',
     hooks: [
       hook(GenerationTask, {
         beforeRequest: (request, api) => {
-          const section = volatile.get(String(api.conversationId));
-          const messages = shortenEarlierEvents(
-            request.messages,
-            volatile.step(String(api.conversationId)),
-          );
+          const conversationId = String(api.conversationId);
+          const section = volatile.get(conversationId);
+          const shortened = shortenEarlierEvents(request.messages, volatile.step(conversationId));
+          const projected = applyContextProjection(shortened, volatile.coldSlim(conversationId));
           return {
-            messages: section === undefined ? messages : withVolatileSection(messages, section),
+            messages: section === undefined ? projected : withVolatileSection(projected, section),
           };
         },
       }),
