@@ -2,6 +2,7 @@ import { ASK_USER_QUESTION_KIND, type NeedsYouReason, type TodoOwner } from '@ca
 import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, gateState, message, project, todo } from '../db/schema.js';
+import { planAwaitsAutoConfirm } from './builds.js';
 import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
@@ -97,6 +98,7 @@ export function ownershipOf(db: Db, row: TodoRow): Ownership | null {
     };
   }
   if (row.phase === 'confirm') {
+    if (row.latestBuildId !== null && planAwaitsAutoConfirm({ db }, row.latestBuildId)) return null;
     return { owner: 'owner', reason: 'confirm', workKey: `confirm:${phaseWork(row)}` };
   }
   if (row.phase === 'review') return reviewOwnership(db, row);

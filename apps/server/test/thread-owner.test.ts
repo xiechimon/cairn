@@ -6,6 +6,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   gateState,
+  plan as planTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -26,6 +27,9 @@ afterAll(() => {
 });
 
 type Policy = 'human' | 'autonomous';
+
+const AUTO_PLAN =
+  'Kind: fix\n## Context\nA task\n## Changes\nA change\n## Edge cases\nNone\n## Verification\n- `pnpm test` passes\n';
 type Failure = 'owed-retry' | 'repeated' | 'parked';
 
 interface World {
@@ -362,6 +366,33 @@ describe('reconcileOwners (#3512)', () => {
     reconcileOwners(w.deps);
     expect(ownerNow(w)).toBe('coordinator');
     expect(wakes(w).filter((prompt) => prompt.startsWith('[wake:failed]'))).toHaveLength(1);
+  });
+
+  test('a plan the policy will auto-confirm notifies nobody until a person is really needed', () => {
+    const w = openWorld({ phase: 'planning' });
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: nowMs() })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+    w.s.db
+      .insert(planTable)
+      .values({ id: 'plan-auto', buildId: w.buildId, version: 1, content: AUTO_PLAN, createdAt: 1 })
+      .run();
+    const before = w.notified();
+    setTodoPhase(w.deps, w.todoId, 'confirm', { hasPlan: true });
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBeNull();
+    expect(w.notified()).toBe(before);
+    expect(wakes(w)).toHaveLength(0);
+    w.s.db
+      .update(planTable)
+      .set({ autoApprovePausedAt: nowMs() })
+      .where(eq(planTable.id, 'plan-auto'))
+      .run();
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('owner');
+    expect(w.notified() - before).toBe(1);
   });
 
   test('a change to owner sends one notification and no wake; an unchanged owner sends nothing', () => {

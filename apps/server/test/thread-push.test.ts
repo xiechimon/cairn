@@ -376,7 +376,7 @@ describe('human attention push', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  test('an auto-confirmable plan still waits on the person and pushes once', () => {
+  test('auto-confirmable plan does not push', () => {
     const s = world({ policy: 'autonomous' });
     s.db.update(todo).set({ phase: 'planning' }).where(eq(todo.id, s.record.id)).run();
     s.db
@@ -394,7 +394,7 @@ describe('human attention push', () => {
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
     setTodoPhase(s.svc, s.record.id, 'confirm', { hasPlan: true });
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('a worker question does not push to the person: the Coordinator owns it', () => {
