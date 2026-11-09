@@ -9,9 +9,10 @@ import type { Db } from '../db/client.js';
 import { build, gateState, message, project, todo } from '../db/schema.js';
 import { planAwaitsAutoConfirm } from './builds.js';
 import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
+import { projectRepoRef } from './git.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
-import { projectMergeConfigOf } from './projects.js';
+import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { endSnoozeOn } from './snooze.js';
 import { getTodo } from './todos.js';
@@ -59,21 +60,20 @@ function reviewOwnership(db: Db, row: TodoRow): Ownership | null {
   const policy =
     projectRow === undefined ? 'autonomous' : projectMergeConfigOf(projectRow).mergePolicy;
   const workKey = `review:${phaseWork(row)}`;
-  if (row.output === 'info') {
-    return policy === 'human' ? { owner: 'coordinator', reason: 'review', workKey } : null;
-  }
+  const coordinatorReview: Ownership = { owner: 'coordinator', reason: 'review', workKey };
+  if (row.output === 'info') return coordinatorReview;
   const buildRow =
     row.latestBuildId === null
       ? undefined
       : db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-  const gate =
-    buildRow === undefined
-      ? undefined
-      : db.select().from(gateState).where(eq(gateState.buildId, buildRow.id)).get();
   const prGate =
     buildRow?.prNumber != null &&
     projectRow?.repoKind === 'github' &&
     projectRow.githubRepo !== null;
+  const gate =
+    buildRow === undefined
+      ? undefined
+      : db.select().from(gateState).where(eq(gateState.buildId, buildRow.id)).get();
   if (prGate && (gate === undefined || gate.evaluatedAt < row.phaseAt)) return null;
   const blockers = gate?.blockers ?? [];
   if (gate !== undefined && !gate.ready && blockers.some((b) => b.class === 'transient')) {
@@ -82,7 +82,15 @@ function reviewOwnership(db: Db, row: TodoRow): Ownership | null {
   if (policy === 'human' || blockers.some((b) => b.class === 'human')) {
     return { owner: 'owner', reason: 'review', workKey };
   }
-  return null;
+  if (prGate) return null;
+  const repo = projectRepoRef(projectRow, '');
+  const personLands =
+    repo !== null &&
+    repo.kind !== 'github' &&
+    row.hasChanges &&
+    projectRow !== undefined &&
+    projectShipRouteOf(projectRow) !== 'custom';
+  return personLands ? { owner: 'owner', reason: 'review', workKey } : coordinatorReview;
 }
 
 function failedOwnership(db: Db, row: TodoRow): Ownership | null {
