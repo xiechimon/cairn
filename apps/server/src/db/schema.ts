@@ -169,6 +169,8 @@ export const todo = sqliteTable(
     supersededBy: text('supersededBy'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
     decisions: json<TaskDecision[]>('decisions').notNull().default(sql`'[]'`),
+    lastNotifiedOwner: text('lastNotifiedOwner').default('none'),
+    lastNotifiedWork: text('lastNotifiedWork').default(''),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()

@@ -531,6 +531,7 @@ export function sharedTodo(patch: {
     createdBy: null,
     ownerId: null,
     sourceBuildId: null,
+    owner: null,
     output: 'code',
   };
 }

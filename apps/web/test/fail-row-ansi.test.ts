@@ -36,6 +36,7 @@ const FAILED_WIRE_CARD: WireTodo = {
   sourceBuildId: null,
   sourceKind: null,
   sourceRef: null,
+  owner: null,
   output: 'code',
 };
 

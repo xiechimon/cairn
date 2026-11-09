@@ -45,6 +45,7 @@ function wire() {
     createdBy: null,
     ownerId: null,
     sourceBuildId: null,
+    owner: null,
     output: 'code' as const,
   };
 }

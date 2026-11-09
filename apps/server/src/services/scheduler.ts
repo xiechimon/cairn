@@ -51,6 +51,7 @@ import {
 import { sweepStaleMachines } from './machines.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
+import { reconcileOwners } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
 import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
@@ -518,6 +519,7 @@ export function createScheduler(
     sweepQuotaWaitSteps(deps, now);
     sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
+    reconcileOwners(deps);
     const digestTimes = opts.pushDigestTimes ?? [];
     if (digestTimes.length > 0 && !digestSweeping) {
       const due = digestSlotsDue(now, digestTimes, lastDigestRun);

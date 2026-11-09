@@ -228,12 +228,12 @@ describe('a snoozed thread sends no pushes', () => {
     expect(row(w)).toMatchObject({ phase: 'done', snoozeMode: 'needed' });
   });
 
-  test('a failure that stopped retrying pushes after the snooze is lifted', async () => {
+  test('a plan awaiting confirmation pushes after the snooze is lifted', async () => {
     const w = await world();
-    w.db.update(build).set({ prevPhase: 'failed' }).where(eq(build.id, 'snooze-build')).run();
+    w.db.update(todo).set({ phase: 'planning' }).where(eq(todo.id, w.todoId)).run();
     snoozeTodo(w.svc, w.todoId, { until: 'needed' });
     unsnoozeTodo(w.svc, w.todoId);
-    setTodoPhase(w.svc, w.todoId, 'failed');
+    setTodoPhase(w.svc, w.todoId, 'confirm');
     expect(w.send).toHaveBeenCalled();
   });
 
@@ -430,17 +430,16 @@ describe('snooze end conditions (table)', () => {
     const w = await world();
     w.db
       .update(todo)
-      .set({ phase: 'building' })
+      .set({ phase: 'planning' })
       .where(and(eq(todo.id, w.todoId)))
       .run();
-    w.db.update(build).set({ prevPhase: 'failed' }).where(eq(build.id, 'snooze-build')).run();
     snoozeTodo(w.svc, w.todoId, { until: 'needed' });
-    setTodoPhase(w.svc, w.todoId, 'failed');
+    setTodoPhase(w.svc, w.todoId, 'confirm');
     expect(row(w)?.snoozeMode).toBeNull();
     expect(w.send).toHaveBeenCalled();
   });
 
-  test('a pending worker question lifts the snooze', async () => {
+  test('a pending worker question keeps the snooze: the Coordinator owns it', async () => {
     const w = await world();
     snoozeTodo(w.svc, w.todoId, { until: 'needed' });
     upsertMessage(w.svc, {
@@ -456,6 +455,6 @@ describe('snooze end conditions (table)', () => {
         answers: null,
       }),
     });
-    expect(row(w)?.snoozeMode).toBeNull();
+    expect(row(w)?.snoozeMode).toBe('needed');
   });
 });

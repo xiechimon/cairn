@@ -1,13 +1,13 @@
-import type { NeedsYouQuery, NeedsYouReason } from '@cairn/shared';
-import { isProviderAuthFailure, WAITING_PHASES } from '@cairn/shared';
+import type { NeedsYouQuery } from '@cairn/shared';
+import { isProviderAuthFailure } from '@cairn/shared';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, step, todo } from '../db/schema.js';
+import { build, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, NotFoundError } from './builds.js';
+import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
-import { projectMergeConfigOf } from './projects.js';
 import { retryIsParked } from './retry-parking.js';
 import { getTodo } from './todos.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
@@ -87,53 +87,17 @@ export function listNeedsYou(
   teamId: string,
   now = nowMs(),
 ): NeedsYouQuery {
-  const rows = deps.db
+  const entries = deps.db
     .select()
     .from(todo)
-    .where(
-      and(
-        eq(todo.teamId, teamId),
-        isNull(todo.archivedAt),
-        inArray(todo.phase, [...WAITING_PHASES, 'failed']),
-      ),
-    )
-    .all();
-  const buildIds = rows.flatMap((row) => (row.latestBuildId === null ? [] : [row.latestBuildId]));
-  const buildById = new Map(
-    (buildIds.length === 0
-      ? []
-      : deps.db.select().from(build).where(inArray(build.id, buildIds)).all()
-    ).map((row) => [row.id, row]),
-  );
-  const scheduledBuildIds = lastStepScheduledBuildIds(
-    deps.db,
-    rows.flatMap((row) =>
-      row.phase === 'failed' && row.latestBuildId !== null ? [row.latestBuildId] : [],
-    ),
-  );
-  const projectIds = [...new Set(rows.map((row) => row.projectId))];
-  const projectById = new Map(
-    (projectIds.length === 0
-      ? []
-      : deps.db.select().from(project).where(inArray(project.id, projectIds)).all()
-    ).map((row) => [row.id, row]),
-  );
-  const entries: { todoId: string; reason: NeedsYouReason; phaseAt: number }[] = [];
-  for (const row of rows) {
-    let reason: NeedsYouReason | null = null;
-    if (row.phase === 'needs_input') reason = 'question';
-    else if (row.phase === 'confirm') reason = 'confirm';
-    else if (row.phase === 'review') {
-      const projectRow = projectById.get(row.projectId);
-      const policy =
-        projectRow === undefined ? 'autonomous' : projectMergeConfigOf(projectRow).mergePolicy;
-      if (policy === 'human') reason = 'review';
-    } else if (row.phase === 'failed') {
-      const latest = row.latestBuildId === null ? undefined : buildById.get(row.latestBuildId);
-      if (!owedAutomaticRetry(latest, scheduledBuildIds)) reason = 'failed';
-    }
-    if (reason !== null) entries.push({ todoId: row.id, reason, phaseAt: row.phaseAt });
-  }
+    .where(and(eq(todo.teamId, teamId), OWNED_CANDIDATE))
+    .all()
+    .flatMap((row) => {
+      const ownership = ownershipOf(deps.db, row);
+      return ownership?.owner === 'owner'
+        ? [{ todoId: row.id, reason: ownership.reason, phaseAt: row.phaseAt }]
+        : [];
+    });
   entries.sort((a, b) => b.phaseAt - a.phaseAt || (a.todoId < b.todoId ? -1 : 1));
   const current: NeedsYouQuery['current'] = [];
   const stale: NeedsYouQuery['stale'] = [];

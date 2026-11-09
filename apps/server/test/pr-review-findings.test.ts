@@ -7,7 +7,7 @@ import {
   reviewFindingBadge,
   stripWorkBranchNote,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, ne } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, project, step, threadPr, todo } from '../src/db/schema.js';
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
@@ -286,7 +286,7 @@ test.each(['P2', 'P3'])(
     await f.wake();
     await f.wake();
     expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(1);
-    expect(f.s.db.select().from(step).all()).toHaveLength(1);
+    expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
     expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
     expect(f.s.db.select().from(step).get()?.prompt).toContain('a.ts:7');
     expect(f.s.db.select().from(step).get()?.prompt).toContain(f.state.body);
@@ -406,7 +406,7 @@ test.each([true, false])(
     await f.wake();
     await f.wake();
     expect(f.state.draft).toBe(true);
-    expect(f.s.db.select().from(step).all()).toEqual([]);
+    expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toEqual([]);
     expect(JSON.stringify(f.s.db.select().from(message).all())).toContain(
       'Review round cap (3) reached; rethink or hand to the owner.',
     );
@@ -431,7 +431,7 @@ test('the review round cap stops wakes, lists every finding class raised, and as
     .values({ id, conversationId: id, role: 'system', content: { reviews: 2 }, createdAt: 1 })
     .run();
   await f.wake();
-  expect(f.s.db.select().from(step).all()).toHaveLength(1);
+  expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
   f.state.findingId = 'RT_1b';
   await f.wake();
   expect(f.posted).toEqual([]);
@@ -440,7 +440,7 @@ test('the review round cap stops wakes, lists every finding class raised, and as
   f.state.body = '**<sub><sub>![P2 Badge](badge)</sub></sub>** Retry path skips the @owner check';
   await f.wake();
   await f.wake();
-  expect(f.s.db.select().from(step).all()).toHaveLength(1);
+  expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
   expect(f.posted).toHaveLength(1);
   const [comment] = f.posted;
   expect(comment).toContain('- Fix this');

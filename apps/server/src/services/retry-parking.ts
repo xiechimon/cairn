@@ -1,10 +1,11 @@
 import { CHIEF_NOTICE_KIND, classifyStepFailure } from '@cairn/shared';
 import { and, eq, gt, inArray, isNotNull, lte, sql } from 'drizzle-orm';
-import { build, chief, chiefMessage, message, step, todo } from '../db/schema.js';
+import { build, chiefMessage, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { coordinatorThreadRow, ensureChief } from './chief.js';
+import { reconcileOwners } from './owner.js';
 import { routeForStep } from './routing-rules.js';
 
 export const RETRY_PARKED_MARK = 'Task parked';
@@ -79,18 +80,6 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
       .set({ status: 'stopped', finishedAt: now })
       .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'waiting_quota'])))
       .run();
-    for (const coordinator of deps.db
-      .select()
-      .from(chief)
-      .where(eq(chief.teamId, owner.teamId))
-      .all()) {
-      if (coordinator.watches.some((watch) => watch.todoId === owner.id))
-        deps.db
-          .update(chief)
-          .set({ watches: coordinator.watches.filter((watch) => watch.todoId !== owner.id) })
-          .where(eq(chief.id, coordinator.id))
-          .run();
-    }
     const inserted = deps.db
       .insert(message)
       .values({ ...taskNotice, conversationId: buildId })
@@ -120,5 +109,6 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
     deps.hub.publishBuildDoc(owner.teamId, { ...row, errorMessage: reason });
     deps.convHub?.publishMessage(parked.threadId, parked.notice);
   }
+  reconcileOwners(deps, [owner.id]);
   return true;
 }

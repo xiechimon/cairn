@@ -1,4 +1,4 @@
-import type { NotificationRecord, TodoRecord, UserRecord } from '@cairn/shared';
+import type { NeedsYouReason, NotificationRecord, UserRecord } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefThread, notification, todo as todoTable } from '../db/schema.js';
@@ -78,19 +78,6 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
   return record;
 }
 
-const PHASE_NOTIFICATION_TYPE = {
-  confirm: 'plan_ready',
-  review: 'build_review',
-  done: 'todo_done',
-  failed: 'todo_failed',
-} as const;
-
-export type NotifiedPhase = keyof typeof PHASE_NOTIFICATION_TYPE;
-
-export function isNotifiedPhase(phase: string): phase is NotifiedPhase {
-  return phase in PHASE_NOTIFICATION_TYPE;
-}
-
 interface TodoNoticeSource {
   id: string;
   teamId: string;
@@ -103,20 +90,34 @@ function todoNoticeAgent(deps: NotificationDeps): { name: string; avatarUrl: str
   return { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl };
 }
 
-export function notifyTodoPhase(
+export function notifyTodo(
   deps: NotificationDeps,
-  todo: TodoRecord,
-  to: NotifiedPhase,
+  todo: TodoNoticeSource,
+  type: NotificationRecord['type'],
   snippet: string | null = null,
 ): NotificationRecord {
   return upsertAndPublish(deps, {
     teamId: todo.teamId,
-    type: PHASE_NOTIFICATION_TYPE[to],
+    type,
     entityId: todo.id,
     entityRef: { title: todo.title, projectId: todo.projectId, seqNum: todo.seqNum },
     agent: todoNoticeAgent(deps),
     snippet,
   });
+}
+
+const OWNERSHIP_NOTIFICATION_TYPE = {
+  question: 'build_review',
+  confirm: 'plan_ready',
+  review: 'build_review',
+} as const satisfies Record<NeedsYouReason, NotificationRecord['type']>;
+
+export function notifyOwnership(
+  deps: NotificationDeps,
+  todo: TodoNoticeSource,
+  reason: NeedsYouReason,
+): NotificationRecord {
+  return notifyTodo(deps, todo, OWNERSHIP_NOTIFICATION_TYPE[reason]);
 }
 
 export function notifyScheduleRun(

@@ -7,6 +7,7 @@ export interface StubResponse {
   usage?: { prompt: number; completion: number; cached?: number };
   toolCall?: { id?: string; name: string; arguments: Record<string, unknown> };
   status?: number;
+  errorMessage?: string;
 }
 
 export interface StubRequest {
@@ -58,7 +59,11 @@ export async function startStubLlm(
         if (rsp.status !== undefined && rsp.status >= 400) {
           const errType = rsp.status >= 500 ? 'server_error' : 'invalid_request_error';
           res.writeHead(rsp.status, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: { message: 'stub provider error', type: errType } }));
+          res.end(
+            JSON.stringify({
+              error: { message: rsp.errorMessage ?? 'stub provider error', type: errType },
+            }),
+          );
           opts.onConsumed?.();
           return;
         }
