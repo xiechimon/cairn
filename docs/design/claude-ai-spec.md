@@ -28,7 +28,7 @@ Not captured: toasts and a failed send (no reliable trigger without breaking the
 
 | Cairn surface (code) | Claude.ai counterpart | Journeys |
 |---|---|---|
-| App shell and sidebar (`board/sidebar.tsx`, `board/app-sidebar.tsx`, `board/sidebar-thread-groups.tsx`) | Left sidebar: nav rows, Pinned and recents sections, account footer; a drawer at 375 | `shell` |
+| App shell and sidebar (`board/sidebar.tsx`, `board/app-sidebar.tsx`, `board/sidebar-projects.ts`) | Left sidebar: nav rows, Pinned and recents sections, account footer; a drawer at 375 | `shell` |
 | Coordinator home, empty (`board/home-c.tsx`, `chief/chief-root.tsx`) | New chat: greeting, one composer, model line, Recent artifacts strip | `shell` |
 | Coordinator conversation (`chief/chief-conversation.tsx`, `chief/chief-message-rows.tsx`) | Chat transcript: user bubble, reply prose, code block, table, list, action row | `chat-long`, `send-stream` |
 | Composer (`chief/composer-surface.tsx`, `chief/answer-composer.tsx`) | Composer card with `+`, voice, model and effort under it | `shell`, `send-stream` |

@@ -431,8 +431,9 @@ States: Running, waiting on the user, done, snoozed or archived; the thread open
 Reach:
 
 1. `open /app`
-2. `click testid:thread-group-running`
-3. `click testid:side-chat-action`
+2. `click testid:tasks-toggle`
+3. `click testid:tasks-section`
+4. `click testid:side-chat-action`
 
 - Web routes: `/app/todo/:id`
 - Keyboard shortcuts in its code: `B`, `C`, `P`
@@ -994,23 +995,23 @@ Reach:
 
 ### sidebar
 
-**Sidebar and thread list** (shipped, centrality 3). The sidebar with the Coordinator row, projects and thread groups, unread marks and the project menu.
+**Sidebar** (shipped, centrality 3). The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.
 
-States: Groups for needs-you, running and done threads, projects with archived ones folded, an attention badge, and loading or error rows.
+States: Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.
 
 Reach:
 
 1. `open /app`
-2. `click testid:thread-groups`
-3. `click testid:project-group`
+2. `click testid:project-group`
+3. `click testid:project-group-header`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `archived-group`, `attention-badge`, `done-threads-toggle`, `project-group`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`, `thread-group-done`, `thread-group-needs-you`, `thread-group-running`, `thread-groups`
+- Test ids in its code: `project-group`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: **gap**: no design for unread and read marks across devices
-- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-project-threads.spec.ts`, `apps/server/test/unread-notifications.test.ts`
+- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/server/test/unread-notifications.test.ts`
 
 ### skills
 
