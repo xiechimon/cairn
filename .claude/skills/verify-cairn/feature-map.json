@@ -56,8 +56,8 @@
     },
     {
       "id": "B8",
-      "title": "Composer, attachments and project files",
-      "scope": "Everything typed or attached before a message is sent and the files a project shows: mentions, slash commands, named prompts, drafts that survive a restart, attachments, and the files and commits tab. Research claude.ai, Amp and t3code; design the draft and attachment model and the files view."
+      "title": "Composer and attachments",
+      "scope": "Everything typed or attached before a message is sent: mentions, slash commands, named prompts, drafts that survive a restart and attachments. Research claude.ai, Amp and t3code; design the draft and attachment model."
     },
     {
       "id": "B9",
@@ -1561,11 +1561,7 @@
           "/api/projects/:id/${action}",
           "/api/projects/:id/autonomy",
           "/api/projects/:id/branches",
-          "/api/projects/:id/file",
           "/api/projects/:id/files",
-          "/api/projects/:id/tree",
-          "/api/projects/:id/commits",
-          "/api/projects/:id/commits/:sha",
           "/api/fs/list",
           "/api/fs/pick"
         ]

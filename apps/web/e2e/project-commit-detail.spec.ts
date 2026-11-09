@@ -8,7 +8,7 @@ test('thread review diffs remain available after project files retirement', asyn
   await expect(diff.getByTestId('doc-pane')).toBeVisible();
 });
 
-for (const scenario of ['r2-24', 'prj-local-files']) {
+for (const scenario of ['r2-24', 'prj-local-tasks']) {
   test(`project tasks make no browsing requests: ${scenario}`, async ({ page }) => {
     const requests: string[] = [];
     page.on('request', (request) => {

@@ -11,13 +11,7 @@ import { project } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
 import { localWorkspaceRoot } from '../src/lib/workspace-root.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
-import {
-  readCommitDetail,
-  readCommitHistory,
-  readFile,
-  readFiles,
-  readTree,
-} from '../src/services/git.js';
+import { readFile, readFiles } from '../src/services/git.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
 registerChiefHarness();
@@ -175,7 +169,7 @@ describe('Coordinator repository reads', () => {
     expect((await read()).files[0]?.error).toMatch(/repository.*mismatch/i);
   });
 
-  test.each(['docs', 'file', 'tree', 'files', 'history', 'detail'] as const)(
+  test.each(['docs', 'file', 'files'] as const)(
     '%s rejects refs retained from the previous cache binding',
     async (entry) => {
       const dir = await bindRepo('github');
@@ -246,10 +240,7 @@ describe('Coordinator repository reads', () => {
         } else {
           const reads = {
             file: () => readFile(repo, H.projectId, 'scripts/owned-process.mjs', ref),
-            tree: () => readTree(repo, H.projectId, ref),
             files: () => readFiles(repo, H.projectId, ref),
-            history: () => readCommitHistory(repo, H.projectId, ref),
-            detail: () => readCommitDetail(repo, H.projectId, ref),
           };
           await expect(reads[entry]()).rejects.toMatchObject({ status: 403 });
         }
@@ -298,10 +289,7 @@ describe('Coordinator repository reads', () => {
     expect(pending.files[0]?.error).toMatch(/repository cache not verified yet.*restart.*daemon/);
     for (const operation of [
       () => readFile(repo, H.projectId, 'scripts/owned-process.mjs'),
-      () => readTree(repo, H.projectId),
       () => readFiles(repo, H.projectId),
-      () => readCommitHistory(repo, H.projectId),
-      () => readCommitDetail(repo, H.projectId, commit),
     ])
       await expect(operation()).rejects.toMatchObject({
         status: 403,
@@ -317,10 +305,7 @@ describe('Coordinator repository reads', () => {
       content,
       commit,
     });
-    expect((await readTree(repo, H.projectId)).commit).toBe(commit);
     expect((await readFiles(repo, H.projectId)).commit).toBe(commit);
-    expect((await readCommitHistory(repo, H.projectId)).commits[0]?.sha).toBe(commit);
-    expect((await readCommitDetail(repo, H.projectId, commit)).sha).toBe(commit);
   });
 
   test('failed daemon backfill keeps an actionable refusal until a later pass succeeds', async () => {
@@ -457,7 +442,7 @@ describe('Coordinator repository reads', () => {
   });
 
   for (const withCacheRoot of [false, true]) {
-    test.each(['docs', 'file', 'tree', 'files', 'history', 'detail'] as const)(
+    test.each(['docs', 'file', 'files'] as const)(
       `%s never uses a GitHub localPath when its cache is unavailable (root=${withCacheRoot})`,
       async (entry) => {
         const dir = await bindRepo('github');
@@ -489,10 +474,7 @@ describe('Coordinator repository reads', () => {
           } else {
             const reads = {
               file: () => readFile(repo, H.projectId, 'scripts/owned-process.mjs', ref),
-              tree: () => readTree(repo, H.projectId, ref),
               files: () => readFiles(repo, H.projectId, ref),
-              history: () => readCommitHistory(repo, H.projectId, ref),
-              detail: () => readCommitDetail(repo, H.projectId, ref),
             };
             await expect(reads[entry]()).rejects.toMatchObject({
               status: 404,
@@ -707,7 +689,7 @@ describe('Coordinator repository reads', () => {
     );
   });
 
-  test('credential restrictions apply to Coordinator reads, not authenticated file browsing', async () => {
+  test('credential restrictions apply to Coordinator reads, not lower-level Git reads', async () => {
     await bindRepo('local');
     const file = await readFile({ db: H.s.db, reposDir: H.s.reposDir }, H.projectId, '.env');
     expect(file.content).toBe('PRIVATE_FIXTURE=not-a-real-secret\n');

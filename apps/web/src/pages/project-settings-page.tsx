@@ -67,8 +67,6 @@ export function ProjectSettingsPage() {
     ? wireProject
       ? {
           name: wireProject.name,
-          branch: wireProject.baseBranch ?? '',
-          files: [],
           repoName: wireProject.repoName ?? wireProject.githubRepo ?? wireProject.localPath ?? '',
           hosted: wireProject.repoKind === 'hosted',
           defaultBranch: wireProject.baseBranch ?? '',
