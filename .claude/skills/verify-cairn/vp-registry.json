@@ -1140,7 +1140,7 @@
       "recipe": "features/project-files-local.md",
       "cases": {
         "local-files": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1030-local-files.mjs",
+          "script": "docs/verify/1030/drive-1030-local-files.mjs",
           "args": [],
           "needs": [
             "stack"
