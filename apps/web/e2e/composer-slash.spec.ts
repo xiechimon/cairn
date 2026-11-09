@@ -81,8 +81,6 @@ const EMPTY_CONVERSATION = {
   nextCursor: null,
 };
 
-const AGENTS = [{ id: 'agent-1', displayName: 'builder', description: 'Builds features' }];
-
 const SKILLS = [
   { id: 'code-review', teamId: TEAM_ID, name: 'code-review', description: 'Reviews code' },
   { id: 'spell-check', teamId: TEAM_ID, name: 'spell-check', description: 'Checks spelling' },
@@ -102,21 +100,10 @@ async function stubBoot(page: Page) {
 
 async function openDetail(page: Page) {
   await stubBoot(page);
-  const members = [
-    { id: 'member-user', teamId: TEAM_ID, actorId: USER.id, memberType: 'user', actor: USER },
-    ...AGENTS.map((a, i) => ({
-      id: `member-agent-${i}`,
-      teamId: TEAM_ID,
-      actorId: a.id,
-      memberType: 'agent',
-      actor: a,
-    })),
-  ];
-  await page.route(`**/api/teams/${TEAM_ID}/members`, (route) => route.fulfill({ json: members }));
   await page.route('**/api/skills*', (route) => route.fulfill({ json: SKILLS }));
   await page.route('**/api/todos?*', (route) => route.fulfill({ json: [WIRE_CARD] }));
   await page.route(`**/api/todos/${CARD_ID}`, (route) => route.fulfill({ json: WIRE_CARD }));
-  await page.route('**/api/projects', (route) => route.fulfill({ json: [PROJECT] }));
+  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route(`**/api/builds/${BUILD_ID}`, (route) => route.fulfill({ json: WIRE_BUILD }));
   await page.route(`**/api/builds/${BUILD_ID}/steps`, (route) => route.fulfill({ json: [] }));
   await page.route(`**/api/builds/${BUILD_ID}/plans`, (route) => route.fulfill({ json: [] }));
@@ -131,14 +118,10 @@ async function openDetail(page: Page) {
     sent.push(request.postData() ?? '');
     return route.fulfill({ status: 201, json: { message: { id: 'msg-1' } } });
   });
-  const membersLoaded = page.waitForResponse(
-    (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
-  );
   const skillsLoaded = page.waitForResponse(
     (r) => r.url().includes('/api/skills') && r.status() === 200,
   );
   await page.goto(`/app/todo/${CARD_ID}`);
-  await membersLoaded;
   await skillsLoaded;
   const input = page.locator('[data-testid="composer-card"] textarea');
   await expect(input).toBeVisible();
@@ -301,13 +284,13 @@ test('mixed: slash skill token plus @ mention coexist', async ({ page }) => {
   await input.press('Enter');
   await expect(input).toHaveValue('@code-review ');
 
-  await input.pressSequentially(' @bu');
+  await input.pressSequentially(' @spell');
   await expect(page.locator('.mention-inline')).toBeVisible();
   await input.press('ArrowDown');
   await input.press('Enter');
   const value = await input.inputValue();
   expect(value).toContain('@code-review');
-  expect(value).toContain('@builder');
+  expect(value).toContain('@spell-check');
 });
 
 test('/help opens the command panel', async ({ page }) => {
