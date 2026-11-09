@@ -9,10 +9,31 @@ import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { type OrbCommandRunner, runOrbCommand } from './provider.js';
 
 export const COMPUTER_TEMPLATE = 'cairn-orb-computer';
+export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
 export const COMPUTER_IDLE_STOP_MS = 10 * 60_000;
 export const COMPUTER_TAKEOVER_GRACE_MS = 30 * 60_000;
 
 const computerNamePattern = /^cairn-orb-computer-[a-f0-9]{40}$/;
+
+export function computerImageOffersBrowser(
+  options: {
+    root?: string;
+    version?: string;
+    readFileSync?: (path: string, encoding: 'utf8') => string;
+  } = {},
+): boolean {
+  const root = options.root ?? process.env.CAIRN_ORB_ROOT ?? '';
+  const version =
+    options.version ?? process.env.CAIRN_AGENT_BROWSER_VERSION ?? PINNED_AGENT_BROWSER_VERSION;
+  const machines = root === '' ? '/var/lib/machines' : join(root, 'var/lib/machines');
+  const marker = join(machines, COMPUTER_TEMPLATE, 'etc', 'cairn-orb-computer-image');
+  try {
+    const text = (options.readFileSync ?? readFileSync)(marker, 'utf8');
+    return text.split('\n').includes(`agent-browser=${version}`);
+  } catch {
+    return false;
+  }
+}
 
 const computerStateSchema = z.array(
   z.object({

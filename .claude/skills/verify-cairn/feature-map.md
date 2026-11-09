@@ -27,23 +27,24 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 
 ### agent-computer
 
-**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and control in the web app.
+**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
 
-States: No computer, a computer with an empty command feed, commands streaming with exit codes, and the live screen enlarged with control.
+States: No computer; command feed empty, streaming, or settled; live screen enlarged with control; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.
 
 Reach:
 
 1. `open /app`
 2. `click testid:machines-button`
-3. `click testid:machine-screen-expand`
+3. `click label:浏览器`
+4. `click testid:machine-screen-expand`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-expand`
+- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view and control handover have no design
-- Backend design: **gap**: no design for computer access grants, the guard and the screen channel
-- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`
+- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
+- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/orb-computer.test.ts`
 
 ### coordinator-chat
 

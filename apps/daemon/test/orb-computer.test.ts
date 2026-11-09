@@ -1,11 +1,13 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   COMPUTER_IDLE_STOP_MS,
   COMPUTER_TAKEOVER_GRACE_MS,
   ComputerOrbs,
+  computerImageOffersBrowser,
   computerMachineName,
+  PINNED_AGENT_BROWSER_VERSION,
 } from '../src/orb/computer.js';
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { rejectGuestExec } from './orb-fake.js';
@@ -230,5 +232,32 @@ describe('computer Orbs', () => {
     const ensuring = computers.ensure('chief:c1');
     await Promise.all([sweeping, ensuring]);
     expect(machines.has(name)).toBe(true);
+  });
+});
+
+describe('computerImageOffersBrowser', () => {
+  test('false when the computer image marker is missing', () => {
+    const root = testTempDir('orb-browser-marker-');
+    expect(computerImageOffersBrowser({ root })).toBe(false);
+  });
+
+  test('false when the marker has no pinned agent-browser line', () => {
+    const root = testTempDir('orb-browser-marker-');
+    const dir = join(root, 'var/lib/machines/cairn-orb-computer/etc');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'cairn-orb-computer-image'), 'recipe=abc\npackages=chromium\n');
+    expect(computerImageOffersBrowser({ root })).toBe(false);
+  });
+
+  test('true only when the marker pins the expected agent-browser version', () => {
+    const root = testTempDir('orb-browser-marker-');
+    const dir = join(root, 'var/lib/machines/cairn-orb-computer/etc');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'cairn-orb-computer-image'),
+      `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`,
+    );
+    expect(computerImageOffersBrowser({ root })).toBe(true);
+    expect(computerImageOffersBrowser({ root, version: '9.9.9' })).toBe(false);
   });
 });

@@ -962,23 +962,28 @@
     {
       "id": "agent-computer",
       "name": "The agent's computer",
-      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and control in the web app.",
-      "states": "No computer, a computer with an empty command feed, commands streaming with exit codes, and the live screen enlarged with control.",
+      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.",
+      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
       "centrality": 1,
       "status": "partial",
       "code": {
         "web": [
           "apps/web/src/board/computer-feed.tsx",
-          "apps/web/src/board/computer-screen.tsx"
+          "apps/web/src/board/computer-screen.tsx",
+          "apps/web/src/board/machines-panel.tsx",
+          "apps/web/src/board/machine-capabilities.ts"
         ],
         "server": [
           "apps/server/src/routes-computers.ts",
           "apps/server/src/routes-computer-screen.ts",
           "apps/server/src/services/computer-control.ts",
-          "apps/server/src/services/computer-screen.ts"
+          "apps/server/src/services/computer-screen.ts",
+          "apps/server/src/services/computer-feed.ts"
         ],
         "daemon": [
-          "apps/daemon/src/computer"
+          "apps/daemon/src/computer",
+          "apps/daemon/src/orb/computer.ts",
+          "apps/daemon/src/machine-loop.ts"
         ]
       },
       "routes": {
@@ -992,6 +997,7 @@
       "reach": [
         "open /app",
         "click testid:machines-button",
+        "click label:浏览器",
         "click testid:machine-screen-expand"
       ],
       "research": [
@@ -1000,15 +1006,20 @@
         "docs/research/user-computer-model-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "the computer feed, screen view and control handover have no design"
+        "gap": "the computer feed, screen view, browser toggle and control handover have no design"
       },
       "backendDesign": {
-        "gap": "no design for computer access grants, the guard and the screen channel"
+        "gap": "no design for computer access grants, the browser preference, the guard and the screen channel"
       },
       "evidence": [
         "apps/web/e2e/machines-computer-feed.spec.ts",
+        "apps/web/test/machine-capabilities.test.ts",
         "apps/server/test/computer-screen-routes.test.ts",
-        "apps/daemon/test/computer-guard.test.ts"
+        "apps/server/test/computer-feed-routes.test.ts",
+        "apps/daemon/test/computer-guard.test.ts",
+        "apps/daemon/test/computer-browser.test.ts",
+        "apps/daemon/test/machine-boot.test.ts",
+        "apps/daemon/test/orb-computer.test.ts"
       ],
       "batch": "B4"
     },
