@@ -1,5 +1,6 @@
 import type {
   GithubRepoRef,
+  GitIdentity,
   Phase,
   RouteOverride,
   SecretBox,
@@ -64,6 +65,7 @@ type TodoRow = typeof todo.$inferSelect;
 
 export interface TodoDeps {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   githubWriteTokenForRepo?: (
     teamId: string,
     repo: GithubRepoRef,

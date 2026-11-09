@@ -62,7 +62,7 @@ export async function stepToken(
         : null;
   }
   return {
-    commitIdentity: await softwareCommitIdentity(deps),
+    commitIdentity: softwareCommitIdentity(deps),
     coAuthor:
       todoRow &&
       stepRow?.scheduleId == null &&
