@@ -4,6 +4,7 @@ import { epochMs, recordId } from './common.js';
 export const NOTIFICATION_TYPES = [
   'plan_ready',
   'build_review',
+  'coordinator_handoff',
   'chief_message',
   'quota_wait',
   'model_fallback',

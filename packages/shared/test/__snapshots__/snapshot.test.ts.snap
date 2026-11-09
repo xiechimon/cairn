@@ -6664,6 +6664,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "enum": [
                 "plan_ready",
                 "build_review",
+                "coordinator_handoff",
                 "chief_message",
                 "quota_wait",
                 "model_fallback",
@@ -9259,6 +9260,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > not
       "enum": [
         "plan_ready",
         "build_review",
+        "coordinator_handoff",
         "chief_message",
         "quota_wait",
         "model_fallback",
