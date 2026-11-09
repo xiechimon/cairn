@@ -1,7 +1,12 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ASK_REQUEST_ID_PATTERN, CHIEF_REMOTE_TOOLS, CHIEF_ROUTER_TOOLS } from '@cairn/shared';
+import {
+  ASK_REQUEST_ID_PATTERN,
+  CHIEF_REMOTE_TOOLS,
+  CHIEF_ROUTER_TOOLS,
+  COMPUTER_REMOTE_TOOLS,
+} from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -57,7 +62,7 @@ describe('coordinator tools', () => {
   it('offers every Coordinator tool with its replay rule from the shared definitions', () => {
     const extension = coordinatorToolsExtension(fakeMachineApi(), createStepGate());
     const tools = extension.tools ?? [];
-    const defs = [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
+    const defs = [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS];
     expect(tools.map((t) => t.name).sort()).toEqual(defs.map((t) => t.name).sort());
     for (const def of defs) {
       const tool = tools.find((t) => t.name === def.name);
@@ -69,8 +74,11 @@ describe('coordinator tools', () => {
     for (const dispatching of ['open_thread', 'create_todo', 'set_secret', 'delete_todos']) {
       expect(tools.find((t) => t.name === dispatching)?.replay).toBe('unsafe');
     }
-    for (const reading of ['todos', 'read_history', 'search_history']) {
+    for (const reading of ['todos', 'read_history', 'search_history', 'browser_snapshot']) {
       expect(tools.find((t) => t.name === reading)?.replay).toBe('safe');
+    }
+    for (const browser of ['browser_navigate', 'browser_act']) {
+      expect(tools.find((t) => t.name === browser)?.replay).toBe('unsafe');
     }
   });
 

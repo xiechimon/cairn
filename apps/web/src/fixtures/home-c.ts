@@ -7,6 +7,19 @@ import { scheduleOnce } from './schedules.js';
 
 export const HOME_C_CRED = 'home-c-cred';
 
+const SERVER_SECTION: Record<TodoRecord['phase'], Pick<TodoRecord, 'section' | 'owner'>> = {
+  todo: { section: 'up_next', owner: null },
+  queued: { section: 'working', owner: null },
+  planning: { section: 'working', owner: null },
+  building: { section: 'working', owner: null },
+  confirm: { section: 'needs_input', owner: 'owner' },
+  needs_input: { section: 'needs_input', owner: 'owner' },
+  review: { section: 'ready_for_review', owner: 'owner' },
+  failed: { section: 'working', owner: 'coordinator' },
+  done: { section: 'resolved', owner: null },
+  closed: { section: 'resolved', owner: null },
+};
+
 function homeTodo(
   id: string,
   seqNum: number,
@@ -22,6 +35,7 @@ function homeTodo(
     spec: title,
     projectId,
     latestBuildId: phase === 'todo' ? null : `build-${id}`,
+    ...SERVER_SECTION[phase],
   };
 }
 

@@ -1,0 +1,4 @@
+SECOND_NAMESPACE pid:[4026532946]
+[heavy-slots] queued, position 1 (all 1 slots are busy); slot 1: pid 4, cwd <checkout>
+[heavy-slots] acquired slot 1/1
+SECOND_HELD guard inode 74324307

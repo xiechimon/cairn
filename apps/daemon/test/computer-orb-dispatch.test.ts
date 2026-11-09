@@ -142,7 +142,7 @@ describe('orb routing', () => {
     expect(log).toEqual(['orb[chief:c1]:execute:ls', 'orb[chief:c2]:read:a', 'host:execute:pwd']);
   });
 
-  test('other tools are still refused even with an Orb provider', async () => {
+  test('screen tools are still refused even with an Orb provider', async () => {
     const log: string[] = [];
     const fake = fakeClient();
     const dispatcher = createComputerDispatcher({
@@ -153,6 +153,91 @@ describe('orb routing', () => {
     await dispatcher.dispatch(call('computer_act', {}, { scopeKey: 'chief:c1' }));
     expect(errorOf(fake.frames)).toMatchObject({ message: NO_COMPUTER_PROVIDER_MESSAGE });
     expect(log).toEqual([]);
+  });
+
+  test('browser_navigate runs agent-browser open on the Orb provider', async () => {
+    const log: string[] = [];
+    const fake = fakeClient();
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: fakeOrb(log),
+      ...FAST,
+    });
+    await dispatcher.dispatch(
+      call('browser_navigate', { url: 'https://example.com' }, { scopeKey: 'chief:c1' }),
+    );
+    expect(errorOf(fake.frames)).toBeUndefined();
+    expect(log.some((line) => line.includes('orb[chief:c1]:execute:https://example.com'))).toBe(
+      true,
+    );
+    expect(fake.frames.some((frame) => frame.kind === 'done')).toBe(true);
+  });
+
+  test('browser_snapshot truncates oversized done text', async () => {
+    const fake = fakeClient();
+    const huge = 'x'.repeat(70_000);
+    const provider: ComputerProvider = {
+      async execute(request) {
+        expect(request.env).toBeUndefined();
+        return (async function* () {
+          yield { kind: 'stdout' as const, text: huge };
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: { forScope: () => provider, async killAll() {} },
+      ...FAST,
+    });
+    await dispatcher.dispatch(call('browser_snapshot', {}, { scopeKey: 'chief:c1' }));
+    const done = fake.frames.find((frame) => frame.kind === 'done');
+    expect(done?.kind).toBe('done');
+    if (done?.kind === 'done') {
+      expect(done.text.length).toBeLessThanOrEqual(64 * 1024);
+      expect(done.text.endsWith('[browser output truncated]')).toBe(true);
+    }
+  });
+
+  test('browser refusal messages are bounded to the error frame limit', async () => {
+    const fake = fakeClient();
+    const huge = `boom ${'y'.repeat(5_000)}`;
+    const provider: ComputerProvider = {
+      async execute() {
+        return (async function* () {
+          yield { kind: 'stderr' as const, text: huge };
+          yield { kind: 'exit' as const, code: 1 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: { forScope: () => provider, async killAll() {} },
+      ...FAST,
+    });
+    await dispatcher.dispatch(call('browser_snapshot', {}, { scopeKey: 'chief:c1' }));
+    const err = fake.frames.find((frame) => frame.kind === 'error');
+    expect(err?.kind).toBe('error');
+    if (err?.kind === 'error') {
+      expect(err.message.length).toBeLessThanOrEqual(4096);
+      expect(err.message.endsWith('[browser output truncated]')).toBe(true);
+    }
   });
 
   test('the Orb shell keeps the desktop-protection guard but not the cairn host rules', async () => {

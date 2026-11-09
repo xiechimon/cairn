@@ -16,36 +16,43 @@ afterEach(() => {
   for (const server of servers.splice(0)) server.dispose();
 });
 
-test.each(['fresh', 'upgrade'] as const)('%s database has no feature release state', (mode) => {
-  const directory = makeTestTempDir('feature-release-removal-');
-  const sqlite = new Database(join(directory, 'db.sqlite'));
-  sqlite.pragma('foreign_keys = ON');
-  try {
-    if (mode === 'upgrade') {
-      migrateUpTo(sqlite, directory, '0131_project_group');
-      sqlite.exec(
-        "INSERT INTO user (id, displayName) VALUES ('owner', 'Owner'), ('member', 'Member')",
-      );
-      sqlite.exec(`INSERT INTO feature_flag (id, key, userId, enabled, updatedAt) VALUES
+test.each(['fresh', 'upgrade', 'latest-main'] as const)(
+  '%s database has no feature release state',
+  (mode) => {
+    const directory = makeTestTempDir('feature-release-removal-');
+    const sqlite = new Database(join(directory, 'db.sqlite'));
+    sqlite.pragma('foreign_keys = ON');
+    try {
+      if (mode !== 'fresh') {
+        migrateUpTo(
+          sqlite,
+          directory,
+          mode === 'upgrade' ? '0131_project_group' : '0133_deploy_lease',
+        );
+        sqlite.exec(
+          "INSERT INTO user (id, displayName) VALUES ('owner', 'Owner'), ('member', 'Member')",
+        );
+        sqlite.exec(`INSERT INTO feature_flag (id, key, userId, enabled, updatedAt) VALUES
         ('global-on', 'released', NULL, 1, 1),
         ('global-off', 'disabled', NULL, 0, 2),
         ('owner-off', 'private', 'owner', 0, 3),
         ('member-on', 'private', 'member', 1, 4)`);
+      }
+      const usersBefore =
+        mode !== 'fresh' ? sqlite.prepare('SELECT * FROM user ORDER BY rowid').all() : [];
+      const db = drizzle(sqlite);
+      migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+      migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+      expect(
+        sqlite.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'feature_flag%'").all(),
+      ).toEqual([]);
+      expect(sqlite.prepare('SELECT * FROM user ORDER BY rowid').all()).toEqual(usersBefore);
+      expect(sqlite.pragma('foreign_key_check')).toEqual([]);
+    } finally {
+      sqlite.close();
     }
-    const usersBefore =
-      mode === 'upgrade' ? sqlite.prepare('SELECT * FROM user ORDER BY rowid').all() : [];
-    const db = drizzle(sqlite);
-    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    expect(
-      sqlite.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'feature_flag%'").all(),
-    ).toEqual([]);
-    expect(sqlite.prepare('SELECT * FROM user ORDER BY rowid').all()).toEqual(usersBefore);
-    expect(sqlite.pragma('foreign_key_check')).toEqual([]);
-  } finally {
-    sqlite.close();
-  }
-});
+  },
+);
 
 test.each([
   ['owner', 'GET', '/api/flags'],

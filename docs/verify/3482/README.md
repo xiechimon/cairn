@@ -32,6 +32,12 @@ Red first: seven server cases failed on retained tables/indexes, owner/member GE
 
 The deletion audit leaves flag references only in historical migrations/snapshots, the frozen migration oracle, historical research, and removal tests/design. The active feature registry, screenshot route-source registry, e2e selector, REST registry and table registry have been updated.
 
+## Main reconciliation
+
+Merged main at `67a2a82c1` after its browser-preference and deploy-lease migrations occupied 0132 and 0133. Regenerated the release-table deletion as `0134_drop_feature_releases`; main's existing migrations and snapshots stay unchanged. The migration regression now also upgrades a populated database through `0133_deploy_lease`. Before regeneration, all three migration modes failed on the retained flag table and indexes; after regeneration, 12 targeted files and 189 tests passed with `--maxWorkers=4 --no-file-parallelism`. The 19 targeted account Playwright cases and both selector suites passed again.
+
+Initial local migration runs exceeded the existing five-second test budget without assertion failures. The isolated fresh-database case and then the complete targeted selection passed unchanged at the default timeout; no production change or timeout relaxation was introduced.
+
 ## Limits and process intercepts
 
 No real provider, external account or production database was exercised. The migration intentionally destroys obsolete release preferences; restoring those preferences requires the previous code and a database backup. Relay, tags, project files and Feishu removal are outside this change.

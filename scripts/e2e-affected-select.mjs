@@ -253,14 +253,13 @@ export const FILE_RULES = new Map([
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
   [
     'apps/web/src/routes/account-page.tsx',
-    ['account-', 'user-menu-', 'cds-density', 'push-device-switch'],
+    ['account-', 'team-attribution-', 'user-menu-', 'cds-density', 'push-device-switch'],
   ],
   ['apps/web/src/routes/feishu-settings.tsx', ['account-feishu']],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'focus-ring-clip', 'api-key-']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-', 'api-key-']],
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
-  ['apps/web/src/routes/team-page.tsx', ['team-', 'account-team-cleanse']],
   ['apps/web/src/components/model-select-core.tsx', [...AGENT, 'chief-settings']],
   [
     'apps/web/src/components/profile-card.tsx',
@@ -331,6 +330,7 @@ const FULL_PATH_PREFIXES = [
   'scripts/e2e-affected.mjs',
   'scripts/e2e-affected-select.mjs',
   'scripts/heavy-slots.mjs',
+  'scripts/test-admission.mjs',
   'scripts/owned-process.mjs',
   'scripts/timed-partition.mjs',
 ];

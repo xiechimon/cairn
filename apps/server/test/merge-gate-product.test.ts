@@ -342,7 +342,7 @@ describe('in-product merge gate', () => {
       s.db
         .insert(message)
         .values({
-          id: 'msg-assistant-raw',
+          id: `msg-${review?.id}-1`,
           conversationId: buildId,
           role: 'assistant',
           content: [
@@ -416,6 +416,64 @@ describe('in-product merge gate', () => {
       expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
     },
   );
+
+  test('the gate run records the latest review step output only, whatever the machine clock says', async () => {
+    const { s, buildId, stepId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    const review = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    s.db
+      .update(step)
+      .set({ status: 'done', claimedAt: 10_000, finishedAt: 20_000 })
+      .where(eq(step.id, review?.id ?? ''))
+      .run();
+    s.db
+      .insert(message)
+      .values(
+        Array.from({ length: 300 }, (_, i) => ({
+          id: `msg-${stepId}-${i + 1}`,
+          conversationId: buildId,
+          role: 'assistant' as const,
+          content: `implementation output ${i} ${'x'.repeat(1_000)}`,
+          createdAt: 12_000 + i,
+        })),
+      )
+      .run();
+    s.db
+      .insert(message)
+      .values([
+        {
+          id: 'msg-earlier-review-1',
+          conversationId: buildId,
+          role: 'assistant',
+          content: 'VERDICT: block',
+          createdAt: 15_000,
+        },
+        {
+          id: `msg-${review?.id}-1`,
+          conversationId: buildId,
+          role: 'assistant',
+          content: 'No blocking findings.\n\nVERDICT: pass',
+          createdAt: 90_000,
+        },
+      ])
+      .run();
+    await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    const runs = s.db
+      .select()
+      .from(message)
+      .where(eq(message.conversationId, buildId))
+      .all()
+      .filter((row) => String(row.content).startsWith(`{"kind":"${MERGE_GATE_RUN_KIND}"`))
+      .map((row) => JSON.parse(String(row.content)) as Record<string, unknown>);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.rawOutput).toBe('No blocking findings.\n\nVERDICT: pass');
+    expect(runs[0]?.parsedVerdict).toBe('pass');
+  });
 
   test('a dispatched verify step clears verify-missing once its passing verdict is bound to the patch', async () => {
     const { s, buildId, stepId } = await world();

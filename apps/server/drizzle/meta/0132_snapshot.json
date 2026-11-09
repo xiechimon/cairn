@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "62746e83-a977-4173-a3a1-1158f3f6c86c",
+  "id": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
   "prevId": "b875be75-f86b-4e0e-b2df-e0f143bdbe4c",
   "tables": {
     "agent_memory": {
@@ -1942,6 +1942,14 @@
           "autoincrement": false,
           "default": 0
         },
+        "browserEnabled": {
+          "name": "browserEnabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "integer",
@@ -2441,6 +2449,83 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "feature_flag": {
+      "name": "feature_flag",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "feature_flag_key_global_unique": {
+          "name": "feature_flag_key_global_unique",
+          "columns": [
+            "key"
+          ],
+          "isUnique": true,
+          "where": "\"feature_flag\".\"userId\" IS NULL"
+        },
+        "feature_flag_key_user_unique": {
+          "name": "feature_flag_key_user_unique",
+          "columns": [
+            "key",
+            "userId"
+          ],
+          "isUnique": true,
+          "where": "\"feature_flag\".\"userId\" IS NOT NULL"
+        }
+      },
+      "foreignKeys": {
+        "feature_flag_userId_user_id_fk": {
+          "name": "feature_flag_userId_user_id_fk",
+          "tableFrom": "feature_flag",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

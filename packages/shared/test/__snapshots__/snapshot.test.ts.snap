@@ -7652,6 +7652,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "coordinator_lease",
   "data_migration",
   "task_issue_close",
+  "deploy_lease",
 ]
 `;
 
@@ -7696,6 +7697,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "the team computers (D75 P8a)",
     "path": "/api/computers",
+  },
+  {
+    "method": "POST",
+    "note": "D75: ensure a stopped private computer for a capable machine and set browserEnabled",
+    "path": "/api/computers",
+  },
+  {
+    "method": "PATCH",
+    "note": "D75: enable or disable browser tools on a computer",
+    "path": "/api/computers/{id}",
   },
   {
     "method": "GET",
@@ -8896,6 +8907,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "browser": {
+              "const": true,
+              "type": "boolean",
+            },
             "codexLogin": {
               "additionalProperties": false,
               "properties": {

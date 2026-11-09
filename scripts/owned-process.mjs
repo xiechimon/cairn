@@ -43,7 +43,7 @@ export function processInfo(pid) {
 
 export function ownerChain(pid, owner = 'parent', info = processInfo) {
   const chain = [];
-  for (let current = info(pid); current && current.ppid > 1; ) {
+  for (let current = info(pid); current && current.ppid > 0; ) {
     const parent = info(current.ppid);
     if (!parent) break;
     chain.push({ pid: parent.pid, start: parent.start, comm: parent.comm });

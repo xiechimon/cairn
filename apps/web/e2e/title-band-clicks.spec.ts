@@ -25,7 +25,6 @@ async function expectOwnsCenter(
 }
 
 for (const [route, scenario] of [
-  ['/app/team', '12'],
   ['/app/account', '13'],
   ['/app/api-keys', 'api-keys'],
   ['/app/schedules', '11'],
@@ -44,13 +43,6 @@ for (const [route, scenario] of [
     await expect(page.locator('[data-testid="page-topbar"] [aria-label="返回"]')).toHaveCount(0);
   });
 }
-
-test('team right-slot action owns its hit area (`设置` in the top bar)', async ({ page }) => {
-  await page.goto('/app/team?scenario=12');
-  const right = page.locator('[role="dialog"] [aria-label="设置"]');
-  await expect(right).toBeVisible();
-  await expectOwnsCenter(page, '[role="dialog"] [aria-label="设置"]');
-});
 
 // resource-new testid: the hit-test probe claims the element by CSS selector,
 // which a role locator cannot express (secondary carrier, #910).
