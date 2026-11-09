@@ -6,7 +6,7 @@ import {
   PackageCheck,
   Settings2,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
@@ -177,12 +177,14 @@ export function HomeC({
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const questionView: QuestionThreadView = {
     threadId: chiefData.threadId ?? null,
     stream: chiefData.stream ?? [],
     hasEarlier: chiefData.hasEarlier === true,
     loadingEarlier: surface.earlier?.loading === true,
     failedEarlier: surface.earlier?.failed === true,
+    dismissing: questionDockState.isDismissing,
   };
   const openQuestion = (target: QuestionTarget) => {
     const step = questionOpenStep(target, questionView);

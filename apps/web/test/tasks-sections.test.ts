@@ -236,6 +236,7 @@ describe('a question row opens the question in the Coordinator thread that asked
     hasEarlier: false,
     loadingEarlier: false,
     failedEarlier: false,
+    dismissing: () => false,
     ...over,
   });
 
@@ -265,6 +266,21 @@ describe('a question row opens the question in the Coordinator thread that asked
     const target = { requestId: 'r9', threadId: 'chief-a' };
     expect(questionOpenStep(target, view())).toEqual({ kind: 'missing' });
     expect(questionOpenStep(target, view({ hasEarlier: true, failedEarlier: true }))).toEqual({
+      kind: 'missing',
+    });
+  });
+
+  test('a card in its dismiss-undo window is not counted, so the next row focuses its own card', () => {
+    const shown = view({ stream: [pending('r0'), pending('r1'), pending('r2')], dismissing: (id) => id === 'r0' });
+    expect(questionOpenStep({ requestId: 'r2', threadId: 'chief-a' }, shown)).toEqual({
+      kind: 'focus',
+      at: 1,
+    });
+  });
+
+  test('the row of a question being dismissed selects no other card', () => {
+    const shown = view({ hasEarlier: true, dismissing: (id) => id === 'r0' });
+    expect(questionOpenStep({ requestId: 'r0', threadId: 'chief-a' }, shown)).toEqual({
       kind: 'missing',
     });
   });
