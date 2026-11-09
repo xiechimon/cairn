@@ -9,7 +9,6 @@ import { registerCoreRoutes } from './routes-core.js';
 import { registerDeployRoutes } from './routes-deploy.js';
 import { registerDraftRoutes } from './routes-drafts.js';
 import { registerFeishuRoutes } from './routes-feishu.js';
-import { registerFlagRoutes } from './routes-flags.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
 import { githubAppOf } from './routes-helpers.js';
 import { registerProjectRoutes } from './routes-projects.js';
@@ -25,7 +24,6 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerComputerRoutes(app, ctx);
   registerComputerScreenRoutes(app, ctx);
   registerFeishuRoutes(app, ctx);
-  registerFlagRoutes(app, ctx);
   registerProjectRoutes(app, ctx);
   registerTodoRoutes(app, ctx);
   registerBuildRoutes(app, ctx);
