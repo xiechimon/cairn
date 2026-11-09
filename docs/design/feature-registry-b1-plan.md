@@ -18,7 +18,11 @@ Numbered overlap list (2026-11-09; title/body searches for memory, context compa
 
 ## Changes
 
-Deliver context backend, memory backend, memory frontend draft, source supplements and a reproducible documentation-only real-component prototype. No application, route, schema, provider, lockfile or eval change is proposed. Update B1 backend/research links now. Keep the memory frontend gap explicit until reference evidence and owner selection exist; the draft path belongs in the gap description, not in a false completed-coverage claim.
+Deliver the context backend, row-backed memory backend baseline and source supplements only. No application, route, schema, provider, dependency or eval change is proposed. The memory frontend is superseded by #3666 and #3677; remove the old UI draft and its tracked prototype rather than keeping competing layouts or a reference-session requirement. Link the approved pending design in the registry and retain all other batches' coverage.
+
+| Date | Owner decision | Effect on B1 |
+|---|---|---|
+| 2026-11-09 | #3666 owns the approved Claude Code layout: team memory in Coordinator settings, project memory in its settings memory tab, no count or bottom input; #3677 owns in-place editing | Keep context/backend documentation, remove superseded UI artifacts and the reference-video/session requirement; coordinator lifts the hold after this push |
 
 ### Original registry scopes for remaining tasks
 
@@ -45,10 +49,10 @@ This is the original #3447 handoff, not permission to resurrect retired surfaces
 
 Canonical history cannot be erased by a failed summary. Test equal-timestamp boundaries, appended messages during folds, skipped older prefixes and restart/task replay. Memory scope must not leak across teams/projects/threads. Promotion and consolidation must revalidate their inputs. A failed read cannot look empty; failed mutations retain the fact. No hidden-mode, retry-loop or keep-alive mechanism is added.
 
-The frontend prototype is fictional data on real components, not live-stack acceptance or observed claude.ai behavior. Signed-in reference access is not exposed by this session's tools; the conventional local CDP endpoint is not listening. Do not read browser credential stores or sign in independently. Missing reference operation, recording and owner approval prevent closing the last frontend gap.
+The retained memory document describes the row-backed baseline, not a competing implementation brief for the MEMORY.md/files model approved in #3677. Its scope/versioning failure modes remain useful; where the future model differs, #3677 takes precedence. Do not restore the removed memory prototype or reopen its reference-access blocker.
 
 ## Verification
 
-The prototype check was written first and failed on the missing heading before the prototype existed. It now renders 13 states at 1440/390 in light/dark, checks zero WCAG axe violations, no horizontal overflow, focus restoration and hover stability, and rejects network requests outside its isolated fixture origin. See [prototype instructions](memory-prototype/README.md) and its screenshot matrix. It imports the real gallery components and tokens; no hand-drawn controls.
+The superseded UI fixture and its screenshot matrix are removed from this PR; #3666 and #3677 own frontend evidence. The retained documents name the context/memory failure modes and tests to write before implementation.
 
-Run targeted memory/context Vitest suites with `--maxWorkers=4`. Run generator and `--check`, `pnpm lint`, `pnpm typecheck`, `pnpm spec:parse`, and `pnpm prepush`. Commit through the bot wrapper, push the same branch, create one PR through the creation gate, inspect CI/cloud review on that head, and never merge. Do not mark the work complete merely because the feature-map check passes. Reference/owner blockers stay visible in the held PR and final report. PR #3640 is open with `coordinator-hold`, so cloud review can run without permitting a merge.
+Run targeted memory/context Vitest suites with `--maxWorkers=4`. Run generator and `--check`, `pnpm lint`, `pnpm typecheck`, `pnpm spec:parse`, and `pnpm prepush`. Commit through the bot wrapper, push the same branch, create one PR through the creation gate, inspect CI/cloud review on that head, and never merge. Do not mark the work complete merely because the feature-map check passes. The previous reference/owner blocker is superseded by the coordinator's decision. PR #3640 retains its hold until the coordinator confirms this scope reduction and lifts it; no agent merge or later-batch dispatch is requested.

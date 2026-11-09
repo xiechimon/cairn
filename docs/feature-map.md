@@ -19,11 +19,11 @@
 | status shipped | 45 |
 | status partial | 7 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 18 |
+| research, frontend design and backend design all present or not applicable | 19 |
 | Research gaps | 17 |
-| Frontend design gaps | 24 |
+| Frontend design gaps | 23 |
 | Backend design gaps | 21 |
-| notes cited but not on main | 20 |
+| notes cited but not on main | 21 |
 
 ## Coverage
 
@@ -36,7 +36,7 @@
 | [Daily report and retro](#daily-report) | 1 | shipped | yes | gap | gap | B2 |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
-| [Memory](#memory) | 1 | shipped | yes | gap | yes | B1 |
+| [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
 | [Needs-you tray](#needs-you) | 1 | shipped | yes | gap | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
@@ -87,14 +87,6 @@
 ## Gaps by batch
 
 Batches are ordered by how central their features are. One agent session researches and designs one batch.
-
-### B1 · Coordinator context and memory
-
-How the never-ending Coordinator conversation assembles each turn and what it remembers: the context budget, compaction, history tools, memory rows, promotion and invalidation. Design the data model and failure modes, and the memory view in Coordinator settings.
-
-| Feature | Centrality | Missing |
-|---|---|---|
-| [Memory](#memory) | 1 | Frontend design: draft at docs/design/memory.md with real-component fixtures; signed-in Claude reference operation and owner selection are still missing |
 
 ### B2 · What reaches ian: needs-you, questions, daily report, push
 
@@ -271,8 +263,8 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 **Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.
 
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md)
-- Frontend design: **gap**: draft at docs/design/memory.md with real-component fixtures; signed-in Claude reference operation and owner selection are still missing
-- Backend design: [docs/design/memory-backend.md](design/memory-backend.md)
+- Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
+- Backend design: [docs/design/memory-backend.md](design/memory-backend.md), [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 
 ### merge-gate
 
@@ -646,6 +638,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 | Note | Where it is |
 |---|---|
+| `docs/design/memory-inplace-edit.md` | owner-approved design in PR #3677; layout implementation owned by PR #3666 |
 | `docs/design/pilot-coordinator-chat-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/design/qcard-variants/README.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/agent-machine-routing.md` | branch origin/claude/elegant-jones-a3e2a9 |

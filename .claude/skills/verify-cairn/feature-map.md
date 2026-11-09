@@ -178,8 +178,8 @@ Reach:
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md)
-- Frontend design: **gap**: draft at docs/design/memory.md with real-component fixtures; signed-in Claude reference operation and owner selection are still missing
-- Backend design: [docs/design/memory-backend.md](../../../docs/design/memory-backend.md)
+- Frontend design: [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
+- Backend design: [docs/design/memory-backend.md](../../../docs/design/memory-backend.md), [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
 - Evidence: `apps/server/test/memory-consolidation.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
 
 ### merge-gate

@@ -1,6 +1,8 @@
 # Memory backend
 
-Status: B1 design draft; no product implementation. Baseline `f004cd719`, 2026-11-08. Research: [current-source supplement](../research/memory-2026-11-08.md), [personal agent memory](../research/personal-agent-memory-2026-11-07.md). Frontend: [memory](memory.md). Context: [compaction](coordinator-context-backend.md).
+Status: B1 row-backed backend baseline and failure-mode inventory; no product implementation. Baseline `f004cd719`, 2026-11-08. Research: [current-source supplement](../research/memory-2026-11-08.md), [personal agent memory](../research/personal-agent-memory-2026-11-07.md). Context: [compaction](coordinator-context-backend.md).
+
+The frontend is superseded by [#3666](https://github.com/xiechimon/cairn/pull/3666) and [#3677](https://github.com/xiechimon/cairn/pull/3677); #3677 also owns the approved MEMORY.md/files and edit-API evolution, which takes precedence over this row-backed baseline where they differ.
 
 ## Data model
 
@@ -50,7 +52,7 @@ Retain existing routes, authenticated with `requireTeam`:
 | `POST /api/teams/:id/memories/:mid/promote` | Current promoted record; 404 inaccessible/missing, 409 invalid or destination conflict |
 | `DELETE /api/teams/:id/memories/:mid` | 204; 404 missing/inaccessible |
 
-No public write API for editing is added in B1. Existing save/update/delete/list tools remain the correction path through conversation; future inline edit must be separately designed rather than inventing an unimplemented endpoint. Refresh queries after successful mutations. Do not retry a failed promotion/delete automatically.
+No public write API for editing is added by B1. At this baseline, existing save/update/delete/list tools provide correction through conversation. The separately approved edit API is owned by #3677; this inventory must not be dispatched as a reason to block or duplicate it. Failed mutations must not be retried automatically.
 
 ## Consolidation and pre-compaction flush
 
@@ -79,4 +81,4 @@ Extend existing suites: `memory-invalidation`, `memory-dedupe`, `project-memory`
 
 ## Code areas and old code replaced
 
-`services/memory.ts` owns scope, identity and mutations; `services/memory-consolidation.ts` owns bounded weekly validation; `routes-agents.ts` retains the team-memory HTTP contract; `coordinator/memory-flush.ts` owns compaction-boundary extraction. #3608 already removed retired-agent gating from `chief/chief-settings.tsx`; preserve its team-scoped query and routing tab. The remaining frontend work replaces silent read states and adds the designed management controls, not agent selection. The unchecked promotion branch and unversioned consolidation input are the specific remaining mutation mechanisms to replace in separately dispatched implementation.
+`services/memory.ts` owns scope, identity and mutations; `services/memory-consolidation.ts` owns bounded weekly validation; `routes-agents.ts` retains the team-memory HTTP contract; `coordinator/memory-flush.ts` owns compaction-boundary extraction. #3608 already removed retired-agent gating from `chief/chief-settings.tsx`; subsequent frontend work belongs to #3666 and #3677 and is excluded from B1. The unchecked promotion branch and unversioned consolidation input identify baseline failure modes; #3677 replaces the promotion and consolidation mechanisms as part of the approved document model, rather than dispatching parallel row-model changes.
