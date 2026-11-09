@@ -18,6 +18,7 @@ import type {
   ComputerState,
   ComputerTool,
   DocumentDiffFile,
+  EvidenceStore,
   INTAKE_SOURCE_KIND,
   MachineCapabilities,
   MemoryCandidateStatus,
@@ -118,6 +119,7 @@ export const project = sqliteTable('project', {
     .notNull()
     .references(() => team.id),
   splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
+  evidenceStore: text('evidenceStore').$type<EvidenceStore>().notNull().default('attachments'),
   description: text('description'),
   instructions: text('instructions'),
   maxConcurrent: integer('maxConcurrent'),
@@ -233,6 +235,7 @@ export const build = sqliteTable('build', {
   harnessHash: text('harnessHash'),
   reportAttachmentId: text('reportAttachmentId'),
   reportLine: text('reportLine'),
+  evidenceStore: text('evidenceStore').$type<EvidenceStore>(),
   stop: json<BuildStop | null>('stop'),
   createdAt: epochMs('createdAt').notNull(),
 });

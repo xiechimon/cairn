@@ -9343,6 +9343,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "description": {
       "type": "string",
     },
+    "evidenceStore": {
+      "default": "attachments",
+      "enum": [
+        "attachments",
+        "repository",
+      ],
+      "type": "string",
+    },
     "githubRepo": {
       "type": "string",
     },
@@ -9460,6 +9468,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "name",
     "teamId",
     "splitPolicy",
+    "evidenceStore",
   ],
   "type": "object",
 }
