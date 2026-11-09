@@ -240,6 +240,7 @@ function fixture() {
         merged: false,
         draft: state.draft,
         title: 'change',
+        body: '',
         htmlUrl: null,
         headSha: 'abc',
         headRef: 'work',

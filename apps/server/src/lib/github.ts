@@ -117,6 +117,7 @@ export interface GithubPull extends GithubPullState {
   defaultBranch: string | null;
   baseOwner: string | null;
   title: string | null;
+  body: string;
   authorAssociation: string | null;
   mergeableState: string | null;
   createdAt?: string | null;
@@ -207,6 +208,7 @@ export async function githubPull(
     state?: unknown;
     merged?: unknown;
     title?: unknown;
+    body?: unknown;
     author_association?: unknown;
     user?: { login?: unknown; type?: unknown } | null;
     mergeable_state?: unknown;
@@ -243,6 +245,7 @@ export async function githubPull(
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
       baseOwner: optString(raw.base?.repo?.owner?.login),
       title: optString(raw.title),
+      body: typeof raw.body === 'string' ? raw.body : '',
       authorAssociation: optString(raw.author_association),
       mergeableState: optString(raw.mergeable_state),
       createdAt: optString(raw.created_at),
@@ -1432,16 +1435,41 @@ export async function githubCloseIssue(
   owner: string,
   repo: string,
   issueNumber: number,
-  opts: string | { stateReason: 'completed' },
+  opts: { stateReason: 'completed' | 'not_planned'; comment?: string },
 ): Promise<void> {
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, {
     state: 'closed',
-    state_reason: typeof opts === 'string' ? 'not_planned' : opts.stateReason,
+    state_reason: opts.stateReason,
   });
-  if (typeof opts === 'string') {
-    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts });
+  if (opts.comment !== undefined) {
+    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts.comment });
   }
+}
+
+export async function githubReopenIssue(
+  fetchImpl: FetchLike,
+  token: GithubWriteToken,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  comment: string,
+): Promise<void> {
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'open', state_reason: 'reopened' });
+  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
+}
+
+export async function githubUpdatePullBody(
+  fetchImpl: FetchLike,
+  token: GithubWriteToken,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<void> {
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}`;
+  await writeJson(fetchImpl, 'PATCH', url, token, { body });
 }
 
 export type GithubMergeResult =
@@ -1513,6 +1541,7 @@ export interface GithubPullPanel {
   merged: boolean;
   draft: boolean;
   title: string;
+  body: string;
   htmlUrl: string | null;
   baseSha?: string | null;
   baseRef?: string | null;
@@ -1546,6 +1575,7 @@ export async function githubPullPanel(
     merged?: unknown;
     draft?: unknown;
     title?: unknown;
+    body?: unknown;
     html_url?: unknown;
     mergeable_state?: unknown;
     additions?: unknown;
@@ -1564,6 +1594,7 @@ export async function githubPullPanel(
       merged: raw.merged,
       draft: raw.draft === true,
       title: typeof raw.title === 'string' ? raw.title : '',
+      body: typeof raw.body === 'string' ? raw.body : '',
       htmlUrl: optString(raw.html_url),
       baseSha: optString(raw.base?.sha),
       baseRef: optString(raw.base?.ref),

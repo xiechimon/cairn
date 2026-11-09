@@ -529,8 +529,16 @@ export async function executeChiefTool(
       return json({ deleted });
     }
     case 'close_todos': {
+      const supersededBy = optStr(params, 'supersededBy');
       return json(
-        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'closed', chiefActor),
+        transitionTodos(
+          deps,
+          ctx.teamId,
+          strArr(params, 'todoIds'),
+          'closed',
+          chiefActor,
+          supersededBy !== undefined ? { supersededBy } : {},
+        ),
       );
     }
     case 'reopen_todos':
@@ -900,7 +908,10 @@ export type TransitionActor = { kind: 'user' | 'agent'; name: string };
 export type TransitionDeps = Pick<
   ChiefToolDeps,
   'db' | 'hub' | 'machineHub' | 'user' | 'vapidKeys' | 'convHub'
->;
+> &
+  Partial<
+    Pick<ChiefToolDeps, 'box' | 'githubFetch' | 'githubAppTokenSocket' | 'githubAppIdentity'>
+  >;
 
 export function transitionTodos(
   deps: TransitionDeps,
@@ -908,6 +919,7 @@ export function transitionTodos(
   todoIds: string[],
   to: 'closed' | 'todo' | 'done',
   actor: TransitionActor,
+  opts: { supersededBy?: string } = {},
 ): { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> } {
   const svc = {
     db: deps.db,
@@ -916,7 +928,18 @@ export function transitionTodos(
     user: deps.user,
     vapidKeys: deps.vapidKeys,
     convHub: deps.convHub,
+    ...(deps.box !== undefined ? { box: deps.box } : {}),
+    ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+    githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
   };
+  const successor =
+    opts.supersededBy === undefined
+      ? undefined
+      : requireTeamTodo(deps.db, opts.supersededBy, teamId);
+  if (successor !== undefined && todoIds.includes(successor.id)) {
+    throw new HttpError(400, 'supersededBy must name a todo that is not being closed');
+  }
   const transitioned: string[] = [];
   const skipped: string[] = [];
   const reasons: Record<string, string> = {};
@@ -941,7 +964,13 @@ export function transitionTodos(
       continue;
     }
     try {
-      const record = setTodoPhase(svc, id, to);
+      const record = setTodoPhase(
+        svc,
+        id,
+        to,
+        {},
+        successor !== undefined ? { supersededBy: successor } : {},
+      );
       if (record) {
         transitioned.push(id);
         const doneFromInProgress =
