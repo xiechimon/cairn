@@ -302,6 +302,8 @@ export const EN: Record<string, string> = {
   运行历史: 'Run history',
   打开方案: 'Open plan',
   添加附件: 'Add attachment',
+  '上下文 {percent}%（示意）': 'Context {percent}% (mock)',
+  '上下文 {percent}%': 'Context {percent}%',
   'AI 审核': 'AI review',
   移除附件: 'Remove attachment',
   '上传中 {percent}%': 'Uploading {percent}%',

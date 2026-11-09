@@ -13,6 +13,7 @@ import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import type { ComposerBinding } from './composer-binding.js';
+import { ContextMeterRing } from './context-meter-ring.js';
 
 export const TOOL_BTN_CLS =
   "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
@@ -286,6 +287,7 @@ export function ComposerSurface({
         >
           <Plus width={16} height={16} />
         </IconTooltip>
+        <ContextMeterRing />
         {tools}
         {running && turnElapsed != null && (
           <span
