@@ -32,13 +32,14 @@ import {
   step,
   stopPending,
   tag,
+  taskIssueClose,
   todo,
   todoTag,
   tokenUsage,
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
+import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
@@ -435,6 +436,7 @@ export function updateAutonomousTodo(
   }
   let manualPhaseApplied = false;
   if (patch.phase !== undefined && patch.phase !== row.phase) {
+    sets.supersededBy = null;
     manualPhaseApplied = opts.manualPhase === true && canManualMovePhase(row.phase, patch.phase);
     if (!manualPhaseApplied) assertPhaseTransition(row.phase, patch.phase);
     if (row.phase === 'failed' && patch.phase === 'review') {
@@ -485,7 +487,14 @@ export function updateAutonomousTodo(
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
-  if (move?.closeIssueRef != null) scheduleMovedIssueClose(deps, row.teamId, move);
+  if (move?.closeIssueRef != null) {
+    queueIssueClose(
+      deps.db,
+      row.teamId,
+      move.closeIssueRef,
+      `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
+    );
+  }
   if (move !== null && record.sourceKind === 'github-issue-self') {
     scheduleSelfIssueCreate(deps, id);
   }
@@ -544,29 +553,13 @@ function planProjectMove(
   };
 }
 
-function scheduleMovedIssueClose(deps: TodoDeps, teamId: string, move: ProjectMove): void {
-  const parsed = move.closeIssueRef === null ? null : parseGithubIssueSourceRef(move.closeIssueRef);
-  if (parsed === null || deps.box === undefined) return;
-  void (deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo)))(
-    teamId,
-    parsed,
-  )
-    .then((token) =>
-      token !== null
-        ? githubCloseIssue(
-            deps.githubFetch ?? fetch,
-            token,
-            parsed.owner,
-            parsed.repo,
-            parsed.issueNumber,
-            `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
-          )
-        : console.warn(`moved todo: no GitHub token to close ${move.closeIssueRef}`),
-    )
-    .catch((error: unknown) =>
-      console.warn(`moved todo: closing ${move.closeIssueRef} failed`, error),
-    );
+export function queueIssueClose(db: Db, teamId: string, sourceRef: string, comment: string): void {
+  db.insert(taskIssueClose)
+    .values({ id: newRecordId(), teamId, sourceRef, comment, createdAt: nowMs() })
+    .run();
 }
+
+export const DELETED_TASK_ISSUE_COMMENT = 'Cairn：这个任务已删除，这里的 issue 关闭（未计划）。';
 
 export function setTodoPhase(
   deps: TodoDeps,
@@ -747,6 +740,9 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
     db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
     db.delete(step).where(inArray(step.buildId, buildIds)).run();
   }
+  if (row.sourceKind === 'github-issue-self' && row.sourceRef !== null) {
+    queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
+  }
   db.delete(todo).where(eq(todo.id, id)).run();
   return true;
 }
@@ -802,32 +798,25 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     body: row.spec,
   });
   const fresh = getRow(deps, todoId);
-  if (!fresh || fresh.sourceRef !== row.sourceRef) return null;
   const ref = githubIssueSourceRef(owner, repo, number);
+  if (!fresh) {
+    queueIssueClose(db, row.teamId, ref, DELETED_TASK_ISSUE_COMMENT);
+    return null;
+  }
+  if (fresh.sourceRef !== row.sourceRef) return null;
   db.update(todo)
-    .set({ sourceRef: ref, v: fresh.v + 1 })
+    .set({ sourceRef: ref, issueState: 'open', v: fresh.v + 1 })
     .where(eq(todo.id, todoId))
     .run();
   const record = getTodo(deps, todoId);
   if (record) hub.publishTodoDoc(record.teamId, record);
-  if (replaced !== null) {
-    const closeToken = await (
-      deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
-    )(row.teamId, replaced);
-    if (closeToken !== null) {
-      await githubCloseIssue(
-        deps.githubFetch ?? fetch,
-        closeToken,
-        replaced.owner,
-        replaced.repo,
-        replaced.issueNumber,
-        `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
-      ).catch((error: unknown) =>
-        console.warn(`moved todo: closing ${row.sourceRef} failed`, error),
-      );
-    } else {
-      console.warn(`moved todo: no GitHub token to close ${row.sourceRef}`);
-    }
+  if (replaced !== null && row.sourceRef !== null) {
+    queueIssueClose(
+      db,
+      row.teamId,
+      row.sourceRef,
+      `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
+    );
   }
   return record;
 }
