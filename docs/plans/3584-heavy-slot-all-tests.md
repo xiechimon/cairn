@@ -21,6 +21,7 @@ Python status 75 means only EAGAIN/EWOULDBLOCK contention. Spawn errors, signals
 | Path | Reads/writes | Expected behavior and test |
 |---|---|---|
 | Every root/package/alternate configuration | Admit before workers or webServer | Concurrent real Vitest runs serialize; Playwright cannot start its server while occupied |
+| Screenshot harness overlay | Copy admission and its runtime dependency closure alongside all four configs | Real Playwright CLI collects each overlaid configuration on an old tree without the admission module |
 | e2e:affected and prepush wrappers | Forward commands only | No duplicate acquisition; runner config owns admission |
 | cairn-heavy host wrapper | Delegate to shared lease CLI | Same directory and inherited lease |
 | CI admission | Read directory existence | Absent directory bypasses without creating it; present directory queues |
@@ -37,3 +38,5 @@ Implementation: current Codex session. Design review: research delegate acting a
 Issue: #3584. PR: [#3601](https://github.com/xiechimon/cairn/pull/3601). Read [runtime evidence](../verify/3584/3584-evidence/result.json) and the PR head checks and Codex cloud review before accepting delivery. Local validation includes [45 allocator/entry regressions](../verify/3584/3601-kernel-evidence/result.json), 49 targeted Vitest tests and four Chromium tests. No deployment claim is made.
 
 The first cloud review found inherited-lease deadlock when the owner is container PID 1. Two regression tests failed before extending the shared ancestor traversal to include init. The full related run passed 61 tests with two unavailable systemd-scope cases skipped. The admission regression uses a real live socket and private directory with a simulated Linux parent field; it does not claim native PID-namespace execution. Read [review-round evidence](../verify/3584/3601-init-evidence/result.json).
+
+The second cloud review found an incomplete screenshot harness overlay: old base trees lacked the newly imported admission module and its dependencies. Four actual Playwright configuration loads failed before copying the complete runtime dependency closure; all pass after the fix. Read [overlay evidence](../verify/3584/3601-overlay-evidence/result.json).
