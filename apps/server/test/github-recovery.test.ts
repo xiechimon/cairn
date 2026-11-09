@@ -122,6 +122,16 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
         .where(eq(project.id, projectId))
         .run();
       s.db
+        .insert(project)
+        .values({
+          id: 'other-repo',
+          teamId: s.team.id,
+          name: 'other',
+          repoKind: 'github',
+          githubRepo: 'owner/other',
+        })
+        .run();
+      s.db
         .insert(todo)
         .values({
           id: 'todo-brake',
@@ -163,12 +173,13 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
       await poller.sweep();
       await poller.sweep();
       expect(labelAttempts).toBe(2);
-      expect(writes).toContainEqual({
-        path: '/repos/owner/repo/issues',
-        body: expect.objectContaining({ labels: ['autonomy-paused'] }),
-      });
+      for (const repo of ['owner/repo', 'owner/other'])
+        expect(writes).toContainEqual({
+          path: `/repos/${repo}/issues`,
+          body: expect.objectContaining({ labels: ['autonomy-paused'] }),
+        });
       expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-        false,
+        true,
       );
       expect(identities.length).toBeGreaterThan(0);
       expect(identities.every(Boolean)).toBe(true);

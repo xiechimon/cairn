@@ -106,43 +106,62 @@ export async function pauseTeamGithubReposAutonomously(
     ) => Promise<GithubWriteToken | null>;
   },
   teamId: string,
+  reason = 'Autonomous merging paused through Cairn.',
 ): Promise<void> {
-  const latchTeam = () =>
-    deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, teamId)).run();
-  const targets = deps.db
-    .select()
-    .from(project)
-    .where(eq(project.teamId, teamId))
-    .all()
-    .map((row) => githubRepoOfProject(row));
-  const repos = new Set(
-    targets.flatMap((repo) => (repo === null ? [] : [`${repo.owner}/${repo.repo}`])),
-  );
-  if (repos.size === 0 || targets.includes(null)) latchTeam();
-  if (repos.size === 0) return;
+  deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, teamId)).run();
+  const repos = teamGithubRepos(deps.db, teamId);
+  if (repos.length === 0) return;
   const results = await Promise.allSettled(
-    [...repos].map(async (repo) => {
-      const [owner, name] = repo.split('/');
-      if (!owner || !name) throw new Error('Invalid GitHub repository');
+    repos.map(async (ref) => {
       const token = await (
         deps.githubWriteTokenForRepo ?? ((teamId, ref) => autonomousToken(deps, teamId, ref))
-      )(teamId, { owner, repo: name });
+      )(teamId, ref);
       if (token === null)
         throw new Error('GitHub connection required to publish the autonomy pause');
-      return pauseGithubRepo(
-        deps.githubFetch ?? fetch,
-        token,
-        repo,
-        'Autonomous merging paused through Cairn.',
-      );
+      return pauseGithubRepo(deps.githubFetch ?? fetch, token, `${ref.owner}/${ref.repo}`, reason);
     }),
   );
-  if (results.some((result) => result.status === 'rejected')) {
-    latchTeam();
+  if (results.some((result) => result.status === 'rejected'))
     throw new Error(
       'Some GitHub pause markers could not be published; the local team remains paused',
     );
+}
+
+function teamGithubRepos(db: Db, teamId: string): { owner: string; repo: string }[] {
+  const seen = new Map<string, { owner: string; repo: string }>();
+  for (const row of db.select().from(project).where(eq(project.teamId, teamId)).all()) {
+    const ref = githubRepoOfProject(row);
+    if (ref !== null) seen.set(`${ref.owner}/${ref.repo}`, { owner: ref.owner, repo: ref.repo });
   }
+  return [...seen.values()];
+}
+
+async function resumeWhenMarkersClosed(
+  deps: GithubTokenDeps & { db: Db },
+  teamId: string,
+): Promise<void> {
+  const repos = teamGithubRepos(deps.db, teamId);
+  if (repos.length === 0) return;
+  const open = await Promise.all(
+    repos.map(async (ref) => {
+      const token = await autonomousToken(deps, teamId, ref);
+      if (token === null) return null;
+      return markerOpen(deps.githubFetch ?? fetch, token, `${ref.owner}/${ref.repo}`).catch(
+        () => null,
+      );
+    }),
+  );
+  if (open.every((state) => state === false))
+    deps.db.update(team).set({ autonomyPaused: false }).where(eq(team.id, teamId)).run();
+}
+
+export async function syncAutonomyPauses(deps: GithubTokenDeps & { db: Db }): Promise<void> {
+  const paused = deps.db
+    .select({ id: team.id })
+    .from(team)
+    .where(eq(team.autonomyPaused, true))
+    .all();
+  for (const row of paused) await resumeWhenMarkersClosed(deps, row.id);
 }
 
 export async function readGithubAutonomyPause(

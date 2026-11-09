@@ -1,15 +1,109 @@
-import { eq } from 'drizzle-orm';
-import { expect, test } from 'vitest';
-import { project, team } from '../src/db/schema.js';
+import { projectMergeConfigSchema } from '@cairn/shared';
+import { afterEach, expect, test, vi } from 'vitest';
+import { project } from '../src/db/schema.js';
 import type { AutonomousToken } from '../src/lib/github-token.js';
+import { autonomousMergePolicy } from '../src/services/autonomous-merge.js';
 import {
   pauseGithubRepo,
   pauseTeamGithubReposAutonomously,
   readGithubAutonomyPause,
+  syncAutonomyPauses,
 } from '../src/services/github-autonomy-brake.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { recentRecoveryTarget } from '../src/services/github-recovery.js';
 import { newGateReadCache } from '../src/services/merge-gate/github-facts.js';
+import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer } from './helpers.js';
+
+afterEach(() => vi.restoreAllMocks());
+
+function teamMarkersWorld() {
+  const open = new Set<string>();
+  let readsFail = false;
+  const posted: string[] = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = new URL(String(input));
+    const repo = url.pathname.split('/').slice(2, 4).join('/');
+    if (url.pathname.endsWith('/issues') && init?.method === 'POST') {
+      posted.push(repo);
+      open.add(repo);
+      return Response.json({ number: 7 });
+    }
+    if (url.pathname.endsWith('/issues')) {
+      if (readsFail) return new Response('', { status: 502 });
+      return Response.json(open.has(repo) ? [{ number: 7 }] : []);
+    }
+    return Response.json({ name: 'autonomy-paused' });
+  };
+  const s = bootServer({ githubFetch: fetchImpl });
+  for (const [id, repo] of [
+    ['alpha', 'octo/alpha'],
+    ['beta', 'octo/beta'],
+    ['local', null],
+  ] as const)
+    s.db
+      .insert(project)
+      .values({
+        id,
+        teamId: s.team.id,
+        name: id,
+        repoKind: repo === null ? 'local' : 'github',
+        githubRepo: repo,
+      })
+      .run();
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, login: 'owner', accessToken: 'token', scope: 'repo' },
+  );
+  stubGithubApp(null);
+  const deps = { ...s.svc, box: s.secretBox, githubFetch: fetchImpl };
+  const localPaused = () =>
+    autonomousMergePolicy(
+      s.db,
+      s.team.id,
+      projectMergeConfigSchema.parse({ mergePolicy: 'autonomous' }),
+    ).autonomyPaused;
+  return {
+    s,
+    deps,
+    open,
+    posted,
+    localPaused,
+    failReads: () => {
+      readsFail = true;
+    },
+  };
+}
+
+test('an automatic pause in one repository pauses every team repository and the local projects; closing the markers resumes them all', async () => {
+  const w = teamMarkersWorld();
+  try {
+    await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id, 'Main check failed in octo/alpha.');
+    expect(w.posted.sort()).toEqual(['octo/alpha', 'octo/beta']);
+    expect(w.localPaused()).toBe(true);
+    w.open.delete('octo/alpha');
+    await syncAutonomyPauses(w.deps);
+    expect(w.localPaused()).toBe(true);
+    w.open.clear();
+    await syncAutonomyPauses(w.deps);
+    expect(w.localPaused()).toBe(false);
+  } finally {
+    w.s.dispose();
+  }
+});
+
+test('an unreadable marker keeps the team paused', async () => {
+  const w = teamMarkersWorld();
+  try {
+    await pauseTeamGithubReposAutonomously(w.deps, w.s.team.id);
+    w.open.clear();
+    w.failReads();
+    await syncAutonomyPauses(w.deps);
+    expect(w.localPaused()).toBe(true);
+  } finally {
+    w.s.dispose();
+  }
+});
 
 test('marker pause creates the label and issue once, and never closes a marker', async () => {
   const calls: { url: string; method: string; body: unknown }[] = [];
@@ -126,44 +220,3 @@ test('marker lookup paginates past labelled pull requests', async () => {
   ).toBe(true);
   expect(pages).toHaveLength(2);
 });
-
-test.each([
-  { name: 'every marker is published', repo: 'octo/alpha', publishes: true, latched: false },
-  { name: 'a marker cannot be published', repo: 'octo/alpha', publishes: false, latched: true },
-  { name: 'the team has no GitHub repository', repo: null, publishes: true, latched: true },
-])(
-  'an automatic pause writes the team flag only when $name',
-  async ({ repo, publishes, latched }) => {
-    const fetchImpl: typeof fetch = async (input, init) => {
-      if (!publishes && init?.method === 'POST') return new Response('', { status: 500 });
-      return String(input).includes('/issues?') ? Response.json([]) : Response.json({ number: 7 });
-    };
-    const s = bootServer({ githubFetch: fetchImpl });
-    try {
-      s.db
-        .insert(project)
-        .values({
-          id: 'brake-project',
-          teamId: s.team.id,
-          name: 'brake',
-          repoKind: repo === null ? 'local' : 'github',
-          githubRepo: repo,
-        })
-        .run();
-      await pauseTeamGithubReposAutonomously(
-        {
-          ...s.svc,
-          box: s.secretBox,
-          githubFetch: fetchImpl,
-          githubWriteTokenForRepo: async () => 'token' as AutonomousToken,
-        },
-        s.team.id,
-      ).catch(() => undefined);
-      expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-        latched,
-      );
-    } finally {
-      s.dispose();
-    }
-  },
-);

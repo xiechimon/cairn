@@ -3,14 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type GitIdentity, localCommitIdentity } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
-import { autonomousMergeAdmission, build, project, team, todo } from '../db/schema.js';
+import { autonomousMergeAdmission, build, project, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
 import { type FetchLike, githubPull, isFullSha } from '../lib/github.js';
 import { type AutonomousToken, isAppToken } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
-import { brakeRequest, pauseGithubRepo } from './github-autonomy-brake.js';
+import { brakeRequest, pauseTeamGithubReposAutonomously } from './github-autonomy-brake.js';
 
 export async function prepareRecoveryBranch(input: {
   url: string;
@@ -160,16 +160,11 @@ export async function recoverRedAutonomousMain(
       .filter((check) => check.name === 'check' && check.app?.slug === 'github-actions')
       .sort((a, b) => b.id - a.id)[0];
     if (latest?.status !== 'completed' || latest.conclusion !== 'failure') continue;
-    await pauseGithubRepo(fetchImpl, token, repo, `Main check failed at ${main}.`).catch(
-      (err: unknown) => {
-        deps.db
-          .update(team)
-          .set({ autonomyPaused: true })
-          .where(eq(team.id, row.admission.teamId))
-          .run();
-        throw err;
-      },
-    );
+    await pauseTeamGithubReposAutonomously(
+      { ...deps, githubFetch: fetchImpl },
+      row.admission.teamId,
+      `Main check failed at ${main} in ${repo}.`,
+    ).catch(() => undefined);
     const pull = await githubPull(fetchImpl, token, target.owner, target.repo, row.build.prNumber);
     const reverted = pull?.pull?.mergeCommitSha;
     if (!reverted || !isFullSha(reverted)) continue;

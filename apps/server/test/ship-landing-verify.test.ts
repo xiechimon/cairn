@@ -109,7 +109,7 @@ function world(pull: { merged: boolean; head: string }) {
 function expectMarkerBrake(w: { s: ReturnType<typeof world>['s']; markers: string[] }) {
   expect(w.markers).toEqual(['https://api.github.com/repos/octo/demo/issues']);
   expect(w.s.db.select().from(team).where(eq(team.id, w.s.team.id)).get()?.autonomyPaused).toBe(
-    false,
+    true,
   );
 }
 

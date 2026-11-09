@@ -1,6 +1,6 @@
 # GitHub autonomy brake
 
-An open issue carrying `autonomy-paused` pauses GitHub autonomy. Closing the issue resumes the GitHub brake. The server reads the marker live (60-second cache) and never copies a marker it observed into the team pause flag. Product team pause settings remain independent: a product pause set through the team settings API must also be cleared there. Automatic pauses (main CI red, an unjudged landing) publish a marker to every GitHub repository in the team and write the team flag only when a marker cannot be published or the team has a project without a GitHub repository. While paused, `cairn/merge-gate` posts `pending`, never `failure`.
+An open issue carrying `autonomy-paused` pauses GitHub autonomy. Closing the issue resumes the GitHub brake. The server reads the marker live (60-second cache) for its own repository and never copies an observed marker into the team pause flag. A team pause (the team settings API, main CI red in any team repository, an unjudged landing) sets the team flag, which also pauses local projects, and publishes a marker to every GitHub repository in the team. Each CI poll clears the team flag once every team repository's marker reads closed; an unreadable marker or a missing token keeps it. A team without GitHub repositories has no markers, so its flag is cleared only through the settings API. While paused, `cairn/merge-gate` posts `pending`, never `failure`.
 
 Use Node, Git, and authenticated `gh`, with `GITHUB_REPOSITORY=owner/repository`:
 
