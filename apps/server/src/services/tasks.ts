@@ -21,8 +21,8 @@ export function listTasks(
     )
     .orderBy(asc(todo.seqNum), asc(todo.id))
     .all()
-    .map((row) => toTodoRecord(deps, row, now));
-  const questions: TasksQuery['questions'] = deps.db
+    .map((row) => ({ kind: 'todo' as const, ...toTodoRecord(deps, row, now) }));
+  const questions: TasksQuery['entries'] = deps.db
     .select({ message: chiefMessage })
     .from(chiefMessage)
     .innerJoin(chiefThread, eq(chiefThread.id, chiefMessage.threadId))
@@ -40,6 +40,7 @@ export function listTasks(
       if (content === null || content.status !== 'pending') return [];
       return [
         {
+          kind: 'question' as const,
           requestId: content.requestId,
           threadId: message.threadId,
           projectId: message.projectId,
@@ -50,5 +51,5 @@ export function listTasks(
         },
       ];
     });
-  return { todos, questions };
+  return { entries: [...questions, ...todos] };
 }

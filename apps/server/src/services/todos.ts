@@ -6,6 +6,7 @@ import type {
   SecretBox,
   TodoOutputKind,
   TodoRecord,
+  TodoSection,
   TodoSourceKind,
   UserRecord,
 } from '@cairn/shared';
@@ -94,7 +95,11 @@ function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: P
   triggerChiefWakes(deps, record, to);
 }
 
-export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow, now = nowMs()): TodoRecord {
+export function toTodoRecord(
+  deps: Pick<TodoDeps, 'db'>,
+  row: TodoRow,
+  now = nowMs(),
+): TodoRecord & { section: TodoSection | null } {
   const { db } = deps;
   const tagIds = db
     .select({ tagId: todoTag.tagId })

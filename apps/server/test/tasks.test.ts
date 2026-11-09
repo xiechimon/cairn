@@ -1,4 +1,4 @@
-import type { Phase, TodoOwner } from '@cairn/shared';
+import type { Phase, TasksQuery, TodoOwner } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import { chiefMessage, chiefThread, project, team, todo } from '../src/db/schema.js';
@@ -131,18 +131,20 @@ test('one Tasks read includes open rows and recently archived rows; section uses
   }
   const response = await req(s.app, 'GET', `/api/tasks?teamId=${s.team.id}`);
   expect(response.status).toBe(200);
-  const body = (await response.json()) as {
-    todos: { id: string; section: string | null }[];
-    questions: unknown[];
-  };
-  expect(body.todos.map(({ id, section }) => [id, section]).sort()).toEqual([
+  const body = (await response.json()) as TasksQuery;
+  expect(body).not.toHaveProperty('todos');
+  expect(body).not.toHaveProperty('questions');
+  expect(
+    body.entries
+      .map((entry) => [entry.kind === 'todo' ? entry.id : entry.requestId, entry.section])
+      .sort(),
+  ).toEqual([
     ['abandoned', null],
     ['old-resolution', null],
     ['open', 'up_next'],
     ['recent', 'resolved'],
     ['unarchived-old', null],
   ]);
-  expect(body.questions).toEqual([]);
   expect((await req(s.app, 'GET', '/api/todos?archived=1')).status).toBe(200);
 });
 
@@ -174,7 +176,12 @@ test('Tasks scopes both sources to the team and lists parked pending standalone 
   const read = async (teamId: string) => {
     const response = await req(s.app, 'GET', `/api/tasks?teamId=${teamId}`);
     expect(response.status).toBe(200);
-    return response.json();
+    const body = (await response.json()) as TasksQuery;
+    expect(Array.isArray(body.entries)).toBe(true);
+    return {
+      todos: body.entries.filter((entry) => entry.kind === 'todo'),
+      questions: body.entries.filter((entry) => entry.kind === 'question'),
+    };
   };
   expect(await read(s.team.id)).toMatchObject({
     todos: [],
