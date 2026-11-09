@@ -64,7 +64,7 @@ export function ApiKeysPage() {
             testId="keys-empty"
             className="mt-6"
             icon={Key}
-            title={t('尚无 API 密钥。')}
+            title={t('尚无 API 密钥')}
             description={t('API 密钥用于从命令行接入机器，也让 MCP 客户端能访问你的工作台。')}
             action={{ label: t('新建密钥'), onClick: live ? () => setCreateOpen(true) : undefined }}
           />

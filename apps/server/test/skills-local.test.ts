@@ -80,7 +80,7 @@ describe('the scanLocalSkills directory scan', () => {
     ]);
   });
 
-  test('S8: folded-block scalar markers are not accepted -- name/description fall back (a shape measured against the real anthropics/skills repo)', () => {
+  test('S8: YAML block scalars supply the skill identity and folded description', () => {
     const root = makeRoot();
     addSkill(
       root,
@@ -90,8 +90,13 @@ describe('the scanLocalSkills directory scan', () => {
     addSkill(root, 'folded-name', '---\nname: |-\n  block\n---\n');
     const scanned = scanLocalSkills(root);
     expect(scanned).toEqual([
-      { id: 'academy-guide', name: 'academy-guide', description: null, dirName: 'folded' },
-      { id: 'folded-name', name: 'folded-name', description: null, dirName: 'folded-name' },
+      {
+        id: 'academy-guide',
+        name: 'academy-guide',
+        description: 'A folded multi-line description here.',
+        dirName: 'folded',
+      },
+      { id: 'block', name: 'block', description: null, dirName: 'folded-name' },
     ]);
     expect(parseSkillFrontmatter('---\nname: a\ndescription: b\n---\n')).toEqual({
       name: 'a',

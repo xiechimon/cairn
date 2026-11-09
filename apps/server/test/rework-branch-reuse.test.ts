@@ -1,11 +1,13 @@
 import type { ClaimedStep } from '@cairn/shared';
 import {
+  BUILD_FAILURE_ROW_KIND,
   buildRestartPrompt,
   buildReviewRejectPrompt,
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   conversationBranch,
   SESSION_BRIEF,
+  systemRowOf,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -178,7 +180,7 @@ function todoRowOf(w: World) {
 }
 
 describe('#931 a failed restart reworks on the original branch: the reuse decision (server surface)', () => {
-  test('failure modes 1/3: a build with a PR -> no new build, feedback and round-marker notes land in the old conv, the failure cause carried over', async () => {
+  test('failure modes 1/3: a build with a PR -> no new build, feedback and round-marker notes land in the old conv, the failure cause kept once as a failure row', async () => {
     const w = makeWorld({ priorSession: { sessionId: 'sess-old', machineId: 'm-ghost' } });
     await restart(w, '我要的是svg样式的');
 
@@ -190,15 +192,17 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
 
     const rows = messagesOf(w, w.buildId);
     expect(rows.some((m) => m.role === 'user' && m.content === '我要的是svg样式的')).toBe(true);
-    const reuseNote = buildReworkReuseNote({
-      prNumber: PR_NUMBER,
-      prUrl: PR_URL,
-      failureReason: '本轮无人认领：团队当前没有在线机器',
-    });
+    const reuseNote = buildReworkReuseNote({ prNumber: PR_NUMBER });
     const note = rows.find((m) => m.role === 'system' && m.content === reuseNote);
     expect(note).toBeDefined();
-    expect(reuseNote).toContain('本轮无人认领');
     expect(reuseNote).toContain(`PR #${PR_NUMBER}`);
+    const failures = rows.filter(
+      (m) => m.role === 'system' && systemRowOf(m.content)?.kind === BUILD_FAILURE_ROW_KIND,
+    );
+    expect(failures.map((m) => systemRowOf(m.content))).toEqual([
+      expect.objectContaining({ reason: '本轮无人认领：团队当前没有在线机器' }),
+    ]);
+    expect(rows.filter((m) => JSON.stringify(m.content).includes('本轮无人认领'))).toHaveLength(1);
 
     const buildRow = builds[0]!;
     expect(buildRow.errorMessage).toBeNull();

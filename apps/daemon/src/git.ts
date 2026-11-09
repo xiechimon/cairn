@@ -687,13 +687,18 @@ export const gitPrim = {
     identity: CommitIdentity,
     hookBudgetMs: number,
   ): Promise<boolean> {
+    const staged = await runGit(['diff', '--cached', '--quiet', '--exit-code'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (staged.code === 0) return false;
+    if (staged.code !== 1) throw new Error(gitFailureMessage('diff', staged, META_TIMEOUT_MS));
     const r = await runGit(['commit', '-m', message], {
       cwd: dir,
       env: commitEnv(identity),
       timeoutMs: hookBudgetMs,
     });
     if (r.code === 0) return true;
-    if (/nothing to commit/i.test(r.stdout) || /nothing to commit/i.test(r.stderr)) return false;
     throw new Error(gitFailureMessage('commit', r, hookBudgetMs));
   },
 

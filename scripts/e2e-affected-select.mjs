@@ -136,7 +136,7 @@ const AGENT = [
   'chief-home-digest',
 ];
 export const LIVE_SERVER = [
-  'account-feature-releases',
+  'account-release-removal',
   'token-gate',
   'live-server-',
   'agent-fallback-models',
@@ -256,7 +256,6 @@ export const FILE_RULES = new Map([
     ['account-', 'team-attribution-', 'user-menu-', 'cds-density', 'push-device-switch'],
   ],
   ['apps/web/src/routes/feishu-settings.tsx', ['account-feishu']],
-  ['apps/web/src/routes/feature-releases.tsx', ['account-feature-releases']],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'focus-ring-clip', 'api-key-']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-', 'api-key-']],

@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -155,13 +156,17 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-const CHECKOUT_CWD = '/tmp/fake-workspace/worktrees/conv-1';
-function fakeWorkspace(calls: string[], opts: { rewindError?: string } = {}): WorktreeOps {
+function fakeWorkspace(
+  cwd: string,
+  calls: string[],
+  opts: { rewindError?: string } = {},
+): WorktreeOps {
   return {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
+      mkdirSync(cwd, { recursive: true });
       return {
-        cwd: CHECKOUT_CWD,
+        cwd,
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
         branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
@@ -252,6 +257,7 @@ async function setupWithBackend(
   backendFor: (captured: SessionOpts[]) => AgentBackend,
 ) {
   const home = testTempDir('cairn-runner-review-');
+  const checkoutCwd = join(home, 'review-checkout');
   const paths = statePaths(home, join(home, 'workspaces'));
   const calls: string[] = [];
   const client = new FakeClient();
@@ -263,20 +269,22 @@ async function setupWithBackend(
     backendFor: () => backendFor(captured),
     logger: captureLogger(),
     paths,
-    workspace: fakeWorkspace(calls, opts),
+    workspace: fakeWorkspace(checkoutCwd, calls, opts),
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
   };
   await runStep(deps, claimed);
-  return { client, calls, captured };
+  return { client, calls, captured, checkoutCwd };
 }
 
 describe('review step execution surface (#511)', () => {
   test('failure modes 1+2: review checkpoint opens the read-only checkout, reviewer writes are discarded, no commit / no push', async () => {
-    const { client, calls, captured } = await setup(claimedReview('review', HOSTED_REPO));
+    const { client, calls, captured, checkoutCwd } = await setup(
+      claimedReview('review', HOSTED_REPO),
+    );
     expect(calls).toContain(`prepare:${HOSTED_REPO.cloneUrl}`);
-    expect(captured[0]!.cwd).toBe(CHECKOUT_CWD);
+    expect(captured[0]!.cwd).toBe(checkoutCwd);
     expect(calls).toContain('restoreCheckpoint:abc123');
     expect(calls.indexOf('restoreCheckpoint:abc123')).toBeLessThan(
       calls.indexOf('done:s-review:success'),
@@ -291,11 +299,11 @@ describe('review step execution surface (#511)', () => {
   });
 
   test('failure mode 3: confirmation checkpoint does not open a checkout (cwd falls back to the bare task directory), material delivered as usual', async () => {
-    const { calls, captured } = await setup(claimedReview('confirm', HOSTED_REPO));
+    const { calls, captured, checkoutCwd } = await setup(claimedReview('confirm', HOSTED_REPO));
     expect(calls.some((c) => c.startsWith('prepare'))).toBe(false);
     expect(calls.some((c) => c.startsWith('push:'))).toBe(false);
     expect(calls).not.toContain('headCommit');
-    expect(captured[0]!.cwd).not.toBe(CHECKOUT_CWD);
+    expect(captured[0]!.cwd).not.toBe(checkoutCwd);
     expect(captured[0]!.prompt).toContain(PLAN_TEXT);
     expect(captured[0]!.prompt).not.toContain('src/parse.ts');
   });

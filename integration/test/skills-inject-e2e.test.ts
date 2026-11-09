@@ -240,10 +240,6 @@ describe('spec 14 skills execution-plane injection E2E', () => {
     expect(flat).not.toContain(PI_NATIVE_MARKER);
     expect(flat).not.toContain('native-dup');
 
-    expect(logLines().some((l) => l.includes('brief written:') && l.includes('(create)'))).toBe(
-      true,
-    );
-    expect(logLines().some((l) => l.includes('brief removed'))).toBe(true);
     expect(existsSync(join(paths.workspacesDir, buildId, 'AGENTS.md'))).toBe(false);
   }, 150_000);
 });

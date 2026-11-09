@@ -1,9 +1,11 @@
-import type { ClaimedStep } from '@cairn/shared';
 import {
+  BUILD_FAILURE_ROW_KIND,
+  type ClaimedStep,
   claimedStepSchema,
   isPlanContractRewritePrompt,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
+  systemRowOf,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -493,9 +495,11 @@ describe('build step fallback report (#1492)', () => {
       expect(w.todoRow().phase).toBe('failed');
       const reports = w
         .messagesOf(buildId)
-        .filter((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
+        .filter(
+          (m) => m.role === 'system' && systemRowOf(m.content)?.kind === BUILD_FAILURE_ROW_KIND,
+        );
       expect(reports).toHaveLength(1);
-      expect(String(reports[0]!.content)).toContain('agent 进程退出码 137');
+      expect(systemRowOf(reports[0]!.content)).toMatchObject({ reason: 'agent 进程退出码 137' });
     } finally {
       w.s.dispose();
     }
@@ -509,7 +513,9 @@ describe('build step fallback report (#1492)', () => {
       await w.done(buildStep.step.id, { status: 'success', hasChanges: false, sessionId: 'pi-f2' });
       const report = w
         .messagesOf(buildId)
-        .find((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
+        .find(
+          (m) => m.role === 'system' && systemRowOf(m.content)?.kind === BUILD_FAILURE_ROW_KIND,
+        );
       expect(report).toBeUndefined();
       expect(w.todoRow().phase).toBe('needs_input');
     } finally {
@@ -536,7 +542,9 @@ describe('build step fallback report (#1492)', () => {
       expect(w.todoRow().phase).toBe('failed');
       const reports = w
         .messagesOf(buildId)
-        .filter((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
+        .filter(
+          (m) => m.role === 'system' && systemRowOf(m.content)?.kind === BUILD_FAILURE_ROW_KIND,
+        );
       expect(reports).toHaveLength(0);
     } finally {
       w.s.dispose();
