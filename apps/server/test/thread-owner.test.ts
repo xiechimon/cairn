@@ -13,6 +13,7 @@ import {
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import type { BuildDeps } from '../src/services/builds.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
+import { listNeedsYou } from '../src/services/needs-you.js';
 import { reconcileOwners, seedOwnerCheckpoints } from '../src/services/owner.js';
 import { parkFailedBuild } from '../src/services/retry-parking.js';
 import { getTodo, setTodoArchived, setTodoPhase } from '../src/services/todos.js';
@@ -261,6 +262,42 @@ describe('ownerOf (#3512)', () => {
     if (c.archived) setTodoArchived(w.deps, w.todoId, true);
     const record = getTodo(w.deps, w.todoId);
     expect(record?.owner).toBe(c.owner);
+  });
+});
+
+describe('pending questions and the inbox read ownerOf (#3512)', () => {
+  test('a question the worker is still long-polling is Coordinator-owned before the phase flips', async () => {
+    const w = openWorld({ phase: 'building' });
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    const polling = askWorkerQuestion(
+      w.deps,
+      row,
+      {
+        requestId: 'ask-0000000e',
+        questions: [{ header: 'Scope', question: 'Which scope?', options: [{ label: 'Small' }] }],
+      },
+      { holdMs: 1_500 },
+    );
+    await vi.waitFor(() => expect(ownerNow(w)).toBe('coordinator'));
+    expect(getTodo(w.deps, w.todoId)?.phase).toBe('building');
+    expect(wakes(w).filter((prompt) => prompt.includes('ask-0000000e'))).toHaveLength(1);
+    await polling;
+  });
+
+  test('/api/needs-you takes each reason from ownerOf, not from the phase', async () => {
+    const confirm = openWorld({ phase: 'confirm' });
+    const review = openWorld({ phase: 'review', policy: 'human' });
+    const asking = openWorld({ phase: 'building', policy: 'human' });
+    await ask(asking, 'ask-0000000f');
+    asking.s.db
+      .update(todoTable)
+      .set({ phase: 'needs_input' })
+      .where(eq(todoTable.id, asking.todoId))
+      .run();
+    const reasons = [confirm, review, asking].map((w) =>
+      listNeedsYou(w.deps, w.s.team.id).current.map((entry) => [entry.todo.owner, entry.reason]),
+    );
+    expect(reasons).toEqual([[['owner', 'confirm']], [['owner', 'review']], []]);
   });
 });
 

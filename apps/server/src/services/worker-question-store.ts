@@ -145,28 +145,6 @@ export function blockingWorkerQuestions(db: Db, buildId: string): AskUserQuestio
   return pendingWorkerQuestions(db, buildId);
 }
 
-export function answerPendingWorkerQuestions(
-  deps: StoreDeps,
-  buildId: string,
-  text: string,
-): boolean {
-  const pending = pendingRows(deps.db, buildId);
-  for (const row of pending) {
-    const answers: AskUserAnswer[] = row.content.questions.map((question) => ({
-      header: question.header,
-      text,
-    }));
-    updateWorkerQuestion(
-      deps,
-      buildId,
-      row.id,
-      { ...row.content, status: 'answered', answers },
-      row.createdAt,
-    );
-  }
-  return pending.length > 0;
-}
-
 export function cancelPendingWorkerQuestions(
   deps: StoreDeps,
   buildId: string,

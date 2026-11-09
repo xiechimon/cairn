@@ -82,7 +82,6 @@ export const legacyReview: TodoRecord = {
   buildHistory: [{ buildId: 'r3-conv-legacy-1', createdAt: at(R3_DAY, 13, 5) }],
   sourceTodo: null,
   v: 3,
-  awaitingReply: true,
 };
 
 export const legacyDone: TodoRecord = {

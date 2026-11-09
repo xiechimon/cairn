@@ -347,6 +347,16 @@ test.each(['pause', 'review-gate'] as const)(
   },
 );
 
+test('a worker schedule stays paused while the task waits for an answer', async () => {
+  const s = await world();
+  const before = s.db.select().from(step).all().length;
+  s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, s.todoId)).run();
+  await s.scheduler.tick(s.due);
+  expect(s.db.select().from(step).all()).toHaveLength(before);
+  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.phase).toBe('needs_input');
+  expect(s.stored()).toMatchObject({ enabled: true, lastRunAt: null });
+});
+
 test.each(['pending-stop', 'acknowledged-stop', 'exit-stop'] as const)(
   'a fired one-shot never restarts after %s',
   async (ending) => {

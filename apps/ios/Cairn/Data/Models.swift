@@ -30,16 +30,14 @@ struct TaskRecord: Decodable, Identifiable, Hashable, Sendable {
     let phaseAt: Double
     let projectId: String
     let latestBuildId: String?
-    let awaitingReply: Bool?
     let archivedAt: Double?
 
     var changed: Date { Date(timeIntervalSince1970: phaseAt / 1000) }
 
     var status: ThreadStatus {
-        if awaitingReply == true { return .needsYou }
         switch phase {
         case "queued", "planning", "building": return .running
-        case "confirm", "review": return .needsYou
+        case "confirm", "needs_input", "review": return .needsYou
         case "failed": return .failed
         case "done", "closed": return .done
         default: return .idle
@@ -47,7 +45,7 @@ struct TaskRecord: Decodable, Identifiable, Hashable, Sendable {
     }
 
     var actRank: Int {
-        if awaitingReply == true || phase == "confirm" { return 0 }
+        if phase == "needs_input" || phase == "confirm" { return 0 }
         if phase == "failed" { return 1 }
         return 2
     }
@@ -63,8 +61,8 @@ struct TaskRecord: Decodable, Identifiable, Hashable, Sendable {
     }
 
     var reason: String {
-        if awaitingReply == true { return "Asked you a question." }
         switch phase {
+        case "needs_input": return "Asked you a question."
         case "confirm": return "Plan ready. Approve to start."
         case "review": return "Ready for your review."
         case "failed": return "Failed. Open it to retry."

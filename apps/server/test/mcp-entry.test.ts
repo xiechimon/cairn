@@ -178,6 +178,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
       questions: [{ header: 'Scope', question: 'Which API?', options: [] }],
     });
     insertWork(s, projectId, 'needs-review');
+    insertWork(s, projectId, 'needs-answer', 'needs_input');
     insertWork(s, projectId, 'working', 'building');
     insertWork(s, projectId, 'archived');
     s.db.update(todo).set({ archivedAt: 10 }).where(eq(todo.id, 'archived')).run();
@@ -196,7 +197,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
       answers: [{ header: 'Scope', text: 'The public API' }],
     });
     const after = await call<{ id: string }[]>(client, 'threads_waiting_on_me', {});
-    expect(after.map((t: { id: string }) => t.id)).toEqual(['needs-review']);
+    expect(after.map((t: { id: string }) => t.id).sort()).toEqual(['needs-review']);
     const duplicate = await client.callTool({
       name: 'reply_thread',
       arguments: {

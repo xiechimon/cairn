@@ -1,7 +1,7 @@
-import type { NeedsYouReason, TodoOwner } from '@cairn/shared';
-import { and, eq, inArray, isNull, ne, or, type SQL } from 'drizzle-orm';
+import { ASK_USER_QUESTION_KIND, type NeedsYouReason, type TodoOwner } from '@cairn/shared';
+import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, gateState, project, todo } from '../db/schema.js';
+import { build, gateState, message, project, todo } from '../db/schema.js';
 import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
@@ -9,7 +9,6 @@ import { projectMergeConfigOf } from './projects.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { endSnoozeOn } from './snooze.js';
 import { getTodo } from './todos.js';
-import { pendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -25,10 +24,25 @@ export interface OwnerDeps extends ChiefDeps {
 
 const NOBODY = 'none';
 
+const PENDING_QUESTION: SQL = sql`json_extract(${message.content}, '$.kind') = ${ASK_USER_QUESTION_KIND} and json_extract(${message.content}, '$.status') = 'pending'`;
+
 export const OWNED_CANDIDATE: SQL = and(
   isNull(todo.archivedAt),
-  or(inArray(todo.phase, ['confirm', 'review', 'failed']), eq(todo.awaitingReply, true)),
+  or(
+    inArray(todo.phase, ['confirm', 'needs_input', 'review', 'failed']),
+    sql`exists (select 1 from ${message} where ${message.conversationId} = ${todo.latestBuildId} and ${PENDING_QUESTION})`,
+  ),
 ) as SQL;
+
+function pendingQuestionIds(db: Db, buildId: string): string[] {
+  return db
+    .select({ id: message.id })
+    .from(message)
+    .where(and(eq(message.conversationId, buildId), PENDING_QUESTION))
+    .all()
+    .map((row) => row.id)
+    .sort();
+}
 
 function phaseWork(row: TodoRow): string {
   return `${row.latestBuildId ?? ''}:${row.phaseAt}`;
@@ -74,15 +88,13 @@ function failedOwnership(db: Db, row: TodoRow): Ownership | null {
 
 export function ownershipOf(db: Db, row: TodoRow): Ownership | null {
   if (row.archivedAt !== null || row.phase === 'done' || row.phase === 'closed') return null;
-  if (row.awaitingReply && row.latestBuildId !== null) {
-    const pending = pendingWorkerQuestions(db, row.latestBuildId).map((q) => q.requestId);
-    if (pending.length > 0) {
-      return {
-        owner: 'coordinator',
-        reason: 'question',
-        workKey: `question:${row.latestBuildId}:${pending.sort().join(',')}`,
-      };
-    }
+  const pending = row.latestBuildId === null ? [] : pendingQuestionIds(db, row.latestBuildId);
+  if (pending.length > 0) {
+    return {
+      owner: 'coordinator',
+      reason: 'question',
+      workKey: `question:${row.latestBuildId}:${pending.join(',')}`,
+    };
   }
   if (row.phase === 'confirm') {
     return { owner: 'owner', reason: 'confirm', workKey: `confirm:${phaseWork(row)}` };
@@ -101,6 +113,7 @@ export function coordinatorAcceptsReview(ownership: Ownership | null): boolean {
 }
 
 const PUSH_TITLE: Record<NeedsYouReason, string> = {
+  question: '需要你决定',
   confirm: '方案已就绪',
   review: '构建待审核',
 };

@@ -10,6 +10,7 @@ import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
 import { retryIsParked } from './retry-parking.js';
 import { getTodo } from './todos.js';
+import { pendingWorkerQuestions } from './worker-question-store.js';
 
 export const CITATION_CHECK_SOURCE_KIND = 'research-citation-check';
 export const CITATION_PARKED_MARK = 'Citation check parked';
@@ -118,6 +119,7 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
     .all();
   for (const row of rows) {
     if (row.latestBuildId === null || row.sourceKind === CITATION_CHECK_SOURCE_KIND) continue;
+    if (pendingWorkerQuestions(deps.db, row.latestBuildId).length > 0) continue;
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
     if (
       buildRow === undefined ||

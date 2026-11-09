@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "23313fb7-3506-4164-8ca3-257db69ca0cf",
+  "id": "fda393a6-1653-445c-85cf-f9d0ed863eb0",
   "prevId": "52883c25-095d-40e7-86de-77eb6149a5d8",
   "tables": {
     "agent_memory": {
@@ -6267,21 +6267,13 @@
           "autoincrement": false,
           "default": false
         },
-        "lastNotifiedOwner": {
-          "name": "lastNotifiedOwner",
+        "decisions": {
+          "name": "decisions",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false,
-          "default": "'none'"
-        },
-        "lastNotifiedWork": {
-          "name": "lastNotifiedWork",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "''"
+          "default": "'[]'"
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

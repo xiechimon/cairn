@@ -16,7 +16,7 @@ import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
-import { messageThreadAsUser, startThreadBuild } from './thread-message.js';
+import { answerTaskQuestion, messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 type Params = Record<string, unknown>;
@@ -26,6 +26,7 @@ const TITLE_MAX = 160;
 const LINE_MAX = 200;
 const QUESTION_TEXT_MAX = 400;
 const OPTION_LABELS_MAX = 8;
+const ANSWER_MAX = 20_000;
 
 const ROUTER_TOOLS: ReadonlySet<string> = new Set(CHIEF_ROUTER_TOOL_NAMES);
 const REMOVED_TOOLS: ReadonlyMap<string, string> = new Map(
@@ -114,6 +115,25 @@ async function messageThread(
   );
 }
 
+async function answerQuestion(
+  deps: ChiefToolDeps,
+  ctx: ChiefToolCtx,
+  params: Params,
+): Promise<string> {
+  const answer = str(params, 'answer');
+  if (answer.length > ANSWER_MAX) {
+    throw new HttpError(400, `invalid params.answer: at most ${ANSWER_MAX} characters`);
+  }
+  return json(
+    await answerTaskQuestion(
+      deps,
+      ctx.teamId,
+      { todoId: str(params, 'todoId'), requestId: str(params, 'requestId'), answer },
+      'coordinator',
+    ),
+  );
+}
+
 function stopThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
   const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
   str(params, 'reason');
@@ -161,7 +181,6 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
       title: tidy(row.title, TITLE_MAX),
       projectId: row.projectId,
       phase: row.phase,
-      awaitingReply: row.awaitingReply,
       line: line === null || line === undefined ? null : tidy(line, LINE_MAX),
       stopped:
         stop === null || stop === undefined ? null : { actor: stop.actor, reason: stop.reason },
@@ -232,6 +251,8 @@ export async function executeRouterTool(
       return messageThread(deps, ctx, params);
     case 'stop_thread':
       return stopThread(deps, ctx, params);
+    case 'answer_question':
+      return answerQuestion(deps, ctx, params);
     case 'threads':
       return threads(deps.db, ctx, params);
     case 'needs_you':

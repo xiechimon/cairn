@@ -62,6 +62,12 @@ import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
+const QUESTION_ABANDONING_PHASES: readonly Phase[] = ['todo', 'done', 'closed'];
+
+export function abandonsQuestions(to: Phase): boolean {
+  return QUESTION_ABANDONING_PHASES.includes(to);
+}
+
 export interface TodoDeps {
   githubAppTokenSocket?: string | null | undefined;
   githubAppIdentity?: GitIdentity | null | undefined;
@@ -146,7 +152,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     archivedAt: row.archivedAt,
     snoozedUntil: row.snoozedUntil,
     snoozeMode: row.snoozeMode,
-    ...(row.awaitingReply ? { awaitingReply: true } : {}),
+    ...(row.decisions.length > 0 ? { decisions: row.decisions } : {}),
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
@@ -339,7 +345,6 @@ export function createAutonomousTodo(
       seqNum,
       orderIndex: (orderRow?.n ?? -1) + 1,
       latestBuildId: null,
-      awaitingReply: false,
       lastRunAt: null,
       hasChanges: false,
       hasPlan: false,
@@ -572,10 +577,7 @@ export function setTodoPhase(
   id: string,
   to: Phase,
   extra: Partial<
-    Pick<
-      TodoRow,
-      'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'routeOverride' | 'awaitingReply'
-    >
+    Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'routeOverride'>
   > = {},
   options: { landedMerge?: true } = {},
 ): TodoRecord | null {
@@ -599,9 +601,8 @@ export function setTodoPhase(
   }
   assertPhaseTransition(row.phase, to);
   if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
-  const leavesQuestion = row.awaitingReply && to !== 'review' && extra.awaitingReply === undefined;
   return db.transaction(() => {
-    if (leavesQuestion && row.latestBuildId !== null) {
+    if (abandonsQuestions(to) && row.latestBuildId !== null) {
       cancelPendingWorkerQuestions(
         deps,
         row.latestBuildId,
@@ -611,7 +612,6 @@ export function setTodoPhase(
     db.update(todo)
       .set({
         ...extra,
-        ...(leavesQuestion ? { awaitingReply: false } : {}),
         phase: to,
         phaseAt: nowMs(),
         v: row.v + 1,

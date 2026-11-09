@@ -645,7 +645,10 @@ describe('needs you (#1800)', () => {
 
   test('a gate rejection is not retried and enters the current group', async () => {
     const w = openWorld();
-    completeStep(w.deps, w.stepId, { hasChanges: false });
+    completeStep(w.deps, w.stepId, {
+      hasChanges: true,
+      workBranchDrift: { expected: 'cairn/conv-1', actual: 'main' },
+    });
     const builds = buildCount(w);
     await sweepFailedRetries(w.deps);
 

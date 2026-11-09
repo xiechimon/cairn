@@ -107,6 +107,7 @@ export function notifyTodo(
 }
 
 const OWNERSHIP_NOTIFICATION_TYPE = {
+  question: 'build_review',
   confirm: 'plan_ready',
   review: 'build_review',
 } as const satisfies Record<NeedsYouReason, NotificationRecord['type']>;

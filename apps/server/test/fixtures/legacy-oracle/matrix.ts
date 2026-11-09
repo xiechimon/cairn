@@ -502,7 +502,6 @@ function same(label: string, actual: unknown, expected: unknown): void {
 }
 
 const ROUTED_TASK_COLUMNS = {
-  id: schema.todo.id,
   teamId: schema.todo.teamId,
   sourceKind: schema.todo.sourceKind,
   routeOverride: schema.todo.routeOverride,

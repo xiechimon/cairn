@@ -10,6 +10,7 @@ import {
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
+  isWaitingPhase,
   MEMORY_LAYERS,
   MERGE_HUMAN_ONLY_COPY,
   type MemoryLayer,
@@ -945,7 +946,7 @@ export function transitionTodos(
     if (
       to === 'done' &&
       actor.kind === 'agent' &&
-      (owned.phase === 'review' || owned.phase === 'confirm') &&
+      isWaitingPhase(owned.phase) &&
       !coordinatorAcceptsReview(ownershipOf(deps.db, owned))
     ) {
       skipped.push(id);

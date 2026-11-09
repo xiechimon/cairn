@@ -69,6 +69,15 @@ export const usageCostSchema = z.object({
 });
 export type UsageCost = z.infer<typeof usageCostSchema>;
 
+export const taskDecisionSchema = z.object({
+  requestId: z.string(),
+  question: z.string(),
+  answer: z.string(),
+  by: z.enum(['person', 'coordinator']),
+  at: epochMs,
+});
+export type TaskDecision = z.infer<typeof taskDecisionSchema>;
+
 export const THREAD_OWNERS = ['owner', 'coordinator'] as const;
 
 export const todoRecordSchema = z.object({
@@ -109,7 +118,7 @@ export const todoRecordSchema = z.object({
   quotaWait: quotaWaitSchema.nullable().optional(),
   usageCost: usageCostSchema.optional(),
   verified: z.boolean().optional(),
-  awaitingReply: z.boolean().optional(),
+  decisions: z.array(taskDecisionSchema).optional(),
   routeOverride: routeOverrideSchema.nullable().optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
