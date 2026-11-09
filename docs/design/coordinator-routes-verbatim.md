@@ -41,7 +41,8 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
      source:
        | { kind: 'chat'; threadId: string; messageId: string; span: 'whole' | 'quote' }
        | { kind: 'answer'; threadId: string; requestId: string; span: 'whole' | 'quote' }
-       | { kind: 'todo'; todoId: string; segment: number | null; span: 'whole' | 'quote' };
+       | { kind: 'todo'; todoId: string; segment: number | null; span: 'whole' | 'quote' }
+       | { kind: 'edit'; userId: string; at: number; span: 'whole' };
      author: 'owner' | 'third-party';
      sourceRef: string | null;
      text: string;
@@ -79,7 +80,11 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
 
    Each quote must be an exact substring of one cited segment (NFC, trimmed at the ends). It becomes a new `quote` segment that keeps that segment's `author` and `sourceRef`, so re-splitting a corrected issue child keeps the owner's correction owner-authored.
 7. `update_todo` (Coordinator surface) takes `todoId`, `tagIds`, `projectId` and `addMessageIds`. `addMessageIds` is allowed only on a task that has `request` and has not started. The cited messages and the task state are validated first, then the routing changes run, and only then the new owner segments are appended and `spec` is re-rendered, in one transaction.
-8. Attachment grants (`userSpecAttachmentIds`) are computed from owner segments only: `attachmentIdsInUserText` over each segment with `author: 'owner'`. Third-party text never grants an attachment.
+8. Other writers of an existing request task:
+   - **REST `PATCH /api/todos/:id`** (the owner editing in the board): a `spec` edit replaces `request.segments` with one owner `edit` segment holding the edited text, and keeps `siblings`, `difficulty` and `titleSource`. The owner's edit is their own words. Prompts and the board then agree, and a later `addMessageIds` appends after the edit instead of re-rendering the old segments over it. A `title` edit sets the title and keeps `titleSource: 'owner'`.
+   - **MCP `update_todo`** (an API-key client): a `title` or `spec` change to a task with `request` returns 409, telling the caller to edit it in the board or send owner messages through the Coordinator. Tag changes still work. MCP text was never the owner's cited words, and letting it into the segments would reopen the paraphrase path.
+   - `updateAutonomousTodo` refuses a `spec` patch on a task with `request` unless the call comes from the request service or the REST edit above. A static test lists its callers.
+9. Attachment grants (`userSpecAttachmentIds`) are computed from owner segments only: `attachmentIdsInUserText` over each segment with `author: 'owner'`. Third-party text never grants an attachment.
 
 ## Turn attribution: who writes `step.ownerMessageIds`
 
@@ -140,7 +145,7 @@ The new rules in `chief.ts`:
 
 ## Invariants
 
-1. For a task with `request`, `spec === renderTaskText(request)`, and only the request service writes either field.
+1. For a task with `request`, `spec === renderTaskText(request)`. Only the request service and the REST owner edit (decision 8) write either field.
 2. A segment's `author` never changes after the segment is created, and every copy of it (a quote, a re-split, an append) keeps it.
 3. Third-party text is fenced in every rendering: spec, issue body, task prompt, orchestration prompt and wake prompt. A title cut from third-party text is fenced wherever a model sees it. Owner text is never inside a fence.
 4. Attachment grants come only from owner segments.
@@ -159,9 +164,9 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 | W4 | re-split of a corrected issue child | copies segment authors | a child holding an issue quote plus an appended owner correction is split again by quoting the correction: the new segment is `owner`, unfenced, and grants the correction's attachments (red on revision 1) |
 | W5 | Coordinator `update_todo` `addMessageIds` | appends owner segments | appends after the fence; grants only the appended owner attachments, not issue-text tokens; a failing tag or project change appends nothing; a task without `request` or already started returns 409 |
 | W6 | owner-answered `ask_user` | `answer` segment | a cited owner-answered question becomes an `answer` segment with the owner's text; a Coordinator-answered one returns 400 |
-| W7 | REST `POST /api/projects/:id/todos`, `PATCH /api/todos/:id` | owner-typed `spec` | unchanged; a test pins that `request` stays null |
+| W7 | REST `POST /api/projects/:id/todos`, `PATCH /api/todos/:id` | owner-typed `spec` | POST and PATCH of a task without `request` are unchanged, and `request` stays null; PATCH `spec` on a task with `request` replaces its segments with one owner `edit` segment, the claim prompt shows the edit, and a following `addMessageIds` keeps it |
 | W8 | GitHub issue import (`github-issues.ts`) | issue body, `sourceKind` | unchanged; `request` stays null and the task-wide fence remains |
-| W9 | MCP face `create_todo`, `update_todo` | caller's own text | unchanged |
+| W9 | MCP face `create_todo`, `update_todo` | caller's own text | `create_todo` unchanged (`request` null); `update_todo` with `title` or `spec` on a task with `request` returns 409 and leaves segments and `spec` untouched; tags still update |
 | W10 | research threads, citation checks, retro proposals | server templates | unchanged |
 | W11 | worker `set_task_meta` | title | step 1: refused for a task with `request` (`titleFinal`); step 3: sets `titleSource: 'worker'`, after which every prompt labels the title as the worker's and does not fence it as the issue author's |
 | R1 | claim payload, daemon `buildTaskPrompt` (`machine-claim.ts`, `runner.ts`) | segments | the claim carries `request` to a daemon at or above `TASK_SEGMENTS_MIN_CLI_VERSION`; the prompt fences exactly the third-party segments and a third-party title; `classifyUserText` still reads it as `task-prompt`; an older daemon receives the server-fenced title and the rendered spec, and its prompt shows no third-party text unfenced |
