@@ -669,6 +669,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       return typeof wake.stepId === 'string' ? [wake.stepId] : [];
     }),
   );
+  const promptOrigins = new Map(
+    steps.flatMap((s) =>
+      s.promptOrigin !== undefined ? [[transcriptPromptRowId(s.id), s.promptOrigin] as const] : [],
+    ),
+  );
   const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
@@ -714,6 +719,14 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const text = textOfContent(m.content).trim();
     if (m.role === 'user') {
       if ([...scheduledStepIds].some((id) => m.id === transcriptPromptRowId(id))) continue;
+      const origin = promptOrigins.get(m.id);
+      if (origin !== undefined) {
+        entries.push({
+          at: m.createdAt,
+          item: { kind: 'step-prompt', id: m.id, origin, raw: text },
+        });
+        continue;
+      }
       if (GATE_ANNOUNCEMENTS.includes(text)) {
         entries.push({
           at: m.createdAt,
