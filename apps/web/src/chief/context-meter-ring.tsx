@@ -51,15 +51,6 @@ export function contextResumeOf(context: unknown): ContextResumeState | null {
     : null;
 }
 
-export function contextResumeRefreshAtMs(context: unknown): number | null {
-  if (context == null || typeof context !== 'object') return null;
-  const resume = contextResumeOf(context);
-  if (resume !== 'warm' && resume !== 'compacted') return null;
-  const until = (context as { resumeUntil?: unknown }).resumeUntil;
-  if (typeof until !== 'number' || !Number.isFinite(until)) return null;
-  return until;
-}
-
 export function contextResumeShortLabel(resume: ContextResumeState): string {
   return CONTEXT_RESUME_SHORT[resume];
 }

@@ -3,6 +3,7 @@ import {
   type ContextResume,
   contextResumeOf,
   resolveCacheRetentionTier,
+  resumeExpiresAtOf,
   retentionMsFor,
 } from '../coordinator/runtime/cold-slim.js';
 import type { Db } from '../db/client.js';
@@ -60,7 +61,12 @@ export function lastTurnContext(
   db: Db,
   chiefRow: { id: string; teamId: string },
   threadId?: string,
-): { tokens: number; contextWindow: number; resume: ContextResume } | null {
+): {
+  tokens: number;
+  contextWindow: number;
+  resume: ContextResume;
+  resumeExpiresAt?: number;
+} | null {
   if (threadId !== undefined) {
     const owned = db
       .select({ id: chiefThread.id })
@@ -111,6 +117,7 @@ export function lastTurnContext(
       .from(coordinatorConversation)
       .where(eq(coordinatorConversation.threadId, last.threadId))
       .get() ?? null;
+  const lastColdSlimAt = coldSlim?.at ?? null;
   const resume = contextResumeOf({
     now: nowMs(),
     retentionMs,
@@ -121,20 +128,20 @@ export function lastTurnContext(
       contextTokens: last.tokens,
       model: last.model,
     },
-    lastColdSlimAt: coldSlim?.at ?? null,
+    lastColdSlimAt,
     lastColdSlimStepId: coldSlim?.stepId ?? null,
     lastUsageStepId: last.stepId,
   });
-  const resumeUntil =
-    resume === 'compacted' && coldSlim?.at != null
-      ? coldSlim.at + retentionMs
-      : resume === 'warm'
-        ? last.createdAt + retentionMs
-        : undefined;
+  const resumeExpiresAt = resumeExpiresAtOf({
+    resume,
+    retentionMs,
+    lastUsageCreatedAt: last.createdAt,
+    lastColdSlimAt,
+  });
   return {
     tokens: last.tokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
     resume,
-    ...(resumeUntil !== undefined ? { resumeUntil } : {}),
+    ...(resumeExpiresAt !== null ? { resumeExpiresAt } : {}),
   };
 }

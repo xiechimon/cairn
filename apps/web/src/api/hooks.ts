@@ -561,8 +561,9 @@ export const useSkillFile = (
     retry: false,
   });
 
-export const useChief = (teamId: string | undefined, enabled: boolean, threadId?: string | null) =>
-  useQuery({
+export function useChief(teamId: string | undefined, enabled: boolean, threadId?: string | null) {
+  const qc = useQueryClient();
+  const query = useQuery({
     queryKey: ['chief', teamId, threadId ?? null],
     queryFn: () => {
       const q =
@@ -571,6 +572,17 @@ export const useChief = (teamId: string | undefined, enabled: boolean, threadId?
     },
     enabled: enabled && teamId !== undefined,
   });
+  const resumeExpiresAt = query.data?.context?.resumeExpiresAt;
+  useEffect(() => {
+    if (!enabled || teamId === undefined || resumeExpiresAt == null) return;
+    const delay = Math.max(0, resumeExpiresAt - Date.now());
+    const timer = window.setTimeout(() => {
+      void qc.invalidateQueries({ queryKey: ['chief', teamId, threadId ?? null] });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [enabled, teamId, threadId, resumeExpiresAt, qc]);
+  return query;
+}
 
 export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
   useQuery({

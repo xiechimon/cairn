@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { type ReactNode, type Ref, useCallback, useEffect, useImperativeHandle } from 'react';
+import { type ReactNode, type Ref, useCallback, useImperativeHandle } from 'react';
 import { useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { formatClock } from '../components/chat/live-row.js';
@@ -19,7 +19,6 @@ import {
   ContextMeterRing,
   contextPercentOf,
   contextResumeOf,
-  contextResumeRefreshAtMs,
   MOCK_CONTEXT_PERCENT,
 } from './context-meter-ring.js';
 
@@ -104,15 +103,6 @@ export function ComposerSurface({
   const chiefQ = useChief(teamId, live, threadId);
   const contextPercent = contextPercentOf(chiefQ.data?.context);
   const contextResume = contextResumeOf(chiefQ.data?.context);
-  const contextResumeRefreshAt = contextResumeRefreshAtMs(chiefQ.data?.context);
-  useEffect(() => {
-    if (!live || contextPercent == null || contextResumeRefreshAt == null) return;
-    const delay = Math.max(0, contextResumeRefreshAt - Date.now());
-    const id = window.setTimeout(() => {
-      void chiefQ.refetch();
-    }, delay);
-    return () => window.clearTimeout(id);
-  }, [live, contextPercent, contextResumeRefreshAt, chiefQ.refetch]);
   const wire = useComposerWire({
     editable,
     draft: binding.draft,

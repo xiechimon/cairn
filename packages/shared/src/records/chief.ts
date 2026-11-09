@@ -92,7 +92,7 @@ export const chiefGetResponseSchema = z.object({
       tokens: z.number().int(),
       contextWindow: z.number().int(),
       resume: z.enum(['warm', 'cold', 'compacted', 'idle']).optional(),
-      resumeUntil: z.number().int().optional(),
+      resumeExpiresAt: epochMs.optional(),
     })
     .nullable(),
   watches: z.array(chiefWatchSchema),

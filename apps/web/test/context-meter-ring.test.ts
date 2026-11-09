@@ -8,7 +8,6 @@ import {
   contextMeterArcPath,
   contextPercentOf,
   contextResumeOf,
-  contextResumeRefreshAtMs,
   contextResumeShortLabel,
   MOCK_CONTEXT_PERCENT,
 } from '../src/chief/context-meter-ring.js';
@@ -56,19 +55,6 @@ describe('contextResumeOf', () => {
     expect(contextResumeOf({ resume: 'cold' })).toBe('cold');
     expect(contextResumeOf({ resume: 'compacted' })).toBe('compacted');
     expect(contextResumeOf({ resume: 'idle' })).toBe('idle');
-  });
-});
-
-describe('contextResumeRefreshAtMs', () => {
-  test('schedules only while warm/compacted still carry a resumeUntil from cold-slim TTL', () => {
-    expect(contextResumeRefreshAtMs(null)).toBeNull();
-    expect(contextResumeRefreshAtMs({ resume: 'cold', resumeUntil: 9 })).toBeNull();
-    expect(contextResumeRefreshAtMs({ resume: 'warm' })).toBeNull();
-    expect(contextResumeRefreshAtMs({ resume: 'warm', resumeUntil: Number.NaN })).toBeNull();
-    expect(contextResumeRefreshAtMs({ resume: 'warm', resumeUntil: 1_700_000_000_000 })).toBe(
-      1_700_000_000_000,
-    );
-    expect(contextResumeRefreshAtMs({ resume: 'compacted', resumeUntil: 42 })).toBe(42);
   });
 });
 

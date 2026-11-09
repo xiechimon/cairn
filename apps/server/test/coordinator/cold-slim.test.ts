@@ -9,6 +9,7 @@ import {
   isColdResume,
   isPureToolCallAssistant,
   projectColdMessages,
+  resumeExpiresAtOf,
   retentionMsFor,
   SHORT_RETENTION_MS,
   selectColdMessageWindow,
@@ -509,6 +510,35 @@ describe('contextResumeOf', () => {
         lastUsageStepId: 'cold-step',
       }),
     ).toBe('compacted');
+  });
+});
+
+describe('resumeExpiresAtOf', () => {
+  it('schedules warm expiry from last usage and compacted from last cold slim', () => {
+    expect(
+      resumeExpiresAtOf({
+        resume: 'warm',
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsageCreatedAt: 1_000,
+        lastColdSlimAt: null,
+      }),
+    ).toBe(1_000 + SHORT_RETENTION_MS);
+    expect(
+      resumeExpiresAtOf({
+        resume: 'compacted',
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsageCreatedAt: 1_000,
+        lastColdSlimAt: 2_000,
+      }),
+    ).toBe(2_000 + SHORT_RETENTION_MS);
+    expect(
+      resumeExpiresAtOf({
+        resume: 'cold',
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsageCreatedAt: 1_000,
+        lastColdSlimAt: null,
+      }),
+    ).toBeNull();
   });
 });
 

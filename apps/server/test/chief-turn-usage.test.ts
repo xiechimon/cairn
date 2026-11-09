@@ -340,15 +340,15 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       ['turn-a', 21_000],
       ['turn-b', 23_456],
     ]);
-    const ctx = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
-    expect(ctx).toMatchObject({
+    const context = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(context).toMatchObject({
       tokens: 23_456,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
-    const lastAt = turnRows().find((r) => r.stepId === 'turn-b')?.createdAt;
-    expect(lastAt).toEqual(expect.any(Number));
-    expect(ctx?.resumeUntil).toBe(lastAt! + SHORT_RETENTION_MS);
+    const turnB = turnRows().find((r) => r.stepId === 'turn-b');
+    expect(turnB).toBeDefined();
+    expect(context?.resumeExpiresAt).toBe((turnB?.createdAt ?? 0) + SHORT_RETENTION_MS);
   });
 
   test('flag on: a turn without contextTokens (claude-code) leaves the meter empty', async () => {
