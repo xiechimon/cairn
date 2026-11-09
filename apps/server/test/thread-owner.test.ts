@@ -6,6 +6,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   gateState,
+  notification,
   plan as planTable,
   project as projectTable,
   step as stepTable,
@@ -528,6 +529,9 @@ describe('a Coordinator turn that changes nothing hands the task to the owner (t
       reconcileOwners(w.deps);
       expect(ownerNow(w)).toBe('owner');
       expect(w.notified()).toBe(before + 1);
+      expect(
+        w.s.db.select().from(notification).where(eq(notification.entityId, w.todoId)).get()?.type,
+      ).toBe('coordinator_handoff');
       expect(wakes(w)).toHaveLength(1);
       const inbox = listNeedsYou(w.deps, w.s.team.id).current;
       expect(inbox.map((entry) => [entry.todo.id, entry.reason])).toEqual([[w.todoId, 'handoff']]);
