@@ -10,7 +10,6 @@ test('Feishu settings configure, reload, update and unbind without disclosing th
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/teams') return route.fulfill({ json: [{ id: 'team-1', name: 'Team', plan: 'free', createdAt: 0 }] });
     if (path === '/api/user/me' || path === '/api/auth/session') return route.fulfill({ json: { id: 'user-1', displayName: 'Owner', avatarUrl: null, type: 'user' } });
-    if (path === '/api/flags') return route.fulfill({ json: { flags: [] } });
     if (path === '/api/teams/team-1/chief') return route.fulfill({ status: 404, json: { error: 'Coordinator not configured' } });
     if (path === '/api/teams/team-1/feishu') {
       if (route.request().method() === 'PUT') {
