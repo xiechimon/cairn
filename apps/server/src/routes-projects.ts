@@ -38,11 +38,7 @@ import {
   isGithubRepoRef,
   provisionHostedRepo,
   readBranches,
-  readCommitDetail,
-  readCommitHistory,
-  readFile,
   readFiles,
-  readTree,
   slugifyRepoName,
   toProjectRecord,
   uniqueRepoName,
@@ -182,20 +178,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     return c.json(record, 201);
   });
 
-  app.get('/api/projects/:id/tree', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    return c.json(await readTree(ctx, row.id, c.req.query('ref'), c.req.query('path')));
-  });
-
-  app.get('/api/projects/:id/file', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    const path = c.req.query('path');
-    if (path === undefined || path === '') {
-      throw new HttpError(400, 'invalid query path: required');
-    }
-    return c.json(await readFile(ctx, row.id, path, c.req.query('ref')));
-  });
-
   app.get('/api/projects/:id/files', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
     return c.json(await readFiles(ctx, row.id, c.req.query('ref'), c.req.query('limit')));
@@ -204,16 +186,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/projects/:id/branches', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
     return c.json(await readBranches({ ...ctx, box: ctx.secretBox }, row.id));
-  });
-
-  app.get('/api/projects/:id/commits', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    return c.json(await readCommitHistory(ctx, row.id, c.req.query('ref')));
-  });
-
-  app.get('/api/projects/:id/commits/:sha', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    return c.json(await readCommitDetail(ctx, row.id, c.req.param('sha')));
   });
 
   app.post('/api/projects', async (c) => {

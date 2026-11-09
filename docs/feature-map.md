@@ -148,9 +148,9 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
-### B8 · Composer, attachments and project files
+### B8 · Composer and attachments
 
-Everything typed or attached before a message is sent and the files a project shows: mentions, slash commands, named prompts, drafts that survive a restart, attachments, and the files and commits tab. Research claude.ai, Amp and t3code; design the draft and attachment model and the files view.
+Everything typed or attached before a message is sent: mentions, slash commands, named prompts, drafts that survive a restart and attachments. Research claude.ai, Amp and t3code; design the draft and attachment model.
 
 | Feature | Centrality | Missing |
 |---|---|---|

@@ -9,12 +9,9 @@ import {
   gitHostedRepoPath,
   normalizedRepoRef,
   type ProjectBranchesResponse,
-  type ProjectCommitDetailResponse,
-  type ProjectCommitsResponse,
   type ProjectFileResponse,
   type ProjectFilesResponse,
   type ProjectRecord,
-  type ProjectTreeResponse,
   parseGithubRepoRef,
   projectMergeConfigSchema,
   type SecretBox,
@@ -329,20 +326,6 @@ async function resolveCommitOr404(
   return commit;
 }
 
-export async function readTree(
-  ctx: RepoCtx,
-  projectId: string,
-  refParam?: string,
-  pathParam?: string,
-): Promise<ProjectTreeResponse> {
-  const dir = await requireRepoReadDir(ctx, projectId);
-  const ref = refParam ?? 'HEAD';
-  const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
-  const subPath = pathParam !== undefined && pathParam !== '' ? pathParam : undefined;
-  const entries = await systemGitOps.lsTree(dir, commit, subPath);
-  return { ref, commit, path: subPath ?? '', entries };
-}
-
 export const PROJECT_FILES_DEFAULT_LIMIT = 2000;
 export const PROJECT_FILES_MAX_LIMIT = 5000;
 
@@ -459,65 +442,6 @@ export async function readBranches(
   }
   const dir = await requireRepoReadDir(ctx, projectId);
   return systemGitOps.listBranches(dir);
-}
-
-const COMMITS_LIMIT = 50;
-
-export async function readCommitHistory(
-  ctx: RepoCtx,
-  projectId: string,
-  refParam?: string,
-): Promise<ProjectCommitsResponse> {
-  const dir = await requireRepoReadDir(ctx, projectId);
-  const { defaultBranch } = await systemGitOps.listBranches(dir);
-  const ref = refParam ?? defaultBranch ?? 'HEAD';
-  const commit = await resolveReadCommit(ctx, projectId, dir, ref);
-  if (commit === null) return { ref, commits: [] };
-  const r = await runGit(
-    ['log', `--max-count=${COMMITS_LIMIT}`, '--format=%H%x00%h%x00%aI%x00%an%x00%s', commit],
-    { cwd: dir, timeoutMs: 30_000 },
-  );
-  if (r.code !== 0) return { ref, commits: [] };
-  const commits = r.stdout
-    .toString('utf8')
-    .split('\n')
-    .filter((line) => line !== '')
-    .map((line) => {
-      const [sha, shortSha, at, authorName, message] = line.split('\0');
-      return {
-        sha: sha ?? '',
-        shortSha: shortSha ?? '',
-        message: message ?? '',
-        authorName: authorName ?? '',
-        at: Date.parse(at ?? '') || 0,
-      };
-    });
-  return { ref, commits };
-}
-
-export async function readCommitDetail(
-  ctx: RepoCtx,
-  projectId: string,
-  sha: string,
-): Promise<ProjectCommitDetailResponse> {
-  const dir = await requireRepoReadDir(ctx, projectId);
-  const commit = await resolveCommitOr404(ctx, projectId, dir, sha);
-  const r = await runGit(
-    ['show', '--format=%H%x00%h%x00%aI%x00%an%x00%s', '--patch', '--first-parent', commit],
-    { cwd: dir, timeoutMs: 30_000 },
-  );
-  if (r.code !== 0) throw notFound(`commit ${sha}`);
-  const text = r.stdout.toString('utf8');
-  const [fullSha, shortSha, at, authorName, message] = (text.split('\n')[0] ?? '').split('\0');
-  if (fullSha === undefined || fullSha === '') throw notFound(`commit ${sha}`);
-  return {
-    sha: fullSha,
-    shortSha: shortSha ?? '',
-    message: message ?? '',
-    authorName: authorName ?? '',
-    at: Date.parse(at ?? '') || 0,
-    files: parseUnifiedDiff(text),
-  };
 }
 
 export function parseUnifiedDiff(text: string): DocumentDiffFile[] {
