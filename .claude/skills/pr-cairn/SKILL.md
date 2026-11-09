@@ -32,8 +32,9 @@ who did not watch the work. Use this order:
 
 For code changes, the Codex cloud review on the PR head is the required
 review. Protected paths, documentation included, need it too; other
-docs-only changes need no code review. After three rounds, rethink or hand
-the PR to ian.
+docs-only changes need no code review. Review convergence (whole bug class
+per push, one push per round, P2/P3 deferral to a real issue, the round-3
+stop) follows `AGENTS.md`, "How to work".
 Review links the Codex cloud review on the head SHA, states its verdict and
 lists unfixed findings with reasons. Risk states one-way or two-way
 door, blast radius and whether the owner must merge. Put longer overlap

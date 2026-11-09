@@ -26,19 +26,25 @@ node scripts/dispatch-agent.mjs wait 1556-impl
 
 Do not continue on a banned model from the "Do not use" line of the "Model roles" section in `AGENTS.md` (including `deepseek-v4-flash`; `deepseek-v4.1-flash` remains allowed). If `ai-route` selects a banned model, stop and exit non-zero so the dispatcher can retry. If you abort without opening a PR (overlapping work, human decision required, or any other stop), exit the process with a non-zero status.
 
-## Dependent work on unmerged PRs (#2566)
+## Dependent work on unmerged PRs (#2566, #3515)
 
-Measured on 2026-11-02 in a scratch repo set up like cairn (results on #2566):
+No stacked PRs by default. Measured on 81 merged PRs (`docs/research/pr-flow-speed-2026-11-09.md`): a clean small PR merges in about 13 minutes, while stacks were hand-merged up the chain (14 merge commits on one layer) and re-reviewed on every base push.
 
-- A held lower layer blocks every layer above it from reaching `main` while they stay stacked: `gh stack merge`, `gh pr merge`, both REST merge APIs, auto-merge and Mergify all refuse. Unstacking is the only leak: the upper PR then merges into the held layer's unprotected branch, so never unstack a layer to merge it.
-- A stacked PR enters the same queue when its body has `Depends-On: #N` for the layer below and that layer's head is its base. The queue then treats the chain as landing on `main`. A stack with no `Depends-On` line is skipped, because the queue rule only matches `base = main` or a dependency.
-- GitHub rebases an upper layer server-side after the layer below squash-merges. Its head SHA changes, so the `review-gate` check re-runs on the new head.
+- Branch every PR from `origin/main`. If your task depends on an open PR, wait for it to merge, or keep your work on a local branch and open the PR only after the base has merged and you have merged `origin/main` into your branch.
+- Never open a PR whose base is another PR's branch, and never point a PR at a lane branch by hand.
+- A stack that exists already is still guarded: a held lower layer blocks every layer above it from reaching `main`, and the queue admits an upper layer only with `Depends-On: #N` for the layer below (measured on 2026-11-02, #2566). Never unstack a layer to merge it.
 
-Rules:
+## Review convergence (#3515)
 
-- Layers on protected paths use the same queue as every other green PR. Build them with `gh stack` (`gh extension install github/gh-stack`) when the work is stacked, one PR per layer, and report the stack ready once every layer has CI and a Codex review on its head. Do not wait for ian to merge a protected path. The Codex review reads each PR against its own base, so each layer is reviewed on its own diff.
-- Layers the merge queue would admit can be stacked. The bottom PR targets `main`. Each layer above sets its base to the previous head and puts `Depends-On: #N` in the body. Queue the top once every layer is green; the chain enters together.
-- Never point a PR at a lane branch by hand; a hand-made base branch has no stack rule behind it.
+Add this block to every implementation brief:
+
+```text
+Review convergence: for each Codex finding, name its bug class, find every other instance in this PR's diff and the entry paths it touches, and fix them all in one push. Reply on each thread with the class and the sites changed, then resolve it. P0/P1 must be fixed. A real P2/P3 outside this change: open an issue, reply "valid, out of scope for this PR, tracked in #N", resolve the thread. Not a defect: reply with the reason, resolve. Push once per round. After round 3 with findings open, stop and hand the PR to the coordinator with the class list.
+Design first: for persisted state, a protocol or concurrency, write a one-page design listing every read and write path and get it reviewed before code.
+Queue: never post Mergify commands. If the PR is green but not queued after 10 minutes, read the "Mergify Merge Queue" check run and fix the unmet condition.
+Stacking: branch from origin/main. If your task depends on an open PR, wait for it to merge or keep your work local until it does.
+Size: one self-contained change, under 400 changed lines outside generated files; split anything past 1000 before review; pr-size fails above 3000.
+```
 
 ## Accessing GitHub
 
