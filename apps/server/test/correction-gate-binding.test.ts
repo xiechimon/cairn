@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { build, message, project, tag, todo, todoTag } from '../src/db/schema.js';
+import { build, message, project, todo } from '../src/db/schema.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
 import { evaluateMergeGate } from '../src/services/merge-gate-run.js';
 import { bootServer } from './helpers.js';
@@ -34,6 +34,7 @@ test.each(['modified', 'added'] as const)(
           projectId: 'project',
           teamId: s.team.id,
           title: 'Thread',
+          correctionRequired: true,
           phase: 'review',
           phaseAt: 1,
           seqNum: 1,
@@ -53,11 +54,6 @@ test.each(['modified', 'added'] as const)(
           prNumber: 42,
         })
         .run();
-      s.db
-        .insert(tag)
-        .values({ id: 'correction', projectId: 'project', name: 'correction', color: '#000000' })
-        .run();
-      s.db.insert(todoTag).values({ todoId: 'task', tagId: 'correction' }).run();
       const port: GateGithubPort = {
         pull: async () =>
           ok({
