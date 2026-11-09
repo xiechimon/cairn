@@ -18,6 +18,7 @@ import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites, updateAutonomousTodo } from '../src/services/todos.js';
 import { bootServer, postProject, req, seedRoute, type TestServer } from './helpers.js';
+import { ownerTodoParams } from './owner-message.js';
 
 const AGENT_ID = 'agent-orch-1';
 const REPO = 'octo/alpha';
@@ -107,6 +108,10 @@ async function relay(
   return JSON.parse(text) as unknown;
 }
 
+function ownerTodo(words: string, target: string = projectId) {
+  return ownerTodoParams(s.db, threadId, target, words);
+}
+
 interface TodoWire {
   id: string;
   sourceKind: string | null;
@@ -145,11 +150,10 @@ beforeEach(async () => {
 
 describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)', () => {
   test('A1 local project -> sourceKind=orchestration + sourceRef=chief:<uuid>, the three provenance layers keep their old values', async () => {
-    const created = (await relay('create_todo', {
-      projectId,
-      title: '重构登录页表单校验',
-      spec: '> 登录页表单校验太松\n\n要求：\n- 邮箱格式校验',
-    })) as TodoWire;
+    const created = (await relay(
+      'create_todo',
+      ownerTodo('重构登录页表单校验', projectId),
+    )) as TodoWire;
     expect(created.sourceKind).toBe('orchestration');
     expect(created.sourceRef).toBe(orchestrationSourceRef(threadId));
     expect(created.createdBy).toBe(AGENT_ID);
@@ -171,7 +175,7 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
     );
     const created = (await relay(
       'create_todo',
-      { projectId: ghProject, title: '写贡献指南', spec: 's' },
+      ownerTodo('写贡献指南', ghProject),
       ghFetch,
     )) as TodoWire;
     expect(created.sourceKind).toBe('github-issue-self');
@@ -225,7 +229,7 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
   });
 
   test('C1 the stored ref and the shared single source are exact inverses (the detail panel links back to the session consumer)', async () => {
-    const created = (await relay('create_todo', { projectId, title: 't', spec: 's' })) as TodoWire;
+    const created = (await relay('create_todo', ownerTodo('t', projectId))) as TodoWire;
     const parsed = parseOrchestrationSourceRef(created.sourceRef as string);
     expect(parsed).toEqual({ threadId });
   });
@@ -286,16 +290,11 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     s.db.run(sql`INSERT INTO github_label (id, projectId, name, color)
       VALUES ('correction-label', ${projectId}, 'correction', '#000000')`);
     updateAutonomousTodo(s.svc, todoId, { githubLabelIds: ['correction-label'] });
-    const edited = await relay('update_todo', {
-      todoId,
-      title: 'Coordinator edit',
-      tagIds: [],
-      githubLabelIds: [],
+    await expect(relay('update_todo', { todoId, githubLabelIds: [] })).rejects.toMatchObject({
+      status: 400,
     });
-    expect(edited).toMatchObject({
-      title: 'Coordinator edit',
-      githubLabelIds: ['correction-label'],
-    });
+    const edited = await relay('update_todo', { todoId, tagIds: [] });
+    expect(edited).toMatchObject({ tagIds: [], githubLabelIds: ['correction-label'] });
     expect(s.db.get(sql`SELECT correctionRequired FROM todo WHERE id = ${todoId}`)).toEqual({
       correctionRequired: 1,
     });
@@ -327,15 +326,15 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
 });
 
 describe('B prompt surface: orchestration round splitting discipline (the r14 §5.2 guardrails in the system prompt)', () => {
-  test('B1 the system prompt contains granularity=verifications per round / the spec embedded verbatim / dispatch through open_thread', () => {
+  test('B1 the system prompt contains granularity=verifications per round / split by exact owner quotes / dispatch through open_thread', () => {
     const prompt = composeChiefSystemPrompt(
       { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir: s.skillsDir },
       teamId,
     );
     expect(prompt).toContain('拆分粒度 = 核销次数');
     expect(prompt).toContain('可独立验收');
-    expect(prompt).toContain('原文片段');
-    expect(prompt).toContain('兄弟任务');
+    expect(prompt).toContain('quotes 填这张卡覆盖的主人原句');
+    expect(prompt).not.toContain('原文片段');
     expect(prompt).toContain('open_thread');
     expect(prompt).not.toContain('withPlan:false');
   });

@@ -67,6 +67,7 @@ export * from './snooze.js';
 export * from './step.js';
 export * from './system-row.js';
 export * from './tag.js';
+export * from './task-request.js';
 export * from './tasks.js';
 export * from './team.js';
 export * from './thread-pr.js';

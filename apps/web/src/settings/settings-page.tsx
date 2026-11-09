@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import {
+  Archive,
   ArrowLeft,
   KeyRound,
   Layers,
@@ -37,6 +38,7 @@ import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
+import { ArchivedProjectsSection } from './archived-projects-section.js';
 import { lastOutsideLocation, SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
 
 interface Section {
@@ -87,6 +89,12 @@ const GROUPS: Group[] = [
     sections: [
       { id: 'account', label: '账号', Icon: User, element: () => <AccountPage /> },
       { id: 'appearance', label: '外观', Icon: Palette, element: () => <AppearanceSection /> },
+      {
+        id: 'projects',
+        label: '项目',
+        Icon: Archive,
+        element: () => <ArchivedProjectsSection />,
+      },
     ],
   },
   {

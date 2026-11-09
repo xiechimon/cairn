@@ -48,6 +48,7 @@ import type {
   StepKind,
   StepPromptOrigin,
   TaskDecision,
+  TaskRequest,
   TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
@@ -182,6 +183,7 @@ export const todo = sqliteTable(
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
       .default(sql`'[]'`),
+    request: json<TaskRequest | null>('request'),
   },
   (t) => [index('todo_phase_idx').on(t.phase)],
 );
@@ -311,6 +313,7 @@ export const step = sqliteTable(
     prompt: text('prompt'),
     promptOrigin: json<StepPromptOrigin>('promptOrigin'),
     scopeProjectId: text('scopeProjectId'),
+    ownerMessageIds: json<string[]>('ownerMessageIds'),
     byPerson: bool('byPerson').notNull().default(false),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),

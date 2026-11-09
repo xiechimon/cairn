@@ -21,6 +21,7 @@ import {
 import { createApiKey } from '../src/services/api-keys.js';
 import { sendChiefMessage } from '../src/services/chief.js';
 import { createOrGetQuestion } from '../src/services/chief-questions.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
 const READ = [
@@ -176,6 +177,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
       threadId,
       requestId: 'question-one',
       questions: [{ header: 'Scope', question: 'Which API?', options: [] }],
+      askedFor: [],
     });
     insertWork(s, projectId, 'needs-review');
     insertWork(s, projectId, 'needs-answer', 'needs_input');
@@ -208,6 +210,81 @@ describe('Coordinator terminal entry through an MCP client', () => {
     });
     expect(duplicate.isError).toBe(true);
   });
+
+  test.each([false, true])(
+    'an MCP answer is included in default task creation (parked=%s)',
+    async (parked) => {
+      const { s, client, projectId, threadId } = await world();
+      const turn = s.db.select().from(step).where(eq(step.buildId, threadId)).get()!;
+      s.db
+        .update(step)
+        .set({ status: 'claimed', claimedAt: Date.now() })
+        .where(eq(step.id, turn.id))
+        .run();
+      createOrGetQuestion(s.svc, {
+        threadId,
+        requestId: 'mcp-owner-answer',
+        questions: [{ header: 'Scope', question: 'Which API?', options: [] }],
+        askedFor: turn.ownerMessageIds ?? [],
+      });
+      if (parked) {
+        const question = s.db
+          .select()
+          .from(chiefMessage)
+          .where(eq(chiefMessage.id, 'mcp-owner-answer'))
+          .get()!;
+        s.db
+          .update(chiefMessage)
+          .set({
+            content: JSON.stringify({
+              ...JSON.parse(String(question.content)),
+              parkedAt: Date.now(),
+            }),
+          })
+          .where(eq(chiefMessage.id, question.id))
+          .run();
+        s.db
+          .update(step)
+          .set({ status: 'done', finishedAt: Date.now() })
+          .where(eq(step.id, turn.id))
+          .run();
+        s.db.update(chiefThread).set({ activeRun: null }).where(eq(chiefThread.id, threadId)).run();
+      }
+      await call(client, 'reply_thread', {
+        threadId,
+        requestId: 'mcp-owner-answer',
+        answers: [{ header: 'Scope', text: 'The public API only' }],
+      });
+      const current = s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, threadId))
+        .all()
+        .find((row) => (parked ? row.id !== turn.id : row.id === turn.id))!;
+      const thread = s.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get()!;
+      const created = JSON.parse(
+        await executeChiefTool(
+          { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
+          {
+            teamId: s.team.id,
+            userId: s.user.id,
+            chiefId: thread.chiefId,
+            chiefAgentId: null,
+            threadId,
+            conversationId: threadId,
+            turnMessageIds: current.ownerMessageIds ?? [],
+          },
+          'create_todo',
+          { projectId },
+        ),
+      ) as { spec: string };
+      expect(created.spec).toBe('Improve the Project\n\nThe public API only');
+      expect(current.ownerMessageIds).toEqual([
+        ...(turn.ownerMessageIds ?? []),
+        'mcp-owner-answer',
+      ]);
+    },
+  );
 
   test('reads and steers a work Thread and returns only its persisted PR links', async () => {
     const { s, client, projectId, threadId } = await world();
@@ -556,6 +633,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
       threadId: foreign,
       requestId: 'foreign-question',
       questions: [{ header: 'Private', question: 'Private decision', options: [] }],
+      askedFor: [],
     });
     s.db
       .insert(todo)
@@ -719,6 +797,7 @@ describe('Thread wait, interrupt and search through an MCP client', () => {
         threadId,
         requestId: 'mid-wait',
         questions: [{ header: 'Scope', question: 'Which API?', options: [] }],
+        askedFor: [],
       });
     }, 300);
     const result = await call<WaitResponse>(client, 'wait_thread', {

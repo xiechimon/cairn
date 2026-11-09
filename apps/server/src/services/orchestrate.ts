@@ -38,12 +38,18 @@ export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
     bugLabel,
     sourceKind: record.sourceKind,
     sourceRef: record.sourceRef,
+    request: record.request ?? null,
   });
-  const result = sendChiefMessage(deps, record.teamId, {
-    threadId: null,
-    projectId: record.projectId,
-    content: isCorrectionTask(deps.db, todoId) ? `${CORRECTION_PROMPT}\n\n${content}` : content,
-  });
+  const result = sendChiefMessage(
+    deps,
+    record.teamId,
+    {
+      threadId: null,
+      projectId: record.projectId,
+      content: isCorrectionTask(deps.db, todoId) ? `${CORRECTION_PROMPT}\n\n${content}` : content,
+    },
+    { ownerWords: false },
+  );
   deps.convHub?.publishMessage(result.thread.id, { ...result.message });
   return result;
 }

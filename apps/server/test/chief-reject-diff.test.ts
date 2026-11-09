@@ -4,18 +4,14 @@ import { build as buildTable, plan as planTable, step as stepTable } from '../sr
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { planDocumentDiff } from '../src/services/documents.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
 import { req, startLegacyBuild } from './helpers.js';
 
 registerChiefHarness();
 
 describe('rejection loop plan v2 + unified diff (r5 section 4 / 02 section 4.2)', () => {
   test('documents/{id}/diff = plan.md file-level unified diff (v1->v2 + hunk header)', async () => {
-    const todoRec = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: 'plan diff',
-      spec: 's',
-    })) as {
+    const todoRec = (await relay('create_todo', ownerTodo('plan diff'))) as {
       id: string;
     };
     const buildId = newUuidv7();
@@ -65,11 +61,7 @@ describe('rejection loop plan v2 + unified diff (r5 section 4 / 02 section 4.2)'
   });
 
   test('rejection -> replan step enqueued carrying the feedback instruction (v2 faithfully executes the feedback host half, r5 section 4)', async () => {
-    const todoRec = (await relay('create_todo', {
-      projectId: H.projectId,
-      title: 't',
-      spec: 's',
-    })) as {
+    const todoRec = (await relay('create_todo', ownerTodo('t'))) as {
       id: string;
     };
     const buildId = startLegacyBuild(H.s, todoRec.id, { withPlan: true });

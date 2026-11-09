@@ -21,8 +21,8 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { messageTodo, requestStop } from './builds.js';
-import { sendChiefMessage } from './chief.js';
-import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
+import { answerChiefQuestion, sendChiefMessage } from './chief.js';
+import { askQuestionContentOf } from './chief-questions.js';
 import type { ChiefToolDeps } from './chief-tools.js';
 import { steerChiefMessage, stopChiefTurn } from './chief-turns.js';
 import { readConversationPage } from './conversation-page.js';
@@ -381,7 +381,7 @@ export async function executeThreadMcpTool(
           input.projectId !== undefined
         )
           throw new HttpError(400, 'Answer a Coordinator question with requestId and answers only');
-        return answerQuestion(deps, {
+        return answerChiefQuestion(deps, teamId, {
           threadId: input.threadId,
           requestId: input.requestId,
           answers: input.answers,

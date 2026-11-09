@@ -7,6 +7,7 @@ import {
   buildTaskPromptText,
   claudeLoginBlocksClaim,
   claudeRateBlock,
+  fencedTitle,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
@@ -175,6 +176,8 @@ export function serverTakesTurn(
     coordinatorRoute(db, teamId) !== null
   );
 }
+
+export const TASK_SEGMENTS_MIN_CLI_VERSION = '0.2.4';
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
   return cliVersionAtLeast(latestCliVersion, MCP_MIN_CLI_VERSION);
@@ -560,12 +563,16 @@ async function tryClaim(
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
     const workerMcp = claimMcpSlugs(machineRow.latestCliVersion, agentRow.mcpServers);
+    const segmentsDaemon = cliVersionAtLeast(
+      machineRow.latestCliVersion,
+      TASK_SEGMENTS_MIN_CLI_VERSION,
+    );
     const isGithubProject = projectRow?.repoKind === 'github';
     const namesTask = stepNamesTask(db, cand.stepRow);
     const taskMeta =
       isGithubProject && namesTask && projectRow
         ? {
-            titleFinal: cand.todoRow.sourceKind === 'github-issue',
+            titleFinal: cand.todoRow.sourceKind === 'github-issue' || cand.todoRow.request !== null,
             vocab: listProjectGithubLabelVocab(db, projectRow.id),
           }
         : undefined;
@@ -601,12 +608,18 @@ async function tryClaim(
       todo: {
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,
-        title: cand.todoRow.title,
+        title:
+          cand.todoRow.request !== null && !segmentsDaemon
+            ? fencedTitle(cand.todoRow.title, cand.todoRow)
+            : cand.todoRow.title,
         spec: cand.todoRow.spec,
         ...(cand.todoRow.decisions.length > 0 ? { decisions: cand.todoRow.decisions } : {}),
         ...(taskMeta !== undefined ? { meta: taskMeta } : {}),
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,
+        ...(cand.todoRow.request !== null && segmentsDaemon
+          ? { request: cand.todoRow.request }
+          : {}),
         ...(blockerHandoff !== null ? { blockerHandoff } : {}),
         output: cand.todoRow.output,
       },

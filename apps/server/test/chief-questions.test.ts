@@ -294,6 +294,7 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
         threadId: w.threadId,
         requestId: 'ask-11111111-2222-3333-4444-555555555555',
         questions: QUESTIONS,
+        askedFor: [],
       },
     );
     expect(again.created).toBe(false);

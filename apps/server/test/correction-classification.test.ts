@@ -268,7 +268,12 @@ describe('internal correction classification', () => {
   test('upgrade snapshots local and GitHub correction membership without changing thread data', () => {
     const path = previousDatabase();
     const before = new Database(path, { readonly: true });
-    const tasks = before.prepare('SELECT * FROM todo ORDER BY id').all();
+    const taskColumns = before
+      .prepare('PRAGMA table_info(todo)')
+      .all()
+      .map((column) => (column as { name: string }).name)
+      .join(', ');
+    const tasks = before.prepare(`SELECT ${taskColumns} FROM todo ORDER BY id`).all();
     const labels = before.prepare('SELECT * FROM tag ORDER BY id').all();
     const links = before.prepare('SELECT * FROM todo_tag ORDER BY todoId').all();
     before.close();
@@ -279,12 +284,7 @@ describe('internal correction classification', () => {
         { id: 'local-fix', correctionRequired: 1 },
         { id: 'ordinary', correctionRequired: 0 },
       ]);
-      expect(
-        opened.db.all<Record<string, unknown>>('SELECT * FROM todo ORDER BY id').map((row) => {
-          const { correctionRequired: _flag, ...rest } = row;
-          return rest;
-        }),
-      ).toEqual(tasks);
+      expect(opened.db.all(`SELECT ${taskColumns} FROM todo ORDER BY id`)).toEqual(tasks);
       expect(opened.db.all('SELECT * FROM tag ORDER BY id')).toEqual(labels);
       expect(
         opened.db.all(`SELECT todoId, tagId FROM todo_tag

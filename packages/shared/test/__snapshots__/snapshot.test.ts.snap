@@ -616,6 +616,221 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "null",
           ],
         },
+        "request": {
+          "additionalProperties": false,
+          "properties": {
+            "difficulty": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "easy",
+                    "standard",
+                    "hard",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "segments": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "author": {
+                    "enum": [
+                      "owner",
+                      "third-party",
+                    ],
+                    "type": "string",
+                  },
+                  "source": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "chat",
+                            "type": "string",
+                          },
+                          "messageId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "span": {
+                            "enum": [
+                              "whole",
+                              "quote",
+                            ],
+                            "type": "string",
+                          },
+                          "threadId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "threadId",
+                          "messageId",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "answer",
+                            "type": "string",
+                          },
+                          "requestId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "span": {
+                            "enum": [
+                              "whole",
+                              "quote",
+                            ],
+                            "type": "string",
+                          },
+                          "threadId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "threadId",
+                          "requestId",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "todo",
+                            "type": "string",
+                          },
+                          "segment": {
+                            "anyOf": [
+                              {
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "span": {
+                            "enum": [
+                              "whole",
+                              "quote",
+                            ],
+                            "type": "string",
+                          },
+                          "todoId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "todoId",
+                          "segment",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "at": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer",
+                          },
+                          "kind": {
+                            "const": "edit",
+                            "type": "string",
+                          },
+                          "span": {
+                            "const": "whole",
+                            "type": "string",
+                          },
+                          "userId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "userId",
+                          "at",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "sourceRef": {
+                    "type": [
+                      "string",
+                      "null",
+                    ],
+                  },
+                  "text": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "source",
+                  "author",
+                  "sourceRef",
+                  "text",
+                ],
+                "type": "object",
+              },
+              "minItems": 1,
+              "type": "array",
+            },
+            "siblings": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "titleSource": {
+              "enum": [
+                "owner",
+                "third-party",
+                "worker",
+              ],
+              "type": "string",
+            },
+            "titleSourceRef": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+          },
+          "required": [
+            "segments",
+            "siblings",
+            "difficulty",
+            "titleSource",
+            "titleSourceRef",
+          ],
+          "type": "object",
+        },
         "seqNum": {
           "maximum": 9007199254740991,
           "minimum": -9007199254740991,
@@ -1322,6 +1537,221 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                     "string",
                     "null",
                   ],
+                },
+                "request": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "difficulty": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "easy",
+                            "standard",
+                            "hard",
+                          ],
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "segments": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "author": {
+                            "enum": [
+                              "owner",
+                              "third-party",
+                            ],
+                            "type": "string",
+                          },
+                          "source": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "chat",
+                                    "type": "string",
+                                  },
+                                  "messageId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "span": {
+                                    "enum": [
+                                      "whole",
+                                      "quote",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "threadId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "threadId",
+                                  "messageId",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "answer",
+                                    "type": "string",
+                                  },
+                                  "requestId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "span": {
+                                    "enum": [
+                                      "whole",
+                                      "quote",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "threadId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "threadId",
+                                  "requestId",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "todo",
+                                    "type": "string",
+                                  },
+                                  "segment": {
+                                    "anyOf": [
+                                      {
+                                        "maximum": 9007199254740991,
+                                        "minimum": 0,
+                                        "type": "integer",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                  "span": {
+                                    "enum": [
+                                      "whole",
+                                      "quote",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "todoId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "todoId",
+                                  "segment",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "at": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  "kind": {
+                                    "const": "edit",
+                                    "type": "string",
+                                  },
+                                  "span": {
+                                    "const": "whole",
+                                    "type": "string",
+                                  },
+                                  "userId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "userId",
+                                  "at",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                            ],
+                          },
+                          "sourceRef": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "text": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "source",
+                          "author",
+                          "sourceRef",
+                          "text",
+                        ],
+                        "type": "object",
+                      },
+                      "minItems": 1,
+                      "type": "array",
+                    },
+                    "siblings": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "titleSource": {
+                      "enum": [
+                        "owner",
+                        "third-party",
+                        "worker",
+                      ],
+                      "type": "string",
+                    },
+                    "titleSourceRef": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                  },
+                  "required": [
+                    "segments",
+                    "siblings",
+                    "difficulty",
+                    "titleSource",
+                    "titleSourceRef",
+                  ],
+                  "type": "object",
                 },
                 "seqNum": {
                   "maximum": 9007199254740991,
@@ -6250,6 +6680,228 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "request": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "difficulty": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "easy",
+                            "standard",
+                            "hard",
+                          ],
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "segments": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "author": {
+                            "enum": [
+                              "owner",
+                              "third-party",
+                            ],
+                            "type": "string",
+                          },
+                          "source": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "chat",
+                                    "type": "string",
+                                  },
+                                  "messageId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "span": {
+                                    "enum": [
+                                      "whole",
+                                      "quote",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "threadId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "threadId",
+                                  "messageId",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "answer",
+                                    "type": "string",
+                                  },
+                                  "requestId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "span": {
+                                    "enum": [
+                                      "whole",
+                                      "quote",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "threadId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "threadId",
+                                  "requestId",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "todo",
+                                    "type": "string",
+                                  },
+                                  "segment": {
+                                    "anyOf": [
+                                      {
+                                        "maximum": 9007199254740991,
+                                        "minimum": 0,
+                                        "type": "integer",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                  "span": {
+                                    "enum": [
+                                      "whole",
+                                      "quote",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "todoId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "todoId",
+                                  "segment",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "at": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  "kind": {
+                                    "const": "edit",
+                                    "type": "string",
+                                  },
+                                  "span": {
+                                    "const": "whole",
+                                    "type": "string",
+                                  },
+                                  "userId": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "userId",
+                                  "at",
+                                  "span",
+                                ],
+                                "type": "object",
+                              },
+                            ],
+                          },
+                          "sourceRef": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "text": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "source",
+                          "author",
+                          "sourceRef",
+                          "text",
+                        ],
+                        "type": "object",
+                      },
+                      "minItems": 1,
+                      "type": "array",
+                    },
+                    "siblings": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "titleSource": {
+                      "enum": [
+                        "owner",
+                        "third-party",
+                        "worker",
+                      ],
+                      "type": "string",
+                    },
+                    "titleSourceRef": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                  },
+                  "required": [
+                    "segments",
+                    "siblings",
+                    "difficulty",
+                    "titleSource",
+                    "titleSourceRef",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "routeOverride": {
               "anyOf": [
                 {
@@ -10453,6 +11105,228 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "label",
             "retryAfterMs",
             "probeAt",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "request": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "difficulty": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "easy",
+                    "standard",
+                    "hard",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "segments": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "author": {
+                    "enum": [
+                      "owner",
+                      "third-party",
+                    ],
+                    "type": "string",
+                  },
+                  "source": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "chat",
+                            "type": "string",
+                          },
+                          "messageId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "span": {
+                            "enum": [
+                              "whole",
+                              "quote",
+                            ],
+                            "type": "string",
+                          },
+                          "threadId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "threadId",
+                          "messageId",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "answer",
+                            "type": "string",
+                          },
+                          "requestId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "span": {
+                            "enum": [
+                              "whole",
+                              "quote",
+                            ],
+                            "type": "string",
+                          },
+                          "threadId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "threadId",
+                          "requestId",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "todo",
+                            "type": "string",
+                          },
+                          "segment": {
+                            "anyOf": [
+                              {
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "span": {
+                            "enum": [
+                              "whole",
+                              "quote",
+                            ],
+                            "type": "string",
+                          },
+                          "todoId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "todoId",
+                          "segment",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "at": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer",
+                          },
+                          "kind": {
+                            "const": "edit",
+                            "type": "string",
+                          },
+                          "span": {
+                            "const": "whole",
+                            "type": "string",
+                          },
+                          "userId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "userId",
+                          "at",
+                          "span",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "sourceRef": {
+                    "type": [
+                      "string",
+                      "null",
+                    ],
+                  },
+                  "text": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "source",
+                  "author",
+                  "sourceRef",
+                  "text",
+                ],
+                "type": "object",
+              },
+              "minItems": 1,
+              "type": "array",
+            },
+            "siblings": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "titleSource": {
+              "enum": [
+                "owner",
+                "third-party",
+                "worker",
+              ],
+              "type": "string",
+            },
+            "titleSourceRef": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+          },
+          "required": [
+            "segments",
+            "siblings",
+            "difficulty",
+            "titleSource",
+            "titleSourceRef",
           ],
           "type": "object",
         },

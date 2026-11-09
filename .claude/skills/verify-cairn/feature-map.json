@@ -1532,7 +1532,7 @@
     {
       "id": "projects",
       "name": "Projects",
-      "summary": "Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive and delete.",
+      "summary": "Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.",
       "states": "A new-project form for a local folder or a GitHub repository, a project home, settings for base branch, concurrency, autonomy and instructions, archived or deleted.",
       "centrality": 3,
       "status": "shipped",
@@ -1541,7 +1541,8 @@
           "apps/web/src/pages/project-new-page.tsx",
           "apps/web/src/pages/project-page.tsx",
           "apps/web/src/pages/project-settings-page.tsx",
-          "apps/web/src/board/project-home.tsx"
+          "apps/web/src/board/project-home.tsx",
+          "apps/web/src/settings/archived-projects-section.tsx"
         ],
         "server": [
           "apps/server/src/routes-projects.ts",
@@ -1553,7 +1554,8 @@
           "/app/project/new",
           "/app/project/:id",
           "/app/project/:id/tasks",
-          "/app/project/:id/settings"
+          "/app/project/:id/settings",
+          "settings:projects"
         ],
         "server": [
           "/api/projects",
@@ -1571,7 +1573,8 @@
         "click testid:github-picker",
         "open /app/project/<id of a project listed by the projects API>/tasks",
         "open /app/project/<id of a project listed by the projects API>/settings",
-        "click testid:project-instructions-input"
+        "click testid:project-instructions-input",
+        "settings projects"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/project-new-form.md",
@@ -1580,11 +1583,13 @@
       ],
       "research": [
         "docs/research/project-coordinators.md",
-        "docs/research/project-files-retirement-2026-11-09.md"
+        "docs/research/project-files-retirement-2026-11-09.md",
+        "docs/research/archived-projects-entry-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md",
-        "docs/design/claude-ai-spec.md"
+        "docs/design/claude-ai-spec.md",
+        "docs/design/archived-projects-settings.md"
       ],
       "backendDesign": [
         "docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md"
@@ -1592,7 +1597,8 @@
       "evidence": [
         "apps/web/e2e/project-new-repo.spec.ts",
         "apps/web/e2e/project-settings-autonomy.spec.ts",
-        "apps/server/test/project-delete.test.ts"
+        "apps/server/test/project-delete.test.ts",
+        "apps/web/e2e/settings-archived-projects.spec.ts"
       ]
     },
     {

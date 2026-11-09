@@ -38,6 +38,14 @@ export const ASK_PARKED_REASON =
 
 const ASK_POLL_MS = 400;
 
+export function isOwnerAnswered(question: AskUserQuestionContent): boolean {
+  return (
+    question.status === 'answered' &&
+    question.answeredBy !== 'coordinator' &&
+    (question.answers ?? []).length > 0
+  );
+}
+
 export function askQuestionContentOf(content: unknown): AskUserQuestionContent | null {
   if (typeof content !== 'string') return null;
   let parsed: unknown;
@@ -135,6 +143,7 @@ export function createOrGetQuestion(
     requestId: string;
     questions: AskUserQuestion[];
     provenance?: string;
+    askedFor: string[];
   },
 ): { content: AskUserQuestionContent; created: boolean } {
   if (!isChiefConversationId(input.threadId)) {
@@ -149,6 +158,7 @@ export function createOrGetQuestion(
     questions: input.questions,
     answers: null,
     ...(input.provenance !== undefined ? { provenance: input.provenance } : {}),
+    askedFor: input.askedFor,
   };
   const threadRow = deps.db
     .select()
@@ -257,8 +267,14 @@ export function answerQuestion(
     }
     return { header: question.header, choices: answer.choices };
   });
-  const next: AskUserQuestionContent = { ...content, status: 'answered', answers: validated };
-  writeQuestion(deps.db, input.threadId, input.requestId, next, nowMs());
+  const answeredAt = nowMs();
+  const next: AskUserQuestionContent = {
+    ...content,
+    status: 'answered',
+    answers: validated,
+    answeredAt,
+  };
+  writeQuestion(deps.db, input.threadId, input.requestId, next, answeredAt);
   publishRow(deps, input.threadId, input.requestId);
   return next;
 }

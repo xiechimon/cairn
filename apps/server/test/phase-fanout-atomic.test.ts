@@ -3,16 +3,12 @@ import { describe, expect, test, vi } from 'vitest';
 import { chiefMessage, step, todo } from '../src/db/schema.js';
 import { addChiefWatch } from '../src/services/chief.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
 
 async function seedWatchedBuildingTask() {
-  const record = (await relay('create_todo', {
-    projectId: H.projectId,
-    title: 'Repair board counts',
-    spec: 'Refresh counts after dragging a task.',
-  })) as { id: string };
+  const record = (await relay('create_todo', ownerTodo('Repair board counts'))) as { id: string };
   H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, record.id)).run();
   const deps = {
     db: H.s.db,

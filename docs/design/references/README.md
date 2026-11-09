@@ -11,6 +11,7 @@ Owner decisions on which product is the reference for each surface:
 | Settings | Amp and t3code | [settings](settings) |
 | Thread progress, review and diff | t3code and Amp | [thread-review](thread-review) |
 | First run and connection state | Amp (connection state sits on the composer) | [first-run](first-run) |
+| Archived projects (Settings) | Claude.ai and Linear, captured 2026-11-09 | [archived-projects](archived-projects) |
 
 Capture notes: Claude.ai and Amp were captured in the owner's signed-in Chrome. Early shots were read-only. Later the owner approved test messages: one test message was sent on Claude.ai (a chat titled `Basic arithmetic question` now exists in that account), and Claude.ai's theme was set to Light for two shots and restored to System. The Chrome window was about 454px wide, so the Claude.ai and Amp mobile shots are at that width (Chrome's window minimum is near 500px). t3code ran locally with scratch data and a scratch git repo. t3code ran locally from `npx t3@latest serve --host 127.0.0.1` with a scratch home, so it shows no account data. Personal details were painted over: the greeting name and the pinned chat in the Claude.ai sidebar, and a browser-extension bubble at the right edge of some shots. A grey block at the bottom left of the Claude.ai shots was a screenshot artifact and was painted with the sidebar color. Other shots are unedited.
 
@@ -87,3 +88,14 @@ Amp does not use a wizard. The composer carries the state, and the screens below
 | `amp-composer-connect-a-machine.jpg` | no machine connected | The chip becomes `Connect a machine` with the exact command (`Run amp --no-tui to start creating threads`) beside it |
 | `amp-orb-progress-and-error-toast.jpg` | run starting | Progress line in the thread (`Cloning into ...`); a title-generation failure is a dismissible toast that offers `Connection Settings`, not a blocking error |
 | `amp-error-retry-connection-settings.jpg` | run failed on auth | Error card with `Retry`, `Retry from Last Message` and `Connection Settings`; the composer stays usable |
+
+## archived-projects (Claude.ai and Linear, light, captured 2026-11-09, read-only)
+
+| File | State | What to compare |
+|---|---|---|
+| `A01-claudeai-projects-archived-dimmed.png` | Projects page | Archived projects stay listed, dimmed, `· Archived` after the date |
+| `A02-claudeai-archived-card-menu.png` | Card menu | `Unarchive` is one direct action, no confirmation |
+| `A03-claudeai-archived-project-banner.png` | Archived project open | `Archived` chip after the name; a banner with `Unarchive` replaces the composer |
+| `A04-claudeai-archived-project-menu.png` | Name menu | `Unarchive` in the project menu; conversation text blurred |
+| `L01-linear-projects-show-closed.png` | Projects display options | Closed projects shown through `Show closed projects` |
+| `L02-linear-settings-teams-retired-filter.png` | Settings > Teams | `Active` / `Retired` / `Recently deleted` filter on a settings list |

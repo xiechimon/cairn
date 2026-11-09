@@ -7,6 +7,8 @@ import type {
 } from '@cairn/shared';
 import {
   CHIEF_NOTICE_KIND,
+  coordinatorCreateTodoParamsSchema,
+  coordinatorUpdateTodoParamsSchema,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
@@ -16,7 +18,6 @@ import {
   type MemoryLayer,
   MODEL_SOURCE_RUNTIME_LABELS,
   snoozeTodoBodySchema,
-  todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
@@ -55,6 +56,7 @@ import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
+import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
@@ -77,14 +79,7 @@ import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { snoozeTodo } from './snooze.js';
 import { seedFixedTags } from './tags.js';
-import {
-  createAutonomousTodo,
-  deleteTodo,
-  getTodo,
-  listTodos,
-  setTodoPhase,
-  updateAutonomousTodo,
-} from './todos.js';
+import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
@@ -114,6 +109,7 @@ export interface ChiefToolCtx {
   chiefAgentId: string | null;
   conversationId: string;
   turnPrompt?: string | null;
+  turnMessageIds?: readonly string[];
   turnScopeProjectId?: string | null;
   turnScopeMixed?: boolean;
 }
@@ -137,15 +133,6 @@ function optStr(params: Params, key: string): string | undefined {
   if (v === undefined || v === null) return undefined;
   if (typeof v !== 'string') throw new HttpError(400, `invalid params.${key}: expected string`);
   return v;
-}
-function optTodoOutput(params: Params, key: string): 'code' | 'info' | undefined {
-  const v = params[key];
-  if (v === undefined || v === null) return undefined;
-  const parsed = todoOutputSchema.safeParse(v);
-  if (!parsed.success) {
-    throw new HttpError(400, `invalid params.${key}: expected "code" or "info"`);
-  }
-  return parsed.data;
 }
 function strArr(params: Params, key: string): string[] {
   const v = params[key];
@@ -565,37 +552,23 @@ export async function executeChiefTool(
       );
 
     case 'create_todo': {
-      const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId, ctx.teamId);
-      const output = optTodoOutput(params, 'output');
-      const record = createAutonomousTodo(svc, {
-        teamId: ctx.teamId,
-        projectId,
-        title: str(params, 'title'),
-        spec: str(params, 'spec'),
+      const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
+      requireProjectRow(db, body.projectId, ctx.teamId);
+      const record = createRequestTodo(svc, ctx, body, {
         createdBy:
           ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
             ? ctx.userId
             : ctx.chiefAgentId,
         ownerId: ctx.userId,
-        orchestration: { threadId: ctx.threadId },
-        ...(output !== undefined ? { output } : {}),
       });
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
       return json({ ...record, sourceBuildId: ctx.chiefId });
     }
     case 'update_todo': {
-      const todoId = str(params, 'todoId');
-      requireTeamTodo(db, todoId, ctx.teamId);
-      const record = updateAutonomousTodo(svc, todoId, {
-        ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
-        ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
-        ...(params.tagIds !== undefined ? { tagIds: strArr(params, 'tagIds') } : {}),
-        ...(optStr(params, 'projectId') !== undefined
-          ? { projectId: optStr(params, 'projectId') }
-          : {}),
-      });
-      if (!record) throw new HttpError(404, `todo ${todoId}`);
+      const body = parseWith(coordinatorUpdateTodoParamsSchema, params, 'params');
+      requireTeamTodo(db, body.todoId, ctx.teamId);
+      const record = updateRequestTodo(svc, ctx, body);
+      if (!record) throw new HttpError(404, `todo ${body.todoId}`);
       return json(record);
     }
     case 'delete_todos': {
@@ -823,6 +796,7 @@ export async function executeChiefTool(
           requestId,
           questions,
           provenance,
+          askedFor: [...(ctx.turnMessageIds ?? [])],
         },
       );
       return json({

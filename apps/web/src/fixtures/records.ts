@@ -236,6 +236,7 @@ export interface FixtureSet {
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;
   projectNames?: Record<string, string>;
+  archivedProjects?: Array<{ id: string; name: string; archivedAt: number }>;
   projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
   github?: GithubFixture;

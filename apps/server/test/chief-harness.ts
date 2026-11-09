@@ -12,6 +12,7 @@ import {
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
+import { ownerTodoParams } from './owner-message.js';
 
 export const AGENT_ID = 'agent-chief-1';
 export const AGENT2_ID = 'agent-chief-2';
@@ -56,6 +57,10 @@ export async function relay(
 ) {
   const text = await executeChiefTool(toolDeps(), ctx(over), name, params);
   return JSON.parse(text) as unknown;
+}
+
+export function ownerTodo(words: string, projectId: string = H.projectId) {
+  return ownerTodoParams(H.s.db, H.threadId, projectId, words);
 }
 
 export function seedMachineReport(
