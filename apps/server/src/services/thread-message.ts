@@ -80,7 +80,7 @@ export function startThreadBuild(
     prompt,
   });
   if (!started) throw new Error('build missing after start');
-  holdCodeThreadForPriorResearch(deps, row.id, started.id);
+  holdCodeThreadForPriorResearch(deps, row.id);
   return started.id;
 }
 

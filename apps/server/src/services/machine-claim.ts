@@ -38,6 +38,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
+import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
@@ -490,6 +491,7 @@ async function tryClaim(
       won = db.transaction((tx) => {
         if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
+        holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)
           .set({
@@ -502,7 +504,13 @@ async function tryClaim(
             holdReason: null,
             holdUntil: null,
           })
-          .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
+          .where(
+            and(
+              eq(step.id, cand.stepRow.id),
+              eq(step.status, 'pending'),
+              or(isNull(step.holdUntil), lte(step.holdUntil, claimedAt)),
+            ),
+          )
           .run();
         if (res.changes === 0) return false;
         if (

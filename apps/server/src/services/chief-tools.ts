@@ -37,12 +37,7 @@ import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
-import {
-  advanceSplitWaves,
-  applyBuildStepAction,
-  cancelBuild,
-  stopActiveStepsAfterExit,
-} from './builds.js';
+import { applyBuildStepAction, cancelBuild, stopActiveStepsAfterExit } from './builds.js';
 import {
   addChiefWatch,
   clearChiefWake,
@@ -79,6 +74,7 @@ import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { snoozeTodo } from './snooze.js';
 import { seedFixedTags } from './tags.js';
+import { startThreadBuild } from './thread-message.js';
 import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
@@ -562,7 +558,11 @@ export async function executeChiefTool(
         ownerId: ctx.userId,
       });
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
-      return json({ ...record, sourceBuildId: ctx.chiefId });
+      const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
+        origin: 'coordinator',
+        actor: 'Coordinator',
+      });
+      return json({ ...record, ...getTodo(svc, record.id), sourceBuildId: ctx.chiefId, buildId });
     }
     case 'update_todo': {
       const body = parseWith(coordinatorUpdateTodoParamsSchema, params, 'params');
@@ -590,8 +590,27 @@ export async function executeChiefTool(
         ),
       );
     }
-    case 'reopen_todos':
-      return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor));
+    case 'reopen_todos': {
+      const out = transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor);
+      const started: string[] = [];
+      const notStarted: Record<string, string> = {};
+      for (const id of out.transitioned) {
+        try {
+          startThreadBuild(svc, requireTeamTodo(db, id, ctx.teamId), {
+            origin: 'coordinator',
+            actor: 'Coordinator',
+          });
+          started.push(id);
+        } catch (error) {
+          notStarted[id] = error instanceof Error ? error.message : String(error);
+        }
+      }
+      return json({
+        ...out,
+        started,
+        ...(Object.keys(notStarted).length > 0 ? { notStarted } : {}),
+      });
+    }
     case 'complete_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
     case 'create_project': {
@@ -1027,18 +1046,6 @@ export function transitionTodos(
           });
         if (to === 'done' && owned.phase !== 'done' && owned.latestBuildId !== null) {
           insertGateAnnouncement(deps, owned.latestBuildId, DONE_ANNOUNCEMENT, actor.name);
-        }
-        if (to === 'done' && owned.phase !== 'done') {
-          advanceSplitWaves(
-            {
-              db: deps.db,
-              hub: deps.hub,
-              machineHub: deps.machineHub,
-              user: deps.user,
-              vapidKeys: deps.vapidKeys,
-            },
-            id,
-          );
         }
       } else skipped.push(id);
     } catch {

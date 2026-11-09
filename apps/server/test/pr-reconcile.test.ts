@@ -12,11 +12,13 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { githubBranchPulls, githubCompareStatus, githubPull } from '../src/lib/github.js';
+import { BLOCKED_BY_HOLD } from '../src/services/blockers.js';
 import {
   applyBuildStepAction,
   completeStep,
   finishTodoDone,
   requestMerge,
+  startBuilds,
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
@@ -1879,7 +1881,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.systemRows()).toContain(DONE_ROW);
   });
 
-  test('[64] the reconcile finishing a split child advances the waves: the unblocked sibling starts', async () => {
+  test('[64] the reconcile finishing a split child releases the sibling it blocked', async () => {
     const w = makeWorld();
     const parentId = `${w.todoId}-parent`;
     const siblingId = `${w.todoId}-sibling`;
@@ -1906,16 +1908,22 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         blockedBy: [w.todoId],
       })
       .run();
-    const phaseOf = (id: string) =>
-      w.s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.phase;
+    const [siblingBuild] = startBuilds(w.s.svc, {
+      projectId: w.projectId,
+      todoIds: [siblingId],
+      triggerSource: 'chief',
+    });
+    const siblingHold = () =>
+      w.s.db.select().from(stepTable).where(eq(stepTable.buildId, siblingBuild!.id)).get()
+        ?.holdReason;
+    expect(siblingHold()).toBe(BLOCKED_BY_HOLD);
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
     await pollerFor(w, mock).sweep();
     expect(w.todoRow().phase).toBe('done');
-    expect(phaseOf(siblingId)).toBe('queued');
-    expect(
-      w.s.db.select().from(buildTable).where(eq(buildTable.todoId, siblingId)).all(),
-    ).toHaveLength(1);
-    expect(phaseOf(parentId)).toBe('building');
+    expect(siblingHold()).toBeNull();
+    expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, parentId)).get()?.phase).toBe(
+      'building',
+    );
   });
 
   test('[65a] an over-long base branch name with control characters is cut to 100 characters in the hint', async () => {
