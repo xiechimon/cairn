@@ -167,7 +167,10 @@ describe('PiStepSpanSink', () => {
     expect(chatAttrs['gen_ai.usage.input_tokens']).toEqual({ intValue: '13' });
     expect(chatAttrs['gen_ai.usage.output_tokens']).toEqual({ intValue: '5' });
     expect(chatAttrs['gen_ai.usage.cache_read.input_tokens']).toEqual({ intValue: '2' });
-    expect(chatAttrs['gen_ai.usage.cost']).toEqual({ doubleValue: 0.01 });
+    expect(chatAttrs['langfuse.observation.cost_details']).toEqual({
+      stringValue: '{"total":0.01}',
+    });
+    expect(chatAttrs['gen_ai.usage.cost']).toBeUndefined();
     expect(chatAttrs['cairn.cost_usd']).toBeUndefined();
     const tool = scope.spans[1]!;
     expect(tool.traceId).toBe(ctx.traceId);
