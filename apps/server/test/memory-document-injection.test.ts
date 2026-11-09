@@ -13,6 +13,7 @@ import {
 import { projectTurnContextTraced } from '../src/services/project-instructions.js';
 import { AGENT_ID, H, registerChiefHarness, toolDeps } from './chief-harness.js';
 import { issueApiKey, req } from './helpers.js';
+import { seedOwnerMessage } from './owner-message.js';
 
 registerChiefHarness();
 
@@ -51,10 +52,17 @@ function check(text: string) {
   expect(text).toContain('后面还有 5 行没有加载');
 }
 function chiefContext() {
-  const id = enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
+  const ownerMessageId = seedOwnerMessage(H.s.db, H.threadId, 'hello');
+  const id = enqueueChiefStep(H.s.svc, H.threadId, {
+    prompt: 'hello',
+    trigger: 'user',
+    ownerMessageIds: [ownerMessageId],
+  });
+  const row = H.s.db.select().from(step).where(eq(step.id, id)).get()!;
+  expect(row.ownerMessageIds).toEqual([ownerMessageId]);
   return chiefTurnContext(
     toolDeps(),
-    H.s.db.select().from(step).where(eq(step.id, id)).get()!,
+    row,
     H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!,
     AGENT_ID,
   );
@@ -134,8 +142,14 @@ test('digest loads index and file count without stamping use or including anothe
   const thread = H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!;
   const digestId = chiefDigestThreadId(H.chiefId);
   const digest = { ...thread, id: digestId };
-  const id = enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
+  const ownerMessageId = seedOwnerMessage(H.s.db, H.threadId, 'hello');
+  const id = enqueueChiefStep(H.s.svc, H.threadId, {
+    prompt: 'hello',
+    trigger: 'user',
+    ownerMessageIds: [ownerMessageId],
+  });
   const row = H.s.db.select().from(step).where(eq(step.id, id)).get()!;
+  expect(row.ownerMessageIds).toEqual([ownerMessageId]);
   const result = chiefTurnContext(toolDeps(), { ...row, buildId: digestId }, digest, AGENT_ID);
   expect(result.digest).toBe(true);
   expect(result.memories).toContainEqual({
@@ -170,7 +184,15 @@ async function machineClaim(token: string) {
 test('machine HTTP claim delivers bounded Coordinator system and step prompts', async () => {
   seed();
   const token = await machineToken();
-  enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
+  const ownerMessageId = seedOwnerMessage(H.s.db, H.threadId, 'hello');
+  const id = enqueueChiefStep(H.s.svc, H.threadId, {
+    prompt: 'hello',
+    trigger: 'user',
+    ownerMessageIds: [ownerMessageId],
+  });
+  expect(H.s.db.select().from(step).where(eq(step.id, id)).get()?.ownerMessageIds).toEqual([
+    ownerMessageId,
+  ]);
   const claimed = await machineClaim(token);
   check(claimed.chief!.systemPrompt);
   check(claimed.agent!.memories!.map((m) => `${m.title}\n${m.content}`).join('\n'));

@@ -15,6 +15,7 @@ import { PROJECT_REPO_KINDS } from '../records/project.js';
 import { INFO_REPORT_MAX_BYTES } from '../records/report.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
+import { taskRequestSchema } from '../records/task-request.js';
 import { taskDecisionSchema } from '../records/todo.js';
 import { verifyVerdictSchema } from '../records/verify.js';
 import { skillInjectionFactsSchema } from '../skill-injection-check.js';
@@ -180,6 +181,7 @@ export const claimedStepSchema = z.object({
         .optional(),
       sourceKind: z.string().nullable().optional(),
       sourceRef: z.string().nullable().optional(),
+      request: taskRequestSchema.optional(),
       blockerHandoff: blockerHandoffSchema.optional(),
       decisions: z.array(taskDecisionSchema).optional(),
       output: z.string().nullable().optional(),

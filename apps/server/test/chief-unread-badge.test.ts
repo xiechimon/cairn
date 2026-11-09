@@ -160,7 +160,12 @@ describe('chief unread badge (#1303)', () => {
     enqueueChiefStep(
       { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
       w.threadId,
-      { prompt: '任务停在确认关口。', trigger: 'gate', provenance: 'watch:test' },
+      {
+        prompt: '任务停在确认关口。',
+        trigger: 'gate',
+        provenance: 'watch:test',
+        ownerMessageIds: [],
+      },
     );
     const wake = await w.claim();
     await w.done(wake.step.id, '关口汇报：方案已停住。');
@@ -218,7 +223,7 @@ describe('chief unread badge (#1303)', () => {
     enqueueChiefStep(
       { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
       w.threadId,
-      { prompt: '约定时间已到。', trigger: 'wake', provenance: 'wake:test' },
+      { prompt: '约定时间已到。', trigger: 'wake', provenance: 'wake:test', ownerMessageIds: [] },
     );
     const wake = await w.claim();
     await w.done(wake.step.id, '到点回头：没有新情况。');

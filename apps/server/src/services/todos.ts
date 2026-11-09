@@ -4,6 +4,7 @@ import type {
   Phase,
   RouteOverride,
   SecretBox,
+  TaskRequest,
   TodoOutputKind,
   TodoRecord,
   TodoSection,
@@ -20,8 +21,9 @@ import {
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
+  renderTaskText,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -197,6 +199,7 @@ export function toTodoRecord(
         }
       : {}),
     ...(row.routeOverride != null ? { routeOverride: row.routeOverride } : {}),
+    ...(row.request != null ? { request: row.request } : {}),
   };
 }
 
@@ -331,6 +334,9 @@ export function createAutonomousTodo(
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
+    request?: TaskRequest;
+    blockedBy?: string[];
+    orderFirst?: boolean;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -343,7 +349,7 @@ export function createAutonomousTodo(
     .get();
   const seqNum = (seqRow?.n ?? 0) + 1;
   const orderRow = db
-    .select({ n: max(todo.orderIndex) })
+    .select({ n: input.orderFirst === true ? min(todo.orderIndex) : max(todo.orderIndex) })
     .from(todo)
     .where(and(eq(todo.projectId, input.projectId), eq(todo.phase, 'todo')))
     .get();
@@ -365,7 +371,7 @@ export function createAutonomousTodo(
         phase: 'todo',
         phaseAt: now,
         seqNum,
-        orderIndex: (orderRow?.n ?? -1) + 1,
+        orderIndex: input.orderFirst === true ? (orderRow?.n ?? 1) - 1 : (orderRow?.n ?? -1) + 1,
         latestBuildId: null,
         lastRunAt: null,
         hasChanges: false,
@@ -391,6 +397,10 @@ export function createAutonomousTodo(
         ...(input.userSpecAttachmentIds !== undefined
           ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
           : {}),
+        ...(input.request !== undefined ? { request: input.request } : {}),
+        ...(input.blockedBy !== undefined && input.blockedBy.length > 0
+          ? { blockedBy: input.blockedBy }
+          : {}),
       })
       .run();
     for (const tagId of tagIds) {
@@ -414,9 +424,11 @@ export function updateTodo(
     { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
     id,
     patch,
-    opts,
+    { ...opts, textWriter: { ownerEdit: deps.user.id } },
   );
 }
+
+export type TodoTextWriter = 'request-service' | { ownerEdit: string };
 
 export function updateAutonomousTodo(
   deps: TodoDeps,
@@ -430,11 +442,25 @@ export function updateAutonomousTodo(
     projectId?: string;
     routeOverride?: RouteOverride | null;
   },
-  opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
+  opts: {
+    manualPhase?: boolean;
+    userSpecAttachmentIds?: string[];
+    textWriter?: TodoTextWriter;
+  } = {},
 ): TodoRecord | null {
   const { db, hub } = deps;
   const row = getRow(deps, id);
   if (!row) return null;
+  if (
+    row.request !== null &&
+    (patch.title !== undefined || patch.spec !== undefined) &&
+    opts.textWriter === undefined
+  ) {
+    throw new HttpError(
+      409,
+      `todo ${id} carries the owner's cited words; edit it in the board, or send owner messages through the Coordinator`,
+    );
+  }
 
   const sets: Partial<TodoRow> = {};
   const tagIds = patch.tagIds === undefined ? undefined : [...new Set(patch.tagIds)];
@@ -450,6 +476,28 @@ export function updateAutonomousTodo(
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
     sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
+    const editor = opts.textWriter;
+    if (row.request !== null && editor !== undefined && editor !== 'request-service') {
+      sets.request = {
+        ...row.request,
+        segments: [
+          {
+            source: { kind: 'edit', userId: editor.ownerEdit, at: nowMs(), span: 'whole' },
+            author: 'owner',
+            sourceRef: null,
+            text: patch.spec,
+          },
+        ],
+      };
+      sets.spec = renderTaskText(sets.request);
+    }
+  }
+  if (patch.title !== undefined && row.request !== null) {
+    sets.request = {
+      ...(sets.request ?? row.request),
+      titleSource: 'owner',
+      titleSourceRef: null,
+    };
   }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
   if (patch.routeOverride !== undefined) {

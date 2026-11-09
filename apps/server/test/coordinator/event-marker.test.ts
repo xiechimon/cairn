@@ -18,6 +18,7 @@ describe('event turns carry their history id', () => {
       prompt: 'Task #3 finished',
       trigger: 'settle',
       provenance: wakeProvenance('w1'),
+      ownerMessageIds: [],
     });
     coordinator.wake(w.threadId);
     await coordinator.idle();
@@ -41,6 +42,7 @@ describe('event turns carry their history id', () => {
       prompt: body,
       trigger: 'settle',
       provenance: wakeProvenance('w2'),
+      ownerMessageIds: [],
     });
     coordinator.wake(w.threadId);
     await coordinator.idle();

@@ -701,7 +701,7 @@ describe('delivery: only decisions push immediately', () => {
       ];
       createOrGetQuestion(
         { db: s.db, hub: s.hub, user: s.user, vapidKeys: s.vapidKeys },
-        { threadId: 'chief-thread-1', requestId: 'ask-q1', questions },
+        { threadId: 'chief-thread-1', requestId: 'ask-q1', questions, askedFor: [] },
       );
       expect(send).toHaveBeenCalledTimes(1);
       const payload = JSON.parse(String(send.mock.calls[0]?.[1] ?? '{}')) as {
@@ -713,7 +713,7 @@ describe('delivery: only decisions push immediately', () => {
       expect(payload.notification.navigate).toContain('/app?chief=chief-thread-1');
       const again = createOrGetQuestion(
         { db: s.db, hub: s.hub, user: s.user, vapidKeys: s.vapidKeys },
-        { threadId: 'chief-thread-1', requestId: 'ask-q1', questions },
+        { threadId: 'chief-thread-1', requestId: 'ask-q1', questions, askedFor: [] },
       );
       expect(again.created).toBe(false);
       expect(send).toHaveBeenCalledTimes(1);
@@ -738,6 +738,7 @@ describe('delivery: only decisions push immediately', () => {
           threadId: 'chief-thread-2',
           requestId: 'ask-q2',
           questions: [{ header: 'h', question: 'q?', options: [] }],
+          askedFor: [],
         },
       );
       expect(send).not.toHaveBeenCalled();

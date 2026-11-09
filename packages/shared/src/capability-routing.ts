@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { StepKind } from './records/step.js';
+import type { TaskRequest } from './records/task-request.js';
 
 export const DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
@@ -60,7 +61,12 @@ const DIFFICULTY_MARKER = /difficulty:(easy|standard|hard)\b/i;
 const HARD_SPEC_CHARS = 3000;
 const EASY_SPEC_CHARS = 300;
 
-export function classifyDifficulty(todo: { title: string; spec: string | null }): Difficulty {
+export function classifyDifficulty(todo: {
+  title: string;
+  spec: string | null;
+  request?: Pick<TaskRequest, 'difficulty'> | null;
+}): Difficulty {
+  if (todo.request?.difficulty != null) return todo.request.difficulty;
   const text = `${todo.title}\n${todo.spec ?? ''}`;
   const marked = DIFFICULTY_MARKER.exec(text)?.[1]?.toLowerCase();
   if (marked !== undefined) return marked as Difficulty;

@@ -35,7 +35,8 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
      segments: TaskSegment[];
      siblings: string[];
      difficulty: 'easy' | 'standard' | 'hard' | null;
-     titleSource: 'owner' | 'worker';
+     titleSource: 'owner' | 'third-party' | 'worker';
+     titleSourceRef: string | null;
    };
    type TaskSegment = {
      source:
@@ -60,7 +61,7 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
    `todo.spec` holds `renderTaskText(request)`, and it is written only by the request service (`coordinator-request.ts`), at creation and on append. Readers that only display or search text (the board, search, the Coordinator `todos` summary, MCP `todos`, trajectory export) keep reading `spec`. Every reader that decides authority or builds a model prompt reads `request.segments`; the table under Entry points lists them.
 3. The title has its own author, `titleAuthor(todo)`:
    - `worker` when `request.titleSource` is `worker`. The title is printed with a `named by the worker` label and no fence.
-   - `segments[0].author` when the title was cut from the first segment.
+   - `request.titleSource` is fixed to the first segment's author when the title is created; `titleSourceRef` snapshots that segment's issue ref. A spec edit preserves both fields. A title edit sets them to `owner` and `null`, independently of the spec segments.
    - `isIssueSourcedTask(todo)` for tasks without `request`.
 
    It is never decided by `sourceKind` for a task with `request`. That rule holds in the task prompt, the orchestration prompt, `wakeFacts` and the other wake prompts.
@@ -94,7 +95,7 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
 | T2 | owner message steered into a running turn | `steerChiefMessage` | appends `message.id` to the running step |
 | T3 | queued owner message that becomes its own turn | `submitChiefMessage` (queued) | `[message.id]` |
 | T4 | rewind | `rewindChiefThread` | `[anchor.id]` |
-| T5 | owner answers `ask_user` while the asking turn runs | `answerQuestion` | appends `requestId` to the running step |
+| T5 | owner answers `ask_user` while the asking turn runs | `answerChiefQuestion` (REST and MCP) | appends `requestId` to the running step |
 | T6 | owner answers a parked question; a new turn resumes | `enqueueResumedTurn` | the question's `askedFor`, then `requestId` |
 | T7 | Coordinator answers its own question (`answeredBy: coordinator`) | none | not appended |
 | T8 | orchestration request (`POST /api/todos/:id/orchestrate`) | `orchestrateTodo` | `[]`; the Coordinator splits with `sourceTodoId` |
