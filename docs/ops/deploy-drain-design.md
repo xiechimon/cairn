@@ -42,4 +42,4 @@ Implementation: Codex `gpt-6.1-sol`. Required review: Coordinator design review 
 
 ## 6. Delivery
 
-Issue: [#3609](https://github.com/xiechimon/cairn/issues/3609). PR: pending creation; replace this with the actual PR number before review. Coordinator approved this design in the implementation conversation on 2026-11-09, requiring durable DB state and a proven server-only bootstrap. Design review and progress reports return through that conversation; never write them into a live Cairn Coordinator or owner thread.
+Issue: [#3609](https://github.com/xiechimon/cairn/issues/3609). PR: [#3624](https://github.com/xiechimon/cairn/pull/3624). Coordinator approved this design in the implementation conversation on 2026-11-09, requiring durable DB state and a proven server-only bootstrap. Design review and progress reports return through that conversation; never write them into a live Cairn Coordinator or owner thread.
