@@ -295,6 +295,51 @@ describe('enabled', () => {
     });
     expect(actual).toBe(expected);
   });
+  test.each([
+    ['100.64.0.7', 401],
+    ['fd7a:115c:a1e0::7', 401],
+    ['100.64.0.9', 200],
+  ])(
+    'socket-only identity from source %s on the serving node gives %i',
+    async (source, expected) => {
+      const home = freshHome();
+      const s = bootServer({ authToken: TOKEN });
+      const remote = await startTsnetRemote({
+        settings: settings(home, { mode: 'socket', allowedLogins: ['owner@example.com'] }),
+        homeDir: home,
+        app: s.app,
+        authToken: TOKEN,
+        logger: silentLogger,
+        readLocalStatus: async () => ({
+          BackendState: 'Running',
+          Self: { UserID: 7, DNSName: 'cairn.tail.example.' },
+          User: { '7': { LoginName: 'owner@example.com' } },
+          TailscaleIPs: ['100.64.0.7', 'fd7a:115c:a1e0::7'],
+        }),
+      });
+      if (remote !== null) stoppers.push(() => remote.stop());
+      const actual = await new Promise<number>((resolve, reject) => {
+        const req = request(
+          {
+            socketPath: tsnetPathsOf(home).socketPath,
+            path: '/api/teams',
+            headers: {
+              host: 'cairn.tail.example',
+              'Tailscale-User-Login': 'owner@example.com',
+              'X-Forwarded-For': source,
+            },
+          },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode ?? 0);
+          },
+        );
+        req.on('error', reject);
+        req.end();
+      });
+      expect(actual).toBe(expected);
+    },
+  );
   test('socket-only startup needs no binary, spawns nothing and uses explicit allowlist when LocalAPI is unavailable', async () => {
     const home = freshHome();
     const s = bootServer({ authToken: TOKEN });

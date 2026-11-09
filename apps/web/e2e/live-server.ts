@@ -59,7 +59,7 @@ async function reapGroup(pgid: number): Promise<void> {
 }
 
 /** Real apps/server on a free port with a scratch CAIRN_HOME, serving this
- *  worktree's dist. Ready = /api/teams answers 401 (token set) or 200.
+ *  worktree's dist. Ready = /api/teams answers 200, or 401 when a token is set.
  *
  *  Runs as `node --import tsx` in its own process group: `pnpm exec` puts
  *  corepack's shim in front, and the shim exits on SIGTERM without
@@ -106,7 +106,7 @@ export async function bootLiveServer(
   for (;;) {
     try {
       const res = await fetch(`${base}/api/teams`, { signal: AbortSignal.timeout(2_000) });
-      if (res.status === (token !== null ? 401 : 200)) break;
+      if (res.status === 200 || (token !== null && res.status === 401)) break;
     } catch {}
     const exited = child.exitCode ?? child.signalCode;
     if (exited !== null || Date.now() > deadline) {

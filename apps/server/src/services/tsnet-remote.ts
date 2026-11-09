@@ -222,6 +222,7 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
           ownerLogin: status?.state === 'ready' ? (status.ownerLogin ?? null) : null,
           selfTagged: status?.selfTagged ?? false,
           allowedLogins: settings.allowedLogins ?? [],
+          selfAddresses: status?.ips ?? [],
         };
       },
     );
