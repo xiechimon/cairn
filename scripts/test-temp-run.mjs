@@ -62,6 +62,7 @@ function finish(code) {
   try {
     rmSync(report, { force: true });
     for (const name of readdirSync(root)) {
+      if (join(root, name) === temporary.env.TMPDIR) continue;
       owned.add(join(root, name));
     }
     for (const path of owned) {

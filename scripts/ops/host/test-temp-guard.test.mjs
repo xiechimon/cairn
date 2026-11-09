@@ -1,3 +1,4 @@
+import '../../test-temp-run.test.mjs';
 import '../../temp-environment.test.mjs';
 import './lane-temp.test.mjs';
 import './temp-reclaim.test.mjs';
@@ -91,8 +92,11 @@ test('runs filesystem cleanup in both roots without following symlinks or descen
     utimesSync(join(root, 'ct-file'), 0, 0);
     symlinkSync(outside, join(root, 'ct-link'));
   }
+  const processRoot = join(home, 'proc');
+  mkdirSync(processRoot);
   const result = runGuard({
     roots,
+    processRoot,
     stateDir: join(home, 'state'),
     now,
     usage: () => ({ space: 20, inodes: 20 }),

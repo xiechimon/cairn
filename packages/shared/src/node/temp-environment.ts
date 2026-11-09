@@ -13,15 +13,21 @@ export function createTempEnvironment(env: NodeJS.ProcessEnv = process.env) {
       slots = join(result.stdout.trim(), 'cairn-heavy-slots');
     } else slots = '/tmp/cairn-heavy-slots';
   }
-  const parent = resolve(
+  const configuredRoot = resolve(
     env.CAIRN_TEST_TEMP_ROOT ?? join(env.HOME || homedir(), '.cache/lane-tmp'),
   );
+  const parent =
+    env.CAIRN_TEST_TEMP_ROOT && env.TMPDIR === join(configuredRoot, 'tmp')
+      ? env.TMPDIR
+      : configuredRoot;
   mkdirSync(parent, { recursive: true, mode: 0o700 });
   const root = mkdtempSync(join(parent, 'ct-'));
+  const runtime = join(root, 'tmp');
+  mkdirSync(runtime, { mode: 0o700 });
   const lease = openSync(root, 'r');
   return {
     root,
-    env: { TMPDIR: root, CAIRN_TEST_TEMP_ROOT: root, CAIRN_HEAVY_SLOTS_DIR: slots },
+    env: { TMPDIR: runtime, CAIRN_TEST_TEMP_ROOT: root, CAIRN_HEAVY_SLOTS_DIR: slots },
     cleanup() {
       try {
         rmSync(root, { recursive: true, force: true });

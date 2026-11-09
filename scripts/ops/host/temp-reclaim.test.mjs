@@ -22,11 +22,15 @@ function fixture() {
   const home = makeTestTempDir('reclaim-');
   const root = join(home, 'lane-tmp');
   mkdirSync(root);
+  const processRoot = join(home, 'proc');
+  mkdirSync(processRoot);
+  symlinkSync(`/proc/${process.pid}`, join(processRoot, String(process.pid)));
   return {
     home,
     root,
     options: {
       roots: [root],
+      processRoot,
       diskRoot: root,
       stateDir: join(home, 'state'),
       now,
@@ -76,6 +80,7 @@ for (const mode of ['cwd', 'fd']) {
         ],
         { stdio: ['ignore', 'pipe', 'inherit'] },
       );
+      symlinkSync(`/proc/${child.pid}`, join(options.processRoot, String(child.pid)));
       const exit = once(child, 'exit');
       try {
         await once(child.stdout, 'data');
@@ -106,6 +111,7 @@ test('caps disk roots by oldest non-live first, even before the age threshold', 
     ['-e', 'process.chdir(process.argv[1]);console.log("ready");setInterval(()=>{},1000)', live],
     { stdio: ['ignore', 'pipe', 'inherit'] },
   );
+  symlinkSync(`/proc/${child.pid}`, join(options.processRoot, String(child.pid)));
   const exit = once(child, 'exit');
   try {
     await once(child.stdout, 'data');
@@ -133,7 +139,7 @@ test('an unreadable process inspection preserves stale roots and over-cap roots'
   const { home, root, options } = fixture();
   const path = directory(root, 'ct-uncertain', 7 * hours);
   writeFileSync(join(path, 'bytes'), 'keep');
-  const proc = join(home, 'proc');
+  const proc = join(home, 'unreadable-proc');
   const pid = join(proc, '123');
   mkdirSync(join(pid, 'fd'), { recursive: true });
   symlinkSync(home, join(pid, 'cwd'));
