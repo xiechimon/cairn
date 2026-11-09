@@ -377,9 +377,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Threads** (shipped). A thread is one piece of work with its own session: created, continued, snoozed, archived, reset and counted by phase.
 
-- Research: [docs/research/r12-save-and-start-behavior.md](research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main)
+- Research: [docs/research/r12-save-and-start-behavior.md](research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
-- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main)
+- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 
 ### desktop-app
 

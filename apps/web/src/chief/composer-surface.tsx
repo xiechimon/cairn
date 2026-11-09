@@ -28,8 +28,10 @@ const STOP_CLS =
   'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
 const HOME_COMPOSER_CLS =
   'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
-const ATTACHED_COMPOSER_CLS = 'mt-0';
-const FREE_COMPOSER_CLS = 'rounded-t-(--radius-composer)';
+const ATTACHED_COMPOSER_CLS =
+  'mt-0 shadow-(--shadow-composer-attached) focus-within:shadow-(--shadow-composer-attached-focus)';
+const FREE_COMPOSER_CLS =
+  'rounded-t-(--radius-composer) shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 
 export interface ComposerSurfaceHandle {
   focus: (options?: FocusOptions) => void;
@@ -154,7 +156,7 @@ export function ComposerSurface({
       inert={!active}
       aria-hidden={active ? undefined : true}
       data-invalid={invalid ? '' : undefined}
-      className={`${active ? 'chief-composer ' : ''}${placement} ${HOME_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)`}
+      className={`${active ? 'chief-composer ' : ''}${placement} ${HOME_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5`}
       style={active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       {above}

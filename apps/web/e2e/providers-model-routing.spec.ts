@@ -61,9 +61,9 @@ test('the settings nav lists Providers and Routing', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=10');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByRole('link', { name: '订阅与路由' })).toHaveCount(0);
-  await settings.getByRole('link', { name: '模型路由', exact: true }).click();
+  await settings.getByRole('link', { name: '用量与连接', exact: true }).click();
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=10/);
-  await expect(page.getByRole('heading', { name: '模型路由', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '用量与连接', exact: true })).toBeVisible();
 });
 
 test('live: rename, verify, remove and the Claude usage switch hit the agreed routes', async ({
