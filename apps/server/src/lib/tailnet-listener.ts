@@ -10,6 +10,7 @@ const TAILNET_LISTENER = 'tailnet';
 const TAILNET_SCHEME = 'https';
 const IDENTITY_LOGIN_HEADER = 'tailscale-user-login';
 const IDENTITY_NAME_HEADER = 'tailscale-user-name';
+const FORWARDED_FOR_HEADER = 'x-forwarded-for';
 const MAX_IDENTITY_CHARS = 254;
 const SOCKET_MODE = 0o600;
 
@@ -22,6 +23,7 @@ export interface TailnetOwnerPolicy {
   ownerLogin: string | null;
   selfTagged: boolean;
   allowedLogins: readonly string[];
+  selfAddresses: readonly string[] | null;
 }
 
 interface TailnetListenerEnv {
@@ -78,6 +80,12 @@ export function tailnetOwnerIdentityOf(c: Context): TailnetIdentity | null {
   const identity = tailnetIdentityOf(c);
   if (identity === null) return null;
   const policy = listener.ownerPolicy();
+  const source = c.req.header(FORWARDED_FOR_HEADER)?.split(',')[0]?.trim();
+  if (
+    source !== undefined &&
+    (policy.selfAddresses === null || policy.selfAddresses.includes(source))
+  )
+    return null;
   const allowed =
     !policy.selfTagged && policy.ownerLogin !== null
       ? identity.login === policy.ownerLogin
@@ -125,6 +133,7 @@ export async function listenOnTailnetSocket(
     ownerLogin: null,
     selfTagged: false,
     allowedLogins: [],
+    selfAddresses: [],
   }),
 ): Promise<TailnetListener> {
   const parent = lstatSync(dirname(socketPath));

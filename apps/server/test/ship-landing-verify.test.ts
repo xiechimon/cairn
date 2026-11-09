@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { build, machine, project, pushDelivery, step, team, todo } from '../src/db/schema.js';
+import { build, machine, project, pushDelivery, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from '../src/services/builds.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { finishStep } from '../src/services/machines.js';
 import { appendShipGateInstruction } from '../src/services/ship-gate.js';
-import { bootServer, insertMachine, seedSessionRoute } from './helpers.js';
+import { bootServer, insertMachine, seedSessionRoute, teamPausedForTest } from './helpers.js';
 
 const JUDGED = 'a'.repeat(40);
 const PUSHED = 'e'.repeat(40);
@@ -15,8 +15,9 @@ afterAll(() => {
   for (const d of disposables) d();
 });
 
-function pullFetch(pull: { merged: boolean; head: string }): FetchLike {
-  return async (url) => {
+function pullFetch(pull: { merged: boolean; head: string }, markers: string[] = []): FetchLike {
+  return async (url, init) => {
+    if (init?.method === 'POST' && String(url).endsWith('/issues')) markers.push(String(url));
     const body = String(url).includes('/pulls/')
       ? {
           state: pull.merged ? 'closed' : 'open',
@@ -34,7 +35,8 @@ function pullFetch(pull: { merged: boolean; head: string }): FetchLike {
 }
 
 function world(pull: { merged: boolean; head: string }) {
-  const s = bootServer({ githubFetch: pullFetch(pull) });
+  const markers: string[] = [];
+  const s = bootServer({ githubFetch: pullFetch(pull, markers) });
   disposables.push(() => s.dispose());
   const machineId = insertMachine(s);
   const now = Date.now();
@@ -99,9 +101,14 @@ function world(pull: { merged: boolean; head: string }) {
     box: s.secretBox,
     reposDir: s.reposDir,
     attachmentsDir: s.attachmentsDir,
-    githubFetch: pullFetch(pull),
+    githubFetch: pullFetch(pull, markers),
   };
-  return { s, machineId, deps };
+  return { s, machineId, deps, markers };
+}
+
+function expectMarkerBrake(w: { s: ReturnType<typeof world>['s']; markers: string[] }) {
+  expect(w.markers).toEqual(['https://api.github.com/repos/octo/demo/issues']);
+  expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(true);
 }
 
 function failure(s: ReturnType<typeof world>['s']) {
@@ -117,9 +124,7 @@ describe('the custom merge step is verified when it finishes', () => {
     const { s, machineId, deps } = world({ merged: true, head: JUDGED });
     await finishStep(deps, machineId, 'm1', { status: 'success' });
     expect(stepRow(s)?.status).toBe('done');
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
   });
 
   test('success reported with an unchanged head but no merge: the step fails without the brake', async () => {
@@ -127,9 +132,7 @@ describe('the custom merge step is verified when it finishes', () => {
     await finishStep(deps, machineId, 'm1', { status: 'success' });
     expect(stepRow(s)?.status).toBe('failed');
     expect(failure(s)).toMatch(/PR is not merged/);
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
   });
 
   test('a failed report with an unchanged unmerged head is an ordinary failure', async () => {
@@ -140,12 +143,13 @@ describe('the custom merge step is verified when it finishes', () => {
   });
 
   test('a push after claim then a merge: step failed, alert raised, brake opened', async () => {
-    const { s, machineId, deps } = world({ merged: true, head: PUSHED });
+    const w = world({ merged: true, head: PUSHED });
+    const { s, machineId, deps } = w;
     await finishStep(deps, machineId, 'm1', { status: 'success' });
     const row = stepRow(s);
     expect(row?.status).toBe('failed');
     expect(failure(s)).toMatch(/unjudged/);
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(true);
+    expectMarkerBrake(w);
     expect(s.db.select().from(pushDelivery).all().length).toBeGreaterThan(0);
   });
 
@@ -155,9 +159,7 @@ describe('the custom merge step is verified when it finishes', () => {
     const row = stepRow(s);
     expect(row?.status).toBe('failed');
     expect(failure(s)).toMatch(/head-moved/);
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
   });
 
   test('an unreadable PR cannot be verified: the step fails closed', async () => {
@@ -187,12 +189,13 @@ describe('an abandoned custom merge step is verified without a finish report', (
   });
 
   test('merged unjudged head and no finish report: step failed, alert raised, brake opened', async () => {
-    const { s, deps } = world({ merged: true, head: PUSHED });
+    const w = world({ merged: true, head: PUSHED });
+    const { s, deps } = w;
     abandon(s);
     await sweepAbandonedShipSteps(deps, Date.now());
     expect(stepRow(s)?.status).toBe('failed');
     expect(failure(s)).toMatch(/unjudged/);
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(true);
+    expectMarkerBrake(w);
     expect(s.db.select().from(pushDelivery).all().length).toBeGreaterThan(0);
   });
 
@@ -201,19 +204,18 @@ describe('an abandoned custom merge step is verified without a finish report', (
     abandon(s);
     await sweepAbandonedShipSteps(deps, Date.now());
     expect(stepRow(s)?.status).toBe('pending');
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
-      false,
-    );
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(false);
     expect(s.db.select().from(pushDelivery).all()).toHaveLength(0);
   });
 
   test('a closed card stops the abandoned step after verification, and an unjudged merge still fails it', async () => {
-    const { s, deps } = world({ merged: true, head: PUSHED });
+    const w = world({ merged: true, head: PUSHED });
+    const { s, deps } = w;
     abandon(s);
     s.db.update(todo).set({ phase: 'closed' }).where(eq(todo.id, 't1')).run();
     await sweepAbandonedShipSteps(deps, Date.now());
     expect(stepRow(s)?.status).toBe('failed');
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(true);
+    expectMarkerBrake(w);
   });
 
   test('a fresh claimed step is not touched', async () => {

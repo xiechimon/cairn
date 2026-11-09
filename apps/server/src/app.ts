@@ -85,6 +85,7 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
   registerTokenAuth(app, ctx.authToken, {
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
+    loopbackOwner: ctx.loopbackOwner ?? null,
   });
   registerMemberActivity(app, ctx);
   registerRoutes(app, ctx);

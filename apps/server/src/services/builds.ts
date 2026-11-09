@@ -94,7 +94,6 @@ import {
   steerPending,
   step,
   stopPending,
-  team,
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -2344,11 +2343,6 @@ async function mergeThroughGithub(
     }
     const titled = `${pull.title} (#${prNumber})`;
     if (await readGithubAutonomyPause(fetchImpl, token, `${repoRef.owner}/${repoRef.repo}`)) {
-      deps.db
-        .update(team)
-        .set({ autonomyPaused: true })
-        .where(eq(team.id, before.todoRow.teamId))
-        .run();
       throw new HttpError(409, 'autonomy-paused: GitHub autonomy marker is open or unreadable');
     }
     await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
@@ -3092,7 +3086,11 @@ export function completeStep(
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
-  if (endedWithoutChanges(stepRow, todoRow, outcome)) askAboutZeroChangeOnce(deps, buildRow.id);
+  if (
+    endedWithoutChanges(stepRow, todoRow, outcome) &&
+    pendingWorkerQuestions(deps.db, buildRow.id).length === 0
+  )
+    askAboutZeroChangeOnce(deps, buildRow.id);
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
   const gateFailure = stepArtifactGate(
     deps,
