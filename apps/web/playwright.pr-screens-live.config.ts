@@ -1,4 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { admitTestRun } from '../../scripts/test-admission.mjs';
+
+await admitTestRun();
 
 const EMPTY = process.env.PR_SCREENS_EMPTY_PORT ?? '8441';
 const SEEDED = process.env.PR_SCREENS_SEEDED_PORT ?? '8443';

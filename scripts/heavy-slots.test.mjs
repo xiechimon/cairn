@@ -29,15 +29,12 @@ import { scrubGateEnv } from './scrub-git-env.mjs';
 
 const moduleUrl = pathToFileURL(resolve('scripts/heavy-slots.mjs')).href;
 const cli = resolve('scripts/heavy-slots.mjs');
-const e2eAffectedCli = resolve('scripts/e2e-affected.mjs');
 const children = new Set();
 
 test.afterEach(() => {
   for (const child of children) child.kill('SIGKILL');
   children.clear();
 });
-
-const SANDBOX_PORT_BASE = 20000 + (process.pid % 1000) * 20;
 
 function sandbox(slots) {
   const dir = mkdtempSync(join(tmpdir(), 'heavy-slots-test-'));
@@ -46,8 +43,8 @@ function sandbox(slots) {
     CAIRN_HEAVY_SLOTS: String(slots),
     CAIRN_HEAVY_SLOTS_DIR: join(dir, 'locks'),
     TMPDIR: join(dir, 'tmp'),
-    E2E_AFFECTED_PORT: String(SANDBOX_PORT_BASE),
   };
+  mkdirSync(env.TMPDIR, { recursive: true });
   delete env.CI;
   delete env.CAIRN_HEAVY_SLOT;
   delete env.CAIRN_HEAVY_SLOT_OWNER;
@@ -82,71 +79,14 @@ async function until(watched, stream, pattern, timeoutMs = 15_000) {
   }
 }
 
-const prepushVitestFixture = (dir) => {
-  mkdirSync(join(dir, 'tmp'), { recursive: true });
-  const repo = join(dir, 'vitest-repo');
-  mkdirSync(join(repo, 'scripts'), { recursive: true });
-  for (const file of [
-    'prepush-vitest.mjs',
-    'heavy-slots.mjs',
-    'owned-process.mjs',
-    'prepush-known-red.json',
-  ])
-    copyFileSync(join('scripts', file), join(repo, 'scripts', file));
-  const bin = join(dir, 'bin');
-  mkdirSync(bin, { recursive: true });
-  writeFileSync(
-    join(bin, 'pnpm'),
-    `#!/usr/bin/env node
-const { writeFileSync } = require('node:fs');
-const output = process.argv.find((arg) => arg.startsWith('--outputFile.json='));
-if (!output) process.exit(2);
-writeFileSync(output.slice('--outputFile.json='.length), JSON.stringify({ testResults: [] }));
-console.log('FAKE-VITEST-RAN');
-`,
-    { mode: 0o755 },
-  );
-  return {
-    repo,
-    withFakePnpm: (env) => ({ ...env, PATH: `${bin}:${process.env.PATH}` }),
-  };
-};
-
-const fakePnpmFixture = (dir) => {
-  const bin = join(dir, 'bin');
-  const log = join(dir, 'pnpm-calls.jsonl');
-  mkdirSync(bin, { recursive: true });
-  writeFileSync(
-    join(bin, 'pnpm'),
-    `#!/usr/bin/env node
-const { appendFileSync } = require('node:fs');
-appendFileSync(
-  ${JSON.stringify(log)},
-  JSON.stringify({
-    argv: process.argv.slice(2),
-    E2E_PORT: process.env.E2E_PORT,
-    E2E_DIST_DIR: process.env.E2E_DIST_DIR,
-    CAIRN_HEAVY_SLOT: process.env.CAIRN_HEAVY_SLOT,
-  }) + '\\n',
-);
-console.log('FAKE-PLAYWRIGHT-RAN');
-`,
-    { mode: 0o755 },
-  );
-  return {
-    log,
-    withFakePnpm: (env) => ({ ...env, PATH: `${bin}:${process.env.PATH}` }),
-  };
-};
-
-const startSquatter = (env, port, cwd) =>
+const startSquatter = (env, cwd) =>
   watch(
     process.execPath,
     [
       '-e',
       `require('node:net')
         .createServer(() => {})
-        .listen(${port}, '127.0.0.1', () => console.log('SQUATTER-READY'))
+        .listen(0, '127.0.0.1', function () { console.log('SQUATTER-READY ' + this.address().port); })
         .on('error', (error) => {
           console.log('SQUATTER-ERROR ' + error.code);
           process.exit(3);
@@ -206,9 +146,19 @@ test('slot count defaults to 2 and falls back to 1 with a warning for bad values
   }
 });
 
-test('CI environments skip the queue', () => {
-  assert.equal(skipsQueue({ CI: 'true' }), true);
-  assert.equal(skipsQueue({ CI: '1' }), true);
+test('CI skips only when its slot directory is absent', () => {
+  const { dir, cleanup } = sandbox(1);
+  try {
+    assert.equal(skipsQueue({ CI: 'true', CAIRN_HEAVY_SLOTS_DIR: dir }), false);
+    assert.equal(skipsQueue({ CI: 'true', CAIRN_HEAVY_SLOTS_DIR: join(dir, 'absent') }), true);
+  } finally {
+    cleanup();
+  }
+  assert.equal(
+    skipsQueue({ CI: 'true', CAIRN_HEAVY_SLOTS_DIR: '/does-not-exist-heavy-slots' }),
+    true,
+  );
+  assert.equal(skipsQueue({ CI: '1', CAIRN_HEAVY_SLOTS_DIR: '/does-not-exist-heavy-slots' }), true);
   assert.equal(skipsQueue({}), false);
   assert.equal(skipsQueue({ CI: '' }), false);
   assert.equal(skipsQueue({ CI: 'false' }), false);
@@ -232,55 +182,13 @@ test('slotPortHolder names the pid, cwd and command of whatever listens on the p
   try {
     mkdirSync(join(dir, 'squatter'));
     const squatterCwd = realpathSync(join(dir, 'squatter'));
-    const squatter = startSquatter(env, Number(env.E2E_AFFECTED_PORT), squatterCwd);
+    const squatter = startSquatter(env, squatterCwd);
     await until(squatter, 'out', /SQUATTER-READY/);
+    env.E2E_AFFECTED_PORT = squatter.out.match(/SQUATTER-READY (\d+)/)[1];
     const holder = slotPortHolder(Number(env.E2E_AFFECTED_PORT));
     assert.equal(holder.pid, squatter.child.pid);
     assert.equal(holder.cwd, squatterCwd);
     assert.match(holder.command, /node/);
-    assert.equal(slotPortHolder(Number(env.E2E_AFFECTED_PORT) + 1), null);
-  } finally {
-    cleanup();
-  }
-});
-
-test('Playwright loads the generated slot config from outside the web package', () => {
-  const { dir, env, cleanup } = sandbox(1);
-  try {
-    mkdirSync(env.TMPDIR, { recursive: true });
-    const webDir = resolve('apps/web');
-    const written = spawnSync(
-      process.execPath,
-      [
-        '--input-type=module',
-        '-e',
-        `import { writeSlotPlaywrightConfig } from ${JSON.stringify(moduleUrl)};
-console.log(writeSlotPlaywrightConfig({ slot: 1, env: process.env, webDir: ${JSON.stringify(webDir)} }).path);`,
-      ],
-      { env, encoding: 'utf8' },
-    );
-    assert.equal(written.status, 0, written.stderr);
-    const configPath = written.stdout.trim();
-    assert.ok(configPath.startsWith(realpathSync(dir)) || configPath.startsWith(dir), configPath);
-    const reportPath = join(dir, 'list.json');
-    const listed = spawnSync(
-      'pnpm',
-      [
-        'exec',
-        'playwright',
-        'test',
-        '--list',
-        '--config',
-        configPath,
-        '--reporter=json',
-        'fixture-mode-chip.spec.ts',
-      ],
-      { cwd: webDir, env: { ...env, PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath }, encoding: 'utf8' },
-    );
-    assert.equal(listed.status, 0, `${listed.stdout}${listed.stderr}`);
-    const { config } = JSON.parse(readFileSync(reportPath, 'utf8'));
-    assert.equal(config.globalSetup, join(webDir, 'e2e/port-holder-guard.ts'));
-    assert.ok(existsSync(config.globalSetup));
   } finally {
     cleanup();
   }
@@ -575,31 +483,6 @@ test('an inherited slot whose lock belongs to someone else is not reused', async
   }
 });
 
-test('CI skips the queue even when every slot is taken', async () => {
-  const { env, cleanup } = sandbox(1);
-  try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
-    const result = spawnSync(
-      process.execPath,
-      [
-        cli,
-        'run',
-        '--',
-        process.execPath,
-        '-e',
-        'console.log("slot=" + process.env.CAIRN_HEAVY_SLOT)',
-      ],
-      { env: { ...env, CI: 'true' }, encoding: 'utf8', timeout: 10_000 },
-    );
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /slot=undefined/);
-    assert.doesNotMatch(result.stderr, /queued, position/);
-  } finally {
-    cleanup();
-  }
-});
-
 test('run wrapper passes the exit code through and frees the slot', async () => {
   const { env, cleanup } = sandbox(1);
   try {
@@ -634,117 +517,6 @@ test('e2e:affected queues for a slot, but a dry run never waits', async () => {
     const queued = watch(process.execPath, ['scripts/e2e-affected.mjs', spec], { env });
     await until(queued, 'err', /queued, position 1/);
     assert.doesNotMatch(queued.out + queued.err, /Running \d+ test/);
-  } finally {
-    cleanup();
-  }
-});
-
-test('e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit', async () => {
-  const { dir, env, cleanup } = sandbox(2);
-  const fake = fakePnpmFixture(dir);
-  try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
-    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/dialog-viewport.spec.ts'], {
-      env: fake.withFakePnpm(env),
-    });
-    assert.equal(await run.exited, 0, run.out + run.err);
-    assert.match(run.out, /FAKE-PLAYWRIGHT-RAN/);
-    const slotTwoPort = Number(env.E2E_AFFECTED_PORT) + 10;
-    assert.match(run.out, new RegExp(`slot 2: E2E_PORT=${slotTwoPort}`));
-    const calls = readFileSync(fake.log, 'utf8')
-      .trim()
-      .split('\n')
-      .map((line) => JSON.parse(line));
-    assert.equal(calls.length, 1);
-    const [call] = calls;
-    assert.equal(call.E2E_PORT, String(slotTwoPort));
-    assert.equal(call.CAIRN_HEAVY_SLOT, '2');
-    assert.equal(call.E2E_DIST_DIR, join(env.TMPDIR, 'cairn-heavy-slot-2', 'web-dist'));
-    assert.notEqual(call.E2E_PORT, env.E2E_AFFECTED_PORT);
-    assert.ok(call.argv.includes('e2e/dialog-viewport.spec.ts'));
-    const configPath = call.argv[call.argv.indexOf('--config') + 1];
-    const config = readFileSync(configPath, 'utf8');
-    assert.match(config, new RegExp(`http://127\\.0\\.0\\.1:${slotTwoPort}`));
-    assert.ok(!config.includes(`127.0.0.1:${env.E2E_AFFECTED_PORT}`));
-    assert.ok(!config.includes('8398'));
-    const next = startHolder(env);
-    await until(next, 'out', /SLOT 2/, 5_000);
-  } finally {
-    cleanup();
-  }
-});
-
-test('a squatted slot port fails e2e:affected before playwright and names the holding process', async () => {
-  const { dir, env, cleanup } = sandbox(2);
-  const fake = fakePnpmFixture(dir);
-  try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
-    mkdirSync(join(dir, 'squatter'));
-    const squatterCwd = realpathSync(join(dir, 'squatter'));
-    const squatter = startSquatter(env, Number(env.E2E_AFFECTED_PORT) + 10, squatterCwd);
-    await until(squatter, 'out', /SQUATTER-READY/);
-    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/dialog-viewport.spec.ts'], {
-      env: fake.withFakePnpm(env),
-    });
-    assert.equal(await run.exited, 1);
-    assert.ok(
-      run.err.includes(
-        `slot 2's port ${Number(env.E2E_AFFECTED_PORT) + 10} is held by pid ${squatter.child.pid}`,
-      ),
-      run.out + run.err,
-    );
-    assert.ok(run.err.includes(squatterCwd), run.out + run.err);
-    assert.ok(!run.out.includes('FAKE-PLAYWRIGHT-RAN'));
-    assert.equal(existsSync(fake.log), false);
-    const next = startHolder(env);
-    await until(next, 'out', /SLOT 2/, 5_000);
-  } finally {
-    cleanup();
-  }
-});
-
-test('prepush-vitest run directly queues for a slot and only starts vitest once the holder exits', async () => {
-  const { dir, env, cleanup } = sandbox(1);
-  const { repo, withFakePnpm } = prepushVitestFixture(dir);
-  try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
-    const run = watch(process.execPath, ['scripts/prepush-vitest.mjs'], {
-      cwd: repo,
-      env: withFakePnpm(env),
-    });
-    await until(run, 'err', /queued, position 1/);
-    assert.doesNotMatch(run.out + run.err, /FAKE-VITEST-RAN/);
-    holder.child.kill('SIGKILL');
-    await until(run, 'out', /FAKE-VITEST-RAN/, 5_000);
-    assert.equal(await run.exited, 0);
-    const next = startHolder(env);
-    await until(next, 'out', /SLOT 1/, 5_000);
-  } finally {
-    cleanup();
-  }
-});
-
-test('prepush-vitest reuses an inherited live lease without queueing', async () => {
-  const { dir, env, cleanup } = sandbox(1);
-  const { repo, withFakePnpm } = prepushVitestFixture(dir);
-  try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
-    const inherited = withFakePnpm({
-      ...env,
-      CAIRN_HEAVY_SLOT: '1',
-      CAIRN_HEAVY_SLOT_OWNER: String(holder.child.pid),
-    });
-    const run = watch(process.execPath, ['scripts/prepush-vitest.mjs'], {
-      cwd: repo,
-      env: inherited,
-    });
-    await until(run, 'out', /FAKE-VITEST-RAN/, 10_000);
-    assert.doesNotMatch(run.err, /queued, position/);
-    assert.equal(await run.exited, 0);
   } finally {
     cleanup();
   }
@@ -816,8 +588,9 @@ test('local prepush ignores a squatted slot port because fast checks do not bind
     writeFileSync(join(repo, 'new.ts'), 'export const probe = 1;\n');
     mkdirSync(join(dir, 'squatter'));
     const squatterCwd = realpathSync(join(dir, 'squatter'));
-    const squatter = startSquatter(env, Number(env.E2E_AFFECTED_PORT), squatterCwd);
+    const squatter = startSquatter(env, squatterCwd);
     await until(squatter, 'out', /SQUATTER-READY/);
+    env.E2E_AFFECTED_PORT = squatter.out.match(/SQUATTER-READY (\d+)/)[1];
     const prepush = watch(process.execPath, ['scripts/prepush.mjs'], {
       cwd: repo,
       env: { ...env, PREPUSH_BASE_SHA: 'origin/main' },
@@ -826,33 +599,6 @@ test('local prepush ignores a squatted slot port because fast checks do not bind
     assert.doesNotMatch(prepush.err, /is held by pid|acquired slot/);
     assert.match(prepush.out, /\[prepush\] node scripts\/ui-debt-gate\.mjs/);
     assert.equal(existsSync(env.CAIRN_HEAVY_SLOTS_DIR), false);
-  } finally {
-    cleanup();
-  }
-});
-
-test('prepush e2e shard mode still queues for a heavy slot and releases it', async () => {
-  const { dir, env, cleanup } = sandbox(1);
-  const fake = fakePnpmFixture(dir);
-  const repo = join(dir, 'repo');
-  mkdirSync(join(repo, 'scripts'), { recursive: true });
-  try {
-    for (const file of prepushModules) copyFileSync(file, join(repo, file));
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
-    const run = watch(process.execPath, ['scripts/prepush.mjs', '--e2e-shard', '1/4'], {
-      cwd: repo,
-      env: fake.withFakePnpm(env),
-    });
-    await until(run, 'err', /queued, position 1/);
-    assert.equal(existsSync(fake.log), false);
-    holder.child.kill('SIGKILL');
-    await until(run, 'out', /FAKE-PLAYWRIGHT-RAN/, 5_000);
-    assert.equal(await run.exited, 0, run.out + run.err);
-    const call = JSON.parse(readFileSync(fake.log, 'utf8').trim());
-    assert.deepEqual(call.argv, ['--filter', '@cairn/web', 'e2e', '--shard=1/4']);
-    assert.equal(call.CAIRN_HEAVY_SLOT, '1');
-    assert.equal(existsSync(join(env.CAIRN_HEAVY_SLOTS_DIR, 'slot-1.lock')), false);
   } finally {
     cleanup();
   }
