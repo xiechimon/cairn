@@ -38,6 +38,7 @@ import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { isLoopbackPeer } from './lib/token-auth.js';
+import { githubAppOf } from './routes-helpers.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
@@ -176,6 +177,7 @@ function originOf(c: Context): string {
 
 export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   const deps = {
+    ...githubAppOf(ctx),
     db: ctx.db,
     hub: ctx.hub,
     machineHub: ctx.machineHub,

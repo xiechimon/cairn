@@ -859,8 +859,15 @@
     {
       "idx": 126,
       "version": "6",
-      "when": 1794193042961,
-      "tag": "0126_thread_owner_checkpoint",
+      "when": 1794192748183,
+      "tag": "0126_autonomy_pause_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "6",
+      "when": 1794197213638,
+      "tag": "0127_thread_owner_checkpoint",
       "breakpoints": true
     }
   ]

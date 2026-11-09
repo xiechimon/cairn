@@ -37,6 +37,7 @@ import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
+import { syncAutonomyPauses } from './github-autonomy-brake.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
 import { githubText } from './github-text.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
@@ -1067,6 +1068,7 @@ export function createCiPoller(
     sweepStartedAt = nowMs();
     await recoverAutonomousMerges(deps, run.githubFetch, now, CI_POLL_INTERVAL_MS);
     try {
+      await syncAutonomyPauses({ ...deps, githubFetch: run.githubFetch });
       await recoverRedAutonomousMain(deps, run.githubFetch);
     } catch (error) {
       run.logger?.info(

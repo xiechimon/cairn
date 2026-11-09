@@ -9,7 +9,6 @@ import {
   HUMAN_LABEL,
   markPreExisting,
   preExistingThreads,
-  QUEUED_LABEL,
   retryStatus,
   reviewRequested,
   STALL_LABEL,
@@ -144,11 +143,6 @@ function writeCheck(repo, sha, newest, result, detailsUrl) {
   else ghWrite('POST', `repos/${repo}/check-runs`, payload);
 }
 
-function dequeueIfQueued(repo, pr) {
-  if (pr.labels.some((label) => label.name === QUEUED_LABEL))
-    ghWrite('POST', `repos/${repo}/issues/${pr.number}/comments`, { body: '@mergifyio dequeue' });
-}
-
 function evaluate(repo, number) {
   const pr = ghJson(['api', `repos/${repo}/pulls/${number}`]);
   const skip = shouldSkip(pr);
@@ -174,7 +168,6 @@ function evaluate(repo, number) {
       summary:
         'The PR file list or review inputs could not be verified. Re-evaluate after the complete file list and review threads are available; a previous successful check cannot qualify this head.',
     });
-    dequeueIfQueued(repo, pr);
     return;
   }
   const stateEntry = trustedStateComment(comments);
@@ -213,7 +206,6 @@ function evaluate(repo, number) {
       body: `${result.block}\nReview-gate: ${result.title}`,
     });
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
-  if (result.conclusion === 'failure') dequeueIfQueued(repo, pr);
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);
   if (result.addStall && !stalled)

@@ -169,6 +169,7 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
     restarts: 0,
   };
   let stopped = false;
+  let knownSelfAddresses: string[] | null = null;
   const refreshSystemStatus = async () => {
     try {
       const status = localStatusSchema.parse(await (input.readLocalStatus ?? readSystemStatus)());
@@ -176,6 +177,8 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
       const running = status.BackendState === 'Running';
       const selfTagged = (status.Self?.Tags?.length ?? 0) > 0;
       const userId = status.Self?.UserID;
+      if (running && (status.TailscaleIPs?.length ?? 0) > 0)
+        knownSelfAddresses = status.TailscaleIPs ?? null;
       socketStatus = {
         ...socketStatus,
         dnsName: running ? (status.Self?.DNSName?.replace(/\.$/, '') ?? null) : null,
@@ -222,6 +225,7 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
           ownerLogin: status?.state === 'ready' ? (status.ownerLogin ?? null) : null,
           selfTagged: status?.selfTagged ?? false,
           allowedLogins: settings.allowedLogins ?? [],
+          selfAddresses: settings.mode === 'socket' ? knownSelfAddresses : (status?.ips ?? []),
         };
       },
     );

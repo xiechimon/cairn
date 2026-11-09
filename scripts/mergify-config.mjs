@@ -6,11 +6,10 @@ const gatePathsPath = 'packages/shared/merge-gate-paths.json';
 export const configPath = '.mergify.yml';
 const prOnlyChecks = ['pr-evidence'];
 const botAuthor = 'cairnwright[bot]';
-const gateBot = 'github-actions[bot]';
 const mergeBotAccount = 'xiechimon';
 export const admitLabel = 'queue-admit';
 const batchHeadRe = '^B[0-9]+/';
-const batchSize = 5;
+const batchSize = { min: 1, max: 4 };
 const batchWait = '0 s';
 const checkRetries = 1;
 const scopes = {
@@ -48,6 +47,7 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '      - check-success = commit-author',
     '      - check-success = @github-actions/review-gate',
     '      - check-success = merge-route',
+    '      - check-success = pr-size',
     ...prChecks.map(passedOrSkipped),
     `      - '#files <= ${maxFiles}'`,
   ].join('\n');
@@ -58,7 +58,9 @@ ${queueConditions}
     merge_conditions:
 ${draftChecks.map(passedOrSkipped).join('\n')}
     merge_method: ${method}
-    batch_size: ${batchSize}
+    batch_size:
+      min: ${batchSize.min}
+      max: ${batchSize.max}
     batch_max_wait_time: ${batchWait}
     max_checks_retries: ${checkRetries}
     branch_protection_injection_mode: none
@@ -71,9 +73,7 @@ merge_protections_settings:
 commands_restrictions:
   dequeue:
     conditions:
-      - or:
-          - sender-permission >= write
-          - sender = ${gateBot}
+      - sender-permission >= write
 merge_queue:
   mode: parallel
   max_parallel_checks: 3
