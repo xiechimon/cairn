@@ -208,7 +208,7 @@ test('live edit prefetch reads 404: form yields to the error block, list invalid
   expect(lists.length).toBeGreaterThanOrEqual(2);
 });
 
-test('client-side preflight: illegal names and quoted descriptions send no request', async ({ page }) => {
+test('client-side preflight: illegal names are refused and quoted descriptions round-trip', async ({ page }) => {
   await stubBoot(page);
   const { calls } = await stubSkillStore(page);
   await page.goto(SKILLS);
@@ -221,10 +221,17 @@ test('client-side preflight: illegal names and quoted descriptions send no reque
   await expect(submit).toBeDisabled();
   await expect(dialog.getByRole('alert')).toContainText('名称须以字母或数字开头');
 
-  await dialog.locator('#dlg-skill-name').fill('ok-name');
-  await dialog.locator('#dlg-skill-desc').fill('"被引号包裹"');
-  await expect(dialog.getByRole('alert')).toContainText('不要用引号整体包裹');
-  await expect(submit).toBeDisabled();
-
   expect(calls).toHaveLength(0);
+  await dialog.locator('#dlg-skill-name').fill('ok-name');
+  await dialog.locator('#dlg-skill-desc').fill('"quoted: # literal"');
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(dialog).toBeHidden();
+  expect(calls).toHaveLength(1);
+  expect(calls[0].body).toMatchObject({
+    name: 'ok-name',
+    description: '"quoted: # literal"',
+    files: [{ path: 'SKILL.md', content: '---\nname: ok-name\ndescription: \'"quoted: # literal"\'\n---\n' }],
+  });
 });
