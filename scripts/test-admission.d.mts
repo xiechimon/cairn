@@ -3,3 +3,5 @@ export function admitTestRun(): Promise<{
   owner: number;
   release(): void;
 } | null>;
+
+export function testRunPort(base: string | number): Promise<number>;

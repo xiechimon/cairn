@@ -252,6 +252,74 @@ console.log('SHARED');
   assert.equal(existsSync(join(root, 'locks/slot-1.lock')), false);
 });
 
+for (const [suffix, defaults, overrides] of [
+  ['', [8399], { E2E_PORT: '17399' }],
+  ['-trip', [8399], { E2E_PORT: '17399' }],
+  ['-live', [8442, 8444], { PR_SCREENS_EMPTY_PORT: '17441', PR_SCREENS_SEEDED_PORT: '17443' }],
+]) {
+  for (const custom of [false, true]) {
+    test(`screenshot ${suffix || 'fixture'} ports follow concurrent leases (${custom ? 'custom' : 'default'})`, async (t) => {
+      const { root, env, start } = fixture(t);
+      env.CAIRN_HEAVY_SLOTS = '2';
+      for (const key of ['E2E_PORT', 'PR_SCREENS_EMPTY_PORT', 'PR_SCREENS_SEEDED_PORT'])
+        delete env[key];
+      const config = `playwright.pr-screens${suffix}.config.ts`;
+      cpSync(join(repo, 'apps/web', config), join(root, 'apps/web', config));
+      const args = [
+        'exec',
+        'node',
+        '--input-type=module',
+        '-e',
+        `
+const { default: config } = await import('./apps/web/${config}');
+const servers = [config.webServer].flat();
+console.log('CONFIG ' + JSON.stringify(servers.map(({url, reuseExistingServer}) => ({port:Number(new URL(url).port),reuseExistingServer}))));
+setInterval(() => {}, 1000);
+`,
+      ];
+      const first = start(args, custom ? overrides : {});
+      await until(first, () => /CONFIG /.test(first.output));
+      const second = start(args, custom ? overrides : {});
+      await until(second, () => /CONFIG /.test(second.output));
+      const ports = custom ? defaults.map((port) => port + 9000) : defaults;
+      for (const [index, run] of [first, second].entries()) {
+        const servers = JSON.parse(run.output.match(/CONFIG (.+)/)[1]);
+        assert.deepEqual(
+          servers.map((server) => server.port),
+          ports.map((port) => port + index * 10),
+        );
+        assert.ok(servers.every((server) => server.reuseExistingServer === false));
+      }
+    });
+  }
+}
+
+test('a screenshot runner rejects a server already bound to its leased port', async (t) => {
+  const { root, start } = fixture(t);
+  const server = createServer((connection) =>
+    connection.end('HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok'),
+  );
+  await new Promise((done) => server.listen(0, '127.0.0.1', done));
+  t.after(() => server.close());
+  const web = join(root, 'apps/web');
+  cpSync(
+    join(repo, 'apps/web/playwright.pr-screens.config.ts'),
+    join(web, 'playwright.pr-screens.config.ts'),
+  );
+  mkdirSync(join(web, 'pr-screens'));
+  writeFileSync(
+    join(web, 'pr-screens/capture.shots.ts'),
+    "import { test } from '@playwright/test'; test('probe', () => {});\n",
+  );
+  const run = start(
+    ['exec', 'playwright', 'test', '-c', 'playwright.pr-screens.config.ts'],
+    { E2E_PORT: String(server.address().port) },
+    web,
+  );
+  assert.notEqual(await run.done, 0, run.output);
+  assert.match(run.output, /already used/);
+});
+
 test('a forged inherited lease from an unrelated live process still queues', async (t) => {
   const { root, start, holder: startHolder } = fixture(t);
   const holder = startHolder();

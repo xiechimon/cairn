@@ -22,6 +22,7 @@ Python status 75 means only EAGAIN/EWOULDBLOCK contention. Spawn errors, signals
 |---|---|---|
 | Every root/package/alternate configuration | Admit before workers or webServer | Concurrent real Vitest runs serialize; Playwright cannot start its server while occupied |
 | Screenshot harness overlay | Copy admission and its runtime dependency closure alongside all four configs | Real Playwright CLI collects each overlaid configuration on an old tree without the admission module |
+| Screenshot server and client ports | Resolve original default/custom bases through the admitted slot | Two live config processes use distinct ports; readiness and live clients use the same mapping; leased fixture/trip runners reject existing servers |
 | e2e:affected and prepush wrappers | Forward commands only | No duplicate acquisition; runner config owns admission |
 | cairn-heavy host wrapper | Delegate to shared lease CLI | Same directory and inherited lease |
 | CI admission | Read directory existence | Absent directory bypasses without creating it; present directory queues |
@@ -40,3 +41,5 @@ Issue: #3584. PR: [#3601](https://github.com/xiechimon/cairn/pull/3601). Read [r
 The first cloud review found inherited-lease deadlock when the owner is container PID 1. Two regression tests failed before extending the shared ancestor traversal to include init. The full related run passed 61 tests with two unavailable systemd-scope cases skipped. The admission regression uses a real live socket and private directory with a simulated Linux parent field; it does not claim native PID-namespace execution. Read [review-round evidence](../verify/3584/3601-init-evidence/result.json).
 
 The second cloud review found an incomplete screenshot harness overlay: old base trees lacked the newly imported admission module and its dependencies. Four actual Playwright configuration loads failed before copying the complete runtime dependency closure; all pass after the fix. Read [overlay evidence](../verify/3584/3601-overlay-evidence/result.json).
+
+The owner resumed the work after the desktop restart and updated the stopping conditions. The remaining third-round finding was screenshot port isolation. Six concurrent-configuration tests failed before the fix and passed after it: fixture, trip and live configurations, with both default and custom bases. A real Playwright runner also rejects an occupied leased port. Server configuration and live screenshot clients both use the admission adapter's port function, which delegates to the existing slot resource mapping without mutating the original bases. Read [port evidence](../verify/3584/3601-ports-evidence/result.json).
