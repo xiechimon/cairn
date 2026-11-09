@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, lstatSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -151,6 +159,20 @@ describe('#1149 environment hook timeout (hookTimeoutMs, same Settings seam prec
 });
 
 describe('local state layout (02 §5.3)', () => {
+  test('persists the CLI-selected workspace root for co-located repository readers', () => {
+    const home = tmp();
+    const config = loadDaemonConfig(
+      { home, workspacesDir: join(home, 'cli-workspaces') },
+      { [ENV_VARS.workspacesDir]: join(home, 'env-workspaces') },
+    );
+    ensureStateDirs(statePaths(config.home, config.workspacesDir));
+    const state = join(home, 'workspace-root.json');
+    expect(JSON.parse(readFileSync(state, 'utf8'))).toEqual({
+      workspacesDir: config.workspacesDir,
+    });
+    expect(modeBits(state)).toBe(0o600);
+  });
+
   test('ensureStateDirs creates home + outbox/chat-sessions/agent-runtime/workspaces', () => {
     const home = join(tmp(), 'cairn-home');
     const paths = statePaths(home);

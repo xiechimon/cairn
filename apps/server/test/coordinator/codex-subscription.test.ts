@@ -65,6 +65,25 @@ describe('Codex subscription credential for the in-server Coordinator', () => {
     });
   });
 
+  it('passes subscription credentials as the API key required by the Codex stream', async () => {
+    const models = createCoordinatorModels();
+    const token = jwt(Math.floor(Date.now() / 1000) + 3600);
+    models.useProvider(
+      {
+        kind: 'http',
+        providerId: 'openai-codex',
+        baseUrl: '',
+        api: 'openai-responses',
+        authHeader: true,
+        models: [{ id: 'gpt-6.1-sol', name: 'gpt-6.1-sol' }],
+      },
+      () => token,
+    );
+    expect(await models.models.getAuth('openai-codex')).toMatchObject({
+      auth: { apiKey: token },
+    });
+  });
+
   it('resolves the route and key from the host login without storing the token', () => {
     const live = jwt(Math.floor(Date.now() / 1000) + 3600);
     process.env.CODEX_HOME = codexHome(live);
