@@ -26,7 +26,7 @@ import {
   CHIEF_DIGEST_THRESHOLD_CHARS,
   planChiefDigests,
 } from '../src/services/chief-digest.js';
-import { foldMemoryIndexes } from '../src/services/memory.js';
+import { foldMemoryIndexes, listMemoryEntries } from '../src/services/memory.js';
 import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 
 const COORDINATOR_RULE = 'route-digest';
@@ -328,9 +328,9 @@ describe('chief long-chat digests (#1939)', () => {
       items: { memory?: { id: string } }[];
     };
     expect(content.items[3]?.memory?.id).toBe('mem-old');
-    expect(
-      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, COORDINATOR_RULE)).all(),
-    ).toHaveLength(folded ? 2 : 1);
+    expect(listMemoryEntries(w.s.db, { teamId: w.teamId, agentId: COORDINATOR_RULE })).toHaveLength(
+      1,
+    );
   });
 
   test('a failed run writes nothing, keeps the session and backs off', async () => {
@@ -602,9 +602,9 @@ describe('chief long-chat digests (#1939)', () => {
       items: { memory?: unknown }[];
     };
     expect(content.items[3]?.memory).toBeUndefined();
-    expect(
-      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, COORDINATOR_RULE)).all(),
-    ).toHaveLength(0);
+    expect(listMemoryEntries(w.s.db, { teamId: w.teamId, agentId: COORDINATOR_RULE })).toHaveLength(
+      0,
+    );
   });
 
   test('a cut that drops the fenced GitHub text still saves no memory', async () => {
@@ -624,9 +624,9 @@ describe('chief long-chat digests (#1939)', () => {
     const claimed = await w.claim();
     if (!claimed) throw new Error('no digest step');
     await w.done(claimed.step.id, VALID_OUTPUT);
-    expect(
-      w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, COORDINATOR_RULE)).all(),
-    ).toHaveLength(0);
+    expect(listMemoryEntries(w.s.db, { teamId: w.teamId, agentId: COORDINATOR_RULE })).toHaveLength(
+      0,
+    );
   });
 
   test('a message written in the same millisecond as the plan stays uncovered', async () => {

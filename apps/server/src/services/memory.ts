@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import {
-  estimateTokens,
   ISSUE_FENCE_OPEN,
   MEMORY_INDEX_ID_PREFIX,
   MEMORY_INDEX_TITLE,
@@ -9,7 +8,7 @@ import {
   type MemoryLayer,
   memoryRecordSchema,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agentMemory, memorySaveConflict } from '../db/schema.js';
@@ -80,15 +79,6 @@ function scratchpadVisible(threadId?: string) {
     : or(ne(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId));
 }
 
-function injectLayerWhere(threadId?: string) {
-  return threadId === undefined
-    ? eq(agentMemory.layer, 'core')
-    : or(
-        eq(agentMemory.layer, 'core'),
-        and(eq(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId)),
-      );
-}
-
 export function listStoredMemoryEntries(
   db: Db | MemoryTx,
   scope: { agentId: string; teamId: string; threadId?: string; teamScoped?: boolean },
@@ -108,12 +98,14 @@ export function listStoredMemoryEntries(
     .all();
 }
 
-export const MEMORY_INJECT_TOKEN_CAP = 3_000;
+export const MEMORY_INDEX_MAX_LINES = 200;
+export const MEMORY_INDEX_MAX_BYTES = 25 * 1024;
 
 export interface InjectedMemory {
   id: string;
   title: string;
   content: string;
+  baseVersion?: string;
 }
 
 interface InjectScope {
@@ -121,95 +113,135 @@ interface InjectScope {
   projectId?: string | null;
   projectOnly?: boolean;
   recordUse?: boolean;
-  teamId?: string;
+  teamId: string;
+  teamScoped?: boolean;
   threadId?: string;
 }
 
-export function capMemories<T extends InjectedMemory & { updatedAt: number }>(
-  rows: readonly T[],
-  capTokens: number,
-): { shown: T[]; omitted: number } {
-  const byRecency = [...rows].sort((a, b) => b.updatedAt - a.updatedAt);
-  const keep = new Set<string>();
-  let used = 0;
-  for (const row of byRecency) {
-    const cost = estimateTokens(`- ${row.title}: ${row.content}`);
-    if (used + cost > capTokens) continue;
-    used += cost;
-    keep.add(row.id);
-  }
-  const shown = rows.filter((row) => keep.has(row.id));
-  const newest = byRecency[0];
-  if (shown.length === 0 && newest !== undefined && Number.isFinite(capTokens)) {
-    const room = Math.max(1, Math.floor(capTokens / 1.25) - newest.title.length);
-    const content = `${newest.content.slice(0, room)} …`;
-    return { shown: [{ ...newest, content }], omitted: rows.length - 1 };
-  }
-  return { shown, omitted: rows.length - shown.length };
+export function boundMemoryIndex(content: string): { content: string; omitted: number } {
+  const lines = content === '' ? [] : content.split('\n');
+  const prefix = lines.slice(0, MEMORY_INDEX_MAX_LINES).join('\n');
+  const bytes = Buffer.from(prefix);
+  let end = Math.min(bytes.length, MEMORY_INDEX_MAX_BYTES);
+  while (end < bytes.length && ((bytes[end] ?? 0) & 0xc0) === 0x80) end--;
+  const loaded = bytes.subarray(0, end).toString('utf8');
+  const loadedLines = loaded === '' ? 0 : loaded.split('\n').length;
+  const omitted = lines.length - loadedLines + (end < bytes.length ? 1 : 0);
+  return {
+    content:
+      omitted > 0
+        ? `${loaded}\n（MEMORY.md 后面还有 ${omitted} 行没有加载；用 memories 读全文，并把细节移到记忆文件）`
+        : loaded,
+    omitted,
+  };
 }
 
-export function injectMemoriesCapped(
+export function ensureMemoryIndex(
+  db: Db | MemoryTx,
+  scope: { agentId: string; teamId: string; projectId: string | null; teamScoped?: boolean },
+) {
+  return db.transaction((tx) => {
+    const where = and(
+      ownerWhere(scope),
+      eq(agentMemory.independent, scope.teamScoped === false),
+      scope.projectId === null
+        ? isNull(agentMemory.projectId)
+        : eq(agentMemory.projectId, scope.projectId),
+    );
+    foldMemoryIndexes(tx, nowMs(), where);
+    const existing = tx
+      .select()
+      .from(agentMemory)
+      .where(and(where, stillValid, eq(agentMemory.layer, 'core')))
+      .get();
+    if (existing) return existing;
+    const now = nowMs();
+    return tx
+      .insert(agentMemory)
+      .values({
+        agentId: scope.agentId,
+        teamId: scope.teamId,
+        projectId: scope.projectId,
+        id: `${MEMORY_INDEX_ID_PREFIX}${newRecordId()}`,
+        title: MEMORY_INDEX_TITLE,
+        content: '',
+        independent: scope.teamScoped === false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning()
+      .get();
+  });
+}
+
+export function injectMemoryDocuments(
   db: Db,
   scope: InjectScope,
-  capTokens: number,
-): { memories: InjectedMemory[]; omitted: number } {
+): { memories: InjectedMemory[]; omitted: number; fileCount: number } {
   return db.transaction((tx) => {
-    const teamId = scope.teamId;
-    const teamScoped = teamId !== undefined;
-    const rows = tx
+    const owner = and(
+      ownerWhere(scope),
+      notAdoptedDuplicate(),
+      eq(agentMemory.independent, scope.teamScoped === false),
+    );
+    const projectId = scope.projectId ?? null;
+    const project =
+      projectId === null
+        ? isNull(agentMemory.projectId)
+        : scope.projectOnly
+          ? eq(agentMemory.projectId, projectId)
+          : or(eq(agentMemory.projectId, projectId), isNull(agentMemory.projectId));
+    const namespaces = (
+      scope.projectOnly || projectId === null ? [projectId] : [null, projectId]
+    ).map((projectId) => ({ ...scope, projectId }));
+    const memories: InjectedMemory[] = [];
+    let omitted = 0;
+    for (const namespace of namespaces.values()) {
+      const index = ensureMemoryIndex(tx, namespace);
+      const facts = readIndex(index);
+      const rendered = facts
+        .map(
+          (fact) =>
+            `- ${fact.title.replace(/[\r\n]+/g, ' ')}：${fact.content}${fact.fileId === null ? '' : `（记忆文件：${fact.title.replace(/[\r\n]+/g, ' ')}）`}`,
+        )
+        .join('\n');
+      const bounded = boundMemoryIndex(rendered);
+      omitted += bounded.omitted;
+      memories.push({
+        id: index.id,
+        title: MEMORY_INDEX_TITLE,
+        content: bounded.content,
+        baseVersion: `${index.id}:${index.updatedAt}`,
+      });
+      if (scope.recordUse !== false && rendered !== '') {
+        tx.update(agentMemory)
+          .set({ lastInjectedAt: nowMs() })
+          .where(eq(agentMemory.id, index.id))
+          .run();
+      }
+    }
+    const pads = tx
       .select()
       .from(agentMemory)
       .where(
         and(
-          teamScoped
-            ? ownerWhere({ agentId: scope.agentId, teamId, teamScoped: true })
-            : eq(agentMemory.agentId, scope.agentId),
-          injectLayerWhere(scope.threadId),
+          owner,
+          project,
           stillValid,
-          scope.projectId === undefined
-            ? undefined
-            : scope.projectId === null
-              ? isNull(agentMemory.projectId)
-              : scope.projectOnly === true
-                ? eq(agentMemory.projectId, scope.projectId)
-                : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
+          eq(agentMemory.layer, 'scratchpad'),
+          scope.threadId === undefined ? sql`0` : eq(agentMemory.threadId, scope.threadId),
         ),
       )
       .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
       .all();
-    const { shown, omitted } = capMemories(factRows(tx, rows), capTokens);
-    if (shown.length > 0 && scope.recordUse !== false) {
-      const shownIds = new Set(shown.map((row) => row.id));
-      const lastInjectedAt = nowMs();
-      for (const row of rows) {
-        if (indexRow(row)) {
-          const facts = readIndex(row);
-          const selected = facts.filter((fact) => shownIds.has(fact.id));
-          if (selected.length === 0) continue;
-          tx.update(agentMemory)
-            .set({
-              lastInjectedAt,
-              content: writeIndex(
-                facts.map((fact) => (shownIds.has(fact.id) ? { ...fact, lastInjectedAt } : fact)),
-              ),
-            })
-            .where(eq(agentMemory.id, row.id))
-            .run();
-          const files = selected.flatMap((fact) => (fact.fileId === null ? [] : [fact.fileId]));
-          if (files.length > 0)
-            tx.update(agentMemory)
-              .set({ lastInjectedAt })
-              .where(inArray(agentMemory.id, files))
-              .run();
-        } else if (shownIds.has(row.id)) {
-          tx.update(agentMemory).set({ lastInjectedAt }).where(eq(agentMemory.id, row.id)).run();
-        }
-      }
-    }
-    return {
-      memories: shown.map(({ id, title, content }) => ({ id, title, content })),
-      omitted,
-    };
+    memories.push(...pads.map(({ id, title, content }) => ({ id, title, content })));
+    const fileCount =
+      tx
+        .select({ count: sql<number>`count(*)` })
+        .from(agentMemory)
+        .where(and(owner, project, stillValid, eq(agentMemory.layer, 'searchable')))
+        .get()?.count ?? 0;
+    return { memories, omitted, fileCount };
   });
 }
 
@@ -230,9 +262,10 @@ export function searchMemoryEntries<T extends { title: string; content: string }
 }
 
 export function injectMemories(db: Db, scope: InjectScope) {
-  return injectMemoriesCapped(db, scope, Number.POSITIVE_INFINITY).memories.map(
-    ({ title, content }) => ({ title, content }),
-  );
+  return injectMemoryDocuments(db, scope).memories.map(({ title, content }) => ({
+    title,
+    content,
+  }));
 }
 
 type MemoryRow = typeof agentMemory.$inferSelect;
@@ -713,16 +746,16 @@ export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): numbe
   });
 }
 
-export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs()): void {
+export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scope?: SQL): void {
   db.transaction((tx) => {
     tx.update(agentMemory)
       .set({ layer: 'searchable' })
-      .where(eq(agentMemory.layer, 'log' as MemoryLayer))
+      .where(and(scope, eq(agentMemory.layer, 'log' as MemoryLayer)))
       .run();
     const rows = tx
       .select()
       .from(agentMemory)
-      .where(and(stillValid, eq(agentMemory.layer, 'core'), notAdoptedDuplicate()))
+      .where(and(scope, stillValid, eq(agentMemory.layer, 'core'), notAdoptedDuplicate()))
       .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
       .all();
     const groups = new Map<string, MemoryRow[]>();
