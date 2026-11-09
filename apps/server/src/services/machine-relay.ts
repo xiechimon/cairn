@@ -124,6 +124,7 @@ export async function executeRelayToolCall(
       machineHub: deps.machineHub,
       box: deps.box,
       githubAppTokenSocket: deps.githubAppTokenSocket,
+      githubAppIdentity: deps.githubAppIdentity,
       user: deps.user,
       vapidKeys: deps.vapidKeys,
       reposDir: deps.reposDir,
@@ -315,6 +316,7 @@ async function setTaskMetaGithubForm(
     vapidKeys: deps.vapidKeys,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
   const record = updateAutonomousTodo(todoDeps, todoRow.id, {

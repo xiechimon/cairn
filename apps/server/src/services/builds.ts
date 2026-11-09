@@ -2,6 +2,7 @@ import type {
   BuildMergePermission,
   BuildRecord,
   GithubRepoRef,
+  GitIdentity,
   MachineDoneBody,
   MergeReadiness,
   Phase,
@@ -183,6 +184,7 @@ import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
   db: Db;
   hub: TeamStreamHub;

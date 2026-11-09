@@ -142,6 +142,14 @@ describe('the local hooks', () => {
     expect(localCommitViolation(policy, owner, owner, human)).toBeNull();
   });
 
+  test('the identity of a cairn server without an App is rejected with the server setting that fixes it', () => {
+    const local = localCommitIdentity('Session');
+    for (const env of [human, agent])
+      expect(localCommitViolation(policy, local, local, env)).toMatch(
+        /cairn server without a GitHub App identity: set CAIRN_GITHUB_APP_SLUG and CAIRN_GITHUB_APP_BOT_ID/,
+      );
+  });
+
   test.each([retiredUser, synthetic])('%o is rejected for everyone', (identity) => {
     expect(localCommitViolation(policy, identity, identity, human)).toMatch(/./);
     expect(localCommitViolation(policy, identity, identity, agent)).toMatch(/./);
