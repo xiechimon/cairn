@@ -65,7 +65,7 @@ const SIGNS: Sign[] = [
     id: 'V24',
     name: 'layout transition',
     pattern:
-      /transition-\[[^\]]*(?:width|height|top|left|right|bottom|margin|padding|inset)[^\]]*\]|transition(?:-property)?:[^;\n{}'"`]*\b(?:width|height|top|left|margin|padding)(?![a-z-])/,
+      /transition-\[[^\]]*(?:width|height|top|left|right|bottom|margin|padding|inset)[^\]]*\]|transition(?:-property)?:[^;\n{}'"`]*\b(?:width|height|top|left|right|bottom|inset|margin|padding)(?:-[a-z]+)*(?![a-z-])/,
     allowed: ['components/segmented.tsx', 'components/ui/trace.tsx'],
   },
   {
@@ -179,6 +179,9 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ['layout transition', '<div className="transition-[width] duration-200" />'],
     ['layout transition', '.panel { transition: height 200ms ease; }'],
     ['layout transition', '<div className="[transition:width_200ms_ease]" />'],
+    ['layout transition', '.panel { transition: margin-left 200ms ease; }'],
+    ['layout transition', '.panel { transition-property: inset; }'],
+    ['layout transition', '.panel { transition: padding-inline 120ms; }'],
     ['gradient text', '<h1 className="bg-gradient-to-r from-violet-500 to-pink-500 bg-clip-text">Cairn</h1>'],
     ['colored glow', '<div className="shadow-[0_0_20px_rgba(139,92,246,0.5)]" />'],
     ['colored glow', '<span className="drop-shadow-lg">AI</span>'],
@@ -251,7 +254,7 @@ describe('unslop signs: the source carries none outside the named exceptions', (
   test('the pristine primitives keep their upstream classes but render the rule', () => {
     const appCss = readFileSync(join(SRC, 'styles/app.css'), 'utf8');
     expect(appCss).toMatch(
-      /\[data-slot="dialog-overlay"\],\s*\[data-slot="alert-dialog-overlay"\],\s*\[data-slot="dialog-content"\] \{[^}]*transition-property: opacity, transform, translate, scale, visibility;/,
+      /\[data-slot="dialog-overlay"\],\s*\[data-slot="alert-dialog-overlay"\],\s*\[data-slot="dialog-content"\],\s*\[data-slot="alert-dialog-content"\] \{[^}]*transition-property: opacity, transform, translate, scale, visibility;/,
     );
     expect(appCss).toMatch(/\[data-slot="empty-title"\] \{[^}]*letter-spacing: normal;/);
     expect(appCss).toMatch(

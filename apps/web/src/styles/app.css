@@ -328,7 +328,8 @@
 
 [data-slot="dialog-overlay"],
 [data-slot="alert-dialog-overlay"],
-[data-slot="dialog-content"] {
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
   transition-property: opacity, transform, translate, scale, visibility;
 }
 
