@@ -16,6 +16,7 @@ import {
   machineEnrollStartBodySchema,
   machineHeartbeatBodySchema,
   machinePresenceBodySchema,
+  machineSteerAckBodySchema,
   machineSyncResultBodySchema,
   machineThinkingDeltaBodySchema,
   machineToolBodySchema,
@@ -37,7 +38,8 @@ import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
-import { isLoopbackPeer, matchesAuthToken } from './lib/token-auth.js';
+import { isLoopbackPeer } from './lib/token-auth.js';
+import { githubAppOf } from './routes-helpers.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
@@ -176,6 +178,7 @@ function originOf(c: Context): string {
 
 export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   const deps = {
+    ...githubAppOf(ctx),
     db: ctx.db,
     hub: ctx.hub,
     machineHub: ctx.machineHub,
@@ -276,10 +279,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/machine/enroll/confirm', async (c) => {
-    if (ctx.authToken !== null) {
-      const token = bearer(c);
-      if (token === null || !matchesAuthToken(ctx.authToken, token)) throw unauthorized();
-    }
     const body = parseWith(machineEnrollConfirmBodySchema, await jsonBody(c), 'body');
     const entry = ctx.enrollments.get(body.enrollId);
     if (!entry || Date.now() - entry.createdAt > ENROLL_TTL_MS) {
@@ -435,12 +434,13 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     return c.json(fetchSteer({ db: ctx.db }, row, stepId));
   });
 
-  app.post('/api/machine/steer/ack', (c) => {
+  app.post('/api/machine/steer/ack', async (c) => {
     const row = me(c);
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
+    const body = parseWith(machineSteerAckBodySchema, (await jsonBody(c)) ?? {}, 'body');
     return c.json(
-      ackSteer({ db: ctx.db, convHub: ctx.convHub, machineHub: ctx.machineHub }, row, stepId),
+      ackSteer({ db: ctx.db, convHub: ctx.convHub, machineHub: ctx.machineHub }, row, stepId, body),
     );
   });
 

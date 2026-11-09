@@ -106,6 +106,13 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         },
       ],
     },
+    "answerIds": {
+      "items": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "type": "array",
+    },
     "chief": {
       "additionalProperties": false,
       "properties": {
@@ -479,6 +486,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                       "planning",
                       "confirm",
                       "building",
+                      "needs_input",
                       "review",
                       "done",
                       "failed",
@@ -533,6 +541,43 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "blockers",
           ],
           "type": "object",
+        },
+        "decisions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "answer": {
+                "type": "string",
+              },
+              "at": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer",
+              },
+              "by": {
+                "enum": [
+                  "person",
+                  "coordinator",
+                ],
+                "type": "string",
+              },
+              "question": {
+                "type": "string",
+              },
+              "requestId": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "requestId",
+              "question",
+              "answer",
+              "by",
+              "at",
+            ],
+            "type": "object",
+          },
+          "type": "array",
         },
         "id": {
           "type": "string",
@@ -763,6 +808,13 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                   "type": "null",
                 },
               ],
+            },
+            "answerIds": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
             },
             "chief": {
               "additionalProperties": false,
@@ -1137,6 +1189,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                               "planning",
                               "confirm",
                               "building",
+                              "needs_input",
                               "review",
                               "done",
                               "failed",
@@ -1191,6 +1244,43 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                     "blockers",
                   ],
                   "type": "object",
+                },
+                "decisions": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "answer": {
+                        "type": "string",
+                      },
+                      "at": {
+                        "maximum": 9007199254740991,
+                        "minimum": -9007199254740991,
+                        "type": "integer",
+                      },
+                      "by": {
+                        "enum": [
+                          "person",
+                          "coordinator",
+                        ],
+                        "type": "string",
+                      },
+                      "question": {
+                        "type": "string",
+                      },
+                      "requestId": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "requestId",
+                      "question",
+                      "answer",
+                      "by",
+                      "at",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
                 },
                 "id": {
                   "type": "string",
@@ -2446,11 +2536,73 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "claudeSubscriptionToken": {
       "type": "string",
     },
+    "coAuthor": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string",
+            },
+            "login": {
+              "type": "string",
+            },
+            "name": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "email",
+            "login",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "commitIdentity": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string",
+            },
+            "name": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "email",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "git": {
       "anyOf": [
         {
           "additionalProperties": false,
           "properties": {
+            "expiresAt": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
+            "kind": {
+              "enum": [
+                "app",
+                "unattributed",
+              ],
+              "type": "string",
+            },
             "password": {
               "type": "string",
             },
@@ -3992,6 +4144,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                           "planning",
                           "confirm",
                           "building",
+                          "needs_input",
                           "review",
                           "done",
                           "failed",
@@ -5176,6 +5329,7 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
               "planning",
               "confirm",
               "building",
+              "needs_input",
               "review",
               "done",
               "failed",
@@ -5403,6 +5557,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                   "planning",
                   "confirm",
                   "building",
+                  "needs_input",
                   "review",
                   "done",
                   "failed",
@@ -5769,9 +5924,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
-            "awaitingReply": {
-              "type": "boolean",
-            },
             "blockedBy": {
               "anyOf": [
                 {
@@ -5812,6 +5964,43 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "null",
               ],
             },
+            "decisions": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "answer": {
+                    "type": "string",
+                  },
+                  "at": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer",
+                  },
+                  "by": {
+                    "enum": [
+                      "person",
+                      "coordinator",
+                    ],
+                    "type": "string",
+                  },
+                  "question": {
+                    "type": "string",
+                  },
+                  "requestId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "requestId",
+                  "question",
+                  "answer",
+                  "by",
+                  "at",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
             "hasChanges": {
               "type": "boolean",
             },
@@ -5850,6 +6039,21 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               ],
               "type": "string",
             },
+            "owner": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "owner",
+                    "coordinator",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+              "default": null,
+            },
             "ownerId": {
               "type": [
                 "string",
@@ -5863,6 +6067,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "planning",
                 "confirm",
                 "building",
+                "needs_input",
                 "review",
                 "done",
                 "failed",
@@ -5963,6 +6168,23 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     },
                   },
                   "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "section": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "needs_input",
+                    "ready_for_review",
+                    "up_next",
+                    "working",
+                    "resolved",
+                  ],
+                  "type": "string",
                 },
                 {
                   "type": "null",
@@ -6146,6 +6368,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
             "sourceKind",
             "sourceRef",
             "output",
+            "owner",
           ],
           "type": "object",
         },
@@ -6231,6 +6454,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "planning",
                     "confirm",
                     "building",
+                    "needs_input",
                     "review",
                     "done",
                     "failed",
@@ -6247,6 +6471,42 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "type": [
                 "string",
                 "null",
+              ],
+            },
+            "stop": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actor": {
+                      "enum": [
+                        "person",
+                        "coordinator",
+                        "mcp",
+                        "system",
+                      ],
+                      "type": "string",
+                    },
+                    "at": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "reason": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "actor",
+                    "reason",
+                    "at",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
               ],
             },
             "todoId": {
@@ -7174,7 +7434,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
 ]
 `;
 
-exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values + board columns + semantics (02 §4.1) 1`] = `
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase ten values + board columns + semantics (02 §4.1) 1`] = `
 {
   "BOARD_COLUMNS": [
     "待开始",
@@ -7188,6 +7448,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values
     "confirm": "计划就绪等你",
     "done": "已接受，若选了则已合并",
     "failed": "run 停在错误上",
+    "needs_input": "agent 问了问题，等按 requestId 回答",
     "planning": "读仓库写计划",
     "queued": "已启动，等空闲机器",
     "review": "改动就绪等你（\`待验收\`≡\`审核\` 同 phase，CONTEXT.md 裁决）",
@@ -7199,6 +7460,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values
     "planning",
     "confirm",
     "building",
+    "needs_input",
     "review",
     "done",
     "failed",
@@ -7361,6 +7623,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "gate_verdict",
   "gate_state",
   "autonomy_state",
+  "autonomy_pause",
   "member_activity",
   "build_feedback",
   "build_outcome_backfill",
@@ -7389,6 +7652,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "coordinator_entry",
   "coordinator_lease",
   "data_migration",
+  "task_issue_close",
 ]
 `;
 
@@ -7633,6 +7897,13 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/todos",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/tasks",
     "query": [
       "teamId",
     ],
@@ -8135,6 +8406,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > bui
             "planning",
             "confirm",
             "building",
+            "needs_input",
             "review",
             "done",
             "failed",
@@ -8151,6 +8423,42 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > bui
       "type": [
         "string",
         "null",
+      ],
+    },
+    "stop": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": [
+                "person",
+                "coordinator",
+                "mcp",
+                "system",
+              ],
+              "type": "string",
+            },
+            "at": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "reason": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "actor",
+            "reason",
+            "at",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "todoId": {
@@ -9062,6 +9370,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "githubRepo": {
       "type": "string",
     },
+    "group": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "icon": {
       "anyOf": [
         {
@@ -9432,6 +9746,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
             "planning",
             "confirm",
             "building",
+            "needs_input",
             "review",
             "done",
             "failed",
@@ -9621,6 +9936,48 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     "autonomyPaused": {
       "type": "boolean",
     },
+    "autonomyPauses": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+          },
+          "openedAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "publishError": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "reason": {
+            "type": "string",
+          },
+          "source": {
+            "enum": [
+              "settings",
+              "main-red",
+              "unjudged-landing",
+              "legacy",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "source",
+          "reason",
+          "publishError",
+          "openedAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "avatarStyle": {
       "type": [
         "string",
@@ -9633,6 +9990,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
         "allow-paid",
       ],
       "type": "string",
+    },
+    "coAuthorTrailer": {
+      "default": true,
+      "type": "boolean",
     },
     "createdAt": {
       "maximum": 9007199254740991,
@@ -9708,6 +10069,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     "plan": {
       "type": "string",
     },
+    "requestInstructorReview": {
+      "default": false,
+      "type": "boolean",
+    },
   },
   "required": [
     "id",
@@ -9715,6 +10080,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     "createdAt",
     "plan",
     "avatarStyle",
+    "coAuthorTrailer",
+    "requestInstructorReview",
   ],
   "type": "object",
 }
@@ -9736,9 +10103,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
           "type": "null",
         },
       ],
-    },
-    "awaitingReply": {
-      "type": "boolean",
     },
     "blockedBy": {
       "anyOf": [
@@ -9780,6 +10144,43 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "null",
       ],
     },
+    "decisions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "type": "string",
+          },
+          "at": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "by": {
+            "enum": [
+              "person",
+              "coordinator",
+            ],
+            "type": "string",
+          },
+          "question": {
+            "type": "string",
+          },
+          "requestId": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "requestId",
+          "question",
+          "answer",
+          "by",
+          "at",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "hasChanges": {
       "type": "boolean",
     },
@@ -9818,6 +10219,21 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       ],
       "type": "string",
     },
+    "owner": {
+      "anyOf": [
+        {
+          "enum": [
+            "owner",
+            "coordinator",
+          ],
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
+      ],
+      "default": null,
+    },
     "ownerId": {
       "type": [
         "string",
@@ -9831,6 +10247,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "planning",
         "confirm",
         "building",
+        "needs_input",
         "review",
         "done",
         "failed",
@@ -9931,6 +10348,23 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             },
           },
           "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "section": {
+      "anyOf": [
+        {
+          "enum": [
+            "needs_input",
+            "ready_for_review",
+            "up_next",
+            "working",
+            "resolved",
+          ],
+          "type": "string",
         },
         {
           "type": "null",
@@ -10114,6 +10548,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
     "sourceKind",
     "sourceRef",
     "output",
+    "owner",
   ],
   "type": "object",
 }

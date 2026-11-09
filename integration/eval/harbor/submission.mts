@@ -125,9 +125,18 @@ export class HarborSubmission {
     const build = await this.request<BuildRecord>(
       `/api/builds/${encodeURIComponent(task.buildId)}`,
     );
-    const messages = await this.request<{ messages: unknown[] }>(
-      `/api/conversations/${encodeURIComponent(task.buildId)}/messages`,
-    );
+    const route = `/api/conversations/${encodeURIComponent(task.buildId)}/messages`;
+    const newest = await this.request<{ messages: unknown[]; nextCursor?: string | null }>(route);
+    const pages = [newest.messages];
+    let before = newest.nextCursor ?? null;
+    while (before !== null) {
+      const page = await this.request<{ messages: unknown[]; nextCursor?: string | null }>(
+        `${route}?before=${encodeURIComponent(before)}`,
+      );
+      pages.unshift(page.messages);
+      before = page.nextCursor ?? null;
+    }
+    const messages = { ...newest, messages: pages.flat(), nextCursor: null };
     const result = { todo, build, messages, timedOut: !terminal.has(todo.phase) };
     let serialized = JSON.stringify(result);
     for (const token of [this.#serverToken, this.#machineToken]) {

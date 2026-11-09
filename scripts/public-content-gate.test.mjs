@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileViolations } from './public-content-gate.mjs';
@@ -65,12 +72,17 @@ test('path allowlist exempts fixture identifiers but not quota disclosures', () 
   for (const path of [
     'apps/server/test/id.test.ts',
     'apps/web/e2e/fixtures/data.ts',
+    'apps/web/e2e/synthetic-id.spec.ts',
     'e2e/fixtures/data.json',
   ]) {
     assert.deepEqual(fileViolations(path, `teamId: '${uuid}'`), []);
     assert.equal(fileViolations(path, 'usage: 37\u0025').length, 1);
   }
-  for (const path of ['apps/server/src/test/data.ts', 'docs/fixtures/data.md']) {
+  for (const path of [
+    'apps/server/src/test/data.ts',
+    'apps/web/e2e/evidence.md',
+    'docs/fixtures/data.md',
+  ]) {
     assert.equal(fileViolations(path, `teamId: '${uuid}'`).length, 1);
   }
 });
@@ -152,6 +164,46 @@ test('staged scan supports unusual paths, extensionless text and binary files', 
   assert.equal(run('--staged').status, 1);
   git('rm', '--cached', 'data/odd\n name');
   assert.equal(run('--staged').status, 0);
+});
+
+test('type-changing additions are checked in staged and committed diffs', (t) => {
+  const { cwd, git, run } = repository(t);
+  const link = join(cwd, 'link.md');
+  symlinkSync('example.md', link);
+  git('add', 'link.md');
+  git('commit', '-qm', 'synthetic symlink');
+  const base = git('rev-parse', 'HEAD').trim();
+  unlinkSync(link);
+  writeFileSync(link, `teamId: ${uuid}\n`);
+  git('add', 'link.md');
+  assert.match(git('diff', '--cached', '--name-status'), /^T\s+link\.md/m);
+  assert.equal(run('--staged').status, 1);
+  git('commit', '-qm', 'synthetic type change');
+  assert.equal(run('--base', base).status, 1);
+});
+
+test('the real commit hook refuses a type-change-only disclosure before formatting', (t) => {
+  const { cwd, git } = repository(t);
+  const link = join(cwd, 'link.md');
+  symlinkSync('example.md', link);
+  git('add', 'link.md');
+  git('commit', '-qm', 'synthetic symlink');
+  unlinkSync(link);
+  writeFileSync(link, `teamId: ${uuid}\n`);
+  git('add', 'link.md');
+  mkdirSync(join(cwd, 'scripts'));
+  for (const name of ['public-content-gate.mjs', 'public-content-allowlist.json'])
+    copyFileSync(join(import.meta.dirname, name), join(cwd, 'scripts', name));
+  for (const name of ['commit-identity.mjs', 'check-lockfile-commit.mjs'])
+    writeFileSync(join(cwd, 'scripts', name), '');
+  const result = spawnSync('sh', [join(import.meta.dirname, '../.husky/pre-commit')], {
+    cwd,
+    encoding: 'utf8',
+    env: scrubGitEnv({ ...process.env }),
+  });
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stderr, /"link.md":1: public-content identifier/);
+  assert.ok(!result.stderr.includes(uuid));
 });
 
 test('invalid options and missing base fail closed', (t) => {

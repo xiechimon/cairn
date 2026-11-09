@@ -251,3 +251,25 @@ describe('Gemini stdio execution', () => {
     for (const event of result) expect(stepEventSchema.safeParse(event).success).toBe(true);
   });
 });
+
+test('ACP children remove inherited token variables when the step uses an App file', async () => {
+  let inherited: NodeJS.ProcessEnv | undefined;
+  const agent = createGeminiBackend({
+    spawnProcess: (_command, _args, options) => {
+      inherited = options.env;
+      throw new Error('captured environment');
+    },
+  });
+  await expect(
+    agent.createSession({
+      ...opts,
+      env: {
+        CAIRN_GIT_CRED_FILE: '/private/token',
+        GH_TOKEN: 'inherited',
+        GITHUB_TOKEN: 'inherited',
+      },
+    }),
+  ).rejects.toThrow('captured environment');
+  expect(inherited?.GH_TOKEN).toBeUndefined();
+  expect(inherited?.GITHUB_TOKEN).toBeUndefined();
+});

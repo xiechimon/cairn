@@ -51,7 +51,6 @@ export const RADIUS_EXPRS: Record<string, string> = {
   bubble: 'var(--radius-bubble)',
   card: 'var(--radius-card)',
   composer: 'var(--radius-composer)',
-  window: 'var(--radius-window)',
 };
 
 const SECTION_RE = /^([\w-]+):\s*$/;

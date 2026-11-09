@@ -1,12 +1,5 @@
 import { cn } from 'cn';
-import {
-  type ReactNode,
-  type Ref,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-} from 'react';
+import { type ReactNode, type Ref, useCallback, useImperativeHandle } from 'react';
 import { formatClock } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
@@ -30,14 +23,15 @@ export const PROJECT_CHIP_CLS =
 const SEND_BTN_CLS =
   'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary aria-expanded:bg-transparent';
 const SEND_ON_CLS =
-  'bg-foreground text-background hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90';
+  'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button)/90 hover:text-(--text-on-accent) dark:hover:bg-(--card-button)/90 dark:hover:text-(--text-on-accent)';
 const STOP_CLS =
   'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
 const HOME_COMPOSER_CLS =
   'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
-const DRAWER_COMPOSER_CLS = 'mx-4 mb-2.5 shrink-0';
-const ATTACHED_COMPOSER_CLS = 'mt-0';
-const FREE_COMPOSER_CLS = 'rounded-t-(--radius-composer)';
+const ATTACHED_COMPOSER_CLS =
+  'mt-0 shadow-(--shadow-composer-attached) focus-within:shadow-(--shadow-composer-attached-focus)';
+const FREE_COMPOSER_CLS =
+  'rounded-t-(--radius-composer) shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 
 export interface ComposerSurfaceHandle {
   focus: (options?: FocusOptions) => void;
@@ -59,8 +53,6 @@ export interface ComposerSurfaceProps {
   onFocusLeave?: (() => void) | undefined;
   placeholder: string;
   invalid: boolean;
-  home: boolean;
-  open: boolean;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   above: ReactNode;
   tools: ReactNode;
@@ -87,8 +79,6 @@ export function ComposerSurface({
   onFocusLeave,
   placeholder,
   invalid,
-  home,
-  open,
   composerRef,
   above,
   tools,
@@ -122,7 +112,6 @@ export function ComposerSurface({
     attaching,
     pendingAttachments,
     onPickFiles,
-    closeInline,
     inlineOpen,
     inlineCaret,
     inlineQuery,
@@ -140,7 +129,6 @@ export function ComposerSurface({
     setSlashHighlight,
     slashListboxId,
     slashListboxRef,
-    closeSlash,
     acceptSlashRow,
     helpOpen,
     closeHelp,
@@ -153,33 +141,6 @@ export function ComposerSurface({
     () => ({ focus: (options) => textareaRef.current?.focus(options) }),
     [textareaRef],
   );
-  useEffect(() => {
-    if (open) return;
-    closeInline();
-    closeSlash();
-    closeHelp();
-  }, [open, closeInline, closeSlash, closeHelp]);
-  const prevOpenRef = useRef(open);
-  useEffect(() => {
-    const wasOpen = prevOpenRef.current;
-    prevOpenRef.current = open;
-    if (!open || wasOpen) return;
-    let frames = 0;
-    const tryFocus = () => {
-      const node = textareaRef.current;
-      if (node == null) return;
-      const shell = node.closest('[hidden], [data-starting-style]');
-      if (shell == null) {
-        node.focus({ preventScroll: true });
-        return;
-      }
-      if (frames < 12) {
-        frames += 1;
-        requestAnimationFrame(tryFocus);
-      }
-    };
-    requestAnimationFrame(tryFocus);
-  }, [open, textareaRef]);
   const attachComposer = useCallback(
     (node: HTMLTextAreaElement | null) => {
       textareaRef.current = node;
@@ -188,17 +149,15 @@ export function ComposerSurface({
     [textareaRef, composerRef],
   );
   const stopMode = canStop && wire.draft === '' && wire.tokens.length === 0;
-  const placement = attached
-    ? ATTACHED_COMPOSER_CLS
-    : `${FREE_COMPOSER_CLS} ${home ? 'mt-2' : 'mt-2.5'}`;
+  const placement = attached ? ATTACHED_COMPOSER_CLS : `${FREE_COMPOSER_CLS} mt-2`;
   return (
     <div
       hidden={!active}
       inert={!active}
       aria-hidden={active ? undefined : true}
       data-invalid={invalid ? '' : undefined}
-      className={`${active ? 'chief-composer ' : ''}${placement} ${home ? HOME_COMPOSER_CLS : DRAWER_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)`}
-      style={home && active ? { viewTransitionName: 'chief-composer' } : undefined}
+      className={`${active ? 'chief-composer ' : ''}${placement} ${HOME_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5`}
+      style={active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       {above}
       <ComposerAttachments

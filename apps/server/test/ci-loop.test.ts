@@ -5,7 +5,7 @@ import {
   parseVerifyPromptMeta,
   RESEARCH_STUCK_SOURCE_KIND,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
@@ -114,6 +114,10 @@ class CheckRunsMock {
     if (url.includes('/pulls?')) {
       this.otherRequests.push(url);
       return Promise.resolve(res(200, '"list"', []));
+    }
+    if (url.includes('/issues?state=open&labels=autonomy-paused')) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"marker"', []));
     }
     if (/\/rules\/branches\//.test(url)) {
       this.otherRequests.push(url);
@@ -279,7 +283,10 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
     pullState: opts.pullState,
     branch: conversationBranch(buildId),
   });
-  const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: mock.fetch });
+  const poller = createCiPoller(
+    { ...s.svc, box: s.secretBox, githubFetch: mock.fetch },
+    { githubFetch: mock.fetch },
+  );
   return {
     s,
     teamId,
@@ -1058,7 +1065,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       .run();
     await w.poller.sweep();
     const verifies = () => w.allSteps().filter((row) => row.kind === 'verify');
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('building');
     expect(verifies()).toHaveLength(1);
     expect(parseVerifyPromptMeta(verifies()[0]?.prompt ?? null)?.expectedHeadSha).toBe(delivered);
 
@@ -1067,6 +1074,9 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       .set({ status: 'done', finishedAt: w.base + 1 })
       .where(eq(stepTable.id, verifies()[0]?.id ?? ''))
       .run();
+    await w.poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(1);
     w.s.db
       .insert(stepTable)
       .values({
@@ -1085,13 +1095,44 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       { githubFetch: w.mock.fetch },
     );
     await restarted.sweep();
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('building');
     expect(verifies()).toHaveLength(2);
     expect(verifies().map((row) => parseVerifyPromptMeta(row.prompt)?.expectedHeadSha)).toEqual(
       expect.arrayContaining([delivered, fixed]),
     );
-    await w.poller.sweep();
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', createdAt: w.base + 3_500, finishedAt: w.base + 4_000 })
+      .where(and(eq(stepTable.kind, 'verify'), eq(stepTable.status, 'pending')))
+      .run();
+    await restarted.sweep();
+    expect(w.todoRow().phase).toBe('review');
     expect(verifies()).toHaveLength(2);
+  });
+
+  test('a queued independent review keeps the task out of review until it finishes', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-review-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'review',
+        status: 'pending',
+        createdAt: w.base,
+      })
+      .run();
+    await w.poller.sweep();
+    expect(w.todoRow().phase).toBe('building');
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: w.base + 1 })
+      .where(eq(stepTable.id, `step-review-${w.buildId}`))
+      .run();
+    await w.poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
   });
 
   test('after green the candidate leaves the grind-green set: another sweep no longer reads checks (moves to the #1403 reconcile surface)', async () => {
@@ -1202,21 +1243,17 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
     );
     const created: { title: string; body: string; labels: string[] }[] = [];
-    const poller = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
-      {
-        githubFetch: (input, init) => {
-          if (String(input).includes('/issues')) {
-            if (init?.method === 'POST') {
-              created.push(JSON.parse(init.body ?? '{}'));
-              return Promise.resolve(res(201, '', { number: 200 }));
-            }
-            return Promise.resolve(res(200, '', []));
-          }
-          return w.mock.fetch(input, init);
-        },
-      },
-    );
+    const githubFetch: FetchLike = (input, init) => {
+      if (String(input).includes('/issues')) {
+        if (init?.method === 'POST') {
+          created.push(JSON.parse(init.body ?? '{}'));
+          return Promise.resolve(res(201, '', { number: 200 }));
+        }
+        return Promise.resolve(res(200, '', []));
+      }
+      return w.mock.fetch(input, init);
+    };
+    const poller = createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch });
     await poller.sweep();
     expect(created).toHaveLength(expected);
     if (expected) {
@@ -1249,6 +1286,8 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       { phase: 'todo' },
     );
     const githubFetch: FetchLike = (input, init) => {
+      if (String(input).includes('/issues?state=open&labels=autonomy-paused'))
+        return w.mock.fetch(input, init);
       if (String(input).includes('/issues')) {
         if (!available) return Promise.resolve(res(503, '', {}));
         if (init?.method === 'POST') {
@@ -1274,10 +1313,10 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
         return extra.mock.fetch(input, init);
       return w.mock.fetch(input, init);
     };
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
     expect(w.todoRow().phase).toBe('review');
     available = true;
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
     expect(writes).toBe(1);
     expect(w.todoRow().phase).toBe('review');
     w.s.db
@@ -1300,7 +1339,7 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       })
       .run();
     w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, extra.todoId)).run();
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
     expect(writes).toBe(2);
     expect(lists).toBe(3);
   });
@@ -1445,7 +1484,10 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
         w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.prUrl,
       ).toBe(`https://github.com/octo/demo/pull/${w.prNumber}`);
       expect(w.todoRow().phase).toBe('building');
-      await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+      await createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox, githubFetch },
+        { githubFetch },
+      ).sweep();
       expect(w.fixRoundSteps()).toHaveLength(1);
       expect(w.fixRoundSteps()[0]?.prompt).toContain('lint');
     },

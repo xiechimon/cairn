@@ -313,12 +313,12 @@ export function RoutingSettingsPage() {
       },
     );
   return (
-    <PageShell route={ROUTING_SETTINGS_HREF} title={t('工作路由')} fixture={fixture}>
+    <PageShell route={ROUTING_SETTINGS_HREF} title={t('规则与策略')} fixture={fixture}>
       <QueryBoundary
         query={live ? settingsQ : undefined}
         isEmpty={live && settingsQ.data === undefined}
-        loadingLabel={t('正在加载工作路由')}
-        errorTitle={t('工作路由没能加载')}
+        loadingLabel={t('正在加载规则与策略')}
+        errorTitle={t('规则与策略没能加载')}
         className="mt-6"
         empty={null}
       >

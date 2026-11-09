@@ -294,7 +294,8 @@ test('carries GenAI convention fields and cairn.* fields', async () => {
   ]);
   expect(count(toolTurn, 'gen_ai.usage.input_tokens')).toBe(100);
   expect(count(toolTurn, 'gen_ai.usage.output_tokens')).toBe(50);
-  expect(attr(toolTurn, 'cairn.cost_usd')?.doubleValue).toBe(0.5);
+  expect(attr(toolTurn, 'gen_ai.usage.cost')?.doubleValue).toBe(0.5);
+  expect(attr(toolTurn, 'cairn.cost_usd')).toBeUndefined();
   const planTurn = chats[0] as OtlpSpan;
   expect(count(planTurn, 'gen_ai.usage.cache_read.input_tokens')).toBe(3);
   expect(count(planTurn, 'gen_ai.usage.cache_creation.input_tokens')).toBe(4);

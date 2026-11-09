@@ -60,20 +60,30 @@ describe('gateStatusFor (S3: state, description, context)', () => {
     });
   });
 
-  test('any human- or policy-class blocker: failure, whatever comes first', () => {
+  test('any human-class blocker: failure, whatever comes first', () => {
     expect(gateStatusFor(HUMAN).state).toBe('failure');
-    expect(gateStatusFor(readiness([blocker('autonomy-paused')])).state).toBe('failure');
     expect(gateStatusFor(readiness([blocker('mergeable-state'), blocker('size-cap')])).state).toBe(
       'failure',
     );
   });
+
+  test.each(['autonomy-paused', 'daily-cap'] as const)(
+    'a %s brake holds the gate pending, never failure',
+    (code) => {
+      expect(gateStatusFor(readiness([blocker(code)]))).toEqual({
+        state: 'pending',
+        description: `${MERGE_BLOCKERS.find((b) => b.code === code)?.label} (${code})`,
+      });
+      expect(gateStatusFor(readiness([blocker(code), blocker('size-cap')])).state).toBe('failure');
+    },
+  );
 
   test('no state is ever error; ready only with no blocker', () => {
     for (const b of MERGE_BLOCKERS) {
       const s = gateStatusFor(readiness([blocker(b.code)]));
       expect(s.state, b.code).not.toBe('error');
       expect(s.state, b.code).not.toBe('success');
-      expect(s.state, b.code).toBe(b.class === 'transient' ? 'pending' : 'failure');
+      expect(s.state, b.code).toBe(b.class === 'human' ? 'failure' : 'pending');
     }
     expect(gateStatusFor({ ...WAITING, ready: true }).state).toBe('pending');
   });

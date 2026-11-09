@@ -55,8 +55,12 @@ interface ChiefWorld {
 
 async function setupChiefWorld(opts?: {
   claudeCode?: { installed: boolean; hostname: string; models: { id: string; name: string }[] };
+  githubAppIdentity?: { name: string; email: string };
 }): Promise<ChiefWorld> {
-  const s = bootServer({ claimHoldMs: 200 });
+  const s = bootServer({
+    claimHoldMs: 200,
+    ...(opts?.githubAppIdentity !== undefined ? { githubAppIdentity: opts.githubAppIdentity } : {}),
+  });
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
   const key = await issueApiKey(s);
@@ -149,7 +153,7 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
       title: '编写 CONTRIBUTING.md 贡献指南',
       spec,
     })) as { id: string; createdBy: string | null; sourceBuildId: string | null };
-    expect(created.createdBy).toBe(w.coordinatorRouteId);
+    expect(created.createdBy).toBe(w.s.user.id);
     expect(created.sourceBuildId).toBe(`chief-${w.s.user.id}-${w.teamId}`);
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!;
     expect(todoRow.spec).toContain('补充信息（探测得出，非用户确认）：');
@@ -303,6 +307,20 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     };
     expect(typeof body.secrets).toBe('object');
     expect(body.secrets).toEqual({});
+  });
+
+  test('a chief step token carries the configured App commit identity', async () => {
+    const bot = {
+      name: 'cairnwright[bot]',
+      email: '347615582+cairnwright[bot]@users.noreply.github.com',
+    };
+    const w = await setupChiefWorld({ githubAppIdentity: bot });
+    const claimed = await w.claim();
+    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
+      cred: w.token,
+    });
+    expect(tokenRes.status).toBe(200);
+    expect(((await tokenRes.json()) as { commitIdentity: unknown }).commitIdentity).toEqual(bot);
   });
 });
 

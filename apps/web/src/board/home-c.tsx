@@ -33,7 +33,7 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { needsYouThreads } from './needs-you.js';
 import { NeedsYouTray } from './needs-you-tray.js';
 import { composeRequest } from './open-composer.js';
-import { THREAD_PARAM, threadStatus } from './thread-copy.js';
+import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -133,6 +133,7 @@ export function HomeC({
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
+    params.delete(VIEW_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state: location.state });
@@ -143,13 +144,8 @@ export function HomeC({
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState('');
-  const { chiefData, chiefView, setChiefView } = surface;
+  const { chiefData } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
-  useEffect(() => {
-    if (chiefView !== 'drawer') return;
-    setChiefView('none');
-    composerRef.current?.focus({ preventScroll: true });
-  }, [chiefView, setChiefView]);
   const loaded = surface.load === 'ready';
   useEffect(() => {
     if (composeAt === null || !loaded) return;
@@ -337,6 +333,7 @@ export function HomeC({
         <WorkPanel
           pane={pane}
           todos={scoped}
+          projectId={projectId}
           schedules={
             projectId === null
               ? schedules
@@ -425,8 +422,7 @@ export function HomeC({
         )}
         <ChiefScrollProvider>
           <ChiefConversation
-            variant="global"
-            chief={{ ...chiefData, stream: conversation, examples: undefined }}
+            chief={{ ...chiefData, stream: conversation }}
             onSend={
               thread.picked !== null
                 ? thread.send
@@ -462,9 +458,7 @@ export function HomeC({
                   composerRef={composerRef}
                   onPick={thread.pick}
                 />
-                <ComposerSetupHint
-                  onOpenCoordinatorSettings={() => surface.setChiefView('settings')}
-                />
+                <ComposerSetupHint />
               </>
             }
             composerRef={(node) => {

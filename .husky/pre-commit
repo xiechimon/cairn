@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 set -e
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+node scripts/commit-identity.mjs pre-commit
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMRT)
 [ -z "$STAGED" ] && exit 0
 
 node scripts/check-lockfile-commit.mjs

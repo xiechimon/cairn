@@ -6,7 +6,6 @@ export const ACTIONS_LOGIN = 'github-actions[bot]';
 export const GATE_CHECK = 'review-gate';
 export const STALL_LABEL = 'review-stalled';
 export const HUMAN_LABEL = 'review-gate-human';
-export const QUEUED_LABEL = 'queued';
 export const BLOCK_ROUND_CAP = 3;
 export const MAX_RETRIES = 2;
 export const REQUEST_AFTER_MS = 10 * 60 * 1000;
@@ -35,6 +34,7 @@ const BADGE_RE = /^\s*\*\*<sub><sub>!\[(P[0-3]) Badge\]/;
 const HUNK_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 const BLOCK_MARKER_RE = /^<!-- review-gate-block:([0-9a-f]+) -->/;
 const LIMIT_RE = /reached your Codex usage limits/i;
+const DEFERRAL_RE = /^\s*valid, out of scope for this PR, tracked in #(\d+)\b/im;
 const BLOCKING = new Set(['P0', 'P1']);
 const WRITE_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 const MERGE_QUEUE_PREFIX = 'mergify/merge-queue/';
@@ -206,6 +206,47 @@ export function preExistingThreads(threads) {
   return openCodexFindings(threads).filter((thread) => thread.preExisting);
 }
 
+export function writerReplies(comments) {
+  return comments
+    .filter(
+      (comment) =>
+        WRITE_ASSOCIATIONS.has(comment?.authorAssociation) ||
+        (comment?.author?.__typename === 'Bot' && stripBot(comment.author.login) === 'cairnwright'),
+    )
+    .map((comment) => comment.body ?? '');
+}
+
+export function deferredIssue(thread) {
+  for (const body of [...(thread.replies ?? [])].reverse()) {
+    const match = DEFERRAL_RE.exec(body ?? '');
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
+export function deferredThreads(threads) {
+  return threads.filter(
+    (thread) =>
+      isCodexAuthor(thread.authorLogin, thread.authorType) && deferredIssue(thread) !== null,
+  );
+}
+
+export function markDeferrals(threads, issueKinds) {
+  const deferred = new Set(deferredThreads(threads));
+  return threads.map((thread) => {
+    if (!deferred.has(thread)) return thread;
+    const number = deferredIssue(thread);
+    if (BLOCKING.has(badgeOf(thread.body)) && !thread.preExisting)
+      return { ...thread, deferral: `deferred to #${number}, but a P0/P1 finding must be fixed` };
+    if (issueKinds.get(number) !== 'issue')
+      return {
+        ...thread,
+        deferral: `deferred to #${number}, which is not an issue in this repository`,
+      };
+    return thread;
+  });
+}
+
 export function blockMarker(sha) {
   return `<!-- review-gate-block:${sha} -->`;
 }
@@ -259,12 +300,17 @@ export function shouldSkip(pr) {
   return null;
 }
 
-function blockedSummary(blocking) {
-  const lines = blocking.map(
-    (thread) =>
-      `- ${badgeOf(thread.body)} ${threadTitle(thread.body).replace(/^P[0-3]\s+/, '')}: ${thread.url}`,
-  );
-  return `Resolve each thread (or fix and comment \`@codex review\`):\n\n${lines.join('\n')}`;
+function blockedSummary(blocking, invalid) {
+  const line = (thread) =>
+    `- ${badgeOf(thread.body)} ${threadTitle(thread.body).replace(/^P[0-3]\s+/, '')}: ${thread.url}${
+      thread.deferral ? ` (${thread.deferral})` : ''
+    }`;
+  return `Fix each P0/P1 finding, then resolve its thread. Only a P2/P3 finding may be answered \`valid, out of scope for this PR, tracked in #N\`, and #N must be an issue in this repository:\n\n${[
+    ...blocking,
+    ...invalid,
+  ]
+    .map(line)
+    .join('\n')}`;
 }
 
 function carriedNote(carried) {
@@ -497,9 +543,10 @@ export function decide(
     };
   }
   const blocking = blockingThreads(threads);
+  const invalid = threads.filter((thread) => thread.deferral && !blocking.includes(thread));
   const carried = carriedNote(preExistingThreads(threads));
   const blockedHeads = rounds.others + (rounds.marked ? 1 : 0);
-  if (blocking.length === 0)
+  if (blocking.length === 0 && invalid.length === 0)
     return {
       status: 'completed',
       conclusion: 'success',
@@ -511,17 +558,21 @@ export function decide(
     };
   const round = rounds.others + 1;
   const capped = round >= BLOCK_ROUND_CAP;
+  const counts = [
+    blocking.length > 0 ? `${blocking.length} open P0/P1 Codex findings` : '',
+    invalid.length > 0 ? `${invalid.length} invalid deferrals` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
   return {
     status: 'completed',
     conclusion: 'failure',
-    title: capped
-      ? `${blocking.length} open P0/P1 Codex findings; round ${round}, reconsider the approach`
-      : `${blocking.length} open P0/P1 Codex findings`,
+    title: capped ? `${counts}; round ${round}, reconsider the approach` : counts,
     summary: `${
       capped
         ? `Review block round ${round} (cap ${BLOCK_ROUND_CAP}): stop fixing findings one line at a time. Name the bug class behind them, fix every instance, or change the approach; the PR is labelled \`${HUMAN_LABEL}\` for a human. The check stays red until the threads are resolved.\n\n`
         : ''
-    }${blockedSummary(blocking)}${carried}`,
+    }${blockedSummary(blocking, invalid)}${carried}`,
     ...(rounds.marked ? {} : { block: blockMarker(sha) }),
     ...(capped && !rounds.marked ? { addHuman: true } : {}),
   };

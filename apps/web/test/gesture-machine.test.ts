@@ -1,9 +1,3 @@
-// Global gesture transitions (#1267). The chief drawer and the Escape
-// layer stack change state only through reduceGesture. A second ⌘J is a
-// second event that closes the drawer; it does not pass through an
-// intermediate open (#1266). The browser half of that regression is
-// e2e/chief-toggle-flash.spec.ts.
-import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,40 +23,21 @@ function walk(dir: string): string[] {
 }
 
 describe('reduceGesture', () => {
-  test('⌘J opens a closed drawer and the next event closes it (#1266)', () => {
-    const opened = reduceGesture(closed, { type: 'chief/toggle' });
-    expect(opened.dismissed).toBeNull();
-    expect(opened.state.chief).toBe('drawer');
-
-    const minimized = reduceGesture(opened.state, { type: 'chief/toggle' });
-    expect(minimized.state.chief).toBe('none');
-    expect(minimized.state.escStack).toEqual([]);
-    expect(minimized.dismissed).toBeNull();
-  });
-
-  test('toggle from settings opens the drawer', () => {
-    const settings: GestureState = { chief: 'settings', escStack: [] };
-    expect(reduceGesture(settings, { type: 'chief/toggle' }).state.chief).toBe('drawer');
-  });
-
-  test('FAB open stays open; minimize from settings closes', () => {
-    const opened = reduceGesture(closed, { type: 'chief/open' });
-    expect(opened.state.chief).toBe('drawer');
-    expect(reduceGesture(opened.state, { type: 'chief/open' }).state).toBe(opened.state);
-
-    const settings = reduceGesture(opened.state, { type: 'chief/settings' });
+  test('settings opens and minimize returns to the conversation', () => {
+    const settings = reduceGesture(closed, { type: 'chief/settings' });
     expect(settings.state.chief).toBe('settings');
+    expect(reduceGesture(settings.state, { type: 'chief/settings' }).state).toBe(settings.state);
     expect(reduceGesture(settings.state, { type: 'chief/minimize' }).state.chief).toBe('none');
   });
 
-  test('Escape pops only the top layer and leaves the drawer alone', () => {
-    let state: GestureState = { chief: 'drawer', escStack: [] };
+  test('Escape pops only the top layer and leaves the Coordinator view alone', () => {
+    let state: GestureState = { chief: 'settings', escStack: [] };
     state = reduceGesture(state, { type: 'esc/push', id: 'a' }).state;
     state = reduceGesture(state, { type: 'esc/push', id: 'b' }).state;
 
     const first = reduceGesture(state, { type: 'escape' });
     expect(first.dismissed).toBe('b');
-    expect(first.state.chief).toBe('drawer');
+    expect(first.state.chief).toBe('settings');
     expect(first.state.escStack).toEqual(['a']);
 
     const second = reduceGesture(first.state, { type: 'escape' });
@@ -77,14 +52,14 @@ describe('reduceGesture', () => {
 
 describe('gesture store', () => {
   test('Escape runs the top closer and a later drop is a no-op', () => {
-    const store = createGestureStore({ chief: 'drawer', escStack: [] });
+    const store = createGestureStore({ chief: 'settings', escStack: [] });
     const log: string[] = [];
     const outer = store.pushLayer(() => log.push('outer'));
     store.pushLayer(() => log.push('inner'));
 
     store.dispatch({ type: 'escape' });
     expect(log).toEqual(['inner']);
-    expect(store.getState().chief).toBe('drawer');
+    expect(store.getState().chief).toBe('settings');
     expect(store.getState().escStack).toEqual([outer]);
 
     store.dropLayer(outer);
@@ -95,7 +70,7 @@ describe('gesture store', () => {
 });
 
 describe('single landing file', () => {
-  test('chief toggle updater and a second ⌘J or Escape listener are absent', () => {
+  test('no chief view updater or second Escape listener exists', () => {
     const src = walk(join(webRoot, 'src')).filter(
       (path) => path.endsWith('.ts') || path.endsWith('.tsx'),
     );
@@ -105,7 +80,6 @@ describe('single landing file', () => {
       const text = readFileSync(path, 'utf8');
       if (
         text.includes('setChiefView((') ||
-        text.includes("prev === 'drawer'") ||
         text.includes("useChordHotkey('j'") ||
         text.includes('useChiefToggleHotkey')
       ) {
@@ -117,18 +91,4 @@ describe('single landing file', () => {
     expect(hits).toEqual([]);
   });
 
-  test('#1266 flash spec stays in this regression set', () => {
-    const spec = readFileSync(join(webRoot, 'e2e/chief-toggle-flash.spec.ts'), 'utf8');
-    expect(spec).toContain('opacityTransitions');
-    const affected = spawnSync(
-      process.execPath,
-      [
-        join(webRoot, '../../scripts/e2e-affected.mjs'),
-        '--dry-run',
-        'apps/web/src/overlay/gesture-machine.ts',
-      ],
-      { encoding: 'utf8' },
-    );
-    expect(affected.stdout).toContain('chief-toggle-flash.spec.ts');
-  });
 });

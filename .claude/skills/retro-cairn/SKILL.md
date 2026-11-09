@@ -18,9 +18,9 @@ Principle: a mistake that appeared during the process, even if fixed by the end,
 
 1. List the errors: list every "appeared and got fixed" point, one sentence describing the symptom. Ones a user corrected always count.
 2. Attribute: ask "why was it not stopped at the time", find the root cause (missing check, unclear rule, missing context, tool misuse).
-3. Choose a safeguard: prefer architecture or types, then lint or tests, then instructions or skills. Use the real mistake as a negative control for a new machine check.
+3. Choose a safeguard on the correction ladder, the highest rung you can build now: codebase (the mistake becomes impossible to write), then static analysis (lint, compiler, CI), then rules and review rules, then skills, then a style guide only humans enforce. Write the reason when you stop below static analysis. Use the real mistake as a negative control for a new machine check: red before the fix, green after.
 4. Record: the safeguard itself is the record. Name the mistake it stops in the PR that adds it. Do not write files under `docs/lessons/`; that directory is a frozen archive.
-5. Recurrence: when the same kind of mistake appears again, strengthen the existing safeguard instead of adding prose.
+5. Recurrence: an existing safeguard that stopped the mistake before commit is an intercept; count it and stop. The same kind of mistake landing despite a safeguard is a recurrence: the current rung failed, so choose again from codebase.
 6. Report: when wrapping up, summarize in one or two sentences how many process errors were caught and what safeguard each became.
 
 ## Boundaries

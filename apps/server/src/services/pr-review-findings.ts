@@ -9,23 +9,24 @@ import {
   githubSetPullDraft,
   githubSetReviewHoldLabel,
 } from '../lib/github-review-findings.js';
+import { type AutonomousToken, githubTokenFetch } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
 
 export function desiredAction(
   snapshot: {
+    humanOverride?: boolean;
     state: string;
     isDraft: boolean;
-    overridden: boolean;
     labels: readonly string[];
     findings: readonly PrReviewFinding[];
   },
   local: { dismissed: boolean; activeStep: boolean; blockingQuestion: boolean },
 ): 'addLabel' | 'convertToDraft' | 'markReady' | 'removeLabel' | null {
-  if (local.dismissed || snapshot.state !== 'OPEN') return null;
+  if (snapshot.humanOverride || local.dismissed || snapshot.state !== 'OPEN') return null;
   const labelPresent = snapshot.labels.includes(CAIRN_REVIEW_HOLD_LABEL);
   if (snapshot.findings.length > 0) {
-    if (snapshot.overridden || snapshot.isDraft) return null;
+    if (snapshot.isDraft) return null;
     return labelPresent ? 'convertToDraft' : 'addLabel';
   }
   if (
@@ -45,13 +46,14 @@ export async function reconcilePrReviewFindings(
   input: {
     row: typeof threadPr.$inferSelect;
     fetch: FetchLike;
-    token: string;
+    token: AutonomousToken;
     owner: string;
     repo: string;
     now: number;
   },
 ): Promise<PrReviewFinding[]> {
-  const { row, fetch, token, owner, repo, now } = input;
+  const { row, fetch: inner, token, owner, repo, now } = input;
+  const fetch = githubTokenFetch(inner, token, { owner, repo });
   if (row.dismissed) return [];
   const pull = await githubPrReviewFindings(fetch, token, owner, repo, row.number);
   if (pull.state !== 'OPEN') return [];
@@ -87,7 +89,7 @@ export async function reconcilePrReviewFindings(
       });
     }
   }
-  if (pull.findings.length > 0) {
+  if (pull.findings.length > 0 && !pull.humanOverride) {
     if (!row.autoFix) {
       const wakeLedger = deps.db
         .select()

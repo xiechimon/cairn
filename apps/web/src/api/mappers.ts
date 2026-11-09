@@ -203,7 +203,6 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
-    ...(w.awaitingReply === true ? { awaitingReply: true } : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
 }
@@ -561,23 +560,15 @@ export interface TranscriptInput {
   stopping?: boolean;
   activity?: StepActivity | null;
   agentTodo?: AgentTodo | null;
+  hasEarlier?: boolean;
 }
 
-export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
-  const {
-    messages,
-    steps,
-    plans,
-    build,
-    todo,
-    machineName,
-    userName,
-    liveText,
-    liveThinking = '',
-    stopping = false,
-    activity = null,
-    agentTodo = null,
-  } = input;
+function transcriptHead(
+  messages: TranscriptInput['messages'],
+  steps: TranscriptInput['steps'],
+  build: TranscriptInput['build'],
+  machineName: TranscriptInput['machineName'],
+): TranscriptItem[] {
   const head: TranscriptItem[] = [];
   if (
     build?.triggerSource === 'schedule' &&
@@ -606,6 +597,26 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       });
     }
   }
+  return head;
+}
+
+export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
+  const {
+    messages,
+    steps,
+    plans,
+    build,
+    todo,
+    machineName,
+    userName,
+    liveText,
+    liveThinking = '',
+    stopping = false,
+    activity = null,
+    agentTodo = null,
+    hasEarlier = false,
+  } = input;
+  const head = hasEarlier ? [] : transcriptHead(messages, steps, build, machineName);
 
   const toolNameByResult = new Map<string, string>();
   for (const m of messages) {
@@ -789,9 +800,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
   }
 
-  entries.sort((a, b) => a.at - b.at);
+  const loadedFrom = hasEarlier
+    ? (messages[0]?.createdAt ?? Number.POSITIVE_INFINITY)
+    : Number.NEGATIVE_INFINITY;
+  const loaded = entries.filter((entry) => entry.at >= loadedFrom).sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
-  for (const entry of entries) {
+  for (const entry of loaded) {
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
       if (previous?.kind === 'work') {
@@ -1323,13 +1337,6 @@ export function askQuestionOfContent(content: unknown): {
   };
 }
 
-const CHIEF_HERO_EXAMPLES = [
-  { icon: 'user-plus' as const, text: '帮我组建 Agent 团队' },
-  { icon: 'folder' as const, text: '帮我创建一个新项目' },
-  { icon: 'grid' as const, text: '总结一下我所有项目现在的进展' },
-  { icon: 'bars' as const, text: '查一下这个月的 token 用量' },
-];
-
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
 function chiefUserText(raw: string): string {
@@ -1639,7 +1646,7 @@ export function mapChief(
   }
   chiefStream.push(...(collected?.pending ?? []));
   return {
-    view: 'drawer',
+    view: 'none',
     bound,
     ...(bound && env.agentActor
       ? {
@@ -1662,9 +1669,7 @@ export function mapChief(
           })),
         }
       : {}),
-    ...(active === null
-      ? { examples: CHIEF_HERO_EXAMPLES }
-      : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
+    ...(active === null ? {} : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
     ...(running ? { running: true } : {}),
     ...(opts.activity?.phase === 'tool' && opts.activity.tool != null
       ? { runningTool: opts.activity.tool }

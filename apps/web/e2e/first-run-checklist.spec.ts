@@ -87,12 +87,12 @@ test('with a model source the chip asks for a machine and the hint shows the sta
   await expect(hint(page).locator('code')).toHaveText(/ start$/);
 });
 
-test('with a source and a machine the chip opens the Coordinator settings', async ({ page }) => {
+test('with a source and a machine the chip opens work routing', async ({ page }) => {
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], machines: [ONLINE] });
   await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
-  await expect(chip(page)).toHaveText('设置 Coordinator');
-  await chip(page).click();
-  await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+  await expect(chip(page)).toHaveText('打开工作路由');
+  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/work-routing/);
+  await expect(hint(page)).toContainText('Coordinator 规则');
 });
 
 test('a machine going offline only advances the chip when it is the first gap', async ({
@@ -155,8 +155,10 @@ test('sending before the Coordinator is ready shows an actionable translated mes
   page,
 }) => {
   await open(page, fresh());
-  await page.getByRole('textbox').first().fill('hello');
-  await page.keyboard.press('Enter');
+  const composer = page.getByTestId('chief-composer-input');
+  await expect(page.getByTestId('loading-composer')).toHaveCount(0);
+  await composer.fill('hello');
+  await composer.press('Enter');
   const toast = page.locator('[data-sonner-toast]').first();
   await expect(toast).toContainText('Coordinator 还不能回答');
   await expect(toast).toContainText('输入框下方的按钮');

@@ -26,9 +26,6 @@
     "apps/web/src/chief/",
     "apps/web/src/detail/"
   ],
-  "chief-window": [
-    "apps/web/src/chief/"
-  ],
   "schedules-list": [
     "apps/web/src/schedules/",
     "apps/web/src/pages/schedules-page.tsx",

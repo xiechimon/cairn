@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
+import { OWNED_PROCESS_CLI } from './owned-process.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -9,6 +10,7 @@ const root = resolve(import.meta.dirname, '..');
 export const prepushModules = [
   'scripts/prepush.mjs',
   'scripts/heavy-slots.mjs',
+  'scripts/owned-process.mjs',
   'scripts/english-only-gate.mjs',
   'scripts/public-content-gate.mjs',
   'scripts/public-content-allowlist.json',
@@ -31,6 +33,8 @@ export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/prepush-refuse-main.test.mjs',
   'scripts/heavy-slots.test.mjs',
+  'scripts/owned-process.test.mjs',
+  'scripts/spawn-ownership.test.mjs',
   'scripts/english-only-gate.test.mjs',
   'scripts/public-content-gate.test.mjs',
   'scripts/journal-newline-gate.test.mjs',
@@ -75,10 +79,24 @@ export function needsGates(paths, testsRead) {
   return hasCode(paths) || paths.some((path) => !path.startsWith('docs/') || testsRead(path));
 }
 
+const FEATURE_REGISTRY = '.claude/skills/verify-cairn/feature-map.json';
+
 export function testsRead(path) {
   const result = spawnSync(
     'git',
-    ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', path, '--', '*.test.ts', '*.test.mjs'],
+    [
+      '-c',
+      'color.ui=never',
+      'grep',
+      '-l',
+      '-F',
+      '-e',
+      path,
+      '--',
+      '*.test.ts',
+      '*.test.mjs',
+      FEATURE_REGISTRY,
+    ],
     { cwd: root, encoding: 'utf8' },
   );
   if (result.status === 1) return false;
@@ -148,7 +166,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
             selfTests.some(
               (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
             ) ||
-            /^scripts\/(prepush|heavy-slots|english-only-gate|public-content|scrub-git-env|doc-reader-tests)/.test(
+            /^scripts\/(prepush|heavy-slots|owned-process|spawn-ownership|english-only-gate|public-content|scrub-git-env|doc-reader-tests)/.test(
               path,
             ),
         )
@@ -173,15 +191,6 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
 
 export const NODE_TEST_TIMEOUT_MS = 300_000;
 const STEP_TIMED_OUT = 124;
-const PROCESS_GROUP_RUNNER = `
-const { spawn } = require('node:child_process');
-const [ms, command, ...args] = process.argv.slice(1);
-const child = spawn(command, args, { stdio: 'inherit', detached: true });
-const killGroup = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch {} };
-const timer = setTimeout(() => { killGroup(); process.exit(${STEP_TIMED_OUT}); }, Number(ms));
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { killGroup(); process.exit(1); });
-child.on('exit', (code) => { clearTimeout(timer); killGroup(); process.exit(code ?? 1); });
-`;
 export const NODE_TEST_STEP_TIMEOUT_MS = 15 * 60_000;
 
 export function runPlan(
@@ -202,9 +211,12 @@ export function runPlan(
       ? spawnSync(
           process.execPath,
           [
-            '-e',
-            PROCESS_GROUP_RUNNER,
+            OWNED_PROCESS_CLI,
+            '--name',
+            'prepush-node-test',
+            '--timeout-ms',
             String(stepTimeoutMs),
+            '--',
             command,
             '--test',
             '--test-force-exit',

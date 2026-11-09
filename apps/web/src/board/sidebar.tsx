@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
-import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { useOptionalChiefRoot } from '../chief/chief-root.js';
+import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
@@ -30,6 +30,7 @@ import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
 import { needsYouCount } from './needs-you.js';
+import { coordinatorSearch } from './open-composer.js';
 import { splitProjectsByArchive } from './project-archive.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
 import { SidebarThreadGroups } from './sidebar-thread-groups.js';
@@ -89,23 +90,8 @@ function readProjectsCollapsed(storage: Storage | null): boolean {
 const ICON = 'size-4.5 flex-none';
 const STROKE = 1.75;
 
-export function BrandMark({ className = 'size-4' }: { className?: string }) {
-  return (
-    <span
-      data-testid="brand-mark"
-      aria-hidden="true"
-      className={`sidebar-brand-mark block flex-none ${className}`}
-      style={{
-        backgroundColor: 'currentColor',
-        WebkitMask: 'url("/logo-mark.svg") center / 100% no-repeat',
-        mask: 'url("/logo-mark.svg") center / 100% no-repeat',
-      }}
-    />
-  );
-}
-
 const FOCUS =
-  'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2';
+  'outline-none focus-visible:[outline:var(--focus-width)_solid_var(--focus-ring)] focus-visible:outline-offset-0';
 
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
@@ -192,6 +178,7 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
   const threadParams = new URLSearchParams(baseParams);
   if (projectParam !== null) threadParams.set('project', projectParam);
   const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
@@ -291,10 +278,8 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link
-            {...railLink({ pathname: '/app', search: plain }, coordinatorActive, coordinatorLabel)}
-          >
-            <SpiralMark busy={false} className={ICON} />
+          <Link {...railLink(coordinatorTarget, coordinatorActive, coordinatorLabel)}>
+            <BrandGlyph className={ICON} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
             )}
@@ -351,11 +336,18 @@ export function BoardSidebar({
     >
       <div
         data-testid="team-row"
-        className="sidebar-team-row flex h-11 flex-none items-center gap-0.5 text-foreground"
+        className="sidebar-team-row flex h-11 flex-none items-center text-foreground"
       >
-        <span className="sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 px-2 text-foreground">
-          <BrandMark className="size-5.5" />
-          <span className="truncate font-heading text-page font-title">{BRAND.manifestName}</span>
+        <Button
+          variant="ghost"
+          className={`sidebar-team-collapse ${ICON_BTN}`}
+          aria-label={t('收起侧边栏')}
+          onClick={onToggle}
+        >
+          <PanelLeft className={ICON} strokeWidth={STROKE} />
+        </Button>
+        <span className="sidebar-team-name ml-1 min-w-0 flex-1 truncate voice-title text-brand text-foreground">
+          {BRAND.manifestName}
         </span>
         <Tooltip>
           <TooltipTrigger
@@ -374,23 +366,15 @@ export function BoardSidebar({
             <Kbd>⌘K</Kbd>
           </TooltipContent>
         </Tooltip>
-        <Button
-          variant="ghost"
-          className={`sidebar-team-collapse ${ICON_BTN}`}
-          aria-label={t('收起侧边栏')}
-          onClick={onToggle}
-        >
-          <PanelLeft className="size-4" strokeWidth={STROKE} />
-        </Button>
       </div>
 
       <div className="mt-2 flex flex-none flex-col gap-px">
         <div className="relative">
           <SidebarNavRow
-            icon={<SpiralMark busy={false} className="size-4" />}
+            icon={<BrandGlyph className="size-4" />}
             label={t('Coordinator')}
             active={coordinatorActive}
-            onClick={() => navigate({ pathname: '/app', search: plain })}
+            onClick={() => navigate(coordinatorTarget)}
           />
           {attention > 0 && (
             <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2">

@@ -16,8 +16,10 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import type { FetchLike } from '../src/lib/github.js';
 import { flushVerdictDigests, maybeEnqueueVerifyStep } from '../src/services/builds.js';
 import { bootServer, issueApiKey, postProject, seedRoute, seedSessionRoute } from './helpers.js';
+import { rejectingGithubFetch } from './network-guard.js';
 
 const HEAD = 'ab'.repeat(20);
 const FIX_HEAD = 'cd'.repeat(20);
@@ -40,8 +42,25 @@ async function call(
   );
 }
 
+const noOpenBranchPulls: FetchLike = async (input, init) => {
+  const url = new URL(String(input));
+  if ((init?.method ?? 'GET') === 'GET' && url.pathname === '/repos/acme/widgets/pulls')
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => [],
+      text: async () => '[]',
+    };
+  return rejectingGithubFetch(input, init);
+};
+
 async function setup(opts: { withVerifierRoute?: boolean } = {}) {
-  const s = bootServer({ claimHoldMs: 200, pingIntervalMs: 3_600_000 });
+  const s = bootServer({
+    claimHoldMs: 200,
+    pingIntervalMs: 3_600_000,
+    githubFetch: noOpenBranchPulls,
+  });
   const key = await issueApiKey(s);
   s.db
     .insert(providerTable)

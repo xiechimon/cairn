@@ -27,6 +27,7 @@ export interface CheckTally {
   failed: number;
   running: number;
   total: number;
+  failedNames: string[];
 }
 
 export function mergeStateOf(mergeableState: string | null): PrMergeState {
@@ -34,19 +35,32 @@ export function mergeStateOf(mergeableState: string | null): PrMergeState {
 }
 
 export function checkTallyOf(runs: readonly GithubCheckRun[]): CheckTally {
-  const tally: CheckTally = { passed: 0, failed: 0, running: 0, total: runs.length };
+  const tally: CheckTally = {
+    passed: 0,
+    failed: 0,
+    running: 0,
+    total: runs.length,
+    failedNames: [],
+  };
   for (const run of runs) {
     if (run.status !== 'completed') tally.running += 1;
     else if (PASSING_CONCLUSIONS.has(run.conclusion ?? '')) tally.passed += 1;
-    else tally.failed += 1;
+    else {
+      tally.failed += 1;
+      if (!tally.failedNames.includes(run.name)) tally.failedNames.push(run.name);
+    }
   }
   return tally;
 }
 
-export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
+export function toPrPanelRow(
+  row: typeof threadPr.$inferSelect,
+  projectId: string | null,
+): PrPanelRow {
   return prPanelRowSchema.parse({
     buildId: row.buildId,
     threadId: row.threadId,
+    projectId,
     repo: row.repo,
     number: row.number,
     title: row.title,
@@ -60,8 +74,12 @@ export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
       failed: row.checksFailed,
       running: row.checksRunning,
       total: row.checksTotal,
+      failedNames: JSON.parse(row.checksFailedNames) as string[],
     },
+    branch: row.headRef,
+    base: row.baseRef,
     head: row.head,
+    checksReadFor: row.checksReadFor,
     verdict:
       row.verdictResult !== null && row.verdictHead !== null
         ? { result: row.verdictResult, judgedHead: row.verdictHead }
@@ -72,12 +90,13 @@ export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
     dismissed: row.dismissed,
     blockedSince: row.blockedSince,
     wakeRounds: row.wakeRounds,
+    lastReadAt: row.lastReadAt,
   });
 }
 
 export function listThreadPrs(db: Db, query: { teamId: string; threadId?: string }): PrPanelRow[] {
   const rows = db
-    .select({ row: threadPr })
+    .select({ row: threadPr, projectId: todo.projectId })
     .from(threadPr)
     .innerJoin(todo, eq(todo.id, threadPr.threadId))
     .where(
@@ -92,5 +111,5 @@ export function listThreadPrs(db: Db, query: { teamId: string; threadId?: string
     )
     .orderBy(desc(threadPr.updatedAt), desc(threadPr.id))
     .all();
-  return rows.map(({ row }) => toPrPanelRow(row));
+  return rows.map(({ row, projectId }) => toPrPanelRow(row, projectId));
 }

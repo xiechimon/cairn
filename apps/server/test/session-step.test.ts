@@ -89,12 +89,12 @@ describe('session steps share the build-step paths', () => {
     return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
   }
 
-  test('a session turn with no changes and no question still fails the artifact gate', () => {
+  test('a session turn with no changes and no question asks the Coordinator instead of failing', () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     claim(stepRow.id);
     completeStep(deps(), stepRow.id, { hasChanges: false });
-    expect(getTodo(deps(), todoId)!.phase).toBe('failed');
+    expect(getTodo(deps(), todoId)!.phase).toBe('needs_input');
   });
 
   test('session steps count toward the marked repair rounds', () => {

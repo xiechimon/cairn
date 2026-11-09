@@ -12,6 +12,7 @@ import { createCiPoller } from '../src/services/ci-loop.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
+import { pendingWorkerQuestionIds } from '../src/services/worker-question-store.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 
@@ -53,6 +54,11 @@ function seedTodo(id = 'session-todo') {
   return id;
 }
 
+function asking(todoId: string): boolean {
+  const buildId = getTodo(deps(), todoId)?.latestBuildId;
+  return buildId != null && pendingWorkerQuestionIds(H.s.db, buildId).length > 0;
+}
+
 function startSession() {
   const todoId = seedTodo();
   const [started] = startBuilds(deps(), {
@@ -78,7 +84,7 @@ describe('worker ask_user on a session step', () => {
     return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
   }
 
-  test('the question parks the thread: awaitingReply is set and a needs-you report is written', async () => {
+  test('the question is stored pending and a needs-you report is written', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
@@ -89,7 +95,7 @@ describe('worker ask_user on a session step', () => {
       { holdMs: 0 },
     );
     expect(settled.status).toBe('pending');
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    expect(asking(todoId)).toBe(true);
     const rows = H.s.db.select().from(message).where(eq(message.id, REQUEST)).all();
     expect(rows).toHaveLength(1);
     await askWorkerQuestion(
@@ -150,7 +156,7 @@ describe('worker ask_user on a session step', () => {
     expect(questionReports().map((r) => r.line)).toEqual(['Which export format?']);
   });
 
-  test('the answer delivered through the thread message clears awaitingReply and settles the held ask', async () => {
+  test('the answer delivered through the thread message settles the held ask', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
@@ -168,10 +174,10 @@ describe('worker ask_user on a session step', () => {
     const settled = await held;
     expect(settled.status).toBe('answered');
     expect(settled.answers).toEqual([{ header: 'Format', text: 'JSON please' }]);
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+    expect(asking(todoId)).toBe(false);
   });
 
-  test('a parked step keeps awaitingReply through the move to review and clears it when the thread moves on', async () => {
+  test('a parked question survives a move to review and is cancelled when the thread is closed', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
@@ -182,9 +188,9 @@ describe('worker ask_user on a session step', () => {
       { holdMs: 0 },
     );
     setTodoPhase(deps(), todoId, 'review');
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
-    setTodoPhase(deps(), todoId, 'queued');
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+    expect(asking(todoId)).toBe(true);
+    setTodoPhase(deps(), todoId, 'closed');
+    expect(asking(todoId)).toBe(false);
     const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
       status: string;
     };
@@ -244,7 +250,7 @@ describe('worker ask_user on a session step', () => {
     );
   });
 
-  test('a delivery that throws leaves the question pending and awaitingReply set', async () => {
+  test('a delivery that throws leaves the question pending', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     const claimed = claim(stepRow.id);
@@ -265,7 +271,7 @@ describe('worker ask_user on a session step', () => {
     await expect(
       messageThreadAsUser(failing, H.teamId, todoId, { content: 'JSON', clientMessageId: 'c-9' }),
     ).rejects.toThrow('delivery down');
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    expect(asking(todoId)).toBe(true);
     const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
       status: string;
     };
@@ -310,8 +316,7 @@ describe('session steps share the build-step paths', () => {
     );
     completeStep(deps(), stepRow.id, { hasChanges: false });
     const record = getTodo(deps(), todoId)!;
-    expect(record.phase).not.toBe('failed');
-    expect(record.awaitingReply).toBe(true);
+    expect(record.phase).toBe('needs_input');
     const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
       status: string;
     };
@@ -338,12 +343,12 @@ describe('session steps share the build-step paths', () => {
     expect(kinds).toEqual(['session']);
   });
 
-  test('a session turn with no changes and no question still fails the artifact gate', () => {
+  test('a session turn with no changes and no question asks the Coordinator instead of failing', () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     claim(stepRow.id);
     completeStep(deps(), stepRow.id, { hasChanges: false });
-    expect(getTodo(deps(), todoId)!.phase).toBe('failed');
+    expect(getTodo(deps(), todoId)!.phase).toBe('needs_input');
   });
 
   test('a reply that moves a review thread on marks the parked question answered', async () => {
@@ -362,19 +367,18 @@ describe('session steps share the build-step paths', () => {
       .where(eq(step.id, stepRow.id))
       .run();
     setTodoPhase(deps(), todoId, 'review');
-    H.s.db.update(todo).set({ awaitingReply: true }).where(eq(todo.id, todoId)).run();
     const sent = await messageThreadAsUser(deps(), H.teamId, todoId, {
       content: 'JSON please',
       clientMessageId: 'c-q',
     });
-    expect(sent.delivered).toBe('revision');
+    expect(sent.delivered).toBe('new-turn');
     const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
       status: string;
       answers: unknown;
     };
     expect(content.status).toBe('answered');
     expect(content.answers).toEqual([{ header: 'Format', text: 'JSON please' }]);
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+    expect(asking(todoId)).toBe(false);
   });
 });
 
@@ -434,7 +438,7 @@ describe('a parked worker question holds the gates', () => {
 });
 
 describe('stopping a session with a pending question', () => {
-  test('clears awaitingReply and cancels the question', async () => {
+  test('cancels the question', async () => {
     const { todoId, buildId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
@@ -445,9 +449,9 @@ describe('stopping a session with a pending question', () => {
       { requestId: REQUEST, questions: QUESTIONS },
       { holdMs: 0 },
     );
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    expect(asking(todoId)).toBe(true);
     applyStoppedStep(deps(), stepRow.id);
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBeFalsy();
+    expect(asking(todoId)).toBe(false);
     const rows = H.s.db.select().from(message).where(eq(message.conversationId, buildId)).all();
     expect(JSON.stringify(rows)).toContain('cancelled');
     expect(JSON.stringify(rows)).not.toContain('"status":"pending"');
@@ -482,17 +486,12 @@ describe('worker question hardening', () => {
     expect(row.content).toBe('plain text');
   });
 
-  test('the push and notification body is capped and scrubbed', async () => {
+  test('the Coordinator question wake caps and scrubs the question text', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
     const secret = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH';
-    const bodies: string[] = [];
-    const push = await import('../src/services/thread-push.js');
-    const spy = vi.spyOn(push, 'pushWorkerQuestion').mockImplementation((_d, _c, body) => {
-      bodies.push(body);
-    });
     await askWorkerQuestion(
       deps(),
       claimed,
@@ -508,18 +507,24 @@ describe('worker question hardening', () => {
       },
       { holdMs: 0 },
     );
-    spy.mockRestore();
-    expect(bodies).toHaveLength(1);
-    expect(bodies[0]!.length).toBeLessThanOrEqual(120);
-    expect(bodies[0]).not.toContain(secret);
+    const wakes = H.s.db
+      .select()
+      .from(step)
+      .where(eq(step.kind, 'chief'))
+      .all()
+      .filter((row) => row.prompt?.includes(`watch:${todoId}`));
+    expect(wakes).toHaveLength(1);
+    const line = wakes[0]!.prompt!.split('\n').find((l) => l.startsWith(`- requestId ${REQUEST}`))!;
+    expect(line.length).toBeLessThanOrEqual(400);
+    expect(wakes[0]!.prompt).not.toContain(secret);
   });
 });
 
 describe('worker ask_user tool dispatch and parked replies', () => {
   test('session steps get ask_user for both repo types, build steps never', () => {
     for (const github of [false, true]) {
-      expect(workerRemoteTools('session', github).map((t) => t.name)).toContain('ask_user');
-      expect(workerRemoteTools('build', github).map((t) => t.name)).not.toContain('ask_user');
+      expect(workerRemoteTools('session', github, true).map((t) => t.name)).toContain('ask_user');
+      expect(workerRemoteTools('build', github, true).map((t) => t.name)).not.toContain('ask_user');
     }
   });
 
@@ -536,13 +541,13 @@ describe('worker ask_user tool dispatch and parked replies', () => {
       { holdMs: 0 },
     );
     H.s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    expect(asking(todoId)).toBe(true);
     const sent = await messageThreadAsUser(deps(), H.teamId, todoId, {
       content: 'JSON please',
       clientMessageId: 'c-parked',
     });
     expect(sent.delivered).toBe('new-turn');
-    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+    expect(asking(todoId)).toBe(false);
     const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
       status: string;
     };

@@ -1,22 +1,10 @@
 #!/bin/bash
-# squash the lane into one commit authored by Cairnwright, keeping every Co-authored-by and closing line
 set -euo pipefail
+NODE="$HOME/.local/share/fnm/node-versions/v24.14.0/installation/bin/node"; [ -x "$NODE" ] || NODE=$(command -v node)
+{ read -r BOT_NAME; read -r BOT_EMAIL; read -r OWNER_COAUTHOR; } < <("$NODE" ~/.cairn/tools/app-token/bot-identity.mjs)
+[ -n "${BOT_EMAIL:-}" ] || { echo "sign-commits: could not read the bot identity" >&2; exit 1; }
+export GIT_AUTHOR_NAME="$BOT_NAME" GIT_AUTHOR_EMAIL="$BOT_EMAIL"
+export GIT_COMMITTER_NAME="$BOT_NAME" GIT_COMMITTER_EMAIL="$BOT_EMAIL"
+export CAIRN_COAUTHOR="${CAIRN_COAUTHOR-$OWNER_COAUTHOR}"
 base=$(git merge-base origin/main HEAD)
-n=$(git rev-list --count "$base"..HEAD)
-[ "$n" -gt 0 ] || exit 0
-if [ "$n" = 1 ]; then
-  author_email=$(git log -1 --format=%ae)
-  message=$(git log -1 --format=%B)
-  case "$author_email" in
-    348051526+cairnwright@users.noreply.github.com) grep -q '^Co-authored-by: xiechimon' <<<"$message" && exit 0;;
-    347615582+cairnwright\[bot\]@users.noreply.github.com) grep -q '^Cairn-Thread: ' <<<"$message" && grep -q '^Co-authored-by: xiechimon' <<<"$message" && exit 0;;
-  esac
-fi
-subject=$(git log --reverse --format=%s "$base"..HEAD | head -1)
-bodies=$(git log --reverse --format=%b "$base"..HEAD | { grep -v '^Co-authored-by:' || true; } | { grep -v '^[Cc]loses #' || true; } | sed '/^$/N;/^\n$/D')
-others=$(git log --reverse --format=%s "$base"..HEAD | tail -n +2 | sed 's/^/- /')
-closes=$(git log --format=%B "$base"..HEAD | { grep -iE '^closes #[0-9]+' || true; } | sort -u)
-coauth=$( { git log --format=%B "$base"..HEAD | grep '^Co-authored-by:' || true; git log --format='%an <%ae>' "$base"..HEAD | { grep -v 'cairnwright' || true; } | sed 's/^/Co-authored-by: /'; echo "Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>"; } | grep -v 'cairnwright\|Cairnwright' | awk -F'<' '!seen[tolower($1)]++')
-msg=$(printf '%s\n\n%s\n%s\n\n%s\n\n%s\n' "$subject" "$bodies" "$others" "$closes" "$coauth" | sed '/^$/N;/^\n$/D')
-git reset -q --soft "$base"
-~/.cairn/tools/app-token/as-bot.sh git commit -q --no-verify --allow-empty -m "$msg"
+exec git rebase -q --force-rebase --exec 'git commit -q --allow-empty --amend --no-edit --reset-author ${CAIRN_COAUTHOR:+--trailer "$CAIRN_COAUTHOR"}' "$base"

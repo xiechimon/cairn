@@ -5,13 +5,13 @@ import {
   build as buildTable,
   project as projectTable,
   step as stepTable,
-  team,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { type BuildDeps, requestMerge, startBuilds } from '../src/services/builds.js';
+import { resumeAutonomyPauses } from '../src/services/github-autonomy-brake.js';
 import { parseShipGateInstruction, reverifyShip } from '../src/services/ship-gate.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req } from './helpers.js';
+import { bootServer, pauseTeamForTest, postProject, req } from './helpers.js';
 
 const s = bootServer();
 afterAll(() => s.dispose());
@@ -89,7 +89,8 @@ function mergeSteps(buildId: string) {
 }
 
 function setPaused(paused: boolean): void {
-  s.db.update(team).set({ autonomyPaused: paused }).where(eq(team.id, s.team.id)).run();
+  if (paused) pauseTeamForTest(s.db, s.team.id);
+  else resumeAutonomyPauses(s.db, s.team.id);
 }
 
 describe('every ship route needs a mergeable gate verdict for the current head', () => {

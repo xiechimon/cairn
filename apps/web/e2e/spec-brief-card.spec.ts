@@ -134,8 +134,8 @@ test('4. brief-card recipe = framed content box (1px border / rounded-lg / surfa
 
   expect(cs.radius).toBe('8px');
 
-  expect(cs.bg).toBe('rgb(42, 48, 43)');
-  expect(cs.borderColor).toBe('rgb(53, 59, 54)');
+  expect(cs.bg).toBe('rgb(38, 38, 38)');
+  expect(cs.borderColor).toBe('rgba(255, 255, 255, 0.1)');
   expect(cs.fontSize).toBe('15px');
 });
 
@@ -157,7 +157,7 @@ test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 c
   expect(Math.abs(capped.maxWidth - capped.zero68)).toBeLessThanOrEqual(2);
 });
 
-test('6. ordered-list numerals distinguished from body text, aligned with the first-line baseline, two-digit numbers do not jog the content column (#814 rework)', async ({
+test('6. ordered-list numerals are native list markers in claude.ai geometry, and two-digit numbers do not jog the content column', async ({
   page,
 }) => {
   await stubWorld(page);
@@ -166,25 +166,30 @@ test('6. ordered-list numerals distinguished from body text, aligned with the fi
   await expect(rows).toHaveCount(3);
   const pins = await rows.evaluateAll((els) =>
     els.map((row) => {
-      const ord = row.querySelector('.chat-md-ordinal') as HTMLElement;
-      const content = row.querySelector('.chat-md-content') as HTMLElement;
-      const ordRect = ord.getBoundingClientRect();
-      const contentRect = content.getBoundingClientRect();
+      const list = row.parentElement as HTMLElement;
+      const range = document.createRange();
+      range.selectNodeContents(row);
       return {
-        rowAlign: getComputedStyle(row).alignItems,
-        ordColor: getComputedStyle(ord).color,
-        contentColor: getComputedStyle(content).color,
-        ordTop: ordRect.top,
-        contentTop: contentRect.top,
-        contentLeft: contentRect.left,
+        display: getComputedStyle(row).display,
+        listTag: list.tagName,
+        listStyle: getComputedStyle(list).listStyleType,
+        listPad: getComputedStyle(list).paddingInlineStart,
+        itemPad: getComputedStyle(row).paddingInlineStart,
+        fontSize: Number.parseFloat(getComputedStyle(row).fontSize),
+        markerColor: getComputedStyle(row, '::marker').color,
+        textColor: getComputedStyle(row).color,
+        contentLeft: range.getBoundingClientRect().left,
       };
     }),
   );
 
   for (const pin of pins) {
-    expect(pin.rowAlign).toBe('baseline');
-    expect(pin.ordColor).not.toBe(pin.contentColor);
-    expect(Math.abs(pin.ordTop - pin.contentTop)).toBeLessThanOrEqual(1);
+    expect(pin.display).toBe('list-item');
+    expect(pin.listTag).toBe('OL');
+    expect(pin.listStyle).toBe('decimal');
+    expect(Number.parseFloat(pin.listPad)).toBeCloseTo(pin.fontSize * 2, 1);
+    expect(Number.parseFloat(pin.itemPad)).toBeCloseTo(pin.fontSize * 0.5, 1);
+    expect(pin.markerColor).toBe(pin.textColor);
   }
 
   const lefts = pins.map((pin) => pin.contentLeft);

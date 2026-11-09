@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PrLink } from '../components/thread/pr-link.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import {
@@ -14,9 +15,11 @@ interface AcceptDialogProps {
   onConfirm?: (merge: boolean) => void;
   confirming?: boolean;
   mergeLocked?: boolean;
+  mergeByDefault?: boolean;
   rejectReason?: string | null;
   substantiveChanges?: boolean | null;
   infoOutput?: boolean;
+  pr?: { number: number; url: string };
 }
 
 export function AcceptDialog({
@@ -25,15 +28,17 @@ export function AcceptDialog({
   onConfirm,
   confirming,
   mergeLocked,
+  mergeByDefault = true,
   rejectReason,
   substantiveChanges,
   infoOutput,
+  pr,
 }: AcceptDialogProps) {
   const { t } = useI18n();
-  const [merge, setMerge] = useState(true);
+  const [merge, setMerge] = useState(mergeByDefault);
   useEffect(() => {
-    if (open === true) setMerge(true);
-  }, [open]);
+    if (open === true) setMerge(mergeByDefault);
+  }, [open, mergeByDefault]);
   const locked = mergeLocked === true;
   const skipMerge = infoOutput === true || (substantiveChanges === false && !locked);
   const mergeChecked = locked || merge;
@@ -61,6 +66,11 @@ export function AcceptDialog({
         </>
       }
     >
+      {pr !== undefined && (
+        <p data-testid="accept-dialog-pr" className="mb-3 text-meta text-(--text-tertiary)">
+          <PrLink number={pr.number} url={pr.url} />
+        </p>
+      )}
       {skipMerge ? (
         <p className="text-meta text-(--text-tertiary)">
           {infoOutput === true

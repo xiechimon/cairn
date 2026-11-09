@@ -7,6 +7,7 @@ import {
   phaseSchema,
   snoozeTodoBodySchema,
   type TodoRecord,
+  tasksQuerySchema,
   threadMessageBodySchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
@@ -34,6 +35,7 @@ import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { assertProjectWritable } from './services/project-writable.js';
 import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
+import { listTasks } from './services/tasks.js';
 import { messageThreadAsUser } from './services/thread-message.js';
 import {
   createTodo,
@@ -62,6 +64,11 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/todos', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     return c.json(listTodos(svc, { teamId, archived: c.req.query('archived') === '1' }));
+  });
+
+  app.get('/api/tasks', (c) => {
+    const teamId = c.req.query('teamId') ?? ctx.team.id;
+    return c.json(tasksQuerySchema.parse(listTasks(svc, teamId)));
   });
 
   app.get('/api/needs-you', (c) => {
@@ -143,7 +150,12 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       prior != null &&
       (IN_PROGRESS_PHASES as readonly string[]).includes(prior.phase) &&
       record.phase === 'done';
-    if (closing || exited) stopActiveStepsAfterExit(svc, id);
+    if (closing || exited) {
+      stopActiveStepsAfterExit(svc, id, {
+        actor: 'person',
+        reason: `${closing ? 'closed' : 'marked done'} by ${svc.user.displayName}`,
+      });
+    }
     return c.json(record);
   });
 
@@ -151,7 +163,10 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     const record = setTodoArchived(svc, id, true);
     if (!record) throw notFound(`todo ${id}`);
-    stopActiveStepsForArchive(svc, id);
+    stopActiveStepsForArchive(svc, id, {
+      actor: 'person',
+      reason: `archived by ${svc.user.displayName}`,
+    });
     return c.json(getTodo(svc, id) ?? record);
   });
 
@@ -183,7 +198,10 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     if (!prior) throw notFound(`todo ${id}`);
     let prep: ReturnType<typeof prepareStopForDone>;
     try {
-      prep = prepareStopForDone(svc, id);
+      prep = prepareStopForDone(svc, id, {
+        actor: 'person',
+        reason: `stop and mark done by ${svc.user.displayName}`,
+      });
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;

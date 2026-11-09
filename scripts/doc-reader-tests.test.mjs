@@ -47,13 +47,13 @@ test('the retired collector archive is excluded while current identity safeguard
       ['docs/ops/agent-bot-identity.md'],
       () => [
         'docs/verify/2136/review-check.test.mjs',
-        'scripts/commit-author-recovery.test.mjs',
+        'scripts/commit-identity.test.mjs',
         'apps/server/test/codeowners.test.ts',
       ],
       knownRed,
     ),
     {
-      node: ['scripts/commit-author-recovery.test.mjs'],
+      node: ['scripts/commit-identity.test.mjs'],
       vitest: ['apps/server/test/codeowners.test.ts'],
     },
   );

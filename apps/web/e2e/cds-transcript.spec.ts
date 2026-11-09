@@ -26,7 +26,7 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120', async ({ page }) => {
   expect(m.chatMaxW).toBe('768px');
   expect(m.chatExtra).toBe('35vh');
   expect(m.fadeSize).toBe('28px');
-  expect(m.radiusBubble).toBe('14px');
+  expect(m.radiusBubble).toBe('12px');
   expect(m.cdsRadiusXl).toBe('12px');
   expect(m.hasScrollFade).toBe(true);
   expect(m.contentMaxW).toBe('768px');
@@ -82,7 +82,7 @@ test('CDS transcript: jump-to-latest appears past 120px and restores end', async
     .toBeLessThanOrEqual(40);
 });
 
-test('CDS transcript: thinking trigger 12/16 medium; code 12px / 11.5', async ({ page }) => {
+test('CDS transcript: thinking trigger 12/16 medium; code block 12px radius, 14 / 22.75', async ({ page }) => {
   // scenario with thinking + code if available; fall back to measuring tokens + any present nodes
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
   await page.waitForSelector('[data-testid="transcript-col"]');
@@ -92,13 +92,14 @@ test('CDS transcript: thinking trigger 12/16 medium; code 12px / 11.5', async ({
       '[data-testid="transcript-col"] button[aria-label*="思考"], [data-testid="transcript-col"] button[aria-label*="thinking" i]',
     ) as HTMLElement | null;
     const code = document.querySelector('[data-testid="md-code"]') as HTMLElement | null;
+    const codeBlock = document.querySelector('[data-testid="md-code-block"]') as HTMLElement | null;
     const tCs = thinkingBtn ? getComputedStyle(thinkingBtn) : null;
     const cCs = code ? getComputedStyle(code) : null;
     return {
       thinkingFontSize: tCs?.fontSize ?? null,
       thinkingLineHeight: tCs?.lineHeight ?? null,
       thinkingWeight: tCs?.fontWeight ?? null,
-      codeRadius: cCs?.borderTopLeftRadius ?? null,
+      codeRadius: codeBlock ? getComputedStyle(codeBlock).borderTopLeftRadius : null,
       codeFontSize: cCs?.fontSize ?? null,
       codeLineHeight: cCs?.lineHeight ?? null,
     };
@@ -111,7 +112,7 @@ test('CDS transcript: thinking trigger 12/16 medium; code 12px / 11.5', async ({
   }
   if (styles.codeRadius != null) {
     expect(styles.codeRadius).toBe('12px');
-    expect(styles.codeFontSize).toBe('11.5px');
-    expect(styles.codeLineHeight).toBe('16px');
+    expect(styles.codeFontSize).toBe('14px');
+    expect(styles.codeLineHeight).toBe('22.75px');
   }
 });

@@ -98,10 +98,6 @@ export const EN: Record<string, string> = {
   晚上好: 'Good evening',
   '，': ', ',
   '{n} 项待你处理': '{n} waiting on you',
-  发给哪个项目: 'Send to which project',
-  '发给哪个项目：{name}': 'Send to project: {name}',
-  '自动，由 Coordinator 判断': 'Auto, the Coordinator decides',
-  'Coordinator 判断，拿不准会问你': 'The Coordinator decides and asks when unsure',
   换项目: 'Move project',
   已转给任务: 'Passed to task',
   '任务 #{n} {title}：{status}': 'Task #{n} {title}: {status}',
@@ -202,8 +198,6 @@ export const EN: Record<string, string> = {
   连接一台机器: 'Connect a machine',
   运行: 'Run',
   连接这台机器: 'to connect this machine',
-  '设置 Coordinator': 'Set up the Coordinator',
-  '给 Coordinator 选一个 Agent，它才能回答': 'Pick an Agent for the Coordinator so it can answer',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
   '点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。':
     'Use the button below the box to connect a model source, a machine and the Coordinator, then send again.',
@@ -233,7 +227,6 @@ export const EN: Record<string, string> = {
   返回: 'Back',
   更多: 'More',
   关闭: 'Close',
-  最小化: 'Minimize',
   滚动到最新: 'Scroll to latest',
   取消: 'Cancel',
   保存: 'Save',
@@ -252,6 +245,8 @@ export const EN: Record<string, string> = {
   待确认: 'Plan to confirm',
   审阅: 'Review',
   回复: 'Reply',
+  选中文字的操作: 'Selection actions',
+  移除引用: 'Remove quote',
   方案: 'Plan',
   分支: 'Branch',
   变更: 'Changes',
@@ -375,6 +370,10 @@ export const EN: Record<string, string> = {
   '你确认方案后，Agent 开始构建。': 'The agent starts building once you confirm the plan.',
   '构建完成后，Agent 会把它移到审核。': 'The agent moves it to Review when the build is done.',
   '审核无误后，你可以把它标记为已完成。': 'Mark it done once the review looks right.',
+  '它在等一个问题的回答，回答后会在同一个会话里继续。':
+    'It is waiting for an answer to its question; once answered it continues in the same session.',
+  待回答: 'Needs input',
+  '回答它的问题…': 'Answer its question…',
   '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
   '这次运行失败了，可以重跑，或移回待开始。':
     'This run failed. Rerun it, or move it back to To start.',
@@ -441,6 +440,12 @@ export const EN: Record<string, string> = {
   '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':
     'Push immediately when a decision is needed; everything else lands in the twice-daily digest — even on the lock screen',
   '首个 PR': 'First PR',
+  人工共同作者署名: 'Human co-author trailers',
+  '团队设置，默认开启。在人工发起的任务提交中添加共同作者署名。':
+    'Team setting, on by default. Credit the human who instructed the work in commit trailers.',
+  邀请任务发起人审阅: 'Request instructor review',
+  '团队设置，默认关闭。在 PR 上邀请人工发起人审阅。':
+    'Team setting, off by default. Request PR review from the human who instructed the work.',
   '首个 PR 社区提示': 'First-PR community prompt',
   '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。':
     'Team setting, off by default. Show a sharing link after the first PR succeeds; you decide whether to post on GitHub.',
@@ -468,6 +473,7 @@ export const EN: Record<string, string> = {
     'API keys connect machines from the command line and let MCP clients reach your workbench.',
   新建密钥: 'New key',
   复制: 'Copy',
+  复制代码: 'Copy code',
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
@@ -576,14 +582,6 @@ export const EN: Record<string, string> = {
   // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
   // 步只等它上线不自动改派）。
   模型: 'Model',
-  // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
-  归属机: 'Home machine',
-  ' · 归属机 {machine}': ' · on {machine}',
-  模型与归属机: 'Model & home machine',
-  '跟随绑定 Agent：模型 {model} · 归属机 {machine}':
-    'Follows the bound Agent: model {model} · home {machine}',
-
-  未设归属机: 'no home machine',
   接入机器: 'Connect a machine',
   在线: 'Online',
   '迁移到…': 'Migrate to…',
@@ -726,10 +724,8 @@ export const EN: Record<string, string> = {
   主题: 'Thread',
   新主题: 'New thread',
   'Coordinator 设置': 'Coordinator settings',
-  '请先为 Coordinator 选择一个 Agent。': 'Choose an Agent for the Coordinator first.',
-  选择一个主题开始: 'Pick a thread to start',
+  '请先在工作路由里配置 Coordinator。': 'Configure the Coordinator in work routing first.',
   '有什么可以帮你的？': 'How can I help?',
-  '完成 {n}': 'Done in {n}',
   章程: 'Charter',
   记忆: 'Memory',
   记忆已更新: 'Memory updated',
@@ -739,8 +735,6 @@ export const EN: Record<string, string> = {
   '尚无章程。点击编辑，为 Coordinator 添加常设指示。':
     'No charter yet. Click edit to give the Coordinator standing instructions.',
   编辑: 'Edit',
-  '尚未选择 Agent。请先在「Agent」页选定 Agent，记忆将保存在该 Agent 上。':
-    'No Agent selected yet. Pick an Agent on the "Agent" tab first; memories are saved on that Agent.',
   '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。':
     'Nothing being watched yet. When the Coordinator watches a todo, or promises to check back at a set time, it is listed here by thread.',
   // #811 关注 tab：无备注 wake 行的回退文案（有备注显示备注原文）。
@@ -924,10 +918,6 @@ export const EN: Record<string, string> = {
   '3 天前': '3d ago',
   '4 天前 · Machine offline': '4d ago · Machine offline',
   '2 天前 · 41.7k tokens': '2d ago · 41.7k tokens',
-  '帮我组建 Agent 团队': 'Help me build an Agent team',
-  帮我创建一个新项目: 'Help me create a new project',
-  总结一下我所有项目现在的进展: 'Summarize the progress of all my projects',
-  '查一下这个月的 token 用量': "Check this month's token usage",
 
   // —— #75 deep dynamic states: reject loop / failed / reuse plan ——
   '由 Coordinator 发起': 'Started by Coordinator',
@@ -1170,8 +1160,9 @@ export const EN: Record<string, string> = {
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
-  '尚无记忆。Agent 会在工作中将值得沉淀的经验存入此处。':
-    'No memories yet. The Agent stores experience worth keeping here as it works.',
+  '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。':
+    'No memories yet. The Coordinator stores experience worth keeping here as it works.',
+  模型与机器: 'Model & machine',
 
   // —— #499 记忆 tab 的搜索与排序（配额头 + 搜索框 + 排序档）——
   // `记忆 · {n} / {max}`：{max} = shared MEMORY_QUOTA_PER_AGENT 插值，不写死
@@ -1208,8 +1199,6 @@ export const EN: Record<string, string> = {
     "The Coordinator's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
   换模型: 'Change model',
   '停止 Coordinator 这次回复': 'Stop this Coordinator reply',
-  '备用模型 {model}': 'Backup model {model}',
-  '，主模型暂时用不了': ', main model unavailable',
   '可以继续说，Coordinator 恢复后会按顺序处理…':
     'Keep typing; the Coordinator handles messages in order once it is back…',
   '发出的话会直接插进 Coordinator 这一轮': 'Steer the current reply',
@@ -1444,6 +1433,12 @@ export const EN: Record<string, string> = {
   用途: 'Uses',
   连接: 'Connections',
   模型路由: 'Model routing',
+  用量与连接: 'Usage & connections',
+  正在加载用量与连接: 'Loading usage & connections',
+  用量与连接没能加载: 'Usage & connections did not load',
+  规则与策略: 'Rules & policies',
+  正在加载规则与策略: 'Loading rules & policies',
+  规则与策略没能加载: 'Rules & policies did not load',
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
@@ -1498,6 +1493,14 @@ export const EN: Record<string, string> = {
   '加密保存，保存后不能再查看': 'Encrypted; cannot be viewed after saving',
   '更换 API key': 'Replace API key',
   '新的 API key': 'New API key',
+  测试连接: 'Test connection',
+  测试: 'Test',
+  '测试中…': 'Testing…',
+  '发一个最小请求，不会显示密钥': 'Sends one minimal request; the key is never shown',
+  连接正常: 'Connected',
+  '连接失败，请检查连接设置后重试。':
+    'Connection failed. Check the connection settings and try again.',
+  '测试没能跑完，请重试。': 'The test could not finish. Try again.',
   协议: 'Protocol',
   地址: 'Base URL',
   这里的模型会出现在模型选择器里: 'These models show up in the model pickers',
@@ -1651,17 +1654,13 @@ export const EN: Record<string, string> = {
   '与 main 冲突，解决后才会审核': 'Conflicts with main; review waits for a clean merge',
   交给负责人合并: 'Routed to the owner to merge',
   还没有审核: 'No review yet',
-  'head 已移到': 'Head moved to',
   审核结论已过期: 'verdict is stale',
-  '{failed} 个失败 · {passed}/{total} 通过': '{failed} failed · {passed} of {total} passed',
-  '{running} 个运行中 · {passed}/{total} 通过': '{running} running · {passed} of {total} passed',
-  '{passed}/{total} 通过': '{passed} of {total} passed',
+  'CI 未读取': 'CI not read',
+  '{failed} 个失败': '{failed} failed',
+  '{failed} 个失败：{names}': '{failed} failed: {names}',
   检查: 'Checks',
   '评审 head': 'Judged head',
-  审核视角: 'Lenses',
-  阻塞项: 'Blockers',
   解决: 'Resolve',
-  '查看 diff': 'View diff',
   '在 GitHub 打开': 'Open on GitHub',
   新功能发布: 'Feature releases',
   '发布后对所有成员开启，不能在这里关闭。':
@@ -1752,6 +1751,22 @@ export const EN: Record<string, string> = {
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
   'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
+  等待审核: 'Review pending',
+  草稿: 'Draft',
+  '落后于 main': 'Behind main',
+  'GitHub 暂不允许合并': 'GitHub is blocking the merge',
+  '分支落后，更新后才能合并': 'Branch is behind; update it before merging',
+  '审核已通过，GitHub 还不允许合并': 'Review passed, but GitHub does not allow the merge yet',
+  '{n} 分钟前读取，GitHub 可能被限流或延迟':
+    'Last read {n} min ago; GitHub may be rate-limiting or slow',
+  '检查通过 {passed} / {total}': 'Checks passed: {passed} of {total}',
+  'PR #{n} 的菜单': 'Menu for PR #{n}',
+  已复制链接: 'Link copied',
+  显示更多: 'Show more',
+  'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
+  拉取请求: 'Pull requests',
+  'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
+  '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
   '这台机器在 Coordinator 里的角色': "This machine's role for the Coordinator",
   '这台机器上能接任务的执行器，以及它们的登录状态。':
     'The runtimes that can take tasks on this machine, and their sign-in state.',
@@ -1789,8 +1804,6 @@ export const EN: Record<string, string> = {
   机器没能加载: 'Machines did not load',
   正在加载模型服务: 'Loading providers',
   模型服务没能加载: 'Providers did not load',
-  正在加载工作路由: 'Loading work routing',
-  工作路由没能加载: 'Work routing did not load',
   正在加载命令记录: 'Loading command history',
   命令记录没能加载: 'Command history did not load',
   '正在加载 Coordinator 的电脑': "Loading the Coordinator's computer",
@@ -1805,6 +1818,7 @@ export const EN: Record<string, string> = {
   正在加载对话: 'Loading the conversation',
   '加载完成后才能发送。': 'You can send once loading finishes.',
   远程访问: 'Remote access',
+  '已通过 Tailscale 登录为 {login}': 'Signed in as {login} via Tailscale',
   配对新设备: 'Pair a new device',
   '用手机扫描二维码，5 分钟内有效，只能用一次。':
     'Scan with your phone. Valid for 5 minutes, works once.',

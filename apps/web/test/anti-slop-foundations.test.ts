@@ -47,10 +47,41 @@ describe('V11 identity carries no colour', () => {
 });
 
 describe('V16 no texture or gradient surfaces', () => {
-  test('the user bubble is a flat tint', () => {
-    expect(offenders(/bubble-gradient/)).toEqual([]);
-    expect(offenders(/--bubble-(wash|rim)/)).toEqual([]);
-    expect(appCss).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
+  const bubbleUtility = appCss.match(/@utility bubble-gradient \{[\s\S]*?\n\}\n/)?.[0] ?? '';
+
+  test('the owner bubble is the one gradient surface', () => {
+    expect(bubbleUtility).toMatch(/radial-gradient/);
+    expect(appCss.replace(bubbleUtility, '')).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
+  });
+
+  test('only user message rows wear the bubble', () => {
+    expect(offenders(/bubble-gradient/).sort()).toEqual([
+      'chief/chief-message-rows.tsx',
+      'design/components-content.tsx',
+      'detail/transcript.tsx',
+      'styles/app.css',
+    ]);
+  });
+});
+
+describe('V3 blur only on the measured claude.ai selection bar', () => {
+  test('the selection bar is the one blurred surface', () => {
+    expect(offenders(/backdrop-blur|backdrop-filter:\s*blur|filter:\s*blur\(/).sort()).toEqual([
+      'chief/selection-reply.tsx',
+      'components/ui/alert-dialog.tsx',
+      'components/ui/dialog.tsx',
+    ]);
+  });
+
+  test('the pristine dialog overlays keep their upstream blur class but render none', () => {
+    expect(appCss).toMatch(
+      /\[data-slot="dialog-overlay"\],\s*\[data-slot="alert-dialog-overlay"\] \{[^}]*backdrop-filter: none;/,
+    );
+  });
+
+  test('it blurs by the measured 8px', () => {
+    const bar = sourceFiles.find(({ path }) => path === 'chief/selection-reply.tsx')?.text ?? '';
+    expect(bar.match(/backdrop-blur[\w-]*/g)).toEqual(['backdrop-blur-sm']);
   });
 });
 
@@ -70,7 +101,10 @@ describe('DESIGN-RULES carries the anti-slop rules', () => {
     },
   );
 
-  test('V3 no longer exempts the bubble', () => {
-    expect(rules).not.toMatch(/except `bubble-gradient`/);
+  test('V3 and V16 name the owner bubble as their one exception', () => {
+    for (const id of ['V3', 'V16']) {
+      const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));
+      expect(row).toMatch(/`bubble-gradient`/);
+    }
   });
 });

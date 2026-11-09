@@ -51,6 +51,8 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  ProviderTestResult,
+  PrPanelRow,
   RemoteRoutesResponse,
   RetroProposal,
   ScheduleRecord,
@@ -92,6 +94,7 @@ export type StepRow = StepJournalRow;
 export interface ProvidersEnvelope {
   presets: ProviderPreset[];
   providers: ProviderRecord[];
+  canTestConnection?: boolean;
 }
 
 export const useSession = (enabled: boolean) =>
@@ -206,6 +209,23 @@ export const useBuildGate = (buildId: string | null | undefined, enabled: boolea
     enabled: enabled && buildId != null,
   });
 
+export const PR_POLL_MS = 30_000;
+
+export const usePrs = (
+  teamId: string | undefined,
+  threadId: string | undefined,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: ['prs', teamId, threadId ?? null],
+    queryFn: () =>
+      api.get<PrPanelRow[]>(
+        threadId !== undefined ? `/api/prs?threadId=${encodeURIComponent(threadId)}` : '/api/prs',
+      ),
+    enabled: enabled && teamId !== undefined,
+    refetchInterval: PR_POLL_MS,
+  });
+
 export const useProjectBuilds = (projectId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['projectBuilds', projectId],
@@ -220,32 +240,27 @@ export const useSteps = (buildId: string | null | undefined, enabled: boolean) =
     enabled: enabled && buildId != null,
   });
 
-export const useMessages = (conversationId: string | null | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['messages', conversationId],
-    queryFn: () =>
-      api.get<ConversationMessagesResponse>(`/api/conversations/${conversationId}/messages`),
-    enabled: enabled && conversationId != null,
-  });
-
-export function useChiefMessages(threadId: string | null, enabled: boolean) {
+export function useConversationMessages(
+  conversationId: string | null | undefined,
+  enabled: boolean,
+) {
   const query = useInfiniteQuery({
-    queryKey: ['messages', threadId, 'pages'],
+    queryKey: ['messages', conversationId, 'pages'],
     queryFn: ({ pageParam }) =>
       api.get<ConversationMessagesResponse>(
-        `/api/conversations/${threadId}/messages${
+        `/api/conversations/${conversationId}/messages${
           pageParam !== null ? `?before=${encodeURIComponent(pageParam)}` : ''
         }`,
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
-    enabled: enabled && threadId != null,
+    enabled: enabled && conversationId != null,
   });
   const messages = useMemo(
     () => [...(query.data?.pages ?? [])].reverse().flatMap((page) => page.messages),
     [query.data],
   );
-  return { query, messages };
+  return { query, messages, newest: query.data?.pages[0] };
 }
 
 export const usePlans = (buildId: string | null | undefined, enabled: boolean) =>
@@ -966,6 +981,10 @@ export function useApiMutations(teamId: string | undefined) {
     deleteProvider: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/providers/${id}`),
       onSuccess: invalidateAll,
+    }),
+    testProvider: useMutation({
+      mutationFn: (id: string) =>
+        api.post<ProviderTestResult>(`/api/teams/${teamId}/providers/${id}/test`, {}),
     }),
     patchProvider: useMutation({
       mutationFn: (input: { id: string; body: PatchProviderBody }) =>

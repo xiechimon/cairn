@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
+import { StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
@@ -293,7 +294,7 @@ export function ConversationSection() {
       <Specimen
         id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="rounded-(--cds-radius-xl) bubble-gradient px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -301,7 +302,7 @@ export function ConversationSection() {
               className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
               data-testid="turn-user"
             >
-              <div className="w-fit max-w-full rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title text-foreground">
+              <div className="w-fit max-w-full rounded-(--cds-radius-xl) bubble-gradient px-3 py-2 text-card-title text-foreground">
                 Why does pnpm install fail in CI?
               </div>
               <div className="mt-1 flex items-center gap-1 text-content-tertiary">
@@ -358,9 +359,7 @@ export function ConversationSection() {
               </Bubble>
             </MessageContent>
           </Message>
-          <Marker variant="separator" className="text-meta text-content-tertiary">
-            <MarkerContent>Plan approved · 3 steps</MarkerContent>
-          </Marker>
+          <StatusLine>Plan approved · 3 steps</StatusLine>
           <Marker
             className="rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-meta text-destructive"
             role="alert"

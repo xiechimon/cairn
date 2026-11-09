@@ -81,24 +81,24 @@ const SEMANTIC = [
 const TYPE = [
   {
     name: 'Greeting',
-    cls: 'font-serif text-greeting font-semibold tracking-[-0.01em]',
+    cls: 'voice-greeting text-greeting',
     sample: 'Good afternoon, ian',
     token: '--type-greeting',
-    weight: 600,
+    weight: 360,
   },
   {
     name: 'Page',
-    cls: 'font-serif text-page font-semibold',
+    cls: 'voice-title text-page',
     sample: 'Waiting on you',
     token: '--type-page',
-    weight: 600,
+    weight: 500,
   },
   {
     name: 'Brand',
-    cls: 'font-heading text-page font-title',
+    cls: 'voice-title text-brand',
     sample: 'Cairn',
-    token: '--type-page',
-    weight: 650,
+    token: '--type-brand',
+    weight: 500,
   },
   {
     name: 'Heading',
@@ -106,6 +106,13 @@ const TYPE = [
     sample: 'Threads',
     token: '--type-heading',
     weight: 650,
+  },
+  {
+    name: 'Response',
+    cls: 'voice-response text-card-title',
+    sample: 'Round 6 found no /work in the orb; fixed, round 7 is running.',
+    token: '--type-card-title',
+    weight: 400,
   },
   {
     name: 'Card title',
@@ -145,7 +152,7 @@ const RADII = [
   },
   { use: 'Cards', expr: 'var(--radius-card)', token: '--radius-card' },
   {
-    use: 'Menus, dialogs, composer, Coordinator window',
+    use: 'Menus, dialogs, composer',
     expr: 'var(--radius-popover)',
     token: '--radius-popover',
   },
@@ -155,7 +162,6 @@ const MOTION = [
   { name: 'Hover and press', dur: '--dur-fast', ease: '--ease-standard' },
   { name: 'Dialog opens', dur: '--dur-overlay', ease: '--ease-standard' },
   { name: 'Card lifts', dur: null, ease: '--ease-out-expo' },
-  { name: 'Coordinator window grows', dur: '--dur-overlay', ease: '--ease-drawer' },
 ];
 
 const ELEVATIONS = [

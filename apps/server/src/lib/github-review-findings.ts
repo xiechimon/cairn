@@ -5,8 +5,14 @@ import {
   reviewFindingBadge,
 } from '@cairn/shared';
 import { z } from 'zod';
-import { type FetchLike, GithubRateLimitedError, githubGraphql } from './github.js';
+import {
+  type FetchLike,
+  GithubRateLimitedError,
+  githubGraphql,
+  githubGraphqlRead,
+} from './github.js';
 import { githubApiBaseUrl } from './github-api-base.js';
+import { type AutonomousToken, githubAppBotLogin, githubTokenFetch } from './github-token.js';
 
 const pageInfo = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() });
 const pullSchema = z.object({
@@ -18,26 +24,30 @@ const pullSchema = z.object({
     nodes: z.array(z.object({ name: z.string() })),
     pageInfo: z.object({ hasNextPage: z.literal(false) }),
   }),
-  timelineItems: z.object({
-    nodes: z
-      .array(
-        z.discriminatedUnion('__typename', [
-          z.object({
-            __typename: z.literal('PullRequestCommit'),
-            commit: z.object({ oid: z.string().min(1) }),
-          }),
-          z.object({
-            __typename: z.literal('HeadRefForcePushedEvent'),
-            afterCommit: z.object({ oid: z.string().min(1) }),
-          }),
-          z.object({
-            __typename: z.literal('UnlabeledEvent'),
-            label: z.object({ name: z.string() }),
-          }),
-        ]),
-      )
-      .max(50),
-  }),
+  timelineItems: z
+    .object({
+      nodes: z.array(
+        z.object({
+          __typename: z.string(),
+          actor: z
+            .object({ login: z.string(), __typename: z.string().optional() })
+            .nullable()
+            .optional(),
+          label: z.object({ name: z.string() }).optional(),
+          createdAt: z.string().optional(),
+          commit: z
+            .object({
+              oid: z.string(),
+              committedDate: z.string().optional(),
+              pushedDate: z.string().nullable().optional(),
+            })
+            .optional(),
+          afterCommit: z.object({ oid: z.string() }).nullable().optional(),
+        }),
+      ),
+      pageInfo: z.object({ hasPreviousPage: z.boolean() }).optional(),
+    })
+    .optional(),
   reviewThreads: z.object({
     pageInfo,
     nodes: z.array(
@@ -60,7 +70,15 @@ const pullSchema = z.object({
   }),
 });
 
-const query = `query($owner:String!,$name:String!,$number:Int!,$after:String,$label:String!){repository(owner:$owner,name:$name){label(name:$label){id} pullRequest(number:$number){id state isDraft headRefOid timelineItems(itemTypes:[PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT,UNLABELED_EVENT],last:50){nodes{__typename ... on PullRequestCommit{commit{oid}} ... on HeadRefForcePushedEvent{afterCommit{oid}} ... on UnlabeledEvent{label{name}}}} labels(first:100){nodes{name} pageInfo{hasNextPage}} reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line comments(first:1){nodes{author{__typename login} body url}}}}}}}`;
+const query = `query($owner:String!,$name:String!,$number:Int!,$after:String,$label:String!){repository(owner:$owner,name:$name){label(name:$label){id} pullRequest(number:$number){id state isDraft headRefOid timelineItems(last:100,itemTypes:[LABELED_EVENT,UNLABELED_EVENT,READY_FOR_REVIEW_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){pageInfo{hasPreviousPage} nodes{__typename ... on LabeledEvent{actor{login __typename} label{name} createdAt} ... on UnlabeledEvent{actor{login __typename} label{name} createdAt} ... on ReadyForReviewEvent{actor{login __typename} createdAt} ... on PullRequestCommit{commit{oid committedDate pushedDate}} ... on HeadRefForcePushedEvent{createdAt afterCommit{oid}}}} labels(first:100){nodes{name} pageInfo{hasNextPage}} reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line comments(first:1){nodes{author{__typename login} body url}}}}}}}`;
+
+function timelineActorLogin(
+  actor: { login: string; __typename?: string } | null | undefined,
+): string | null {
+  if (!actor) return null;
+  const login = actor.login.toLowerCase();
+  return actor.__typename === 'Bot' && !login.endsWith('[bot]') ? `${login}[bot]` : login;
+}
 
 export async function githubPrReviewFindings(
   fetch: FetchLike,
@@ -80,9 +98,8 @@ export async function githubPrReviewFindings(
         head: string;
         labels: string[];
         labelId: string | null;
-        timeline: z.infer<typeof pullSchema>['timelineItems']['nodes'];
-        overridden: boolean;
         cairnHolds: boolean;
+        humanOverride: boolean;
       }
     | undefined;
   for (;;) {
@@ -94,7 +111,7 @@ export async function githubPrReviewFindings(
         }),
       })
       .parse(
-        await githubGraphql(fetch, token, query, {
+        await githubGraphqlRead(fetch, token, query, {
           owner,
           name: repo,
           number,
@@ -108,28 +125,44 @@ export async function githubPrReviewFindings(
       pull.labels.nodes.some((label) => label.name === CAIRN_REVIEW_HOLD_LABEL)
     )
       throw new Error('GitHub review hold label inconsistent');
-    const timeline = pull.timelineItems.nodes;
-    const headIndex = timeline.findLastIndex((event) =>
-      event.__typename === 'PullRequestCommit'
-        ? event.commit.oid === pull.headRefOid
-        : event.__typename === 'HeadRefForcePushedEvent' &&
-          event.afterCommit.oid === pull.headRefOid,
+    const bot = githubAppBotLogin(token);
+    const events = pull.timelineItems?.nodes ?? [];
+    const headIndex = events.findLastIndex(
+      (event) =>
+        event.commit?.oid === pull.headRefOid || event.afterCommit?.oid === pull.headRefOid,
     );
-    const overridden = timeline
-      .slice(headIndex + 1)
-      .some(
-        (event) =>
-          event.__typename === 'UnlabeledEvent' && event.label.name === CAIRN_REVIEW_HOLD_LABEL,
+    const headEvent = events[headIndex];
+    const headTime =
+      headEvent?.createdAt ?? headEvent?.commit?.pushedDate ?? headEvent?.commit?.committedDate;
+    const lastHold = events.findLastIndex(
+      (event) =>
+        event.__typename === 'LabeledEvent' && event.label?.name === CAIRN_REVIEW_HOLD_LABEL,
+    );
+    const attributedHold = bot !== null && timelineActorLogin(events[lastHold]?.actor) === bot;
+    const humanOverride =
+      attributedHold &&
+      headIndex >= 0 &&
+      headTime !== undefined &&
+      events.some(
+        (event, index) =>
+          index > headIndex &&
+          index > lastHold &&
+          event.actor != null &&
+          timelineActorLogin(event.actor) !== bot &&
+          event.createdAt !== undefined &&
+          Date.parse(event.createdAt) > Date.parse(headTime) &&
+          (event.__typename === 'ReadyForReviewEvent' ||
+            (event.__typename === 'UnlabeledEvent' &&
+              event.label?.name === CAIRN_REVIEW_HOLD_LABEL)),
       );
     const current = {
+      humanOverride,
       id: pull.id,
       state: pull.state,
       isDraft: pull.isDraft,
       head: pull.headRefOid,
       labels: pull.labels.nodes.map((label) => label.name),
       labelId: data.repository.label?.id ?? null,
-      timeline,
-      overridden,
       cairnHolds:
         pull.isDraft && pull.labels.nodes.some((label) => label.name === CAIRN_REVIEW_HOLD_LABEL),
     };
@@ -162,7 +195,7 @@ export async function githubPrReviewFindings(
 
 export async function githubSetPullDraft(
   fetch: FetchLike,
-  token: string,
+  token: AutonomousToken,
   id: string,
   draft: boolean,
 ): Promise<void> {
@@ -180,7 +213,7 @@ export async function githubSetPullDraft(
 
 export async function githubSetReviewHoldLabel(
   fetch: FetchLike,
-  token: string,
+  token: AutonomousToken,
   id: string,
   labelId: string,
   add: boolean,
@@ -197,12 +230,12 @@ export async function githubSetReviewHoldLabel(
 
 export async function githubCreateReviewHoldLabel(
   fetch: FetchLike,
-  token: string,
+  token: AutonomousToken,
   owner: string,
   repo: string,
 ): Promise<void> {
   const url = `${githubApiBaseUrl()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/labels`;
-  const response = await fetch(url, {
+  const response = await githubTokenFetch(fetch, token)(url, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${token}`,

@@ -48,7 +48,7 @@ export function scanDiff({ staged = false, base } = {}) {
     ? null
     : git('merge-base', 'HEAD', base && !/^0{40}$/.test(base) ? base : 'origin/main').trim();
   const range = staged ? ['--cached'] : [ancestor, 'HEAD'];
-  const files = git('diff', '--no-renames', '--name-only', '-z', '--diff-filter=ACM', ...range)
+  const files = git('diff', '--no-renames', '--name-only', '-z', '--diff-filter=ACMT', ...range)
     .split('\0')
     .filter(Boolean);
   const hits = [];

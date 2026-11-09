@@ -7,28 +7,31 @@ import {
   reviewFindingBadge,
   stripWorkBranchNote,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, ne } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, project, step, threadPr, todo } from '../src/db/schema.js';
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
 import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
+import { type AppToken, type AutonomousToken, registerAppToken } from '../src/lib/github-token.js';
+import { recordAnswer } from '../src/services/answer-delivery.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
-import { createPrWakes } from '../src/services/pr-wakes.js';
+import { CAP_REVIEW_FOCUS, createPrWakes, focusedCodexReview } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
-import {
-  answerPendingWorkerQuestions,
-  writeWorkerQuestion,
-} from '../src/services/worker-question-store.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
+import { stubGithubApp } from './github-identity-fixture.js';
+import * as serverHelpers from './helpers.js';
+import { req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   for (const s of servers.splice(0)) s.dispose();
 });
 
 function fixture() {
-  const s = bootServer();
+  const s = serverHelpers.bootServer();
   servers.push(s);
   s.db
     .insert(project)
@@ -82,6 +85,8 @@ function fixture() {
     timeline: [{ __typename: 'PullRequestCommit', commit: { oid: 'abc' } }] as unknown[],
     failure: null as null | { operation: string; kind: string },
     resolved: false,
+    resolvedBy: null as string | null,
+    findingId: 'RT_1',
     outdated: false,
     login: 'chatgpt-codex-connector[bot]',
     type: 'Bot',
@@ -90,9 +95,28 @@ function fixture() {
     apply: true,
     error: '',
     page: false,
+    commentFailures: 0,
+    token: 'fake',
+    poster: 'cairnwright[bot]',
+    foreignComments: [] as { user: { login: string }; body: string }[],
   };
   const queries: string[] = [];
+  const posted: string[] = [];
   const fetch = vi.fn<FetchLike>(async (url, init) => {
+    if (init?.body && /\/issues\/3377\/comments$/.test(String(url))) {
+      if (state.commentFailures > 0) {
+        state.commentFailures -= 1;
+        throw new Error('response lost');
+      }
+      posted.push((JSON.parse(init.body) as { body: string }).body);
+      return {
+        ok: true,
+        status: 201,
+        headers: { get: () => null },
+        json: async () => ({ id: posted.length }),
+        text: async () => '',
+      };
+    }
     if (!init?.body)
       return {
         ok: true,
@@ -109,7 +133,12 @@ function fixture() {
               }
             : String(url).includes('/check-runs')
               ? { check_runs: [] }
-              : [],
+              : /\/issues\/3377\/comments/.test(String(url))
+                ? [
+                    ...state.foreignComments,
+                    ...posted.map((body) => ({ user: { login: state.poster }, body })),
+                  ]
+                : [],
         text: async () => '',
       };
     if (!String(url).endsWith('/graphql')) {
@@ -140,11 +169,20 @@ function fixture() {
     const failure = state.failure?.operation === operation ? state.failure.kind : null;
     if (failure) state.failure = null;
     if (query.includes('mutation') && state.apply && (!failure || failure === 'lost')) {
-      if (operation === 'addLabel') state.labels.push(CAIRN_REVIEW_HOLD_LABEL);
-      else if (operation === 'removeLabel') {
+      if (operation === 'addLabel') {
+        state.labels.push(CAIRN_REVIEW_HOLD_LABEL);
+        state.timeline.push({
+          __typename: 'LabeledEvent',
+          actor: { login: 'cairnwright', __typename: 'Bot' },
+          label: { name: CAIRN_REVIEW_HOLD_LABEL },
+          createdAt: '2026-11-07T01:01:00Z',
+        });
+      } else if (operation === 'removeLabel') {
         state.labels = state.labels.filter((name) => name !== CAIRN_REVIEW_HOLD_LABEL);
         state.timeline.push({
           __typename: 'UnlabeledEvent',
+          actor: { login: 'cairnwright', __typename: 'Bot' },
+          createdAt: '2026-11-07T01:02:00Z',
           label: { name: CAIRN_REVIEW_HOLD_LABEL },
         });
       } else state.draft = operation === 'convert';
@@ -160,8 +198,9 @@ function fixture() {
       reviewThreads: {
         nodes: [
           {
-            id: 'RT_1',
+            id: state.findingId,
             isResolved: state.resolved,
+            resolvedBy: state.resolvedBy ? { login: state.resolvedBy } : null,
             isOutdated: state.outdated,
             path: 'a.ts',
             line: 7,
@@ -208,7 +247,14 @@ function fixture() {
   });
   const deps = { ...s.svc, box: s.secretBox };
   const row = () => s.db.select().from(threadPr).get()!;
-  const input = () => ({ row: row(), fetch, token: 'fake', owner: 'o', repo: 'r', now: 1000 });
+  const input = () => ({
+    row: row(),
+    fetch,
+    token: state.token as AutonomousToken,
+    owner: 'o',
+    repo: 'r',
+    now: 1000,
+  });
   const reconcile = () => reconcilePrReviewFindings(deps, input());
   const wake = () =>
     createPrWakes(deps)({
@@ -218,15 +264,17 @@ function fixture() {
         merged: false,
         draft: state.draft,
         title: 'change',
+        body: '',
         htmlUrl: null,
         headSha: 'abc',
+        headRef: 'work',
         mergeableState: 'clean',
         additions: 1,
         deletions: 0,
       },
       runs: [],
     });
-  return { s, state, queries, fetch, row, reconcile, wake };
+  return { s, state, queries, posted, fetch, row, reconcile, wake };
 }
 
 test.each(['P2', 'P3'])(
@@ -238,7 +286,7 @@ test.each(['P2', 'P3'])(
     await f.wake();
     await f.wake();
     expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(1);
-    expect(f.s.db.select().from(step).all()).toHaveLength(1);
+    expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
     expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
     expect(f.s.db.select().from(step).get()?.prompt).toContain('a.ts:7');
     expect(f.s.db.select().from(step).get()?.prompt).toContain(f.state.body);
@@ -358,12 +406,138 @@ test.each([true, false])(
     await f.wake();
     await f.wake();
     expect(f.state.draft).toBe(true);
-    expect(f.s.db.select().from(step).all()).toEqual([]);
+    expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toEqual([]);
     expect(JSON.stringify(f.s.db.select().from(message).all())).toContain(
       'Review round cap (3) reached; rethink or hand to the owner.',
     );
   },
 );
+
+test('the findings wake asks for whole-class fixes in one push, P0/P1 fixed, and P2/P3 deferral only with a new issue', () => {
+  const prompt = buildReviewFindingsPrompt({ prNumber: 1, round: 2, findings: [] });
+  expect(prompt).toContain('缺陷类别');
+  expect(prompt).toContain('只推送一次');
+  expect(prompt).toContain('P0/P1 必须修复');
+  expect(prompt).toContain('`valid, out of scope for this PR, tracked in #N`');
+  expect(prompt).toContain('先新建或复用一个跟踪它的 issue');
+  expect(prompt).not.toContain('@mergifyio');
+});
+
+test('the review round cap stops wakes, lists every finding class raised, and asks Codex once for a focused full-diff pass', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 2 }, createdAt: 1 })
+    .run();
+  await f.wake();
+  expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
+  f.state.findingId = 'RT_1b';
+  await f.wake();
+  expect(f.posted).toEqual([]);
+  f.s.db.update(step).set({ status: 'done' }).run();
+  f.state.findingId = 'RT_2';
+  f.state.body = '**<sub><sub>![P2 Badge](badge)</sub></sub>** Retry path skips the @owner check';
+  await f.wake();
+  await f.wake();
+  expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
+  expect(f.posted).toHaveLength(1);
+  const [comment] = f.posted;
+  expect(comment).toContain('- Fix this');
+  expect(comment).toContain('- Retry path skips the @\u200bowner check');
+  expect(comment?.split('\n').at(-1)).toBe(focusedCodexReview(CAP_REVIEW_FOCUS));
+  expect(comment?.match(/@codex/g)).toHaveLength(1);
+  f.state.head = 'def';
+  f.s.db.update(threadPr).set({ head: 'def' }).where(eq(threadPr.id, 'pr')).run();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a failed cap comment is retried on the next poll and then posted once', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.state.commentFailures = 1;
+  await f.wake();
+  expect(f.posted).toEqual([]);
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a cap request left pending by a restart is posted once, and a delivered marker is never reposted', async () => {
+  const f = fixture();
+  registerAppToken(
+    'staging-app' as AppToken,
+    Date.now() + 3600000,
+    (inner) => inner,
+    'cairn-staging',
+  );
+  f.state.token = 'staging-app';
+  f.state.poster = 'cairn-staging[bot]';
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({
+      id,
+      conversationId: id,
+      role: 'system',
+      content: { reviews: 3, capRequest: 'pending' },
+      createdAt: 1,
+    })
+    .run();
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+  f.s.db
+    .update(message)
+    .set({ content: { reviews: 3, capRequest: 'pending' } })
+    .where(eq(message.id, id))
+    .run();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a cap marker written by someone else does not count as delivered', async () => {
+  const f = fixture();
+  registerAppToken(
+    'staging-app' as AppToken,
+    Date.now() + 3600000,
+    (inner) => inner,
+    'cairn-staging',
+  );
+  f.state.token = 'staging-app';
+  f.state.poster = 'cairn-staging[bot]';
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.state.foreignComments.push(
+    { user: { login: 'drive-by' }, body: '<!-- cairn:review-cap --> fake' },
+    { user: { login: 'cairnwright[bot]' }, body: '<!-- cairn:review-cap --> other deployment' },
+  );
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('the cap is still delivered after the total wake cap turned Auto-fix off during the third round', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.s.db.update(threadPr).set({ autoFix: false }).where(eq(threadPr.id, 'pr')).run();
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+  expect(f.s.db.select().from(step).all()).toEqual([]);
+});
 
 test('autoFix off still holds, notifies and later releases', async () => {
   const f = fixture();
@@ -400,7 +574,7 @@ test('pending blocking worker question prevents release until answered', async (
   await f.reconcile();
   expect(f.state.draft).toBe(true);
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(false);
-  expect(answerPendingWorkerQuestions({ db: f.s.db }, 'b', 'Proceed')).toBe(true);
+  recordAnswer({ db: f.s.db }, 'b', 'question', { text: 'Proceed', by: 'person' });
   await f.reconcile();
   expect(f.state.draft).toBe(false);
   expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);
@@ -461,7 +635,7 @@ test('shared matcher, badges and prompts preserve the ready boundary', () => {
   expect(note).toContain('Codex');
   expect(note).toContain('draft');
   expect(stripWorkBranchNote(`task\n${note}`)).toBe('task');
-  const old = note.slice(0, note.indexOf('\n开 PR 后'));
+  const old = note.slice(note.indexOf('工作分支注记'), note.indexOf('\n'));
   expect(stripWorkBranchNote(`task\n${old}`)).toBe('task');
   expect(buildReviewFindingsPrompt({ prNumber: 1, round: 1, findings: [] })).toContain(
     'addPullRequestReviewThreadReply',
@@ -538,7 +712,6 @@ test('Codex findings bypass permission while a human without write access is ign
 const cleanSnapshot = {
   state: 'OPEN',
   isDraft: true,
-  overridden: false,
   labels: [CAIRN_REVIEW_HOLD_LABEL] as string[],
   findings: [] as {
     id: string;
@@ -564,12 +737,6 @@ test('desiredAction covers every ordered rule and release blocker', () => {
     [cleanSnapshot, idleLocal, 'markReady'],
     [{ ...cleanSnapshot, isDraft: false, labels: [], findings: [finding] }, idleLocal, 'addLabel'],
     [{ ...cleanSnapshot, isDraft: false, findings: [finding] }, idleLocal, 'convertToDraft'],
-    [{ ...cleanSnapshot, overridden: true, findings: [finding] }, idleLocal, null],
-    [
-      { ...cleanSnapshot, overridden: true, isDraft: false, labels: [], findings: [finding] },
-      idleLocal,
-      null,
-    ],
     [{ ...cleanSnapshot, findings: [finding] }, idleLocal, null],
     [{ ...cleanSnapshot, isDraft: false }, idleLocal, 'removeLabel'],
     [{ ...cleanSnapshot, labels: [] }, idleLocal, null],
@@ -587,6 +754,11 @@ test('desiredAction covers every ordered rule and release blocker', () => {
 });
 
 test('each failed transition converges in exactly the remaining clean polls', async () => {
+  const boots = vi.spyOn(serverHelpers, 'bootServer');
+  const f = fixture();
+  const initial = structuredClone(f.state);
+  vi.useFakeTimers();
+  const now = Date.now();
   for (const operation of [
     'snapshot',
     'createLabel',
@@ -596,7 +768,8 @@ test('each failed transition converges in exactly the remaining clean polls', as
     'removeLabel',
   ]) {
     for (const kind of ['http', 'graphql', 'lost']) {
-      const f = fixture();
+      Object.assign(f.state, structuredClone(initial));
+      f.queries.length = 0;
       const poll = async (fails = false) => {
         const before = f.queries.length;
         if (fails && operation === 'snapshot') await expect(f.reconcile()).rejects.toThrow();
@@ -622,42 +795,65 @@ test('each failed transition converges in exactly the remaining clean polls', as
       for (let i = 0; i < remaining; i++) await poll();
       expect(f.state.draft).toBe(!f.state.resolved);
       expect(f.state.labels.includes(CAIRN_REVIEW_HOLD_LABEL)).toBe(!f.state.resolved);
-      f.s.dispose();
-      servers.splice(servers.indexOf(f.s), 1);
+      expect(f.s.db.select().from(step).all()).toEqual([]);
+      expect(f.s.db.select().from(message).all()).toEqual([]);
     }
   }
+  expect(boots).toHaveBeenCalledTimes(1);
+  expect(Date.now()).toBe(now);
+  expect(vi.getTimerCount()).toBe(0);
 });
 
-test.each([false, true])(
-  'human removal overrides a held head, including ready=%s',
-  async (ready) => {
-    const f = fixture();
-    await f.reconcile();
-    await f.reconcile();
-    f.state.labels = [];
-    f.state.timeline.push({
-      __typename: 'UnlabeledEvent',
-      label: { name: CAIRN_REVIEW_HOLD_LABEL },
-    });
-    f.state.draft = !ready;
-    const before = f.queries.length;
-    await f.reconcile();
-    expect(f.queries.slice(before).some((q) => q.includes('mutation'))).toBe(false);
-    f.state.resolved = true;
-    await f.reconcile();
-    expect(f.state.draft).toBe(!ready);
-    f.state.resolved = false;
-    f.state.head = 'new';
-    f.state.timeline.push({ __typename: 'HeadRefForcePushedEvent', afterCommit: { oid: 'new' } });
-    f.state.draft = false;
-    await f.reconcile();
-    expect(f.state.labels).toContain(CAIRN_REVIEW_HOLD_LABEL);
-    await f.reconcile();
-    expect(f.state.draft).toBe(true);
-  },
-);
+test('human label removal on a ready PR with findings re-adds the label and converts to draft', async () => {
+  const f = fixture();
+  await f.reconcile();
+  await f.reconcile();
+  f.state.labels = [];
+  f.state.timeline.push({
+    __typename: 'UnlabeledEvent',
+    label: { name: CAIRN_REVIEW_HOLD_LABEL },
+  });
+  f.state.draft = false;
+  const before = f.queries.length;
+  await f.reconcile();
+  expect(f.state.labels).toEqual([CAIRN_REVIEW_HOLD_LABEL]);
+  expect(f.state.draft).toBe(false);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.queries.slice(before).filter((q) => q.includes('mutation'))).toEqual([
+    expect.stringContaining('addLabelsToLabelable'),
+    expect.stringContaining('convertPullRequestToDraft'),
+  ]);
+});
 
-test('marking a held PR ready retains the hold until findings resolve', async () => {
+test('a new finding on the same head re-holds after cairn releases and removes the label', async () => {
+  const f = fixture();
+  const head = f.state.head;
+  await f.reconcile();
+  expect(f.state.labels).toEqual([CAIRN_REVIEW_HOLD_LABEL]);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  f.state.resolved = true;
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+  await f.reconcile();
+  expect(f.state.labels).toEqual([]);
+  f.state.resolved = false;
+  f.state.findingId = 'RT_2';
+  const before = f.queries.length;
+  await f.reconcile();
+  expect(f.state.labels).toEqual([CAIRN_REVIEW_HOLD_LABEL]);
+  expect(f.state.draft).toBe(false);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.state.head).toBe(head);
+  expect(f.queries.slice(before).filter((q) => q.includes('mutation'))).toEqual([
+    expect.stringContaining('addLabelsToLabelable'),
+    expect.stringContaining('convertPullRequestToDraft'),
+  ]);
+});
+
+test('a human marking a held PR ready is converted back until findings resolve', async () => {
   const f = fixture();
   await f.reconcile();
   await f.reconcile();
@@ -670,23 +866,24 @@ test('marking a held PR ready retains the hold until findings resolve', async ()
   expect(f.state.labels).toEqual([]);
 });
 
-test.each([
-  [[], false],
-  [[{ __typename: 'UnlabeledEvent', label: { name: CAIRN_REVIEW_HOLD_LABEL } }], true],
-  [[{ __typename: 'UnlabeledEvent', label: { name: 'other' } }], false],
-  [
-    [
-      { __typename: 'UnlabeledEvent', label: { name: CAIRN_REVIEW_HOLD_LABEL } },
-      { __typename: 'PullRequestCommit', commit: { oid: 'abc' } },
-    ],
-    false,
-  ],
-])('timeline window derives head override from %j', async (timeline, overridden) => {
+test('review snapshots request actor timeline evidence', async () => {
   const f = fixture();
-  f.state.timeline = timeline;
+  const implementation = f.fetch.getMockImplementation()!;
+  f.fetch.mockImplementation(async (url, init) => {
+    const response = await implementation(url, init);
+    const data = (await response.json()) as {
+      data: { repository: { pullRequest: { timelineItems?: unknown } } };
+    };
+    delete data.data.repository.pullRequest.timelineItems;
+    return { ...response, json: async () => data };
+  });
   const snapshot = await githubPrReviewFindings(f.fetch, 'fake', 'o', 'r', 3377);
-  expect(snapshot.overridden).toBe(overridden);
-  expect(snapshot.cairnHolds).toBe(false);
+  expect(snapshot.findings).toHaveLength(1);
+  expect(snapshot).not.toHaveProperty('overridden');
+  expect(snapshot).not.toHaveProperty('timeline');
+  expect(f.queries[0]).toMatch(
+    /timelineItems|UNLABELED_EVENT|PULL_REQUEST_COMMIT|HEAD_REF_FORCE_PUSHED_EVENT/,
+  );
 });
 
 test('already-existing label creation is a successful one-write poll', async () => {
@@ -742,7 +939,7 @@ test('mutation rate limits propagate through the wake', async () => {
   expect(f.s.db.select().from(step).all()).toEqual([]);
 });
 
-test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])(
+test.each(['label', 'labels', 'changed', 'repeated', 'later-error'])(
   'incomplete or inconsistent snapshot fails closed: %s',
   async (failure) => {
     const f = fixture();
@@ -756,7 +953,6 @@ test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])
             label?: unknown;
             pullRequest: {
               isDraft: boolean;
-              timelineItems?: unknown;
               labels: { pageInfo: { hasNextPage: boolean } };
               reviewThreads: { pageInfo: { hasNextPage: boolean; endCursor: string | null } };
             };
@@ -766,7 +962,6 @@ test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])
       const pull = result.data.repository.pullRequest;
       page += 1;
       if (failure === 'label') delete result.data.repository.label;
-      if (failure === 'timeline') delete pull.timelineItems;
       if (failure === 'labels') pull.labels.pageInfo.hasNextPage = true;
       if (['changed', 'repeated', 'later-error'].includes(failure)) {
         if (page === 1 || failure === 'repeated')
@@ -781,14 +976,18 @@ test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])
   },
 );
 
-test.each(['createLabel', 'addLabel'])('failed %s preserves the review wake', async (operation) => {
-  for (const kind of ['http', 'graphql', 'lost']) {
-    const f = fixture();
-    if (operation === 'createLabel') f.state.labelId = null;
-    f.state.failure = { operation, kind };
-    await f.wake();
-    expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
-  }
+test.each(
+  ['createLabel', 'addLabel'].flatMap((operation) =>
+    ['http', 'graphql', 'lost'].map((kind) => ({ operation, kind })),
+  ),
+)('failed $operation preserves the review wake: $kind', async ({ operation, kind }) => {
+  const boots = vi.spyOn(serverHelpers, 'bootServer');
+  const f = fixture();
+  if (operation === 'createLabel') f.state.labelId = null;
+  f.state.failure = { operation, kind };
+  await f.wake();
+  expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
+  expect(boots).toHaveBeenCalledTimes(1);
 });
 
 test.each([false, true])(
@@ -831,3 +1030,119 @@ test.each([429, 403])(
     expect(f.s.db.select().from(step).all()).toEqual([]);
   },
 );
+
+test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
+  'PR watch G14 writes use the trigger identity when App reason is %s',
+  async (reason) => {
+    const f = fixture();
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const app = stubGithubApp(reason);
+    upsertGithubConnection(
+      { db: f.s.db, box: f.s.secretBox },
+      {
+        teamId: f.s.team.id,
+        login: 'human',
+        accessToken: 'identity-test-user',
+        scope: 'repo',
+      },
+    );
+    const watcher = createPrWatch({ ...f.s.svc, box: f.s.secretBox }, { githubFetch: f.fetch });
+    await watcher.sweep();
+    await watcher.sweep();
+    const writes = f.fetch.mock.calls.filter(([, init]) => init?.body?.includes('mutation'));
+    expect(writes.length).toBeGreaterThan(0);
+    expect(
+      writes.every(
+        ([, init]) =>
+          init?.headers?.authorization === `Bearer ${reason === null ? app : 'identity-test-user'}`,
+      ),
+    ).toBe(true);
+    if (reason !== null) {
+      expect(log).toHaveBeenCalledWith(
+        'github write unattributed',
+        expect.objectContaining({ reason, owner: 'o', repo: 'r' }),
+      );
+      expect(JSON.stringify(log.mock.calls).includes('identity-test-user')).toBe(false);
+    }
+  },
+);
+
+test.each(['app-removal', 'human-removal', 'human-ready', 'unattributed', 'new-head'])(
+  'actor override convergence: %s',
+  async (scenario) => {
+    const f = fixture();
+    registerAppToken('fake' as AppToken, Date.now() + 3600000, (inner) => inner, 'cairnwright');
+    f.state.timeline = [
+      {
+        __typename: 'PullRequestCommit',
+        commit: { oid: 'abc', committedDate: '2026-11-07T01:00:00Z', pushedDate: null },
+      },
+      {
+        __typename: 'LabeledEvent',
+        actor: {
+          login: scenario === 'unattributed' ? 'human' : 'Cairnwright',
+          __typename: scenario === 'unattributed' ? 'User' : 'Bot',
+        },
+        label: { name: CAIRN_REVIEW_HOLD_LABEL },
+        createdAt: '2026-11-07T01:01:00Z',
+      },
+      {
+        __typename: scenario === 'human-ready' ? 'ReadyForReviewEvent' : 'UnlabeledEvent',
+        actor: {
+          login: scenario === 'app-removal' ? 'cairnwright' : 'human',
+          __typename: scenario === 'app-removal' ? 'Bot' : 'User',
+        },
+        label: { name: CAIRN_REVIEW_HOLD_LABEL },
+        createdAt: '2026-11-07T01:02:00Z',
+      },
+    ];
+    if (scenario === 'human-ready') f.state.labels = [CAIRN_REVIEW_HOLD_LABEL];
+    if (scenario === 'new-head') {
+      f.state.head = 'next';
+      f.state.timeline.push({
+        __typename: 'PullRequestCommit',
+        commit: { oid: 'next', committedDate: '2026-11-07T01:03:00Z', pushedDate: null },
+      });
+    }
+    await f.reconcile();
+    const overridden = ['human-removal', 'human-ready'].includes(scenario);
+    expect(f.queries.some((q) => q.includes('mutation'))).toBe(!overridden);
+  },
+);
+test.each(['human', 'cairnwright[bot]'])(
+  'resolved threads are not findings regardless of resolver: %s',
+  async (resolver) => {
+    const f = fixture();
+    f.state.resolved = true;
+    f.state.resolvedBy = resolver;
+    expect(await f.reconcile()).toEqual([]);
+    f.state.resolved = false;
+    expect(await f.reconcile()).toHaveLength(1);
+    expect(f.queries.some((query) => query.includes('addLabelsToLabelable'))).toBe(true);
+  },
+);
+
+test('App release converges and a same-head new finding re-holds', async () => {
+  const f = fixture();
+  registerAppToken('fake' as AppToken, Date.now() + 3600000, (inner) => inner, 'cairnwright');
+  f.state.timeline = [
+    {
+      __typename: 'PullRequestCommit',
+      commit: { oid: 'abc', committedDate: '2026-11-07T01:00:00Z', pushedDate: null },
+    },
+  ];
+  await f.reconcile();
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  f.state.resolved = true;
+  await f.reconcile();
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+  expect(f.state.labels).toEqual([]);
+  f.state.findingId = 'RT_new';
+  f.state.resolved = false;
+  await f.reconcile();
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.state.labels).toContain(CAIRN_REVIEW_HOLD_LABEL);
+});

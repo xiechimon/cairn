@@ -23,6 +23,14 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
   if (trimmed === '') return 'other';
   const lower = trimmed.toLowerCase();
 
+  if (
+    /\bmodel\s+[^\n]+?\s+not found\b/.test(lower) ||
+    /unsupported[ _-]model/.test(lower) ||
+    /\bmodel(?:\s+["'][^"']+["'])?\s+(?:is\s+)?not supported\b/.test(lower) ||
+    containsAny(lower, ['model_not_found', 'model_not_supported'])
+  )
+    return 'model_unavailable';
+
   if (lower.includes('concurrent request limit')) return 'capacity';
 
   if (

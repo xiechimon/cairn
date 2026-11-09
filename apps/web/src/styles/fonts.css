@@ -45,8 +45,11 @@
 
 :root {
   --font-instrument-sans: "instrumentSans", "instrumentSans Fallback";
-  --font-source-serif: "sourceSerif4", Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+  --font-source-serif:
+    "sourceSerif4", Georgia, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Noto Sans CJK SC", serif;
   --font-jetbrains-mono: "jetbrainsMono", "jetbrainsMono Fallback";
+  --font-system-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 :root:not(.light) .optical-medium {

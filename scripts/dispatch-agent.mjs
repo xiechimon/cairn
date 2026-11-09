@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectTicketSources, findTicketConflicts } from './dispatch-dedupe.mjs';
+import { launchOwnedDetached } from './owned-process.mjs';
 
 const START_GRACE_MS = Number(process.env.CAIRN_DISPATCH_START_GRACE_MS) || 500;
 const WAIT_POLL_MS = 500;
@@ -15,8 +16,9 @@ const USAGE = `Usage:
   node scripts/dispatch-agent.mjs check <id>
   node scripts/dispatch-agent.mjs wait <id> [--timeout-s <n>]
 
-start spawns the command in its own session (it survives the process-group
-teardown that kills ( ... & ) / nohup jobs when a tool call returns), verifies
+start spawns the command through scripts/owned-process.mjs bound to the agent
+session (it survives the tool call that started it and dies with the claude or
+codex process that owns the session, or at the 12h runtime ceiling), verifies
 the process right away and writes <status-dir>/<id>.json. The default status
 dir is $TMPDIR/cairn-dispatch; override with CAIRN_DISPATCH_STATUS_DIR.
 Command output is written to <status-dir>/<id>.log. check re-verifies the
@@ -247,12 +249,16 @@ if (subcommand === 'record-exit') {
     alive: false,
     checkedAt: startedAt,
   });
-  const child = spawn(process.execPath, [SCRIPT, 'record-exit', statusPath, '--', ...command], {
-    cwd: workCwd,
-    detached: true,
-    stdio: ['ignore', logFd, logFd],
-    env: { ...process.env, CAIRN_DISPATCH_RECORD_CWD: workCwd },
-  });
+  const child = launchOwnedDetached(
+    process.execPath,
+    [SCRIPT, 'record-exit', statusPath, '--', ...command],
+    {
+      cwd: workCwd,
+      stdio: ['ignore', logFd, logFd],
+      env: { ...process.env, CAIRN_DISPATCH_RECORD_CWD: workCwd },
+      name: `dispatch-${id}`,
+    },
+  );
   let exited = false;
   let exitCode = null;
   child.once('exit', (code, signal) => {
@@ -272,7 +278,6 @@ if (subcommand === 'record-exit') {
     exited = true;
     exitCode = 1;
   });
-  child.unref();
   await new Promise((resolve) => {
     setTimeout(resolve, START_GRACE_MS);
   });

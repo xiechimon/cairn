@@ -305,6 +305,7 @@ test('folded gates stay visibly red, continue after failures and retain full his
     ['Comment discipline gate (advisory, #1520)', 'COMMENT_DISCIPLINE_BASE_SHA'],
     ['Probe reach gate (advisory, #1542)', 'VP_REACH_BASE_SHA'],
     ['Dispatch agent start/check round trip (#1556)'],
+    ['Feature map covers every route and stays in step with the code', 'FEATURE_REGISTRY_BASE_SHA'],
     ['Gardener sweep self-test (#1617)'],
   ];
   for (const [name, variable] of expected) {
@@ -350,7 +351,11 @@ for (const [name, paths, expected] of [
 
 test('testsRead finds a doc a test names in the real tree and not an unread one', () => {
   assert.equal(testsRead('docs/pr-review.md'), true);
-  assert.equal(testsRead(['docs', 'research', 'duet-proactive-coordinator.md'].join('/')), false);
+  assert.equal(testsRead(['docs', 'research', 'xmon48-filter-panel-closure.md'].join('/')), false);
+});
+
+test('testsRead counts a note the feature registry cites, so deleting it runs the gates', () => {
+  assert.equal(testsRead(['docs', 'research', 'duet-proactive-coordinator.md'].join('/')), true);
 });
 
 test('documentation skips code checks, unknown paths fail closed', () => {

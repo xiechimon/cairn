@@ -16,12 +16,16 @@ import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
 import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
-import { jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
+import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
-import { pauseTeamGithubRepos } from './services/github-autonomy-brake.js';
+import {
+  openAutonomyPauses,
+  pauseTeamGithubRepos,
+  resumeAutonomyPauses,
+} from './services/github-autonomy-brake.js';
 import { getModelRouting } from './services/model-routing.js';
 import {
   listUnreadEntityIds,
@@ -68,7 +72,12 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(
       row === undefined
         ? []
-        : [{ ...toTeamRecord(row), firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, row.id) }],
+        : [
+            {
+              ...toTeamRecord(row, openAutonomyPauses(ctx.db, row.id)),
+              firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, row.id),
+            },
+          ],
     );
   });
 
@@ -114,12 +123,25 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (body.claudeUsage !== undefined) {
       ctx.db.update(team).set({ claudeUsage: body.claudeUsage }).where(eq(team.id, id)).run();
     }
-    if (body.autonomyPaused !== undefined) {
-      ctx.db.update(team).set({ autonomyPaused: body.autonomyPaused }).where(eq(team.id, id)).run();
+    if (body.coAuthorTrailer !== undefined) {
+      ctx.db
+        .update(team)
+        .set({ coAuthorTrailer: body.coAuthorTrailer })
+        .where(eq(team.id, id))
+        .run();
     }
+    if (body.requestInstructorReview !== undefined) {
+      ctx.db
+        .update(team)
+        .set({ requestInstructorReview: body.requestInstructorReview })
+        .where(eq(team.id, id))
+        .run();
+    }
+    if (body.autonomyPaused === false) resumeAutonomyPauses(ctx.db, id);
     if (body.autonomyPaused === true) {
       await pauseTeamGithubRepos(
         {
+          ...githubAppOf(ctx),
           db: ctx.db,
           box: ctx.secretBox,
           githubFetch: ctx.githubFetch,
@@ -139,7 +161,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const row = ctx.db.select().from(team).where(eq(team.id, id)).get();
     return c.json({
       ...ctx.team,
-      ...(row === undefined ? {} : toTeamRecord(row)),
+      ...(row === undefined ? {} : toTeamRecord(row, openAutonomyPauses(ctx.db, id))),
       firstPrReportPrompt: prompt,
     });
   });

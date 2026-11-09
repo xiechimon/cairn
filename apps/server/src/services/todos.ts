@@ -1,10 +1,12 @@
 import type {
   GithubRepoRef,
+  GitIdentity,
   Phase,
   RouteOverride,
   SecretBox,
   TodoOutputKind,
   TodoRecord,
+  TodoSection,
   TodoSourceKind,
   UserRecord,
 } from '@cairn/shared';
@@ -31,36 +33,50 @@ import {
   step,
   stopPending,
   tag,
+  taskIssueClose,
   todo,
   todoTag,
   tokenUsage,
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
+import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
+import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import { assertCorrectionDone } from './correction.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { hasGithubConnection, teamGithubToken } from './github-connection.js';
+import { autonomousToken } from './github-autonomous-token.js';
+import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
+import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
+import { ownershipOf, reconcileOwners, sectionOf } from './owner.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
 import { profileForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
-import { endSnoozeOn } from './snooze.js';
-import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 import { buildVerified } from './verified.js';
 import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
+const QUESTION_ABANDONING_PHASES: readonly Phase[] = ['todo', 'done', 'closed'];
+
+export function abandonsQuestions(to: Phase): boolean {
+  return QUESTION_ABANDONING_PHASES.includes(to);
+}
+
 export interface TodoDeps {
+  githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
+  githubWriteTokenForRepo?: (
+    teamId: string,
+    repo: GithubRepoRef,
+  ) => Promise<GithubWriteToken | null>;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -74,14 +90,16 @@ export interface TodoDeps {
 
 function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: Phase): void {
   if (from === to) return;
-  if (to === 'confirm' || to === 'review' || to === 'failed')
-    endSnoozeOn(deps, record.id, 'needs-you');
-  if (isNotifiedPhase(to)) notifyTodoPhase(deps, record, to);
+  if (to === 'done') notifyTodo(deps, record, 'todo_done');
+  reconcileOwners(deps, [record.id]);
   triggerChiefWakes(deps, record, to);
-  notifyThreadPhase(deps, record, to);
 }
 
-export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoRecord {
+export function toTodoRecord(
+  deps: Pick<TodoDeps, 'db'>,
+  row: TodoRow,
+  now = nowMs(),
+): TodoRecord & { section: TodoSection | null } {
   const { db } = deps;
   const tagIds = db
     .select({ tagId: todoTag.tagId })
@@ -115,6 +133,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     }
   }
   const waitingOn = waitingOnOf(deps, row);
+  const ownership = ownershipOf(db, row);
   const usage = db
     .select({
       rows: sql<number>`count(*)`,
@@ -140,7 +159,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     archivedAt: row.archivedAt,
     snoozedUntil: row.snoozedUntil,
     snoozeMode: row.snoozeMode,
-    ...(row.awaitingReply ? { awaitingReply: true } : {}),
+    ...(row.decisions.length > 0 ? { decisions: row.decisions } : {}),
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
@@ -158,6 +177,8 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
     output: row.output,
+    owner: ownership?.owner ?? null,
+    section: sectionOf(row, ownership, now),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     ...((row.phase === 'done' || row.phase === 'closed') && row.latestBuildId !== null
       ? { verified: buildVerified(db, row.latestBuildId) }
@@ -229,6 +250,7 @@ export function setTodoArchived(deps: TodoDeps, id: string, archived: boolean): 
     .where(eq(todo.id, id))
     .run();
   if (archived) pauseTodoSchedule(deps, id, ARCHIVED_SCHEDULE_PAUSE_REASON);
+  reconcileOwners(deps, [id]);
   const record = getTodo(deps, id);
   if (record) deps.hub.publishTodoDoc(record.teamId, record);
   return record;
@@ -273,6 +295,16 @@ function assertTagsInProject(db: Db, projectId: string, tagIds: readonly string[
 }
 
 export function createTodo(
+  deps: TodoDeps,
+  input: Parameters<typeof createAutonomousTodo>[1],
+): TodoRecord {
+  return createAutonomousTodo(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    input,
+  );
+}
+
+export function createAutonomousTodo(
   deps: TodoDeps,
   input: {
     teamId: string;
@@ -321,7 +353,6 @@ export function createTodo(
       seqNum,
       orderIndex: (orderRow?.n ?? -1) + 1,
       latestBuildId: null,
-      awaitingReply: false,
       lastRunAt: null,
       hasChanges: false,
       hasPlan: false,
@@ -359,6 +390,20 @@ export function createTodo(
 }
 
 export function updateTodo(
+  deps: TodoDeps,
+  id: string,
+  patch: Parameters<typeof updateAutonomousTodo>[2],
+  opts: Parameters<typeof updateAutonomousTodo>[3] = {},
+): TodoRecord | null {
+  return updateAutonomousTodo(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    id,
+    patch,
+    opts,
+  );
+}
+
+export function updateAutonomousTodo(
   deps: TodoDeps,
   id: string,
   patch: {
@@ -402,6 +447,7 @@ export function updateTodo(
   }
   let manualPhaseApplied = false;
   if (patch.phase !== undefined && patch.phase !== row.phase) {
+    sets.supersededBy = null;
     manualPhaseApplied = opts.manualPhase === true && canManualMovePhase(row.phase, patch.phase);
     if (!manualPhaseApplied) assertPhaseTransition(row.phase, patch.phase);
     if (row.phase === 'failed' && patch.phase === 'review') {
@@ -452,7 +498,14 @@ export function updateTodo(
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
-  if (move?.closeIssueRef != null) scheduleMovedIssueClose(deps, row.teamId, move);
+  if (move?.closeIssueRef != null) {
+    queueIssueClose(
+      deps.db,
+      row.teamId,
+      move.closeIssueRef,
+      `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
+    );
+  }
   if (move !== null && record.sourceKind === 'github-issue-self') {
     scheduleSelfIssueCreate(deps, id);
   }
@@ -511,36 +564,20 @@ function planProjectMove(
   };
 }
 
-function scheduleMovedIssueClose(deps: TodoDeps, teamId: string, move: ProjectMove): void {
-  const parsed = move.closeIssueRef === null ? null : parseGithubIssueSourceRef(move.closeIssueRef);
-  if (parsed === null || deps.box === undefined) return;
-  void teamGithubToken(deps, teamId)
-    .then((access) =>
-      'token' in access
-        ? githubCloseIssue(
-            deps.githubFetch ?? fetch,
-            access.token,
-            parsed.owner,
-            parsed.repo,
-            parsed.issueNumber,
-            `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
-          )
-        : console.warn(`moved todo: no GitHub token to close ${move.closeIssueRef}`),
-    )
-    .catch((error: unknown) =>
-      console.warn(`moved todo: closing ${move.closeIssueRef} failed`, error),
-    );
+export function queueIssueClose(db: Db, teamId: string, sourceRef: string, comment: string): void {
+  db.insert(taskIssueClose)
+    .values({ id: newRecordId(), teamId, sourceRef, comment, createdAt: nowMs() })
+    .run();
 }
+
+export const DELETED_TASK_ISSUE_COMMENT = 'Cairn：这个任务已删除，这里的 issue 关闭（未计划）。';
 
 export function setTodoPhase(
   deps: TodoDeps,
   id: string,
   to: Phase,
   extra: Partial<
-    Pick<
-      TodoRow,
-      'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'routeOverride' | 'awaitingReply'
-    >
+    Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'routeOverride'>
   > = {},
   options: { landedMerge?: true } = {},
 ): TodoRecord | null {
@@ -551,21 +588,21 @@ export function setTodoPhase(
     const changed = (Object.keys(extra) as (keyof typeof extra)[]).filter(
       (k) => extra[k] !== undefined && JSON.stringify(extra[k]) !== JSON.stringify(row[k]),
     );
-    if (changed.length === 0) return getTodo(deps, id);
-    db.update(todo)
-      .set({ ...extra, v: row.v + 1 })
-      .where(eq(todo.id, id))
-      .run();
+    if (changed.length > 0) {
+      db.update(todo)
+        .set({ ...extra, v: row.v + 1 })
+        .where(eq(todo.id, id))
+        .run();
+    }
+    reconcileOwners(deps, [id]);
     const record = getTodo(deps, id);
-    if (!record) return null;
-    deps.hub.publishTodoDoc(record.teamId, record);
+    if (record && changed.length > 0) deps.hub.publishTodoDoc(record.teamId, record);
     return record;
   }
   assertPhaseTransition(row.phase, to);
   if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
-  const leavesQuestion = row.awaitingReply && to !== 'review' && extra.awaitingReply === undefined;
   return db.transaction(() => {
-    if (leavesQuestion && row.latestBuildId !== null) {
+    if (abandonsQuestions(to) && row.latestBuildId !== null) {
       cancelPendingWorkerQuestions(
         deps,
         row.latestBuildId,
@@ -575,7 +612,6 @@ export function setTodoPhase(
     db.update(todo)
       .set({
         ...extra,
-        ...(leavesQuestion ? { awaitingReply: false } : {}),
         phase: to,
         phaseAt: nowMs(),
         v: row.v + 1,
@@ -711,6 +747,9 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
     db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
     db.delete(step).where(inArray(step.buildId, buildIds)).run();
   }
+  if (row.sourceKind === 'github-issue-self' && row.sourceRef !== null) {
+    queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
+  }
   db.delete(todo).where(eq(todo.id, id)).run();
   return true;
 }
@@ -756,38 +795,35 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   if (row.sourceRef !== null && !replacesOtherRepo) return null;
   if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
-  const access = await teamGithubToken(deps, row.teamId);
-  if (!('token' in access)) throw new HttpError(404, 'github connection not found');
+  const token = await (
+    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
+  )(row.teamId, repoRef);
+  if (token === null) throw new HttpError(404, 'github connection not found');
   const { owner, repo } = repoRef;
-  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, access.token, owner, repo, {
+  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, token, owner, repo, {
     title: row.title,
     body: row.spec,
   });
   const fresh = getRow(deps, todoId);
-  if (!fresh || fresh.sourceRef !== row.sourceRef) return null;
   const ref = githubIssueSourceRef(owner, repo, number);
+  if (!fresh) {
+    queueIssueClose(db, row.teamId, ref, DELETED_TASK_ISSUE_COMMENT);
+    return null;
+  }
+  if (fresh.sourceRef !== row.sourceRef) return null;
   db.update(todo)
-    .set({ sourceRef: ref, v: fresh.v + 1 })
+    .set({ sourceRef: ref, issueState: 'open', v: fresh.v + 1 })
     .where(eq(todo.id, todoId))
     .run();
   const record = getTodo(deps, todoId);
   if (record) hub.publishTodoDoc(record.teamId, record);
-  if (replaced !== null) {
-    const closeAccess = await teamGithubToken(deps, row.teamId);
-    if ('token' in closeAccess) {
-      await githubCloseIssue(
-        deps.githubFetch ?? fetch,
-        closeAccess.token,
-        replaced.owner,
-        replaced.repo,
-        replaced.issueNumber,
-        `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
-      ).catch((error: unknown) =>
-        console.warn(`moved todo: closing ${row.sourceRef} failed`, error),
-      );
-    } else {
-      console.warn(`moved todo: no GitHub token to close ${row.sourceRef}`);
-    }
+  if (replaced !== null && row.sourceRef !== null) {
+    queueIssueClose(
+      db,
+      row.teamId,
+      row.sourceRef,
+      `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
+    );
   }
   return record;
 }
@@ -801,7 +837,10 @@ export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Prom
   if (selfIssueInFlight.has(todoId)) {
     throw new HttpError(409, 'github issue creation already in flight');
   }
-  const raw = runSelfIssueCreate(deps, todoId);
+  const raw = runSelfIssueCreate(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    todoId,
+  );
   const guarded = raw
     .catch(() => undefined)
     .finally(() => {
@@ -824,11 +863,13 @@ export async function writebackSelfIssueTitle(
   if (row?.sourceKind !== 'github-issue-self' || row.sourceRef === null) return;
   const parsed = parseGithubIssueSourceRef(row.sourceRef);
   if (parsed === null) return;
-  const access = await teamGithubToken(deps, row.teamId);
-  if (!('token' in access)) return;
+  const token = await (
+    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
+  )(row.teamId, parsed);
+  if (token === null) return;
   await githubUpdateIssueTitle(
     deps.githubFetch ?? fetch,
-    access.token,
+    token,
     parsed.owner,
     parsed.repo,
     parsed.issueNumber,

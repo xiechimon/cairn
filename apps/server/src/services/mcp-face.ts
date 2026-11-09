@@ -28,7 +28,7 @@ import {
 } from './mcp-threads.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
-import { createTodo, listTodos, updateTodo } from './todos.js';
+import { createAutonomousTodo, listTodos, updateAutonomousTodo } from './todos.js';
 
 export interface McpCallerCtx {
   teamId: string;
@@ -56,7 +56,7 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   message_todo: { todoId: s, content: s },
   confirm_builds: { buildIds: sArr },
   merge_builds: { buildIds: sArr },
-  cancel_builds: { buildIds: sArr },
+  cancel_builds: { buildIds: sArr, reason: s.optional() },
   complete_todos: { todoIds: sArr },
   close_todos: { todoIds: sArr },
   reopen_todos: { todoIds: sArr },
@@ -137,10 +137,16 @@ export async function executeMcpTool(
     user: deps.user,
     vapidKeys: deps.vapidKeys,
     box: deps.box,
+    githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     oauthClient: deps.oauthClient,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const mcpActor: TransitionActor = { kind: 'user', name: deps.user.displayName };
+  const mcpActor: TransitionActor = {
+    kind: 'user',
+    name: deps.user.displayName,
+    stopActor: 'mcp',
+  };
   switch (name) {
     case 'start_thread':
     case 'threads_waiting_on_me':
@@ -221,7 +227,7 @@ export async function executeMcpTool(
       const projectId = str(args, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
       return json(
-        createTodo(svc, {
+        createAutonomousTodo(svc, {
           teamId: ctx.teamId,
           projectId,
           title: str(args, 'title'),
@@ -234,7 +240,7 @@ export async function executeMcpTool(
     case 'update_todo': {
       const todoId = str(args, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
-      const record = updateTodo(svc, todoId, {
+      const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(args, 'title') !== undefined ? { title: optStr(args, 'title') } : {}),
         ...(optStr(args, 'spec') !== undefined ? { spec: optStr(args, 'spec') } : {}),
         ...(args.tagIds !== undefined ? { tagIds: strArrOf(args, 'tagIds') } : {}),
@@ -260,10 +266,9 @@ export async function executeMcpTool(
     }
     case 'cancel_builds': {
       const buildIds = strArrOf(args, 'buildIds');
-      for (const buildId of buildIds) {
-        requireTeamBuild(db, buildId, ctx.teamId);
-        cancelBuild(svc, buildId);
-      }
+      const reason = optStr(args, 'reason') ?? `cancel_builds over MCP by ${deps.user.displayName}`;
+      for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
+      for (const buildId of buildIds) cancelBuild(svc, buildId, { actor: 'mcp', reason });
       return json({ cancelled: buildIds });
     }
     case 'complete_todos':

@@ -3,9 +3,9 @@ import { settleTransitions } from './helpers.js';
 
 const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files';
 
-const CARD_DARK = 'rgb(34, 39, 35)';
-const CARD_LIGHT = 'rgb(253, 253, 251)';
-const CANVAS_LIGHT = 'rgb(230, 231, 225)';
+const CARD_DARK = 'rgb(48, 48, 48)';
+const CARD_LIGHT = 'rgb(255, 255, 255)';
+const CANVAS_LIGHT = 'rgb(242, 242, 242)';
 const CLEAR = 'rgba(0, 0, 0, 0)';
 
 const bg = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -175,7 +175,7 @@ test('chief tabs: indicator pill slides between chips — 150ms ease on left/top
 }) => {
   await themed(page, 'light', '/app?scenario=101');
   const pill = page.locator('[data-segmented="indicator"]');
-  const agent = page.getByRole('tab', { name: 'Agent' });
+  const routing = page.getByRole('tab', { name: '模型与机器' });
   const charter = page.getByRole('tab', { name: '章程' });
 
   const box = (loc: Locator) =>
@@ -191,8 +191,8 @@ test('chief tabs: indicator pill slides between chips — 150ms ease on left/top
     expect(Math.abs(p.h - c.h)).toBeLessThanOrEqual(1);
   };
 
-  await aligned(agent);
-  expect(await bg(agent)).toBe('rgba(0, 0, 0, 0)');
+  await aligned(routing);
+  expect(await bg(routing)).toBe('rgba(0, 0, 0, 0)');
   const layering = await pill.evaluate((el) => {
     const cs = getComputedStyle(el);
     const tabCs = getComputedStyle(document.querySelector('[role="tab"]')!);

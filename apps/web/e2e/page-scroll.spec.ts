@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { openChiefWindow } from './helpers.js';
 
 const MARK = 'data-scroll-probe-1032';
 
@@ -133,11 +132,7 @@ const MEMORIES = Array.from({ length: 40 }, (_, i) => ({
 }));
 
 async function openChiefSettings(page: Page) {
-  await page.goto('/app/schedules');
-  await openChiefWindow(page);
-  const drawer = page.getByRole('dialog', { name: 'Coordinator' });
-  await expect(drawer).toBeVisible();
-  await drawer.locator('button[aria-label="Coordinator 设置"]').click();
+  await page.goto('/app?chief=settings');
   await expect(page.getByRole('heading', { name: 'Coordinator 设置' })).toBeVisible();
 }
 

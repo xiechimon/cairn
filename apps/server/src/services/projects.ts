@@ -33,7 +33,7 @@ import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
-import { teamGithubToken } from './github-connection.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -167,6 +167,7 @@ export async function updateProject(
 
   const carriesKey =
     body.name !== undefined ||
+    body.group !== undefined ||
     body.splitPolicy !== undefined ||
     body.description !== undefined ||
     body.instructions !== undefined ||
@@ -180,7 +181,7 @@ export async function updateProject(
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of name/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color)',
+      'invalid body: nothing to update (at least one of group/name/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color)',
     );
   }
 
@@ -253,14 +254,9 @@ export async function updateProject(
     const slash = ref.indexOf('/');
     const owner = ref.slice(0, slash);
     const repo = ref.slice(slash + 1);
-    const access = await teamGithubToken(deps, row.teamId);
+    const token = await githubReadToken(deps, row.teamId, { owner, repo });
     const fetchImpl = deps.githubFetch ?? fetch;
-    const probe = await githubRepoReachable(
-      fetchImpl,
-      'token' in access ? access.token : null,
-      owner,
-      repo,
-    );
+    const probe = await githubRepoReachable(fetchImpl, token, owner, repo);
     if (!probe.reachable) {
       throw new HttpError(400, `invalid body at githubRepo: repository not reachable: ${ref}`);
     }
@@ -292,6 +288,7 @@ export async function updateProject(
   db.update(project)
     .set({
       name: nextName,
+      group: body.group !== undefined ? body.group : row.group,
       splitPolicy: nextSplitPolicy,
       repoKind: nextRepoKind,
       githubRepo: nextGithubRepo,

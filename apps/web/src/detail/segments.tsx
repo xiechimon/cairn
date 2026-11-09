@@ -10,7 +10,7 @@ import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 
 const CODE_SKIN: Record<string, string> = {
   'chat-code':
-    'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code leading-3 [overflow-wrap:anywhere]',
+    'rounded-(--cds-radius-sm) bg-(--prose-code-fill) px-1 py-px font-prose-mono text-code-inline whitespace-pre-wrap [overflow-wrap:anywhere]',
   'doc-code': 'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code',
 };
 const CODE_LINK_SKIN = 'bg-secondary text-content-secondary';

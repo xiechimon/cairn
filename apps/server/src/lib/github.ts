@@ -8,6 +8,12 @@ import { RULESETS_NOT_ON_PLAN } from '../services/merge-gate/github-rules.js';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
 import { githubApiBaseUrl, isGithubApiUrl } from './github-api-base.js';
+import {
+  type AutonomousToken,
+  type GithubWriteToken,
+  githubTokenFetch,
+  type UserToken,
+} from './github-token.js';
 
 export type FetchLike = (
   input: string | URL,
@@ -27,6 +33,14 @@ export type FetchLike = (
 
 const FETCH_TIMEOUT_MS = 15_000;
 
+export type GithubCreateGate = () => Promise<unknown>;
+
+let githubCreateGate: GithubCreateGate = acquireGithubCreateSlot;
+
+export function setGithubCreateGate(gate: GithubCreateGate): void {
+  githubCreateGate = gate;
+}
+
 const API_HEADERS = {
   accept: 'application/vnd.github+json',
   'x-github-api-version': '2022-11-28',
@@ -42,10 +56,13 @@ async function readJsonFull(
 ): Promise<{ data: unknown; getHeader: (name: string) => string | null }> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
-      headers,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    res = await githubTokenFetch(fetchImpl, headers.authorization?.replace(/^Bearer /, '') ?? null)(
+      url,
+      {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      },
+    );
   } catch (err) {
     throw mapFetchThrow(url, err);
   }
@@ -100,6 +117,7 @@ export interface GithubPull extends GithubPullState {
   defaultBranch: string | null;
   baseOwner: string | null;
   title: string | null;
+  body: string;
   authorAssociation: string | null;
   mergeableState: string | null;
   createdAt?: string | null;
@@ -140,7 +158,7 @@ async function conditionalGetJson(
 > {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       headers: {
         ...API_HEADERS,
         ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
@@ -190,6 +208,7 @@ export async function githubPull(
     state?: unknown;
     merged?: unknown;
     title?: unknown;
+    body?: unknown;
     author_association?: unknown;
     user?: { login?: unknown; type?: unknown } | null;
     mergeable_state?: unknown;
@@ -226,6 +245,7 @@ export async function githubPull(
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
       baseOwner: optString(raw.base?.repo?.owner?.login),
       title: optString(raw.title),
+      body: typeof raw.body === 'string' ? raw.body : '',
       authorAssociation: optString(raw.author_association),
       mergeableState: optString(raw.mergeable_state),
       createdAt: optString(raw.created_at),
@@ -246,7 +266,7 @@ export async function githubCompareStatus(
   if (!isFullSha(base) || !isFullSha(head)) return 'invalid';
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/compare/${base}...${head}?per_page=1`;
   try {
-    const res = await fetchImpl(url, {
+    const res = await githubTokenFetch(fetchImpl, token)(url, {
       headers: {
         ...API_HEADERS,
         ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
@@ -369,6 +389,9 @@ function mapUpstreamStatus(
   if (res.status === 404) {
     return new HttpError(404, `github repo not found (or private without auth): ${url}`);
   }
+  if (res.status === 410) {
+    return new HttpError(410, `github resource gone: ${url}`);
+  }
   if (isRateLimited(res)) {
     return new HttpError(
       429,
@@ -484,15 +507,28 @@ export async function githubUserRepos(
   return repos;
 }
 
-export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
+export async function githubUserIdentity(
+  fetchImpl: FetchLike,
+  token: string,
+): Promise<{ login: string; id: number; name: string | null }> {
   const data = (await readJson(fetchImpl, `${githubApiBaseUrl()}/user`, {
     ...API_HEADERS,
     authorization: `Bearer ${token}`,
-  })) as { login?: unknown };
-  if (typeof data.login !== 'string' || data.login === '') {
-    throw new HttpError(502, 'github user response missing login');
+  })) as { login?: unknown; id?: unknown; name?: unknown };
+  if (
+    typeof data.login !== 'string' ||
+    data.login === '' ||
+    typeof data.id !== 'number' ||
+    !Number.isSafeInteger(data.id) ||
+    data.id <= 0
+  ) {
+    throw new HttpError(502, 'github user response missing identity');
   }
-  return data.login;
+  return { login: data.login, id: data.id, name: typeof data.name === 'string' ? data.name : null };
+}
+
+export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
+  return (await githubUserIdentity(fetchImpl, token)).login;
 }
 
 export interface GithubLabel {
@@ -645,7 +681,7 @@ async function getListPage(
 > {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       headers: authHeaders(token),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -918,7 +954,7 @@ async function intakeGet(
 ): Promise<{ status: number; etag: string | null; link: string | null; data: unknown } | null> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       ...(init?.method !== undefined ? { method: init.method } : {}),
       headers: {
         ...authHeaders(token),
@@ -1327,7 +1363,7 @@ async function writeJson(
 ): Promise<unknown> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       method,
       headers: { ...authHeaders(token), 'content-type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1351,7 +1387,7 @@ async function writeJson(
 
 export async function githubCreateIssue(
   fetchImpl: FetchLike,
-  token: string,
+  token: GithubWriteToken,
   owner: string,
   repo: string,
   input: { title: string; body: string; labels?: string[] },
@@ -1360,7 +1396,7 @@ export async function githubCreateIssue(
   let data: Record<string, unknown>;
   for (let attempt = 0; ; attempt++) {
     try {
-      await acquireGithubCreateSlot();
+      await githubCreateGate();
     } catch (error) {
       if (error instanceof GithubCreateGateNotWritableError)
         throw new HttpError(503, error.message);
@@ -1386,7 +1422,7 @@ export async function githubCreateIssue(
 
 export async function githubUpdateIssueTitle(
   fetchImpl: FetchLike,
-  token: string,
+  token: GithubWriteToken,
   owner: string,
   repo: string,
   issueNumber: number,
@@ -1398,20 +1434,45 @@ export async function githubUpdateIssueTitle(
 
 export async function githubCloseIssue(
   fetchImpl: FetchLike,
-  token: string,
+  token: GithubWriteToken,
   owner: string,
   repo: string,
   issueNumber: number,
-  opts: string | { stateReason: 'completed' },
+  opts: { stateReason: 'completed' | 'not_planned'; comment?: string },
 ): Promise<void> {
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  if (opts.comment !== undefined) {
+    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts.comment });
+  }
   await writeJson(fetchImpl, 'PATCH', url, token, {
     state: 'closed',
-    state_reason: typeof opts === 'string' ? 'not_planned' : opts.stateReason,
+    state_reason: opts.stateReason,
   });
-  if (typeof opts === 'string') {
-    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts });
-  }
+}
+
+export async function githubReopenIssue(
+  fetchImpl: FetchLike,
+  token: GithubWriteToken,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  comment: string,
+): Promise<void> {
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
+  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'open', state_reason: 'reopened' });
+}
+
+export async function githubUpdatePullBody(
+  fetchImpl: FetchLike,
+  token: GithubWriteToken,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<void> {
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}`;
+  await writeJson(fetchImpl, 'PATCH', url, token, { body });
 }
 
 export type GithubMergeResult =
@@ -1426,7 +1487,7 @@ export type GithubMergeResult =
 
 export async function githubMergePull(
   fetchImpl: FetchLike,
-  token: string,
+  token: UserToken,
   owner: string,
   repo: string,
   prNumber: number,
@@ -1435,7 +1496,7 @@ export async function githubMergePull(
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       method: 'PUT',
       headers: { ...authHeaders(token), 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -1483,13 +1544,16 @@ export interface GithubPullPanel {
   merged: boolean;
   draft: boolean;
   title: string;
+  body: string;
   htmlUrl: string | null;
   baseSha?: string | null;
   baseRef?: string | null;
   headSha: string | null;
+  headRef: string;
   mergeableState: string | null;
   additions: number;
   deletions: number;
+  labels?: string[];
 }
 
 export interface GithubPullPanelPage {
@@ -1515,11 +1579,13 @@ export async function githubPullPanel(
     merged?: unknown;
     draft?: unknown;
     title?: unknown;
+    body?: unknown;
     html_url?: unknown;
     mergeable_state?: unknown;
     additions?: unknown;
     deletions?: unknown;
-    head?: { sha?: unknown } | null;
+    labels?: unknown;
+    head?: { sha?: unknown; ref?: unknown } | null;
     base?: { sha?: unknown; ref?: unknown } | null;
   };
   if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
@@ -1533,13 +1599,20 @@ export async function githubPullPanel(
       merged: raw.merged,
       draft: raw.draft === true,
       title: typeof raw.title === 'string' ? raw.title : '',
+      body: typeof raw.body === 'string' ? raw.body : '',
       htmlUrl: optString(raw.html_url),
       baseSha: optString(raw.base?.sha),
       baseRef: optString(raw.base?.ref),
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      headRef: typeof raw.head?.ref === 'string' ? raw.head.ref : '',
       mergeableState: optString(raw.mergeable_state),
       additions: typeof raw.additions === 'number' ? raw.additions : 0,
       deletions: typeof raw.deletions === 'number' ? raw.deletions : 0,
+      labels: Array.isArray(raw.labels)
+        ? raw.labels.flatMap((label: { name?: unknown } | null) =>
+            typeof label?.name === 'string' ? [label.name] : [],
+          )
+        : [],
     },
   };
 }
@@ -1551,6 +1624,7 @@ export interface GithubCheckRun {
   conclusion: string | null;
   outputTitle: string | null;
   outputSummary: string | null;
+  completedAt?: number | null;
 }
 
 export interface GithubCheckRunsPage {
@@ -1590,6 +1664,10 @@ export async function githubCommitCheckRuns(
       conclusion: typeof entry.conclusion === 'string' ? entry.conclusion : null,
       outputTitle: typeof output?.title === 'string' ? output.title : null,
       outputSummary: typeof output?.summary === 'string' ? output.summary : null,
+      completedAt:
+        typeof entry.completed_at === 'string' && Number.isFinite(Date.parse(entry.completed_at))
+          ? Date.parse(entry.completed_at)
+          : null,
     });
   }
   return { notModified: false, etag: got.etag, checkRuns };
@@ -1771,7 +1849,7 @@ async function gateRequest(
 ): Promise<GithubRawResult> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
-    res = await fetchImpl(url, {
+    res = await githubTokenFetch(fetchImpl, token)(url, {
       method: req.method,
       headers: {
         ...authHeaders(token),
@@ -1983,7 +2061,7 @@ export async function githubContentsRaw(
 
 export async function githubCreateCommitStatus(
   fetchImpl: FetchLike,
-  token: string,
+  token: AutonomousToken,
   owner: string,
   repo: string,
   sha: string,
@@ -2120,7 +2198,17 @@ export async function exchangeOAuthCode(
   return projectTokenPayload(payload, 'oauth token exchange');
 }
 
-export async function githubGraphql(
+export async function githubGraphqlRead(
+  fetchImpl: FetchLike,
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<unknown> {
+  if (!/^\s*(?:query\b|\{)/.test(query)) throw new Error('GitHub reads require a query');
+  return graphqlRequest(fetchImpl, token, query, variables);
+}
+
+async function graphqlRequest(
   fetchImpl: FetchLike,
   token: string,
   query: string,
@@ -2149,4 +2237,83 @@ export async function githubGraphql(
   if (root.errors !== undefined || root.data == null)
     throw new HttpError(502, 'GitHub GraphQL incomplete response');
   return root.data;
+}
+
+export function githubGraphql(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<unknown> {
+  return graphqlRequest(fetchImpl, token, query, variables);
+}
+
+export async function githubComment(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  body: string,
+): Promise<void> {
+  await writeJson(
+    fetchImpl,
+    'POST',
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/comments`,
+    token,
+    { body },
+  );
+}
+
+export async function githubIssueComments(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+): Promise<{ author: string; body: string }[] | null> {
+  const comments: { author: string; body: string }[] = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const got = await conditionalGetJson(
+      fetchImpl,
+      `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      token,
+      null,
+      FETCH_TIMEOUT_MS,
+    );
+    if (got === null || got.notModified || !Array.isArray(got.data)) return null;
+    const rows = got.data as Array<{ body?: unknown; user?: { login?: unknown } | null }>;
+    for (const row of rows)
+      if (typeof row?.body === 'string' && typeof row.user?.login === 'string')
+        comments.push({ author: row.user.login, body: row.body });
+    if (rows.length < 100) return comments;
+  }
+  return null;
+}
+
+export function githubReplyReviewThread(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  threadId: string,
+  body: string,
+): Promise<unknown> {
+  return githubGraphql(
+    fetchImpl,
+    token,
+    'mutation($threadId:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$threadId,body:$body}){comment{id}}}',
+    { threadId, body },
+  );
+}
+
+export function githubResolveReviewThread(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  threadId: string,
+): Promise<unknown> {
+  return githubGraphql(
+    fetchImpl,
+    token,
+    'mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}',
+    { threadId },
+  );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { AppContext } from '../src/context.js';
+import { githubConnection } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { openGithubToken } from '../src/services/github-connection.js';
 import { bootServer, req, type TestServer } from './helpers.js';
@@ -159,6 +160,7 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
       const status = (await (await statusOf(s)).json()) as Record<string, unknown>;
       expect(status.login).toBe('octocat');
       expect(status.scope).toBe('read:user,repo');
+      expect(s.db.select().from(githubConnection).get()?.githubUserId).toBe(1);
     } finally {
       s.dispose();
     }
@@ -243,14 +245,14 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
   test('10. reauth = overwrite: second happy new token/login -> single row new value effective', async () => {
     const script: UpstreamScript = {
       token: { json: { access_token: TOKEN, scope: 'read:user,repo' } },
-      user: { json: { login: 'octocat' } },
+      user: { json: { login: 'octocat', id: 1 } },
     };
     const { s } = boot(script);
     try {
       const a1 = await authorizeConnection(s);
       await callback(s, `code=c1&state=${a1.state}`);
       script.token = { json: { access_token: SECOND_TOKEN, scope: 'repo' } };
-      script.user = { json: { login: 'octocat2' } };
+      script.user = { json: { login: 'octocat2', id: 2 } };
       const a2 = await authorizeConnection(s);
       const res = await callback(s, `code=c2&state=${a2.state}`);
       expect(res.status).toBe(302);

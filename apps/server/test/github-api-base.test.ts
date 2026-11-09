@@ -9,7 +9,7 @@ test('unset or empty API base preserves production URLs', async () => {
     vi.stubEnv('CAIRN_GITHUB_API_BASE_URL', value);
     expect(githubApiBaseUrl()).toBe('https://api.github.com');
     const fetcher = vi.fn(
-      async (_input: string | URL) => new Response(JSON.stringify({ login: 'octo' })),
+      async (_input: string | URL) => new Response(JSON.stringify({ login: 'octo', id: 1 })),
     );
     expect(await githubUserLogin(fetcher, 'local-token')).toBe('octo');
     expect(fetcher.mock.calls[0]?.[0]).toBe('https://api.github.com/user');

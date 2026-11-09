@@ -119,12 +119,35 @@ export async function keyboardFocus(page: Page, locator: Locator) {
   await settleTransitions(page);
 }
 
-export async function openChiefWindow(page: Page): Promise<void> {
+export async function pressOpenCoordinator(page: Page): Promise<void> {
   await page.evaluate(() => {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   });
   await page.keyboard.press('ControlOrMeta+j');
+}
+
+export async function stubCoordinatorChief(page: Page, teamId: string, userId: string) {
+  await page.route(`**/api/teams/${teamId}/chief`, (route) =>
+    route.fulfill({
+      json: {
+        chief: {
+          id: `chief-${userId}-${teamId}`,
+          userId,
+          teamId,
+          agent: null,
+          charter: '',
+          lastTurnAt: null,
+          createdAt: 0,
+          tz: null,
+        },
+        agentActor: null,
+        context: null,
+        watches: [],
+        wakes: [],
+      },
+    }),
+  );
 }
 
 export async function stubLiveApiKeys(page: Page, keys: unknown[] = []) {

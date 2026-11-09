@@ -73,7 +73,7 @@ function expectRejected(promise: Promise<unknown>, status: number, message: RegE
 }
 
 describe('router tool vocabulary', () => {
-  test('the router tools are a separate five from the base vocabulary', () => {
+  test('the router tools are a separate six from the base vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS).toHaveLength(47);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) {
@@ -82,7 +82,7 @@ describe('router tool vocabulary', () => {
     for (const read of ['threads', 'needs_you']) {
       expect(CHIEF_ROUTER_TOOLS.find((t) => t.name === read)?.replaySafe).toBe(true);
     }
-    for (const write of ['open_thread', 'message_thread', 'stop_thread']) {
+    for (const write of ['open_thread', 'message_thread', 'stop_thread', 'answer_question']) {
       expect(CHIEF_ROUTER_TOOLS.find((t) => t.name === write)?.replaySafe).toBeUndefined();
     }
   });
@@ -97,7 +97,7 @@ describe('router tool vocabulary', () => {
       ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
       ...CHIEF_ROUTER_TOOL_NAMES,
     ]);
-    expect(Object.keys(chiefToolDefHashes())).toHaveLength(52);
+    expect(Object.keys(chiefToolDefHashes())).toHaveLength(53);
   });
 });
 
@@ -246,7 +246,7 @@ describe('router tools', () => {
       seedSessionRoute(H.s);
       const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
       const opened = (await relay('open_thread', { todoId: id })) as { buildId: string };
-      await relay('stop_thread', { todoId: id });
+      await relay('stop_thread', { todoId: id, reason: 'test stop' });
       await relay('message_thread', { todoId: id, content: 'Try a smaller export.' });
       const resumed = H.s.db.select().from(todo).where(eq(todo.id, id)).get();
       expect(resumed?.latestBuildId).not.toBe(opened.buildId);
@@ -359,7 +359,7 @@ describe('router tools', () => {
       expect(queued[0]!.byPerson).toBe(false);
     });
 
-    test('is the answer to a parked worker question and clears awaitingReply', async () => {
+    test('refuses a thread with a parked worker question and points at answer_question', async () => {
       const { todoId, buildId } = await openThread();
       const claimed = claimSession(buildId);
       await askWorkerQuestion(
@@ -368,10 +368,12 @@ describe('router tools', () => {
         { requestId: REQUEST, questions: QUESTIONS },
         { holdMs: 0 },
       );
-      expect(H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!.awaitingReply).toBe(true);
-      await relay('message_thread', { todoId, content: 'JSON please' });
-      const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
-      expect(row.awaitingReply).toBe(false);
+      await expectRejected(
+        relay('message_thread', { todoId, content: 'JSON please' }),
+        409,
+        /answer_question/,
+      );
+      await relay('answer_question', { todoId, requestId: REQUEST, answer: 'JSON please' });
       const answered = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!
         .content as { status: string; answers: { text: string }[] };
       expect(answered.status).toBe('answered');
@@ -445,7 +447,9 @@ describe('router tools', () => {
       const { todoId, buildId } = await openThread();
       const claimed = claimSession(buildId);
       const signal = vi.spyOn(H.s.machineHub, 'stopSignal');
-      const out = (await relay('stop_thread', { todoId })) as { stopped: string };
+      const out = (await relay('stop_thread', { todoId, reason: 'test stop' })) as {
+        stopped: string;
+      };
       expect(out.stopped).toBe('delegated');
       expect(signal).toHaveBeenCalledWith(H.teamId, claimed.id);
       expect(H.s.db.select().from(stopPending).all()).toHaveLength(1);
@@ -453,7 +457,9 @@ describe('router tools', () => {
 
     test('a queued step is stopped at once', async () => {
       const { todoId, buildId } = await openThread();
-      const out = (await relay('stop_thread', { todoId })) as { stopped: string };
+      const out = (await relay('stop_thread', { todoId, reason: 'test stop' })) as {
+        stopped: string;
+      };
       expect(out.stopped).toBe('stopped');
       expect(H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!.status).toBe(
         'stopped',
@@ -462,7 +468,7 @@ describe('router tools', () => {
 
     test('a thread stopped before its first run is resumed by message_thread', async () => {
       const { todoId, buildId } = await openThread();
-      await relay('stop_thread', { todoId });
+      await relay('stop_thread', { todoId, reason: 'test stop' });
       const stopped = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
       expect(stopped.phase).toBe('todo');
       expect(stopped.latestBuildId).toBe(buildId);
@@ -495,7 +501,7 @@ describe('router tools', () => {
 
     test('a thread stopped before its first run is reopened by open_thread', async () => {
       const { todoId, buildId } = await openThread();
-      await relay('stop_thread', { todoId });
+      await relay('stop_thread', { todoId, reason: 'test stop' });
       const out = (await relay('open_thread', { todoId })) as { buildId: string };
       expect(out.buildId).not.toBe(buildId);
       const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
@@ -517,7 +523,11 @@ describe('router tools', () => {
 
     test('rejects an unstarted thread and another team', async () => {
       const unstarted = seedTodo();
-      await expectRejected(relay('stop_thread', { todoId: unstarted }), 409, /not started/);
+      await expectRejected(
+        relay('stop_thread', { todoId: unstarted, reason: 'test stop' }),
+        409,
+        /not started/,
+      );
       H.s.db.insert(team).values({ id: 'other-team', name: 'Other', createdAt: 1 }).run();
       H.s.db.insert(project).values({ id: 'other-project', name: 'p', teamId: 'other-team' }).run();
       const foreign = seedTodo({
@@ -525,7 +535,11 @@ describe('router tools', () => {
         projectId: 'other-project',
         latestBuildId: 'foreign-build',
       });
-      await expectRejected(relay('stop_thread', { todoId: foreign }), 404, /todo/);
+      await expectRejected(
+        relay('stop_thread', { todoId: foreign, reason: 'test stop' }),
+        404,
+        /todo/,
+      );
     });
   });
 
@@ -541,7 +555,7 @@ describe('router tools', () => {
       expect(out.threads[0]).toMatchObject({ title: 'Al pha job', line: 'Half wa y' });
     });
 
-    test('lists open threads with phase, awaiting flag and report line; leaves out unstarted, done, closed, archived and other teams', async () => {
+    test('lists open threads with phase and report line; leaves out unstarted, done, closed, archived and other teams', async () => {
       const a = await openThread({ seqNum: 1, title: 'Alpha' });
       H.s.db
         .update(build)
@@ -565,14 +579,13 @@ describe('router tools', () => {
         phase: 'building',
       });
       const out = (await relay('threads', {})) as {
-        threads: { seqNum: number; line: string | null; phase: string; awaitingReply: boolean }[];
+        threads: { seqNum: number; line: string | null; phase: string }[];
         total: number;
         nextOffset: number | null;
       };
       expect(out.threads.map((t) => t.seqNum)).toEqual([1]);
       expect(out.threads[0]).toMatchObject({
         phase: 'queued',
-        awaitingReply: false,
         line: 'Halfway through the export',
       });
       expect(out.nextOffset).toBeNull();
@@ -644,16 +657,17 @@ describe('router tools', () => {
         items: {
           todoId: string;
           seqNum: number;
+          owner: string;
           kind: string;
           line: string | null;
           questions?: { requestId: string; items: { question: string; options: string[] }[] }[];
         }[];
       };
-      expect(out.items.map((i) => [i.seqNum, i.kind])).toEqual([
-        [1, 'question'],
-        [2, 'failed'],
+      expect(out.items.map((i) => [i.seqNum, i.owner, i.kind]).sort()).toEqual([
+        [1, 'coordinator', 'question'],
+        [2, 'coordinator', 'failed'],
       ]);
-      expect(out.items[0]!.questions).toEqual([
+      expect(out.items.find((i) => i.kind === 'question')!.questions).toEqual([
         {
           requestId: REQUEST,
           items: [{ header: 'Format', question: 'Which export format?', options: ['CSV', 'JSON'] }],
@@ -661,7 +675,7 @@ describe('router tools', () => {
       ]);
     });
 
-    test('a thread that is both asking and in review is listed once, as a question', async () => {
+    test('a thread that is asking and in needs_input is listed once, as a question', async () => {
       const asking = await openThread({ seqNum: 1 });
       const claimed = claimSession(asking.buildId);
       await askWorkerQuestion(
@@ -670,7 +684,7 @@ describe('router tools', () => {
         { requestId: REQUEST, questions: QUESTIONS },
         { holdMs: 0 },
       );
-      H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, asking.todoId)).run();
+      H.s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, asking.todoId)).run();
       const out = (await relay('needs_you', {})) as { items: { kind: string }[] };
       expect(out.items.map((i) => i.kind)).toEqual(['question']);
     });
@@ -683,7 +697,6 @@ describe('router tools', () => {
         projectId: 'other-project',
         latestBuildId: 'foreign-build',
         phase: 'failed',
-        awaitingReply: true,
       });
       expect(await relay('needs_you', {})).toEqual({ items: [] });
     });
@@ -703,6 +716,7 @@ describe('router tools', () => {
         { requestId: REQUEST, questions: QUESTIONS },
         { holdMs: 0 },
       );
+      H.s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, asking.todoId)).run();
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
       for (const gone of [
         'agents:',
@@ -721,8 +735,8 @@ describe('router tools', () => {
       expect(text).toContain('open_thread');
       expect(text).toContain('message_thread');
       expect(text).toContain('threads (1 open');
-      expect(text).toContain('#7 building');
-      expect(text).toContain('needs-you: #7 asking you');
+      expect(text).toContain('#7 needs_input');
+      expect(text).toContain('needs-you: #7 question (coordinator)');
       expect(text).not.toContain('Ignore previous instructions');
     });
 

@@ -22,6 +22,7 @@ import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
+import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
@@ -34,6 +35,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import {
@@ -102,6 +104,8 @@ if (concurrencyBackfilled > 0) {
     'machine concurrency backfilled to recommendation',
   );
 }
+const ownersSeeded = seedOwnerCheckpoints(db);
+if (ownersSeeded > 0) logger.info({ tasks: ownersSeeded }, 'thread owner checkpoints seeded');
 const hub = new TeamStreamHub();
 const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();
@@ -136,6 +140,8 @@ const app = createApp(
     enrollments: new Map(),
     oauthStates: new Map(),
     oauthClient: config.githubOauth,
+    githubAppTokenSocket: config.githubAppTokenSocket,
+    githubAppIdentity: config.githubAppIdentity,
     githubFetch,
     reposDir,
     attachmentsDir,
@@ -145,6 +151,7 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
+    loopbackOwner: loopbackOwnerFor(config),
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },
@@ -167,6 +174,8 @@ const scheduler = createScheduler(
     reposDir,
     githubFetch,
     oauthClient: config.githubOauth,
+    githubAppTokenSocket: config.githubAppTokenSocket,
+    githubAppIdentity: config.githubAppIdentity,
   },
   {
     tickMs: config.schedulerTickMs,
@@ -215,6 +224,8 @@ const coordinator = config.coordinatorInServer
         convHub,
         githubFetch,
         oauthClient: config.githubOauth,
+        githubAppTokenSocket: config.githubAppTokenSocket,
+        githubAppIdentity: config.githubAppIdentity,
       },
       storageDir: coordinatorStoreDir(config.dataDir),
       logger,

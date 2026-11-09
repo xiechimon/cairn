@@ -106,6 +106,24 @@ async function deliver(
   return { prompt: sent.prompt ?? '', systemPrompt: sent.systemPrompt ?? '', home };
 }
 
+describe('task decisions travel as a delivery section', () => {
+  test('the first-round prompt keeps the brief and appends the decisions section', () => {
+    const step = claimed({ kind: 'build' });
+    const withDecisions: ClaimedStep = {
+      ...step,
+      todo: {
+        ...step.todo!,
+        decisions: [
+          { requestId: 'ask-1', question: 'Which wins?', answer: 'Repo rule', by: 'person', at: 1 },
+        ],
+      },
+    };
+    const prompt = buildTaskPrompt(withDecisions);
+    expect(prompt.startsWith(buildTaskPromptText('接线', '把登录接到页面'))).toBe(true);
+    expect(prompt).toContain('Repo rule');
+  });
+});
+
 describe('#1624 daemon delivery: prior-card handoff goes into the first-round prompt, not the system layer', () => {
   test('D1 build step new session: prompt = task text + handoff section; systemPrompt contains no handoff content', async () => {
     const step = claimed({ kind: 'build', blockerHandoff: HANDOFF });

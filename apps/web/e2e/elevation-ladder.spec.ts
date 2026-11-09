@@ -72,42 +72,32 @@ const TOP_DARK = 'rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset';
 // there would void the whole box-shadow of any consumer that joins it)
 const TOP_LIGHT = 'rgba(255, 255, 255, 0) 0px 1px 0px 0px inset';
 
-const RUNGS = [
-  ['e1', 'cds-shadow-sm'],
-  ['e2', 'cds-shadow-md'],
-  ['e3', 'cds-shadow-lg'],
-] as const;
-
 for (const theme of ['light', 'dark'] as const) {
   test.describe(`elevation ladder (${theme})`, () => {
     test.beforeEach(async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     });
 
-    test('each rung is its pool plus one ring, ring last', async ({ page }) => {
+    test('e1 is a bare ring; e2 and e3 are their own pool plus one ring', async ({ page }) => {
       await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
-      const ringColor = theme === 'light' ? 'border' : 'ring-inset-highlight';
-      const borderRing = await ringIn(page, 'border');
-      const tierRing = await ringIn(page, ringColor);
-      for (const [rung, poolName] of RUNGS) {
-        const value = await slot(page, rung);
-        const pool = await slot(page, poolName);
-        expect(value, rung).not.toBe('none');
-        expect(value.startsWith(`${pool}, `), `${rung} starts with its pool`).toBe(true);
-        expect(rings(value), `${rung} ring count`).toBe(1);
-        const want = rung === 'e1' ? borderRing : tierRing;
-        expect(value.endsWith(want), `${rung} ends with its ring`).toBe(true);
-      }
+      const e1 = await slot(page, 'e1');
+      expect(e1).toBe(await ringIn(page, 'border'));
+      const floating = await slot(page, 'shadow-floating');
+      const dialog = await slot(page, 'shadow-dialog');
+      const e2 = await slot(page, 'e2');
+      const e3 = await slot(page, 'e3');
+      expect(e2.startsWith(`${floating}, `), 'e2 starts with its pool').toBe(true);
+      expect(e2.endsWith('0px 0px 0px 1px inset'), 'e2 ring is inset and last').toBe(true);
+      expect(e3.startsWith(`${dialog}, `), 'e3 starts with its pool').toBe(true);
+      expect(e3.endsWith(await ringIn(page, 'dialog-ring')), 'e3 ends with its ring').toBe(true);
+      expect(rings(e3), 'e3 ring count').toBe(1);
     });
 
-    test('pools hold the faint layered shadows; --top only in dark e2/e3', async ({ page }) => {
+    test('cds pools keep their layered shadows; --top only in dark cds md/lg', async ({ page }) => {
       await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const top = await slot(page, 'top');
-      const e1 = await slot(page, 'e1');
-      const e2 = await slot(page, 'e2');
-      const e3 = await slot(page, 'e3');
       for (const [name, want] of Object.entries(POOLS[theme])) {
         const got = await slot(page, name);
         if (theme === 'dark' && name !== 'cds-shadow-sm') {
@@ -116,16 +106,9 @@ for (const theme of ['light', 'dark'] as const) {
           expect(got, name).toBe(want);
         }
       }
-      expect(e1).not.toContain('inset');
-      if (theme === 'light') {
-        expect(top).toBe(TOP_LIGHT);
-        expect(e2).not.toContain('inset');
-        expect(e3).not.toContain('inset');
-      } else {
-        expect(top).toBe(TOP_DARK);
-        expect(e2).toContain(TOP_DARK);
-        expect(e3).toContain(TOP_DARK);
-      }
+      expect(top).toBe(theme === 'light' ? TOP_LIGHT : TOP_DARK);
+      expect(await slot(page, 'e1')).not.toContain('inset');
+      expect(await slot(page, 'e3')).not.toContain(TOP_DARK);
     });
 
     test('old slot names alias the ladder', async ({ page }) => {
@@ -135,7 +118,7 @@ for (const theme of ['light', 'dark'] as const) {
         ['panel-shadow', 'e1'],
         ['shadow-popover', 'e2'],
         ['dialog-shadow', 'e3'],
-        ['floating-shadow', 'cds-shadow-lg'],
+        ['floating-shadow', 'shadow-floating'],
         ['card-lift', 'panel-shadow-hover'],
       ];
       for (const [alias, target] of pairs) {
@@ -154,21 +137,10 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('one ring per edge on the rendered surfaces', async ({ page }) => {
-      const edgeRing = await (async () => {
-        await page.goto('/app/schedules?scenario=01');
-        await page.waitForSelector('.board-sidebar');
-        return slot(page, 'edge-ring');
-      })();
-
       await page.goto('/app?scenario=notify-banner');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
       expect(banner.endsWith(await slot(page, 'e1'))).toBe(true);
-
-      await page.goto('/app/schedules?scenario=111');
-      const drawer = await surfaceShadow(page, '.chief-drawer');
-      expect(rings(drawer)).toBe(1);
-      expect(drawer).toContain(edgeRing);
 
       // the composer keeps its inset ring, and only that ring
       await page.goto(`${DETAIL}?scenario=16`);
@@ -183,10 +155,6 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(dialog).toBeVisible();
       const dialogShadow = await dialog.evaluate((el) => getComputedStyle(el).boxShadow);
       expect(rings(dialogShadow)).toBe(1);
-      if (theme === 'dark') {
-        expect(dialogShadow).toContain(TOP_DARK);
-        expect(drawer).toContain(TOP_DARK);
-      }
     });
   });
 }

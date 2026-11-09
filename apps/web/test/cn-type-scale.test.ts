@@ -12,8 +12,21 @@ const appCss = readFileSync(new URL('../src/styles/app.css', import.meta.url), '
 const typeKeys = [...appCss.matchAll(/^\s*--text-([a-z]+(?:-[a-z]+)*):/gm)].map((m) => m[1]);
 
 describe('cn keeps Paper type-scale keys', () => {
-  test('app.css declares the eight type keys', () => {
-    expect(typeKeys).toEqual(['page', 'greeting', 'heading', 'card-title', 'ui', 'meta', 'code', 'caption']);
+  test('app.css declares the twelve type keys', () => {
+    expect(typeKeys).toEqual([
+      'page',
+      'brand',
+      'greeting',
+      'heading',
+      'card-title',
+      'ui',
+      'meta',
+      'code',
+      'caption',
+      'code-block',
+      'code-inline',
+      'code-lang',
+    ]);
   });
 
   test.each(typeKeys)('text-%s survives next to a text color', (key) => {

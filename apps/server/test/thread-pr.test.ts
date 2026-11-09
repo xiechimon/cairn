@@ -32,8 +32,11 @@ interface PullSpec {
   head?: string;
   mergeable?: string;
   title?: string;
+  branch?: string;
+  base?: string;
   additions?: number;
   deletions?: number;
+  body?: string;
 }
 
 interface RunSpec {
@@ -46,72 +49,88 @@ class GithubMock {
   pulls = new Map<string, PullSpec>();
   checks = new Map<string, RunSpec[]>();
   failing = new Set<string>();
+  failingChecks = false;
   remaining: number | null = null;
   limit = 5000;
   resetAtSeconds: number | null = null;
   requests: string[] = [];
   authorizations: string[] = [];
   notModified = 0;
-  fetch = vi.fn((input: string | URL, init?: { headers?: Record<string, string> }) => {
-    const url = String(input);
-    this.requests.push(url);
-    this.authorizations.push(init?.headers?.authorization ?? '');
-    const send = (status: number, body: unknown) => {
-      const etag = `"${createHash('md5').update(JSON.stringify(body)).digest('hex')}"`;
-      const headers: Record<string, string> = { etag };
-      if (this.remaining !== null) {
-        headers['x-ratelimit-remaining'] = String(this.remaining);
-        headers['x-ratelimit-limit'] = String(this.limit);
-        if (this.resetAtSeconds !== null)
-          headers['x-ratelimit-reset'] = String(this.resetAtSeconds);
-      }
-      const lookup = (name: string) => headers[name.toLowerCase()] ?? null;
-      if (status === 200 && init?.headers?.['if-none-match'] === etag) {
-        this.notModified += 1;
+  bodyEdits: { key: string; body: string }[] = [];
+  fetch = vi.fn(
+    (
+      input: string | URL,
+      init?: { method?: string; headers?: Record<string, string>; body?: string },
+    ) => {
+      const url = String(input);
+      this.requests.push(url);
+      this.authorizations.push(init?.headers?.authorization ?? '');
+      const send = (status: number, body: unknown) => {
+        const etag = `"${createHash('md5').update(JSON.stringify(body)).digest('hex')}"`;
+        const headers: Record<string, string> = { etag };
+        if (this.remaining !== null) {
+          headers['x-ratelimit-remaining'] = String(this.remaining);
+          headers['x-ratelimit-limit'] = String(this.limit);
+          if (this.resetAtSeconds !== null)
+            headers['x-ratelimit-reset'] = String(this.resetAtSeconds);
+        }
+        const lookup = (name: string) => headers[name.toLowerCase()] ?? null;
+        if (status === 200 && init?.headers?.['if-none-match'] === etag) {
+          this.notModified += 1;
+          return Promise.resolve({
+            ok: false,
+            status: 304,
+            headers: { get: lookup },
+            json: () => Promise.resolve(null),
+            text: () => Promise.resolve(''),
+          });
+        }
         return Promise.resolve({
-          ok: false,
-          status: 304,
+          ok: status < 400,
+          status,
           headers: { get: lookup },
-          json: () => Promise.resolve(null),
-          text: () => Promise.resolve(''),
+          json: () => Promise.resolve(body),
+          text: () => Promise.resolve(JSON.stringify(body)),
+        });
+      };
+      const pull = /\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/.exec(url);
+      if (pull) {
+        const key = `${(pull[1] ?? '').toLowerCase()}#${pull[2]}`;
+        const spec = this.pulls.get(key);
+        if (this.failing.has(key) || spec === undefined) return send(500, { message: 'boom' });
+        if (init?.method === 'PATCH') {
+          const edited = (JSON.parse(init.body ?? '{}') as { body: string }).body;
+          this.bodyEdits.push({ key, body: edited });
+          this.pulls.set(key, { ...spec, body: edited });
+          return send(200, { number: Number(pull[2]), body: edited });
+        }
+        return send(200, {
+          body: spec.body ?? '## What\n\nA change.',
+          state: spec.state ?? 'open',
+          merged: spec.merged ?? false,
+          draft: spec.draft ?? false,
+          title: spec.title ?? 'server(1): a change',
+          html_url: `https://github.com/${pull[1]}/pull/${pull[2]}`,
+          mergeable_state: spec.mergeable ?? 'clean',
+          additions: spec.additions ?? 12,
+          deletions: spec.deletions ?? 3,
+          head: { sha: spec.head ?? HEAD_A, ref: spec.branch ?? 'cairn/feature' },
+          base: { ref: spec.base ?? 'main' },
         });
       }
-      return Promise.resolve({
-        ok: status < 400,
-        status,
-        headers: { get: lookup },
-        json: () => Promise.resolve(body),
-        text: () => Promise.resolve(JSON.stringify(body)),
-      });
-    };
-    const pull = /\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/.exec(url);
-    if (pull) {
-      const key = `${(pull[1] ?? '').toLowerCase()}#${pull[2]}`;
-      const spec = this.pulls.get(key);
-      if (this.failing.has(key) || spec === undefined) return send(500, { message: 'boom' });
-      return send(200, {
-        state: spec.state ?? 'open',
-        merged: spec.merged ?? false,
-        draft: spec.draft ?? false,
-        title: spec.title ?? 'server(1): a change',
-        html_url: `https://github.com/${pull[1]}/pull/${pull[2]}`,
-        mergeable_state: spec.mergeable ?? 'clean',
-        additions: spec.additions ?? 12,
-        deletions: spec.deletions ?? 3,
-        head: { sha: spec.head ?? HEAD_A },
-      });
-    }
-    const runs = /\/commits\/([0-9a-f]+)\/check-runs/.exec(url);
-    if (runs) {
-      return send(200, {
-        check_runs: (this.checks.get(runs[1] ?? '') ?? []).map((r) => ({
-          ...r,
-          output: { title: null, summary: null },
-        })),
-      });
-    }
-    return send(404, { message: 'not found' });
-  });
+      const runs = /\/commits\/([0-9a-f]+)\/check-runs/.exec(url);
+      if (runs) {
+        if (this.failingChecks) return send(500, { message: 'boom' });
+        return send(200, {
+          check_runs: (this.checks.get(runs[1] ?? '') ?? []).map((r) => ({
+            ...r,
+            output: { title: null, summary: null },
+          })),
+        });
+      }
+      return send(404, { message: 'not found' });
+    },
+  );
   count(fragment: string): number {
     return this.requests.filter((u) => u.includes(fragment)).length;
   }
@@ -137,6 +156,8 @@ function seedThread(
     repo?: string;
     archived?: boolean;
     phase?: 'review' | 'done';
+    sourceKind?: 'github-issue' | 'github-issue-self' | null;
+    sourceRef?: string | null;
   } = {},
 ) {
   counter += 1;
@@ -167,6 +188,8 @@ function seedThread(
       seqNum: counter,
       latestBuildId: buildId,
       archivedAt: opts.archived === true ? 5 : null,
+      sourceKind: opts.sourceKind ?? null,
+      sourceRef: opts.sourceRef ?? null,
     })
     .run();
   s.db
@@ -240,6 +263,160 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
       dismissed: false,
       wakeRounds: 0,
     });
+  });
+
+  test('the panel row carries the project of its thread, archived or not', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    await watchFor(s, mock).sweep(1_000);
+    const projectId = s.db
+      .select()
+      .from(todoTable)
+      .where(eq(todoTable.id, t.todoId))
+      .get()?.projectId;
+    expect(projectId).toBeTruthy();
+    expect(listThreadPrs(s.db, { teamId: s.team.id })[0]?.projectId).toBe(projectId);
+    s.db.update(todoTable).set({ archivedAt: 5 }).where(eq(todoTable.id, t.todoId)).run();
+    expect(listThreadPrs(s.db, { teamId: s.team.id })[0]?.projectId).toBe(projectId);
+  });
+
+  test('the panel row names the branch, its base and the failing checks', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { branch: 'cairn/pr-panel', base: 'main' });
+    mock.checks.set(HEAD_A, [
+      { name: 'unit', status: 'completed', conclusion: 'success' },
+      { name: 'lint', status: 'completed', conclusion: 'failure' },
+      { name: 'e2e (1)', status: 'completed', conclusion: 'timed_out' },
+      { name: 'e2e (1)', status: 'completed', conclusion: 'failure' },
+    ]);
+    await watchFor(s, mock).sweep(1_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row).toMatchObject({ branch: 'cairn/pr-panel', base: 'main' });
+    expect(row?.checks.failedNames).toEqual(['lint', 'e2e (1)']);
+  });
+
+  test('an unchanged PR polled successfully, including on a 304, moves lastReadAt', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    await watch.sweep(70_000);
+    expect(mock.notModified).toBeGreaterThan(0);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row?.lastReadAt).toBe(70_000);
+  });
+
+  test('repeated unreadable check runs keep the old counts and leave lastReadAt at the last full read', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    mock.checks.set(HEAD_A, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.failingChecks = true;
+    await watch.sweep(70_000);
+    await watch.sweep(140_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row?.checks).toMatchObject({ passed: 1, total: 1 });
+    expect(row?.lastReadAt).toBe(1_000);
+    mock.failingChecks = false;
+    await watch.sweep(210_000);
+    expect(listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId })[0]?.lastReadAt).toBe(
+      210_000,
+    );
+  });
+
+  test('a new PR whose check runs cannot be read is recorded as never fully read', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    mock.failingChecks = true;
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    expect(rows(s)[0]?.lastReadAt).toBe(0);
+    mock.failingChecks = false;
+    await watch.sweep(70_000);
+    expect(rows(s)[0]?.lastReadAt).toBe(70_000);
+  });
+
+  test('a changed pull with unreadable check runs still updates its fields but not lastReadAt', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { title: 'before' });
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.failingChecks = true;
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { title: 'after' });
+    await watch.sweep(70_000);
+    expect(rows(s)[0]).toMatchObject({ title: 'after', lastReadAt: 1_000 });
+  });
+
+  test('checksReadFor names the head the checks were read for, and a head change with a failed read keeps the old one', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { head: HEAD_A });
+    mock.checks.set(HEAD_A, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    expect(listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId })[0]).toMatchObject({
+      head: HEAD_A,
+      checksReadFor: HEAD_A,
+    });
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { head: HEAD_B });
+    mock.failingChecks = true;
+    await watch.sweep(70_000);
+    await watch.sweep(140_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row).toMatchObject({ head: HEAD_B, checksReadFor: '' });
+    expect(row?.checks.total).toBe(0);
+    mock.failingChecks = false;
+    mock.checks.set(HEAD_B, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
+    await watch.sweep(210_000);
+    expect(listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId })[0]).toMatchObject({
+      head: HEAD_B,
+      checksReadFor: HEAD_B,
+    });
+  });
+
+  test('a force-push back to a head whose tally was discarded does not read as read', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { head: HEAD_A });
+    mock.checks.set(HEAD_A, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.failingChecks = true;
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { head: HEAD_B });
+    await watch.sweep(70_000);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { head: HEAD_A });
+    await watch.sweep(140_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row).toMatchObject({ head: HEAD_A, checksReadFor: '' });
+    expect(row?.checks.total).toBe(0);
+  });
+
+  test('a failed poll leaves lastReadAt at the last good read', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.failing.add(`octo/demo#${t.prNumber}`);
+    await watch.sweep(70_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row?.lastReadAt).toBe(1_000);
   });
 
   test('mergeable_state values map onto the panel merge states, a draft shows as draft', async () => {
@@ -862,5 +1039,160 @@ describe('F8 GET /api/prs', () => {
       .run();
     await watchFor(s, mock).sweep(1_000);
     expect(rows(s)[0]).toMatchObject({ verdictResult: null, verdictHead: null });
+  });
+});
+
+describe('F8 the PR body carries a closing keyword for the task issue', () => {
+  test('a self-issue task PR without the keyword gets one Closes line at the top, once', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1010,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#77',
+    });
+    mock.pulls.set('octo/demo#1010', { body: '## What\n\nRefs #7 and #770, fixes #7700.' });
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    await watch.sweep(70_000);
+    expect(mock.bodyEdits).toEqual([
+      { key: 'octo/demo#1010', body: 'Closes #77\n\n## What\n\nRefs #7 and #770, fixes #7700.' },
+    ]);
+  });
+
+  test('a worker rewrite that drops the line gets it back on the next sweep', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1015,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#78',
+    });
+    mock.pulls.set('octo/demo#1015', { body: 'first' });
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.pulls.set('octo/demo#1015', { body: 'rewritten' });
+    await watch.sweep(70_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([
+      'Closes #78\n\nfirst',
+      'Closes #78\n\nrewritten',
+    ]);
+  });
+
+  test.each([
+    'closes #77',
+    'Fixes: #77.',
+    'RESOLVED octo/demo#77',
+    'This pull request fixes #77 for real.',
+  ])('a body that already says %s is left alone', async (line) => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1020,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#77',
+    });
+    mock.pulls.set('octo/demo#1020', { body: `## What\n\n${line}` });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits).toEqual([]);
+  });
+
+  test.each([
+    ['a fenced code block', '```\nCloses #77\n```'],
+    ['an HTML comment', '<!-- Closes #77 -->'],
+    ['an inline code span', 'run `closes #77` later'],
+  ])('a keyword only inside %s does not count, so the line is added', async (_name, inert) => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1025,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#77',
+    });
+    mock.pulls.set('octo/demo#1025', { body: inert });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`Closes #77\n\n${inert}`]);
+  });
+
+  test('the edit builds on the body as it is now, not on the body the sweep read earlier', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1027,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#79',
+    });
+    mock.pulls.set('octo/demo#1027', { body: 'old' });
+    let reads = 0;
+    const inner = mock.fetch.getMockImplementation();
+    mock.fetch.mockImplementation((input, init) => {
+      if (init?.method !== 'PATCH' && String(input).endsWith('/pulls/1027')) {
+        reads += 1;
+        if (reads === 2) mock.pulls.set('octo/demo#1027', { body: 'edited meanwhile' });
+      }
+      return inner!(input, init);
+    });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['Closes #79\n\nedited meanwhile']);
+  });
+
+  test.each([
+    ['an unclosed fence', '## What\n\n```text\nlog output'],
+    ['an unclosed HTML comment', '## What\n\n<!-- note'],
+  ])('a body ending in %s converges after one edit', async (_name, open) => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1029,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#81',
+    });
+    mock.pulls.set('octo/demo#1029', { body: open });
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    await watch.sweep(70_000);
+    await watch.sweep(140_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`Closes #81\n\n${open}`]);
+  });
+
+  test('an imported issue from the same repo is closed the same way', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, { prNumber: 1030, sourceKind: 'github-issue', sourceRef: 'github:octo/demo#5' });
+    mock.pulls.set('octo/demo#1030', { body: 'x' });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['Closes #5\n\nx']);
+  });
+
+  test.each([
+    ['no issue', null, null],
+    ['an issue still being created', 'github-issue-self', null],
+    ['an issue in another repo', 'github-issue', 'github:octo/other#5'],
+  ] as const)('a task with %s gets no closing line', async (_name, sourceKind, sourceRef) => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, { prNumber: 1040, sourceKind, sourceRef });
+    mock.pulls.set('octo/demo#1040', { body: 'x' });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits).toEqual([]);
+  });
+
+  test('a merged or closed PR body is never edited', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1050,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#9',
+    });
+    seedThread(s, {
+      prNumber: 1051,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#10',
+    });
+    mock.pulls.set('octo/demo#1050', { state: 'closed', merged: true, body: 'x' });
+    mock.pulls.set('octo/demo#1051', { state: 'closed', merged: false, body: 'x' });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits).toEqual([]);
   });
 });

@@ -79,8 +79,8 @@ test('B2: ordered list renders ordinals and unordered list renders bullets', asy
   await expect(ordered).toHaveCount(2);
   await expect(ordered.first()).toContainText('第一步：确认目录');
   await expect(ordered.nth(1)).toContainText('第二步：打印问候');
-  // the ordinal marker is rendered, not the literal `1.` from source
-  await expect(ordered.first().getByTestId('md-ordinal')).toContainText('1.');
+  await expect(ordered.first()).toHaveAttribute('value', '1');
+  await expect(ordered.first()).not.toContainText('1.');
 
   const bullets = page.getByTestId('md-item-bullet');
 

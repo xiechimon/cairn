@@ -59,6 +59,7 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     sourceKind: null,
     sourceRef: null,
     output: 'code',
+    owner: 'owner',
   };
 
   it('parses the full observed field set', () => {
@@ -579,7 +580,11 @@ describe('team record (r2 §1.5 teams-v1 cache measured values)', () => {
       plan: 'free',
       avatarStyle: 'notionist',
     };
-    expect(teamRecordSchema.parse(sample)).toEqual(sample);
+    expect(teamRecordSchema.parse(sample)).toEqual({
+      ...sample,
+      coAuthorTrailer: true,
+      requestInstructorReview: false,
+    });
   });
 
   it('member rows accept the embedded actor full record (r5 §1: agent list goes through members)', () => {

@@ -16,6 +16,7 @@ import {
   githubUserRepos,
 } from '../../apps/server/src/lib/github.js';
 import { githubPrFeedback } from '../../apps/server/src/lib/github-feedback.js';
+import type { UserToken } from '../../apps/server/src/lib/github-token.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { upsertGithubConnection } from '../../apps/server/src/services/github-connection.js';
@@ -211,11 +212,18 @@ export async function runGithubEmulatorCase() {
         (repo) => repo.fullName === 'octo/demo',
       ),
     );
-    const merge = await githubMergePull(wire, 'emulate-local-token', 'octo', 'demo', number, {
-      sha,
-      commitTitle: 'D109 evidence',
-      commitMessage: 'Local only',
-    });
+    const merge = await githubMergePull(
+      wire,
+      'emulate-local-token' as UserToken,
+      'octo',
+      'demo',
+      number,
+      {
+        sha,
+        commitTitle: 'D109 evidence',
+        commitMessage: 'Local only',
+      },
+    );
     assert.equal(merge.kind, 'merged');
     await watch.sweep(70_000);
     const merged = db.select().from(threadPr).get();

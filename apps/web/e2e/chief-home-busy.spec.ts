@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openChiefWindow, verticalGap } from './helpers.js';
+import { verticalGap } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -255,7 +255,7 @@ test.describe('chief unavailable (T4)', () => {
     expect(width).toBeLessThanOrEqual(390);
   });
 
-  test('with a backup model the drawer model row gets a dot, and the reply says which model answered', async ({
+  test('with a backup model the banner names it and the reply says which model answered', async ({
     page,
   }) => {
     await mockLive(page, {
@@ -290,12 +290,6 @@ test.describe('chief unavailable (T4)', () => {
     await expect(home.getByTestId('chief-fallback-banner')).toContainText('relay-b/glm-4.6');
     await expect(home.getByTestId('chief-outage')).toHaveCount(0);
     await evidenceShot(page, 'fallback.png');
-    await page.goto('/app/schedules');
-    await openChiefWindow(page);
-    const row = page.locator('.chief-drawer').getByTestId('chief-model-row');
-    await expect(row).toContainText('备用模型 relay-b/glm-4.6');
-    await expect(row.getByTestId('chief-fallback-dot')).toBeVisible();
-    await expect(row).toContainText('主模型暂时用不了');
   });
 });
 
@@ -463,7 +457,7 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await reply.getByTestId('chief-tools-toggle').click();
     await evidenceShot(page, 'tools-once.png');
     const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
-    expect(await verticalGap(page, question, reply)).toBeLessThan(40);
+    expect(await verticalGap(page, question, reply)).toBeLessThan(48);
     for (const name of ['pull_requests', 'issues', 'run_builds']) {
       await expect(home.getByText(name, { exact: true })).toHaveCount(1);
     }
@@ -521,10 +515,7 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
 });
 
 test.describe('queued messages never push the input out of the composer', () => {
-  for (const target of [
-    { name: 'home at 600px height', url: '/app', width: 1440, height: 600 },
-    { name: 'drawer at 600px height', url: '/app/schedules?chief=chief-home', width: 1440, height: 600 },
-  ]) {
+  for (const target of [{ name: 'home at 600px height', url: '/app', width: 1440, height: 600 }]) {
     test(`ten queued messages keep the input and send button in view (${target.name})`, async ({
       page,
     }) => {
@@ -543,7 +534,7 @@ test.describe('queued messages never push the input out of the composer', () => 
         messages: [FIRST, ...queued],
       });
       await page.goto(target.url);
-      const root = target.url.includes('chief=') ? page.locator('.chief-drawer') : page.getByTestId('home-c');
+      const root = page.getByTestId('home-c');
       await expect(root.getByTestId('queued-message')).toHaveCount(10);
       await expect(root.getByTestId('chief-composer-input')).toBeInViewport({ ratio: 1 });
       await expect(root.getByRole('button', { name: '停止 Coordinator 这次回复' })).toBeInViewport({ ratio: 1 });

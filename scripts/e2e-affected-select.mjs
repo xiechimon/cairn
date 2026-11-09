@@ -75,7 +75,7 @@ const DETAIL = [
   'escape-',
   'spec-brief-',
   'spinner-',
-  'chief-fab',
+  'coordinator-entry',
   'chief-home-',
   'chief-project-pick',
   'chief-stream-markdown',
@@ -225,8 +225,12 @@ export const SHARED_SURFACE_ONLY = [
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 export const FILE_RULES = new Map([
-  ['apps/web/src/components/thread/pr-card.tsx', ['pr-card']],
-  ['apps/web/src/components/thread/pr-card-model.ts', ['pr-card']],
+  ['apps/web/src/components/thread/pr-card.tsx', ['pr-card', 'thread-pr-panel']],
+  ['apps/web/src/components/thread/pr-card-model.ts', ['pr-card', 'thread-pr-panel']],
+  ['apps/web/src/components/thread/pr-link.tsx', ['thread-pr-panel']],
+  ['apps/web/src/components/thread/pr-list.tsx', ['thread-pr-panel']],
+  ['apps/web/src/components/thread/pr-panel-model.ts', ['thread-pr-panel']],
+  ['apps/web/src/board/thread-pr-panel.tsx', ['thread-pr-panel']],
   ['apps/web/src/design/components-overlays.tsx', ['menu-keys', 'shadcn-primitives']],
   [
     'apps/web/src/components/menu-keys.tsx',
@@ -238,7 +242,7 @@ export const FILE_RULES = new Map([
     ['menu-keys', 'sidebar-', 'cds-sidebar', 'paper-sidebar'],
   ],
   ['apps/web/src/overlay/status-menu.tsx', [...OVERLAYS, ...DETAIL]],
-  ['apps/web/src/overlay/gesture-machine.ts', [...OVERLAYS, 'chief-toggle-flash']],
+  ['apps/web/src/overlay/gesture-machine.ts', OVERLAYS],
   ['apps/web/src/overlay/hotkeys.ts', OVERLAYS],
   ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
   ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
@@ -258,10 +262,7 @@ export const FILE_RULES = new Map([
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-', 'api-key-']],
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
   ['apps/web/src/routes/team-page.tsx', ['team-', 'account-team-cleanse']],
-  [
-    'apps/web/src/components/model-select-core.tsx',
-    [...AGENT, 'chief-drawer-model', 'chief-settings'],
-  ],
+  ['apps/web/src/components/model-select-core.tsx', [...AGENT, 'chief-settings']],
   [
     'apps/web/src/components/profile-card.tsx',
     ['avatar-', 'user-menu-', 'paper-', 'account-', ...AGENT],
@@ -331,6 +332,7 @@ const FULL_PATH_PREFIXES = [
   'scripts/e2e-affected.mjs',
   'scripts/e2e-affected-select.mjs',
   'scripts/heavy-slots.mjs',
+  'scripts/owned-process.mjs',
   'scripts/timed-partition.mjs',
 ];
 

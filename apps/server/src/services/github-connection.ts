@@ -1,12 +1,14 @@
 import {
   GITHUB_CONNECTION_OAUTH,
   type GithubConnectionStatus,
+  type GitIdentity,
   type SecretBox,
 } from '@cairn/shared';
 import { eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { githubConnection } from '../db/schema.js';
 import { type FetchLike, refreshOAuthAccessToken } from '../lib/github.js';
+import { isAppToken, type UserToken } from '../lib/github-token.js';
 import { nowMs } from '../lib/ids.js';
 import { SecretBoxError } from '../lib/secret-box.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -20,6 +22,8 @@ export interface GithubConnectionDeps {
 
 export interface GithubTokenDeps {
   db: Db;
+  githubAppTokenSocket?: string | null;
+  githubAppIdentity?: GitIdentity | null | undefined;
   box?: SecretBox | undefined;
   githubFetch?: FetchLike | undefined;
   oauthClient?: OAuthClientConfig | null | undefined;
@@ -42,6 +46,8 @@ export function upsertGithubConnection(
   input: {
     teamId: string;
     login: string;
+    githubUserId?: number | null;
+    githubName?: string | null;
     accessToken: string;
     scope: string;
     refreshToken?: string | null | undefined;
@@ -59,6 +65,8 @@ export function upsertGithubConnection(
     .values({
       teamId: input.teamId,
       login: input.login,
+      githubUserId: input.githubUserId ?? null,
+      githubName: input.githubName ?? null,
       accessTokenCipher,
       refreshTokenCipher,
       accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
@@ -70,6 +78,8 @@ export function upsertGithubConnection(
       target: githubConnection.teamId,
       set: {
         login: input.login,
+        githubUserId: input.githubUserId ?? null,
+        githubName: input.githubName ?? null,
         accessTokenCipher,
         refreshTokenCipher,
         accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
@@ -126,10 +136,7 @@ export function openGithubToken(deps: GithubConnectionDeps, teamId: string): str
 
 const refreshChains = new Map<string, Promise<GithubTokenAccess>>();
 
-export async function teamGithubToken(
-  deps: GithubTokenDeps,
-  teamId: string,
-): Promise<GithubTokenAccess> {
+async function connectionToken(deps: GithubTokenDeps, teamId: string): Promise<GithubTokenAccess> {
   const box = deps.box;
   if (box === undefined) return { reason: 'no-secret-box' };
   const connectionDeps = { db: deps.db, box };
@@ -198,8 +205,9 @@ function refreshConnectionToken(
 
 export function refreshingGithubFetch(deps: GithubTokenDeps, inner: FetchLike): FetchLike {
   return async (input, init) => {
-    const res = await inner(input, init);
     const header = init?.headers?.authorization;
+    if (header?.startsWith('Bearer ') && isAppToken(header.slice(7))) return inner(input, init);
+    const res = await inner(input, init);
     if (res.status !== 401 || deps.box === undefined || !header?.startsWith('Bearer ')) return res;
     const box = deps.box;
     const rejected = header.slice('Bearer '.length);
@@ -237,7 +245,7 @@ export async function githubTokenOrNull(
   deps: GithubTokenDeps,
   teamId: string,
 ): Promise<string | null> {
-  const access = await teamGithubToken(deps, teamId);
+  const access = await connectionToken(deps, teamId);
   return 'token' in access ? access.token : null;
 }
 
@@ -261,3 +269,21 @@ export function readGithubConnectionStatus(
   }
   return { connected: true, login: row.login, scope: row.scope };
 }
+
+export async function teamUserToken(
+  deps: GithubTokenDeps,
+  teamId: string,
+): Promise<{ token: UserToken; box: SecretBox } | { reason: GithubTokenReason }> {
+  const access = await connectionToken(deps, teamId);
+  return 'token' in access ? { ...access, token: access.token as UserToken } : access;
+}
+
+export async function userTokenOrNull(
+  deps: GithubTokenDeps,
+  teamId: string,
+): Promise<UserToken | null> {
+  const access = await teamUserToken(deps, teamId);
+  return 'token' in access ? access.token : null;
+}
+
+export { teamUserToken as teamGithubToken };

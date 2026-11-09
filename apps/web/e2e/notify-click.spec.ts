@@ -377,18 +377,16 @@ test.describe('push notification click loop (XMON-106)', () => {
     await page.waitForURL('**/app?thread=todo-fb');
   });
 
-  test('T4: chief deep link → drawer opens on the target thread, params consumed once and stripped from the URL', async ({ page }) => {
+  test('T4: a chief deep link off the home navigates to the Coordinator page on the target thread, and the param is stripped', async ({ page }) => {
     await stubEventSource(page);
     await mockLiveApi(page);
     await page.goto('/app/schedules?chief=chief-bbb');
 
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toBeVisible();
-
-    await expect(drawer.getByTestId('chief-stream')).toContainText('线程乙的消息');
-
+    const home = page.getByTestId('home-c');
+    await expect(home.getByTestId('chief-stream')).toContainText('线程乙的消息');
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/app');
     await expect.poll(() => page.url()).not.toContain('chief=');
-    expect(page.url()).toContain('/app');
+    await expect(page.getByRole('complementary', { name: 'Coordinator' })).toHaveCount(0);
   });
 
   test('T4 home: a chief deep link on home opens the target thread in the home chat, strips the param, and lets go once the user leaves', async ({ page }) => {
@@ -399,7 +397,6 @@ test.describe('push notification click loop (XMON-106)', () => {
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stream')).toContainText('线程乙的消息');
     await expect.poll(() => page.url()).not.toContain('chief=');
-    await expect(page.locator('.chief-drawer')).toHaveCount(0);
 
     await page.getByTestId('sidebar-settings').click();
     await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '技能' }).click();
@@ -410,14 +407,13 @@ test.describe('push notification click loop (XMON-106)', () => {
     await expect(home.getByTestId('chief-stream')).not.toContainText('线程乙的消息');
   });
 
-  test('T4b: chief deep link pointing at a missing thread → drawer does not open, params still cleared', async ({ page }) => {
+  test('T4b: chief deep link pointing at a missing thread keeps the home on its default thread, params still cleared', async ({ page }) => {
     await stubEventSource(page);
     await mockLiveApi(page);
     await page.goto('/app?chief=chief-zzz');
 
     await expect.poll(() => page.url()).not.toContain('chief=');
 
-    await expect(page.locator('.chief-drawer')).toHaveCount(0);
     await expect(page.getByTestId('home-c')).toBeVisible();
 
     await expect(page.locator('[data-route="board"]')).toBeVisible();
