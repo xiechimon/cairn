@@ -12,6 +12,7 @@ export const STREAM_QUERY_KEYS: readonly (readonly string[])[] = [
   ['steps'],
   ['notifications'],
   ['chiefThreads'],
+  ['chief'],
   ['machines'],
   ['branchSync'],
   ['messages'],

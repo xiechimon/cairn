@@ -72,7 +72,9 @@ export function contextResumeOf(args: {
     usageStep !== ''
       ? slimStep === usageStep
       : args.lastColdSlimAt !== null && args.lastColdSlimAt >= args.lastUsage.createdAt;
-  if (slimRecent && slimOwnsLatest) return 'compacted';
+  const active = args.activeModel?.trim() ?? '';
+  const modelMatches = active === '' || args.lastUsage.model === active;
+  if (slimRecent && slimOwnsLatest && modelMatches) return 'compacted';
   if (
     isColdResume({
       now: args.now,
@@ -84,6 +86,19 @@ export function contextResumeOf(args: {
     return 'cold';
   }
   return 'warm';
+}
+
+export function resumeExpiresAtOf(args: {
+  resume: ContextResume;
+  retentionMs: number;
+  lastUsageCreatedAt: number;
+  lastColdSlimAt: number | null;
+}): number | null {
+  if (args.resume === 'warm') return args.lastUsageCreatedAt + args.retentionMs;
+  if (args.resume === 'compacted' && args.lastColdSlimAt !== null) {
+    return args.lastColdSlimAt + args.retentionMs;
+  }
+  return null;
 }
 
 export function isColdResume(args: {

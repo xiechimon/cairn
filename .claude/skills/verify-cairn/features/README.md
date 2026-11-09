@@ -66,6 +66,7 @@ The map does not write implementation details, only user paths, stable handles, 
 - [Control Glass five journeys](./glass-journeys.md) new task, dispatch to chief, review diff, request changes, merge. One-shot script `node .cursor/skills/verify-cairn/scripts/glass.mjs`.
 - [New task (workbench)](./board-new-task.md) workbench shell rendering (4 columns since #351), new-task dialog, automatic default-project creation when none, persistence triple truth.
 - [API keys](./api-keys.md) empty-state key creation, one-time plaintext, masked rows, DB stores the hash not the plaintext.
+- [API evidence card](./api-evidence-card.md) live-stack driver for backend Proof cards (calls screenshot, transcript, Before/After request table).
 - [Search](./search.md) sidebar entry -> panel input -> hit task rows.
 - [Theme](./theme.md) cairn-theme persistence, light/dark both ways.
 - [Avatars (local spiral seal)](./avatars.md) seeded spiral-seal avatar data URL, busy rotation, Root fixed-size box after #1003; custom probe `scripts/drive-avatars.mjs` (#387 / #1429).

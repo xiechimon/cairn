@@ -88,6 +88,7 @@ import { useAuth } from './auth.js';
 import { api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { cacheUserMessage } from './message-cache.js';
+import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
@@ -561,12 +562,28 @@ export const useSkillFile = (
     retry: false,
   });
 
-export const useChief = (teamId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['chief', teamId],
-    queryFn: () => api.get<ChiefGetResponse>(`/api/teams/${teamId}/chief`),
+export function useChief(teamId: string | undefined, enabled: boolean, threadId?: string | null) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ['chief', teamId, threadId ?? null],
+    queryFn: () => {
+      const q =
+        threadId != null && threadId !== '' ? `?threadId=${encodeURIComponent(threadId)}` : '';
+      return api.get<ChiefGetResponse>(`/api/teams/${teamId}/chief${q}`);
+    },
     enabled: enabled && teamId !== undefined,
   });
+  const resumeExpiresInMs = query.data?.context?.resumeExpiresInMs;
+  const dataUpdatedAt = query.dataUpdatedAt;
+  useEffect(() => {
+    if (!enabled || teamId === undefined || resumeExpiresInMs == null) return;
+    const timer = window.setTimeout(() => {
+      void qc.invalidateQueries({ queryKey: ['chief', teamId, threadId ?? null] });
+    }, resumeRefreshDelayMs(resumeExpiresInMs));
+    return () => window.clearTimeout(timer);
+  }, [enabled, teamId, threadId, resumeExpiresInMs, dataUpdatedAt, qc]);
+  return query;
+}
 
 export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
