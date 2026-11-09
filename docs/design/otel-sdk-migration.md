@@ -1,6 +1,6 @@
 # Tracing through the OpenTelemetry SDK
 
-Status: proposed. The seam move under Protected paths was approved by the orchestrator on 2026-11-09. The temporary coexistence under Rollout waits for ian's decision. Prior art and the live spike: `docs/research/otel-sdk-migration-2026-11-08.md`. Trigger: #3470, where one hand-written key kept Langfuse cost at 0.
+Status: proposed. The seam move under Protected paths was approved by the orchestrator on 2026-11-09. ian approved the temporary coexistence under Rollout on 2026-11-09. Prior art and the live spike: `docs/research/otel-sdk-migration-2026-11-08.md`. Trigger: #3470, where one hand-written key kept Langfuse cost at 0.
 
 ## Choice
 
@@ -57,10 +57,10 @@ Deleted, with no second path left: `OtlpValue`, `OtlpAttribute`, `OtlpSpan`, `Ot
 
 ## Rollout
 
-Three PRs off `main`, each under ~1000 lines and red-first:
+Three stacked PRs (shared, then server, then daemon), each branched on the previous one so the later ones are built while the first is in review. Each PR stays under ~1000 lines and is red-first:
 
 1. `shared(otel)`: dependencies, `biome.json`, the bridge, library keys, and the offline paths (`trajectory-otlp`, `trajectory-push`, `trajectory-shadow`).
 2. `server(otel)`: `runtime-otel.ts` and the server shutdown flush.
 3. `daemon(otel)`: the sink, `TRACEPARENT` and the daemon stop flush. This PR deletes the hand-written OTLP code.
 
-Between PR 1 and PR 3, the old sender still serves the server and the daemon. **ian: this coexistence needs your consent.** The proposed end date is 2026-11-15, tracked in one issue that PR 3 closes. Each PR is proven live: a real step's spans are in ClickHouse `events_core` (read with `docker exec`) under one `trace_id`, with parent ids that join and `provided_cost_details.total` present.
+Between PR 1 and PR 3, the old sender still serves the server and the daemon. ian approved this coexistence on 2026-11-09. It expires on 2026-11-09, and #3567 tracks it; PR 3 closes that issue. Each PR is proven live: a real step's spans are in ClickHouse `events_core` (read with `docker exec`) under one `trace_id`, with parent ids that join and `provided_cost_details.total` present.
