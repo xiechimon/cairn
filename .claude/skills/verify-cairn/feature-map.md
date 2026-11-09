@@ -13,8 +13,8 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `account` | `设置` (Settings) › `账号` (Account) | [Account and team](#account-and-team) |
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
 | `providers` | `设置` (Settings) › `模型与账户` (Models & accounts) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
-| `routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `模型路由` (Model routing) | [Model and work routing](#routing) |
-| `work-routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `工作路由` (Work routing) | [Model and work routing](#routing) |
+| `routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
+| `work-routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
@@ -313,7 +313,7 @@ Reach:
 3. `settings work-routing`
 
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`
-- Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `模型路由` (Model routing); `设置` (Settings) › `模型与账户` (Models & accounts) › `工作路由` (Work routing)
+- Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
@@ -426,7 +426,7 @@ Reach:
 
 **Threads** (shipped, centrality 1). A thread is one piece of work with its own session: created, continued, snoozed, archived, reset and counted by phase.
 
-States: Running, waiting on the user, done, snoozed or archived; the thread opens in the side panel with its actions menu.
+States: Running, waiting on the user, done, snoozed or archived; the thread opens in the side panel with its actions menu. Tasks reads include recent archives and pending standalone Coordinator questions; section is derived on every read.
 
 Reach:
 
@@ -438,10 +438,10 @@ Reach:
 - Keyboard shortcuts in its code: `B`, `C`, `P`
 - Test ids in its code: `accept-dialog-pr`, `agent-text`, `agent-todo`, `automation-completed`, `composer-card`, `composer-placeholder`, `composer-toolbar`, `composer-working`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `injected-skills`, `injected-skills-chip`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-list-bullet`, `md-list-ordered`, `md-table`, `md-task`, `md-tasks`, `msg-actions`, `msg-stamp`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `taskline`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `worked-for-rule`
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
-- Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main)
+- Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
-- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](../../../docs/spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main)
-- Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/snooze.test.ts`, `apps/server/test/archive.test.ts`
+- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](../../../docs/spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
+- Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/snooze.test.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
 ### desktop-app
 
