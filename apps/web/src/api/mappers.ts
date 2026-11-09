@@ -800,9 +800,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
   }
 
-  entries.sort((a, b) => a.at - b.at);
+  const loadedFrom = hasEarlier
+    ? (messages[0]?.createdAt ?? Number.POSITIVE_INFINITY)
+    : Number.NEGATIVE_INFINITY;
+  const loaded = entries.filter((entry) => entry.at >= loadedFrom).sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
-  for (const entry of entries) {
+  for (const entry of loaded) {
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
       if (previous?.kind === 'work') {

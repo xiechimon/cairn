@@ -55,14 +55,25 @@ const WIRE_BUILD = {
   createdAt: 0,
 };
 
-const history = Array.from({ length: 250 }, (_, i) => ({
-  id: `h-${String(i).padStart(4, '0')}`,
-  role: i % 2 === 0 ? 'user' : 'assistant',
-  content: i % 2 === 0 ? `question ${i}` : [{ type: 'text', text: `answer ${i}` }],
-  createdAt: 1_000 + i * 1_000,
-}));
+type Row = { id: string; role: string; content: unknown; createdAt: number };
 
-function pageBefore(before: string | null, size = 100) {
+const chat = (count: number): Row[] =>
+  Array.from({ length: count }, (_, i) => ({
+    id: `h-${String(i).padStart(4, '0')}`,
+    role: i % 2 === 0 ? 'user' : 'assistant',
+    content: i % 2 === 0 ? `question ${i}` : [{ type: 'text', text: `answer ${i}` }],
+    createdAt: 1_000 + i * 1_000,
+  }));
+
+const hiddenTail = (from: number, count: number): Row[] =>
+  Array.from({ length: count }, (_, i) => ({
+    id: `s-${String(i).padStart(4, '0')}`,
+    role: 'system',
+    content: JSON.stringify({ kind: 'merge_gate_run', rawOutput: `run ${i}` }),
+    createdAt: from + i * 1_000,
+  }));
+
+function pageBefore(history: Row[], before: string | null, size = 100) {
   const end = before === null ? history.length : history.findIndex((row) => row.id === before);
   const start = Math.max(0, end - size);
   return {
@@ -76,7 +87,7 @@ function pageBefore(before: string | null, size = 100) {
   };
 }
 
-async function openPagedThread(page: Page) {
+async function openPagedThread(page: Page, history: Row[] = chat(250)) {
   const requested: (string | null)[] = [];
   const json = (body: unknown, status = 200) => ({
     status,
@@ -105,7 +116,7 @@ async function openPagedThread(page: Page) {
     if (path === `/api/conversations/${BUILD_ID}/messages`) {
       const before = url.searchParams.get('before');
       requested.push(before);
-      return route.fulfill(json(pageBefore(before)));
+      return route.fulfill(json(pageBefore(history, before)));
     }
     return route.fulfill(json({ error: 'e2e stub: not the surface under test' }, 500));
   });
@@ -148,4 +159,10 @@ test('scrolling to the top of a task thread loads older pages until the spec app
   await expect(text(page, 'question 0')).toHaveCount(1);
   expect(requested).toEqual([null, 'h-0150', 'h-0050']);
   await expect(column(page).getByText(SPEC)).toHaveCount(1);
+});
+
+test('a newest page with no visible rows still loads the earlier page', async ({ page }) => {
+  const requested = await openPagedThread(page, [...chat(20), ...hiddenTail(100_000, 100)]);
+  await expect(text(page, 'answer 19')).toHaveCount(1);
+  expect(requested).toEqual([null, 's-0000']);
 });

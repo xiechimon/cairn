@@ -107,7 +107,7 @@ function TranscriptColumnInner({
         <ArrowDown width={16} height={16} />
         <span className="sr-only">{t('滚动到最新')}</span>
       </JumpToLatestButton>
-      {earlier !== undefined && openedKey === threadKey && (
+      {earlier !== undefined && settled && (openedKey === threadKey || transcript.length === 0) && (
         <EarlierLoader
           earlier={earlier}
           hasEarlier={hasEarlier}
