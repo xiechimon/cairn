@@ -8,7 +8,7 @@ import {
   type Tracer,
   trace,
 } from '@opentelemetry/api';
-import { ExportResultCode } from '@opentelemetry/core';
+import { ExportResultCode, W3CTraceContextPropagator } from '@opentelemetry/core';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
@@ -60,8 +60,18 @@ export function otlpTraceIdOfStep(step: { kind: string; buildId: string; stepId:
   return step.kind === 'chief' ? otlpTraceIdOfTurn(step.stepId) : otlpTraceIdOfBuild(step.buildId);
 }
 
-export function otlpTraceparent(traceId: string, spanId: string): string {
-  return `00-${traceId}-${spanId}-01`;
+export function traceparentFor(traceId: string, spanId: string): string {
+  const carrier: Record<string, string> = {};
+  new W3CTraceContextPropagator().inject(
+    trace.setSpanContext(ROOT_CONTEXT, { traceId, spanId, traceFlags: TraceFlags.SAMPLED }),
+    carrier,
+    {
+      set: (target, key, value) => {
+        target[key] = value;
+      },
+    },
+  );
+  return carrier.traceparent ?? '';
 }
 
 export function parseOtlpTarget(env: {
@@ -101,8 +111,6 @@ export interface StepOtelContext {
   stepSpanId: string;
   tracesUrl: string;
   headers: Record<string, string>;
-  exporterEndpoint: string;
-  exporterHeaders: string;
   environment?: string;
 }
 
@@ -112,182 +120,22 @@ export function stepOtelContext(
   target: OtlpTarget,
   options: { kind?: string; environment?: string | null } = {},
 ): StepOtelContext {
-  const basePath = target.url.pathname.replace(/\/v1\/traces$/, '');
   return {
     traceId: otlpTraceIdOfStep({ kind: options.kind ?? '', buildId, stepId }),
     stepSpanId: otlpStepSpanIdOfBuild(buildId, stepId),
     ...(options.environment != null ? { environment: options.environment } : {}),
     tracesUrl: `${target.url.origin}${target.url.pathname}`,
     headers: target.headers,
-    exporterEndpoint: `${target.url.origin}${basePath}`,
-    exporterHeaders: Object.entries(target.headers)
-      .map(([key, value]) => `${key}=${value}`)
-      .join(','),
   };
 }
 
-export const OTLP_SPAN_KIND = { internal: 1, client: 3 } as const;
-export const OTLP_STATUS_ERROR = 2;
-
-export interface OtlpValue {
-  stringValue?: string;
-  intValue?: string;
-  doubleValue?: number;
-  boolValue?: boolean;
-  arrayValue?: { values: OtlpValue[] };
-}
-
-export interface OtlpAttribute {
-  key: string;
-  value: OtlpValue;
-}
-
-export interface OtlpSpan {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  name: string;
-  kind: number;
-  startTimeUnixNano: string;
-  endTimeUnixNano: string;
-  attributes: OtlpAttribute[];
-  status?: { code: number; message?: string };
-}
-
-export interface OtlpTracesRequest {
-  resourceSpans: {
-    resource: { attributes: OtlpAttribute[] };
-    scopeSpans: { scope: { name: string }; spans: OtlpSpan[] }[];
-  }[];
-}
-
-const NANOS_PER_MILLI = 1_000_000n;
+const EXPORT_TIMEOUT_MS = 5_000;
 
 function deriveOtelId(bytes: number, ...parts: (string | number)[]): string {
   return createHash('sha256')
     .update(JSON.stringify(parts))
     .digest('hex')
     .slice(0, bytes * 2);
-}
-
-export function otlpAttributes(attributes: Attributes): OtlpAttribute[] {
-  return Object.entries(attributes).flatMap(([key, value]): OtlpAttribute[] => {
-    if (value == null) return [];
-    if (typeof value === 'string') return [{ key, value: { stringValue: value } }];
-    if (typeof value === 'boolean') return [{ key, value: { boolValue: value } }];
-    if (typeof value === 'number')
-      return [
-        {
-          key,
-          value: Number.isInteger(value) ? { intValue: String(value) } : { doubleValue: value },
-        },
-      ];
-    if (!Array.isArray(value)) return [];
-    return [
-      {
-        key,
-        value: {
-          arrayValue: {
-            values: value.map((item: unknown) => ({ stringValue: String(item ?? '') })),
-          },
-        },
-      },
-    ];
-  });
-}
-
-export function otlpNanos(epochMs: number): string {
-  return (BigInt(Math.trunc(epochMs)) * NANOS_PER_MILLI).toString();
-}
-
-export function otlpTracesRequest(
-  resourceAttributes: Attributes,
-  scopeName: string,
-  spans: OtlpSpan[],
-): OtlpTracesRequest {
-  return {
-    resourceSpans: [
-      {
-        resource: { attributes: otlpAttributes(resourceAttributes) },
-        scopeSpans: [{ scope: { name: scopeName }, spans }],
-      },
-    ],
-  };
-}
-
-export const OTLP_SEND_TIMEOUT_MS = 5000;
-
-export async function postOtlpTraces(
-  target: OtlpTarget,
-  request: OtlpTracesRequest,
-  timeoutMs = OTLP_SEND_TIMEOUT_MS,
-): Promise<void> {
-  const response = await fetch(target.url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...target.headers },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!response.ok) throw new Error(`OTLP endpoint replied HTTP ${response.status}`);
-}
-
-export interface OtlpSenderLimits {
-  concurrency: number;
-  queue: number;
-  timeoutMs: number;
-}
-
-export interface OtlpSender {
-  send(
-    target: OtlpTarget,
-    request: OtlpTracesRequest,
-    onFailure?: (error: unknown) => void,
-  ): boolean;
-  dropped(): number;
-}
-
-interface Job {
-  target: OtlpTarget;
-  request: OtlpTracesRequest;
-  onFailure: ((error: unknown) => void) | undefined;
-}
-
-export function createOtlpSender(
-  limits: OtlpSenderLimits = { concurrency: 4, queue: 64, timeoutMs: OTLP_SEND_TIMEOUT_MS },
-  defaultOnFailure?: (error: unknown) => void,
-): OtlpSender {
-  const waiting: Job[] = [];
-  let active = 0;
-  let dropped = 0;
-  const run = (job: Job): void => {
-    active += 1;
-    postOtlpTraces(job.target, job.request, limits.timeoutMs)
-      .catch((error: unknown) => {
-        try {
-          (job.onFailure ?? defaultOnFailure)?.(error);
-        } catch {}
-      })
-      .finally(() => {
-        active -= 1;
-        const next = waiting.shift();
-        if (next !== undefined) run(next);
-      });
-  };
-  return {
-    send(target, request, onFailure) {
-      if (active < limits.concurrency) {
-        run({ target, request, onFailure });
-        return true;
-      }
-      if (waiting.length >= limits.queue) {
-        dropped += 1;
-        return false;
-      }
-      waiting.push({ target, request, onFailure });
-      return true;
-    },
-    dropped: () => dropped,
-  };
 }
 
 export interface CairnSpan {
@@ -396,7 +244,7 @@ export async function exportCairnSpans(
   resource: Attributes,
   scope: string,
   spans: readonly CairnSpan[],
-  timeoutMs = OTLP_SEND_TIMEOUT_MS,
+  timeoutMs = EXPORT_TIMEOUT_MS,
 ): Promise<void> {
   const ended: ReadableSpan[] = [];
   const recorder = spanRecorder(resource, scope, {
@@ -433,7 +281,7 @@ export function createCairnTracing(
   resource: Attributes,
   scope: string,
   onError: (error: Error) => void = () => {},
-  timeoutMs = OTLP_SEND_TIMEOUT_MS,
+  timeoutMs = EXPORT_TIMEOUT_MS,
 ): CairnTracing {
   const processor = new BatchSpanProcessor({
     exporter: otlpExporter(target, timeoutMs),
