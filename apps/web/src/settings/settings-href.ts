@@ -3,6 +3,7 @@ export const SETTINGS_HREF = '/app/settings';
 export const SETTINGS_SECTION_IDS = [
   'account',
   'appearance',
+  'projects',
   'providers',
   'routing',
   'work-routing',

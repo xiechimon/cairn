@@ -12,6 +12,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 |---|---|---|
 | `account` | `设置` (Settings) › `账号` (Account) | [Account and team](#account-and-team) |
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
+| `projects` | `设置` (Settings) › `项目` | [Projects](#projects) |
 | `providers` | `设置` (Settings) › `模型与账户` (Models & accounts) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
 | `routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
 | `work-routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
@@ -669,7 +670,7 @@ Reach:
 
 - Web routes: `/app/settings/:section?`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `settings-backdrop`, `settings-body`, `settings-breadcrumb`, `settings-content`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `settings-backdrop`, `settings-body`, `settings-breadcrumb`, `settings-content`
 - Verify recipes: [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md), [.claude/skills/verify-cairn/features/persona-verify.md](features/persona-verify.md)
 - Research: [docs/research/ai-frontend-quality-2026-11-06.md](../../../docs/research/ai-frontend-quality-2026-11-06.md) (not on main), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/settings](../../../docs/design/references/settings)
@@ -836,7 +837,7 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.
 
 States: A new-project form for a local folder or a GitHub repository, a project home, settings for base branch, concurrency, autonomy and instructions, archived or deleted.
 
@@ -847,15 +848,17 @@ Reach:
 3. `open /app/project/<id of a project listed by the projects API>/tasks`
 4. `open /app/project/<id of a project listed by the projects API>/settings`
 5. `click testid:project-instructions-input`
+6. `settings projects`
 
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
+- Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `A`, `D`, `G`, `L`, `P`, `R`, `T`
-- Test ids in its code: `github-picker`, `project-home`, `project-home-ask`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-home`, `project-home-ask`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
-- Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md)
-- Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
+- Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
+- Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
-- Evidence: `apps/web/e2e/project-new-repo.spec.ts`, `apps/web/e2e/project-settings-autonomy.spec.ts`, `apps/server/test/project-delete.test.ts`
+- Evidence: `apps/web/e2e/project-new-repo.spec.ts`, `apps/web/e2e/project-settings-autonomy.spec.ts`, `apps/server/test/project-delete.test.ts`, `apps/web/e2e/settings-archived-projects.spec.ts`
 
 ### quota-wait
 
