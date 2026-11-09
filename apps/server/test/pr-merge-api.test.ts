@@ -505,6 +505,20 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.fake.puts()).toHaveLength(1);
   });
 
+  test('[2b-D2d] the task is cancelled while the body edit is in flight → refused, no merge PUT', async () => {
+    const w = makeWorld({ source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' } });
+    w.deps.githubFetch = async (input, init) => {
+      const res = await w.fake.fetch(input, init);
+      if (init?.method === 'PATCH') {
+        w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
+      }
+      return res;
+    };
+    await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow('closed -> done');
+    expect(w.fake.bodyEdits()).toHaveLength(1);
+    expect(w.fake.puts()).toHaveLength(0);
+  });
+
   test('[2b-D2c] the body edit fails → 409, no merge PUT', async () => {
     const w = makeWorld({ source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' } });
     w.deps.githubFetch = async (input, init) =>
