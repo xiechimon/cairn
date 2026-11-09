@@ -40,6 +40,7 @@ const STRUCTURED_FAILURE = JSON.stringify({
   kind: 'build-failure',
   reason: GIT_ERROR,
   files: ['scripts/a.mjs', 'scripts/b.mjs'],
+  fileCount: 2,
   commits: ['a1cfe71e8377706ddd9aff08a6e90f97b7b40d8a'],
   pr: null,
 });
@@ -136,6 +137,31 @@ describe('task thread hierarchy', () => {
     expect(items.filter((item) => item.kind === 'robot')).toHaveLength(1);
   });
 
+  test('only the credential row is marked for translation; hook output stays verbatim', () => {
+    const hook = JSON.stringify({
+      kind: 'workspace-hook',
+      name: 'setup',
+      status: 'failed',
+      exitCode: 1,
+      ms: 10,
+      output: '失败',
+      omittedChars: 0,
+    });
+    const items = render(
+      rows([
+        ['system', hook],
+        ['system', STRUCTURED_CREDENTIAL],
+      ]),
+      'building',
+    );
+    const work = items.find((item) => item.kind === 'work');
+    const steps = work?.kind === 'work' ? work.steps : [];
+    expect(steps.map((step) => step.kind === 'call' && [step.output, step.localized])).toEqual([
+      ['失败', undefined],
+      ['integration：每步下发的 token', true],
+    ]);
+  });
+
   test.each([
     ['legacy text rows', LEGACY_FAILURE, LEGACY_REWORK],
     ['structured rows', STRUCTURED_FAILURE, REWORK],
@@ -184,6 +210,7 @@ describe('task thread hierarchy', () => {
       kind: 'build-failure',
       reason: 'request timed out talking to the model',
       files: null,
+      fileCount: null,
       commits: [],
       pr: null,
     });

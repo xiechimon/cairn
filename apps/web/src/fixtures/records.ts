@@ -346,6 +346,7 @@ export type WorkStep =
       running: boolean;
       unfinished: boolean;
       cancelled?: boolean;
+      localized?: boolean;
       seconds: number | null;
     };
 

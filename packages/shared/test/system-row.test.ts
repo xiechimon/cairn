@@ -50,6 +50,7 @@ describe('structured system rows', () => {
       kind: BUILD_FAILURE_ROW_KIND,
       reason: 'git commit failed (exit 1)',
       files: ['a.ts'],
+      fileCount: 1,
       commits: ['a1cfe71'],
       pr: { number: 7, url: null },
     });
@@ -85,9 +86,24 @@ describe('structured system rows', () => {
       kind: BUILD_FAILURE_ROW_KIND,
       reason: 'git commit failed (exit 1): On branch x\nYour branch has diverged',
       files: null,
+      fileCount: null,
       commits: [],
       pr: { number: 12, url: 'https://github.com/o/r/pull/12' },
     });
+  });
+
+  test('a legacy report that listed only the first ten files keeps its real file count', () => {
+    const names = Array.from({ length: 10 }, (_, index) => `f${index}.ts`);
+    const row = systemRowOf(
+      [
+        '构建步兜底报告：本步异常结束，以下由系统根据已知记录生成。',
+        '- 失败原因：boom',
+        `- 已知改动：15 个文件（${names.join('、')} 等）`,
+        '- PR：无',
+        '- 下一步：看过失败原因后带反馈重跑。',
+      ].join('\n'),
+    );
+    expect(row).toMatchObject({ fileCount: 15, files: names });
   });
 
   test('ordinary notes and other structured kinds are not system rows', () => {

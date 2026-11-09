@@ -1011,6 +1011,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           label: 'git',
           description: 'git 凭据',
           output: CREDENTIAL_SOURCE_DETAIL[row.source],
+          localized: true,
           error: false,
           running: false,
           unfinished: false,
@@ -1027,7 +1028,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
         title: stripAnsiEscapes(headline),
         body: failGuidanceBody(classifyStepFailure(row.reason)),
         facts: {
-          files: row.files?.length ?? null,
+          files: row.fileCount,
           commit: row.commits[0]?.slice(0, 9) ?? null,
           pr: row.pr?.number ?? null,
         },

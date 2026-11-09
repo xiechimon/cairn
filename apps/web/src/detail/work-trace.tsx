@@ -51,7 +51,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
   const lines = call
     ? (call.output === null
         ? t('无输出')
-        : call.action === 'setup'
+        : call.localized === true
           ? t(call.output)
           : call.output
       ).split('\n')
@@ -93,7 +93,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             >
               {preview}
             </span>
-          ) : call.action === 'setup' ? (
+          ) : call.localized === true ? (
             t(stepTarget(call))
           ) : (
             stepTarget(call)

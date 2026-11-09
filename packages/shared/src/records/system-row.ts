@@ -25,6 +25,7 @@ const buildFailureRowSchema = z.object({
   kind: z.literal(BUILD_FAILURE_ROW_KIND),
   reason: z.string(),
   files: z.array(z.string()).nullable(),
+  fileCount: z.number().int().nonnegative().nullable(),
   commits: z.array(z.string()),
   pr: z.object({ number: z.number().int(), url: z.string().nullable() }).nullable(),
 });
@@ -68,6 +69,7 @@ export function buildFailureRowContent(args: {
     kind: BUILD_FAILURE_ROW_KIND,
     reason: args.reason,
     files: args.files === undefined ? null : [...args.files],
+    fileCount: args.files === undefined ? null : args.files.length,
     commits: [...(args.commits ?? [])],
     pr: args.pr,
   };
@@ -119,11 +121,13 @@ function legacySystemRow(text: string): SystemRow | null {
   if (text.startsWith(LEGACY_FAILURE_HEAD)) {
     const files = legacyFailureField(text, '已知改动：');
     const fileList = files === null ? null : /（(.*?)( 等)?）$/.exec(files)?.[1]?.split('、');
+    const unrecorded = files === null || files === '没有改动记录';
     const pr = /^#(\d+)(?: (\S+))?$/.exec(legacyFailureField(text, 'PR：') ?? '');
     return {
       kind: BUILD_FAILURE_ROW_KIND,
       reason: legacyFailureField(text, '失败原因：') ?? '',
-      files: files === null || files === '没有改动记录' ? null : (fileList ?? []),
+      files: unrecorded ? null : (fileList ?? []),
+      fileCount: unrecorded ? null : Number(/^(\d+) 个文件/.exec(files)?.[1] ?? 0),
       commits: text
         .slice(Math.max(0, text.indexOf('\n- 已知改动：')))
         .split('\n')
