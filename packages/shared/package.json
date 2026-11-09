@@ -14,6 +14,7 @@
     "./github-create-gate": "./src/github-create-gate.ts",
     "./merge-gate": "./src/records/merge-gate.ts",
     "./otel": "./src/otel.ts",
+    "./repo-cache": "./src/repo-cache.ts",
     "./commit-identity": "./src/commit-identity.ts"
   },
   "scripts": {
@@ -28,6 +29,7 @@
     "@opentelemetry/resources": "3.1.0",
     "@opentelemetry/sdk-trace": "3.1.0",
     "@opentelemetry/semantic-conventions": "1.45.0",
+    "yaml": "2.9.0",
     "zod": "catalog:"
   },
   "devDependencies": {

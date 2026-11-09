@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6b57c914-6c2d-4ea5-9fd3-9ab279df78d2",
+  "id": "0d5845d6-00c4-4e8f-818f-952b6921f214",
   "prevId": "749d1454-31d5-4eb7-9b76-ab1220609c22",
   "tables": {
     "agent_memory": {
@@ -2492,6 +2492,107 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "feishu_binding": {
+      "name": "feishu_binding",
+      "columns": {
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "openId": {
+          "name": "openId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cairnOrigin": {
+          "name": "cairnOrigin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "appIdCipher": {
+          "name": "appIdCipher",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "appSecretCipher": {
+          "name": "appSecretCipher",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "feishu_binding_openId_unique": {
+          "name": "feishu_binding_openId_unique",
+          "columns": [
+            "openId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "feishu_binding_teamId_team_id_fk": {
+          "name": "feishu_binding_teamId_team_id_fk",
+          "tableFrom": "feishu_binding",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "feishu_binding_userId_user_id_fk": {
+          "name": "feishu_binding_userId_user_id_fk",
+          "tableFrom": "feishu_binding",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -6235,6 +6336,13 @@
           "notNull": false,
           "autoincrement": false,
           "default": "''"
+        },
+        "coordinatorTurn": {
+          "name": "coordinatorTurn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

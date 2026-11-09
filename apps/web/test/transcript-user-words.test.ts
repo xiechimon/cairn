@@ -272,11 +272,7 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
   });
 
   test('F14 the #931 rework-round-boundary note: both reuse-round and new-round system rows render as notes (do not pose as bubbles)', () => {
-    const reuse = buildReworkReuseNote({
-      prNumber: 888,
-      prUrl: 'https://github.com/demo-owner/demo-repo/pull/888',
-      failureReason: '本轮无人认领：团队当前没有在线机器',
-    });
+    const reuse = buildReworkReuseNote({ prNumber: 888 });
     const newBranch = buildReworkNewBranchNote({
       prNumber: 888,
       prUrl: 'https://github.com/demo-owner/demo-repo/pull/888',

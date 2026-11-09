@@ -109,13 +109,13 @@ function assembleCreateBody(files: SkillFileBody[], sourceLabel: string): Create
   if (!fm.name) {
     throw new HttpError(
       400,
-      `invalid ${SKILL_ENTRY_FILE} frontmatter: name is required (one line, plain value)`,
+      `invalid ${SKILL_ENTRY_FILE} frontmatter: name is required (non-empty YAML string scalar)`,
     );
   }
   if (!fm.description) {
     throw new HttpError(
       400,
-      `invalid ${SKILL_ENTRY_FILE} frontmatter: description is required (one line, plain value)`,
+      `invalid ${SKILL_ENTRY_FILE} frontmatter: description is required (non-empty YAML string scalar)`,
     );
   }
   return { name: fm.name, description: fm.description, files };

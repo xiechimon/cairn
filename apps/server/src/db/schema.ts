@@ -18,6 +18,7 @@ import type {
   ComputerState,
   ComputerTool,
   DocumentDiffFile,
+  EvidenceStore,
   INTAKE_SOURCE_KIND,
   MachineCapabilities,
   MemoryCandidateStatus,
@@ -45,6 +46,7 @@ import type {
   SnoozeMode,
   SplitPolicy,
   StepKind,
+  StepPromptOrigin,
   TaskDecision,
   TodoOutputKind,
   TodoSourceKind,
@@ -119,6 +121,7 @@ export const project = sqliteTable('project', {
     .notNull()
     .references(() => team.id),
   splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
+  evidenceStore: text('evidenceStore').$type<EvidenceStore>().notNull().default('attachments'),
   description: text('description'),
   instructions: text('instructions'),
   maxConcurrent: integer('maxConcurrent'),
@@ -147,6 +150,7 @@ export const todo = sqliteTable(
       .references(() => project.id),
     title: text('title').notNull(),
     spec: text('spec').notNull().default(''),
+    correctionRequired: bool('correctionRequired').notNull().default(false),
     phase: text('phase').$type<Phase>().notNull().default('todo'),
     phaseAt: epochMs('phaseAt').notNull(),
     archivedAt: epochMs('archivedAt'),
@@ -173,6 +177,7 @@ export const todo = sqliteTable(
     decisions: json<TaskDecision[]>('decisions').notNull().default(sql`'[]'`),
     lastNotifiedOwner: text('lastNotifiedOwner').default('none'),
     lastNotifiedWork: text('lastNotifiedWork').default(''),
+    coordinatorTurn: json<CoordinatorTurn>('coordinatorTurn'),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
@@ -234,6 +239,7 @@ export const build = sqliteTable('build', {
   harnessHash: text('harnessHash'),
   reportAttachmentId: text('reportAttachmentId'),
   reportLine: text('reportLine'),
+  evidenceStore: text('evidenceStore').$type<EvidenceStore>(),
   stop: json<BuildStop | null>('stop'),
   createdAt: epochMs('createdAt').notNull(),
 });
@@ -279,6 +285,7 @@ export const step = sqliteTable(
     lastHeartbeatAt: epochMs('lastHeartbeatAt'),
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
+    promptOrigin: json<StepPromptOrigin>('promptOrigin'),
     scopeProjectId: text('scopeProjectId'),
     byPerson: bool('byPerson').notNull().default(false),
     freshSession: bool('freshSession').notNull().default(false),
@@ -686,6 +693,8 @@ export const pushDigestItem = sqliteTable('push_digest_item', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
+export type CoordinatorTurn = { stepId: string; workKey: string };
+
 type HarnessEvalAttemptState = 'claimed' | 'dispatched' | 'dispatch_uncertain' | 'terminal';
 type HarnessEvalAttemptOutcome =
   | 'completed'
@@ -916,6 +925,8 @@ export const coordinatorConversation = sqliteTable('coordinator_conversation', {
   threadId: text('threadId').primaryKey(),
   conversationId: text('conversationId').notNull(),
   lastMirroredEntryId: text('lastMirroredEntryId'),
+  lastColdSlimAt: epochMs('lastColdSlimAt'),
+  lastColdSlimStepId: text('lastColdSlimStepId'),
   piVersion: text('piVersion').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
 });

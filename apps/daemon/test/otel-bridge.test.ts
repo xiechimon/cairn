@@ -1,18 +1,23 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { LANGFUSE_ATTR } from '@cairn/shared';
 import {
   OtlpTargetConfigError,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
   otlpTraceIdOfTurn,
-  otlpTraceparent,
   parseOtlpTarget,
   stepOtelContext,
+  traceparentFor,
 } from '@cairn/shared/otel';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   claudeCliEnv,
   claudeTelemetryEnv,
   daemonOtelFromEnv,
+  flushDaemonOtel,
   PiStepSpanSink,
+  shutdownDaemonOtel,
 } from '../src/backend/otel.js';
 
 const env = {
@@ -20,8 +25,48 @@ const env = {
   CAIRN_OTEL_HEADERS: 'x-langfuse-ingestion-version=4',
 };
 
-afterEach(() => {
-  vi.unstubAllGlobals();
+const received: CapturedRequest[] = [];
+const servers: Server[] = [];
+let collector = '';
+let refusing = '';
+let silent = '';
+
+async function listen(handler: Parameters<typeof createServer>[1]): Promise<string> {
+  const server = createServer(handler);
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  return `http://pk:sk@127.0.0.1:${(server.address() as AddressInfo).port}/api/public/otel`;
+}
+
+beforeAll(async () => {
+  collector = await listen((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      received.push({
+        url: `http://127.0.0.1${req.url ?? ''}`,
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+      });
+      res.setHeader('content-type', 'application/json');
+      res.end('{}');
+    });
+  });
+  refusing = await listen((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.statusCode = 400;
+      res.end('{}');
+    });
+  });
+  silent = await listen(() => {});
+});
+
+afterAll(async () => {
+  await shutdownDaemonOtel();
+  for (const server of servers) {
+    server.closeAllConnections();
+    server.close();
+  }
 });
 
 describe('daemonOtelFromEnv', () => {
@@ -82,7 +127,7 @@ describe('claudeTelemetryEnv', () => {
     const target = parseOtlpTarget(env)!;
     const ctx = stepOtelContext('build-abc', 'step-xyz', target);
     const injected = claudeTelemetryEnv(ctx);
-    expect(injected.TRACEPARENT).toBe(otlpTraceparent(ctx.traceId, ctx.stepSpanId));
+    expect(injected.TRACEPARENT).toBe(traceparentFor(ctx.traceId, ctx.stepSpanId));
     expect(injected.TRACEPARENT).toBe('00-c8e7752b66c5938fc686748fdc429fb0-68de601387c7a961-01');
     expect(injected.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0');
     expect(injected.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA).toBe('0');
@@ -114,19 +159,12 @@ interface CapturedRequest {
 }
 
 function captureFetch() {
-  const captured: CapturedRequest[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string, init: RequestInit) => {
-      captured.push({ url: String(url), body: JSON.parse(String(init.body)) });
-      return new Response('{}', { status: 200 });
-    }),
-  );
-  return captured;
+  received.splice(0);
+  return received;
 }
 
-function makeSink(log?: (msg: string) => void) {
-  const target = parseOtlpTarget(env)!;
+function makeSink(log?: (msg: string) => void, endpoint = collector) {
+  const target = parseOtlpTarget({ ...env, CAIRN_OTEL_ENDPOINT: endpoint })!;
   const ctx = stepOtelContext('build-abc', 'step-xyz', target);
   return { sink: new PiStepSpanSink(ctx, { provider: 'stub-gw', model: 'stub-model' }, log), ctx };
 }
@@ -146,8 +184,9 @@ describe('PiStepSpanSink', () => {
     sink.toolStart('call-1', 1100, 'bash', { command: 'ls' });
     sink.toolEnd('call-1', 1500, 'file.txt', false);
     await sink.flush();
+    await flushDaemonOtel();
     expect(captured).toHaveLength(1);
-    expect(captured[0]?.url).toBe('http://127.0.0.1:3000/api/public/otel/v1/traces');
+    expect(new URL(captured[0]?.url ?? '').pathname).toBe('/api/public/otel/v1/traces');
     const scope = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!;
     expect(captured[0]!.body.resourceSpans[0]!.resource.attributes).toEqual([
       { key: 'service.name', value: { stringValue: 'cairn' } },
@@ -164,9 +203,9 @@ describe('PiStepSpanSink', () => {
     expect(chatAttrs['gen_ai.provider.name']).toEqual({ stringValue: 'anthropic' });
     expect(chatAttrs['gen_ai.request.model']).toEqual({ stringValue: 'claude-sonnet' });
     expect(chatAttrs['gen_ai.response.model']).toEqual({ stringValue: 'claude-sonnet-4-5' });
-    expect(chatAttrs['gen_ai.usage.input_tokens']).toEqual({ intValue: '13' });
-    expect(chatAttrs['gen_ai.usage.output_tokens']).toEqual({ intValue: '5' });
-    expect(chatAttrs['gen_ai.usage.cache_read.input_tokens']).toEqual({ intValue: '2' });
+    expect(chatAttrs['gen_ai.usage.input_tokens']).toEqual({ intValue: 13 });
+    expect(chatAttrs['gen_ai.usage.output_tokens']).toEqual({ intValue: 5 });
+    expect(chatAttrs['gen_ai.usage.cache_read.input_tokens']).toEqual({ intValue: 2 });
     expect(chatAttrs['langfuse.observation.cost_details']).toEqual({
       stringValue: '{"total":0.01}',
     });
@@ -194,6 +233,7 @@ describe('PiStepSpanSink', () => {
     sink.toolStart('call-2', 1100, 'bash', 'ls');
     sink.toolEnd('call-2', 1200, 'boom', true);
     await sink.flush();
+    await flushDaemonOtel();
     const spans = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans;
     expect(spans[0]?.status?.code).toBe(2);
     expect(spans[1]?.status?.code).toBe(2);
@@ -204,6 +244,7 @@ describe('PiStepSpanSink', () => {
     const captured = captureFetch();
     sink.chat(1000, { finishReason: 'stop', usage: { input: 1 } });
     await sink.flush();
+    await flushDaemonOtel();
     const chat = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     const attrs = Object.fromEntries(chat.attributes.map((a) => [a.key, a.value]));
     expect(attrs['gen_ai.provider.name']).toEqual({ stringValue: 'stub-gw' });
@@ -217,6 +258,7 @@ describe('PiStepSpanSink', () => {
     sink.toolStart('call-3', 1000, 'bash', 'curl');
     sink.toolEnd('call-3', 1100, 'token Bearer abcdef0123456789abcdef0123456789abcdef01', false);
     await sink.flush();
+    await flushDaemonOtel();
     const raw = JSON.stringify(captured[0]);
     expect(raw).not.toContain('Bearer abcdef');
     expect(raw).toContain('[REDACTED]');
@@ -226,19 +268,62 @@ describe('PiStepSpanSink', () => {
     const { sink } = makeSink();
     const captured = captureFetch();
     await sink.flush();
+    await flushDaemonOtel();
     expect(captured).toEqual([]);
   });
 
   test('swallows push failures and reports them to the log', async () => {
     const logs: string[] = [];
-    const { sink } = makeSink((msg) => logs.push(msg));
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('down', { status: 503 })),
-    );
+    const { sink } = makeSink((msg) => logs.push(msg), refusing);
     sink.chat(1000, { provider: 'p', model: 'm', finishReason: 'stop' });
     await expect(sink.flush()).resolves.toBeUndefined();
-    await vi.waitFor(() => expect(logs.some((l) => l.includes('503'))).toBe(true));
+    await flushDaemonOtel();
+    expect(logs.some((l) => l.startsWith('otel push failed'))).toBe(true);
+  });
+
+  test('observation payloads are redacted and bounded on the SDK wire', async () => {
+    const { sink } = makeSink();
+    const captured = captureFetch();
+    sink.request([
+      {
+        role: 'user',
+        content: { token: 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz', text: '🧪'.repeat(12_000) },
+      },
+    ]);
+    sink.chat(1000, { output: { role: 'assistant', content: 'answer '.repeat(8_000) } });
+    await sink.flush();
+    await flushDaemonOtel();
+    const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    for (const key of [LANGFUSE_ATTR.input, LANGFUSE_ATTR.output]) {
+      const value = span.attributes.find((attribute) => attribute.key === key)?.value as {
+        stringValue: string;
+      };
+      expect(Buffer.byteLength(value.stringValue)).toBeLessThanOrEqual(32_768);
+      expect(() => JSON.parse(value.stringValue)).not.toThrow();
+      expect(value.stringValue).toContain('[truncated]');
+    }
+    expect(JSON.stringify(span)).not.toContain('abcdefghijklmnopqrstuvwxyz');
+  });
+
+  test('a second flush does not export the same completed spans again', async () => {
+    const { sink } = makeSink();
+    const captured = captureFetch();
+    sink.chat(1000, { finishReason: 'stop' });
+    await sink.flush();
+    await flushDaemonOtel();
+    await sink.flush();
+    await flushDaemonOtel();
+    expect(captured).toHaveLength(1);
+  });
+
+  test('daemon shutdown delivers spans a step flushed just before it', async () => {
+    const { sink, ctx } = makeSink();
+    const captured = captureFetch();
+    sink.chat(1000, { provider: 'p', model: 'm', finishReason: 'stop' });
+    void sink.flush();
+    await shutdownDaemonOtel();
+    const spans = captured.flatMap((r) => r.body.resourceSpans[0]!.scopeSpans[0]!.spans);
+    expect(spans.map((s) => [s.traceId, s.parentSpanId])).toEqual([[ctx.traceId, ctx.stepSpanId]]);
   });
 });
 
@@ -257,7 +342,11 @@ describe('Coordinator turn context', () => {
   });
 
   test('chat and tool spans of a turn carry the environment and a redacted payload', async () => {
-    const otel = daemonOtelFromEnv({ ...env, CAIRN_OTEL_ENVIRONMENT: 'prod' })!;
+    const otel = daemonOtelFromEnv({
+      ...env,
+      CAIRN_OTEL_ENDPOINT: collector,
+      CAIRN_OTEL_ENVIRONMENT: 'prod',
+    })!;
     const ctx = otel.contextFor('chief-thread-1', 'step-turn', 'chief');
     const sink = new PiStepSpanSink(ctx, { provider: 'anthropic', model: 'claude-opus' });
     const captured = captureFetch();
@@ -265,6 +354,7 @@ describe('Coordinator turn context', () => {
     sink.toolStart('c1', 1100, 'list_todos', { token: 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz' });
     sink.toolEnd('c1', 1200, 'ok', false);
     await sink.flush();
+    await flushDaemonOtel();
     const request = captured[0]!.body.resourceSpans[0]!;
     expect(request.resource.attributes).toEqual([
       { key: 'service.name', value: { stringValue: 'cairn' } },
@@ -281,13 +371,9 @@ describe('Coordinator turn context', () => {
   });
 
   test('an unreachable collector never delays or fails the sink', async () => {
-    const otel = daemonOtelFromEnv(env)!;
+    const otel = daemonOtelFromEnv({ ...env, CAIRN_OTEL_ENDPOINT: silent })!;
     const ctx = otel.contextFor('chief-thread-1', 'step-turn', 'chief');
     const sink = new PiStepSpanSink(ctx, { provider: 'p', model: 'm' });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise(() => {})),
-    );
     sink.chat(1, { finishReason: 'stop' });
     const started = Date.now();
     await expect(sink.flush()).resolves.toBeUndefined();

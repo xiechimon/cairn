@@ -15,15 +15,15 @@
 
 | Item | Count |
 |---|---|
-| Features | 53 |
-| status shipped | 44 |
+| Features | 52 |
+| status shipped | 43 |
 | status partial | 7 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 17 |
+| research, frontend design and backend design all present or not applicable | 19 |
 | Research gaps | 16 |
-| Frontend design gaps | 23 |
-| Backend design gaps | 22 |
-| notes cited but not on main | 20 |
+| Frontend design gaps | 20 |
+| Backend design gaps | 19 |
+| notes cited but not on main | 21 |
 
 ## Coverage
 
@@ -31,14 +31,14 @@
 |---|---|---|---|---|---|---|
 | [The agent's computer](#agent-computer) | 1 | partial | yes (not on main) | gap | gap | B4 |
 | [Coordinator chat](#coordinator-chat) | 1 | shipped | yes | yes | yes |  |
-| [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | gap | B1 |
+| [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | yes |  |
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Daily report and retro](#daily-report) | 1 | shipped | yes | gap | gap | B2 |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
-| [Memory](#memory) | 1 | shipped | yes | gap | gap | B1 |
+| [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
-| [Needs-you tray](#needs-you) | 1 | shipped | yes | gap | gap | B2 |
+| [Task cards and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
 | [Phone push](#push-notifications) | 1 | shipped | gap | gap | gap | B2 |
@@ -70,15 +70,14 @@
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
 | [MCP servers](#mcp-servers) | 3 | shipped | gap | yes | yes | B9 |
-| [Project files](#project-files) | 3 | shipped | yes | gap | gap | B8 |
-| [Projects](#projects) | 3 | shipped | yes (not on main) | yes | yes |  |
+| [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
 | [Scheduled tasks](#schedules) | 3 | shipped | gap | gap | gap | B7 |
 | [Search and activity](#search-and-activity) | 3 | shipped | gap | yes | gap | B7 |
 | [Secrets](#secrets) | 3 | shipped | yes | gap | yes | B10 |
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
-| [Sidebar and thread list](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
+| [Sidebar](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
 | [Thread tags](#thread-tags) | 4 | shipped | gap | yes | yes | B11 |
@@ -87,15 +86,6 @@
 
 Batches are ordered by how central their features are. One agent session researches and designs one batch.
 
-### B1 · Coordinator context and memory
-
-How the never-ending Coordinator conversation assembles each turn and what it remembers: the context budget, compaction, history tools, memory rows, promotion and invalidation. Design the data model and failure modes, and the memory view in Coordinator settings.
-
-| Feature | Centrality | Missing |
-|---|---|---|
-| [Coordinator context and compaction](#coordinator-context) | 1 | Backend design: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes |
-| [Memory](#memory) | 1 | Frontend design: the memory list in Coordinator settings has no design<br>Backend design: no design for memory keys, scope, consolidation, promotion and invalidation |
-
 ### B2 · What reaches ian: needs-you, questions, daily report, push
 
 The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, the 08:00 report and retro proposals, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules.
@@ -103,7 +93,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
-| [Needs-you tray](#needs-you) | 1 | Frontend design: D121 decided the tray, but no design or approved screenshot set shows its states<br>Backend design: no design for which records enter the tray, their order and when they leave |
+| [Task cards and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Research: no prior-art note on agent notifications and push delivery<br>Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns behind D85 and D119 were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
 
@@ -155,7 +145,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 |---|---|---|
 | [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model behind D56<br>Frontend design: the schedules page and detail dialog have no design<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
-| [Sidebar and thread list](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
+| [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
 ### B8 · Composer, attachments and project files
 
@@ -165,7 +155,6 @@ Everything typed or attached before a message is sent and the files a project sh
 |---|---|---|
 | [Attachments](#attachments) | 3 | Research: no note on attachment handling in reference products<br>Frontend design: attachment cards and previews have no design |
 | [Composer](#composer) | 3 | Research: no note comparing composers in claude.ai, Amp and t3code<br>Backend design: no design for server drafts (D110) and named prompts |
-| [Project files](#project-files) | 3 | Frontend design: the files tab has no design<br>Backend design: no design for reading files and commits from local and hosted repos |
 
 ### B9 · Execution settings: skills, MCP, harness profile, quota wait
 
@@ -229,9 +218,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Coordinator context and compaction** (shipped). Each Coordinator turn is assembled by the server within a token budget from recent messages, an index of older ones, history tools and ledger facts, so compaction is invisible to the user.
 
-- Research: [docs/research/coordinator-compaction-2026-11-07.md](research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md)
+- Research: [docs/research/coordinator-compaction-2026-11-07.md](research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/coordinator-context-2026-11-08.md](research/coordinator-context-2026-11-08.md)
 - Frontend design: n/a: compaction is invisible by design; the transcript keeps full history
-- Backend design: **gap**: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes
+- Backend design: [docs/design/coordinator-context-backend.md](design/coordinator-context-backend.md)
 
 ### coordinator-dispatch
 
@@ -267,11 +256,11 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.
+**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.
 
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md)
-- Frontend design: **gap**: the memory list in Coordinator settings has no design
-- Backend design: **gap**: no design for memory keys, scope, consolidation, promotion and invalidation
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
+- Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
+- Backend design: [docs/design/memory-backend.md](design/memory-backend.md), [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 
 ### merge-gate
 
@@ -283,10 +272,10 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### needs-you
 
-**Needs-you tray** (shipped). Questions, failures, pending approvals and reviews that wait on the user, shown as at most three cards above the composer.
+**Task cards and needs-you** (shipped). A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.
 
-- Research: [docs/research/link-roundup-2026-11-01.md](research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
-- Frontend design: **gap**: D121 decided the tray, but no design or approved screenshot set shows its states
+- Research: [docs/research/link-roundup-2026-11-01.md](research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
+- Frontend design: [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
 
 ### orb-isolation
@@ -537,19 +526,11 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 
-### project-files
-
-**Project files** (shipped). The remaining project file tree and viewer, pending retirement in #3479.
-
-- Research: [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md)
-- Frontend design: **gap**: the files tab has no design
-- Backend design: **gap**: no design for reading files and commits from local and hosted repos
-
 ### projects
 
 **Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive and delete.
 
-- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main)
+- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 
@@ -603,7 +584,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### sidebar
 
-**Sidebar and thread list** (shipped). The sidebar with the Coordinator row, projects and thread groups, unread marks and the project menu.
+**Sidebar** (shipped). The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.
 
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
@@ -637,6 +618,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 | Note | Where it is |
 |---|---|
+| `docs/design/memory-inplace-edit.md` | owner-approved design in PR #3677; layout implementation owned by PR #3666 |
 | `docs/design/pilot-coordinator-chat-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/design/qcard-variants/README.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/agent-machine-routing.md` | branch origin/claude/elegant-jones-a3e2a9 |

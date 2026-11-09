@@ -28,7 +28,7 @@ Not captured: toasts and a failed send (no reliable trigger without breaking the
 
 | Cairn surface (code) | Claude.ai counterpart | Journeys |
 |---|---|---|
-| App shell and sidebar (`board/sidebar.tsx`, `board/app-sidebar.tsx`, `board/sidebar-thread-groups.tsx`) | Left sidebar: nav rows, Pinned and recents sections, account footer; a drawer at 375 | `shell` |
+| App shell and sidebar (`board/sidebar.tsx`, `board/app-sidebar.tsx`, `board/sidebar-projects.ts`) | Left sidebar: nav rows, Pinned and recents sections, account footer; a drawer at 375 | `shell` |
 | Coordinator home, empty (`board/home-c.tsx`, `chief/chief-root.tsx`) | New chat: greeting, one composer, model line, Recent artifacts strip | `shell` |
 | Coordinator conversation (`chief/chief-conversation.tsx`, `chief/chief-message-rows.tsx`) | Chat transcript: user bubble, reply prose, code block, table, list, action row | `chat-long`, `send-stream` |
 | Composer (`chief/composer-surface.tsx`, `chief/answer-composer.tsx`) | Composer card with `+`, voice, model and effort under it | `shell`, `send-stream` |
@@ -41,7 +41,7 @@ Not captured: toasts and a failed send (no reliable trigger without breaking the
 | Menus (`board/sidebar-project-menu.tsx`, `board/thread-actions.tsx`, `chief/project-menu.tsx`, model pickers) | Composer `+` menu, model menu; a bottom sheet at 375 | `shell` |
 | Dialogs (`DialogShell`, `chief/edit-charter-dialog.tsx`, `board/reset-confirm-dialog.tsx`) | Settings dialog chrome | `shell`, `settings` |
 | Tooltips (rule C4) | Composer and action-row tooltips | `shell`, `chat-long`, `focus` |
-| No counterpart: needs-you tray and question card, board and activity, machines and computer feed, diff and review | Apply the component rules in section 8; keep the t3code and Amp references in `docs/design/references/` for structure | none |
+| No counterpart: task cards and question card, board and activity, machines and computer feed, diff and review | Apply the component rules in section 8; keep the t3code and Amp references in `docs/design/references/` for structure | none |
 
 ## 2. Typesetting (checklist 1)
 

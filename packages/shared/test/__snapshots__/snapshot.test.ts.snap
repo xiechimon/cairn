@@ -3965,6 +3965,25 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
     {
       "additionalProperties": false,
       "properties": {
+        "conversationId": {
+          "type": "string",
+        },
+        "deliveredQueue": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string",
+            },
+            "messageId": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "conversationId",
+            "messageId",
+          ],
+          "type": "object",
+        },
         "message": {
           "additionalProperties": {},
           "properties": {
@@ -4233,6 +4252,81 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "type": [
                 "string",
                 "null",
+              ],
+            },
+            "promptOrigin": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "ci-fix",
+                      "type": "string",
+                    },
+                    "round": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    "roundsMax": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    "trigger": {
+                      "enum": [
+                        "ci-checks",
+                        "pre-push",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "trigger",
+                    "round",
+                    "roundsMax",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "merge-conflict",
+                      "type": "string",
+                    },
+                    "round": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    "roundsMax": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "round",
+                    "roundsMax",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "rework",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
               ],
             },
             "queue": {
@@ -5648,6 +5742,81 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
         "null",
       ],
     },
+    "promptOrigin": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "ci-fix",
+              "type": "string",
+            },
+            "round": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "roundsMax": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "trigger": {
+              "enum": [
+                "ci-checks",
+                "pre-push",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+            "trigger",
+            "round",
+            "roundsMax",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "merge-conflict",
+              "type": "string",
+            },
+            "round": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "roundsMax": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "kind",
+            "round",
+            "roundsMax",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "rework",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+      ],
+    },
     "queue": {
       "additionalProperties": false,
       "properties": {
@@ -6664,6 +6833,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "enum": [
                 "plan_ready",
                 "build_review",
+                "coordinator_handoff",
                 "chief_message",
                 "quota_wait",
                 "model_fallback",
@@ -8210,7 +8380,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > age
     "layer": {
       "enum": [
         "core",
-        "log",
         "scratchpad",
         "searchable",
       ],
@@ -9246,6 +9415,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > not
       "enum": [
         "plan_ready",
         "build_review",
+        "coordinator_handoff",
         "chief_message",
         "quota_wait",
         "model_fallback",
@@ -9356,6 +9526,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
       ],
     },
     "description": {
+      "type": "string",
+    },
+    "evidenceStore": {
+      "default": "attachments",
+      "enum": [
+        "attachments",
+        "repository",
+      ],
       "type": "string",
     },
     "githubRepo": {
@@ -9475,6 +9653,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "name",
     "teamId",
     "splitPolicy",
+    "evidenceStore",
   ],
   "type": "object",
 }

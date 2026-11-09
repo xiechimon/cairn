@@ -34,6 +34,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
+import { foldMemoryIndexes } from './memory.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -138,6 +139,7 @@ export function deleteProject(deps: ProjectDeps, id: string): boolean {
       }
     }
     tx.update(agentMemory).set({ projectId: null }).where(eq(agentMemory.projectId, id)).run();
+    foldMemoryIndexes(tx);
     tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
     tx.delete(project).where(eq(project.id, id)).run();
   });
@@ -169,6 +171,7 @@ export async function updateProject(
     body.name !== undefined ||
     body.group !== undefined ||
     body.splitPolicy !== undefined ||
+    body.evidenceStore !== undefined ||
     body.description !== undefined ||
     body.instructions !== undefined ||
     body.maxConcurrent !== undefined ||
@@ -181,7 +184,7 @@ export async function updateProject(
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of group/name/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color)',
+      'invalid body: nothing to update (at least one of group/name/splitPolicy/evidenceStore/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color)',
     );
   }
 
@@ -290,6 +293,7 @@ export async function updateProject(
       name: nextName,
       group: body.group !== undefined ? body.group : row.group,
       splitPolicy: nextSplitPolicy,
+      evidenceStore: body.evidenceStore ?? row.evidenceStore,
       repoKind: nextRepoKind,
       githubRepo: nextGithubRepo,
       localPath: nextLocalPath,

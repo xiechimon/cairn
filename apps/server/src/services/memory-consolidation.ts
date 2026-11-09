@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agentMemory, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { listMemoryEntries, updateMemoryEntry } from './memory.js';
+import { isMemoryIndex, listStoredMemoryEntries, updateMemoryEntry } from './memory.js';
 
 export const MEMORY_PASS_MARK = '【记忆整理】';
 export const MEMORY_PASS_INTERVAL_MS = 7 * 24 * 60 * 60_000;
@@ -37,8 +37,10 @@ export interface MemoryPassResult {
   skipped: number;
 }
 
-function validCore(db: Db, teamId: string, agentId: string) {
-  return listMemoryEntries(db, { agentId, teamId }).filter((m) => m.layer === 'core');
+function legacyCoreFacts(db: Db, teamId: string, agentId: string) {
+  return listStoredMemoryEntries(db, { agentId, teamId }).filter(
+    (m) => m.layer === 'core' && !isMemoryIndex(db, m.id),
+  );
 }
 
 export function memoryPassDue(
@@ -48,7 +50,7 @@ export function memoryPassDue(
   agentId: string,
   now: number,
 ) {
-  if (validCore(db, teamId, agentId).length < MEMORY_PASS_MIN_ENTRIES) return false;
+  if (legacyCoreFacts(db, teamId, agentId).length < MEMORY_PASS_MIN_ENTRIES) return false;
   const done = db
     .select({ finishedAt: step.finishedAt, createdAt: step.createdAt })
     .from(step)
@@ -63,7 +65,7 @@ export function memoryPassDue(
   return !done.some((row) => now - (row.finishedAt ?? row.createdAt) < MEMORY_PASS_INTERVAL_MS);
 }
 
-type CoreRow = ReturnType<typeof validCore>[number];
+type CoreRow = ReturnType<typeof legacyCoreFacts>[number];
 
 function memoryLine(m: CoreRow) {
   return `${m.id} | ${m.projectId ?? 'team'} | 更新 ${DAY(m.updatedAt)} | 最近注入 ${
@@ -73,7 +75,7 @@ function memoryLine(m: CoreRow) {
 
 const shownInFull = (m: CoreRow) => memoryLine(m).length <= LINE_MAX_CHARS;
 
-function unvisitedFirst(db: Db, chiefId: string, rows: ReturnType<typeof validCore>) {
+function unvisitedFirst(db: Db, chiefId: string, rows: ReturnType<typeof legacyCoreFacts>) {
   const prompts = db
     .select({ prompt: step.prompt })
     .from(step)
@@ -98,7 +100,7 @@ export function memoryPassSection(
 ): string {
   const lines: string[] = [];
   let used = 0;
-  for (const m of unvisitedFirst(db, chiefId, validCore(db, teamId, agentId)).slice(
+  for (const m of unvisitedFirst(db, chiefId, legacyCoreFacts(db, teamId, agentId)).slice(
     0,
     LIST_MAX_ENTRIES,
   )) {
@@ -135,7 +137,7 @@ export function applyMemoryPass(
   const merges = (parsed.data.merge ?? []).slice(0, MERGES_MAX);
   const expires = (parsed.data.expire ?? []).slice(0, EXPIRES_MAX);
   for (const merge of merges) {
-    const rows = validCore(db, scope.teamId, scope.agentId);
+    const rows = legacyCoreFacts(db, scope.teamId, scope.agentId);
     const keep = rows.find((m) => m.id === merge.keep);
     const drops = merge.drop.map((id) => rows.find((m) => m.id === id));
     const content = merge.content.trim();
@@ -167,7 +169,7 @@ export function applyMemoryPass(
     }
   }
   for (const id of expires) {
-    const row = validCore(db, scope.teamId, scope.agentId).find((m) => m.id === id);
+    const row = legacyCoreFacts(db, scope.teamId, scope.agentId).find((m) => m.id === id);
     const lastUse = Math.max(row?.updatedAt ?? 0, row?.lastInjectedAt ?? 0);
     if (row === undefined || now - lastUse < MEMORY_PASS_STALE_MS) {
       result.skipped += 1;

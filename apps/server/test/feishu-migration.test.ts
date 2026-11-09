@@ -47,7 +47,7 @@ test.each(['fresh', 'empty upgrade', 'configured upgrade'])(
     const db = drizzle(sqlite);
     try {
       if (mode !== 'fresh') {
-        migrateUpTo(sqlite, directory, '0134_drop_feature_releases');
+        migrateUpTo(sqlite, directory, '0139_correction_classification');
         sqlite.exec(`
         INSERT INTO deploy_lease (id, owner, status, expiresAt) VALUES ('lease', 'test-owner', 'accepting', 1234);
         INSERT INTO user (id, displayName) VALUES ('owner', 'Test owner');

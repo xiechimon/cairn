@@ -279,6 +279,17 @@ export function getTodo<D extends Pick<TodoDeps, 'db'>>(deps: D, id: string): To
   return row ? toTodoRecord(deps, row) : null;
 }
 
+function correctionFromTags(db: Db, tagIds: string[]): boolean {
+  if (tagIds.length === 0) return false;
+  return (
+    db
+      .select({ id: tag.id })
+      .from(tag)
+      .where(and(inArray(tag.id, tagIds), eq(sql`lower(${tag.name})`, 'correction')))
+      .get() !== undefined
+  );
+}
+
 function assertTagsInProject(db: Db, projectId: string, tagIds: readonly string[]): void {
   if (tagIds.length === 0) return;
   const owned = new Set(
@@ -312,6 +323,7 @@ export function createAutonomousTodo(
     title: string;
     spec: string;
     tagIds?: string[];
+    correctionRequired?: boolean;
     createdBy: string | null;
     ownerId: string | null;
     sourceKind?: TodoSourceKind;
@@ -341,47 +353,50 @@ export function createAutonomousTodo(
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
   const selfIssue =
     input.sourceKind === undefined ? planSelfIssue(deps, input.teamId, input.projectId) : null;
-  db.insert(todo)
-    .values({
-      id,
-      teamId: input.teamId,
-      projectId: input.projectId,
-      title,
-      spec: input.spec,
-      phase: 'todo',
-      phaseAt: now,
-      seqNum,
-      orderIndex: (orderRow?.n ?? -1) + 1,
-      latestBuildId: null,
-      lastRunAt: null,
-      hasChanges: false,
-      hasPlan: false,
-      sourceTodo: null,
-      v: 1,
-      createdBy: input.createdBy,
-      ownerId: input.ownerId,
-      sourceBuildId: null,
-      sourceKind:
-        input.sourceKind ??
-        (selfIssue !== null
-          ? 'github-issue-self'
-          : input.orchestration !== undefined
-            ? 'orchestration'
+  db.transaction((tx) => {
+    tx.insert(todo)
+      .values({
+        id,
+        teamId: input.teamId,
+        projectId: input.projectId,
+        title,
+        spec: input.spec,
+        correctionRequired: input.correctionRequired ?? correctionFromTags(db, tagIds),
+        phase: 'todo',
+        phaseAt: now,
+        seqNum,
+        orderIndex: (orderRow?.n ?? -1) + 1,
+        latestBuildId: null,
+        lastRunAt: null,
+        hasChanges: false,
+        hasPlan: false,
+        sourceTodo: null,
+        v: 1,
+        createdBy: input.createdBy,
+        ownerId: input.ownerId,
+        sourceBuildId: null,
+        sourceKind:
+          input.sourceKind ??
+          (selfIssue !== null
+            ? 'github-issue-self'
+            : input.orchestration !== undefined
+              ? 'orchestration'
+              : null),
+        sourceRef:
+          input.sourceRef ??
+          (selfIssue === null && input.orchestration !== undefined
+            ? orchestrationSourceRef(input.orchestration.threadId)
             : null),
-      sourceRef:
-        input.sourceRef ??
-        (selfIssue === null && input.orchestration !== undefined
-          ? orchestrationSourceRef(input.orchestration.threadId)
-          : null),
-      output: input.output ?? 'code',
-      ...(input.userSpecAttachmentIds !== undefined
-        ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
-        : {}),
-    })
-    .run();
-  for (const tagId of tagIds) {
-    db.insert(todoTag).values({ todoId: id, tagId }).run();
-  }
+        output: input.output ?? 'code',
+        ...(input.userSpecAttachmentIds !== undefined
+          ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
+          : {}),
+      })
+      .run();
+    for (const tagId of tagIds) {
+      tx.insert(todoTag).values({ todoId: id, tagId }).run();
+    }
+  });
   const record = getTodo(deps, id);
   if (!record) throw new Error('todo missing after insert');
   hub.publishTodoDoc(input.teamId, record);
@@ -422,11 +437,15 @@ export function updateAutonomousTodo(
   if (!row) return null;
 
   const sets: Partial<TodoRow> = {};
+  const tagIds = patch.tagIds === undefined ? undefined : [...new Set(patch.tagIds)];
   const move =
     patch.projectId !== undefined && patch.projectId !== row.projectId
-      ? planProjectMove(deps, row, patch.projectId, patch.tagIds ?? [])
+      ? planProjectMove(deps, row, patch.projectId, tagIds ?? [])
       : null;
+  if (tagIds !== undefined && move === null) assertTagsInProject(db, row.projectId, tagIds);
   if (move !== null) Object.assign(sets, move.sets);
+  if (tagIds !== undefined) sets.correctionRequired = correctionFromTags(db, tagIds);
+  else if (move !== null) sets.correctionRequired = false;
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
@@ -463,29 +482,25 @@ export function updateAutonomousTodo(
     sets.phase = patch.phase;
     sets.phaseAt = nowMs();
   }
-  if (Object.keys(sets).length > 0) {
-    sets.v = row.v + 1;
-    db.update(todo).set(sets).where(eq(todo.id, id)).run();
-  }
-  if (move !== null) {
-    db.update(schedule)
-      .set({ projectId: move.sets.projectId })
-      .where(eq(schedule.todoId, id))
-      .run();
-    if (patch.tagIds === undefined) db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
-  }
-  if (patch.tagIds !== undefined) {
-    db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
-    for (const tagId of patch.tagIds) {
-      db.insert(todoTag).values({ todoId: id, tagId }).run();
+  db.transaction((tx) => {
+    if (Object.keys(sets).length > 0) {
+      sets.v = row.v + 1;
+      tx.update(todo).set(sets).where(eq(todo.id, id)).run();
     }
-    if (Object.keys(sets).length === 0) {
-      db.update(todo)
-        .set({ v: row.v + 1 })
-        .where(eq(todo.id, id))
+    if (move !== null) {
+      tx.update(schedule)
+        .set({ projectId: move.sets.projectId })
+        .where(eq(schedule.todoId, id))
         .run();
+      if (tagIds === undefined) tx.delete(todoTag).where(eq(todoTag.todoId, id)).run();
     }
-  }
+    if (tagIds !== undefined) {
+      tx.delete(todoTag).where(eq(todoTag.todoId, id)).run();
+      for (const tagId of tagIds) {
+        tx.insert(todoTag).values({ todoId: id, tagId }).run();
+      }
+    }
+  });
 
   if (
     sets.phase === 'done' &&

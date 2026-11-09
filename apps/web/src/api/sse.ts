@@ -5,7 +5,11 @@ import type {
   NotificationRecord,
   TranscriptRow,
 } from '@cairn/shared';
-import { isChiefConversationId, SILENT_NOTIFICATION_TYPES } from '@cairn/shared';
+import {
+  conversationMessageEventSchema,
+  isChiefConversationId,
+  SILENT_NOTIFICATION_TYPES,
+} from '@cairn/shared';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
@@ -22,6 +26,7 @@ import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
 import { textOfContent, thinkingOfContent } from './mappers.js';
+import { cacheUserMessage } from './message-cache.js';
 import { connect } from './sse-connection.js';
 import { streamGuards } from './sse-guards.js';
 import { teamEventInvalidations } from './sse-team-events.js';
@@ -131,15 +136,17 @@ function fireDesktopNotification(record: NotificationRecord): void {
   const title =
     record.type === 'plan_ready'
       ? t('方案已就绪')
-      : record.type === 'build_review'
-        ? t('构建待审核')
-        : record.type === 'quota_wait'
-          ? t('等额度')
-          : record.type === 'model_fallback'
-            ? t('已换备用模型')
-            : record.type === 'no_machine'
-              ? t('没有机器能跑')
-              : record.entityRef.title;
+      : record.type === 'coordinator_handoff'
+        ? t('需要你决定')
+        : record.type === 'build_review'
+          ? t('构建待审核')
+          : record.type === 'quota_wait'
+            ? t('等额度')
+            : record.type === 'model_fallback'
+              ? t('已换备用模型')
+              : record.type === 'no_machine'
+                ? t('没有机器能跑')
+                : record.entityRef.title;
   const body =
     record.snippet ??
     (record.entityRef.seqNum !== null
@@ -222,6 +229,15 @@ export function startConversationStream(
         }
         case 'message': {
           const row = ev.message as TranscriptRow;
+          const targetConversationId =
+            conversationMessageEventSchema.shape.conversationId.safeParse(ev.conversationId).data ??
+            conversationId;
+          cacheUserMessage(
+            qc,
+            targetConversationId,
+            row,
+            conversationMessageEventSchema.shape.deliveredQueue.safeParse(ev.deliveredQueue).data,
+          );
           if (row.role === 'assistant' && textOfContent(row.content).trim() !== '') {
             liveTextStore.noteSettled(conversationId, row.id);
           }
@@ -229,6 +245,8 @@ export function startConversationStream(
             liveThinkingStore.noteSettled(conversationId, row.id);
           }
           void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
+          if (targetConversationId !== conversationId)
+            void invalidateConverged(qc, { queryKey: ['messages', targetConversationId] });
           void invalidateConverged(qc, { queryKey: ['plans'] });
           if (isChiefConversationId(conversationId)) {
             void invalidateConverged(qc, { queryKey: ['tasks'] });

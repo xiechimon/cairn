@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { step } from '../../src/db/schema.js';
-import { saveMemoryEntry } from '../../src/services/memory.js';
+import { foldMemoryIndexes, saveMemoryEntry } from '../../src/services/memory.js';
 import { coordinatorProfile } from '../../src/services/routing-rules.js';
 import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
@@ -50,6 +50,7 @@ describe('Coordinator memory loading per turn', () => {
     const projectA = await projectNamed(w, 'Alpha');
     const teamId = remember(w, 'TEAM-FACT-ALPHA', null);
     const projId = remember(w, 'PROJECT-FACT-ALPHA', projectA);
+    foldMemoryIndexes(w.s.db);
     const { seen, trace } = await runTurn(w);
     const messages = JSON.stringify(seen[0]?.messages);
     expect(messages.split('TEAM-FACT-ALPHA')).toHaveLength(2);
@@ -66,6 +67,7 @@ describe('Coordinator memory loading per turn', () => {
     const aId = remember(w, 'PROJECT-FACT-ALPHA', projectA);
     remember(w, 'PROJECT-FACT-BETA', projectB);
     w.s.db.update(step).set({ scopeProjectId: projectA }).where(eq(step.id, w.stepId)).run();
+    foldMemoryIndexes(w.s.db);
     const { seen, trace } = await runTurn(w);
     const all = JSON.stringify(seen[0]?.messages);
     expect(all).toContain('PROJECT-FACT-ALPHA');
