@@ -335,11 +335,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/src/routes/team-page.tsx",
-    "line": "// client-state key (r2 §1.5 `cairn.teamMembersLayout`); chart drops the",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/src/styles/shadcn.css",
     "line": "   主题机制沿用 cairn 反相规约（#106）：:root = dark 默认，.light = 浅色",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"

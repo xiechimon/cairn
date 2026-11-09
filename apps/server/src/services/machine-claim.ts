@@ -490,7 +490,13 @@ async function tryClaim(
             holdReason: null,
             holdUntil: null,
           })
-          .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
+          .where(
+            and(
+              eq(step.id, cand.stepRow.id),
+              eq(step.status, 'pending'),
+              or(isNull(step.holdUntil), lte(step.holdUntil, claimedAt)),
+            ),
+          )
           .run();
         if (res.changes === 0) return false;
         if (

@@ -81,7 +81,7 @@ export function holdBlockedBuild(db: Db, buildId: string): void {
     .where(
       and(
         eq(step.buildId, buildId),
-        eq(step.status, 'pending'),
+        inArray(step.status, ['pending', 'waiting_quota']),
         inArray(step.kind, [...HELD_KINDS]),
       ),
     )

@@ -6,6 +6,8 @@ import { Link } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import {
   acquireComputerControl,
+  ensureComputerBrowser,
+  patchComputerBrowser,
   releaseComputerControl,
   renewComputerControl,
 } from '../api/computer-screen.js';
@@ -27,7 +29,11 @@ import { X } from '../icons/index.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
 import { machineStateLabel } from './fleet-status.js';
-import { desktopControlInstalled, desktopControlOnline } from './machine-capabilities.js';
+import {
+  browserCapabilityInstalled,
+  desktopControlInstalled,
+  desktopControlOnline,
+} from './machine-capabilities.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -162,11 +168,13 @@ function MachineCard({
   machine,
   coordinator,
   computer,
+  pinnedElsewhere,
   teamId,
 }: {
   machine: MachineRow;
   coordinator: boolean;
   computer: ComputerRecord | null;
+  pinnedElsewhere: boolean;
   teamId: string | undefined;
 }) {
   const { t } = useI18n();
@@ -174,14 +182,31 @@ function MachineCard({
   const online = machine.online === true;
   const Icon = machine.kind === 'local' ? Laptop : Server;
   const desktopInstalled = desktopControlInstalled(machine, computer);
+  const browserInstalled = browserCapabilityInstalled(machine, computer);
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [browserBusy, setBrowserBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandAfterLease, setExpandAfterLease] = useState(false);
   const reclaiming = useRef(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
+  const browserEnabled = computer?.browserEnabled === true;
+  const browserPinnedElsewhere = pinnedElsewhere && computer === null;
+  const canToggleBrowser =
+    teamId !== undefined &&
+    machine.id !== undefined &&
+    !browserBusy &&
+    !browserPinnedElsewhere &&
+    (browserInstalled || browserEnabled);
+  const browserHint = browserPinnedElsewhere
+    ? t('浏览器偏好已绑定到另一台机器。')
+    : browserInstalled
+      ? t('让 agent 打开网页、点击和填表。')
+      : browserEnabled
+        ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
+        : t('这台机器还不支持浏览器。');
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -255,6 +280,24 @@ function MachineCard({
     void run
       .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
       .finally(() => setBusy(false));
+  };
+
+  const onBrowserToggle = (checked: boolean) => {
+    const machineId = machine.id;
+    if (teamId === undefined || machineId === undefined || browserBusy) return;
+    if (browserPinnedElsewhere) return;
+    if (checked && !browserInstalled) return;
+    if (!checked && computer === null) return;
+    const ownedTeamId = teamId;
+    setBrowserBusy(true);
+    const run =
+      computer !== null
+        ? patchComputerBrowser(computer.id, checked)
+        : ensureComputerBrowser(machineId, checked);
+    void run
+      .then(() => invalidateConverged(qc, { queryKey: ['computers', ownedTeamId] }))
+      .catch(() => invalidateConverged(qc, { queryKey: ['computers', ownedTeamId] }))
+      .finally(() => setBrowserBusy(false));
   };
 
   const openEnlarged = () => {
@@ -383,9 +426,10 @@ function MachineCard({
       <CapabilityRow
         icon={<Globe aria-hidden="true" className="size-4" />}
         label={t('浏览器')}
-        hint={t('让 agent 打开网页、点击和填表。')}
-        checked={false}
-        disabled
+        hint={browserHint}
+        checked={browserEnabled}
+        disabled={!canToggleBrowser}
+        onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
       />
     </ListCard>
   );
@@ -435,6 +479,9 @@ export function MachinesPanel({
               machine={machine}
               coordinator={machine === host}
               computer={computerFor(machine)}
+              pinnedElsewhere={computers.some(
+                (row) => machine.id !== undefined && row.machine.id !== machine.id,
+              )}
               teamId={teamId}
             />
           ))}

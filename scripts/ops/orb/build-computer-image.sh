@@ -11,7 +11,8 @@ machines_dir=$host_root/var/lib/machines
 base=$machines_dir/cairn-orb-base
 image=$machines_dir/cairn-orb-computer
 daemon_entry=/opt/cairn/daemon/cli.mjs
-packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick)
+packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick npm)
+agent_browser_version=${CAIRN_AGENT_BROWSER_VERSION:-0.41.2}
 if [[ ! -f $base/etc/cairn-orb-image ]]; then
   if $dry_run; then
     printf 'snapshot cairn-orb-base after cairn-orb-base is built, then install: %s\n1 planned changes\n' "${packages[*]}"
@@ -24,7 +25,7 @@ base_marker=$(cat "$base/etc/cairn-orb-image")
 node_major=$(sed -n 's/^node_major=\([1-9][0-9]*\)$/\1/p' <<< "$base_marker")
 [[ $node_major =~ ^[1-9][0-9]*$ ]] || { printf 'cairn-orb-base marker has no Node major; rebuild the base\n' >&2; exit 1; }
 recipe=$(cat "$script_dir/build-computer-image.sh" | sha256sum | awk '{print $1}')
-expected=$(printf 'recipe=%s\npackages=%s\n%s' "$recipe" "${packages[*]}" "$(sed 's/^/base./' <<< "$base_marker")")
+expected=$(printf 'recipe=%s\npackages=%s\nagent-browser=%s\n%s' "$recipe" "${packages[*]}" "$agent_browser_version" "$(sed 's/^/base./' <<< "$base_marker")")
 filesystem_path=$machines_dir
 while [[ ! -d $filesystem_path ]]; do filesystem_path=$(dirname -- "$filesystem_path"); done
 filesystem=$(stat -f -c %T -- "$filesystem_path")
@@ -46,7 +47,7 @@ if [[ -d $image ]]; then
     printf '0 changes\n'
     exit 0
   fi
-  if [[ ! -f $image/etc/cairn-orb-computer-image || ! $(cat "$image/etc/cairn-orb-computer-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'packages=[a-z0-9\ -]+$'\n'base\. ]]; then
+  if [[ ! -f $image/etc/cairn-orb-computer-image || ! $(cat "$image/etc/cairn-orb-computer-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'packages=[a-z0-9\ -]+$'\n'(agent-browser=[0-9.]+$'\n')?base\. ]]; then
     printf 'Unrecognized existing computer image; preserve it and resolve explicitly\n' >&2
     exit 1
   fi
@@ -57,6 +58,7 @@ printf '%s\n' \
   'snapshot cairn-orb-base into a locked staging image under /var/lib/machines' \
   "install with systemd-nspawn and the host mirrorlist read-only: pacman -Syu ${packages[*]}" \
   "refuse a guest Node major other than $node_major" \
+  "install agent-browser@${agent_browser_version} for the agent user" \
   'install the Chromium managed policy and the cairn-computer-desktop service for agent' \
   'install the cairn-computer-agent service for agent and disable the inherited cairn-orb-worker service' \
   'remove package caches; clear /etc/machine-id' \
@@ -100,6 +102,11 @@ guest_major=$(guest /usr/bin/node -p 'process.versions.node.split(".")[0]' | tr 
 for binary in Xvfb x11vnc fluxbox xdotool chromium import; do
   guest runuser -u agent -- sh -c "command -v $binary" > /dev/null || { printf '%s is not runnable by agent\n' "$binary" >&2; exit 1; }
 done
+guest npm install -g "agent-browser@${agent_browser_version}"
+guest runuser -u agent -- sh -c 'command -v agent-browser' > /dev/null || {
+  printf 'agent-browser is not runnable by agent\n' >&2
+  exit 1
+}
 write_file 644 "$stage/etc/chromium/policies/managed/cairn.json" <<'POLICY'
 {
   "PasswordManagerEnabled": false,
@@ -152,6 +159,7 @@ StartLimitIntervalSec=0
 User=agent
 Environment=CAIRN_ORB=1
 Environment=DISPLAY=:1
+Environment=AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 Restart=always
 RestartSec=1
 ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/computer.sock ]; do sleep 1; done'

@@ -10,15 +10,15 @@
 
 ## How to get to it (user POV)
 
-- Create a local project (see [local-repo-api.md](./local-repo-api.md)) -> the project page's `文件` tab (the default landing) -> branch chip + file rows + viewer + history seg.
+- Create a local project (see [local-repo-api.md](./local-repo-api.md)) -> open its files page -> branch chip + file rows + viewer. Project history was retired in #3479.
 - Driving (`vp.mjs list project-files-local` lists all cases and usage):
   - `node .claude/skills/verify-cairn/scripts/vp.mjs drive project-files-local local-files`: the local project's files tab, hosted control, deleted-repo degradation.
 
 ## Driving it with drive-1030-local-files.mjs
 
-Preconditions: `launch.mjs` already started the isolated stack; proxy env all unset (loopback through a proxy = 502 false positive); the local machine has `git`.
+Preconditions: this archived probe is stale because it still requires the retired history controls. Use the current e2e regression for the remaining file viewer. Historical execution required an isolated stack, no loopback proxy and local git.
 
-- One-command three phases: `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/drive-1030-local-files.mjs` -> console 20 PASS/FAIL + `evidence:<dir>` (result.json + responses.json + 5 screenshots).
+- One-command three phases: `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node docs/verify/1030/drive-1030-local-files.mjs` -> console 20 PASS/FAIL + `evidence:<dir>` (result.json + responses.json + 5 screenshots).
 - Phase A: a true git worktree repo (default branch `trunk` + README marker line) -> REST five read-face truth + browser Files tab opening/chip=HEAD/row->viewer/history.
 - Phase B: hosted control zero regression (bare repo push a real README then the same page chain, chip='main').
 - Phase C: delete the repo directory -> reload shows the degradation copy + FilesPane does not render + API 404+reason.

@@ -1,9 +1,12 @@
 import { and, eq, like } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
-import { build, step, todo } from '../src/db/schema.js';
+import { build, machine, step, todo } from '../src/db/schema.js';
 import { BLOCKED_BY_HOLD, releaseBlockedSteps } from '../src/services/blockers.js';
 import { enqueueStep } from '../src/services/builds.js';
+import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
+import { claimStep } from '../src/services/machines.js';
 import { reconcileOwners } from '../src/services/owner.js';
+import { applyQuotaWaitStep, sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { req, seedSessionRoute } from './helpers.js';
@@ -173,6 +176,131 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       status: 409,
     });
     expect(row(id).blockedBy ?? []).toEqual([]);
+  });
+
+  test.each(['plan', 'session'] as const)(
+    'a quota-waiting %s stays blocked through recovery and claim',
+    async (kind) => {
+      const blocker = await create();
+      const id = await create();
+      finish(blocker, 'done');
+      H.s.db
+        .update(step)
+        .set({ status: 'done' })
+        .where(eq(step.buildId, row(blocker).latestBuildId!))
+        .run();
+      const machineId = 'blocker-claim-machine';
+      H.s.db
+        .insert(machine)
+        .values({
+          id: machineId,
+          teamId: H.teamId,
+          name: 'Blocker claim',
+          online: true,
+          enabledRuntimes: ['pi'],
+        })
+        .run();
+      seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      const [session] = sessions(id);
+      H.s.db.update(step).set({ kind }).where(eq(step.id, session!.id)).run();
+      applyQuotaWaitStep(toolDeps(), sessions(id)[0]!, {
+        kind: 'quota',
+        providerId: 'stub-gw',
+        reason: 'Quota exhausted',
+        retryAfterMs: 1,
+      });
+      finish(blocker, 'failed');
+      await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+      sweepQuotaWaitSteps(toolDeps(), Date.now() + 1000);
+      expect(sessions(id)[0]?.status).toBe('pending');
+      const claim = () =>
+        claimStep(
+          {
+            ...H.s.svc,
+            box: H.s.secretBox,
+            reposDir: H.s.reposDir,
+            attachmentsDir: H.s.attachmentsDir,
+          },
+          machineId,
+          H.teamId,
+          0,
+          'http://localhost',
+        );
+      expect(await claim()).toBeNull();
+      expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+      finish(blocker, 'done');
+      releaseBlockedSteps(toolDeps());
+      expect((await claim())?.step.id).toBe(session!.id);
+    },
+  );
+
+  test('a recovered subscription-policy park preserves dependency holds', async () => {
+    const blocker = await create();
+    const id = await create();
+    const [session] = sessions(id);
+    applyQuotaWaitStep(toolDeps(), session!, {
+      kind: 'quota',
+      providerId: 'stub-gw',
+      reason: 'subscription-only',
+    });
+    const quotaBlock = sessions(id)[0]!.quotaBlock!;
+    H.s.db
+      .update(step)
+      .set({ quotaBlock: { ...quotaBlock, source: 'subscription_policy' } })
+      .where(eq(step.id, session!.id))
+      .run();
+    await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+    refreshClaudeRateParks(
+      {
+        ...H.s.svc,
+        box: H.s.secretBox,
+        reposDir: H.s.reposDir,
+        attachmentsDir: H.s.attachmentsDir,
+      },
+      H.teamId,
+    );
+    expect(sessions(id)[0]?.status).toBe('pending');
+    expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+  });
+
+  test('a blocker added during asynchronous claim preparation prevents that claim', async () => {
+    const blocker = await create();
+    const id = await create();
+    finish(blocker, 'done');
+    H.s.db
+      .update(step)
+      .set({ status: 'done' })
+      .where(eq(step.buildId, row(blocker).latestBuildId!))
+      .run();
+    const machineId = 'blocker-race-machine';
+    H.s.db
+      .insert(machine)
+      .values({
+        id: machineId,
+        teamId: H.teamId,
+        name: 'Blocker race',
+        online: true,
+        enabledRuntimes: ['pi'],
+      })
+      .run();
+    seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+    const result = claimStep(
+      {
+        ...H.s.svc,
+        box: H.s.secretBox,
+        reposDir: H.s.reposDir,
+        attachmentsDir: H.s.attachmentsDir,
+      },
+      machineId,
+      H.teamId,
+      0,
+      'http://localhost',
+    );
+    await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+    finish(blocker, 'failed');
+    await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+    expect(await result).toBeNull();
+    expect(sessions(id)[0]?.status).toBe('pending');
   });
 
   test('a cycle is refused', async () => {
