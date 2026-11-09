@@ -100,6 +100,7 @@ export const machineRecoverResponseSchema = z.object({
 export type MachineRecoverResponse = z.infer<typeof machineRecoverResponseSchema>;
 
 export const machineClaimBodySchema = z.object({
+  verifyAttachments: z.literal(true).optional(),
   maxWorkers: z.number().int().min(1).optional(),
   role: z.literal('coordinator').optional(),
 });

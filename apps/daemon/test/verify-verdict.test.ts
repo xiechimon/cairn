@@ -97,3 +97,14 @@ describe('verify step verdict extraction (#1250)', () => {
     expect(reason).toBeTruthy();
   });
 });
+
+test('strict verification rejects concatenated verdicts instead of accepting a passing prefix', () => {
+  expect(
+    extractVerifyVerdict([assistantMsg(`${PASS_VERDICT}\n${FAIL_VERDICT}`)], { strict: true })
+      .status,
+  ).toBe('failed');
+  expect(
+    extractVerifyVerdict([assistantMsg(`\`\`\`json\n${PASS_VERDICT}\n\`\`\``)], { strict: true })
+      .status,
+  ).toBe('ok');
+});

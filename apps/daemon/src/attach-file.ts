@@ -10,9 +10,15 @@ import {
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
 
+function containsPath(directory: string, path: string): boolean {
+  const within = relative(directory, path);
+  return !isAbsolute(within) && within !== '..' && !within.startsWith(`..${sep}`);
+}
+
 export function prepareFileAttachment(
   cwd: string,
   params: Record<string, unknown>,
+  evidenceDirectory?: string,
 ): Record<string, unknown> {
   if (typeof params.path !== 'string' || params.path.trim() === '' || params.path.includes('\0')) {
     throw new Error('attach_file requires a non-empty path');
@@ -24,21 +30,26 @@ export function prepareFileAttachment(
     throw new Error('attach_file caption must be a string of at most 2000 characters');
   }
   const root = realpathSync(cwd);
-  const file = realpathSync(resolve(root, params.path));
-  const within = relative(root, file);
-  if (isAbsolute(within) || within === '..' || within.startsWith(`..${sep}`)) {
+  const scope = evidenceDirectory === undefined ? root : resolve(root, evidenceDirectory);
+  if (
+    evidenceDirectory !== undefined &&
+    (!containsPath(root, scope) || realpathSync(scope) !== scope)
+  ) {
+    throw new Error('attach_file evidence directory must be a real directory inside the worktree');
+  }
+  const requested = resolve(root, params.path);
+  const file = realpathSync(requested);
+  if (!containsPath(scope, requested) || !containsPath(scope, file)) {
     throw new Error('attach_file path is outside the step worktree');
   }
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const stat = fstatSync(fd);
     const openedPath = realpathSync(file);
-    const openedWithin = relative(root, openedPath);
     const current = statSync(openedPath);
     if (
-      isAbsolute(openedWithin) ||
-      openedWithin === '..' ||
-      openedWithin.startsWith(`..${sep}`) ||
+      !containsPath(scope, openedPath) ||
+      (evidenceDirectory !== undefined && realpathSync(scope) !== scope) ||
       current.dev !== stat.dev ||
       current.ino !== stat.ino
     ) {

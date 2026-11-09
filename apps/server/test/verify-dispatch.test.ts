@@ -1,10 +1,12 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   claimedStepSchema,
   parseVerifyPromptMeta,
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
@@ -44,6 +46,14 @@ async function call(
 
 const noOpenBranchPulls: FetchLike = async (input, init) => {
   const url = new URL(String(input));
+  if ((init?.method ?? 'GET') === 'GET' && url.pathname === '/repos/acme/widgets/pulls/7')
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({ state: 'open', merged: false }),
+      text: async () => '{"state":"open","merged":false}',
+    };
   if ((init?.method ?? 'GET') === 'GET' && url.pathname === '/repos/acme/widgets/pulls')
     return {
       ok: true,
@@ -119,15 +129,20 @@ async function setup(opts: { withVerifierRoute?: boolean } = {}) {
     enqueueVerify(buildId: string) {
       maybeEnqueueVerifyStep(s.svc, this.todoRow(), buildId);
     },
-    async claim() {
+    async tryClaim(supportsAttachmentVerify = true) {
       const res = await call(s.app, 'POST', '/api/machine/tasks/claim', {
         cred: machineToken,
-        body: {},
+        body: supportsAttachmentVerify ? { verifyAttachments: true } : {},
       });
       const body = (await res.json()) as { step?: unknown };
-      if (!body.step) throw new Error('claim returned no step');
+      if (!body.step) return null;
       const parsed = claimedStepSchema.parse(body.step);
       return { stepId: parsed.step.id, kind: parsed.step.kind };
+    },
+    async claim() {
+      const claimed = await this.tryClaim();
+      if (claimed === null) throw new Error('claim returned no step');
+      return claimed;
     },
     async done(stepId: string, body: Record<string, unknown>) {
       const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
@@ -286,3 +301,145 @@ describe('verification dispatch driven by the routing rules', () => {
     expect(heads).toEqual(expect.arrayContaining([HEAD, FIX_HEAD]));
   });
 });
+
+test.each(['attachments', 'repository'] as const)(
+  'first verify snapshots %s once; later enqueues retain it and new builds pick up edits',
+  async (evidenceStore) => {
+    world = await setup();
+    const w = world;
+    const buildId = await w.startBuild();
+    const projectId = w.todoRow().projectId;
+    w.s.db.update(projectTable).set({ evidenceStore }).where(eq(projectTable.id, projectId)).run();
+    const author = await w.claim();
+    await w.done(author.stepId, { status: 'success', hasChanges: true, commit: HEAD });
+    w.enqueueVerify(buildId);
+    const firstSnapshot = w.s.db
+      .select()
+      .from(buildTable)
+      .where(eq(buildTable.id, buildId))
+      .get()?.evidenceStore;
+    expect(firstSnapshot).toBe(evidenceStore);
+    const firstVerify = w.stepsOf(buildId).find((row) => row.kind === 'verify');
+    const firstMeta = parseVerifyPromptMeta(firstVerify?.prompt ?? null);
+    if (evidenceStore === 'attachments')
+      expect(firstMeta).toHaveProperty('evidence', 'attachments');
+    else expect(firstVerify?.prompt).toContain('docs/verify/');
+
+    const nextMode = evidenceStore === 'attachments' ? 'repository' : 'attachments';
+    w.s.db
+      .update(projectTable)
+      .set({ evidenceStore: nextMode })
+      .where(eq(projectTable.id, projectId))
+      .run();
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.buildId, buildId)).run();
+    maybeEnqueueVerifyStep(w.s.svc, w.todoRow(), buildId, { reverify: true });
+    const pending = w
+      .stepsOf(buildId)
+      .find((row) => row.kind === 'verify' && row.status === 'pending');
+    expect(pending).toBeDefined();
+    expect(parseVerifyPromptMeta(pending?.prompt ?? null)).toEqual(firstMeta);
+    const laterSnapshot = w.s.db
+      .select()
+      .from(buildTable)
+      .where(eq(buildTable.id, buildId))
+      .get()?.evidenceStore;
+    expect(laterSnapshot).toBe(evidenceStore);
+
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.buildId, buildId)).run();
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
+    const nextBuild = await w.startBuild();
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, nextBuild)).get()?.evidenceStore,
+    ).toBeNull();
+    const nextAuthor = await w.claim();
+    await w.done(nextAuthor.stepId, { status: 'success', hasChanges: true, commit: FIX_HEAD });
+    w.enqueueVerify(nextBuild);
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, nextBuild)).get()?.evidenceStore,
+    ).toBe(nextMode);
+    const evidenceDirectory = process.env.VERIFY_EVIDENCE_DIR;
+    if (evidenceDirectory !== undefined) {
+      mkdirSync(evidenceDirectory, { recursive: true });
+      writeFileSync(
+        join(evidenceDirectory, `snapshot-${evidenceStore}.json`),
+        JSON.stringify(
+          {
+            firstSnapshot,
+            firstPromptMeta: firstMeta,
+            laterSnapshot,
+            laterPromptMeta: parseVerifyPromptMeta(pending?.prompt ?? null),
+            editedProjectMode: w.s.db
+              .select()
+              .from(projectTable)
+              .where(eq(projectTable.id, projectId))
+              .get()?.evidenceStore,
+            newBuildSnapshot: w.s.db
+              .select()
+              .from(buildTable)
+              .where(eq(buildTable.id, nextBuild))
+              .get()?.evidenceStore,
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  },
+);
+
+test('a failed verify enqueue rolls back its evidence snapshot and announcement', async () => {
+  world = await setup();
+  const w = world;
+  const buildId = await w.startBuild();
+  const author = await w.claim();
+  await w.done(author.stepId, { status: 'success', hasChanges: true, commit: HEAD });
+  w.s.db.run(
+    sql`CREATE TRIGGER reject_verify BEFORE INSERT ON step WHEN NEW.kind = 'verify' BEGIN SELECT RAISE(ABORT, 'verify enqueue rejected'); END;`,
+  );
+  expect(() => w.enqueueVerify(buildId)).toThrow('verify enqueue rejected');
+  expect(
+    w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()?.evidenceStore,
+  ).toBeNull();
+  expect(w.stepsOf(buildId).filter((row) => row.kind === 'verify')).toHaveLength(0);
+  expect(
+    w.s.db
+      .select()
+      .from(messageTable)
+      .where(eq(messageTable.conversationId, buildId))
+      .all()
+      .some((row) => row.content === VERIFY_ANNOUNCEMENT),
+  ).toBe(false);
+});
+
+test.each(['attachments', 'repository'] as const)(
+  'legacy claim cannot take %s attachment-only work without a current-request capability',
+  async (evidenceStore) => {
+    world = await setup();
+    const w = world;
+    const buildId = await w.startBuild();
+    w.s.db
+      .update(projectTable)
+      .set({ evidenceStore })
+      .where(eq(projectTable.id, w.todoRow().projectId))
+      .run();
+    const author = await w.claim();
+    await w.done(author.stepId, { status: 'success', hasChanges: true, commit: HEAD });
+    w.enqueueVerify(buildId);
+    if (evidenceStore === 'repository') {
+      expect((await w.tryClaim(false))?.kind).toBe('verify');
+      return;
+    }
+    expect(await w.tryClaim(false)).toBeNull();
+    expect(w.stepsOf(buildId).find((row) => row.kind === 'verify')?.status).toBe('pending');
+    const verifier = await w.claim();
+    expect(verifier.kind).toBe('verify');
+    await w.done(verifier.stepId, {
+      status: 'success',
+      commit: HEAD,
+      verifyVerdict: { passed: true, conclusion: 'checked', evidence: [] },
+    });
+    maybeEnqueueVerifyStep(w.s.svc, w.todoRow(), buildId, { reverify: true });
+    expect(await w.tryClaim(false)).toBeNull();
+    expect((await w.claim()).kind).toBe('verify');
+  },
+);
