@@ -27,6 +27,7 @@ export interface AnswerComposerProps {
   tools: ReactNode;
   running: boolean;
   turnElapsed: number | null;
+  threadId?: string | null;
   onFocusEnter: () => void;
   onFocusLeave: () => void;
 }
@@ -43,6 +44,7 @@ export function AnswerComposer({
   tools,
   running,
   turnElapsed,
+  threadId = null,
   onFocusEnter,
   onFocusLeave,
 }: AnswerComposerProps) {
@@ -105,6 +107,7 @@ export function AnswerComposer({
       canStop={false}
       running={running}
       turnElapsed={turnElapsed}
+      threadId={threadId}
     />
   );
 }

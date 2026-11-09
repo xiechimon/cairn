@@ -561,10 +561,14 @@ export const useSkillFile = (
     retry: false,
   });
 
-export const useChief = (teamId: string | undefined, enabled: boolean) =>
+export const useChief = (teamId: string | undefined, enabled: boolean, threadId?: string | null) =>
   useQuery({
-    queryKey: ['chief', teamId],
-    queryFn: () => api.get<ChiefGetResponse>(`/api/teams/${teamId}/chief`),
+    queryKey: ['chief', teamId, threadId ?? null],
+    queryFn: () => {
+      const q =
+        threadId != null && threadId !== '' ? `?threadId=${encodeURIComponent(threadId)}` : '';
+      return api.get<ChiefGetResponse>(`/api/teams/${teamId}/chief${q}`);
+    },
     enabled: enabled && teamId !== undefined,
   });
 

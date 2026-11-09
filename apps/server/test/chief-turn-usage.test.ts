@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   build,
+  chiefThread,
   chiefTurnUsage,
   provider as providerTable,
   step as stepTable,
@@ -265,6 +266,61 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     });
     setCoordinatorServerContextEnabled(false);
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+  });
+
+  test('threadId scopes the meter to that thread, not the newest chief-wide turn', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-scope-a');
+    await finishStep(deps(), machineId, 'turn-scope-a', {
+      status: 'success',
+      usage: [usage('pi/glm', 100, 0, { contextTokens: 1_000 })],
+    });
+    const otherThread = `chief-other-scope`;
+    const now = Date.now();
+    H.s.db
+      .insert(chiefThread)
+      .values({
+        id: otherThread,
+        chiefId: H.chiefId,
+        userId: H.userId,
+        teamId: H.teamId,
+        title: 'other',
+        createdAt: now,
+        updatedAt: now,
+        sessionRuntime: 'pi',
+        sessionId: '',
+        sessionOpenedAt: now,
+        toolDefHashes: {},
+        toolResultHashes: {},
+        archivedAt: now,
+      })
+      .run();
+    H.s.db
+      .insert(chiefTurnUsage)
+      .values({
+        stepId: 'turn-scope-b',
+        threadId: otherThread,
+        model: 'pi/glm',
+        input: 1,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        contextTokens: 9_000,
+        createdAt: now + 10,
+      })
+      .run();
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 9_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toEqual({
+      tokens: 1_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, otherThread).context).toEqual({
+      tokens: 9_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
   });
 
   test('flag on: the meter shows the last turn context the provider reported, not the running sum', async () => {

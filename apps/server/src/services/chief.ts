@@ -233,13 +233,17 @@ function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['
   };
 }
 
-export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetResponse {
+export function getChiefEnvelope(
+  deps: ChiefDeps,
+  teamId: string,
+  threadId?: string,
+): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
   const agentRow = coordinatorProfile(deps.db, teamId);
   return {
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
-    context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row) : null,
+    context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row, threadId) : null,
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
     orchestration: chiefOrchestration(deps, teamId),

@@ -57,7 +57,8 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/chief', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(getChiefEnvelope(svc, teamId));
+    const threadId = c.req.query('threadId');
+    return c.json(getChiefEnvelope(svc, teamId, threadId));
   });
 
   app.patch('/api/teams/:id/chief', async (c) => {

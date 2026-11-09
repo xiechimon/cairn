@@ -52,20 +52,31 @@ function contextWindowOf(db: Db, teamId: string, usageModel: string): number {
 export function lastTurnContext(
   db: Db,
   chiefRow: { id: string; teamId: string },
+  threadId?: string,
 ): { tokens: number; contextWindow: number } | null {
+  if (threadId !== undefined) {
+    const owned = db
+      .select({ id: chiefThread.id })
+      .from(chiefThread)
+      .where(and(eq(chiefThread.chiefId, chiefRow.id), eq(chiefThread.id, threadId)))
+      .get();
+    if (owned === undefined) return null;
+  }
   const last = db
     .select({ tokens: chiefTurnUsage.contextTokens, model: chiefTurnUsage.model })
     .from(chiefTurnUsage)
     .where(
       and(
         isNotNull(chiefTurnUsage.contextTokens),
-        inArray(
-          chiefTurnUsage.threadId,
-          db
-            .select({ id: chiefThread.id })
-            .from(chiefThread)
-            .where(eq(chiefThread.chiefId, chiefRow.id)),
-        ),
+        threadId !== undefined
+          ? eq(chiefTurnUsage.threadId, threadId)
+          : inArray(
+              chiefTurnUsage.threadId,
+              db
+                .select({ id: chiefThread.id })
+                .from(chiefThread)
+                .where(eq(chiefThread.chiefId, chiefRow.id)),
+            ),
       ),
     )
     .orderBy(desc(chiefTurnUsage.createdAt))

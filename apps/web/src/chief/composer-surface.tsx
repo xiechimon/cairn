@@ -68,6 +68,7 @@ export interface ComposerSurfaceProps {
   onStop?: (() => void) | undefined;
   running: boolean;
   turnElapsed: number | null;
+  threadId?: string | null;
   handleRef?: Ref<ComposerSurfaceHandle>;
 }
 
@@ -94,11 +95,12 @@ export function ComposerSurface({
   onStop,
   running,
   turnElapsed,
+  threadId = null,
   handleRef,
 }: ComposerSurfaceProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
-  const chiefQ = useChief(teamId, live);
+  const chiefQ = useChief(teamId, live, threadId);
   const contextPercent = contextPercentOf(chiefQ.data?.context);
   const contextResume = contextResumeOf(chiefQ.data?.context);
   const wire = useComposerWire({
