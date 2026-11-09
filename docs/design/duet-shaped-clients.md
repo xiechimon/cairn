@@ -36,9 +36,10 @@ Duet is waitlisted, so nothing here comes from operating it. Every Duet row is S
 | Seal (`imylhbot/MJorb`), AltStore, SideStore, LiveContainer, iloader READMEs | Re-signing mechanisms and licenses | https://github.com/imylhbot/MJorb , https://github.com/altstoreio/AltStore , https://github.com/SideStore/SideStore , https://github.com/LiveContainer/LiveContainer , https://github.com/nab138/iloader |
 | Seal demo video, uploader `Sealsign`, 56 s, 2026-10-08 (frames viewed in a browser) | Seal's screens: pending and installed lists, sign sheet, batch renewal, expiry reminder | https://www.bilibili.com/video/BV1k5HS6aE5s/ |
 | CatCoder video, "LiveContainer + SideStore", 2026-07-02 (title and description; no subtitle track) | Free signing via iloader, LiveContainer and SideStore, then a Shortcuts automation for refresh without a computer | https://www.youtube.com/watch?v=UjS2oob2KUk |
+| WebKit blog, "Web Push for Web Apps on iOS and iPadOS" | iOS 16.4 adds Web Push to Home Screen web apps; permission only on a user gesture; "You do not need to be a member of the Apple Developer Program to use it" | https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/ |
 | Apple: Background Tasks, `earliestBeginDate` | "the system doesn't guarantee launching the task at the specified date, but only that it won't begin sooner" | https://developer.apple.com/documentation/backgroundtasks/bgtaskrequest/earliestbegindate |
 | Community guide on SideStore refresh automation | Shortcuts `Refresh All Apps` in a personal automation; reports of "took too long" errors and VPN steps | https://kitsah.bearblog.dev/how-to-setup-livecontainer-sidestore-with-automatic-refreshing/ |
-| cairn | `ownerOf` (`apps/server/src/services/owner.ts`), `docs/design/thread-owner-field.md`, `docs/design/coordinator-routes-verbatim.md`, `docs/design/mobile-information-architecture.md`, `docs/research/ios-app-pilot-2026-11-08.md`, `docs/research/desktop-app-stack-2026-11-08.md`, `docs/research/desktop-mobile-mcp-forms-2026-11-08.md`, `docs/research/duet-proactive-coordinator.md`, `apps/web/DESIGN-RULES.md`, `apps/ios/` | this repository |
+| cairn | `ownerOf` (`apps/server/src/services/owner.ts`), `docs/design/thread-owner-field.md`, `docs/design/coordinator-routes-verbatim.md`, `docs/design/mobile-information-architecture.md`, `docs/research/ios-app-pilot-2026-11-08.md`, `docs/research/desktop-app-stack-2026-11-08.md`, `docs/research/duet-proactive-coordinator.md`, `apps/web/DESIGN-RULES.md`, `apps/ios/` | this repository |
 
 ## 1. What Duet's layout is
 
@@ -101,11 +102,14 @@ The server computes one more field next to `owner`, `section`, in one function `
 
 | `section` | Rule, first match wins | Row status word | Glyph and color (DESIGN-RULES V5, L2) |
 |---|---|---|---|
-| `resolved` | phase `done` or `closed`, or archived, within 7 days; older rows are not listed | `Done` or `Closed` | ink check, no color |
+| `null` (not listed) | archived in any phase other than `done` or `closed`; or `done` or `closed` with `phaseAt` older than 7 days | none | none |
+| `resolved` | phase `done` or `closed` with `phaseAt` within the last 7 days, archived or not | `Done` or `Closed` (the phase) | ink check, no color |
 | `needs_input` | `ownerOf` is `owner` with reason `question` or `confirm` | `Needs input`, then the reason (`Asked you a question.`, `Plan ready. Approve to start.`) | ochre needs-you glyph |
 | `ready_for_review` | `ownerOf` is `owner` with reason `review` | `Ready for review`, then the reason | ochre needs-you glyph |
 | `up_next` | phase `todo` | `Up next` | ink glyph |
 | `working` | everything else open: `queued`, `planning`, `building`, a `needs_input` or `failed` task owned by the Coordinator, a `review` waiting on the merge queue | `Working`, then who is on it (`Coordinator is on it.` when `owner = 'coordinator'`, else the run phrase from `status-words.ts`) | 6px green dot only while a run is active |
+
+`section` is nullable on `TodoRecord`; clients drop `null` rows. The Tasks list reads `GET /api/todos?teamId=` (unarchived) plus the archived rows of the last 7 days, through one server query that returns both and computes `section` on each, so no client merges two lists. Today `listTodos` returns either unarchived or archived rows, never both (Read, `apps/server/src/services/todos.ts`, `filter.archived`); PR 2 adds the combined read. An archived task that never finished drops out of Tasks, as archiving means "stop showing me this". Inferred.
 
 Read: `ownerOf` returns `owner` or `coordinator` with a reason from `question`, `confirm`, `review` (owner) or `question`, `failed`, `review` (Coordinator) (`apps/server/src/services/owner.ts`, `packages/shared/src/records/needs-you.ts`); phases are `todo`, `queued`, `planning`, `confirm`, `building`, `needs_input`, `review`, `done`, `failed`, `closed` (`packages/shared/src/phase.ts`).
 
@@ -202,7 +206,7 @@ The owner chose free signing (4.4). The free Apple Developer tier has no Push no
 
 | Option | Reaches a locked phone with the app closed | Latency | Work | Mark |
 |---|---|---|---|---|
-| A. PWA Web Push alongside the app | Yes: the server already sends VAPID Web Push, and iOS Safari 16.4+ delivers it to a home-screen web app | Seconds, the same path the PWA uses today | None on the server; the owner installs the PWA once and allows notifications | Read (`services/push.ts`, mcp-forms note, MDN data for iOS 16.4); delivery latency Inferred |
+| A. PWA Web Push alongside the app | Yes: the server already sends VAPID Web Push, and iOS Safari 16.4+ delivers it to a home-screen web app | Seconds, the same path the PWA uses today | None on the server; the owner installs the PWA once and allows notifications | Read (`services/push.ts`, WebKit blog); delivery latency Inferred |
 | B. Background refresh plus local notifications | Sometimes | Unbounded: "the system doesn't guarantee launching the task at the specified date, but only that it won't begin sooner"; the system weighs usage, power and a force-quit | A `BGAppRefreshTask` that fetches needs-you and posts `UNNotificationRequest`s, plus de-duplication against what the owner already saw | Read (Apple `earliestBeginDate`); usage and force-quit effects Inferred |
 | C. Poll or stream while the app is open | No | Instant, but only in the foreground | Exists: the app already follows the SSE stream | Read (`apps/ios/README.md`) |
 
@@ -212,7 +216,7 @@ How A fits the native app:
 
 - The PWA on the home screen is the notification receiver. A tap opens the thread in the PWA, which renders the same phone layout as the native app (section 3, step 6), and the thread page offers `Open in app` (`cairn://thread/<todoId>`). Inferred: a service worker can only open windows on its own origin, so the tap cannot launch the native app directly.
 - The native app sends the same presence heartbeat as a visible web tab (`pwa/thread-presence.ts`, Read), so a thread on screen in the native app suppresses its Web Push.
-- Per-device class toggles (`needs you`, `done`) from the mcp-forms note apply to the PWA subscription (Read).
+- Per-device class toggles (`needs you`, `done`) on the PWA subscription, so `done` can be muted without muting needs-you. Proposed here; the server sends one class today (Inferred from `services/push.ts`).
 - If the owner later pays for the program, APNs replaces Web Push on that phone from the same trigger, and the PWA is no longer needed for alerts.
 
 ### 4.4 Getting the app onto the owner's iPhone: free signing, re-signed on the phone
@@ -292,10 +296,10 @@ Make tab (2.7); APNs, Live Activities and the widget extension; background-refre
 
 ## 5. Desktop
 
-The desktop borrows from Duet rather than copying it: it keeps the wide web layout (sidebar, main pane, Tasks panel) with Duet's sidebar, sections and sub-threads, and adds no phone-style tabs. Electron, as decided in `docs/research/desktop-app-stack-2026-11-08.md` (Read; not reopened). The first slice is a client of the always-on server, not a bundled server (`desktop-mobile-mcp-forms-2026-11-08.md`, 1.3, Read).
+The desktop borrows from Duet rather than copying it: it keeps the wide web layout (sidebar, main pane, Tasks panel) with Duet's sidebar, sections and sub-threads, and adds no phone-style tabs. Electron, as decided in `docs/research/desktop-app-stack-2026-11-08.md` (Read; not reopened). The first slice is a client of the always-on server, not a bundled server: the owner's server and main daemon already run on an always-on machine, and bundling them serves the later stranger-install phase (D100/D105 in the stack note, Read). Inferred.
 
 - **Window**: `BrowserWindow.loadURL(<server origin>)`, the same SPA, so the desktop layout is the web layout in section 3 with nothing desktop-only in the UI. First run asks for the server URL or a pairing link; single instance.
-- **Tray badge**: the needs-you count from 2.4, the same number as the iOS tab badge. Linux shows it in the tray icon (StatusNotifierItem on waybar, unverified on Wayland, Inferred), macOS on the dock and menu bar. Cleared when the window is focused, as t3code does (Read, mcp-forms note).
+- **Tray badge**: the needs-you count from 2.4, the same number as the iOS tab badge. Linux shows it in the tray icon (StatusNotifierItem on waybar, unverified on Wayland, Inferred), macOS on the dock and menu bar. It is derived from task state and never cleared on focus: it drops only when a task leaves `needs_input` or `ready_for_review`, so tray, web toggle and iOS tab always show the same number. Inferred.
 - **Notifications**: the main process subscribes to the team stream (`GET /api/teams/:id/stream`, Read, `routes-core.ts`) and raises an OS notification for each ownership notification the reconciler writes (`notifyOwnership`, Read, `notifications.ts`). It does not use Web Push inside Electron (Inferred: the desktop is online whenever it can notify, and the stream already carries the events). Suppressed when the thread is on screen, through the same presence heartbeat. Clicking opens `/app?thread=<todoId>`.
 - **Deep links**: register `cairn://` with `setAsDefaultProtocolClient`, handle `open-url` on macOS and `second-instance` on Linux and Windows (Read, stack note), and map each link to the web route in section 3, step 7. `cairn://new?q=` opens a draft and never runs.
 - **Update and packaging**: electron-builder and electron-updater; AppImage for the Linux desktop, an unsigned DMG for the Mac. Signing and notarization cost money (D9).
@@ -308,17 +312,17 @@ Each PR is independent off `main` unless it says otherwise, and each ends with s
 | # | PR | Area | Depends on |
 |---|---|---|---|
 | 1 | `docs`: update `mobile-information-architecture.md` to Chat and Tasks, `section`, drawer, deep links | docs | this document accepted |
-| 2 | `server`: `sectionOf` and `section` on `TodoRecord`, table test | server, shared | — |
+| 2 | `server`: `sectionOf` and a nullable `section` on `TodoRecord`; one Tasks read returning unarchived rows plus rows archived in the last 7 days; table test over phase, owner, reason, archive and age | server, shared | — |
 | 3 | `server`: `project.group` column; `projectId` written on owner messages sent from a project view and on task-card messages; test that a project filter returns them | server | — |
 | 4 | `web`: Tasks panel with Active and Up next, sections from `section`, badge on the toggle (lands the useful part of the a326b prototype) | web | 2 |
 | 5 | `web`: sidebar with Coordinator row, project dots, groups and `Move to group`; task rows removed from the sidebar | web | 3, 4 |
 | 6 | `web`: project lens on the Coordinator conversation, composer preset, task cards | web | 3 |
-| 7 | `web`: phone width with Chat and Tasks tabs and drawer; deep-link query routes | web | 4, 5 |
+| 7 | `web`: phone width with Chat and Tasks tabs and drawer; deep-link query routes | web | 4, 5, 6 |
 | 8 | `ios`: Chat home tab and Tasks tab, drawer, `section` rows in Duet's order, task cards; no hard-coded bundle ID, no push entitlement, no extensions | ios | 2, 3 |
 | 9 | `ci`: macOS workflow that builds the unsigned IPA on `apps/ios/**` changes and attaches it to the rolling `ios-latest` prerelease | ci | 8 |
 | 10 | `server`+`web`: per-device Web Push class toggles (`needs you`, `done`); `Open in app` link on the PWA thread page | server, web | 7 |
 | 11 | `ios`: `cairn://` deep-link handling and the presence heartbeat, so a thread on screen in the app suppresses its Web Push | ios | 8, 10 |
-| 12 | `desktop`: `apps/desktop` Electron window on the server origin, tray badge, notifications from the team stream, `cairn://`, AppImage and DMG | desktop | 4, 7 |
+| 12 | `desktop`: `apps/desktop` Electron window on the server origin, tray badge, notifications from the team stream, `cairn://`, AppImage and DMG | desktop | 4, 6, 7 |
 
 ## 7. What cairn should not copy from Duet
 
