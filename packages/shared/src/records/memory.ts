@@ -4,8 +4,10 @@ import { epochMs, recordId } from './common.js';
 export const MEMORY_QUOTA_PER_AGENT = 100;
 export const MEMORY_QUOTA_PER_TEAM = 100;
 
-export const MEMORY_LAYERS = ['core', 'log', 'scratchpad', 'searchable'] as const;
+export const MEMORY_LAYERS = ['core', 'scratchpad', 'searchable'] as const;
 export type MemoryLayer = (typeof MEMORY_LAYERS)[number];
+
+export const MEMORY_INDEX_TITLE = 'MEMORY.md';
 
 export const MEMORY_TOOLS = ['save_memory', 'update_memory', 'delete_memory', 'memories'] as const;
 

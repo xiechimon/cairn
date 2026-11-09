@@ -1,10 +1,14 @@
-import { COORDINATOR_MEMORY_FLUSH_MAX, ISSUE_FENCE_OPEN } from '@cairn/shared';
+import { COORDINATOR_MEMORY_FLUSH_MAX, ISSUE_FENCE_OPEN, MEMORY_INDEX_TITLE } from '@cairn/shared';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 import { applyFlush, FLUSH_SOURCE, parseFlushOutput } from '../../src/coordinator/memory-flush.js';
 import { flushTranscript, summarizerFor } from '../../src/coordinator/runtime/compaction.js';
 import { agentMemory, project } from '../../src/db/schema.js';
-import { listMemoryEntries, saveMemoryEntry } from '../../src/services/memory.js';
+import {
+  foldMemoryIndexes,
+  listMemoryEntries,
+  saveMemoryEntry,
+} from '../../src/services/memory.js';
 import { coordinatorProfile } from '../../src/services/routing-rules.js';
 import { boot, world } from './runner-world.js';
 
@@ -48,6 +52,34 @@ describe('flushTranscript', () => {
 });
 
 describe('applyFlush', () => {
+  it('appends instead of overwriting when a flush entry names the MEMORY.md id', async () => {
+    const w = await world('hi');
+    const scope = { teamId: w.teamId, threadId: w.threadId };
+    applyFlush(w.s.db, scope, json({ title: 'Merge', content: 'ian wants squash merges only.' }));
+    foldMemoryIndexes(w.s.db);
+    const index = w.s.db
+      .select()
+      .from(agentMemory)
+      .all()
+      .find((row) => row.title === MEMORY_INDEX_TITLE && row.invalidAt === null);
+    expect(index).toBeDefined();
+    const result = applyFlush(
+      w.s.db,
+      scope,
+      json({ title: 'Deploy', content: 'Deploy on weekdays.', replaces: index?.id }),
+    );
+    expect(result).toEqual({ saved: 1, updated: 0, skipped: 0 });
+    const still = w.s.db
+      .select()
+      .from(agentMemory)
+      .all()
+      .find((row) => row.id === index?.id);
+    expect(still).toMatchObject({
+      invalidAt: null,
+      content: '- Merge：ian wants squash merges only.',
+    });
+  });
+
   it('saves a new fact with its source, skips a repeat, and never throws on quota or fences', async () => {
     const w = await world('hi');
     const scope = { teamId: w.teamId, threadId: w.threadId };

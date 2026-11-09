@@ -2,11 +2,12 @@ import { createHash } from 'node:crypto';
 import {
   estimateTokens,
   ISSUE_FENCE_OPEN,
+  MEMORY_INDEX_TITLE,
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_QUOTA_PER_TEAM,
   type MemoryLayer,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agentMemory, memorySaveConflict } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -219,6 +220,18 @@ export function injectMemories(db: Db, scope: InjectScope) {
   );
 }
 
+type MemoryRow = typeof agentMemory.$inferSelect;
+
+const INDEX_LINE = /^- (.+?)：(.*)$/;
+
+function indexFacts(row: MemoryRow): MemoryRow[] {
+  if (row.layer !== 'core' || row.title !== MEMORY_INDEX_TITLE) return [row];
+  return row.content.split('\n').flatMap((line) => {
+    const match = INDEX_LINE.exec(line);
+    return match === null ? [] : [{ ...row, title: match[1] ?? '', content: match[2] ?? '' }];
+  });
+}
+
 export function memoriesInScope(
   tx: MemoryTx,
   scope: {
@@ -231,7 +244,7 @@ export function memoriesInScope(
   },
   everyProject = false,
 ) {
-  return tx
+  const rows = tx
     .select()
     .from(agentMemory)
     .where(
@@ -248,6 +261,7 @@ export function memoriesInScope(
     )
     .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
     .all();
+  return rows.flatMap(indexFacts);
 }
 
 export function saveMemoryEntry(
@@ -435,6 +449,128 @@ export function updateMemoryEntry(
       .run();
     absorb(successor.id);
     return successor;
+  });
+}
+
+function indexEntry(title: string, content: string): { line: string; file: boolean } {
+  const [first = '', ...rest] = content.split('\n');
+  const file = rest.some((line) => line.trim() !== '');
+  return {
+    line: file ? `- ${title}：${first}（详见记忆文件「${title}」）` : `- ${title}：${first}`,
+    file,
+  };
+}
+
+export function isMemoryIndex(db: Db, memoryId: string): boolean {
+  return (
+    db
+      .select({ title: agentMemory.title })
+      .from(agentMemory)
+      .where(and(eq(agentMemory.id, memoryId), eq(agentMemory.layer, 'core')))
+      .get()?.title === MEMORY_INDEX_TITLE
+  );
+}
+
+export const MEMORY_VERSION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): number {
+  const cutoff = now - MEMORY_VERSION_RETENTION_MS;
+  return db.transaction((tx) => {
+    const purged = tx
+      .delete(agentMemory)
+      .where(and(isNotNull(agentMemory.invalidAt), lt(agentMemory.invalidAt, cutoff)))
+      .run().changes;
+    for (const row of tx
+      .select({
+        id: agentMemory.id,
+        history: agentMemory.history,
+        createdAt: agentMemory.createdAt,
+      })
+      .from(agentMemory)
+      .where(sql`json_array_length(${agentMemory.history}) > 0`)
+      .all()) {
+      const kept = row.history.filter((_, index) => {
+        const supersededAt = row.history[index + 1]?.updatedAt ?? row.createdAt;
+        return supersededAt >= cutoff;
+      });
+      if (kept.length !== row.history.length) {
+        tx.update(agentMemory).set({ history: kept }).where(eq(agentMemory.id, row.id)).run();
+      }
+    }
+    return purged;
+  });
+}
+
+export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs()): void {
+  db.transaction((tx) => {
+    tx.update(agentMemory)
+      .set({ layer: 'searchable' })
+      .where(eq(agentMemory.layer, 'log' as MemoryLayer))
+      .run();
+    const rows = tx
+      .select()
+      .from(agentMemory)
+      .where(and(stillValid, eq(agentMemory.layer, 'core'), notAdoptedDuplicate()))
+      .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
+      .all();
+    const groups = new Map<string, MemoryRow[]>();
+    for (const row of rows) {
+      const key = JSON.stringify([row.teamId, row.projectId, row.independent ? row.agentId : null]);
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    }
+    for (const group of groups.values()) {
+      const [head] = group;
+      if (head === undefined || (group.length === 1 && head.title === MEMORY_INDEX_TITLE)) continue;
+      const lines: string[] = [];
+      for (const row of group) {
+        if (row.title === MEMORY_INDEX_TITLE) {
+          lines.push(row.content);
+          continue;
+        }
+        const { line, file } = indexEntry(row.title, row.content);
+        lines.push(line);
+        if (file) {
+          tx.insert(agentMemory)
+            .values({
+              ...row,
+              id: newRecordId(),
+              layer: 'searchable',
+              history: [],
+              invalidAt: null,
+              supersededBy: null,
+            })
+            .run();
+        }
+      }
+      const index = tx
+        .insert(agentMemory)
+        .values({
+          ...head,
+          id: newRecordId(),
+          title: MEMORY_INDEX_TITLE,
+          content: lines.join('\n'),
+          sourceTodoId: null,
+          sourceBuildId: null,
+          source: null,
+          history: [],
+          invalidAt: null,
+          supersededBy: null,
+          lastInjectedAt: null,
+          createdAt: head.createdAt,
+          updatedAt: Math.max(...group.map((row) => row.updatedAt)),
+        })
+        .returning()
+        .get();
+      tx.update(agentMemory)
+        .set({ invalidAt: now, supersededBy: index.id })
+        .where(
+          inArray(
+            agentMemory.id,
+            group.map((row) => row.id),
+          ),
+        )
+        .run();
+    }
   });
 }
 

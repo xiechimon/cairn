@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { claimedStepSchema } from '@cairn/shared';
+import { claimedStepSchema, MEMORY_INDEX_TITLE } from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { eq, ne } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -396,7 +396,11 @@ describe('removing the agent table from a seeded legacy install', () => {
         agentId: memoryOwnerOf(opened.db, 't1', kind),
         teamId: 't1',
         teamScoped: memoryOpsAreTeamScoped(kind),
-      }).map((entry) => entry.title);
+      }).flatMap((entry) =>
+        entry.title === MEMORY_INDEX_TITLE
+          ? entry.content.split('\n').map((line) => line.slice(2, line.indexOf('：')))
+          : [entry.title],
+      );
     expect(titles('review')).toEqual(['review fact']);
     expect(titles('verify')).toEqual(['verify fact']);
     expect(titles('build')).not.toContain('review fact');

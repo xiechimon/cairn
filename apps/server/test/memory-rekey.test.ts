@@ -155,18 +155,12 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['try the cached index next']);
   });
 
-  test('searchable and log layers stay out of prompt injection', () => {
+  test('the searchable layer stays out of prompt injection', () => {
     save({
       agentId: 'planner',
       content: 'search later',
       source: 'Planner',
       layer: 'searchable',
-    });
-    save({
-      agentId: 'planner',
-      content: 'dated note',
-      source: 'Planner',
-      layer: 'log',
     });
     expect(
       injectMemories(s.db, {
@@ -175,7 +169,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         projectId: null,
       }),
     ).toEqual([]);
-    expect(s.db.select().from(agentMemory).all()).toHaveLength(2);
+    expect(s.db.select().from(agentMemory).all()).toHaveLength(1);
   });
 
   test('an adopted routing-rule copy is not listed or injected beside the original', () => {
@@ -478,12 +472,6 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       content: 'search later',
       source: 'Implementer',
       layer: 'searchable',
-    });
-    save({
-      agentId: 'builder',
-      content: 'dated note',
-      source: 'Implementer',
-      layer: 'log',
     });
     expect(
       injectMemories(s.db, { agentId: 'builder', projectId: null }).map((m) => m.content),
