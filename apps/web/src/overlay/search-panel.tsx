@@ -351,7 +351,7 @@ export function SearchPanel({
                 ? '输入命令或搜索…'
                 : chips.length > 0
                   ? '再加一个筛选或词'
-                  : '搜索任务、项目、成员…',
+                  : '搜索任务、项目…',
             )}
             onChange={(event) => onQuery(joinQuery(chips, event.target.value))}
             onKeyDown={(event) => {
