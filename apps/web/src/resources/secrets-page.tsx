@@ -57,7 +57,7 @@ export function SecretsPage() {
             testId="resource-empty"
             className="mt-6"
             icon={KeyRound}
-            title={t('尚无密钥。')}
+            title={t('尚无密钥')}
             description={t(
               '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。',
             )}

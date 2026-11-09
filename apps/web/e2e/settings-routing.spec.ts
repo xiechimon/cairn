@@ -10,7 +10,7 @@ test('settings work-routing shows the empty state and the create-rule editors', 
     'page',
   );
   await expect(settings.getByTestId('routing-settings-empty')).toBeVisible();
-  await expect(settings.getByText('还没有路由规则。')).toBeVisible();
+  await expect(settings.getByText('还没有路由规则')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-review')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-citation_check')).toBeVisible();
