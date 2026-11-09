@@ -68,6 +68,7 @@ export function lastTurnContext(
       cacheRead: chiefTurnUsage.cacheRead,
       input: chiefTurnUsage.input,
       threadId: chiefTurnUsage.threadId,
+      stepId: chiefTurnUsage.stepId,
     })
     .from(chiefTurnUsage)
     .where(
@@ -86,12 +87,15 @@ export function lastTurnContext(
     .get();
   if (last?.tokens == null) return null;
   const retentionMs = retentionMsFor(resolveCacheRetentionTier(), last.model);
-  const lastColdSlimAt =
+  const coldSlim =
     db
-      .select({ at: coordinatorConversation.lastColdSlimAt })
+      .select({
+        at: coordinatorConversation.lastColdSlimAt,
+        stepId: coordinatorConversation.lastColdSlimStepId,
+      })
       .from(coordinatorConversation)
       .where(eq(coordinatorConversation.threadId, last.threadId))
-      .get()?.at ?? null;
+      .get() ?? null;
   return {
     tokens: last.tokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
@@ -105,7 +109,9 @@ export function lastTurnContext(
         contextTokens: last.tokens,
         model: last.model,
       },
-      lastColdSlimAt,
+      lastColdSlimAt: coldSlim?.at ?? null,
+      lastColdSlimStepId: coldSlim?.stepId ?? null,
+      lastUsageStepId: last.stepId,
     }),
   };
 }

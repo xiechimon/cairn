@@ -52,15 +52,26 @@ export function contextResumeOf(args: {
   retentionMs: number;
   lastUsage: TurnUsageSnapshot | null;
   lastColdSlimAt: number | null;
+  lastColdSlimStepId?: string | null;
+  lastUsageStepId?: string | null;
 }): ContextResume {
   if (args.lastUsage === null) return 'idle';
-  if (
+  const slimRecent =
     args.lastColdSlimAt !== null &&
     args.now - args.lastColdSlimAt >= 0 &&
-    args.now - args.lastColdSlimAt < args.retentionMs
-  ) {
-    return 'compacted';
-  }
+    args.now - args.lastColdSlimAt < args.retentionMs;
+  const slimStep = args.lastColdSlimStepId;
+  const usageStep = args.lastUsageStepId;
+  const slimOwnsLatest =
+    slimStep !== undefined &&
+    slimStep !== null &&
+    slimStep !== '' &&
+    usageStep !== undefined &&
+    usageStep !== null &&
+    usageStep !== ''
+      ? slimStep === usageStep
+      : args.lastColdSlimAt !== null && args.lastColdSlimAt >= args.lastUsage.createdAt;
+  if (slimRecent && slimOwnsLatest) return 'compacted';
   if (
     isColdResume({
       now: args.now,

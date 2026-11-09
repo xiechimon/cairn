@@ -369,6 +369,60 @@ describe('contextResumeOf', () => {
       }),
     ).toBe('compacted');
   });
+
+  it('prefers a newer warm turn over a recent cold-slim marker', () => {
+    const slimAt = 10_000;
+    expect(
+      contextResumeOf({
+        now: slimAt + 30_000,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: {
+          createdAt: slimAt + 20_000,
+          cacheRead: 12_000,
+          input: 100,
+          contextTokens: 12_100,
+          model: 'openai/gpt',
+        },
+        lastColdSlimAt: slimAt,
+        lastColdSlimStepId: 'cold-step',
+        lastUsageStepId: 'warm-step',
+      }),
+    ).toBe('warm');
+    expect(
+      contextResumeOf({
+        now: slimAt + 30_000,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: {
+          createdAt: slimAt + 20_000,
+          cacheRead: 12_000,
+          input: 100,
+          contextTokens: 12_100,
+          model: 'openai/gpt',
+        },
+        lastColdSlimAt: slimAt,
+      }),
+    ).toBe('warm');
+  });
+
+  it('keeps compacted when the slim marker still owns the latest usage step', () => {
+    const slimAt = 10_000;
+    expect(
+      contextResumeOf({
+        now: slimAt + 30_000,
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsage: {
+          createdAt: slimAt - 1,
+          cacheRead: 0,
+          input: COLD_CACHE_MISS_MIN_TOKENS,
+          contextTokens: 20_000,
+          model: 'anthropic/claude',
+        },
+        lastColdSlimAt: slimAt,
+        lastColdSlimStepId: 'cold-step',
+        lastUsageStepId: 'cold-step',
+      }),
+    ).toBe('compacted');
+  });
 });
 
 describe('projectColdMessages', () => {
