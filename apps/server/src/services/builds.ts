@@ -18,6 +18,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  ASK_USER_QUESTION_KIND,
   buildFallbackReport,
   buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
@@ -38,6 +39,7 @@ import {
   hasBlockingFinding,
   isBuildStepKind,
   isPlanContractRewritePrompt,
+  isWaitingPhase,
   MERGE_ANNOUNCEMENT,
   PLAN_PRIOR_ART_RULE,
   type PlanContractCheck,
@@ -171,6 +173,7 @@ import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import {
+  abandonsQuestions,
   childrenOfTodo,
   getTodo,
   setTodoPhase,
@@ -178,8 +181,17 @@ import {
   splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
-import { blockingWorkerQuestions, cancelPendingWorkerQuestions } from './worker-question-store.js';
-import { settleWorkerReply } from './worker-questions.js';
+import {
+  blockingWorkerQuestions,
+  cancelPendingWorkerQuestions,
+  pendingWorkerQuestions,
+  writeWorkerQuestion,
+} from './worker-question-store.js';
+import {
+  type QuestionAnswer,
+  settleQuestionAnswers,
+  settleWorkerReply,
+} from './worker-questions.js';
 
 export interface BuildDeps {
   githubAppTokenSocket?: string | null | undefined;
@@ -257,6 +269,7 @@ interface BuildSteerOptions {
   human?: boolean;
   actor?: string;
   schedule?: { id: string; createdBy: string; at: number };
+  answer?: QuestionAnswer;
 }
 
 function continuationTodo(
@@ -284,7 +297,7 @@ function continuationTodo(
   const resumable =
     row?.phase === 'done' ||
     (options.allowReviewContinuation === true && row?.phase === 'review') ||
-    (row?.awaitingReply === true && (row.phase === 'building' || row.phase === 'planning')) ||
+    row?.phase === 'needs_input' ||
     (options.afterTurn === true &&
       row !== undefined &&
       (['planning', 'building', 'confirm', 'review', 'failed'].includes(row.phase) ||
@@ -400,10 +413,7 @@ export async function sendBuildSteer(
         if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
           throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
         }
-        if (
-          wake.createdBy.startsWith('worker:') &&
-          ['confirm', 'review'].includes(todoRow?.phase ?? '')
-        ) {
+        if (wake.createdBy.startsWith('worker:') && isWaitingPhase(todoRow?.phase ?? '')) {
           throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
         }
       }
@@ -424,8 +434,9 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      if (human || continuationOptions.actor !== undefined)
-        settleWorkerReply(deps, conversationId, body.content);
+      if (continuationOptions.answer !== undefined)
+        settleQuestionAnswers(deps, conversationId, [continuationOptions.answer]);
+      else if (human) settleWorkerReply(deps, conversationId, body.content);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
@@ -606,16 +617,14 @@ function dropQuestionOnPhaseChange(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
   to: Phase,
-): { awaitingReply?: false } {
-  if (!todoRow.awaitingReply || to === 'review') return {};
-  if (todoRow.latestBuildId !== null) {
+): void {
+  if (abandonsQuestions(to) && todoRow.latestBuildId !== null) {
     cancelPendingWorkerQuestions(
       deps,
       todoRow.latestBuildId,
       'The thread moved on before an answer.',
     );
   }
-  return { awaitingReply: false };
 }
 
 function landReservedPhase(
@@ -624,10 +633,10 @@ function landReservedPhase(
   desired: Phase,
 ): void {
   if (todoRow.phase !== desired) {
+    dropQuestionOnPhaseChange(deps, todoRow, desired);
     deps.db
       .update(todo)
       .set({
-        ...dropQuestionOnPhaseChange(deps, todoRow, desired),
         phase: desired,
         phaseAt: nowMs(),
         v: todoRow.v + 1,
@@ -749,9 +758,9 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   if (todoRow.latestBuildId !== buildRow.id || hasLeftExecution(todoRow.phase)) return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
+  dropQuestionOnPhaseChange(deps, todoRow, target);
   db.update(todo)
     .set({
-      ...dropQuestionOnPhaseChange(deps, todoRow, target),
       phase: target,
       phaseAt: nowMs(),
       v: todoRow.v + 1,
@@ -776,9 +785,9 @@ function releaseZombieQueued(
   }
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
+  dropQuestionOnPhaseChange(deps, todoRow, target);
   db.update(todo)
     .set({
-      ...dropQuestionOnPhaseChange(deps, todoRow, target),
       phase: target,
       phaseAt: nowMs(),
       v: todoRow.v + 1,
@@ -2785,12 +2794,7 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (isBuildStepKind(stepRow.kind)) {
-    if (
-      stepRow.kind === 'session' &&
-      blockingWorkerQuestions(deps.db, stepRow.buildId).length > 0
-    ) {
-      return null;
-    }
+    if (blockingWorkerQuestions(deps.db, stepRow.buildId).length > 0) return null;
     if (outcome.output === 'info') {
       return outcome.report === undefined ? '信息卡未产出报告' : null;
     }
@@ -2801,7 +2805,6 @@ function stepArtifactGate(
       }
       return `agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
     }
-    if (outcome.hasChanges === false) return '构建零改动';
   }
   return null;
 }
@@ -2951,6 +2954,77 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
   }
 }
 
+const ZERO_CHANGE_EXCERPT_MAX = 1_200;
+
+function endedWithoutChanges(
+  stepRow: typeof step.$inferSelect,
+  todoRow: TodoRow,
+  outcome: { hasChanges?: boolean; workBranchDrift?: unknown },
+): boolean {
+  return (
+    isBuildStepKind(stepRow.kind) &&
+    todoRow.output !== 'info' &&
+    outcome.hasChanges === false &&
+    outcome.workBranchDrift === undefined
+  );
+}
+
+function spokenText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .flatMap((block: unknown) => {
+      if (block === null || typeof block !== 'object') return [];
+      const { type, text } = block as { type?: unknown; text?: unknown };
+      return type === 'text' && typeof text === 'string' ? [text] : [];
+    })
+    .join('\n');
+}
+
+function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {
+  const rows = deps.db
+    .select({ content: message.content })
+    .from(message)
+    .where(and(eq(message.conversationId, buildId), eq(message.role, 'assistant')))
+    .orderBy(desc(message.createdAt))
+    .all();
+  for (const row of rows) {
+    const text = spokenText(row.content).trim();
+    if (text !== '') return text;
+  }
+  return null;
+}
+
+function askAboutZeroChangeOnce(deps: BuildDeps, buildId: string): void {
+  const last = lastAgentMessage(deps, buildId);
+  const excerpt =
+    last === null
+      ? '(the agent left no message)'
+      : last.length > ZERO_CHANGE_EXCERPT_MAX
+        ? `${last.slice(0, ZERO_CHANGE_EXCERPT_MAX - 1)}…`
+        : last;
+  const requestId = `no-change-${buildId}`;
+  writeWorkerQuestion(
+    deps,
+    buildId,
+    requestId,
+    {
+      kind: ASK_USER_QUESTION_KIND,
+      requestId,
+      status: 'pending',
+      questions: [
+        {
+          header: 'No changes',
+          question: `The step ended without committing anything. The agent's last message:\n${excerpt}\nAnswer with what it should do next, or say the task needs no code change.`,
+          options: [],
+        },
+      ],
+      answers: null,
+    },
+    nowMs(),
+  );
+}
+
 export function completeStep(
   deps: BuildDeps,
   stepId: string,
@@ -3012,6 +3086,11 @@ export function completeStep(
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
+  if (
+    endedWithoutChanges(stepRow, todoRow, outcome) &&
+    pendingWorkerQuestions(deps.db, buildRow.id).length === 0
+  )
+    askAboutZeroChangeOnce(deps, buildRow.id);
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
   const gateFailure = stepArtifactGate(
     deps,
@@ -3067,6 +3146,19 @@ export function completeStep(
       return;
     }
     setTodoPhase(deps, todoRow.id, 'confirm', { hasPlan: true });
+    return;
+  }
+  if (
+    isBuildStepKind(stepRow.kind) &&
+    canTransitionPhase(todoRow.phase, 'needs_input') &&
+    pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0
+  ) {
+    setTodoPhase(
+      deps,
+      todoRow.id,
+      'needs_input',
+      outcome.hasChanges !== undefined ? { hasChanges: outcome.hasChanges } : {},
+    );
     return;
   }
   if (isBuildStepKind(stepRow.kind) && todoRow.output === 'info') {

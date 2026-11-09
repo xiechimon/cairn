@@ -30,6 +30,7 @@ import {
   AGENT_TOOL_PUSH,
   appendBlockerHandoff,
   appendConfirmedPlanNote,
+  appendDecisionsNote,
   appendPlanLocationNote,
   appendReportLocationNote,
   appendWorkBranchNote,
@@ -203,9 +204,9 @@ export function streamTimeoutMessage(
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
   if (!todo) return claimed.instruction ?? '';
-  const taskText = appendBlockerHandoff(
-    buildTaskPromptText(todo.title, todo.spec, todo),
-    todo.blockerHandoff,
+  const taskText = appendDecisionsNote(
+    appendBlockerHandoff(buildTaskPromptText(todo.title, todo.spec, todo), todo.blockerHandoff),
+    todo.decisions,
   );
   const instruction = claimed.instruction ?? null;
   if (instruction !== null && instruction.trim() !== '') {
