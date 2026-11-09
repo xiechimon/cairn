@@ -156,7 +156,7 @@ Open measurements before steps 3 and 5: (a) how many of the 41 `'/tmp/` literals
 
 ## 6. Implementation follow-up (#3630)
 
-Design: [disk-backed temporary work](../design/3630-disk-temp.md). PR number pending creation.
+Design: [disk-backed temporary work](../design/3630-disk-temp.md). PR: [#3638](https://github.com/xiechimon/cairn/pull/3638).
 
 The original recommendation 2/4 scope is unchanged. Recommendation 3 (rewiring every test admission path) is deferred; PR #3601 remains open at the follow-up check. This change must not modify its heavy-slot allocator, admission configs or cairn-heavy wrapper before it merges.
 # Installed agent temp-root checks (2026-11-09)
