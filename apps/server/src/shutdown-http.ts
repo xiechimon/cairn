@@ -1,3 +1,4 @@
+import type { Socket } from 'node:net';
 import type { ServerType } from '@hono/node-server';
 
 interface DrainingResponse {
@@ -6,8 +7,14 @@ interface DrainingResponse {
   once(event: 'close', listener: () => void): unknown;
 }
 
-export function createHttpDrain(server: ServerType) {
+export function createHttpDrain(server: ServerType, graceMs = 5_000) {
   const responses = new Set<DrainingResponse>();
+  const sockets = new Set<Socket>();
+  const trackSocket = (socket: Socket) => {
+    sockets.add(socket);
+    socket.once('close', () => sockets.delete(socket));
+  };
+  server.on('connection', trackSocket);
   const track = (_request: unknown, response: DrainingResponse) => {
     responses.add(response);
     response.once('close', () => responses.delete(response));
@@ -18,13 +25,21 @@ export function createHttpDrain(server: ServerType) {
       if (String(response.getHeader('content-type')).startsWith('text/event-stream'))
         response.end();
     }
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve();
+    const deadline = setTimeout(() => {
+      for (const socket of sockets) socket.destroy();
+    }, graceMs);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
       });
-    });
-    server.off('request', track);
+    } finally {
+      clearTimeout(deadline);
+      server.off('request', track);
+      server.off('connection', trackSocket);
+    }
     await shutdownTracing();
   };
 }
