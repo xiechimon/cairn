@@ -38,6 +38,7 @@ export interface TurnDeps {
   volatile?: VolatileContext;
   volatileText?: string | null;
   coldSlim?: ColdSlimPlan | null;
+  beforeDone?: () => void;
   onModel?: (ref: ModelRef) => void;
 }
 
@@ -98,6 +99,7 @@ export async function runCoordinatorTurn(
   const stepId = claimed.step.id;
   let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
+    if (body.status === 'success') deps.beforeDone?.();
     await api.done(stepId, body, observation);
     return body;
   };

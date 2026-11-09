@@ -550,20 +550,24 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         claimed: payload.claimed,
         volatileText: payload.volatileText,
         coldSlim,
+        ...(coldSlim.cold
+          ? {
+              beforeDone: () => {
+                const at = nowMs();
+                db.update(coordinatorConversation)
+                  .set({
+                    lastColdSlimAt: at,
+                    lastColdSlimStepId: row.id,
+                    updatedAt: at,
+                  })
+                  .where(eq(coordinatorConversation.threadId, row.buildId))
+                  .run();
+              },
+            }
+          : {}),
         router: binding(teamId, providers.router),
         summary: binding(teamId, providers.summary),
       });
-      if (coldSlim.cold) {
-        const at = nowMs();
-        db.update(coordinatorConversation)
-          .set({
-            lastColdSlimAt: at,
-            lastColdSlimStepId: row.id,
-            updatedAt: at,
-          })
-          .where(eq(coordinatorConversation.threadId, row.buildId))
-          .run();
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const scrubbed = scrubProviderError({ db, box: machine.box }, teamId, keyed, message);
