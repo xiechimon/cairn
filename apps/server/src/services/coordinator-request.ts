@@ -242,11 +242,11 @@ export function updateRequestTodo(
   params: CoordinatorUpdateTodoParams,
 ): TodoRecord | null {
   const { db } = deps;
-  if (params.addMessageIds !== undefined) appendableRow(db, ctx, params.todoId);
   const added =
     params.addMessageIds === undefined
       ? null
       : citedMessages(db, ctx, params.addMessageIds).map((c) => c.segment);
+  if (added !== null) appendableRow(db, ctx, params.todoId);
   const routed = updateAutonomousTodo(deps, params.todoId, {
     ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
     ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
