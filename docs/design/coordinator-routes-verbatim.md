@@ -187,7 +187,7 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 
 - `open_thread` does not refuse a task whose `blockedBy` is not done. `dependsOn` only gates wave dispatch for split children (`advanceSplitWaves`) and feeds the blocker handoff. A follow-up makes `open_thread` return 409 naming the blockers. It must first check how research-before-plan sets `blockedBy` on code tasks.
 - The Coordinator sees ids of earlier messages only through `search_history`. A follow-up labels owner messages with their ids in the turn context, so the Coordinator can cite them without searching.
-- The plan eval (`integration/eval/plan`, protected) grades Coordinator-written spec text. Under this design that text is the owner's prompt. The coordinator is taking this to ian. This work does not edit the eval ruler.
+- The plan eval (`integration/eval/plan`, protected) grades Coordinator-written spec text. Under this design that text is the owner's prompt. ian approved (2026-11-09) changing it to grade the Coordinator's routing decisions: project choice, split quotes, `dependsOn` and `difficulty`. That change is a separate PR on ian's route, touching only the eval ruler. It follows rollout step 1, so it scores the real tool shape. Steps 1 to 3 do not edit the eval ruler.
 
 ## Rollout
 
