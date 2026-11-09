@@ -13,7 +13,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
-import { MemoryTab } from './memory-tab.js';
+import { MemoryPanel } from './memory-panel.js';
 
 const TABS: { id: ChiefSettingsTab; label: string }[] = [
   { id: 'routing', label: '模型与机器' },
@@ -120,7 +120,7 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
             </>
           )}
 
-          {tab === 'memory' && <MemoryTab live={live} teamId={teamId} />}
+          {tab === 'memory' && <MemoryPanel live={live} teamId={teamId} project={null} />}
 
           {tab === 'watches' && (
             <SettingsCard className="mt-4">

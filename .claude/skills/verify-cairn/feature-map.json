@@ -229,13 +229,13 @@
       "id": "memory",
       "name": "Memory",
       "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.",
-      "states": "Coordinator settings list the memories in use; a memory can be deleted or promoted from project to team.",
+      "states": "Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/chief/chief-settings.tsx",
-          "apps/web/src/chief/memory-tab.tsx",
+          "apps/web/src/chief/memory-panel.tsx",
           "apps/web/src/chief/memory-list.ts",
           "apps/web/src/board/project-instructions-field.tsx"
         ],

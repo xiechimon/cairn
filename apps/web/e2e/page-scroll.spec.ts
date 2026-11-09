@@ -149,9 +149,9 @@ test('all three long-content tabs of chief settings scroll to the bottom (#1032)
   await openChiefSettings(page);
 
   await page.getByRole('tab', { name: '记忆' }).click();
-  const quota = page.getByText('已存 40 条，上限 100 条 · 不是每条都会自动注入');
-  await expect(quota).toBeVisible();
-  await expectScrollerReachesBottom(page, quota, page.getByText('记忆条目 39'));
+  const autoMemory = page.getByRole('heading', { name: '自动记忆' });
+  await expect(autoMemory).toBeVisible();
+  await expectScrollerReachesBottom(page, autoMemory, page.getByText('记忆条目 39'));
 
   await page.getByRole('tab', { name: '关注与提醒' }).click();
   const firstWatch = page.getByText('关注条目 0', { exact: true });

@@ -6,7 +6,7 @@ import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { ProjectIconPicker } from '../board/project-icon-picker.js';
-import { ProjectInstructionsField } from '../board/project-instructions-field.js';
+import { MemoryPanel } from '../chief/memory-panel.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
   SETTINGS_HINT_CLS,
@@ -37,6 +37,7 @@ const TABS = [
   { id: 'basic', label: '基本信息' },
   { id: 'repo', label: '仓库' },
   { id: 'tags', label: '标签' },
+  { id: 'memory', label: '记忆' },
 ];
 
 const ROW_INPUT_CLS = `${FORM_CONTROL_CLS} w-72`;
@@ -136,294 +137,295 @@ export function ProjectSettingsPage() {
         <div className="flex">
           <TabGroup tabs={TABS} tab={tab} onTab={setTab} />
         </div>
-        <SettingsCard className="prj-set-card">
-          <SettingsRow label={t('名称')}>
-            {live && wireProject !== undefined ? (
-              <>
-                <Input
-                  aria-label={t('名称')}
-                  className={ROW_INPUT_CLS}
-                  value={nameDraft ?? wireProject.name}
-                  onChange={(event) => setNameDraft(event.target.value)}
-                />
-                <Button
-                  className={DIALOG_PRIMARY_BUTTON}
-                  aria-label={t('保存名称')}
-                  disabled={
-                    mutations.patchProject.isPending ||
-                    (nameDraft ?? '').trim() === wireProject.name ||
-                    (nameDraft ?? '').trim() === ''
-                  }
-                  onClick={() => {
-                    if (id === undefined) return;
-                    mutations.patchProject.mutate(
-                      { id, body: { name: (nameDraft ?? '').trim() } },
-                      {
-                        onSuccess: () => setNameDraft(null),
-                        onError: (error) => toastError(t('保存失败，请重试。'), error),
-                      },
-                    );
-                  }}
-                >
-                  {t('保存')}
-                </Button>
-              </>
-            ) : (
-              <>
-                {project?.name ?? ''}
-                <SquarePen width={14} height={14} className={ROW_ICON_CLS} />
-              </>
-            )}
-          </SettingsRow>
-          {live && wireProject?.repoKind === 'github' ? (
-            <SettingsRow label={t('仓库')}>
-              <Input
-                aria-label={t('GitHub 仓库（owner/repo）')}
-                className={`${ROW_INPUT_CLS} font-mono`}
-                placeholder="owner/repo"
-                value={repoDraft ?? wireProject.githubRepo ?? ''}
-                onChange={(event) => {
-                  setRepoDraft(event.target.value);
-                  setRepoError(null);
-                }}
-              />
-              <Button
-                className={DIALOG_PRIMARY_BUTTON}
-                aria-label={t('保存仓库')}
-                disabled={
-                  mutations.patchProject.isPending ||
-                  (repoDraft ?? wireProject.githubRepo ?? '').trim() ===
-                    (wireProject.githubRepo ?? '').trim() ||
-                  (repoDraft ?? '').trim() === ''
-                }
-                onClick={() => {
-                  if (id === undefined) return;
-                  const repo = (repoDraft ?? '').trim();
-                  if (!isGithubRepoRef(repo)) {
-                    setRepoError(t('GitHub 仓库格式应为 owner/repo。'));
-                    return;
-                  }
-                  mutations.patchProject.mutate(
-                    { id, body: { githubRepo: repo } },
-                    {
-                      onSuccess: () => {
-                        setRepoDraft(null);
-                        setRepoError(null);
-                      },
-                      onError: (error) => toastError(t('仓库保存失败，请重试。'), error),
-                    },
-                  );
-                }}
-              >
-                {t('保存')}
-              </Button>
-              {repoError !== null && (
-                <span role="alert" className="text-meta text-destructive">
-                  {repoError}
-                </span>
-              )}
-            </SettingsRow>
-          ) : (
-            <SettingsRow label={t('仓库')}>{project?.repoName ?? ''}</SettingsRow>
-          )}
-          <SettingsRow label={t('目标分支')}>
-            {live && wireProject?.repoKind !== undefined ? (
-              <ProjectBaseBranchSelect project={wireProject} />
-            ) : (
-              <span
-                className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
-              >
-                {project?.defaultBranch ?? 'main'}
-                <ChevronDown width={14} height={14} className={ROW_ICON_CLS} />
-              </span>
-            )}
-          </SettingsRow>
-          {live && wireProject !== undefined && (
-            <SettingsRow
-              label={t('并发与优先级')}
-              hint={t('本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。')}
-            >
-              <ProjectConcurrencySelect project={wireProject} />
-            </SettingsRow>
-          )}
-          {live && wireProject?.repoKind === 'github' && (
-            <SettingsRow label={t('本机加速路径')}>
-              <Input
-                aria-label={t('本机加速路径')}
-                className={`${ROW_INPUT_CLS} font-mono`}
-                placeholder={t('绝对路径，留空即清除')}
-                value={accelDraft ?? wireProject.localPath ?? ''}
-                onChange={(event) => setAccelDraft(event.target.value)}
-              />
-              <Button
-                className={DIALOG_PRIMARY_BUTTON}
-                disabled={
-                  mutations.patchProject.isPending ||
-                  (accelDraft ?? wireProject.localPath ?? '') === (wireProject.localPath ?? '')
-                }
-                onClick={() => {
-                  if (id === undefined) return;
-                  const next = (accelDraft ?? '').trim();
-                  mutations.patchProject.mutate(
-                    { id, body: { localPath: next === '' ? null : next } },
-                    {
-                      onSuccess: () => setAccelDraft(null),
-                      onError: (error) => toastError(t('保存失败，请重试。'), error),
-                    },
-                  );
-                }}
-              >
-                {t('保存')}
-              </Button>
-            </SettingsRow>
-          )}
-          <SettingsRow
-            label={t('描述')}
-            valueClassName={
-              live || project?.description != null ? undefined : 'text-content-tertiary'
-            }
-          >
-            {live && wireProject !== undefined ? (
-              <>
-                <Input
-                  aria-label={t('描述')}
-                  className={ROW_INPUT_CLS}
-                  placeholder={t('尚无描述')}
-                  value={descDraft ?? wireProject.description ?? ''}
-                  onChange={(event) => setDescDraft(event.target.value)}
-                />
-                <Button
-                  className={DIALOG_PRIMARY_BUTTON}
-                  aria-label={t('保存描述')}
-                  disabled={
-                    mutations.patchProject.isPending ||
-                    (descDraft ?? wireProject.description ?? '') === (wireProject.description ?? '')
-                  }
-                  onClick={() => {
-                    if (id === undefined) return;
-                    const next = (descDraft ?? '').trim();
-                    mutations.patchProject.mutate(
-                      { id, body: { description: next === '' ? null : next } },
-                      {
-                        onSuccess: () => setDescDraft(null),
-                        onError: (error) => toastError(t('描述保存失败，请重试。'), error),
-                      },
-                    );
-                  }}
-                >
-                  {t('保存')}
-                </Button>
-              </>
-            ) : (
-              <>
-                {project?.description ?? t('尚无描述')}
-                <SquarePen width={14} height={14} className={ROW_ICON_CLS} />
-              </>
-            )}
-          </SettingsRow>
-          {live && wireProject !== undefined && (
-            <SettingsRow
-              label={t('项目说明')}
-              hint={t('本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。')}
-              valueClassName="flex-col items-stretch gap-2"
-            >
-              <ProjectInstructionsField
-                project={wireProject}
-                teamId={teamId}
-                testId="project-instructions-input"
-              />
-            </SettingsRow>
-          )}
-        </SettingsCard>
-        {live && wireProject?.repoKind === 'local' && (
-          <SettingsCard>
-            <div className="flex flex-col gap-3 p-4">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-ui font-medium text-foreground">
-                  {t('转换为 GitHub 形态')}
-                </span>
-                <span className={SETTINGS_HINT_CLS}>
-                  {t(
-                    '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位；有在飞构建时不可转换。',
-                  )}
-                </span>
-              </div>
-              <Input
-                aria-label={t('GitHub 仓库（owner/repo）')}
-                className={`${ROW_INPUT_CLS} font-mono`}
-                placeholder="owner/repo"
-                value={convRepo}
-                onChange={(event) => {
-                  setConvRepo(event.target.value);
-                  setConvError(null);
-                }}
-              />
-              <Input
-                aria-label={t('本机加速路径')}
-                className={`${ROW_INPUT_CLS} font-mono`}
-                placeholder={t('绝对路径，留空即清除')}
-                value={convPathDraft ?? wireProject.localPath ?? ''}
-                onChange={(event) => setConvPathDraft(event.target.value)}
-              />
-              <div className="flex items-center gap-3">
-                <Button
-                  className={DIALOG_PRIMARY_BUTTON}
-                  disabled={mutations.patchProject.isPending || convRepo.trim() === ''}
-                  onClick={() => {
-                    if (id === undefined) return;
-                    const repo = convRepo.trim();
-                    if (!isGithubRepoRef(repo)) {
-                      setConvError(t('GitHub 仓库格式应为 owner/repo。'));
-                      return;
+        {tab === 'memory' ? (
+          <MemoryPanel
+            live={live}
+            teamId={teamId}
+            project={wireProject ?? { id: id ?? '', name: project?.name ?? '' }}
+          />
+        ) : (
+          <>
+            <SettingsCard className="prj-set-card">
+              <SettingsRow label={t('名称')}>
+                {live && wireProject !== undefined ? (
+                  <>
+                    <Input
+                      aria-label={t('名称')}
+                      className={ROW_INPUT_CLS}
+                      value={nameDraft ?? wireProject.name}
+                      onChange={(event) => setNameDraft(event.target.value)}
+                    />
+                    <Button
+                      className={DIALOG_PRIMARY_BUTTON}
+                      aria-label={t('保存名称')}
+                      disabled={
+                        mutations.patchProject.isPending ||
+                        (nameDraft ?? '').trim() === wireProject.name ||
+                        (nameDraft ?? '').trim() === ''
+                      }
+                      onClick={() => {
+                        if (id === undefined) return;
+                        mutations.patchProject.mutate(
+                          { id, body: { name: (nameDraft ?? '').trim() } },
+                          {
+                            onSuccess: () => setNameDraft(null),
+                            onError: (error) => toastError(t('保存失败，请重试。'), error),
+                          },
+                        );
+                      }}
+                    >
+                      {t('保存')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {project?.name ?? ''}
+                    <SquarePen width={14} height={14} className={ROW_ICON_CLS} />
+                  </>
+                )}
+              </SettingsRow>
+              {live && wireProject?.repoKind === 'github' ? (
+                <SettingsRow label={t('仓库')}>
+                  <Input
+                    aria-label={t('GitHub 仓库（owner/repo）')}
+                    className={`${ROW_INPUT_CLS} font-mono`}
+                    placeholder="owner/repo"
+                    value={repoDraft ?? wireProject.githubRepo ?? ''}
+                    onChange={(event) => {
+                      setRepoDraft(event.target.value);
+                      setRepoError(null);
+                    }}
+                  />
+                  <Button
+                    className={DIALOG_PRIMARY_BUTTON}
+                    aria-label={t('保存仓库')}
+                    disabled={
+                      mutations.patchProject.isPending ||
+                      (repoDraft ?? wireProject.githubRepo ?? '').trim() ===
+                        (wireProject.githubRepo ?? '').trim() ||
+                      (repoDraft ?? '').trim() === ''
                     }
-                    const nextPath = (convPathDraft ?? wireProject.localPath ?? '').trim();
-                    mutations.patchProject.mutate(
-                      {
-                        id,
-                        body: {
-                          repoKind: 'github',
-                          githubRepo: repo,
-                          localPath: nextPath === '' ? null : nextPath,
+                    onClick={() => {
+                      if (id === undefined) return;
+                      const repo = (repoDraft ?? '').trim();
+                      if (!isGithubRepoRef(repo)) {
+                        setRepoError(t('GitHub 仓库格式应为 owner/repo。'));
+                        return;
+                      }
+                      mutations.patchProject.mutate(
+                        { id, body: { githubRepo: repo } },
+                        {
+                          onSuccess: () => {
+                            setRepoDraft(null);
+                            setRepoError(null);
+                          },
+                          onError: (error) => toastError(t('仓库保存失败，请重试。'), error),
                         },
-                      },
-                      {
-                        onSuccess: () => {
-                          setConvRepo('');
-                          setConvPathDraft(null);
-                          setConvError(null);
-                        },
-                        onError: (error) => toastError(t('转换失败，请重试。'), error),
-                      },
-                    );
-                  }}
-                >
-                  {mutations.patchProject.isPending && <Spinner data-icon="inline-start" />}
-                  {t('转换')}
-                </Button>
-                {convError !== null && (
-                  <span role="alert" className="text-meta text-destructive">
-                    {convError}
+                      );
+                    }}
+                  >
+                    {t('保存')}
+                  </Button>
+                  {repoError !== null && (
+                    <span role="alert" className="text-meta text-destructive">
+                      {repoError}
+                    </span>
+                  )}
+                </SettingsRow>
+              ) : (
+                <SettingsRow label={t('仓库')}>{project?.repoName ?? ''}</SettingsRow>
+              )}
+              <SettingsRow label={t('目标分支')}>
+                {live && wireProject?.repoKind !== undefined ? (
+                  <ProjectBaseBranchSelect project={wireProject} />
+                ) : (
+                  <span
+                    className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
+                  >
+                    {project?.defaultBranch ?? 'main'}
+                    <ChevronDown width={14} height={14} className={ROW_ICON_CLS} />
                   </span>
                 )}
-              </div>
-            </div>
-          </SettingsCard>
-        )}
-        {live && wireProject?.repoKind === 'github' && id !== undefined && teamId !== undefined && (
-          <ProjectAutonomyCard projectId={id} teamId={teamId} />
-        )}
-        <section className="flex flex-col gap-2">
-          <h3 className="m-0 px-1 text-meta font-normal text-content-tertiary">{t('危险操作')}</h3>
-          <SettingsDangerZone
-            className="prj-set-danger"
-            label={t('删除项目')}
-            description={t(
-              '删除项目将级联删除其下所有任务、构建历史、定时任务、标签与托管仓库文件，此操作不可恢复。',
+              </SettingsRow>
+              {live && wireProject !== undefined && (
+                <SettingsRow
+                  label={t('并发与优先级')}
+                  hint={t('本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。')}
+                >
+                  <ProjectConcurrencySelect project={wireProject} />
+                </SettingsRow>
+              )}
+              {live && wireProject?.repoKind === 'github' && (
+                <SettingsRow label={t('本机加速路径')}>
+                  <Input
+                    aria-label={t('本机加速路径')}
+                    className={`${ROW_INPUT_CLS} font-mono`}
+                    placeholder={t('绝对路径，留空即清除')}
+                    value={accelDraft ?? wireProject.localPath ?? ''}
+                    onChange={(event) => setAccelDraft(event.target.value)}
+                  />
+                  <Button
+                    className={DIALOG_PRIMARY_BUTTON}
+                    disabled={
+                      mutations.patchProject.isPending ||
+                      (accelDraft ?? wireProject.localPath ?? '') === (wireProject.localPath ?? '')
+                    }
+                    onClick={() => {
+                      if (id === undefined) return;
+                      const next = (accelDraft ?? '').trim();
+                      mutations.patchProject.mutate(
+                        { id, body: { localPath: next === '' ? null : next } },
+                        {
+                          onSuccess: () => setAccelDraft(null),
+                          onError: (error) => toastError(t('保存失败，请重试。'), error),
+                        },
+                      );
+                    }}
+                  >
+                    {t('保存')}
+                  </Button>
+                </SettingsRow>
+              )}
+              <SettingsRow
+                label={t('描述')}
+                valueClassName={
+                  live || project?.description != null ? undefined : 'text-content-tertiary'
+                }
+              >
+                {live && wireProject !== undefined ? (
+                  <>
+                    <Input
+                      aria-label={t('描述')}
+                      className={ROW_INPUT_CLS}
+                      placeholder={t('尚无描述')}
+                      value={descDraft ?? wireProject.description ?? ''}
+                      onChange={(event) => setDescDraft(event.target.value)}
+                    />
+                    <Button
+                      className={DIALOG_PRIMARY_BUTTON}
+                      aria-label={t('保存描述')}
+                      disabled={
+                        mutations.patchProject.isPending ||
+                        (descDraft ?? wireProject.description ?? '') ===
+                          (wireProject.description ?? '')
+                      }
+                      onClick={() => {
+                        if (id === undefined) return;
+                        const next = (descDraft ?? '').trim();
+                        mutations.patchProject.mutate(
+                          { id, body: { description: next === '' ? null : next } },
+                          {
+                            onSuccess: () => setDescDraft(null),
+                            onError: (error) => toastError(t('描述保存失败，请重试。'), error),
+                          },
+                        );
+                      }}
+                    >
+                      {t('保存')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {project?.description ?? t('尚无描述')}
+                    <SquarePen width={14} height={14} className={ROW_ICON_CLS} />
+                  </>
+                )}
+              </SettingsRow>
+            </SettingsCard>
+            {live && wireProject?.repoKind === 'local' && (
+              <SettingsCard>
+                <div className="flex flex-col gap-3 p-4">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-ui font-medium text-foreground">
+                      {t('转换为 GitHub 形态')}
+                    </span>
+                    <span className={SETTINGS_HINT_CLS}>
+                      {t(
+                        '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位；有在飞构建时不可转换。',
+                      )}
+                    </span>
+                  </div>
+                  <Input
+                    aria-label={t('GitHub 仓库（owner/repo）')}
+                    className={`${ROW_INPUT_CLS} font-mono`}
+                    placeholder="owner/repo"
+                    value={convRepo}
+                    onChange={(event) => {
+                      setConvRepo(event.target.value);
+                      setConvError(null);
+                    }}
+                  />
+                  <Input
+                    aria-label={t('本机加速路径')}
+                    className={`${ROW_INPUT_CLS} font-mono`}
+                    placeholder={t('绝对路径，留空即清除')}
+                    value={convPathDraft ?? wireProject.localPath ?? ''}
+                    onChange={(event) => setConvPathDraft(event.target.value)}
+                  />
+                  <div className="flex items-center gap-3">
+                    <Button
+                      className={DIALOG_PRIMARY_BUTTON}
+                      disabled={mutations.patchProject.isPending || convRepo.trim() === ''}
+                      onClick={() => {
+                        if (id === undefined) return;
+                        const repo = convRepo.trim();
+                        if (!isGithubRepoRef(repo)) {
+                          setConvError(t('GitHub 仓库格式应为 owner/repo。'));
+                          return;
+                        }
+                        const nextPath = (convPathDraft ?? wireProject.localPath ?? '').trim();
+                        mutations.patchProject.mutate(
+                          {
+                            id,
+                            body: {
+                              repoKind: 'github',
+                              githubRepo: repo,
+                              localPath: nextPath === '' ? null : nextPath,
+                            },
+                          },
+                          {
+                            onSuccess: () => {
+                              setConvRepo('');
+                              setConvPathDraft(null);
+                              setConvError(null);
+                            },
+                            onError: (error) => toastError(t('转换失败，请重试。'), error),
+                          },
+                        );
+                      }}
+                    >
+                      {mutations.patchProject.isPending && <Spinner data-icon="inline-start" />}
+                      {t('转换')}
+                    </Button>
+                    {convError !== null && (
+                      <span role="alert" className="text-meta text-destructive">
+                        {convError}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </SettingsCard>
             )}
-            actionLabel={t('删除')}
-            onAction={() => setDeleteOpen(true)}
-          />
-        </section>
+            {live &&
+              wireProject?.repoKind === 'github' &&
+              id !== undefined &&
+              teamId !== undefined && <ProjectAutonomyCard projectId={id} teamId={teamId} />}
+            <section className="flex flex-col gap-2">
+              <h3 className="m-0 px-1 text-meta font-normal text-content-tertiary">
+                {t('危险操作')}
+              </h3>
+              <SettingsDangerZone
+                className="prj-set-danger"
+                label={t('删除项目')}
+                description={t(
+                  '删除项目将级联删除其下所有任务、构建历史、定时任务、标签与托管仓库文件，此操作不可恢复。',
+                )}
+                actionLabel={t('删除')}
+                onAction={() => setDeleteOpen(true)}
+              />
+            </section>
+          </>
+        )}
       </div>
       <DeleteProjectConfirm
         projectName={project?.name ?? ''}
