@@ -40,7 +40,7 @@ Key actions: read the `变更` pane. It is the phase default, and it opens expan
 
 Expected outcome: the header contains `个文件改动` and the seeded path `src/hello.txt`, with the added and removed lines visible. `GET /api/builds/:id/changes` reports that file.
 
-Detail: commit-history diffs are a different page, [project-commit-detail.md](./project-commit-detail.md).
+Project commit-history browsing has been retired. Thread review diffs remain available here.
 
 ## Request changes
 
