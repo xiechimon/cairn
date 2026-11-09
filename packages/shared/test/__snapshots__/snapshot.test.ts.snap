@@ -8397,7 +8397,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > age
     "layer": {
       "enum": [
         "core",
-        "log",
         "scratchpad",
         "searchable",
       ],

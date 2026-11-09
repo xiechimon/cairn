@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { projectRecordSchema, todoRecordSchema } from '@cairn/shared';
+import { MEMORY_INDEX_TITLE, projectRecordSchema, todoRecordSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   agentMemory,
@@ -133,9 +133,14 @@ describe('DELETE /api/projects/{id} (#189)', () => {
     expect(s.db.select().from(projectTable).all()).toHaveLength(0);
     const chiefRow = s.db.select().from(chief).all()[0];
     expect(chiefRow?.watches).toHaveLength(0);
-    const mem = s.db.select().from(agentMemory).all();
+    const mem = s.db
+      .select()
+      .from(agentMemory)
+      .all()
+      .filter((row) => row.invalidAt === null);
     expect(mem).toHaveLength(1);
     expect(mem[0]?.projectId).toBeNull();
+    expect(mem[0]?.title).toBe(MEMORY_INDEX_TITLE);
     s.dispose();
   });
 

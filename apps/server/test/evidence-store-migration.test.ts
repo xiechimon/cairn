@@ -50,7 +50,7 @@ test('migration initializes only existing cairn projects and never reassigns mod
   }
 });
 
-test('evidence migration upgrades the latest main database without replacing its schema', () => {
+test('evidence migration upgrades its predecessor database without replacing its schema', () => {
   const directory = makeTestTempDir('cairn-evidence-main-upgrade-');
   const sqlite = new Database(join(directory, 'db.sqlite'));
   try {

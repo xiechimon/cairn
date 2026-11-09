@@ -4,7 +4,12 @@ import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { listMemoryEntries, saveMemoryEntry, updateMemoryEntry } from '../services/memory.js';
+import {
+  isMemoryIndex,
+  listMemoryEntries,
+  saveMemoryEntry,
+  updateMemoryEntry,
+} from '../services/memory.js';
 import { coordinatorProfile } from '../services/routing-rules.js';
 import type { MemoryFlush } from './runtime/compaction.js';
 
@@ -69,7 +74,7 @@ export function applyFlush(
   );
   for (const entry of parseFlushOutput(raw)) {
     try {
-      if (entry.replaces != null) {
+      if (entry.replaces != null && !isMemoryIndex(db, entry.replaces)) {
         updateMemoryEntry(db, {
           memoryId: entry.replaces,
           agentId,
