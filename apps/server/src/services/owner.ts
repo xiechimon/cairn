@@ -29,6 +29,7 @@ export type Ownership =
 export const COORDINATOR_TURN_DEADLINE_MS = 30 * 60 * 1000;
 
 const ENDED_STEP = new Set(['done', 'failed', 'stopped']);
+const UNSTARTED_STEP = ['pending', 'waiting_quota'] as const;
 
 export interface OwnerDeps extends ChiefDeps {
   vapidKeys?: VapidKeys | null;
@@ -98,22 +99,25 @@ function failedOwnership(db: Db, row: TodoRow): Ownership | null {
   return { owner: 'coordinator', reason: 'failed', workKey: `failed:${phaseWork(row)}` };
 }
 
-function coordinatorTurnEnded(db: Db, row: TodoRow, workKey: string, now: number): boolean {
+type TurnState = 'running' | 'ended' | 'never-started';
+
+function coordinatorTurnState(db: Db, row: TodoRow, workKey: string, now: number): TurnState {
   const turn = row.coordinatorTurn;
-  if (turn === null || turn.workKey !== workKey) return false;
+  if (turn === null || turn.workKey !== workKey) return 'running';
   const wake = db
     .select({ status: step.status, createdAt: step.createdAt })
     .from(step)
     .where(eq(step.id, turn.stepId))
     .get();
-  if (wake === undefined) return true;
-  return ENDED_STEP.has(wake.status) || now - wake.createdAt >= COORDINATOR_TURN_DEADLINE_MS;
+  if (wake === undefined || ENDED_STEP.has(wake.status)) return 'ended';
+  if (wake.status === 'claimed') return 'running';
+  return now - wake.createdAt >= COORDINATOR_TURN_DEADLINE_MS ? 'never-started' : 'running';
 }
 
 export function ownershipOf(db: Db, row: TodoRow, now = nowMs()): Ownership | null {
   const ownership = workOwnership(db, row);
   if (ownership?.owner !== 'coordinator') return ownership;
-  if (!coordinatorTurnEnded(db, row, ownership.workKey, now)) return ownership;
+  if (coordinatorTurnState(db, row, ownership.workKey, now) === 'running') return ownership;
   return {
     owner: 'owner',
     reason: 'handoff',
@@ -205,6 +209,14 @@ function claimCheckpoint(db: Db, row: TodoRow, owner: string, workKey: string): 
   );
 }
 
+function cancelUnstartedWake(db: Db, row: TodoRow): void {
+  if (row.coordinatorTurn === null) return;
+  db.update(step)
+    .set({ status: 'stopped', finishedAt: nowMs() })
+    .where(and(eq(step.id, row.coordinatorTurn.stepId), inArray(step.status, [...UNSTARTED_STEP])))
+    .run();
+}
+
 function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
   const ownership = ownershipOf(deps.db, row);
   const owner = ownership?.owner ?? NOBODY;
@@ -217,6 +229,7 @@ function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
   }
   if (ownership === null) return;
   if (ownership.owner === 'owner') {
+    if (ownership.reason === 'handoff') cancelUnstartedWake(deps.db, row);
     notifyOwner(deps, row, ownership.reason);
     return;
   }

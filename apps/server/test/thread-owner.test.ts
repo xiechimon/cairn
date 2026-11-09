@@ -540,7 +540,7 @@ describe('a Coordinator turn that changes nothing hands the task to the owner (t
     expect(ownerNow(w)).toBe('coordinator');
   });
 
-  test('a wake turn not finished after 30 minutes hands the task to the owner', () => {
+  test('a wake never claimed after 30 minutes hands the task to the owner and cancels the wake', () => {
     const w = failedWorld();
     for (const row of wakeStep(w)) {
       w.s.db
@@ -551,6 +551,24 @@ describe('a Coordinator turn that changes nothing hands the task to the owner (t
     }
     reconcileOwners(w.deps);
     expect(ownerNow(w)).toBe('owner');
+    expect(wakeStep(w).map((row) => row.status)).toEqual(['stopped']);
+  });
+
+  test('a wake the Coordinator is still running keeps the task, however long it runs', () => {
+    const w = failedWorld();
+    for (const row of wakeStep(w)) {
+      w.s.db
+        .update(stepTable)
+        .set({
+          status: 'claimed',
+          createdAt: nowMs() - 60 * 60_000,
+          claimedAt: nowMs() - 45 * 60_000,
+        })
+        .where(eq(stepTable.id, row.id))
+        .run();
+    }
+    reconcileOwners(w.deps);
+    expect(ownerNow(w)).toBe('coordinator');
   });
 
   test('a turn that acts on the failure changes the work and hands nothing over', () => {
