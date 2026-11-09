@@ -3,6 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { TRANSCRIPT_PROMPT_ROW_ID_PREFIX } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import type { RosterAgent } from '../eval/chief-dispatch/grade.mts';
@@ -120,7 +121,12 @@ function ownerMessageIdFromHistory(messages: unknown[]): string | null {
     if (row.role !== 'tool' || typeof row.content !== 'string') continue;
     try {
       const parsed = JSON.parse(row.content) as { hits?: { id?: unknown; role?: unknown }[] };
-      const hit = parsed.hits?.find((h) => h.role === 'user' && typeof h.id === 'string');
+      const hit = parsed.hits?.find(
+        (h) =>
+          h.role === 'user' &&
+          typeof h.id === 'string' &&
+          !h.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX),
+      );
       if (hit !== undefined) return hit.id as string;
     } catch {}
   }
