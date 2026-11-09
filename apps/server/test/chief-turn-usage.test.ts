@@ -1,11 +1,19 @@
 import type { MachineDoneBody } from '@cairn/shared';
 import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
+  isColdResume,
+  resolveCacheRetentionTier,
+  retentionMsFor,
+  SHORT_RETENTION_MS,
+} from '../src/coordinator/runtime/cold-slim.js';
+import {
   build,
+  chiefThread,
   chiefTurnUsage,
   provider as providerTable,
+  routingRule,
   step as stepTable,
   todo,
   tokenUsage,
@@ -13,6 +21,8 @@ import {
 import { getChiefEnvelope } from '../src/services/chief.js';
 import {
   DEFAULT_CONTEXT_WINDOW,
+  lastContextBearingTurnUsage,
+  lastTurnUsageForColdResume,
   setCoordinatorServerContextEnabled,
 } from '../src/services/coordinator-context.js';
 import { finishStep } from '../src/services/machines.js';
@@ -240,7 +250,7 @@ describe('the done report carries time to first token', () => {
 });
 
 describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
-  test('flag off: no turn row is written and the meter keeps the cumulative total', async () => {
+  test('flag off: no turn row is written and the meter stays empty', async () => {
     setCoordinatorServerContextEnabled(false);
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-off');
@@ -249,8 +259,75 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
     });
     expect(turnRows()).toEqual([]);
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
-      tokens: 1000 + 7 + 800 + 3,
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+  });
+
+  test('flag off after prior rows: retained turn usage does not keep the meter lit', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-prior');
+    await finishStep(deps(), machineId, 'turn-prior', {
+      status: 'success',
+      usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 1810,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    setCoordinatorServerContextEnabled(false);
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
+  });
+
+  test('threadId scopes the meter to that thread, not the newest chief-wide turn', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-scope-a');
+    await finishStep(deps(), machineId, 'turn-scope-a', {
+      status: 'success',
+      usage: [usage('pi/glm', 100, 0, { contextTokens: 1_000 })],
+    });
+    const otherThread = `chief-other-scope`;
+    const now = Date.now();
+    H.s.db
+      .insert(chiefThread)
+      .values({
+        id: otherThread,
+        chiefId: H.chiefId,
+        userId: H.userId,
+        teamId: H.teamId,
+        title: 'other',
+        createdAt: now,
+        updatedAt: now,
+        sessionRuntime: 'pi',
+        sessionId: '',
+        sessionOpenedAt: now,
+        toolDefHashes: {},
+        toolResultHashes: {},
+        archivedAt: now,
+      })
+      .run();
+    H.s.db
+      .insert(chiefTurnUsage)
+      .values({
+        stepId: 'turn-scope-b',
+        threadId: otherThread,
+        model: 'pi/glm',
+        input: 1,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        contextTokens: 9_000,
+        createdAt: now + 10,
+      })
+      .run();
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toMatchObject({
+      tokens: 9_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 1_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, otherThread).context).toMatchObject({
+      tokens: 9_000,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
   });
@@ -260,25 +337,59 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     claimedStep(machineId, 'turn-a');
     await finishStep(deps(), machineId, 'turn-a', {
       status: 'success',
-      usage: [usage('pi/glm', 9000, 40000, { contextTokens: 21_000 })],
+      usage: [usage('stub-gw/stub-model', 9000, 40000, { contextTokens: 21_000 })],
     });
     claimedStep(machineId, 'turn-b', { createdAt: Date.now() + 5 });
     await finishStep(deps(), machineId, 'turn-b', {
       status: 'success',
-      usage: [usage('pi/glm', 6000, 50000, { contextTokens: 23_456 })],
+      usage: [usage('stub-gw/stub-model', 6000, 50000, { contextTokens: 23_456 })],
     });
     expect(turnRows().map((r) => [r.stepId, r.contextTokens])).toEqual([
       ['turn-a', 21_000],
       ['turn-b', 23_456],
     ]);
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    const context = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(context).toMatchObject({
       tokens: 23_456,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
+    const turnB = turnRows().find((r) => r.stepId === 'turn-b');
+    expect(turnB).toBeDefined();
+    expect(context?.resumeExpiresAt).toBe((turnB?.createdAt ?? 0) + SHORT_RETENTION_MS);
+    expect(context?.resumeExpiresInMs).toBeGreaterThan(0);
+    expect((context?.resumeExpiresAt ?? 0) - (context?.resumeExpiresInMs ?? 0)).toBeLessThanOrEqual(
+      Date.now() + 100,
+    );
   });
 
-  test('flag on: a turn without contextTokens (claude-code) leaves the meter on the last known value or empty', async () => {
+  test('flag on: a coordinator model-route change reports cold resume', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-route-a');
+    await finishStep(deps(), machineId, 'turn-route-a', {
+      status: 'success',
+      usage: [usage('stub-gw/stub-model', 1000, 800, { contextTokens: 1810 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 1810,
+      resume: 'warm',
+    });
+    H.s.db
+      .update(routingRule)
+      .set({ modelId: 'stub-model-2', updatedAt: Date.now() })
+      .where(eq(routingRule.use, 'coordinator'))
+      .run();
+    const after = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(after).toMatchObject({
+      tokens: 1810,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+      resume: 'cold',
+    });
+    expect(after?.resumeExpiresAt).toBeUndefined();
+    expect(after?.resumeExpiresInMs).toBeUndefined();
+  });
+
+  test('flag on: a turn without contextTokens (claude-code) leaves the meter empty', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-cc');
     await finishStep(deps(), machineId, 'turn-cc', {
@@ -288,7 +399,173 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
   });
 
+  test('flag on: cold-resume still sees a context-less turn model for route mismatch', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-cc-cold');
+    await finishStep(deps(), machineId, 'turn-cc-cold', {
+      status: 'success',
+      usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
+    });
+    expect(lastContextBearingTurnUsage(H.s.db, H.threadId)).toBeNull();
+    const raw = lastTurnUsageForColdResume(H.s.db, H.threadId);
+    expect(raw).toMatchObject({
+      model: 'claude-code/claude-haiku-5-5',
+      contextTokens: null,
+      stepId: 'turn-cc-cold',
+    });
+    expect(
+      isColdResume({
+        now: Date.now(),
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'stub-gw/stub-model',
+        lastUsage:
+          raw === null
+            ? null
+            : {
+                createdAt: raw.createdAt,
+                cacheRead: raw.cacheRead,
+                input: raw.input,
+                contextTokens: raw.contextTokens,
+                model: raw.model,
+              },
+      }),
+    ).toBe(true);
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
+  });
+
+  test('flag on: a multi-model turn keeps the context-bearing model for the meter', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-multi');
+    await finishStep(deps(), machineId, 'turn-multi', {
+      status: 'success',
+      usage: [usage('pi/model-a', 100, 0, { contextTokens: 5_000 }), usage('pi/model-b', 50, 0)],
+    });
+    expect(turnRows().map((r) => [r.model, r.contextTokens])).toEqual([
+      ['pi/model-a', 5_000],
+      ['pi/model-b', null],
+    ]);
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 5_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+  });
+
+  test('flag on: A→B→A keeps meter and cold-resume send path on the final model (Warm)', async () => {
+    const machineId = insertMachine(H.s);
+    const modelA = 'stub-gw/stub-model';
+    const modelB = 'stub-gw/other-model';
+    claimedStep(machineId, 'turn-aba');
+    await finishStep(deps(), machineId, 'turn-aba', {
+      status: 'success',
+      usage: [
+        usage(modelA, 100, 0, { contextTokens: 1_000 }),
+        usage(modelB, 50, 0),
+        usage(modelA, 200, 800, { contextTokens: 5_000 }),
+      ],
+    });
+    const rows = turnRows().filter((r) => r.stepId === 'turn-aba');
+    expect(Object.fromEntries(rows.map((r) => [r.model, r.contextTokens]))).toEqual({
+      [modelA]: 5_000,
+      [modelB]: null,
+    });
+    const modelARow = rows.find((r) => r.model === modelA);
+    expect(modelARow).toBeDefined();
+    H.s.db
+      .update(chiefTurnUsage)
+      .set({ createdAt: (modelARow?.createdAt ?? 0) + 10 })
+      .where(and(eq(chiefTurnUsage.stepId, 'turn-aba'), eq(chiefTurnUsage.model, modelB)))
+      .run();
+    const newestByCreatedAt = H.s.db
+      .select()
+      .from(chiefTurnUsage)
+      .where(eq(chiefTurnUsage.threadId, H.threadId))
+      .orderBy(desc(chiefTurnUsage.createdAt))
+      .get();
+    expect(newestByCreatedAt?.model).toBe(modelB);
+    expect(lastContextBearingTurnUsage(H.s.db, H.threadId)).toMatchObject({
+      model: modelA,
+      contextTokens: 5_000,
+      stepId: 'turn-aba',
+    });
+    const shared = lastTurnUsageForColdResume(H.s.db, H.threadId);
+    expect(shared).toMatchObject({
+      model: modelA,
+      contextTokens: 5_000,
+      stepId: 'turn-aba',
+    });
+    const meter = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(meter).toMatchObject({
+      tokens: 5_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+      resume: 'warm',
+    });
+    const retentionMs = retentionMsFor(resolveCacheRetentionTier(), shared?.model ?? modelA);
+    const sendCold = isColdResume({
+      now: Date.now(),
+      lastUsage:
+        shared === null
+          ? null
+          : {
+              createdAt: shared.createdAt,
+              cacheRead: shared.cacheRead,
+              input: shared.input,
+              contextTokens: shared.contextTokens,
+              model: shared.model,
+            },
+      retentionMs,
+      activeModel: modelA,
+    });
+    expect(sendCold).toBe(false);
+    expect(meter?.resume === 'warm').toBe(!sendCold);
+    expect(
+      isColdResume({
+        now: Date.now(),
+        lastUsage:
+          newestByCreatedAt === undefined
+            ? null
+            : {
+                createdAt: newestByCreatedAt.createdAt,
+                cacheRead: newestByCreatedAt.cacheRead,
+                input: newestByCreatedAt.input,
+                contextTokens: newestByCreatedAt.contextTokens,
+                model: newestByCreatedAt.model,
+              },
+        retentionMs: retentionMsFor(
+          resolveCacheRetentionTier(),
+          newestByCreatedAt?.model ?? modelA,
+        ),
+        activeModel: modelA,
+      }),
+    ).toBe(true);
+  });
+
+  test('flag on: a later turn without contextTokens hides the meter instead of keeping the prior percent', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-prior-ctx');
+    await finishStep(deps(), machineId, 'turn-prior-ctx', {
+      status: 'success',
+      usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 1810,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    claimedStep(machineId, 'turn-no-ctx', { createdAt: Date.now() + 5 });
+    await finishStep(deps(), machineId, 'turn-no-ctx', {
+      status: 'success',
+      usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
+    expect(lastContextBearingTurnUsage(H.s.db, H.threadId)).toBeNull();
+    expect(lastTurnUsageForColdResume(H.s.db, H.threadId)).toMatchObject({
+      model: 'claude-code/claude-haiku-5-5',
+      contextTokens: null,
+      stepId: 'turn-no-ctx',
+    });
+  });
+
   test('flag on: the window comes from the model that ran the last turn, from its provider catalog', async () => {
+    expect(DEFAULT_CONTEXT_WINDOW).toBe(200_000);
     H.s.db
       .insert(providerTable)
       .values({
@@ -299,7 +576,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
         baseUrl: 'https://example.invalid/v1',
         api: 'anthropic-messages',
         compat: {},
-        models: [{ id: 'stub-model', name: 'stub-model', contextWindow: 200_000 }],
+        models: [{ id: 'stub-model', name: 'stub-model' }],
         createdBy: H.userId,
         createdAt: 1,
         updatedAt: 1,
@@ -311,20 +588,20 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       status: 'success',
       usage: [usage('stub-gw/stub-model', 100, 0, { contextTokens: 110 })],
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 110,
-      contextWindow: 200_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
     claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
     await finishStep(deps(), machineId, 'turn-fallback', {
       status: 'success',
-      usage: [usage('other-gw/fallback-model', 100, 0, { contextTokens: 120 })],
+      usage: [usage('other-gw/fallback-model', 100, 800, { contextTokens: 120 })],
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 120,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
-      resume: 'warm',
+      resume: 'cold',
     });
   });
 });

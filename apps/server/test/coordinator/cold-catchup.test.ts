@@ -147,4 +147,70 @@ describe('cold catchUpColdSummary on lag', () => {
         .map((r) => r.status),
     ).toEqual(['done']);
   });
+
+  it('cold-slims on model mismatch after a context-less prior turn (claude-code → Pi)', async () => {
+    const w = await world('resume after claude-code');
+    olderRows(w, 130);
+    const priorCovered = w.s.db
+      .select({
+        id: chiefMessage.id,
+        createdAt: chiefMessage.createdAt,
+        rowid: sql<number>`rowid`,
+      })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, 'old-9'))
+      .get();
+    expect(priorCovered).toBeDefined();
+    w.s.db
+      .insert(chiefSummary)
+      .values({
+        threadId: w.threadId,
+        summary: 'Stale prior summary',
+        coveredThroughId: 'old-9',
+        coveredAt: priorCovered!.createdAt,
+        coveredRowid: priorCovered!.rowid,
+        compactedMessages: 10,
+        generation: 1,
+        updatedAt: 1,
+      })
+      .run();
+    w.s.db
+      .insert(chiefTurnUsage)
+      .values({
+        stepId: 'prior-claude-code',
+        threadId: w.threadId,
+        model: 'claude-code/claude-haiku-5-5',
+        input: 9_000,
+        output: 40,
+        cacheRead: 40_000,
+        cacheWrite: 0,
+        contextTokens: null,
+        createdAt: Date.now() - 30_000,
+      })
+      .run();
+
+    const { faux } = stub('unused');
+    faux.setResponses([
+      fauxAssistantMessage('Folded after model-mismatch cold'),
+      fauxAssistantMessage('answered on Pi after claude-code'),
+    ]);
+    const coordinator = boot(w, faux);
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+
+    const conversation = w.s.db
+      .select()
+      .from(coordinatorConversation)
+      .where(eq(coordinatorConversation.threadId, w.threadId))
+      .get();
+    expect(conversation?.lastColdSlimStepId).toBe(w.stepId);
+    expect(conversation?.lastColdSlimAt).toEqual(expect.any(Number));
+    expect(
+      w.s.db
+        .select()
+        .from(step)
+        .all()
+        .map((r) => r.status),
+    ).toEqual(['done']);
+  });
 });

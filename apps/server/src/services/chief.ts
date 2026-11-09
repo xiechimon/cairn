@@ -62,7 +62,6 @@ import {
   project,
   step,
   todo,
-  tokenUsage,
 } from '../db/schema.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
@@ -181,33 +180,6 @@ function refreshWatches(deps: ChiefDeps, watches: ChiefWatch[]): ChiefWatch[] {
   });
 }
 
-function chiefContext(
-  deps: ChiefDeps,
-  chiefId: string,
-): { tokens: number; contextWindow: number } | null {
-  const rows = deps.db
-    .select({
-      input: tokenUsage.input,
-      output: tokenUsage.output,
-      cacheRead: tokenUsage.cacheRead,
-      cacheWrite: tokenUsage.cacheWrite,
-    })
-    .from(tokenUsage)
-    .where(
-      inArray(
-        tokenUsage.buildId,
-        deps.db
-          .select({ id: chiefThread.id })
-          .from(chiefThread)
-          .where(eq(chiefThread.chiefId, chiefId)),
-      ),
-    )
-    .all();
-  if (rows.length === 0) return null;
-  const tokens = rows.reduce((n, r) => n + r.input + r.output + r.cacheRead + r.cacheWrite, 0);
-  return { tokens, contextWindow: 128_000 };
-}
-
 function chiefRuntimeGatePasses(
   machineRow: { enabledRuntimes: string[] },
   agentProvider: string | null | undefined,
@@ -261,13 +233,17 @@ function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['
   };
 }
 
-export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetResponse {
+export function getChiefEnvelope(
+  deps: ChiefDeps,
+  teamId: string,
+  threadId?: string,
+): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
   const agentRow = coordinatorProfile(deps.db, teamId);
   return {
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
-    context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row) : chiefContext(deps, row.id),
+    context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row, threadId) : null,
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
     orchestration: chiefOrchestration(deps, teamId),

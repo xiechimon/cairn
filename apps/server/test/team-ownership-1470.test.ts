@@ -5,6 +5,7 @@ import {
   build as buildTable,
   chiefMessage,
   chiefThread,
+  chiefTurnUsage,
   message as messageTable,
   project as projectTable,
   schedule as scheduleTable,
@@ -16,6 +17,10 @@ import { HttpError } from '../src/lib/errors.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { getChiefEnvelope } from '../src/services/chief.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
+import {
+  DEFAULT_CONTEXT_WINDOW,
+  setCoordinatorServerContextEnabled,
+} from '../src/services/coordinator-context.js';
 import { hasRepoBinding, projectRepoRef, toProjectRecord } from '../src/services/git.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
 import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
@@ -213,8 +218,41 @@ describe('#1470 chief usage: only own-team builds and own-team chief turns are r
 
 describe('#1470 the chief envelope context.tokens: only this chief own threads are counted', () => {
   test('U9 another team chief turns do not enter the reading', () => {
+    setCoordinatorServerContextEnabled(true);
+    H.s.db
+      .insert(chiefTurnUsage)
+      .values({
+        stepId: 'step-own-1470',
+        threadId: H.threadId,
+        model: 'stub/m',
+        input: 1,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        contextTokens: 2,
+        createdAt: 1,
+      })
+      .run();
+    H.s.db
+      .insert(chiefTurnUsage)
+      .values({
+        stepId: 'step-other-1470',
+        threadId: THREAD_B,
+        model: 'stub/m',
+        input: 1,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        contextTokens: 200,
+        createdAt: 999,
+      })
+      .run();
     const svc = { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user };
-    expect(getChiefEnvelope(svc, H.teamId).context?.tokens).toBe(2);
+    expect(getChiefEnvelope(svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 2,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    setCoordinatorServerContextEnabled(false);
   });
 });
 

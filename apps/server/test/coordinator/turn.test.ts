@@ -71,7 +71,14 @@ describe('runCoordinatorTurn', () => {
     ]);
     expect(api.dones).toHaveLength(1);
     expect(api.dones[0]?.body.status).toBe('success');
-    expect(api.dones[0]?.body.usage?.[0]?.model).toBe('stub/m');
+    const usage = api.dones[0]?.body.usage?.[0];
+    expect(usage?.model).toBe('stub/m');
+    expect(usage?.contextTokens).toBe(
+      (usage?.input ?? 0) +
+        (usage?.output ?? 0) +
+        (usage?.cacheRead ?? 0) +
+        (usage?.cacheWrite ?? 0),
+    );
     await harness.close(ctx);
   });
 

@@ -9,6 +9,7 @@ import {
   isColdResume,
   isPureToolCallAssistant,
   projectColdMessages,
+  resumeExpiresAtOf,
   retentionMsFor,
   SHORT_RETENTION_MS,
   selectColdMessageWindow,
@@ -509,6 +510,74 @@ describe('contextResumeOf', () => {
         lastUsageStepId: 'cold-step',
       }),
     ).toBe('compacted');
+  });
+
+  it('is cold when the active router model differs from the last usage model', () => {
+    expect(
+      contextResumeOf({
+        now: 10_000,
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'anthropic/claude',
+        lastUsage: {
+          createdAt: 9_000,
+          cacheRead: 12_000,
+          input: 100,
+          contextTokens: 12_100,
+          model: 'openai/gpt',
+        },
+        lastColdSlimAt: null,
+      }),
+    ).toBe('cold');
+  });
+
+  it('is cold when a compacted slim still owns the latest step but the route model changed', () => {
+    const slimAt = 10_000;
+    expect(
+      contextResumeOf({
+        now: slimAt + 30_000,
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'stub-gw/model-c',
+        lastUsage: {
+          createdAt: slimAt - 1,
+          cacheRead: 0,
+          input: COLD_CACHE_MISS_MIN_TOKENS,
+          contextTokens: 20_000,
+          model: 'stub-gw/model-b',
+        },
+        lastColdSlimAt: slimAt,
+        lastColdSlimStepId: 'cold-step-b',
+        lastUsageStepId: 'cold-step-b',
+      }),
+    ).toBe('cold');
+  });
+});
+
+describe('resumeExpiresAtOf', () => {
+  it('schedules warm expiry from last usage and compacted from last cold slim', () => {
+    expect(
+      resumeExpiresAtOf({
+        resume: 'warm',
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsageCreatedAt: 1_000,
+        lastColdSlimAt: null,
+      }),
+    ).toBe(1_000 + SHORT_RETENTION_MS);
+    expect(
+      resumeExpiresAtOf({
+        resume: 'compacted',
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsageCreatedAt: 1_000,
+        lastColdSlimAt: 2_000,
+      }),
+    ).toBe(2_000 + SHORT_RETENTION_MS);
+    expect(
+      resumeExpiresAtOf({
+        resume: 'cold',
+        retentionMs: SHORT_RETENTION_MS,
+        lastUsageCreatedAt: 1_000,
+        lastColdSlimAt: null,
+      }),
+    ).toBeNull();
   });
 });
 

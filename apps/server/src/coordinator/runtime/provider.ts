@@ -14,7 +14,7 @@ const STREAMS: Record<string, () => ProviderStreams> = {
   'openai-codex-responses': openAICodexResponsesApi,
 };
 
-const DEFAULT_CONTEXT_WINDOW = 200_000;
+export const DEFAULT_CONTEXT_WINDOW = 200_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const KEYLESS_PLACEHOLDER = 'cairn-keyless';
 
