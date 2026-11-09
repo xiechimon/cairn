@@ -1,6 +1,6 @@
 # Task stall root causes
 
-Status: proposed, awaiting coordinator review. Builds on `answer-delivery-record.md` and `thread-owner-field.md`, both landed (#3545, #3527). Prior art: `docs/research/task-stall-root-causes-2026-11-09.md`. Out of scope, fixed elsewhere: the dirty `AGENTS.md` zero-change commit failure (#3615) and deploy starvation (#3624).
+Status: proposed, awaiting coordinator review. Builds on `answer-delivery-record.md` and `thread-owner-field.md`, both landed (#3545, #3527). Prior art: `docs/research/task-stall-root-causes-2026-11-09.md` (Linear, GitHub Actions, Temporal, Airflow, Buildkite) and `docs/research/orca-execution-model-2026-11-09.md` (Orca, Codex CLI, Claude Code, t3code; its section 5 recommendations R1 to R3 are the input for classes 3, 1 and 4, and 2, and each section below says where it follows or departs from them). Out of scope, fixed elsewhere: the dirty `AGENTS.md` zero-change commit failure (#3615) and deploy starvation (#3624). Also out of scope: Orca R4 (long-lane hosting) and R6 (park a failure that repeats the same cause), which are separate changes.
 
 Evidence is the 2026-11-09 stuck sweep of the live `server.db`, read-only. Every open task has since been archived by the owner, so the cases below are history (`todo`, `build`, `step`, `message` and `chief_message` rows).
 
@@ -28,6 +28,10 @@ Prior art: GitHub `needs`, Airflow trigger rules and Buildkite `depends_on` all 
 5. When a blocker reaches `failed` or `closed`, the dependent's step stays held, and `ownerOf` returns `coordinator` with the new reason `blocked` and work key `blocked:<blockerId>:<phase>`. The Coordinator wakes once and can retry the blocker, drop the edge with `update_todo`, or close the dependent. This is the counterpart of Airflow's `upstream_failed`, routed to the Coordinator instead of failing the task.
 6. Parallelism is `project.maxConcurrent` only. The Coordinator prompt's dispatch guidance says to start everything and express order with `blockedBy`.
 
+Rule 1 is awaiting the owner's decision on whether Coordinator-created todos may start without his confirmation. This design assumes yes.
+
+This follows Orca R1's root fix, which folds create and open into one call. It does not add R1's level-triggered `runTick` sweep over unstarted todos, for two reasons. First, the sweep cannot tell a todo the Coordinator forgot from one that was deliberately stopped back to `todo`: #139's first build was cancelled during the 11-08 freeze, and a sweep would have restarted it. Second, with create and reopen starting the build themselves, the forgotten case no longer exists, so the sweep would be a second starter for a state that cannot be reached. The level re-check Orca relies on lives in rule 4, which re-evaluates every held task on every tick.
+
 ### Deletes
 
 - `RESEARCH_BEFORE_PLAN_HOLD` and `releaseResearchBeforePlanHolds`. Research-before-plan writes `blockedBy`, and the lesson injection moves into `releaseBlockedSteps`.
@@ -37,7 +41,7 @@ Prior art: GitHub `needs`, Airflow trigger rules and Buildkite `depends_on` all 
 
 | # | Path | Today | After |
 |---|---|---|---|
-| 1 | `create_todo` (Coordinator) | `todo`; needs `open_thread` | `queued`; held if blocked |
+| 1 | `create_todo` (Coordinator) | `todo`; needs `open_thread` | `queued`; held if blocked (awaiting owner decision on auto-start) |
 | 2 | `reopen_todos` | back to `todo` | new build, `queued` |
 | 3 | `update_todo` with `blockedBy` | n/a | writes the edge; next release pass re-evaluates |
 | 4 | `startBuilds` / `enqueueStep` for a blocked task (continuation, rework, wakes) | not held | held at insert |
@@ -71,6 +75,8 @@ Migration: rewrite `holdReason = 'research-before-plan'` rows to `blocked-by`.
 
 `coordinatorAcceptsReview` then holds for these reviews, so `complete_todos` accepts them, and `message_thread` reworks them.
 
+This is Orca R2(a), widened to no-PR code reviews. It leaves out R2(a)'s auto-accept timeout: accepting a report nobody read would end the wait silently, which is the defect being fixed. A review the Coordinator does not act on goes to the owner through the class 4 handoff instead.
+
 ### Deletes
 
 - The `info review, autonomous -> null` row and the implicit "no PR and autonomous means nobody" path in `reviewOwnership`.
@@ -98,6 +104,8 @@ In every case the worker's statement that the task was not delivered lived only 
 There is one notion, an undelivered step: a build step of a `code` task on a GitHub-bound project that ends with no pending question and either no commits or no PR on the build. An undelivered step asks one synthetic question per build, `no-deliverable-<buildId>`, written with `writeWorkerQuestion`. The question quotes the worker's report line and last message, and asks what is missing and who should supply it. From there the existing path takes over: `needs_input`, Coordinator-owned through the question, a wake carrying the request id, `answer_question` or `ask_user`, and the answer delivered on the same build by the delivery record.
 
 If the same build ends undelivered again after that question is answered, it goes to `review`, which class 1 makes Coordinator-owned.
+
+Orca R3 instead proposes a required `status` on `thread_report` (`done`, `blocked` or `needs_ruling`) that creates the question, plus the same server-side check for reports that are free text only. This design keeps only the server-side check. `ask_user` is already the typed channel a worker uses to say what it needs. A status enum would be a second channel for the same thing, and the server-side check is needed anyway for workers that use neither. That matches Orca's own model: the turn-stop kind (`finished`, `errored`, `needs-input`, `exited`) is derived by the runtime, not declared by the worker.
 
 ### Deletes
 
@@ -136,6 +144,8 @@ Prior art: GitHub environment approvals, Airflow `response_timeout` and the Temp
 4. The `failed` wake text lists the actions that settle a failure (`message_thread` retry, `close_todos`, `update_todo` with `blockedBy` and a restart) and says that a turn ending without one hands the task to the owner.
 
 The same rule covers the class 1 review wake, the class 2 question wake and the class 3 `blocked` wake, so no Coordinator-owned state can end in silence.
+
+Orca R2(b) re-fires the wake once, with the previous turn's last message, before escalating. This design hands over on the first no-op turn instead. The wake already carried every fact, and #148, #156 and #165 each show the turn diagnosing correctly and then stopping. A second identical turn adds hours of delay and no information. R2(c), "a wake turn must end in a recorded action", is rule 4's wake text, backed by the structural handoff in rule 2.
 
 ### Deletes
 
