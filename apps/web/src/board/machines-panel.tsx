@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import {
   acquireComputerControl,
+  ensureComputerBrowser,
   patchComputerBrowser,
   releaseComputerControl,
   renewComputerControl,
@@ -190,8 +191,11 @@ function MachineCard({
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
   const canToggleBrowser =
-    browserInstalled && online && computer !== null && teamId !== undefined && !browserBusy;
+    browserInstalled && teamId !== undefined && machine.id !== undefined && !browserBusy;
   const browserEnabled = computer?.browserEnabled === true;
+  const browserHint = browserInstalled
+    ? t('让 agent 打开网页、点击和填表。')
+    : t('这台机器还不支持浏览器。');
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -268,14 +272,16 @@ function MachineCard({
   };
 
   const onBrowserToggle = (checked: boolean) => {
-    if (computer === null || browserBusy) return;
+    const machineId = machine.id;
+    if (teamId === undefined || machineId === undefined || browserBusy || !browserInstalled) return;
+    const ownedTeamId = teamId;
     setBrowserBusy(true);
-    void patchComputerBrowser(computer.id, checked)
-      .then(() =>
-        teamId !== undefined
-          ? invalidateConverged(qc, { queryKey: ['computers', teamId] })
-          : undefined,
-      )
+    const run =
+      computer !== null
+        ? patchComputerBrowser(computer.id, checked)
+        : ensureComputerBrowser(machineId, checked);
+    void run
+      .then(() => invalidateConverged(qc, { queryKey: ['computers', ownedTeamId] }))
       .finally(() => setBrowserBusy(false));
   };
 
@@ -405,7 +411,7 @@ function MachineCard({
       <CapabilityRow
         icon={<Globe aria-hidden="true" className="size-4" />}
         label={t('浏览器')}
-        hint={t('让 agent 打开网页、点击和填表。')}
+        hint={browserHint}
         checked={browserEnabled}
         disabled={!canToggleBrowser}
         onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}

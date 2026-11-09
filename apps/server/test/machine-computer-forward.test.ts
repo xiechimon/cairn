@@ -12,6 +12,7 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import {
+  COMPUTER_BROWSER_DISABLED,
   COMPUTER_BUSY,
   COMPUTER_EXECUTION_LEASE_MS,
   COMPUTER_NOT_CONNECTED,
@@ -161,6 +162,22 @@ function done(seq: number, text: string, exitCode: number | null = 0): ComputerF
 }
 
 describe('forwardComputerCall target and presence', () => {
+  test('browser tools refuse before creating a starting computer when browser is off', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    connect(s, 'omarchy');
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_navigate',
+        toolCallId: 'browser-1',
+        params: { url: 'https://example.com' },
+      }),
+    ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_DISABLED });
+    expect(s.db.select().from(computerTable).all()).toEqual([]);
+    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
+  });
+
   test('an offline target fails at once, sends no stream event and writes no row', async () => {
     const { s, deps } = boot();
     addMachine(s, 'omarchy', { computer: true });

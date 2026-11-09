@@ -4,16 +4,18 @@ import {
   COMPUTER_FEED_TOOLS,
   type ComputerCommand,
   type ComputerRecord,
+  chiefIdFormat,
 } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, computerCall, machine } from '../db/schema.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   computerCallOwnerUserId,
   ownedPrivateComputer,
   privateComputerWhere,
 } from './computer-access.js';
-import { feedOf } from './machine-computer.js';
+import { computerMachineName, feedOf } from './machine-computer.js';
 
 export function clampCommandsLimit(raw: string | undefined): number {
   const asked = Number(raw);
@@ -48,10 +50,55 @@ export function setComputerBrowserEnabled(
 ): ComputerRecord | null {
   if (!ownedPrivateComputer(db, teamId, userId, computerId)) return null;
   db.update(computer)
-    .set({ browserEnabled, updatedAt: Date.now() })
+    .set({ browserEnabled, updatedAt: nowMs() })
     .where(eq(computer.id, computerId))
     .run();
   return listComputers(db, teamId, userId).find((row) => row.id === computerId) ?? null;
+}
+
+export function ensureComputerBrowserEnabled(
+  db: Db,
+  teamId: string,
+  userId: string,
+  machineId: string,
+  browserEnabled: boolean,
+): ComputerRecord | null {
+  const host = db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.id, machineId), eq(machine.teamId, teamId)))
+    .get();
+  if (
+    host === undefined ||
+    (host.capabilities?.computer !== true && host.capabilities?.browser !== true)
+  ) {
+    return null;
+  }
+  const scopeKey = `chief:${chiefIdFormat(userId, teamId)}`;
+  const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
+  const now = nowMs();
+  if (existing === undefined) {
+    const id = newRecordId();
+    db.insert(computer)
+      .values({
+        id,
+        teamId,
+        scopeKey,
+        machineId,
+        providerRef: computerMachineName(scopeKey),
+        state: 'stopped',
+        browserEnabled,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    return listComputers(db, teamId, userId).find((row) => row.id === id) ?? null;
+  }
+  db.update(computer)
+    .set({ browserEnabled, updatedAt: now })
+    .where(eq(computer.id, existing.id))
+    .run();
+  return listComputers(db, teamId, userId).find((row) => row.id === existing.id) ?? null;
 }
 
 export function recentComputerCommands(

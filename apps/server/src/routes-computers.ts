@@ -1,10 +1,11 @@
-import { computerPatchBodySchema } from '@cairn/shared';
+import { computerEnsureBodySchema, computerPatchBodySchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { notFound, parseWith } from './lib/errors.js';
 import { ownedPrivateComputer } from './services/computer-access.js';
 import {
   clampCommandsLimit,
+  ensureComputerBrowserEnabled,
   listComputers,
   recentComputerCommands,
   setComputerBrowserEnabled,
@@ -14,6 +15,19 @@ export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/computers', (c) =>
     c.json({ computers: listComputers(ctx.db, ctx.team.id, ctx.user.id) }),
   );
+
+  app.post('/api/computers', async (c) => {
+    const body = parseWith(computerEnsureBodySchema, await c.req.json(), 'body');
+    const computer = ensureComputerBrowserEnabled(
+      ctx.db,
+      ctx.team.id,
+      ctx.user.id,
+      body.machineId,
+      body.browserEnabled,
+    );
+    if (!computer) throw notFound(`machine ${body.machineId}`);
+    return c.json({ computer });
+  });
 
   app.patch('/api/computers/:id', async (c) => {
     const id = c.req.param('id');

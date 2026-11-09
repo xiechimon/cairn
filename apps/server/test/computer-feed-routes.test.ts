@@ -183,6 +183,48 @@ describe('computer feed routes', () => {
     ).toBe(404);
   });
 
+  test('POST ensures a stopped private computer and sets browserEnabled before any tool call', async () => {
+    const s = boot();
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'm1',
+        teamId: s.team.id,
+        name: 'omarchy',
+        online: false,
+        lastSeenAt: 1,
+        capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
+      })
+      .run();
+    const created = await req(s.app, 'POST', '/api/computers', {
+      machineId: 'm1',
+      browserEnabled: true,
+    });
+    expect(created.status).toBe(200);
+    expect(await created.json()).toMatchObject({
+      computer: {
+        state: 'stopped',
+        browserEnabled: true,
+        machine: { id: 'm1', online: false },
+      },
+    });
+    const listed = await req(s.app, 'GET', '/api/computers');
+    expect(await listed.json()).toMatchObject({
+      computers: [{ browserEnabled: true, state: 'stopped', machine: { id: 'm1' } }],
+    });
+    const again = await req(s.app, 'POST', '/api/computers', {
+      machineId: 'm1',
+      browserEnabled: false,
+    });
+    expect(await again.json()).toMatchObject({
+      computer: { browserEnabled: false, state: 'stopped' },
+    });
+    expect(
+      (await req(s.app, 'POST', '/api/computers', { machineId: 'missing', browserEnabled: true }))
+        .status,
+    ).toBe(404);
+  });
+
   test('another team computer and calls are never returned', async () => {
     const s = boot();
     s.db

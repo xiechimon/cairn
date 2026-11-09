@@ -713,13 +713,14 @@ export async function forwardComputerCall(
     return resultOfRow(existing);
   }
 
-  const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
-  if (isComputerBrowserTool(tool) && target.computerId !== null) {
-    const row = db.select().from(computer).where(eq(computer.id, target.computerId)).get();
-    if (row !== undefined && !row.browserEnabled) {
+  if (isComputerBrowserTool(tool)) {
+    const scopeKey = `chief:${thread.chiefId}`;
+    const preferred = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
+    if (preferred === undefined || !preferred.browserEnabled) {
       throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
     }
   }
+  const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);
   if (target.computerId !== null) {

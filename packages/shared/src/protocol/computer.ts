@@ -163,6 +163,12 @@ export const computerPatchBodySchema = z.object({
 });
 export type ComputerPatchBody = z.infer<typeof computerPatchBodySchema>;
 
+export const computerEnsureBodySchema = z.object({
+  machineId: z.string().min(1).max(128),
+  browserEnabled: z.boolean(),
+});
+export type ComputerEnsureBody = z.infer<typeof computerEnsureBodySchema>;
+
 export const COMPUTER_BROWSER_TOOLS = [
   'browser_navigate',
   'browser_snapshot',

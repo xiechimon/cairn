@@ -61,3 +61,13 @@ export function patchComputerBrowser(
     browserEnabled,
   });
 }
+
+export function ensureComputerBrowser(
+  machineId: string,
+  browserEnabled: boolean,
+): Promise<{ computer: ComputerRecord }> {
+  return api.post<{ computer: ComputerRecord }>('/api/computers', {
+    machineId,
+    browserEnabled,
+  });
+}
