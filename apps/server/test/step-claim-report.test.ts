@@ -136,11 +136,11 @@ describe('#1473 a report counts only for the current claim', () => {
     expect((await w.claim())?.step.id).toBe(STEP);
     await finishStep(w.deps, MACHINE, STEP, { status: 'success', hasChanges: true });
     expect(w.stepRow().status).toBe('done');
-    expect(w.todoRow().phase).toBe('review');
+    const settled = w.todoRow().phase;
     const before = w.todoRow();
     await finishStep(w.deps, MACHINE, STEP, { status: 'failed', errorMessage: 'second report' });
     expect(w.stepRow().status).toBe('done');
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe(settled);
     expect(w.todoRow().v).toBe(before.v);
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, 'build-1473')).get();
     expect(buildRow?.errorMessage ?? null).toBeNull();

@@ -168,13 +168,19 @@ test('Run now schedules the actual run endpoint and reports queued status', asyn
   expect(probe.calls).toContainEqual({ method: 'POST', path: '/api/schedules/schedule-1/run', body: {} });
 });
 
-for (const surface of ['global', 'project', 'work-panel'] as const) {
-  const path = surface === 'global' ? '/app/schedules' : surface === 'project' ? '/app?project=proj-1' : '/app?pane=tasks';
+test('the Tasks panel links to schedules instead of summarising them', async ({ page }) => {
+  await setup(page, { kind: 'once', nextRunAt: null });
+  await page.goto('/app?pane=tasks');
+  const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
+  await expect(panel.getByRole('link', { name: 'Manage schedules' })).toHaveAttribute('href', '/app/schedules');
+  await expect(panel).not.toContainText('No upcoming runs');
+});
+
+for (const surface of ['global', 'project'] as const) {
+  const path = surface === 'global' ? '/app/schedules' : '/app?project=proj-1';
   const summary = (page: Page) => surface === 'global'
     ? page.locator('.sched-card')
-    : surface === 'project'
-      ? page.locator('[data-slot="scheduled-task-row"]')
-      : page.getByRole('complementary', { name: 'Tasks', exact: true });
+    : page.locator('[data-slot="scheduled-task-row"]');
   test(`${surface} summary uses the saved timezone across midnight`, async ({ page }) => {
     const at = Date.UTC(2026, 10, 5, 6, 15);
     await setup(page, { at, nextRunAt: at, tz: 'America/New_York' });
@@ -377,7 +383,7 @@ test('schedule loading and failed loads never masquerade as an empty list', asyn
   await expect(page.getByText('No schedules yet', { exact: true })).toHaveCount(0);
   probe.rejectLoads(true);
   probe.releaseLoads();
-  await expect(page.getByTestId('schedules-error')).toContainText('Scheduled tasks could not be loaded.');
+  await expect(page.getByTestId('schedules-error')).toContainText('Scheduled tasks could not be loaded');
   await expect(page.getByText('No schedules yet', { exact: true })).toHaveCount(0);
   probe.rejectLoads(false);
   await page.getByTestId('schedules-error').getByRole('button', { name: 'Retry', exact: true }).click();

@@ -2973,19 +2973,22 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
   }
 }
 
-const ZERO_CHANGE_EXCERPT_MAX = 1_200;
+const UNDELIVERED_EXCERPT_MAX = 1_200;
 
-function endedWithoutChanges(
+type Undelivered = 'no-commits' | 'no-pr';
+
+function undeliveredEnd(
+  deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   todoRow: TodoRow,
+  buildRow: BuildRow,
   outcome: { hasChanges?: boolean; workBranchDrift?: unknown },
-): boolean {
-  return (
-    isBuildStepKind(stepRow.kind) &&
-    todoRow.output !== 'info' &&
-    outcome.hasChanges === false &&
-    outcome.workBranchDrift === undefined
-  );
+): Undelivered | null {
+  if (!isBuildStepKind(stepRow.kind) || todoRow.output === 'info') return null;
+  if (outcome.workBranchDrift !== undefined) return null;
+  if (outcome.hasChanges === false) return 'no-commits';
+  const githubProject = githubRepoOfProject(projectOfTodo(deps.db, todoRow)) !== null;
+  return githubProject && buildRow.prNumber === null ? 'no-pr' : null;
 }
 
 function spokenText(content: unknown): string {
@@ -3014,18 +3017,31 @@ function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {
   return null;
 }
 
-function askAboutZeroChangeOnce(deps: BuildDeps, buildId: string): void {
-  const last = lastAgentMessage(deps, buildId);
-  const excerpt =
-    last === null
-      ? '(the agent left no message)'
-      : last.length > ZERO_CHANGE_EXCERPT_MAX
-        ? `${last.slice(0, ZERO_CHANGE_EXCERPT_MAX - 1)}…`
-        : last;
-  const requestId = `no-change-${buildId}`;
+function excerptOf(text: string | null, missing: string): string {
+  if (text === null || text.trim() === '') return missing;
+  return text.length > UNDELIVERED_EXCERPT_MAX
+    ? `${text.slice(0, UNDELIVERED_EXCERPT_MAX - 1)}…`
+    : text;
+}
+
+const UNDELIVERED_SUMMARY: Record<Undelivered, string> = {
+  'no-commits': 'The step ended without committing anything.',
+  'no-pr': 'The step ended without opening a pull request.',
+};
+
+function askUndeliveredOnce(deps: BuildDeps, buildRow: BuildRow, kind: Undelivered): void {
+  const asked = deps.db
+    .select({ id: message.id })
+    .from(message)
+    .where(inArray(message.id, [`no-deliverable-${buildRow.id}`, `no-change-${buildRow.id}`]))
+    .get();
+  if (asked !== undefined) return;
+  const reportLine = excerptOf(buildRow.reportLine, '(no report line)');
+  const last = excerptOf(lastAgentMessage(deps, buildRow.id), '(the agent left no message)');
+  const requestId = `no-deliverable-${buildRow.id}`;
   writeWorkerQuestion(
     deps,
-    buildId,
+    buildRow.id,
     requestId,
     {
       kind: ASK_USER_QUESTION_KIND,
@@ -3033,8 +3049,8 @@ function askAboutZeroChangeOnce(deps: BuildDeps, buildId: string): void {
       status: 'pending',
       questions: [
         {
-          header: 'No changes',
-          question: `The step ended without committing anything. The agent's last message:\n${excerpt}\nAnswer with what it should do next, or say the task needs no code change.`,
+          header: 'Not delivered',
+          question: `Report line: ${reportLine}\n${UNDELIVERED_SUMMARY[kind]} The agent's last message:\n${last}\nAnswer with what is missing and who supplies it, or say what the task should deliver instead.`,
           options: [],
         },
       ],
@@ -3105,11 +3121,9 @@ export function completeStep(
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
-  if (
-    endedWithoutChanges(stepRow, todoRow, outcome) &&
-    pendingWorkerQuestions(deps.db, buildRow.id).length === 0
-  )
-    askAboutZeroChangeOnce(deps, buildRow.id);
+  const undelivered = undeliveredEnd(deps, stepRow, todoRow, buildRow, outcome);
+  if (undelivered !== null && pendingWorkerQuestions(deps.db, buildRow.id).length === 0)
+    askUndeliveredOnce(deps, buildRow, undelivered);
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
   const gateFailure = stepArtifactGate(
     deps,

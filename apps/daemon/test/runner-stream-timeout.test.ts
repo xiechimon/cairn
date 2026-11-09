@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -152,6 +153,7 @@ class FakeClient implements MachineApi {
 function fakeWorkspace(cwd: string): WorktreeOps {
   return {
     async prepare() {
+      mkdirSync(cwd, { recursive: true });
       return {
         cwd,
         baseRepoDir: join(cwd, '..', 'repo'),

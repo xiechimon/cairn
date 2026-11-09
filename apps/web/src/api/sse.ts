@@ -246,6 +246,9 @@ export function startConversationStream(
           if (targetConversationId !== conversationId)
             void invalidateConverged(qc, { queryKey: ['messages', targetConversationId] });
           void invalidateConverged(qc, { queryKey: ['plans'] });
+          if (isChiefConversationId(conversationId)) {
+            void invalidateConverged(qc, { queryKey: ['tasks'] });
+          }
           onMessage?.(row);
           break;
         }

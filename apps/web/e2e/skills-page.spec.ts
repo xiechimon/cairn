@@ -23,7 +23,7 @@ test('empty state double entry — directory guide copy + `新建技能` primary
   await page.goto(`${SKILLS}?scenario=01`);
   const empty = page.getByTestId('resource-empty');
   await expect(empty).toBeVisible();
-  await expect(empty.getByRole('heading')).toHaveText('尚无技能。');
+  await expect(empty.getByRole('heading')).toHaveText('尚无技能');
 
   const desc = empty.locator('p');
   await expect(desc).toContainText('~/.agents/skills');
