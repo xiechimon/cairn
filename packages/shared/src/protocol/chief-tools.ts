@@ -374,7 +374,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      'Create a todo in a project. Title = verb phrase; spec = the three-section transform (user quote block, 要求 bullets, 补充信息 bullets).',
+      'Create a todo in a project and start its thread right away (no open_thread needed). Title = verb phrase; spec = the three-section transform (user quote block, 要求 bullets, 补充信息 bullets). Express order with blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.',
     parameters: obj(
       {
         projectId: str('Project id.'),
@@ -382,6 +382,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         spec: str('Structured spec markdown.'),
         output: str(
           'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
+        ),
+        blockedBy: idArr(
+          'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
         ),
       },
       ['projectId', 'title', 'spec'],
@@ -399,6 +402,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         tagIds: idArr('Optional replacement tag ids.'),
         projectId: str(
           'Optional target project id. Only for a todo that has not started; its tags are dropped.',
+        ),
+        blockedBy: idArr(
+          'Optional replacement list of todo ids that must finish first; [] removes every blocker.',
         ),
       },
       ['todoId'],
@@ -423,7 +429,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'reopen_todos',
-    description: 'Reopen closed todos (phase closed → todo).',
+    description: 'Reopen closed todos and start a new thread on each (phase closed → queued).',
     parameters: obj({ todoIds: idArr('Todo ids to reopen.') }, ['todoIds']),
   },
   {
@@ -725,7 +731,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'open_thread',
     description:
-      'Open a thread on a todo that has not started: one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from create_todo or todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
+      'Open a thread on a todo the user created that has not started (create_todo and reopen_todos already start theirs): one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
     parameters: obj({ todoId: str('Id of the todo to open a thread on.') }, ['todoId']),
   },
   {

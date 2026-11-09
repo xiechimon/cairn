@@ -115,6 +115,7 @@ import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
+import { blockedHold, blockedNow } from './blockers.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import {
@@ -181,7 +182,6 @@ import {
   getTodo,
   setTodoPhase,
   settleSplitOnDone,
-  splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 import {
@@ -653,10 +653,7 @@ function landReservedPhase(
       deps.hub.publishTodoDoc(record.teamId, record);
     }
   }
-  if (desired === 'done') {
-    settleSplitOnDone(deps, todoRow.id);
-    advanceSplitWaves(deps, todoRow.id);
-  }
+  if (desired === 'done') settleSplitOnDone(deps, todoRow.id);
 }
 
 export function requestStop(
@@ -1021,6 +1018,10 @@ export function enqueueStep(
     throw new HttpError(409, current.errorMessage ?? 'Task parked');
   const id = newRecordId();
   const createdAt = nowMs();
+  const owner =
+    current === undefined || (kind !== 'plan' && kind !== 'session')
+      ? undefined
+      : deps.db.select().from(todo).where(eq(todo.id, current.todoId)).get();
   deps.db
     .insert(step)
     .values({
@@ -1033,6 +1034,7 @@ export function enqueueStep(
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
+      ...(owner !== undefined && blockedNow(deps.db, owner) ? blockedHold() : {}),
     })
     .run();
   clearStop(deps.db, buildId);
@@ -1304,29 +1306,9 @@ export function maybeEnqueueIndependentReview(
   enqueueStep(deps, buildId, 'review', todoRow.teamId, prompt);
 }
 
-export function advanceSplitWaves(deps: BuildDeps, childTodoId: string): void {
-  const row = deps.db.select().from(todo).where(eq(todo.id, childTodoId)).get();
-  if (row === undefined || row.sourceTodo === null) return;
-  const ready = childrenOfTodo(deps.db, row.sourceTodo).filter(
-    (c) => c.phase === 'todo' && splitBlockersSatisfied(deps.db, c),
-  );
-  for (const child of ready) {
-    try {
-      startBuilds(deps, {
-        projectId: child.projectId,
-        todoIds: [child.id],
-        triggerSource: 'chief',
-      });
-    } catch {}
-  }
-}
-
 export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number {
-  const ready = childrenOfTodo(deps.db, parentId).filter(
-    (c) => c.phase === 'todo' && splitBlockersSatisfied(deps.db, c),
-  );
   let dispatched = 0;
-  for (const child of ready) {
+  for (const child of childrenOfTodo(deps.db, parentId).filter((c) => c.phase === 'todo')) {
     try {
       startBuilds(deps, {
         projectId: child.projectId,
@@ -3395,7 +3377,6 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     content: DONE_ROW,
     createdAt: nowMs(),
   });
-  advanceSplitWaves(deps, todoId);
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
   markFirstPrPromptDue(deps.db, buildId);
 }

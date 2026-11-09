@@ -166,7 +166,7 @@ describe('#1466 the chief tool surface: a cross-team project id = 404 (same shap
     expect(single.status).toBe(404);
     expect(single.message).toBe(`project ${PROJ_B}`);
     expect(todoState(CROSS)).toEqual({ phase: 'todo', builds: 0 });
-    expect(todoState(own)).toEqual({ phase: 'todo', builds: 0 });
+    expect(todoState(own)).toEqual({ phase: 'queued', builds: 1 });
     expect(chiefWatchIds()).toEqual([]);
   });
 

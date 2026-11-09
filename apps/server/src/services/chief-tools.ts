@@ -36,12 +36,8 @@ import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
-import {
-  advanceSplitWaves,
-  applyBuildStepAction,
-  cancelBuild,
-  stopActiveStepsAfterExit,
-} from './builds.js';
+import { setBlockedBy } from './blockers.js';
+import { applyBuildStepAction, cancelBuild, stopActiveStepsAfterExit } from './builds.js';
 import {
   addChiefWatch,
   clearChiefWake,
@@ -77,6 +73,7 @@ import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { snoozeTodo } from './snooze.js';
 import { seedFixedTags } from './tags.js';
+import { startThreadBuild } from './thread-message.js';
 import {
   createAutonomousTodo,
   deleteTodo,
@@ -152,6 +149,9 @@ function strArr(params: Params, key: string): string[] {
     throw new HttpError(400, `invalid params.${key}: expected string[]`);
   }
   return v as string[];
+}
+function optStrArr(params: Params, key: string): string[] | undefined {
+  return params[key] === undefined || params[key] === null ? undefined : strArr(params, key);
 }
 function num(params: Params, key: string): number | undefined {
   const v = params[key];
@@ -518,11 +518,21 @@ export async function executeChiefTool(
         ...(output !== undefined ? { output } : {}),
       });
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
-      return json({ ...record, sourceBuildId: ctx.chiefId });
+      const blockedBy = optStrArr(params, 'blockedBy');
+      if (blockedBy !== undefined)
+        setBlockedBy(db, requireTeamTodo(db, record.id, ctx.teamId), blockedBy);
+      const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
+        origin: 'coordinator',
+        actor: 'Coordinator',
+      });
+      return json({ ...getTodo(svc, record.id), sourceBuildId: ctx.chiefId, buildId });
     }
     case 'update_todo': {
       const todoId = str(params, 'todoId');
-      requireTeamTodo(db, todoId, ctx.teamId);
+      const blockedBy = optStrArr(params, 'blockedBy');
+      if (blockedBy !== undefined)
+        setBlockedBy(db, requireTeamTodo(db, todoId, ctx.teamId), blockedBy);
+      else requireTeamTodo(db, todoId, ctx.teamId);
       const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
         ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
@@ -553,8 +563,18 @@ export async function executeChiefTool(
         ),
       );
     }
-    case 'reopen_todos':
-      return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor));
+    case 'reopen_todos': {
+      const out = transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor);
+      const started: string[] = [];
+      for (const id of out.transitioned) {
+        startThreadBuild(svc, requireTeamTodo(db, id, ctx.teamId), {
+          origin: 'coordinator',
+          actor: 'Coordinator',
+        });
+        started.push(id);
+      }
+      return json({ ...out, started });
+    }
     case 'complete_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
     case 'create_project': {
@@ -989,18 +1009,6 @@ export function transitionTodos(
           });
         if (to === 'done' && owned.phase !== 'done' && owned.latestBuildId !== null) {
           insertGateAnnouncement(deps, owned.latestBuildId, DONE_ANNOUNCEMENT, actor.name);
-        }
-        if (to === 'done' && owned.phase !== 'done') {
-          advanceSplitWaves(
-            {
-              db: deps.db,
-              hub: deps.hub,
-              machineHub: deps.machineHub,
-              user: deps.user,
-              vapidKeys: deps.vapidKeys,
-            },
-            id,
-          );
         }
       } else skipped.push(id);
     } catch {

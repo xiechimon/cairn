@@ -51,9 +51,8 @@ describe('#1219 the chief cancel -> re-dispatch chain', () => {
       projectId: H.projectId,
       title: '被取消后重派',
       spec: 's',
-    })) as { id: string };
-    const started = (await relay('open_thread', { todoId: todoRec.id })) as { buildId: string };
-    const buildId = started.buildId;
+    })) as { id: string; buildId: string };
+    const buildId = todoRec.buildId;
 
     const cancelled = (await relay('cancel_builds', {
       buildIds: [buildId],

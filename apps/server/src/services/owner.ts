@@ -6,7 +6,8 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, gateState, message, project, todo } from '../db/schema.js';
+import { build, gateState, message, project, step, todo } from '../db/schema.js';
+import { BLOCKED_BY_HOLD, deadEndBlocker } from './blockers.js';
 import { planAwaitsAutoConfirm } from './builds.js';
 import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
@@ -18,7 +19,7 @@ import { getTodo } from './todos.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
-export type CoordinatorReason = 'question' | 'failed' | 'review';
+export type CoordinatorReason = 'question' | 'failed' | 'review' | 'blocked';
 
 export type Ownership =
   | { owner: 'owner'; reason: NeedsYouReason; workKey: string }
@@ -37,6 +38,7 @@ export const OWNED_CANDIDATE: SQL = and(
   or(
     inArray(todo.phase, ['confirm', 'needs_input', 'review', 'failed']),
     sql`exists (select 1 from ${message} where ${message.conversationId} = ${todo.latestBuildId} and ${PENDING_QUESTION})`,
+    sql`exists (select 1 from ${step} where ${step.buildId} = ${todo.latestBuildId} and ${step.holdReason} = ${BLOCKED_BY_HOLD})`,
   ),
 ) as SQL;
 
@@ -92,6 +94,23 @@ function failedOwnership(db: Db, row: TodoRow): Ownership | null {
   return { owner: 'coordinator', reason: 'failed', workKey: `failed:${phaseWork(row)}` };
 }
 
+function blockedOwnership(db: Db, row: TodoRow): Ownership | null {
+  if (row.latestBuildId === null) return null;
+  const held = db
+    .select({ id: step.id })
+    .from(step)
+    .where(and(eq(step.buildId, row.latestBuildId), eq(step.holdReason, BLOCKED_BY_HOLD)))
+    .get();
+  if (held === undefined) return null;
+  const blocker = deadEndBlocker(db, row);
+  if (blocker === null) return null;
+  return {
+    owner: 'coordinator',
+    reason: 'blocked',
+    workKey: `blocked:${blocker.id}:${blocker.phase}`,
+  };
+}
+
 export function ownershipOf(db: Db, row: TodoRow): Ownership | null {
   if (row.archivedAt !== null || row.phase === 'done' || row.phase === 'closed') return null;
   const pending = row.latestBuildId === null ? [] : pendingQuestionIds(db, row.latestBuildId);
@@ -102,6 +121,8 @@ export function ownershipOf(db: Db, row: TodoRow): Ownership | null {
       workKey: `question:${row.latestBuildId}:${pending.join(',')}`,
     };
   }
+  const blocked = blockedOwnership(db, row);
+  if (blocked !== null) return blocked;
   if (row.phase === 'confirm') {
     if (row.latestBuildId !== null && planAwaitsAutoConfirm({ db }, row.latestBuildId)) return null;
     return { owner: 'owner', reason: 'confirm', workKey: `confirm:${phaseWork(row)}` };
