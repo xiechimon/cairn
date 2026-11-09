@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import {
   chatAttributes,
   chiefTurnErrorContentSchema,
@@ -17,18 +16,14 @@ import {
   type TokenCounts,
 } from '@cairn/shared';
 import {
-  createOtlpSender,
-  OTLP_SPAN_KIND,
-  OTLP_STATUS_ERROR,
-  type OtlpSpan,
+  type CairnSpan,
+  type CairnTracing,
+  createCairnTracing,
   type OtlpTarget,
-  otlpAttributes,
-  otlpNanos,
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
   otlpTraceIdOfStep,
-  otlpTracesRequest,
   parseOtlpTarget,
 } from '@cairn/shared/otel';
 import { and, eq } from 'drizzle-orm';
@@ -41,7 +36,7 @@ import { storedStepRoute } from './services/step-route.js';
 
 const SCOPE = 'cairn.server';
 const COORDINATOR_TURN_SPAN = 'coordinator turn';
-const sender = createOtlpSender();
+const tracings = new Map<string, CairnTracing>();
 
 function runtimeTarget(env: NodeJS.ProcessEnv): OtlpTarget | null {
   try {
@@ -51,12 +46,26 @@ function runtimeTarget(env: NodeJS.ProcessEnv): OtlpTarget | null {
   }
 }
 
-function push(target: OtlpTarget, env: NodeJS.ProcessEnv, spans: OtlpSpan[]): void {
+function push(target: OtlpTarget, env: NodeJS.ProcessEnv, spans: CairnSpan[]): void {
   if (spans.length === 0) return;
-  sender.send(
-    target,
-    otlpTracesRequest(otelResourceAttributes(otelEnvironment(env)), SCOPE, spans),
-  );
+  const environment = otelEnvironment(env);
+  const key = JSON.stringify([target.url.href, target.headers, environment]);
+  let tracing = tracings.get(key);
+  if (tracing === undefined) {
+    tracing = createCairnTracing(target, otelResourceAttributes(environment), SCOPE);
+    tracings.set(key, tracing);
+  }
+  tracing.record(spans);
+}
+
+export async function flushRuntimeOtel(): Promise<void> {
+  await Promise.all([...tracings.values()].map((tracing) => tracing.forceFlush()));
+}
+
+export async function shutdownRuntimeOtel(): Promise<void> {
+  const open = [...tracings.values()];
+  tracings.clear();
+  await Promise.all(open.map((tracing) => tracing.shutdown()));
 }
 
 function stepFailureReason(db: Db, row: typeof step.$inferSelect): string | undefined {
@@ -115,20 +124,18 @@ export function emitRuntimeStepSpan(
     row.status === 'failed'
       ? (stepFailureReason(db, row) ?? otelErrorMessage(buildRow?.errorMessage))
       : undefined;
-  const status =
-    row.status === 'failed'
-      ? { status: { code: OTLP_STATUS_ERROR, message: errorMessage ?? 'failed' } }
-      : {};
+  const traceId = otlpTraceIdOfStep({ kind: row.kind, buildId: row.buildId, stepId: row.id });
   push(target, env, [
     {
-      traceId: otlpTraceIdOfStep({ kind: row.kind, buildId: row.buildId, stepId: row.id }),
       spanId: otlpStepSpanIdOfBuild(row.buildId, row.id),
-      ...(isTurn ? {} : { parentSpanId: otlpRootSpanIdOfBuild(row.buildId) }),
+      ...(isTurn
+        ? { traceId }
+        : { parent: { traceId, spanId: otlpRootSpanIdOfBuild(row.buildId) } }),
       name: isTurn ? COORDINATOR_TURN_SPAN : `step ${row.kind}`,
-      kind: OTLP_SPAN_KIND.internal,
-      startTimeUnixNano: otlpNanos(start),
-      endTimeUnixNano: otlpNanos(end),
-      attributes: otlpAttributes({
+      kind: 'internal',
+      startMs: start,
+      endMs: end,
+      attributes: {
         ...attribution,
         ...stepAttributes({
           stepId: row.id,
@@ -166,8 +173,8 @@ export function emitRuntimeStepSpan(
               ...langfuseEnvironmentAttributes(environment),
               ...(buildRow ? { [LANGFUSE_ATTR.sessionId]: buildRow.todoId } : {}),
             }),
-      }),
-      ...status,
+      },
+      ...(row.status === 'failed' ? { error: errorMessage ?? 'failed' } : {}),
     },
   ]);
 }
@@ -191,10 +198,10 @@ export function emitRuntimeBuildSpan(
       traceId: otlpTraceIdOfBuild(row.id),
       spanId: otlpRootSpanIdOfBuild(row.id),
       name: GENAI_OPERATION.invokeAgent,
-      kind: OTLP_SPAN_KIND.internal,
-      startTimeUnixNano: otlpNanos(start),
-      endTimeUnixNano: otlpNanos(end),
-      attributes: otlpAttributes({
+      kind: 'internal',
+      startMs: start,
+      endMs: end,
+      attributes: {
         ...runtimeBuildAttributes({
           buildId: row.id,
           todoId: row.todoId,
@@ -209,10 +216,8 @@ export function emitRuntimeBuildSpan(
           tags: ['cairn', 'build'],
           environment: otelEnvironment(env),
         }),
-      }),
-      ...(outcome === 'done'
-        ? {}
-        : { status: { code: OTLP_STATUS_ERROR, message: errorMessage ?? outcome } }),
+      },
+      ...(outcome === 'done' ? {} : { error: errorMessage ?? outcome }),
     },
   ]);
 }
@@ -253,19 +258,19 @@ export function emitCoordinatorTurnSpans(
   const target = runtimeTarget(env);
   if (target === null || records.length === 0) return;
   const environment = otelEnvironment(env);
-  const traceId = otlpTraceIdOfStep({ kind: 'chief', buildId: turn.threadId, stepId: turn.stepId });
-  const parentSpanId = otlpStepSpanIdOfBuild(turn.threadId, turn.stepId);
-  const spans: OtlpSpan[] = records.map((record) => {
+  const parent = {
+    traceId: otlpTraceIdOfStep({ kind: 'chief', buildId: turn.threadId, stepId: turn.stepId }),
+    spanId: otlpStepSpanIdOfBuild(turn.threadId, turn.stepId),
+  };
+  const spans: CairnSpan[] = records.map((record): CairnSpan => {
     if (record.kind === 'chat') {
       return {
-        traceId,
-        spanId: randomBytes(8).toString('hex'),
-        parentSpanId,
+        parent,
         name: `chat ${record.model}`.trim(),
-        kind: OTLP_SPAN_KIND.client,
-        startTimeUnixNano: otlpNanos(record.at),
-        endTimeUnixNano: otlpNanos(record.at),
-        attributes: otlpAttributes({
+        kind: 'client',
+        startMs: record.at,
+        endMs: record.at,
+        attributes: {
           ...chatAttributes(
             {
               provider: record.provider,
@@ -283,26 +288,19 @@ export function emitCoordinatorTurnSpans(
             { provider: turn.provider, model: turn.model },
           ),
           ...langfuseEnvironmentAttributes(environment),
-        }),
+        },
         ...(record.finishReason === 'error'
-          ? {
-              status: {
-                code: OTLP_STATUS_ERROR,
-                message: otelErrorMessage(record.errorMessage) ?? 'error',
-              },
-            }
+          ? { error: otelErrorMessage(record.errorMessage) ?? 'error' }
           : {}),
       };
     }
     return {
-      traceId,
-      spanId: randomBytes(8).toString('hex'),
-      parentSpanId,
+      parent,
       name: `execute_tool ${record.name}`,
-      kind: OTLP_SPAN_KIND.internal,
-      startTimeUnixNano: otlpNanos(record.startAt),
-      endTimeUnixNano: otlpNanos(Math.max(record.startAt, record.endAt)),
-      attributes: otlpAttributes({
+      kind: 'internal',
+      startMs: record.startAt,
+      endMs: Math.max(record.startAt, record.endAt),
+      attributes: {
         ...executeToolAttributes({
           name: record.name,
           callId: record.id,
@@ -310,13 +308,11 @@ export function emitCoordinatorTurnSpans(
           result: jsonText(record.result),
         }),
         ...langfuseEnvironmentAttributes(environment),
-      }),
-      ...(record.isError ? { status: { code: OTLP_STATUS_ERROR, message: 'tool error' } } : {}),
+      },
+      ...(record.isError ? { error: 'tool error' } : {}),
     };
   });
-  const request = otlpTracesRequest(otelResourceAttributes(environment), SCOPE, spans);
-  const redacted = redactSecrets(request).value as typeof request;
-  sender.send(target, redacted);
+  push(target, env, redactSecrets(spans).value as CairnSpan[]);
 }
 
 export function emitCompactionFailureSpan(
@@ -335,30 +331,33 @@ export function emitCompactionFailureSpan(
   const environment = otelEnvironment(env);
   const now = Date.now();
   const inTurn = failure.threadId !== undefined && failure.stepId !== undefined;
-  const span: OtlpSpan = {
-    traceId: inTurn
-      ? otlpTraceIdOfStep({
-          kind: 'chief',
-          buildId: failure.threadId ?? '',
-          stepId: failure.stepId ?? '',
-        })
-      : otlpTraceIdOfBuild(failure.threadId ?? 'coordinator'),
-    spanId: randomBytes(8).toString('hex'),
+  const traceId = inTurn
+    ? otlpTraceIdOfStep({
+        kind: 'chief',
+        buildId: failure.threadId ?? '',
+        stepId: failure.stepId ?? '',
+      })
+    : otlpTraceIdOfBuild(failure.threadId ?? 'coordinator');
+  const span: CairnSpan = {
     ...(inTurn
-      ? { parentSpanId: otlpStepSpanIdOfBuild(failure.threadId ?? '', failure.stepId ?? '') }
-      : {}),
+      ? {
+          parent: {
+            traceId,
+            spanId: otlpStepSpanIdOfBuild(failure.threadId ?? '', failure.stepId ?? ''),
+          },
+        }
+      : { traceId }),
     name: `compaction ${failure.stage}`,
-    kind: OTLP_SPAN_KIND.internal,
-    startTimeUnixNano: otlpNanos(now),
-    endTimeUnixNano: otlpNanos(now),
-    attributes: otlpAttributes({
+    kind: 'internal',
+    startMs: now,
+    endMs: now,
+    attributes: {
       'cairn.compaction.stage': failure.stage,
       'cairn.compaction.failure_count': failure.count,
       'error.type': failure.errorClass,
       ...langfuseEnvironmentAttributes(environment),
-    }),
-    status: { code: OTLP_STATUS_ERROR, message: failure.message },
+    },
+    error: failure.message,
   };
-  const request = otlpTracesRequest(otelResourceAttributes(environment), SCOPE, [span]);
-  sender.send(target, redactSecrets(request).value as typeof request);
+  push(target, env, redactSecrets([span]).value as CairnSpan[]);
 }

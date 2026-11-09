@@ -24,6 +24,7 @@ import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environmen
 import { createServerLogger } from './lib/logger.js';
 import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import { shutdownRuntimeOtel } from './runtime-otel.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
   setCoordinatorInServer,
@@ -276,6 +277,7 @@ async function shutdown(): Promise<void> {
   killInFlightPick();
   computerScreens.close();
   server.close();
+  await shutdownRuntimeOtel();
   await (await tsnetStarting)?.stop();
   close();
   process.exit(0);
