@@ -26,14 +26,23 @@ import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { needsYouThreads, pendingQuestions } from './needs-you.js';
+import { needsYouThreads } from './needs-you.js';
 import { NeedsYouTray } from './needs-you-tray.js';
 import { composeRequest } from './open-composer.js';
 import { TasksPanel } from './tasks-panel.js';
-import { needsYouBadge, scopeTasks, type TasksView } from './tasks-sections.js';
+import {
+  needsYouBadge,
+  type QuestionTarget,
+  type QuestionThreadView,
+  questionOpenStep,
+  scopeTasks,
+  type TasksView,
+} from './tasks-sections.js';
 import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
+
+const CHIEF_PARAM = 'chief';
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
@@ -167,13 +176,41 @@ export function HomeC({
   const entries = needsYouThreads(scoped);
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
-  const openQuestion = (requestId: string) => {
-    const at = pendingQuestions(chiefData.stream ?? []).findIndex(
-      (question) => question.requestId === requestId,
-    );
-    if (at >= 0) questionDockState.setFocus(at);
-    if (questionDockState.isCollapsed(requestId)) questionDockState.toggleCollapsed(requestId);
+  const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
+  const questionView: QuestionThreadView = {
+    threadId: chiefData.threadId ?? null,
+    stream: chiefData.stream ?? [],
+    hasEarlier: chiefData.hasEarlier === true,
+    loadingEarlier: surface.earlier?.loading === true,
+    failedEarlier: surface.earlier?.failed === true,
   };
+  const openQuestion = (target: QuestionTarget) => {
+    const step = questionOpenStep(target, questionView);
+    if (step.kind === 'open-thread') {
+      const params = new URLSearchParams(searchParams);
+      params.set(CHIEF_PARAM, step.threadId);
+      setSearchParams(params, { replace: true, state: location.state });
+    }
+    setQuestionTarget(target);
+  };
+  const questionStep =
+    questionTarget === null || !loaded ? null : questionOpenStep(questionTarget, questionView);
+  const stepKind = questionStep?.kind ?? null;
+  const focusAt = questionStep?.kind === 'focus' ? questionStep.at : -1;
+  const loadEarlier = surface.earlier?.onLoad;
+  useEffect(() => {
+    if (questionTarget === null) return;
+    if (stepKind === 'focus') {
+      questionDockState.setFocus(focusAt);
+      if (questionDockState.isCollapsed(questionTarget.requestId))
+        questionDockState.toggleCollapsed(questionTarget.requestId);
+      setQuestionTarget(null);
+    } else if (stepKind === 'load-earlier') {
+      loadEarlier?.();
+    } else if (stepKind === 'missing') {
+      setQuestionTarget(null);
+    }
+  }, [questionTarget, stepKind, focusAt, loadEarlier]);
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,

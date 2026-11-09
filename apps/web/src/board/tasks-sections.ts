@@ -33,6 +33,7 @@ export interface TaskEntry {
 
 export interface StandaloneQuestion {
   requestId: string;
+  threadId: string | null;
   header: string;
   createdAt: number;
   projectId: string | null;
@@ -151,6 +152,7 @@ export function tasksFromQuery(query: TasksQuery | undefined): TasksView {
     if (entry.kind === 'question') {
       view.questions.push({
         requestId: entry.requestId,
+        threadId: entry.threadId,
         header: entry.title,
         createdAt: entry.createdAt,
         projectId: entry.projectId,
@@ -172,6 +174,7 @@ export function tasksFromFixture(
     ),
     questions: pendingQuestions(stream).map((question) => ({
       requestId: question.requestId,
+      threadId: null,
       header: question.questions[0]?.header ?? '',
       createdAt: 0,
       projectId: null,
@@ -185,4 +188,35 @@ export function scopeTasks(view: TasksView, projectId: string | null): TasksView
     entries: view.entries.filter((entry) => entry.todo.projectId === projectId),
     questions: view.questions.filter((question) => question.projectId === projectId),
   };
+}
+
+export type QuestionTarget = Pick<StandaloneQuestion, 'requestId' | 'threadId'>;
+
+export interface QuestionThreadView {
+  threadId: string | null;
+  stream: readonly ChiefStreamItem[];
+  hasEarlier: boolean;
+  loadingEarlier: boolean;
+  failedEarlier: boolean;
+}
+
+export type QuestionOpenStep =
+  | { kind: 'open-thread'; threadId: string }
+  | { kind: 'focus'; at: number }
+  | { kind: 'load-earlier' }
+  | { kind: 'wait' }
+  | { kind: 'missing' };
+
+export function questionOpenStep(
+  target: QuestionTarget,
+  view: QuestionThreadView,
+): QuestionOpenStep {
+  if (target.threadId !== null && target.threadId !== view.threadId)
+    return { kind: 'open-thread', threadId: target.threadId };
+  const at = pendingQuestions(view.stream).findIndex(
+    (question) => question.requestId === target.requestId,
+  );
+  if (at >= 0) return { kind: 'focus', at };
+  if (!view.hasEarlier || view.failedEarlier) return { kind: 'missing' };
+  return view.loadingEarlier ? { kind: 'wait' } : { kind: 'load-earlier' };
 }

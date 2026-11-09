@@ -10,6 +10,7 @@ import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { PrList } from '../components/thread/pr-list.js';
+import { prByThread } from '../components/thread/pr-panel-model.js';
 import { TaskRow, type TaskRowGlyph } from '../components/thread/task-row.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
@@ -21,6 +22,7 @@ import {
   bySection,
   isWaiting,
   type Phrase,
+  type QuestionTarget,
   questionRowCopy,
   SECTION_LABEL,
   type StandaloneQuestion,
@@ -154,7 +156,7 @@ interface TasksPanelProps {
   now: number;
   onClose: () => void;
   onOpenThread: (id: string) => void;
-  onOpenQuestion: (requestId: string) => void;
+  onOpenQuestion: (question: QuestionTarget) => void;
   onNewTask: () => void;
   query?: QueryLike;
 }
@@ -179,7 +181,7 @@ export function TasksPanel({
   const prs = (prsQuery.data ?? []).filter(
     (pr) => projectId === null || pr.projectId === projectId,
   );
-  const prOf = new Map(prs.map((pr) => [pr.threadId, pr]));
+  const prOf = prByThread(prs);
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
   const row = (entry: TaskEntry) => {
     const copy: TaskRowCopy = taskRowCopy(entry, prOf.get(entry.todo.id));
@@ -211,7 +213,7 @@ export function TasksPanel({
       age={relativeTime(question.createdAt, now, t)}
       waiting
       running={false}
-      onOpen={() => onOpenQuestion(question.requestId)}
+      onOpen={() => onOpenQuestion(question)}
     />
   ));
   const count = (section: ActiveSection) =>

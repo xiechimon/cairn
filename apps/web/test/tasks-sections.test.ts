@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   bySection,
   needsYouBadge,
+  questionOpenStep,
   questionRowCopy,
   scopeTasks,
   tasksFromQuery,
@@ -156,7 +157,7 @@ describe('sections and the badge come from the server section, not the phase', (
       entry(3, 'review', 'working'),
       entry(4, 'done', 'resolved'),
     ];
-    expect(needsYouBadge(entries, [{ requestId: 'q', header: 'h', createdAt: 0, projectId: null }])).toBe(3);
+    expect(needsYouBadge(entries, [{ requestId: 'q', threadId: null, header: 'h', createdAt: 0, projectId: null }])).toBe(3);
   });
 });
 
@@ -192,7 +193,13 @@ describe('the panel reads the one Tasks query as the server sent it', () => {
     } as unknown as Parameters<typeof tasksFromQuery>[0]);
     expect(view.entries.map((row) => [row.todo.seqNum, row.section])).toEqual([[1, 'ready_for_review']]);
     expect(view.questions).toEqual([
-      { requestId: 'r1', header: 'Remove Feishu entirely?', createdAt: 5, projectId: 'p1' },
+      {
+        requestId: 'r1',
+        threadId: 'th',
+        header: 'Remove Feishu entirely?',
+        createdAt: 5,
+        projectId: 'p1',
+      },
     ]);
   });
 
@@ -204,13 +211,68 @@ describe('the panel reads the one Tasks query as the server sent it', () => {
           { ...entry(2, 'review', 'ready_for_review'), todo: { ...todo(2, 'review'), projectId: 'b' } },
         ],
         questions: [
-          { requestId: 'x', header: 'h', createdAt: 0, projectId: 'a' },
-          { requestId: 'y', header: 'h', createdAt: 0, projectId: null },
+          { requestId: 'x', threadId: null, header: 'h', createdAt: 0, projectId: 'a' },
+          { requestId: 'y', threadId: null, header: 'h', createdAt: 0, projectId: null },
         ],
       },
       'a',
     );
     expect(view.entries.map((row) => row.todo.seqNum)).toEqual([1]);
     expect(view.questions.map((q) => q.requestId)).toEqual(['x']);
+  });
+});
+
+describe('a question row opens the question in the Coordinator thread that asked it', () => {
+  const pending = (requestId: string) => ({
+    kind: 'question' as const,
+    requestId,
+    status: 'pending' as const,
+    questions: [],
+    answers: null,
+  });
+  const view = (over: Partial<Parameters<typeof questionOpenStep>[1]> = {}) => ({
+    threadId: 'chief-a',
+    stream: [pending('r0'), pending('r1')],
+    hasEarlier: false,
+    loadingEarlier: false,
+    failedEarlier: false,
+    ...over,
+  });
+
+  test('a question in the open thread focuses its card', () => {
+    expect(questionOpenStep({ requestId: 'r1', threadId: 'chief-a' }, view())).toEqual({
+      kind: 'focus',
+      at: 1,
+    });
+  });
+
+  test('a question from another thread opens that thread first', () => {
+    expect(questionOpenStep({ requestId: 'r9', threadId: 'chief-b' }, view())).toEqual({
+      kind: 'open-thread',
+      threadId: 'chief-b',
+    });
+  });
+
+  test('a question on an earlier page loads earlier messages until it appears', () => {
+    const target = { requestId: 'r9', threadId: 'chief-a' };
+    expect(questionOpenStep(target, view({ hasEarlier: true }))).toEqual({ kind: 'load-earlier' });
+    expect(questionOpenStep(target, view({ hasEarlier: true, loadingEarlier: true }))).toEqual({
+      kind: 'wait',
+    });
+  });
+
+  test('a question that is gone, or whose pages fail to load, stops the search', () => {
+    const target = { requestId: 'r9', threadId: 'chief-a' };
+    expect(questionOpenStep(target, view())).toEqual({ kind: 'missing' });
+    expect(questionOpenStep(target, view({ hasEarlier: true, failedEarlier: true }))).toEqual({
+      kind: 'missing',
+    });
+  });
+
+  test('a fixture question without a thread belongs to the open conversation', () => {
+    expect(questionOpenStep({ requestId: 'r0', threadId: null }, view({ threadId: null }))).toEqual({
+      kind: 'focus',
+      at: 0,
+    });
   });
 });
