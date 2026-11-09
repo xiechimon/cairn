@@ -308,13 +308,15 @@ The desktop borrows from Duet rather than copying it: it keeps the wide web layo
 
 ## 6. Order of small PRs
 
+Row 2 implementation: [#3586](https://github.com/xiechimon/cairn/pull/3586).
+
 Each PR is independent off `main` unless it says otherwise, and each ends with screenshots from a live verify stack.
 
 | # | PR | Area | Depends on |
 |---|---|---|---|
 | 1 | `docs`: update `mobile-information-architecture.md` to Chat and Tasks, `section`, drawer, deep links | docs | this document accepted |
-| 2 | `server` ([#3586](https://github.com/xiechimon/cairn/pull/3586)): `sectionOf` and a nullable `section` on `TodoRecord`; one Tasks read returning unarchived rows, rows archived in the last 7 days and pending standalone Coordinator questions; table test over phase, owner, reason, archive and age | server, shared | — |
-| 3 | `server`: `project.group` column; `projectId` written on owner messages sent from a project view and on task-card messages; test that a project filter returns them | server | — |
+| 2 | `server`: `sectionOf` and a nullable `section` on `TodoRecord`; one Tasks read returning unarchived rows, rows archived in the last 7 days and pending standalone Coordinator questions; table test over phase, owner, reason, archive and age | server, shared | — |
+| 3 | [#3581](https://github.com/xiechimon/cairn/pull/3581) `server`: `project.group` column; `projectId` written on owner messages sent from a project view and on task-card messages; test that a project filter returns them | server | — |
 | 4 | `web`: Tasks panel with Active and Up next, sections from `section`, badge on the toggle (lands the useful part of the a326b prototype) | web | 2 |
 | 5 | `web`: sidebar with Coordinator row, project dots, groups and `Move to group`; task rows removed from the sidebar | web | 3, 4 |
 | 6 | `web`: project lens on the Coordinator conversation, composer preset, task cards | web | 3 |

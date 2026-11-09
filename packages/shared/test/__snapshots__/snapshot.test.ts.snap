@@ -9370,6 +9370,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "githubRepo": {
       "type": "string",
     },
+    "group": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "icon": {
       "anyOf": [
         {

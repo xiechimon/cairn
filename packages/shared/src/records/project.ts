@@ -55,6 +55,7 @@ export type ProjectColor = z.infer<typeof projectColorSchema>;
 export const projectRecordSchema = z.object({
   id: recordId,
   name: z.string(),
+  group: z.string().nullable().optional(),
   teamId: recordId,
   splitPolicy: splitPolicySchema.default('human'),
   description: z.string().optional(),
@@ -128,6 +129,7 @@ export const PROJECT_MAX_CONCURRENT = 16;
 export const patchProjectBodySchema = z
   .object({
     name: z.string().optional(),
+    group: z.string().trim().min(1).nullable().optional(),
     splitPolicy: splitPolicySchema.optional(),
     description: z.string().nullish(),
     instructions: z
