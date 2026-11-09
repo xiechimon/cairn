@@ -393,17 +393,35 @@ export async function runStep(
   if (heartbeat.unref) heartbeat.unref();
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
   const credentialCleanups: (() => void)[] = [];
+  const errors: unknown[] = [];
   try {
     await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, credentialCleanups);
-  } finally {
-    for (const cleanup of credentialCleanups.reverse()) cleanup();
-    deps.sessionHandles?.delete(stepId);
-    clearInterval(heartbeat);
-    deps.stepImageSupport?.delete(stepId);
-    deps.stepSteeringSupport?.delete(stepId);
-    deps.stepTranscripts?.delete(stepId);
-    stop.settle();
+  } catch (error) {
+    errors.push(error);
   }
+  for (const cleanup of [
+    ...credentialCleanups.reverse(),
+    () => deps.sessionHandles?.delete(stepId),
+    () => clearInterval(heartbeat),
+    () => deps.stepImageSupport?.delete(stepId),
+    () => deps.stepSteeringSupport?.delete(stepId),
+    () => deps.stepTranscripts?.delete(stepId),
+    () => stop.settle(),
+  ]) {
+    try {
+      cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1)
+    throw new AggregateError(
+      errors,
+      `Step execution or cleanup failed: ${errors
+        .map((error) => (error instanceof Error ? error.message : String(error)))
+        .join('; ')}`,
+    );
 }
 
 async function runClaimedStep(

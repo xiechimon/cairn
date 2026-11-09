@@ -140,7 +140,7 @@ test('an unreadable process inspection preserves stale roots and over-cap roots'
   assert.equal(existsSync(path), true);
 });
 
-test('a private root keeps its idle owner protected by a directory descriptor', () => {
+test('a private root keeps its idle owner protected by an open lease file', () => {
   const { root, options } = fixture();
   const temporary = createTempEnvironment({ CAIRN_TEST_TEMP_ROOT: root });
   try {

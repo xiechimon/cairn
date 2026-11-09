@@ -24,7 +24,7 @@ export function createTempEnvironment(env: NodeJS.ProcessEnv = process.env) {
   const root = mkdtempSync(join(parent, 'ct-'));
   const runtime = join(root, 'tmp');
   mkdirSync(runtime, { mode: 0o700 });
-  const lease = openSync(root, 'r');
+  const lease = openSync(join(runtime, '.lease'), 'wx', 0o600);
   return {
     root,
     env: {
@@ -35,9 +35,9 @@ export function createTempEnvironment(env: NodeJS.ProcessEnv = process.env) {
     },
     cleanup() {
       try {
-        rmSync(root, { recursive: true, force: true });
-      } finally {
         closeSync(lease);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
       }
     },
   };

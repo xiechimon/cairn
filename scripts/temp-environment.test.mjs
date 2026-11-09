@@ -77,3 +77,47 @@ process.exitCode = 17;
     assert.equal(existsSync(join(home, 'started')), false);
   });
 }
+
+test('private root leases use regular files and release them before Windows-style deletion', () => {
+  const root = makeTestTempDir('portable-lease-');
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { createTempEnvironment } from './packages/shared/src/node/temp-environment.ts';
+const opened = new Map();
+const open = fs.openSync;
+const close = fs.closeSync;
+const remove = fs.rmSync;
+fs.openSync = (path, ...args) => {
+  if (fs.existsSync(path) && fs.statSync(path).isDirectory())
+    throw Object.assign(new Error('Windows cannot open a directory'), { code: 'EISDIR' });
+  const fd = open(path, ...args);
+  opened.set(fd, path);
+  return fd;
+};
+fs.closeSync = (fd) => { close(fd); opened.delete(fd); };
+fs.rmSync = (path, ...args) => {
+  assert.equal([...opened.values()].some(file => file.startsWith(path + '/')), false,
+    'Windows deletion must not encounter an open lease');
+  return remove(path, ...args);
+};
+syncBuiltinESMExports();
+const temporary = createTempEnvironment({ CAIRN_TEST_TEMP_ROOT: process.argv[1] });
+assert.equal(opened.size, 1);
+assert.ok([...opened.values()].every(path => fs.statSync(path).isFile()));
+temporary.cleanup();
+assert.equal(opened.size, 0);
+assert.equal(fs.existsSync(temporary.root), false);
+`,
+      root,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
