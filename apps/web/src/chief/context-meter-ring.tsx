@@ -1,3 +1,5 @@
+import { useChief } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
@@ -18,6 +20,15 @@ export function clampContextPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
+export function contextPercentOf(
+  context: { tokens: number; contextWindow: number } | null | undefined,
+): number | null {
+  if (context == null || context.contextWindow <= 0 || !Number.isFinite(context.tokens)) {
+    return null;
+  }
+  return clampContextPercent((100 * context.tokens) / context.contextWindow);
+}
+
 export function contextMeterArcPath(percent: number, cx = CX, cy = CY, radius = RADIUS): string {
   const filled = clampContextPercent(percent);
   if (filled <= 0) return '';
@@ -33,17 +44,20 @@ export function contextMeterArcPath(percent: number, cx = CX, cy = CY, radius = 
   return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
 }
 
-export function ContextMeterRing({
-  percent = MOCK_CONTEXT_PERCENT,
-  mock = true,
-}: {
+export type ContextMeterRingProps = {
   percent?: number;
   mock?: boolean;
-}) {
+};
+
+export function ContextMeterRing({ percent, mock }: ContextMeterRingProps) {
   const { t } = useI18n();
-  const filled = clampContextPercent(percent);
+  const { live, teamId } = useLiveData();
+  const chiefQ = useChief(teamId, live);
+  const realPercent = contextPercentOf(chiefQ.data?.context);
+  const resolvedMock = mock ?? realPercent == null;
+  const filled = clampContextPercent(percent ?? realPercent ?? MOCK_CONTEXT_PERCENT);
   const arc = contextMeterArcPath(filled);
-  const label = mock
+  const label = resolvedMock
     ? t('上下文 {percent}%（示意）', { percent: filled })
     : t('上下文 {percent}%', { percent: filled });
   return (
@@ -55,7 +69,7 @@ export function ContextMeterRing({
           size="icon"
           type="button"
           data-testid="composer-context-meter"
-          data-mock={mock ? '' : undefined}
+          data-mock={resolvedMock ? '' : undefined}
           data-percent={filled}
           className={METER_BTN_CLS}
         />
