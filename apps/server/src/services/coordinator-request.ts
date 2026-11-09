@@ -19,6 +19,7 @@ import type { Db } from '../db/client.js';
 import { chiefMessage, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
+import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -38,6 +39,15 @@ interface CitedSource {
 const NO_OWNER_WORDS =
   "create_todo needs the owner's words: cite owner messages of this thread with messageIds, or a todo with sourceTodoId. Ask the owner with ask_user when there is nothing to cite.";
 
+function ownerAnswersText(content: unknown): string | null {
+  const question = askQuestionContentOf(content);
+  if (question === null || !isOwnerAnswered(question)) return null;
+  return (question.answers ?? [])
+    .map((answer) => answer.text ?? answer.choices?.join('、') ?? '')
+    .filter((text) => text !== '')
+    .join('\n');
+}
+
 function ownerMessagesText(db: Db, ctx: RequestCtx, messageIds: readonly string[]): string {
   const rows = db
     .select()
@@ -48,6 +58,8 @@ function ownerMessagesText(db: Db, ctx: RequestCtx, messageIds: readonly string[
   return messageIds
     .map((id) => {
       const row = byId.get(id);
+      const answers = row === undefined ? null : ownerAnswersText(row.content);
+      if (answers !== null) return answers;
       if (row === undefined || row.role !== 'user' || typeof row.content !== 'string') {
         throw new HttpError(400, `message ${id} is not an owner message of this thread`);
       }
@@ -193,46 +205,63 @@ export function createRequestTodo(
   return { ...record, uncovered: uncoveredRequestText([cited.text], allQuotes) };
 }
 
+function appendableRow(
+  db: Db,
+  ctx: RequestCtx,
+  todoId: string,
+): TodoRow & { request: TaskRequest } {
+  const row = db
+    .select()
+    .from(todo)
+    .where(and(eq(todo.id, todoId), eq(todo.teamId, ctx.teamId)))
+    .get();
+  if (row === undefined) throw new HttpError(404, `todo ${todoId}`);
+  if (row.request === null) {
+    throw new HttpError(
+      409,
+      `todo ${todoId} has no cited request; forward the owner's words with message_thread`,
+    );
+  }
+  if (row.phase !== 'todo' || row.latestBuildId !== null) {
+    throw new HttpError(
+      409,
+      `todo ${todoId} has started; forward the owner's words with message_thread`,
+    );
+  }
+  return { ...row, request: row.request };
+}
+
 export function updateRequestTodo(
   deps: TodoDeps,
   ctx: RequestCtx,
   params: CoordinatorUpdateTodoParams,
 ): TodoRecord | null {
   const { db } = deps;
-  if (params.addMessageIds !== undefined) {
-    const row = db
-      .select()
-      .from(todo)
-      .where(and(eq(todo.id, params.todoId), eq(todo.teamId, ctx.teamId)))
-      .get();
-    if (row === undefined) throw new HttpError(404, `todo ${params.todoId}`);
-    if (row.request === null) {
-      throw new HttpError(
-        409,
-        `todo ${params.todoId} has no cited request; forward the owner's words with message_thread`,
-      );
-    }
-    if (row.phase !== 'todo' || row.latestBuildId !== null) {
-      throw new HttpError(
-        409,
-        `todo ${params.todoId} has started; forward the owner's words with message_thread`,
-      );
-    }
-    const added = citedMessages(db, ctx, params.addMessageIds);
-    const spec = `${row.spec}\n\n${added.text.text}`;
+  if (params.addMessageIds !== undefined) appendableRow(db, ctx, params.todoId);
+  const added =
+    params.addMessageIds === undefined ? null : citedMessages(db, ctx, params.addMessageIds);
+  const routed = updateAutonomousTodo(deps, params.todoId, {
+    ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
+    ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+  });
+  if (added === null || routed === null) return routed;
+  const row = appendableRow(db, ctx, params.todoId);
+  const grants = [
+    ...new Set([
+      ...row.userSpecAttachmentIds,
+      ...attachmentIdsInUserText(added.text.text, ctx.teamId),
+    ]),
+  ];
+  return db.transaction(() => {
     db.update(todo)
       .set({ request: { ...row.request, sources: [...row.request.sources, added.source] } })
       .where(eq(todo.id, row.id))
       .run();
-    updateAutonomousTodo(
+    return updateAutonomousTodo(
       deps,
       row.id,
-      { spec },
-      { userSpecAttachmentIds: attachmentIdsInUserText(spec, ctx.teamId) },
+      { spec: `${row.spec}\n\n${added.text.text}` },
+      { userSpecAttachmentIds: grants },
     );
-  }
-  return updateAutonomousTodo(deps, params.todoId, {
-    ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
-    ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
   });
 }

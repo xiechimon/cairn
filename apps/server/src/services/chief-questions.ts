@@ -38,6 +38,14 @@ export const ASK_PARKED_REASON =
 
 const ASK_POLL_MS = 400;
 
+export function isOwnerAnswered(question: AskUserQuestionContent): boolean {
+  return (
+    question.status === 'answered' &&
+    question.answeredBy !== 'coordinator' &&
+    (question.answers ?? []).length > 0
+  );
+}
+
 export function askQuestionContentOf(content: unknown): AskUserQuestionContent | null {
   if (typeof content !== 'string') return null;
   let parsed: unknown;

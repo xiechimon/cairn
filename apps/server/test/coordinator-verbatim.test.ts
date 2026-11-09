@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildTaskPromptText, ISSUE_FENCE_OPEN, type TaskRequest } from '@cairn/shared';
+import {
+  ASK_USER_QUESTION_KIND,
+  buildTaskPromptText,
+  ISSUE_FENCE_OPEN,
+  type TaskRequest,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
@@ -212,6 +217,86 @@ describe('static: Coordinator todo writes take no text from tool params', () => 
 
   test('the request service takes no spec or title from tool params', () => {
     expect(source('coordinator-request.ts')).not.toMatch(/params\.(spec|title)\b/);
+  });
+});
+
+describe('owner answers and appended words', () => {
+  function answeredQuestion(answeredBy: 'person' | 'coordinator'): string {
+    const id = `ask-${newRecordId()
+      .toLowerCase()
+      .replace(/[^0-9a-f]/g, '0')
+      .padEnd(12, '0')}`;
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id,
+        threadId: H.threadId,
+        role: 'assistant',
+        content: JSON.stringify({
+          kind: ASK_USER_QUESTION_KIND,
+          requestId: id,
+          status: 'answered',
+          questions: [{ header: 'scope', question: 'Which pages?', options: [] }],
+          answers: [{ header: 'scope', text: '只改看板页' }],
+          answeredAt: nowMs(),
+          answeredBy,
+        }),
+        createdAt: nowMs(),
+      })
+      .run();
+    return id;
+  }
+
+  test('an ask_user answer the owner gave is citable, one the Coordinator gave is not', async () => {
+    const owner = answeredQuestion('person');
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [ownerMessage('修一下计数'), owner],
+    })) as Created;
+    expect(created.spec).toBe('修一下计数\n\n只改看板页');
+    await expect(
+      relay('create_todo', {
+        projectId: H.projectId,
+        messageIds: [answeredQuestion('coordinator')],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  test('appending to an issue split grants only the owner message attachments', async () => {
+    const issue = createTodo(H.s, {
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'Crash',
+      spec: `Fix the crash.\n![x.png](attachment:${H.teamId}/issueatt.png)`,
+      createdBy: H.userId,
+      ownerId: H.userId,
+      sourceKind: 'github-issue',
+      sourceRef: 'github:octo/demo#8',
+    });
+    const child = (await relay('create_todo', {
+      projectId: H.projectId,
+      sourceTodoId: issue.id,
+      quotes: ['Fix the crash.'],
+    })) as Created;
+    const note = ownerMessage(`见截图\n![y.png](attachment:${H.teamId}/owneratt.png)`);
+    await relay('update_todo', { todoId: child.id, addMessageIds: [note] });
+    expect(row(child.id).userSpecAttachmentIds).toEqual(['owneratt']);
+  });
+
+  test('a failing routing change appends nothing', async () => {
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [ownerMessage('原话')],
+    })) as Created;
+    await expect(
+      relay('update_todo', {
+        todoId: created.id,
+        addMessageIds: [ownerMessage('补充')],
+        tagIds: ['no-such-tag'],
+      }),
+    ).rejects.toThrow();
+    expect(row(created.id).spec).toBe('原话');
+    expect(row(created.id).request?.sources).toHaveLength(1);
   });
 });
 

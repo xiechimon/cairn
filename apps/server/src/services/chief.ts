@@ -69,7 +69,7 @@ import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
+import { answerQuestion, askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
 import {
   CHIEF_ABANDONED_STEP_MS,
   chiefOutage,
@@ -786,6 +786,7 @@ function enqueueResumedTurn(
     return `- ${question.header}：${question.question}\n  答复：${text}`;
   });
   enqueueChiefStep(deps, threadId, {
+    id: `${ASK_RESUME_STEP_PREFIX}${answered.requestId}`,
     prompt: promptWithPickedProject(
       pickedProjectOf(deps.db, teamId, projectId),
       `你之前用 ask_user 提的问题，用户现在答复了：\n${lines.join('\n')}\n请从这里继续。`,
@@ -1527,9 +1528,56 @@ export function chiefClaimContext(
   };
 }
 
+const ASK_RESUME_STEP_PREFIX = 'resume-';
+
 export function turnOwnerMessageIds(db: Db, running: typeof step.$inferSelect): string[] {
   const own = turnAnchorMessageId(db, running);
-  return [...(own === null ? [] : [own]), ...steeredMessages(db, running).map((m) => m.id)];
+  return [
+    ...new Set([
+      ...(own === null ? [] : [own]),
+      ...steeredMessages(db, running).map((m) => m.id),
+      ...turnOwnerAnswerIds(db, running),
+    ]),
+  ];
+}
+
+function turnOwnerAnswerIds(db: Db, running: typeof step.$inferSelect): string[] {
+  const resumed = running.id.startsWith(ASK_RESUME_STEP_PREFIX)
+    ? running.id.slice(ASK_RESUME_STEP_PREFIX.length)
+    : null;
+  const since = running.claimedAt;
+  const answered = db
+    .select({
+      id: chiefMessage.id,
+      content: chiefMessage.content,
+      createdAt: chiefMessage.createdAt,
+    })
+    .from(chiefMessage)
+    .where(and(eq(chiefMessage.threadId, running.buildId), eq(chiefMessage.role, 'assistant')))
+    .all()
+    .filter((row) => {
+      const question = askQuestionContentOf(row.content);
+      if (question === null || !isOwnerAnswered(question)) return false;
+      if (row.id === resumed) return true;
+      return since !== null && (question.answeredAt ?? 0) >= since;
+    });
+  const asked = answered.find((row) => row.id === resumed);
+  const request =
+    asked === undefined
+      ? undefined
+      : db
+          .select({ id: chiefMessage.id })
+          .from(chiefMessage)
+          .where(
+            and(
+              eq(chiefMessage.threadId, running.buildId),
+              eq(chiefMessage.role, 'user'),
+              lte(chiefMessage.createdAt, asked.createdAt),
+            ),
+          )
+          .orderBy(desc(chiefMessage.createdAt))
+          .get();
+  return [...(request === undefined ? [] : [request.id]), ...answered.map((row) => row.id)];
 }
 
 function turnAnchorMessageId(db: Db, running: typeof step.$inferSelect): string | null {
