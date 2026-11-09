@@ -10,7 +10,7 @@ import {
   ticketDedupeKey,
   ticketDedupeMarker,
 } from '@cairn/shared';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -431,10 +431,18 @@ export async function evaluateMergeGate(
     const rawOutput = deps.db
       .select()
       .from(message)
-      .where(eq(message.conversationId, buildId))
+      .where(
+        and(
+          eq(message.conversationId, buildId),
+          eq(message.role, 'assistant'),
+          gte(message.createdAt, latestReview.claimedAt ?? latestReview.createdAt),
+          latestReview.finishedAt !== null
+            ? lte(message.createdAt, latestReview.finishedAt)
+            : undefined,
+        ),
+      )
       .orderBy(asc(message.createdAt))
       .all()
-      .filter((row) => row.role === 'assistant')
       .map((row) => (typeof row.content === 'string' ? row.content : JSON.stringify(row.content)))
       .join('\n');
     const storedReview = stored.find((item) => item.stepId === latestReview.id);
