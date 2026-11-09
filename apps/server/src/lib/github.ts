@@ -1435,29 +1435,16 @@ export async function githubCloseIssue(
   owner: string,
   repo: string,
   issueNumber: number,
-  opts: { stateReason: 'completed' | 'not_planned'; comment?: string },
+  opts: string | { stateReason: 'completed' },
 ): Promise<void> {
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, {
     state: 'closed',
-    state_reason: opts.stateReason,
+    state_reason: typeof opts === 'string' ? 'not_planned' : opts.stateReason,
   });
-  if (opts.comment !== undefined) {
-    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts.comment });
+  if (typeof opts === 'string') {
+    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts });
   }
-}
-
-export async function githubReopenIssue(
-  fetchImpl: FetchLike,
-  token: GithubWriteToken,
-  owner: string,
-  repo: string,
-  issueNumber: number,
-  comment: string,
-): Promise<void> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'open', state_reason: 'reopened' });
-  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
 }
 
 export async function githubUpdatePullBody(
