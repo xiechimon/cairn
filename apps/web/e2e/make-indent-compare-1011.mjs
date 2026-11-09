@@ -1,8 +1,9 @@
+import { homedir } from 'node:os';
 import { chromium } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const DIR = process.argv[2] ?? '/tmp/evidence-1011';
+const DIR = process.argv[2] ?? join(homedir(), '.cache/cairn-evidence/1011');
 const b64 = (p) => `data:image/png;base64,${readFileSync(p).toString('base64')}`;
 
 const browser = await chromium.launch();

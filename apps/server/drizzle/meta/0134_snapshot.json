@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "46c76472-8e82-49b2-b473-04f31b9b6301",
+  "id": "749d1454-31d5-4eb7-9b76-ab1220609c22",
   "prevId": "cde508aa-38fa-437f-8811-63ece2f18800",
   "tables": {
     "agent_memory": {
@@ -2492,83 +2492,6 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "feature_flag": {
-      "name": "feature_flag",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "userId": {
-          "name": "userId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "feature_flag_key_global_unique": {
-          "name": "feature_flag_key_global_unique",
-          "columns": [
-            "key"
-          ],
-          "isUnique": true,
-          "where": "\"feature_flag\".\"userId\" IS NULL"
-        },
-        "feature_flag_key_user_unique": {
-          "name": "feature_flag_key_user_unique",
-          "columns": [
-            "key",
-            "userId"
-          ],
-          "isUnique": true,
-          "where": "\"feature_flag\".\"userId\" IS NOT NULL"
-        }
-      },
-      "foreignKeys": {
-        "feature_flag_userId_user_id_fk": {
-          "name": "feature_flag_userId_user_id_fk",
-          "tableFrom": "feature_flag",
-          "tableTo": "user",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -6413,13 +6336,6 @@
           "notNull": false,
           "autoincrement": false,
           "default": "''"
-        },
-        "coordinatorTurn": {
-          "name": "coordinatorTurn",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

@@ -80,7 +80,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
         target={
           call === null ? (
             <span
-              className={`work-preview font-normal italic text-(--text-tertiary)${open ? ' invisible' : ''}`}
+              className={`work-preview font-normal text-(--text-tertiary)${open ? ' invisible' : ''}`}
             >
               {preview}
             </span>
