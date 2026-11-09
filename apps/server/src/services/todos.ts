@@ -50,14 +50,13 @@ import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
+import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
+import { ownerOf, reconcileOwners } from './owner.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
 import { profileForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
-import { endSnoozeOn } from './snooze.js';
-import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 import { buildVerified } from './verified.js';
 import { cancelPendingWorkerQuestions } from './worker-question-store.js';
@@ -90,11 +89,9 @@ export interface TodoDeps {
 
 function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: Phase): void {
   if (from === to) return;
-  if (to === 'confirm' || to === 'needs_input' || to === 'review' || to === 'failed')
-    endSnoozeOn(deps, record.id, 'needs-you');
-  if (isNotifiedPhase(to)) notifyTodoPhase(deps, record, to);
+  if (to === 'done') notifyTodo(deps, record, 'todo_done');
+  reconcileOwners(deps, [record.id]);
   triggerChiefWakes(deps, record, to);
-  notifyThreadPhase(deps, record, to);
 }
 
 export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoRecord {
@@ -174,6 +171,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
     output: row.output,
+    owner: ownerOf(db, row),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     ...((row.phase === 'done' || row.phase === 'closed') && row.latestBuildId !== null
       ? { verified: buildVerified(db, row.latestBuildId) }
@@ -245,6 +243,7 @@ export function setTodoArchived(deps: TodoDeps, id: string, archived: boolean): 
     .where(eq(todo.id, id))
     .run();
   if (archived) pauseTodoSchedule(deps, id, ARCHIVED_SCHEDULE_PAUSE_REASON);
+  reconcileOwners(deps, [id]);
   const record = getTodo(deps, id);
   if (record) deps.hub.publishTodoDoc(record.teamId, record);
   return record;
@@ -582,14 +581,15 @@ export function setTodoPhase(
     const changed = (Object.keys(extra) as (keyof typeof extra)[]).filter(
       (k) => extra[k] !== undefined && JSON.stringify(extra[k]) !== JSON.stringify(row[k]),
     );
-    if (changed.length === 0) return getTodo(deps, id);
-    db.update(todo)
-      .set({ ...extra, v: row.v + 1 })
-      .where(eq(todo.id, id))
-      .run();
+    if (changed.length > 0) {
+      db.update(todo)
+        .set({ ...extra, v: row.v + 1 })
+        .where(eq(todo.id, id))
+        .run();
+    }
+    reconcileOwners(deps, [id]);
     const record = getTodo(deps, id);
-    if (!record) return null;
-    deps.hub.publishTodoDoc(record.teamId, record);
+    if (record && changed.length > 0) deps.hub.publishTodoDoc(record.teamId, record);
     return record;
   }
   assertPhaseTransition(row.phase, to);

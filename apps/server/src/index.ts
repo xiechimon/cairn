@@ -35,6 +35,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import {
@@ -103,6 +104,8 @@ if (concurrencyBackfilled > 0) {
     'machine concurrency backfilled to recommendation',
   );
 }
+const ownersSeeded = seedOwnerCheckpoints(db);
+if (ownersSeeded > 0) logger.info({ tasks: ownersSeeded }, 'thread owner checkpoints seeded');
 const hub = new TeamStreamHub();
 const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();

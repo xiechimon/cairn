@@ -69,6 +69,7 @@ import {
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
+import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -949,7 +950,7 @@ export function transitionTodos(
   const reasons: Record<string, string> = {};
   for (const id of todoIds) {
     const owned = deps.db
-      .select({ id: todo.id, phase: todo.phase, latestBuildId: todo.latestBuildId })
+      .select()
       .from(todo)
       .where(and(eq(todo.id, id), eq(todo.teamId, teamId)))
       .get();
@@ -957,7 +958,12 @@ export function transitionTodos(
       skipped.push(id);
       continue;
     }
-    if (to === 'done' && actor.kind === 'agent' && isWaitingPhase(owned.phase)) {
+    if (
+      to === 'done' &&
+      actor.kind === 'agent' &&
+      isWaitingPhase(owned.phase) &&
+      !coordinatorAcceptsReview(ownershipOf(deps.db, owned))
+    ) {
       skipped.push(id);
       reasons[id] =
         '待确认/审核关口的 done 落地必须由人过闸（发起合并，或用户在看板确认）。把卡停在当前关口，用 notify_user 唤醒用户处理。';

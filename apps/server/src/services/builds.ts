@@ -2813,7 +2813,7 @@ function stepArtifactGate(
 }
 
 function latestPlanRow(
-  deps: BuildDeps,
+  deps: Pick<BuildDeps, 'db'>,
   buildId: string,
 ): typeof planTable.$inferSelect | undefined {
   return deps.db
@@ -2841,7 +2841,11 @@ type PlanAutoConfirmation =
   | { eligible: true; planId: string; deadline: number }
   | { eligible: false; reason: string };
 
-function planAutoConfirmation(deps: BuildDeps, buildId: string): PlanAutoConfirmation {
+export function planAwaitsAutoConfirm(deps: Pick<BuildDeps, 'db'>, buildId: string): boolean {
+  return planAutoConfirmation(deps, buildId).eligible;
+}
+
+function planAutoConfirmation(deps: Pick<BuildDeps, 'db'>, buildId: string): PlanAutoConfirmation {
   const latestPlan = latestPlanRow(deps, buildId);
   if (latestPlan === undefined)
     return { eligible: false, reason: 'No plan is available for automatic confirmation' };
