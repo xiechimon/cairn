@@ -98,7 +98,8 @@ function divergentRows(deps: Pick<TodoDeps, 'db'>): TodoRow[] {
     .all();
 }
 
-const isGone = (error: unknown) => error instanceof HttpError && error.status === 404;
+const isGone = (error: unknown) =>
+  error instanceof HttpError && (error.status === 404 || error.status === 410);
 
 export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLike }) {
   let sweeping = false;

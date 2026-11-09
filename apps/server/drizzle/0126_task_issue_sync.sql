@@ -8,4 +8,5 @@ CREATE TABLE `task_issue_close` (
 );
 --> statement-breakpoint
 ALTER TABLE `todo` ADD `issueState` text;--> statement-breakpoint
-ALTER TABLE `todo` ADD `supersededBy` text;
+ALTER TABLE `todo` ADD `supersededBy` text;--> statement-breakpoint
+UPDATE `todo` SET `issueState` = 'open' WHERE `sourceKind` = 'github-issue-self' AND `sourceRef` IS NOT NULL AND `phase` NOT IN ('closed', 'done') AND `archivedAt` IS NULL;

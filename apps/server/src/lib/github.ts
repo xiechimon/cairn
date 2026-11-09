@@ -386,6 +386,9 @@ function mapUpstreamStatus(
   if (res.status === 404) {
     return new HttpError(404, `github repo not found (or private without auth): ${url}`);
   }
+  if (res.status === 410) {
+    return new HttpError(410, `github resource gone: ${url}`);
+  }
   if (isRateLimited(res)) {
     return new HttpError(
       429,
@@ -1435,13 +1438,13 @@ export async function githubCloseIssue(
   opts: { stateReason: 'completed' | 'not_planned'; comment?: string },
 ): Promise<void> {
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  if (opts.comment !== undefined) {
+    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts.comment });
+  }
   await writeJson(fetchImpl, 'PATCH', url, token, {
     state: 'closed',
     state_reason: opts.stateReason,
   });
-  if (opts.comment !== undefined) {
-    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts.comment });
-  }
 }
 
 export async function githubReopenIssue(
@@ -1453,8 +1456,8 @@ export async function githubReopenIssue(
   comment: string,
 ): Promise<void> {
   const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'open', state_reason: 'reopened' });
   await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
+  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'open', state_reason: 'reopened' });
 }
 
 export type GithubMergeResult =

@@ -50,6 +50,8 @@ The sweep runs with the PR watch, once a minute. A change on the board reaches G
 | The issue was deleted on GitHub (404/410) | records the desired state and stops retrying |
 | The successor's issue is not created yet | waits; the comment always names the successor's issue |
 | Rate limit | at most 20 issue writes per sweep; the rest wait for the next sweep |
+| The comment posts but the state write fails | the comment goes first, so a retry can repeat the comment but never loses it |
+| Upgrade with existing tasks | the migration records active self-issue tasks as `open`, so the first sweep never reopens an issue a person closed; cancelled and archived ones stay unknown and are settled |
 
 ### Tests
 

@@ -909,6 +909,32 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     s.dispose();
   });
 
+  test('a close whose comment fails changes nothing, and the next sweep posts the comment and closes', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { phase: 'closed' });
+    mock.set(`POST ${issuePath(101)}/comments`, { status: 502, body: { message: 'bad gateway' } });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([]);
+    mock.set(`POST ${issuePath(101)}/comments`, { status: 201, body: { id: 1 } });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock).at(-1)).toBe('Cairn：这个任务已取消，这里的 issue 关闭（未计划）。');
+    s.dispose();
+  });
+
+  test('an issue GitHub reports gone (410) is recorded and not retried', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    await call(s.app, 'DELETE', `/api/todos/${id}`);
+    mock.set(`GET ${issuePath(101)}`, { status: 410, body: { message: 'This issue was deleted' } });
+    mock.set(`POST ${issuePath(101)}/comments`, { status: 410, body: { message: 'gone' } });
+    mock.set(`PATCH ${issuePath(101)}`, { status: 410, body: { message: 'gone' } });
+    await sync.sweep();
+    expect(s.db.select().from(taskIssueCloseTable).all()).toEqual([]);
+    s.dispose();
+  });
+
   test('deleting while the issue is still being created closes it once it exists', async () => {
     let release = (): void => undefined;
     const gate = new Promise<void>((resolve) => {
