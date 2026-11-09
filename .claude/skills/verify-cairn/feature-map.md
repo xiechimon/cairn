@@ -13,8 +13,8 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `account` | `设置` (Settings) › `账号` (Account) | [Account and team](#account-and-team) |
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
 | `providers` | `设置` (Settings) › `模型与账户` (Models & accounts) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
-| `routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `模型路由` (Model routing) | [Model and work routing](#routing) |
-| `work-routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `工作路由` (Work routing) | [Model and work routing](#routing) |
+| `routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
+| `work-routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
@@ -313,7 +313,7 @@ Reach:
 3. `settings work-routing`
 
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`
-- Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `模型路由` (Model routing); `设置` (Settings) › `模型与账户` (Models & accounts) › `工作路由` (Work routing)
+- Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
