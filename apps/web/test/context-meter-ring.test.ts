@@ -1,27 +1,21 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createElement, type ReactNode } from 'react';
+import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import {
   clampContextPercent,
   ContextMeterRing,
+  type ContextMeterRingProps,
   contextMeterArcPath,
   contextPercentOf,
   MOCK_CONTEXT_PERCENT,
 } from '../src/chief/context-meter-ring.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
-function renderRing(node: ReactNode): string {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
+function renderRing(props: ContextMeterRingProps = {}): string {
   return renderToStaticMarkup(
-    createElement(QueryClientProvider, {
-      client,
-      children: createElement(I18nProvider, {
-        initialLocale: 'zh',
-        children: node,
-      }),
+    createElement(I18nProvider, {
+      initialLocale: 'zh',
+      children: createElement(ContextMeterRing, props),
     }),
   );
 }
@@ -40,6 +34,8 @@ describe('contextPercentOf', () => {
     expect(contextPercentOf(null)).toBeNull();
     expect(contextPercentOf(undefined)).toBeNull();
     expect(contextPercentOf({ tokens: 10, contextWindow: 0 })).toBeNull();
+    expect(contextPercentOf({ tokens: Number.NaN, contextWindow: 128_000 })).toBeNull();
+    expect(contextPercentOf({ tokens: 10, contextWindow: Number.NaN })).toBeNull();
   });
 
   test('rounds tokens against the context window', () => {
@@ -58,8 +54,8 @@ describe('contextMeterArcPath', () => {
 });
 
 describe('ContextMeterRing', () => {
-  test('falls back to the mock fill when chief context is unknown', () => {
-    const html = renderRing(createElement(ContextMeterRing, {}));
+  test('falls back to the mock fill when percent is omitted', () => {
+    const html = renderRing();
     expect(html).toContain('data-testid="composer-context-meter"');
     expect(html).toContain('data-mock=""');
     expect(html).toContain(`data-percent="${MOCK_CONTEXT_PERCENT}"`);
@@ -68,8 +64,8 @@ describe('ContextMeterRing', () => {
     expect(html).toContain('<path ');
   });
 
-  test('renders a real percent without the mock label when props say so', () => {
-    const html = renderRing(createElement(ContextMeterRing, { percent: 18, mock: false }));
+  test('renders a prop-driven percent without the mock label', () => {
+    const html = renderRing({ percent: 18, mock: false });
     expect(html).toContain('data-percent="18"');
     expect(html).not.toContain('data-mock');
     expect(html).toContain('aria-label="上下文 18%"');

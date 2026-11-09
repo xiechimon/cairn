@@ -1,5 +1,3 @@
-import { useChief } from '../api/hooks.js';
-import { useLiveData } from '../api/provider.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
@@ -23,7 +21,12 @@ export function clampContextPercent(value: number): number {
 export function contextPercentOf(
   context: { tokens: number; contextWindow: number } | null | undefined,
 ): number | null {
-  if (context == null || context.contextWindow <= 0 || !Number.isFinite(context.tokens)) {
+  if (
+    context == null ||
+    !Number.isFinite(context.tokens) ||
+    !Number.isFinite(context.contextWindow) ||
+    context.contextWindow <= 0
+  ) {
     return null;
   }
   return clampContextPercent((100 * context.tokens) / context.contextWindow);
@@ -49,15 +52,14 @@ export type ContextMeterRingProps = {
   mock?: boolean;
 };
 
-export function ContextMeterRing({ percent, mock }: ContextMeterRingProps) {
+export function ContextMeterRing({
+  percent = MOCK_CONTEXT_PERCENT,
+  mock = true,
+}: ContextMeterRingProps) {
   const { t } = useI18n();
-  const { live, teamId } = useLiveData();
-  const chiefQ = useChief(teamId, live);
-  const realPercent = contextPercentOf(chiefQ.data?.context);
-  const resolvedMock = mock ?? realPercent == null;
-  const filled = clampContextPercent(percent ?? realPercent ?? MOCK_CONTEXT_PERCENT);
+  const filled = clampContextPercent(percent);
   const arc = contextMeterArcPath(filled);
-  const label = resolvedMock
+  const label = mock
     ? t('上下文 {percent}%（示意）', { percent: filled })
     : t('上下文 {percent}%', { percent: filled });
   return (
@@ -69,7 +71,7 @@ export function ContextMeterRing({ percent, mock }: ContextMeterRingProps) {
           size="icon"
           type="button"
           data-testid="composer-context-meter"
-          data-mock={resolvedMock ? '' : undefined}
+          data-mock={mock ? '' : undefined}
           data-percent={filled}
           className={METER_BTN_CLS}
         />
