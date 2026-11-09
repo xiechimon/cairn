@@ -29,7 +29,7 @@ const SIGNS: Sign[] = [
   {
     id: 'V23',
     name: 'heavy weight',
-    pattern: /(?<![\w-])font-(?:extrabold|black)(?![\w-])|font-weight:\s*[89]00|font-\[[89]00\]/,
+    pattern: /(?<![\w-])font-(?:extrabold|black)(?![\w-])/,
     allowed: [],
   },
   {
@@ -116,6 +116,11 @@ const sourceFiles = walk(SRC)
 
 function signsIn(text: string): string[] {
   const found = SIGNS.filter(({ pattern }) => pattern.test(text)).map(({ name }) => name);
+  for (const match of text.matchAll(
+    /font-weight:\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)|font-\[(?:number:)?([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)\]/gi,
+  )) {
+    if (Number(match[1] ?? match[2]) >= 800) found.push('heavy weight');
+  }
   for (const m of text.matchAll(OVERSHOOT)) {
     const y1 = Number(m[2]);
     const y2 = Number(m[4]);
@@ -189,6 +194,13 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ['letter spacing', '.small { letter-spacing: -0.01em; }'],
     ['heavy weight', '<h1 className="font-extrabold">Inbox</h1>'],
     ['heavy weight', 'h1 { font-weight: 900; }'],
+    ['heavy weight', '<h1 className="font-[850]">Inbox</h1>'],
+    ['heavy weight', '<h1 className="font-[number:825.5]">Inbox</h1>'],
+    ['heavy weight', 'h1 { font-weight: 850; }'],
+    ['heavy weight', 'h1 { font-weight: 999.5; }'],
+    ['heavy weight', 'h1 { font-weight: 1000; }'],
+    ['heavy weight', 'h1 { font-weight: +850; }'],
+    ['heavy weight', 'h1 { font-weight: 8e2; }'],
     ['italic chrome', '<span className="text-(--text-tertiary) italic">Thinking</span>'],
     ['italic chrome', '.note { font-style: italic; }'],
     ['transition all', '<button className="transition-all duration-200">Save</button>'],
@@ -224,6 +236,9 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     '<div className="shadow-[inset_1px_0_0_var(--border)]" />',
     '<div className="[transition:visibility_0s_linear_var(--dur-overlay)]" />',
     '<span className="font-semibold">Inbox</span>',
+    '<span className="font-[799.5]">Inbox</span>',
+    '.title { font-weight: 799.5; }',
+    '.title { font-weight: 7.99e2; }',
   ])('clean: %s', (snippet) => {
     expect(signsIn(snippet)).toEqual([]);
   });
