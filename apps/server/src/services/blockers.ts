@@ -78,7 +78,9 @@ export function holdBlockedBuild(db: Db, buildId: string): void {
     .run();
 }
 
-export function setBlockedBy(db: Db, row: TodoRow, ids: readonly string[]): void {
+type BlockedRow = Pick<TodoRow, 'id' | 'teamId' | 'latestBuildId'>;
+
+export function checkBlockedBy(db: Db, row: BlockedRow, ids: readonly string[]): string[] {
   const unique = [...new Set(ids)];
   if (unique.includes(row.id))
     throw new HttpError(400, 'invalid blockedBy: a task cannot block itself');
@@ -97,8 +99,30 @@ export function setBlockedBy(db: Db, row: TodoRow, ids: readonly string[]): void
     seen.add(next.id);
     stack.push(...blockersOf(db, next));
   }
-  db.update(todo).set({ blockedBy: unique }).where(eq(todo.id, row.id)).run();
-  if (row.latestBuildId !== null && blockedNow(db, { blockedBy: unique }))
+  if (row.latestBuildId !== null && blockedNow(db, { blockedBy: unique })) {
+    const running = db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, row.latestBuildId),
+          eq(step.status, 'claimed'),
+          inArray(step.kind, [...HELD_KINDS]),
+        ),
+      )
+      .get();
+    if (running !== undefined)
+      throw new HttpError(
+        409,
+        'blockedBy cannot hold a thread that is already running: stop_thread first, or let it finish',
+      );
+  }
+  return unique;
+}
+
+export function writeBlockedBy(db: Db, row: BlockedRow, blockedBy: string[]): void {
+  db.update(todo).set({ blockedBy }).where(eq(todo.id, row.id)).run();
+  if (row.latestBuildId !== null && blockedNow(db, { blockedBy }))
     holdBlockedBuild(db, row.latestBuildId);
 }
 

@@ -58,6 +58,22 @@ describe('the Coordinator starts what it creates (task stall class 3)', () => {
   });
 });
 
+describe('reopen_todos reports a task it could not start', () => {
+  test('a reopened task whose start is refused is listed with the reason', async () => {
+    const id = await create();
+    finish(id, 'closed');
+    H.s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, id)).run();
+    const out = (await relay('reopen_todos', { todoIds: [id] })) as {
+      transitioned: string[];
+      started: string[];
+      notStarted?: Record<string, string>;
+    };
+    expect(out.transitioned).toEqual([id]);
+    expect(out.started).toEqual([]);
+    expect(out.notStarted?.[id]).toMatch(/Unarchive/);
+  });
+});
+
 describe('blockedBy holds a task until its blockers are satisfied', () => {
   test('a task created behind an unfinished blocker is held, and released once the blocker is done', async () => {
     const blocker = await create();
@@ -94,6 +110,34 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     const id = await create();
     await expect(relay('update_todo', { todoId: id, blockedBy: ids(id) })).rejects.toMatchObject({
       status: 400,
+    });
+    expect(row(id).blockedBy ?? []).toEqual([]);
+  });
+
+  test('create_todo with an invalid blockedBy creates nothing', async () => {
+    const before = H.s.db.select().from(todo).all().length;
+    await expect(create({ blockedBy: ['missing-task'] })).rejects.toMatchObject({ status: 400 });
+    expect(H.s.db.select().from(todo).all()).toHaveLength(before);
+    expect(H.s.db.select().from(build).all()).toHaveLength(0);
+  });
+
+  test('update_todo that fails on another field leaves blockedBy unchanged', async () => {
+    const blocker = await create();
+    const id = await create();
+    await expect(
+      relay('update_todo', { todoId: id, blockedBy: [blocker], projectId: 'missing-project' }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(row(id).blockedBy ?? []).toEqual([]);
+    expect(sessions(id)[0]?.holdReason).toBeNull();
+  });
+
+  test('a blocker cannot be added under a running session', async () => {
+    const blocker = await create();
+    const id = await create();
+    const [session] = sessions(id);
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, session!.id)).run();
+    await expect(relay('update_todo', { todoId: id, blockedBy: [blocker] })).rejects.toMatchObject({
+      status: 409,
     });
     expect(row(id).blockedBy ?? []).toEqual([]);
   });

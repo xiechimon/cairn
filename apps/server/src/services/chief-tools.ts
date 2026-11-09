@@ -36,7 +36,7 @@ import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
-import { setBlockedBy } from './blockers.js';
+import { checkBlockedBy, writeBlockedBy } from './blockers.js';
 import { applyBuildStepAction, cancelBuild, stopActiveStepsAfterExit } from './builds.js';
 import {
   addChiefWatch,
@@ -504,6 +504,11 @@ export async function executeChiefTool(
       const projectId = str(params, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
       const output = optTodoOutput(params, 'output');
+      const requested = optStrArr(params, 'blockedBy');
+      const blockedBy =
+        requested === undefined
+          ? undefined
+          : checkBlockedBy(db, { id: '', teamId: ctx.teamId, latestBuildId: null }, requested);
       const record = createAutonomousTodo(svc, {
         teamId: ctx.teamId,
         projectId,
@@ -518,9 +523,7 @@ export async function executeChiefTool(
         ...(output !== undefined ? { output } : {}),
       });
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
-      const blockedBy = optStrArr(params, 'blockedBy');
-      if (blockedBy !== undefined)
-        setBlockedBy(db, requireTeamTodo(db, record.id, ctx.teamId), blockedBy);
+      if (blockedBy !== undefined) writeBlockedBy(db, record, blockedBy);
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
         actor: 'Coordinator',
@@ -529,10 +532,9 @@ export async function executeChiefTool(
     }
     case 'update_todo': {
       const todoId = str(params, 'todoId');
-      const blockedBy = optStrArr(params, 'blockedBy');
-      if (blockedBy !== undefined)
-        setBlockedBy(db, requireTeamTodo(db, todoId, ctx.teamId), blockedBy);
-      else requireTeamTodo(db, todoId, ctx.teamId);
+      const owned = requireTeamTodo(db, todoId, ctx.teamId);
+      const requested = optStrArr(params, 'blockedBy');
+      const blockedBy = requested === undefined ? undefined : checkBlockedBy(db, owned, requested);
       const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
         ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
@@ -542,7 +544,9 @@ export async function executeChiefTool(
           : {}),
       });
       if (!record) throw new HttpError(404, `todo ${todoId}`);
-      return json(record);
+      if (blockedBy === undefined) return json(record);
+      writeBlockedBy(db, owned, blockedBy);
+      return json(getTodo(svc, todoId));
     }
     case 'delete_todos': {
       const ids = strArr(params, 'todoIds');
@@ -566,14 +570,23 @@ export async function executeChiefTool(
     case 'reopen_todos': {
       const out = transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor);
       const started: string[] = [];
+      const notStarted: Record<string, string> = {};
       for (const id of out.transitioned) {
-        startThreadBuild(svc, requireTeamTodo(db, id, ctx.teamId), {
-          origin: 'coordinator',
-          actor: 'Coordinator',
-        });
-        started.push(id);
+        try {
+          startThreadBuild(svc, requireTeamTodo(db, id, ctx.teamId), {
+            origin: 'coordinator',
+            actor: 'Coordinator',
+          });
+          started.push(id);
+        } catch (error) {
+          notStarted[id] = error instanceof Error ? error.message : String(error);
+        }
       }
-      return json({ ...out, started });
+      return json({
+        ...out,
+        started,
+        ...(Object.keys(notStarted).length > 0 ? { notStarted } : {}),
+      });
     }
     case 'complete_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
