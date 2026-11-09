@@ -4,10 +4,24 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { SessionOpts, StepEvent } from '@cairn/shared';
-import { type OtlpTracesRequest, parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
+import { parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
+import { flushDaemonOtel } from '../src/backend/otel.js';
 import { testTempDir } from './test-temp-dir.js';
+
+interface OtlpTracesRequest {
+  resourceSpans: {
+    scopeSpans: {
+      spans: {
+        name: string;
+        traceId: string;
+        parentSpanId?: string;
+        attributes: { key: string; value: unknown }[];
+      }[];
+    }[];
+  }[];
+}
 
 const secret = `sk-ant-oat01-${'synthetic'.repeat(8)}`;
 const cli = `
@@ -150,6 +164,8 @@ async function runCli(completion: string, configured = true, status = 200, token
     };
   } finally {
     await handle.stop();
+    await flushDaemonOtel();
+    collector.closeAllConnections();
     await new Promise<void>((resolve, reject) =>
       collector.close((error) => (error ? reject(error) : resolve())),
     );
@@ -203,7 +219,7 @@ test('unconfigured telemetry cannot inherit a direct CLI exporter', async () => 
 });
 
 test('a failed collector does not fail the CLI session', async () => {
-  const { requests, events } = await runCli('success', true, 503);
+  const { requests, events } = await runCli('success', true, 500);
   expect(requests).toHaveLength(1);
   expect(requests[0]!.body).not.toContain(secret);
   expect(events.at(-1)?.type).toBe('done');

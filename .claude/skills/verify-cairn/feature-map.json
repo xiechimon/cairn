@@ -530,7 +530,8 @@
       },
       "reach": [
         "open /app",
-        "click testid:thread-group-running",
+        "click testid:tasks-toggle",
+        "click testid:tasks-section",
         "click testid:side-chat-action"
       ],
       "verify": [
@@ -1740,16 +1741,16 @@
     },
     {
       "id": "sidebar",
-      "name": "Sidebar and thread list",
-      "summary": "The sidebar with the Coordinator row, projects and thread groups, unread marks and the project menu.",
-      "states": "Groups for needs-you, running and done threads, projects with archived ones folded, an attention badge, and loading or error rows.",
+      "name": "Sidebar",
+      "summary": "The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.",
+      "states": "Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/sidebar.tsx",
           "apps/web/src/board/app-sidebar.tsx",
-          "apps/web/src/board/sidebar-thread-groups.tsx"
+          "apps/web/src/board/sidebar-projects.ts"
         ],
         "server": [
           "apps/server/src/services/notifications.ts"
@@ -1762,8 +1763,8 @@
       },
       "reach": [
         "open /app",
-        "click testid:thread-groups",
-        "click testid:project-group"
+        "click testid:project-group",
+        "click testid:project-group-header"
       ],
       "research": [
         "docs/research/sidebar-coordinator-icon-2026-11-08.md"
@@ -1777,7 +1778,7 @@
       },
       "evidence": [
         "apps/web/e2e/sidebar-nav.spec.ts",
-        "apps/web/e2e/sidebar-project-threads.spec.ts",
+        "apps/web/e2e/sidebar-projects.spec.ts",
         "apps/server/test/unread-notifications.test.ts"
       ],
       "batch": "B7"
