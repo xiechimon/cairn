@@ -551,7 +551,7 @@ export function ChiefConversation({
                 onStop: () => stopTurnRef.current?.(),
               }}
               active={!answerActive}
-              attached={questionAttached}
+              attached={questionAttached && answerHere}
               onFocusEnter={() => {
                 focusedComposerRef.current = THREAD_COMPOSER;
               }}

@@ -1,4 +1,4 @@
-import { expect, type Route, test } from '@playwright/test';
+import { expect, type Page, type Route, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 function question(requestId: string, header: string, text: string, options: unknown[]) {
@@ -540,6 +540,62 @@ for (const size of [
   });
 }
 
+function surfaceEdges(page: Page) {
+  return page.evaluate(() => {
+    const read = (el: Element) => {
+      const style = getComputedStyle(el);
+      const layers = style.boxShadow.split(/,(?![^(]*\))/).map((layer) => layer.trim());
+      const rings: Record<string, string> = {};
+      let outerRing = false;
+      for (const layer of layers) {
+        const color = /^(rgba?\([^)]*\)|oklab\([^)]*\)|color\([^)]*\))/.exec(layer)?.[1] ?? '';
+        const [x, y, blur, spread] = layer
+          .slice(color.length)
+          .trim()
+          .split(/\s+/)
+          .map((part) => Number.parseFloat(part));
+        if (!layer.endsWith('inset')) {
+          if (blur === 0 && (spread ?? 0) > 0) outerRing = true;
+          continue;
+        }
+        if ((spread ?? 0) > 0) rings.all = color;
+        else if ((x ?? 0) > 0) rings.left = color;
+        else if ((x ?? 0) < 0) rings.right = color;
+        else if ((y ?? 0) > 0) rings.top = color;
+        else if ((y ?? 0) < 0) rings.bottom = color;
+      }
+      const borders = ['Top', 'Right', 'Bottom', 'Left'].map(
+        (side) => style.getPropertyValue(`border-${side.toLowerCase()}-width`),
+      );
+      return { rings, outerRing, borders };
+    };
+    return {
+      card: read(document.querySelector('[data-testid="home-c"] [data-testid="chief-question-card"]')!),
+      composer: read(document.querySelector('[data-testid="home-c"] .chief-composer')!),
+    };
+  });
+}
+
+test('a question left pending while the composer targets a thread stays its own outlined card', async ({
+  page,
+}) => {
+  await mockLive(page, { ...structuredClone(ONE), todos: [{ ...TASK, phase: 'confirm' }] });
+  await page.goto('/app');
+  const scope = page.getByTestId('home-c');
+  const card = scope.getByTestId('chief-question-card');
+  await expect(card).toBeVisible();
+  await page.getByRole('button', { name: '对某个 thread 说' }).click();
+  await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: '提交回答' })).toBeVisible();
+  const { card: top, composer: bottom } = await surfaceEdges(page);
+  expect(Object.keys(top.rings)).toEqual(['all']);
+  expect(Object.keys(bottom.rings)).toEqual(['all']);
+  const cardBox = (await card.boundingBox())!;
+  const composerBox = (await scope.locator('.chief-composer').boundingBox())!;
+  expect(composerBox.y - (cardBox.y + cardBox.height)).toBeGreaterThan(0);
+});
+
 for (const theme of ['light', 'dark'] as const) {
   test(`the card and composer read as one surface: one hairline per outer edge, none at the seam (${theme})`, async ({
     page,
@@ -551,40 +607,7 @@ for (const theme of ['light', 'dark'] as const) {
     const card = scope.getByTestId('chief-question-card');
     const composer = scope.locator('.chief-composer');
     await expect(card).toBeVisible();
-    const edges = async () =>
-      page.evaluate(() => {
-        const read = (el: Element) => {
-          const style = getComputedStyle(el);
-          const layers = style.boxShadow.split(/,(?![^(]*\))/).map((layer) => layer.trim());
-          const rings: Record<string, string> = {};
-          let outerRing = false;
-          for (const layer of layers) {
-            const color = /^(rgba?\([^)]*\)|oklab\([^)]*\)|color\([^)]*\))/.exec(layer)?.[1] ?? '';
-            const [x, y, blur, spread] = layer
-              .slice(color.length)
-              .trim()
-              .split(/\s+/)
-              .map((part) => Number.parseFloat(part));
-            if (!layer.endsWith('inset')) {
-              if (blur === 0 && (spread ?? 0) > 0) outerRing = true;
-              continue;
-            }
-            if ((spread ?? 0) > 0) rings.all = color;
-            else if ((x ?? 0) > 0) rings.left = color;
-            else if ((x ?? 0) < 0) rings.right = color;
-            else if ((y ?? 0) > 0) rings.top = color;
-            else if ((y ?? 0) < 0) rings.bottom = color;
-          }
-          const borders = ['Top', 'Right', 'Bottom', 'Left'].map(
-            (side) => style.getPropertyValue(`border-${side.toLowerCase()}-width`),
-          );
-          return { rings, outerRing, borders };
-        };
-        return {
-          card: read(document.querySelector('[data-testid="home-c"] [data-testid="chief-question-card"]')!),
-          composer: read(document.querySelector('[data-testid="home-c"] .chief-composer')!),
-        };
-      });
+    const edges = () => surfaceEdges(page);
     const assertOneSurface = async () => {
       const { card: top, composer: bottom } = await edges();
       expect(top.borders).toEqual(['0px', '0px', '0px', '0px']);
