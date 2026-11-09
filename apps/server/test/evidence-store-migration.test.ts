@@ -15,6 +15,7 @@ test('migration initializes only existing cairn projects and never reassigns mod
       'INSERT INTO project (id, name, teamId, repoKind, githubRepo) VALUES (?, ?, ?, ?, ?)',
     );
     insert.run('cairn', 'Cairn', 'team', 'github', 'xiechimon/cairn');
+    insert.run('cairn-mixed', 'Cairn mixed case', 'team', 'github', 'Xiechimon/Cairn');
     insert.run('other', 'Other', 'team', 'github', 'example/app');
     insert.run('fork', 'Fork', 'team', 'github', 'fork/cairn');
     insert.run('plain', 'Cairn', 'team', null, null);
@@ -28,6 +29,7 @@ test('migration initializes only existing cairn projects and never reassigns mod
     insert.run('new-cairn', 'New Cairn', 'team', 'github', 'xiechimon/cairn');
     expect(sqlite.prepare('SELECT id, evidenceStore FROM project ORDER BY id').all()).toEqual([
       { id: 'cairn', evidenceStore: 'repository' },
+      { id: 'cairn-mixed', evidenceStore: 'repository' },
       { id: 'fork', evidenceStore: 'attachments' },
       { id: 'new-cairn', evidenceStore: 'attachments' },
       { id: 'other', evidenceStore: 'attachments' },
