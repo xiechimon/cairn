@@ -20,9 +20,9 @@
 | status partial | 7 |
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 17 |
-| Research gaps | 20 |
+| Research gaps | 18 |
 | Frontend design gaps | 25 |
-| Backend design gaps | 25 |
+| Backend design gaps | 24 |
 | notes cited but not on main | 20 |
 
 ## Coverage
@@ -70,14 +70,14 @@
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
 | [MCP servers](#mcp-servers) | 3 | shipped | gap | yes | yes | B9 |
-| [Project files and commits](#project-files) | 3 | shipped | gap | gap | gap | B8 |
+| [Project files](#project-files) | 3 | shipped | yes | gap | gap | B8 |
 | [Projects](#projects) | 3 | shipped | yes (not on main) | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
 | [Scheduled tasks](#schedules) | 3 | shipped | gap | gap | gap | B7 |
 | [Search and activity](#search-and-activity) | 3 | shipped | gap | yes | gap | B7 |
 | [Secrets](#secrets) | 3 | shipped | yes | gap | yes | B10 |
-| [Server backup and deploy status](#server-status) | 3 | shipped | gap | gap | gap | B11 |
+| [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
 | [Sidebar and thread list](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
 | [Feature flags and releases](#feature-releases) | 4 | shipped | gap | gap | gap | B11 |
@@ -167,7 +167,7 @@ Everything typed or attached before a message is sent and the files a project sh
 |---|---|---|
 | [Attachments](#attachments) | 3 | Research: no note on attachment handling in reference products<br>Frontend design: attachment cards and previews have no design |
 | [Composer](#composer) | 3 | Research: no note comparing composers in claude.ai, Amp and t3code<br>Backend design: no design for server drafts (D110) and named prompts |
-| [Project files and commits](#project-files) | 3 | Research: no note on whether a files tab belongs in an agent product and how others show it<br>Frontend design: the files tab has no design<br>Backend design: no design for reading files and commits from local and hosted repos |
+| [Project files](#project-files) | 3 | Frontend design: the files tab has no design<br>Backend design: no design for reading files and commits from local and hosted repos |
 
 ### B9 · Execution settings: skills, MCP, harness profile, quota wait
 
@@ -198,7 +198,7 @@ Small surfaces that work today without research or design: the Coordinator MCP f
 |---|---|---|
 | [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository |
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
-| [Server backup and deploy status](#server-status) | 3 | Research: no note on how self-hosted products report backup and update health<br>Frontend design: the banners have no design<br>Backend design: no design for the backup and deploy probes |
+| [Server backup and deploy status](#server-status) | 3 | Frontend design: the banners have no design |
 | [Feature flags and releases](#feature-releases) | 4 | Research: no note on per-user flags for a single-user product<br>Frontend design: the releases list has no design<br>Backend design: no design for flag defaults and release |
 | [Feishu integration](#feishu) | 4 | Research: no note on why Feishu and what it delivers<br>Frontend design: the Feishu settings have no design<br>Backend design: no design for the Feishu delivery path |
 | [Thread tags](#thread-tags) | 4 | Research: no note on whether tags still earn their place after D58 |
@@ -543,9 +543,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### project-files
 
-**Project files and commits** (shipped). The files tab of a project: the tree, file viewer and commit detail.
+**Project files** (shipped). The remaining project file tree and viewer, pending retirement in #3479.
 
-- Research: **gap**: no note on whether a files tab belongs in an agent product and how others show it
+- Research: [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md)
 - Frontend design: **gap**: the files tab has no design
 - Backend design: **gap**: no design for reading files and commits from local and hosted repos
 
@@ -601,9 +601,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Server backup and deploy status** (shipped). Banners that warn when backups are stale or the deployed server lags main.
 
-- Research: **gap**: no note on how self-hosted products report backup and update health
+- Research: [docs/research/deploy-drain-2026-11-09.md](research/deploy-drain-2026-11-09.md)
 - Frontend design: **gap**: the banners have no design
-- Backend design: **gap**: no design for the backup and deploy probes
+- Backend design: [docs/ops/deploy-drain-design.md](ops/deploy-drain-design.md)
 
 ### sidebar
 

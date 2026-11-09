@@ -59,7 +59,7 @@ Reach:
 
 - Web routes: `/app`
 - Keyboard shortcuts in its code: `Enter`
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-note`, `chief-outage`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `reply-quote`, `selection-reply`, `selection-reply-bar`, `tasks-attention-dot`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-handoff-card`, `chief-home-scroll`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-note`, `chief-outage`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-turn-tools`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `reply-quote`, `selection-reply`, `selection-reply-bar`, `tasks-badge`, `tasks-toggle`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -415,7 +415,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `fail-raw-error`, `info-report`, `injected-skills`, `injected-skills-chip`, `made-empty`, `msg-actions`, `msg-stamp`, `queued-capsules-standalone`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `taskline`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-prs`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `worked-for-rule`
+- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `fail-raw-error`, `info-report`, `injected-skills`, `injected-skills-chip`, `made-empty`, `msg-actions`, `msg-stamp`, `queued-capsules-standalone`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `taskline`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `worked-for-rule`
 - Verify recipes: [.claude/skills/verify-cairn/features/detail-right-pane.md](features/detail-right-pane.md)
 - Research: [docs/research/r15-multica-run-rendering.md](../../../docs/research/r15-multica-run-rendering.md), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
@@ -835,20 +835,19 @@ Reach:
 
 ### project-files
 
-**Project files and commits** (shipped, centrality 3). The files tab of a project: the tree, file viewer and commit detail.
+**Project files** (shipped, centrality 3). The remaining project file tree and viewer, pending retirement in #3479.
 
-States: A file tree with a viewer and a commit history with commit detail; unavailable for some project kinds.
+States: A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.
 
 Reach:
 
 1. `open /app/project/<id of a project listed by the projects API>/files`
-2. `click testid:history-message`
 
 - Web routes: `/app/project/:id/files`
 - Keyboard shortcuts in its code: `A`, `D`, `P`, `R`, `T`
-- Test ids in its code: `history-message`, `history-meta`, `task-card`, `task-meta`, `task-row`, `task-status`
-- Verify recipes: [.claude/skills/verify-cairn/features/project-files-drill.md](features/project-files-drill.md), [.claude/skills/verify-cairn/features/project-files-local.md](features/project-files-local.md), [.claude/skills/verify-cairn/features/project-commit-detail.md](features/project-commit-detail.md)
-- Research: **gap**: no note on whether a files tab belongs in an agent product and how others show it
+- Test ids in its code: `task-card`, `task-meta`, `task-row`, `task-status`
+- Verify recipes: [.claude/skills/verify-cairn/features/project-files-drill.md](features/project-files-drill.md), [.claude/skills/verify-cairn/features/project-files-local.md](features/project-files-local.md)
+- Research: [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md)
 - Frontend design: **gap**: the files tab has no design
 - Backend design: **gap**: no design for reading files and commits from local and hosted repos
 - Evidence: `apps/web/e2e/project-files-tree.spec.ts`, `apps/web/e2e/project-commit-detail.spec.ts`
@@ -988,10 +987,10 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `backup-warning`
-- Research: **gap**: no note on how self-hosted products report backup and update health
+- Research: [docs/research/deploy-drain-2026-11-09.md](../../../docs/research/deploy-drain-2026-11-09.md)
 - Frontend design: **gap**: the banners have no design
-- Backend design: **gap**: no design for the backup and deploy probes
-- Evidence: `apps/web/e2e/chief-home-backup.spec.ts`, `apps/server/test/backup-status.test.ts`, `apps/server/test/deploy-status.test.ts`
+- Backend design: [docs/ops/deploy-drain-design.md](../../../docs/ops/deploy-drain-design.md)
+- Evidence: `apps/web/e2e/chief-home-backup.spec.ts`, `apps/server/test/backup-status.test.ts`, `apps/server/test/deploy-status.test.ts`, `apps/server/test/deploy-lease.test.ts`, `integration/test/deploy-server-restart.test.ts`, `scripts/ops/deploy-self.test.mjs`
 
 ### sidebar
 
