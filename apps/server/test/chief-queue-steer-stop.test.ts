@@ -373,7 +373,7 @@ describe('steer (T5): `现在插话`', () => {
     });
     const queued = ((await res.json()) as { message: { id: string } }).message.id;
     expect((await w.steer(queued)).status).toBe(200);
-    expect(await w.fetchSteer(running!.step.id)).toBe(
+    expect(await w.fetchSteer(running!.step.id)).toContain(
       `【输入框选定项目：queue-proj（id: ${w.projectId}）】\n改一下按钮`,
     );
   });

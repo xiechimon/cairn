@@ -211,10 +211,6 @@ export function memoryOpsAreTeamScoped(kind: StepKind): boolean {
   return kind !== 'review' && kind !== 'verify';
 }
 
-export function memoryInjectTeamId(kind: StepKind, teamId: string): string | undefined {
-  return memoryOpsAreTeamScoped(kind) ? teamId : undefined;
-}
-
 function toRoutingRuleRecord(row: RoutingRuleRow): RoutingRuleRecord {
   return {
     id: row.id,
