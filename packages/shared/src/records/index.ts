@@ -63,6 +63,7 @@ export * from './secret.js';
 export * from './skill.js';
 export * from './snooze.js';
 export * from './step.js';
+export * from './system-row.js';
 export * from './tag.js';
 export * from './tasks.js';
 export * from './team.js';
