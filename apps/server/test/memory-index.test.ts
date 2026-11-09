@@ -131,7 +131,7 @@ describe('version retention', () => {
     const oldVersion = insert(db, { invalidAt: now - MEMORY_VERSION_RETENTION_MS - 1 });
     const recentVersion = insert(db, { invalidAt: now - DAY });
     const live = insert(db, {
-      title: MEMORY_INDEX_TITLE,
+      title: 'Retained fact',
       createdAt: now - DAY,
       updatedAt: now - DAY,
       history: [

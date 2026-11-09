@@ -31,9 +31,9 @@ test('fact IDs survive folding and retention in the active REST response used by
   const first = await save('release', 'Squash only.');
   const second = await save('proof', 'Attach evidence.');
   foldMemoryIndexes(H.s.db, 10_000);
-  const document = listStoredMemoryEntries(H.s.db, scope())[0]!;
-  expect(injectMemoriesCapped(H.s.db, scope(), Infinity).memories).toEqual([
-    { id: document.id, title: MEMORY_INDEX_TITLE, content: document.content },
+  expect(injectMemoriesCapped(H.s.db, scope(), Infinity).memories.map((row) => row.id)).toEqual([
+    first.id,
+    second.id,
   ]);
   purgeExpiredMemoryVersions(H.s.db, 10_001 + MEMORY_VERSION_RETENTION_MS);
   const response = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/memories`);

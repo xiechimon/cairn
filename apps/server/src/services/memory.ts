@@ -7,6 +7,7 @@ import {
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_QUOTA_PER_TEAM,
   type MemoryLayer,
+  memoryRecordSchema,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -156,12 +157,7 @@ export function injectMemoriesCapped(
     const teamId = scope.teamId;
     const teamScoped = teamId !== undefined;
     const rows = tx
-      .select({
-        id: agentMemory.id,
-        title: agentMemory.title,
-        content: agentMemory.content,
-        updatedAt: agentMemory.updatedAt,
-      })
+      .select()
       .from(agentMemory)
       .where(
         and(
@@ -181,17 +177,34 @@ export function injectMemoriesCapped(
       )
       .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
       .all();
-    const { shown, omitted } = capMemories(rows, capTokens);
+    const { shown, omitted } = capMemories(factRows(tx, rows), capTokens);
     if (shown.length > 0 && scope.recordUse !== false) {
-      tx.update(agentMemory)
-        .set({ lastInjectedAt: nowMs() })
-        .where(
-          inArray(
-            agentMemory.id,
-            shown.map((row) => row.id),
-          ),
-        )
-        .run();
+      const shownIds = new Set(shown.map((row) => row.id));
+      const lastInjectedAt = nowMs();
+      for (const row of rows) {
+        if (indexRow(row)) {
+          const facts = readIndex(row);
+          const selected = facts.filter((fact) => shownIds.has(fact.id));
+          if (selected.length === 0) continue;
+          tx.update(agentMemory)
+            .set({
+              lastInjectedAt,
+              content: writeIndex(
+                facts.map((fact) => (shownIds.has(fact.id) ? { ...fact, lastInjectedAt } : fact)),
+              ),
+            })
+            .where(eq(agentMemory.id, row.id))
+            .run();
+          const files = selected.flatMap((fact) => (fact.fileId === null ? [] : [fact.fileId]));
+          if (files.length > 0)
+            tx.update(agentMemory)
+              .set({ lastInjectedAt })
+              .where(inArray(agentMemory.id, files))
+              .run();
+        } else if (shownIds.has(row.id)) {
+          tx.update(agentMemory).set({ lastInjectedAt }).where(eq(agentMemory.id, row.id)).run();
+        }
+      }
     }
     return {
       memories: shown.map(({ id, title, content }) => ({ id, title, content })),
@@ -224,8 +237,19 @@ export function injectMemories(db: Db, scope: InjectScope) {
 
 type MemoryRow = typeof agentMemory.$inferSelect;
 
-const indexFactSchema = z
-  .object({
+const factMetadataSchema = memoryRecordSchema
+  .pick({
+    createdAt: true,
+    updatedAt: true,
+    lastInjectedAt: true,
+    history: true,
+    source: true,
+    sourceTodoId: true,
+    sourceBuildId: true,
+  })
+  .required();
+const indexFactSchema = factMetadataSchema
+  .extend({
     id: z.string(),
     title: z.string(),
     content: z.string(),
@@ -261,16 +285,16 @@ function writeIndex(facts: IndexFact[]): string {
 
 function indexFacts(db: Db | MemoryTx, row: MemoryRow): MemoryRow[] {
   if (!indexRow(row)) return [row];
-  return readIndex(row).map((fact) => {
+  return readIndex(row).map(({ fileId, ...fact }) => {
     const file =
-      fact.fileId === null
+      fileId === null
         ? undefined
         : db
             .select()
             .from(agentMemory)
             .where(
               and(
-                eq(agentMemory.id, fact.fileId),
+                eq(agentMemory.id, fileId),
                 ownerWhere({ ...row, teamScoped: !row.independent }),
                 row.projectId === null
                   ? isNull(agentMemory.projectId)
@@ -280,11 +304,11 @@ function indexFacts(db: Db | MemoryTx, row: MemoryRow): MemoryRow[] {
               ),
             )
             .get();
-    if (fact.fileId !== null && file === undefined)
-      throw new HttpError(409, `missing memory file ${fact.fileId}`);
+    if (fileId !== null && file === undefined)
+      throw new HttpError(409, `missing memory file ${fileId}`);
     return {
       ...row,
-      ...file,
+      ...fact,
       id: fact.id,
       title: fact.title,
       content: file?.content ?? fact.content,
@@ -303,12 +327,16 @@ function factRows(db: Db | MemoryTx, rows: MemoryRow[]): MemoryRow[] {
         readIndex(row).flatMap((fact) => (fact.fileId === null ? [] : [fact.fileId])),
       ),
   );
-  return rows.filter((row) => !files.has(row.id)).flatMap((row) => indexFacts(db, row));
+  const expanded = rows
+    .filter((row) => !files.has(row.id) && (!indexRow(row) || row.invalidAt === null))
+    .flatMap((row) => indexFacts(db, row));
+  const activeIds = new Set(expanded.filter((row) => row.invalidAt === null).map((row) => row.id));
+  return expanded.filter((row) => row.invalidAt === null || !activeIds.has(row.id));
 }
 
 export function listMemoryEntries(...args: Parameters<typeof listStoredMemoryEntries>) {
   const rows = listStoredMemoryEntries(...args);
-  return args[2] === true ? rows : factRows(args[0], rows);
+  return factRows(args[0], rows);
 }
 
 function indexedFact(
@@ -346,7 +374,7 @@ function fileEntry(tx: MemoryTx, row: MemoryRow): IndexFact {
         supersededBy: null,
       })
       .run();
-  return { id: row.id, title: row.title, content: first, fileId };
+  return { ...factMetadataSchema.parse(row), id: row.id, title: row.title, content: first, fileId };
 }
 
 export function memoriesInScope(
@@ -509,12 +537,26 @@ function replaceMemory(tx: MemoryTx, row: MemoryRow, content: string): MemoryRow
   return successor;
 }
 
+function archiveFact(
+  tx: MemoryTx,
+  row: MemoryRow,
+  invalidAt: number,
+  supersededBy: string | null,
+): void {
+  const version = { ...row, invalidAt, supersededBy };
+  tx.insert(agentMemory)
+    .values(version)
+    .onConflictDoUpdate({ target: agentMemory.id, set: version })
+    .run();
+}
+
 function removeIndexedFact(
   tx: MemoryTx,
   indexed: NonNullable<ReturnType<typeof indexedFact>>,
 ): void {
   const entries = indexed.entries.filter((fact) => fact.id !== indexed.entry.id);
   const invalidAt = Math.max(nowMs(), indexed.document.updatedAt + 1);
+  archiveFact(tx, indexed.row, invalidAt, null);
   if (entries.length === 0)
     tx.update(agentMemory).set({ invalidAt }).where(eq(agentMemory.id, indexed.document.id)).run();
   else replaceMemory(tx, indexed.document, writeIndex(entries));
@@ -591,7 +633,12 @@ export function updateMemoryEntry(
         content: input.content,
         createdAt: updatedAt,
         updatedAt,
+        history: [
+          ...row.history,
+          { title: row.title, content: row.content, updatedAt: row.updatedAt },
+        ],
       };
+      archiveFact(tx, row, updatedAt, successor.id);
       const replacement = fileEntry(tx, successor);
       replaceMemory(
         tx,
@@ -620,6 +667,13 @@ export function isMemoryIndex(db: Db | MemoryTx, memoryId: string): boolean {
 
 export const MEMORY_VERSION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
+function retainedHistory(row: Pick<MemoryRow, 'history' | 'createdAt'>, cutoff: number) {
+  return row.history.filter((_, index) => {
+    const supersededAt = row.history[index + 1]?.updatedAt ?? row.createdAt;
+    return supersededAt >= cutoff;
+  });
+}
+
 export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): number {
   const cutoff = now - MEMORY_VERSION_RETENTION_MS;
   return db.transaction((tx) => {
@@ -636,13 +690,24 @@ export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): numbe
       .from(agentMemory)
       .where(sql`json_array_length(${agentMemory.history}) > 0`)
       .all()) {
-      const kept = row.history.filter((_, index) => {
-        const supersededAt = row.history[index + 1]?.updatedAt ?? row.createdAt;
-        return supersededAt >= cutoff;
-      });
+      const kept = retainedHistory(row, cutoff);
       if (kept.length !== row.history.length) {
         tx.update(agentMemory).set({ history: kept }).where(eq(agentMemory.id, row.id)).run();
       }
+    }
+    for (const row of tx
+      .select()
+      .from(agentMemory)
+      .where(and(stillValid, eq(agentMemory.layer, 'core')))
+      .all()
+      .filter(indexRow)) {
+      const facts = readIndex(row);
+      const kept = facts.map((fact) => ({ ...fact, history: retainedHistory(fact, cutoff) }));
+      if (kept.some((fact, i) => fact.history.length !== facts[i]?.history.length))
+        tx.update(agentMemory)
+          .set({ content: writeIndex(kept) })
+          .where(eq(agentMemory.id, row.id))
+          .run();
     }
     return purged;
   });
@@ -750,6 +815,8 @@ export function promoteMemoryEntry(
   );
   const row = db.select().from(agentMemory).where(where).get();
   if (row === undefined) return null;
+  if (indexRow(row))
+    throw new HttpError(400, 'memory index is managed; promote a fact ID from memories');
   if (row.projectId === null) return row;
   const updatedAt = nowMs();
   db.update(agentMemory).set({ projectId: null, updatedAt }).where(where).run();
@@ -769,10 +836,11 @@ export function deleteMemoryEntry(
   return db.transaction((tx) => {
     const indexed = indexedFact(tx, input, input.memoryId);
     if (indexed !== undefined) removeIndexedFact(tx, indexed);
-    const removed =
+    const physical =
       indexed === undefined
         ? tx
-            .delete(agentMemory)
+            .select()
+            .from(agentMemory)
             .where(
               and(
                 eq(agentMemory.id, input.memoryId),
@@ -780,8 +848,16 @@ export function deleteMemoryEntry(
                 scratchpadVisible(input.threadId),
               ),
             )
-            .run().changes
-        : 1;
+            .get()
+        : undefined;
+    if (physical !== undefined && indexRow(physical))
+      throw new HttpError(400, 'memory index is managed; delete a fact ID from memories');
+    const removed =
+      indexed !== undefined
+        ? 1
+        : physical === undefined
+          ? 0
+          : tx.delete(agentMemory).where(eq(agentMemory.id, physical.id)).run().changes;
     if (removed === 0) return 0;
     const removedIds = [input.memoryId, ...(indexed === undefined ? [] : [indexed.entry.id])];
     const mentioning = tx
