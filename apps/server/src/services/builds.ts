@@ -18,6 +18,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  ANSWERS_CONTINUE_PROMPT,
   ASK_USER_QUESTION_KIND,
   buildFallbackReport,
   buildPlanContractRewritePrompt,
@@ -437,7 +438,9 @@ export async function sendBuildSteer(
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
       if (continuationOptions.answer !== undefined)
         settleQuestionAnswers(deps, conversationId, [continuationOptions.answer]);
-      else if (human) settleWorkerReply(deps, conversationId, body.content);
+      const answered =
+        continuationOptions.answer !== undefined ||
+        (human && settleWorkerReply(deps, conversationId, body.content) > 0);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
@@ -472,7 +475,7 @@ export async function sendBuildSteer(
         });
       }
       if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
-      if (running) {
+      if (running && !answered) {
         db.insert(steerPending)
           .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
           .onConflictDoUpdate({
@@ -520,7 +523,7 @@ export async function sendBuildSteer(
                 ? 'session'
                 : 'build',
             todoRow.teamId,
-            body.content,
+            answered ? ANSWERS_CONTINUE_PROMPT : body.content,
             false,
             human && !continuationOptions.schedule,
           );

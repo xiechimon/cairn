@@ -28,6 +28,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendAnswers,
   appendBlockerHandoff,
   appendConfirmedPlanNote,
   appendDecisionsNote,
@@ -216,6 +217,13 @@ export function buildTaskPrompt(claimed: ClaimedStep): string {
     return composeTaskPromptWithInstruction(taskText, buildPlanFirstRoundInstruction());
   }
   return taskText;
+}
+
+function carriedAnswers(claimed: ClaimedStep): { requestId: string; text: string }[] {
+  const carried = new Set(claimed.answerIds ?? []);
+  return (claimed.todo?.decisions ?? [])
+    .filter((decision) => carried.has(decision.requestId))
+    .map((decision) => ({ requestId: decision.requestId, text: decision.answer }));
 }
 
 function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
@@ -465,7 +473,10 @@ async function runClaimedStep(
     (isChief || isReview || isVerify
       ? (claimed.instruction ?? '')
       : claimed.session.action === 'continue' && claimed.session.sessionId
-        ? (claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind])
+        ? appendAnswers(
+            claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind],
+            carriedAnswers(claimed),
+          )
         : buildTaskPrompt(claimed));
   const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
   const readonlyWorkspace = !isChief && claimed.todo?.output === 'info';
@@ -938,6 +949,13 @@ async function runClaimedStep(
         },
         { signal: askAbort.signal },
       );
+      if (response.status === 'answered' && !askAbort.signal.aborted) {
+        await client
+          .steerAck?.(stepId, { answerIds: [requestId], via: 'poll' })
+          .catch((err: unknown) => {
+            logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
+          });
+      }
       return JSON.stringify(response);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1576,6 +1594,13 @@ async function runClaimedStep(
     }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     deps.sessionHandles?.set(stepId, handle);
+    if (claimed.answerIds !== undefined && claimed.answerIds.length > 0) {
+      client
+        .steerAck?.(stepId, { answerIds: claimed.answerIds, via: 'session-start' })
+        .catch((err: unknown) => {
+          logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+    }
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });

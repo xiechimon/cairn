@@ -99,6 +99,24 @@ function stripDecisionsBlock(text: string): string {
   return `${text.slice(0, open)}${text.slice(close + 1 + DECISIONS_BLOCK_CLOSE.length)}`;
 }
 
+export const ANSWERS_CONTINUE_PROMPT =
+  'Your questions have been answered; the answers are in this message. Continue the task with them.';
+
+export function renderAnswers(answers: readonly { requestId: string; text: string }[]): string {
+  return answers
+    .map((answer) => `Answer to your question ${answer.requestId}:\n${answer.text}`)
+    .join('\n\n');
+}
+
+export function appendAnswers(
+  prompt: string,
+  answers: readonly { requestId: string; text: string }[],
+): string {
+  const rendered = renderAnswers(answers);
+  if (rendered === '') return prompt;
+  return prompt === '' ? rendered : `${prompt}\n\n${rendered}`;
+}
+
 export const TRANSCRIPT_PROMPT_ROW_ID_PREFIX = 'user-';
 
 export function transcriptPromptRowId(stepId: string): string {
