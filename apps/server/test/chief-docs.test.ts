@@ -84,7 +84,7 @@ async function docs(paths: string[], ref?: string): Promise<Docs> {
 }
 
 describe('Coordinator repository reads', () => {
-  for (const kind of ['github', 'local', 'hosted'] as const) {
+  for (const kind of ['local', 'hosted'] as const) {
     test(`${kind}: reads committed source and returns its immutable version`, async () => {
       const dir = await bindRepo(kind);
       const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim();
@@ -360,72 +360,96 @@ describe('Coordinator repository reads', () => {
     ).toBe('');
   });
 
-  test('github local binding refuses missing and mismatched origin identity', async () => {
+  for (const withCacheRoot of [false, true]) {
+    test.each(['docs', 'file', 'tree', 'files', 'history', 'detail'] as const)(
+      `%s never uses a GitHub localPath when its cache is unavailable (root=${withCacheRoot})`,
+      async (entry) => {
+        const dir = await bindRepo('github');
+        const oldCommit = (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout
+          .toString()
+          .trim();
+        expect((await runGit(['tag', 'retained'], { cwd: dir })).code).toBe(0);
+        await gitPrim.setRemoteUrl(dir, 'https://github.com/fixture/replacement.git');
+        H.s.db
+          .update(project)
+          .set({ githubRepo: 'fixture/replacement' })
+          .where(eq(project.id, H.projectId))
+          .run();
+        const workspaces = withCacheRoot
+          ? { workspacesDir: join(H.s.reposDir, 'absent-workspaces') }
+          : {};
+        const repo = { db: H.s.db, reposDir: H.s.reposDir, ...workspaces };
+        for (const ref of ['HEAD', 'retained', 'refs/heads/main', oldCommit]) {
+          if (entry === 'docs') {
+            const result = JSON.parse(
+              await executeChiefTool({ ...toolDeps(), ...workspaces }, ctx(), 'docs', {
+                projectId: H.projectId,
+                paths: ['scripts/owned-process.mjs'],
+                ref,
+              }),
+            ) as Docs;
+            expect(result.files[0]?.content).toBeUndefined();
+            expect(result.files[0]?.error).toMatch(/github.*cache.*unavailable/i);
+          } else {
+            const reads = {
+              file: () => readFile(repo, H.projectId, 'scripts/owned-process.mjs', ref),
+              tree: () => readTree(repo, H.projectId, ref),
+              files: () => readFiles(repo, H.projectId, ref),
+              history: () => readCommitHistory(repo, H.projectId, ref),
+              detail: () => readCommitDetail(repo, H.projectId, ref),
+            };
+            await expect(reads[entry]()).rejects.toMatchObject({
+              status: 404,
+              message: expect.stringMatching(/github.*cache.*unavailable/i),
+            });
+          }
+        }
+      },
+    );
+  }
+
+  test.each([
+    { origin: 'https://github.com/fixture/repository.git', allowed: true },
+    { origin: 'git@github.com:fixture/repository.git', allowed: true },
+    { origin: 'ssh://git@github.com/fixture/repository.git', allowed: true },
+    { origin: 'git://github.com/fixture/repository.git', allowed: true },
+    { origin: 'http://github.com/fixture/repository.git', allowed: true },
+    { origin: 'https://GitHub.com/FiXtUrE/RePoSiToRy.git/', allowed: true },
+    { origin: 'ssh://git@github.example/fixture/repository.git', allowed: false },
+    { origin: 'git://github.com/other/repository.git', allowed: false },
+    { origin: 'http://github.com/fixture/other.git', allowed: false },
+    { origin: '', allowed: false },
+  ])('cache: validates normalized origin $origin', async ({ origin, allowed }) => {
     const dir = await bindRepo('github');
-    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.content).toBeDefined();
+    const workspacesDir = join(H.s.reposDir, 'workspaces');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', dir, cache])).code).toBe(0);
+    await fetchFixture(cache, dir);
+    H.s.db.update(project).set({ localPath: null }).where(eq(project.id, H.projectId)).run();
     expect(
       (
-        await runGit(['remote', 'set-url', 'origin', 'https://github.com/other/repository.git'], {
-          cwd: dir,
+        await runGit(['remote', 'set-url', 'origin', origin], {
+          cwd: cache,
         })
       ).code,
     ).toBe(0);
-    expect((await docs(['scripts/owned-process.mjs'])).files[0]).toMatchObject({
-      error: expect.stringMatching(/identity mismatch/),
-    });
-    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.content).toBeUndefined();
-    expect((await runGit(['remote', 'remove', 'origin'], { cwd: dir })).code).toBe(0);
-    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toMatch(
-      /identity mismatch/,
-    );
+    const result = JSON.parse(
+      await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+        projectId: H.projectId,
+        paths: ['scripts/owned-process.mjs'],
+      }),
+    ) as Docs;
+    if (allowed) {
+      expect(result.files[0]).toMatchObject({
+        content: 'export const spawn = true;\n',
+        commit: (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim(),
+      });
+    } else {
+      expect(result.files[0]?.error).toMatch(/identity mismatch/);
+      expect(result.files[0]?.content).toBeUndefined();
+    }
   });
-
-  for (const binding of ['localPath', 'cache'] as const) {
-    test.each([
-      { origin: 'https://github.com/fixture/repository.git', allowed: true },
-      { origin: 'git@github.com:fixture/repository.git', allowed: true },
-      { origin: 'ssh://git@github.com/fixture/repository.git', allowed: true },
-      { origin: 'git://github.com/fixture/repository.git', allowed: true },
-      { origin: 'http://github.com/fixture/repository.git', allowed: true },
-      { origin: 'https://GitHub.com/FiXtUrE/RePoSiToRy.git/', allowed: true },
-      { origin: 'ssh://git@github.example/fixture/repository.git', allowed: false },
-      { origin: 'git://github.com/other/repository.git', allowed: false },
-      { origin: 'http://github.com/fixture/other.git', allowed: false },
-      { origin: '', allowed: false },
-    ])(`${binding}: validates normalized origin $origin`, async ({ origin, allowed }) => {
-      const dir = await bindRepo('github');
-      const workspacesDir = join(H.s.reposDir, 'workspaces');
-      const cache = join(workspacesDir, H.projectId, 'repo');
-      if (binding === 'cache') {
-        mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
-        expect((await runGit(['clone', dir, cache])).code).toBe(0);
-        await fetchFixture(cache, dir);
-        H.s.db.update(project).set({ localPath: null }).where(eq(project.id, H.projectId)).run();
-      }
-      expect(
-        (
-          await runGit(['remote', 'set-url', 'origin', origin], {
-            cwd: binding === 'cache' ? cache : dir,
-          })
-        ).code,
-      ).toBe(0);
-      const result = JSON.parse(
-        await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
-          projectId: H.projectId,
-          paths: ['scripts/owned-process.mjs'],
-        }),
-      ) as Docs;
-      if (allowed) {
-        expect(result.files[0]).toMatchObject({
-          content: 'export const spawn = true;\n',
-          commit: (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim(),
-        });
-      } else {
-        expect(result.files[0]?.error).toMatch(/identity mismatch/);
-        expect(result.files[0]?.content).toBeUndefined();
-      }
-    });
-  }
 
   test('uses the persisted daemon CLI root, including changes after server startup', async () => {
     const dir = await bindRepo('github');
@@ -471,54 +495,52 @@ describe('Coordinator repository reads', () => {
     expect(() => deps.workspacesDir).toThrow();
   });
 
-  for (const kind of ['local', 'github'] as const) {
-    test(`${kind}: omitted ref reads configured base, not the feature checkout`, async () => {
-      const dir = await bindRepo(kind);
-      const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim();
-      H.s.db.update(project).set({ baseBranch: 'main' }).where(eq(project.id, H.projectId)).run();
-      expect((await runGit(['checkout', '-b', 'feature'], { cwd: dir })).code).toBe(0);
-      writeFileSync(join(dir, 'scripts/owned-process.mjs'), 'feature source\n');
-      expect((await runGit(['add', '.'], { cwd: dir })).code).toBe(0);
-      expect(
-        (
-          await runGit(
-            [
-              '-c',
-              'user.name=Fixture',
-              '-c',
-              'user.email=fixture@example.test',
-              'commit',
-              '-m',
-              'feature',
-            ],
-            { cwd: dir },
-          )
-        ).code,
-      ).toBe(0);
-      expect((await docs(['scripts/owned-process.mjs'])).files[0]).toMatchObject({
-        commit,
-        content: 'export const spawn = true;\n',
-      });
-      expect((await docs(['scripts/owned-process.mjs'], 'feature')).files[0]?.content).toBe(
-        'feature source\n',
-      );
-      H.s.db.update(project).set({ baseBranch: null }).where(eq(project.id, H.projectId)).run();
-      expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toContain(
-        'default branch is unknown',
-      );
-      expect(
-        (await runGit(['update-ref', 'refs/remotes/origin/main', commit], { cwd: dir })).code,
-      ).toBe(0);
-      expect(
-        (
-          await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main'], {
-            cwd: dir,
-          })
-        ).code,
-      ).toBe(0);
-      expect((await docs(['scripts/owned-process.mjs'])).files[0]?.commit).toBe(commit);
+  test('local: omitted ref reads configured base, not the feature checkout', async () => {
+    const dir = await bindRepo('local');
+    const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: dir })).stdout.toString().trim();
+    H.s.db.update(project).set({ baseBranch: 'main' }).where(eq(project.id, H.projectId)).run();
+    expect((await runGit(['checkout', '-b', 'feature'], { cwd: dir })).code).toBe(0);
+    writeFileSync(join(dir, 'scripts/owned-process.mjs'), 'feature source\n');
+    expect((await runGit(['add', '.'], { cwd: dir })).code).toBe(0);
+    expect(
+      (
+        await runGit(
+          [
+            '-c',
+            'user.name=Fixture',
+            '-c',
+            'user.email=fixture@example.test',
+            'commit',
+            '-m',
+            'feature',
+          ],
+          { cwd: dir },
+        )
+      ).code,
+    ).toBe(0);
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]).toMatchObject({
+      commit,
+      content: 'export const spawn = true;\n',
     });
-  }
+    expect((await docs(['scripts/owned-process.mjs'], 'feature')).files[0]?.content).toBe(
+      'feature source\n',
+    );
+    H.s.db.update(project).set({ baseBranch: null }).where(eq(project.id, H.projectId)).run();
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toContain(
+      'default branch is unknown',
+    );
+    expect(
+      (await runGit(['update-ref', 'refs/remotes/origin/main', commit], { cwd: dir })).code,
+    ).toBe(0);
+    expect(
+      (
+        await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main'], {
+          cwd: dir,
+        })
+      ).code,
+    ).toBe(0);
+    expect((await docs(['scripts/owned-process.mjs'])).files[0]?.commit).toBe(commit);
+  });
 
   test('preflights oversized blobs and bounds aggregate serialized document output', async () => {
     const dir = await bindRepo('local');
@@ -562,7 +584,7 @@ describe('Coordinator repository reads', () => {
     }
   });
 
-  test('github without a local binding reports the actual missing repository', async () => {
+  test('github without a project cache reports the missing cache', async () => {
     H.s.db
       .update(project)
       .set({ repoKind: 'github', githubRepo: 'fixture/repository', localPath: null })
@@ -574,7 +596,7 @@ describe('Coordinator repository reads', () => {
   });
 
   test('missing local directory and missing file/ref remain visible per path', async () => {
-    await bindRepo('github');
+    await bindRepo('local');
     expect((await docs(['absent'])).files[0]?.error).toContain('file absent');
     expect((await docs(['scripts/owned-process.mjs'], 'absent-ref')).files[0]?.error).toContain(
       'ref absent-ref',
@@ -585,7 +607,7 @@ describe('Coordinator repository reads', () => {
       .where(eq(project.id, H.projectId))
       .run();
     expect((await docs(['scripts/owned-process.mjs'])).files[0]?.error).toMatch(
-      /repository.*unavailable/i,
+      /local repo path not found/i,
     );
   });
 
@@ -620,7 +642,7 @@ describe('Coordinator repository reads', () => {
     mkdirSync(dir, { recursive: true });
     H.s.db
       .update(project)
-      .set({ repoKind: 'github', githubRepo: 'fixture/repository', localPath: dir })
+      .set({ repoKind: 'local', githubRepo: null, localPath: dir })
       .where(eq(project.id, H.projectId))
       .run();
     expect((await docs(['source.ts'])).files[0]?.error).toContain('not a git repository');
@@ -637,13 +659,24 @@ describe('Coordinator repository reads', () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 
-  test('reads the actual owned-process source through the Coordinator tool executor', async () => {
+  test('reads the actual owned-process source through the Coordinator cache executor', async () => {
+    const workspacesDir = join(H.s.reposDir, 'actual-source-workspaces');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', '--no-checkout', resolve('.'), cache])).code).toBe(0);
+    await fetchFixture(cache, resolve('.'), 'xiechimon/cairn');
     H.s.db
       .update(project)
-      .set({ repoKind: 'github', githubRepo: 'xiechimon/cairn', localPath: resolve('.') })
+      .set({ repoKind: 'github', githubRepo: 'xiechimon/cairn', localPath: null })
       .where(eq(project.id, H.projectId))
       .run();
-    const result = await docs(['scripts/owned-process.mjs'], 'HEAD');
+    const result = JSON.parse(
+      await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+        projectId: H.projectId,
+        paths: ['scripts/owned-process.mjs'],
+        ref: 'HEAD',
+      }),
+    ) as Docs;
     expect(result.files[0]?.content).toBe(readFileSync('scripts/owned-process.mjs', 'utf8'));
     expect(result.files[0]?.commit).toBe(
       (await runGit(['rev-parse', 'HEAD'])).stdout.toString().trim(),

@@ -245,13 +245,10 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
       return cache;
     }
   }
-  if (row.repoKind === 'local' || row.repoKind === 'github') {
-    if (row.repoKind === 'github' && (row.localPath === null || !existsSync(row.localPath))) {
-      throw new HttpError(
-        404,
-        'github repository unavailable on this server: no accessible local binding',
-      );
-    }
+  if (row.repoKind === 'github') {
+    throw new HttpError(404, 'github repository cache unavailable on this server');
+  }
+  if (row.repoKind === 'local') {
     if (row.localPath === null) {
       throw notFound(`local repo for project ${projectId}`);
     }
@@ -264,11 +261,6 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
         `local repo path is not a git repository: ${row.localPath}`,
         'not_git',
       );
-    }
-    if (row.repoKind === 'github') {
-      const ref = githubRepoOfProject(row);
-      if (ref === null) throw new HttpError(409, 'invalid GitHub repository binding');
-      await requireGithubRepoIdentity(row.localPath, ref);
     }
     return row.localPath;
   }
