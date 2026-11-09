@@ -168,8 +168,10 @@ function fakeWorkspace(opts: { prepareError?: Error } = {}) {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
       if (opts.prepareError) throw opts.prepareError;
+      const cwd = join(input.workspacesRoot, input.conversationId);
+      mkdirSync(cwd, { recursive: true });
       return {
-        cwd: join(input.workspacesRoot, input.conversationId),
+        cwd,
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
         branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: input.baseBranch ?? 'main',
