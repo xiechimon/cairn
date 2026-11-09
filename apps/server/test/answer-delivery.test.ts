@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { AnswerDeliveryVia } from '@cairn/shared';
+import { ANSWERS_CONTINUE_PROMPT, type AnswerDeliveryVia } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { message, steerPending, step, todo } from '../src/db/schema.js';
@@ -101,6 +101,10 @@ function finish(stepId: string) {
   completeStep(deps(), stepId, { hasChanges: true });
 }
 
+function phaseOf(world: World) {
+  return H.s.db.select().from(todo).where(eq(todo.id, world.todoId)).get()?.phase;
+}
+
 function recordOf(world: World, requestId: string) {
   return H.s.db
     .select()
@@ -137,7 +141,7 @@ describe('an answer is delivered only when the daemon acks it', () => {
     });
   });
 
-  test('an interrupted poll: the poll returned the answer but no ack came, so the next pickup and the next continuation re-send it', async () => {
+  test('an interrupted poll: the poll returned the answer but no ack came, so the next pickup and the continuation enqueued at step end re-send it', async () => {
     const world = startSession();
     await ask(world, REQUEST_A, false);
     await answer(world, REQUEST_A, 'Repo rule wins.');
@@ -150,12 +154,6 @@ describe('an answer is delivered only when the daemon acks it', () => {
     expect(polled.status).toBe('answered');
     expect(pickup(world).answers).toEqual([{ requestId: REQUEST_A, text: 'Repo rule wins.' }]);
     finish(world.stepRow.id);
-    await sendBuildSteer(
-      deps(),
-      world.buildId,
-      { content: 'Carry on.' },
-      { human: true, afterTurn: true },
-    );
     expect((await claimContinuation(world)).answerIds).toEqual([REQUEST_A]);
   });
 
@@ -219,18 +217,12 @@ describe('an answer is delivered only when the daemon acks it', () => {
     expect(pickup(world).answers).toEqual(expected);
   });
 
-  test('the session is gone before the ack: the next continuation carries the answer and its session-start ack marks it', async () => {
+  test('the session is gone before the ack: the continuation enqueued at step end carries the answer and its session-start ack marks it', async () => {
     const world = startSession();
     await ask(world, REQUEST_A, true);
     await answer(world, REQUEST_A, 'Repo rule wins.');
     expect(pickup(world).answers).toHaveLength(1);
     finish(world.stepRow.id);
-    await sendBuildSteer(
-      deps(),
-      world.buildId,
-      { content: 'Carry on.' },
-      { human: true, afterTurn: true },
-    );
     const claimed = await claimContinuation(world);
     expect(claimed.answerIds).toEqual([REQUEST_A]);
     ack(world, claimed.step.id, [REQUEST_A], 'session-start');
@@ -256,6 +248,40 @@ describe('an answer is delivered only when the daemon acks it', () => {
       deliveredVia: 'steer',
       deliveredStepId: world.stepRow.id,
     });
+  });
+
+  test('a step that ends with an undelivered answer and no pending question does not go to review: the continuation that delivers it is enqueued', async () => {
+    const world = startSession();
+    await ask(world, REQUEST_A, true);
+    await answer(world, REQUEST_A, 'Repo rule wins.');
+    finish(world.stepRow.id);
+    expect(phaseOf(world)).not.toBe('review');
+    const queued = H.s.db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, world.buildId), eq(step.status, 'pending')))
+      .all()
+      .filter((row) => row.kind !== 'chief');
+    expect(queued.map((row) => [row.kind, row.prompt])).toEqual([
+      [world.stepRow.kind, ANSWERS_CONTINUE_PROMPT],
+    ]);
+    expect((await claimContinuation(world)).answerIds).toEqual([REQUEST_A]);
+  });
+
+  test('a step that ends with a pending question still goes to needs_input, with no continuation', async () => {
+    const world = startSession();
+    await ask(world, REQUEST_A, true);
+    await ask(world, REQUEST_B, true);
+    finish(world.stepRow.id);
+    expect(phaseOf(world)).toBe('needs_input');
+    expect(
+      H.s.db
+        .select()
+        .from(step)
+        .where(and(eq(step.buildId, world.buildId), eq(step.status, 'pending')))
+        .all()
+        .filter((row) => row.kind !== 'chief'),
+    ).toEqual([]);
   });
 
   test('a double ack and an ack for an unknown id change nothing', async () => {

@@ -1598,7 +1598,7 @@ async function runClaimedStep(
     }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     deps.sessionHandles?.set(stepId, handle);
-    await ackAnswers(claimed.answerIds ?? [], 'session-start');
+    let promptDelivered = false;
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
@@ -1608,6 +1608,10 @@ async function runClaimedStep(
     if (pass === 0) armDurationCap();
     try {
       for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
+        if (!promptDelivered) {
+          promptDelivered = true;
+          await ackAnswers(claimed.answerIds ?? [], 'session-start');
+        }
         if (ev.type === 'toolcall_end') {
           if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
           else runningToolCalls.delete(ev.call.id);

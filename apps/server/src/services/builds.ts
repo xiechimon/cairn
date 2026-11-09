@@ -112,6 +112,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
@@ -3131,6 +3132,26 @@ export function completeStep(
 
   finishScheduledStep(deps, stepRow);
 
+  if (
+    receivesAnswers(stepRow.kind) &&
+    pendingWorkerQuestions(deps.db, stepRow.buildId).length === 0 &&
+    undeliveredAnswers(deps.db, stepRow.buildId).length > 0
+  ) {
+    const working = stepRow.kind === 'plan' ? 'planning' : 'building';
+    if (todoRow.phase !== working && canTransitionPhase(todoRow.phase, working)) {
+      setTodoPhase(deps, todoRow.id, working);
+    }
+    enqueueStep(
+      deps,
+      stepRow.buildId,
+      stepRow.kind,
+      todoRow.teamId,
+      ANSWERS_CONTINUE_PROMPT,
+      false,
+      true,
+    );
+    return;
+  }
   if (stepRow.kind === 'plan') {
     const planDoc = deps.db
       .select({ id: planTable.id })

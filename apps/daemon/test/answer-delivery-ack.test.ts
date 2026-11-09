@@ -188,6 +188,67 @@ describe('the daemon acks an answer only after it reached the agent', () => {
     expect(api.steerAckBodies).toEqual([]);
   });
 
+  function lazyPromptBackend(api: FakeMachineApi, events: StepEvent[]) {
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        throw new Error('unused');
+      },
+      async continueSession() {
+        return {
+          sessionId: 'sess-lazy',
+          events: (async function* () {
+            api.calls.push('prompt-sent');
+            for (const event of events) {
+              api.calls.push(`event:${event.type}`);
+              yield event;
+            }
+          })(),
+          async steer() {},
+          async stop() {},
+          usage: () => [],
+        };
+      },
+    };
+    return backend;
+  }
+
+  const continued: ClaimedStep = {
+    ...CLAIMED,
+    step: { ...CLAIMED.step, kind: 'session' },
+    session: { action: 'continue', sessionId: 'sess-prev' },
+    answerIds: [REQUEST_A],
+    todo: { ...CLAIMED.todo!, decisions: [decision(REQUEST_A, 'Answer for A.')] },
+  };
+
+  test('a backend that sends its prompt on first iteration is acked via session-start only after its first event', async () => {
+    const api = new FakeMachineApi();
+    const backend = lazyPromptBackend(api, [
+      { type: 'text_delta', text: 'working' } as StepEvent,
+      { type: 'done', usage: [] } as StepEvent,
+    ]);
+    const { handle } = await run(api, backend, continued);
+    await waitFor(() => api.doneBodies.length === 1);
+    const ackAt = api.calls.indexOf('steer-ack:s1');
+    expect(ackAt).toBeGreaterThan(api.calls.indexOf('event:text_delta'));
+    expect(api.steerAckBodies).toEqual([{ answerIds: [REQUEST_A], via: 'session-start' }]);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a session that ends without emitting any event never acks its answers', async () => {
+    const api = new FakeMachineApi();
+    const backend = lazyPromptBackend(api, []);
+    const booted = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(continued);
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.calls).toContain('prompt-sent');
+    expect(api.steerAckBodies).toEqual([]);
+    await booted.handle.stop();
+    await booted.handle.done;
+  });
+
   test('the session-start ack completes before the step reports done', async () => {
     const api = new FakeMachineApi();
     const ack = api.steerAck.bind(api);
