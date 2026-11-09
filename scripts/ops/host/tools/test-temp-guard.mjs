@@ -139,7 +139,11 @@ export function runGuard({
               if (error.code !== 'ENOENT') throw error;
             }
           }
-          if (!prefixed && !nanoid) continue;
+          if (!prefixed && !nanoid) {
+            if (resolve(root) === resolve(diskRoot))
+              diskCandidates.push({ path, bytes, mtimeMs: entry.mtimeMs, ino: entry.ino });
+            continue;
+          }
           const stale = nanoid
             ? now - entry.mtimeMs > policy.nanoidMaxAgeMinutes * 60_000
             : shouldDelete(name, entry.mtimeMs, now);
@@ -177,7 +181,7 @@ export function runGuard({
   }
   if (diskBytes > maxDiskBytes)
     warn(
-      `lane-tmp over limit: ${diskBytes} bytes remain (limit ${maxDiskBytes}); live or unmanaged roots retained`,
+      `lane-tmp over limit: ${diskBytes} bytes remain (limit ${maxDiskBytes}); live or protected roots retained`,
     );
   if (errors.length) throw new AggregateError(errors, 'Test temp cleanup failed');
   return { deleted, pressure, diskBytes };

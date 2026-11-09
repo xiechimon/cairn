@@ -83,7 +83,7 @@ for (const mode of ['cwd', 'fd']) {
 
 test('caps disk roots by oldest non-live first, even before the age threshold', async () => {
   const { root, options } = fixture();
-  const oldest = directory(root, 'ct-oldest', 3 * hours, false);
+  const oldest = directory(root, 'manual-oldest', 3 * hours, false);
   const newer = directory(root, 'ct-newer', hours, false);
   const live = directory(root, 'ct-live', 4 * hours, false);
   for (const path of [oldest, newer, live]) {
