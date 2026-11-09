@@ -200,6 +200,46 @@ test('a thread whose machine must update cairn waits on you in the inbox and in 
   await expect(row.getByRole('textbox')).toHaveCount(0);
 });
 
+test('after the first request is answered, the next request on the same thread has live controls', async ({
+  page,
+}) => {
+  const ask = (requestId: string, text: string, options: string[]) => ({
+    text,
+    requestId,
+    options: options.map((label) => ({ label })),
+    defaultAnswer: null,
+  });
+  const asking = {
+    ...todoIn(4, 'needs_input', 'Rename the sidebar groups'),
+    waitingOn: { on: 'owner', retryAt: null },
+    ask: ask('ask-first', 'Keep the old names?', ['Keep', 'Rename']),
+  };
+  const state = { threads: [THREAD], messages: HISTORY, todos: [asking] };
+  const posts: string[] = [];
+  await mockLive(page, state, (path, route, json) => {
+    if (route.request().method() !== 'POST' || !/\/questions\/[^/]+\/answer$/.test(path)) {
+      return undefined;
+    }
+    posts.push(path);
+    state.todos = [{ ...asking, ask: ask('ask-second', 'Which order?', ['Alphabetical', 'By status']) }];
+    return json({ todoId: 'todo-4', buildId: 'build-4', requestId: 'x', delivered: 'steer' });
+  });
+  await page.goto('/app?pane=inbox');
+  const row = page.getByTestId('needs-you-inbox-row');
+  await row.getByTestId('needs-you-inbox-toggle').click();
+  await row.getByRole('button', { name: 'Keep', exact: true }).click();
+  await expect(row.getByTestId('needs-you-inbox-ask')).toHaveText('Which order?');
+  await row.getByTestId('needs-you-inbox-toggle').click();
+  const next = row.getByRole('button', { name: 'By status', exact: true });
+  await expect(next).toBeEnabled();
+  await expect(row.getByRole('textbox', { name: 'Reply to #4' })).toBeEditable();
+  await next.click();
+  await expect.poll(() => posts).toEqual([
+    '/api/todos/todo-4/questions/ask-first/answer',
+    '/api/todos/todo-4/questions/ask-second/answer',
+  ]);
+});
+
 test('no needs-you thread and no question means no chip and a plain tab title', async ({ page }) => {
   await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: [TASK] });
   await page.goto('/app');

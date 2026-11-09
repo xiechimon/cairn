@@ -9,7 +9,7 @@ type Listener = () => void;
 let answered: ReadonlySet<string> = new Set();
 const listeners = new Set<Listener>();
 
-function answerKeyOf(todo: TodoRecord): string {
+export function needsYouKeyOf(todo: TodoRecord): string {
   return `${todo.id}:${todo.ask?.requestId ?? todo.phaseAt}`;
 }
 
@@ -24,7 +24,7 @@ export const answeredThreads = {
     return answered;
   },
   mark(todo: TodoRecord): void {
-    answered = new Set([...answered, answerKeyOf(todo)]);
+    answered = new Set([...answered, needsYouKeyOf(todo)]);
     for (const listener of listeners) listener();
   },
 };
@@ -42,7 +42,7 @@ export function useNeedsYou(todos: readonly TodoRecord[]): NeedsYou {
     answeredThreads.snapshot,
     answeredThreads.snapshot,
   );
-  const threads = needsYouThreads(todos).filter((todo) => !done.has(answerKeyOf(todo)));
+  const threads = needsYouThreads(todos).filter((todo) => !done.has(needsYouKeyOf(todo)));
   const questions = root?.pendingQuestions ?? [];
   return { threads, questions, count: threads.length + questions.length };
 }

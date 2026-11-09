@@ -1,11 +1,12 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import { useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChiefQuestionCard, recommendedFirst } from './chief-question-card.js';
 import { useOptionalChiefRoot } from './chief-root.js';
+import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import { questionDraftKey, questionDraftStore, questionSubmitStore } from './question-drafts.js';
 import type { OriginChiefQuestion } from './question-origin.js';
 
@@ -111,6 +112,7 @@ export function QuickQuestion({
         ))}
       </div>
       <OwnAnswer
+        answerKey={answerKeyOf(key, 0)}
         disabled={submitting}
         onSend={(text) => answer([{ header: question.header, choices: [text] }])}
         onCancel={() => cancel(request.item.requestId)}
@@ -147,16 +149,23 @@ export function InlineCoordinatorQuestion({ request }: { request: OriginChiefQue
 }
 
 function OwnAnswer({
+  answerKey,
   disabled,
   onSend,
   onCancel,
 }: {
+  answerKey: string;
   disabled: boolean;
   onSend: (text: string) => void;
   onCancel: () => void;
 }) {
   const { t } = useI18n();
-  const [text, setText] = useState('');
+  const text = useSyncExternalStore(
+    questionDockState.subscribe,
+    () => questionDockState.answerText(answerKey),
+    () => '',
+  );
+  const setText = (value: string) => questionDockState.setAnswerText(answerKey, value);
   const send = () => {
     const value = text.trim();
     if (value === '' || disabled) return;

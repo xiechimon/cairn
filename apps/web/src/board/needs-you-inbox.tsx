@@ -13,7 +13,7 @@ import { ThreadReply } from '../components/thread/thread-reply.js';
 import { Button } from '../components/ui/button.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { answeredThreads, type NeedsYou } from './needs-you-store.js';
+import { answeredThreads, type NeedsYou, needsYouKeyOf } from './needs-you-store.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadTone } from './thread-copy.js';
 import { useThreadReply } from './thread-reply-send.js';
@@ -279,11 +279,11 @@ export function NeedsYouPanel({
         ))}
         {needsYou.threads.map((todo) => (
           <ThreadEntry
-            key={todo.id}
+            key={needsYouKeyOf(todo)}
             todo={todo}
             now={now}
-            open={openId === todo.id}
-            onToggle={() => toggle(todo.id)}
+            open={openId === needsYouKeyOf(todo)}
+            onToggle={() => toggle(needsYouKeyOf(todo))}
             onOpenThread={() => onOpenThread(todo.id)}
           />
         ))}

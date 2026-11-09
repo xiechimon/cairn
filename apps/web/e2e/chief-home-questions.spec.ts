@@ -207,6 +207,24 @@ for (const where of ['conversation', 'inbox'] as const) {
   });
 }
 
+test('an own-words draft in the inbox survives closing and reopening the row and shows in the conversation', async ({
+  page,
+}) => {
+  await mockLive(page, structuredClone(ONE));
+  await page.goto('/app?pane=inbox');
+  const row = page.getByTestId('needs-you-inbox-question');
+  const toggle = row.getByTestId('needs-you-inbox-toggle');
+  await toggle.click();
+  await row.getByTestId('quick-question-own').fill('Use the metered key this once');
+  await toggle.click();
+  await expect(row.getByTestId('quick-question-own')).toHaveCount(0);
+  await toggle.click();
+  await expect(row.getByTestId('quick-question-own')).toHaveValue('Use the metered key this once');
+  await expect(inline(page).getByTestId('quick-question-own')).toHaveValue(
+    'Use the metered key this once',
+  );
+});
+
 test('a request with several questions takes your own words for each step on home', async ({ page }) => {
   const answered: { path: string; body: unknown }[] = [];
   const state = structuredClone(MIXED);
