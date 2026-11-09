@@ -59,7 +59,7 @@ async function reapGroup(pgid: number): Promise<void> {
 }
 
 /** Real apps/server on a free port with a scratch CAIRN_HOME, serving this
- *  worktree's dist. Ready = /api/teams answers 200, or 401 when a token is set.
+ *  worktree's dist. Ready = /api/teams answers 401 (token set) or 200.
  *
  *  Runs as `node --import tsx` in its own process group: `pnpm exec` puts
  *  corepack's shim in front, and the shim exits on SIGTERM without
