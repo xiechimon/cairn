@@ -560,23 +560,15 @@ export interface TranscriptInput {
   stopping?: boolean;
   activity?: StepActivity | null;
   agentTodo?: AgentTodo | null;
+  hasEarlier?: boolean;
 }
 
-export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
-  const {
-    messages,
-    steps,
-    plans,
-    build,
-    todo,
-    machineName,
-    userName,
-    liveText,
-    liveThinking = '',
-    stopping = false,
-    activity = null,
-    agentTodo = null,
-  } = input;
+function transcriptHead(
+  messages: TranscriptInput['messages'],
+  steps: TranscriptInput['steps'],
+  build: TranscriptInput['build'],
+  machineName: TranscriptInput['machineName'],
+): TranscriptItem[] {
   const head: TranscriptItem[] = [];
   if (
     build?.triggerSource === 'schedule' &&
@@ -605,6 +597,26 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       });
     }
   }
+  return head;
+}
+
+export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
+  const {
+    messages,
+    steps,
+    plans,
+    build,
+    todo,
+    machineName,
+    userName,
+    liveText,
+    liveThinking = '',
+    stopping = false,
+    activity = null,
+    agentTodo = null,
+    hasEarlier = false,
+  } = input;
+  const head = hasEarlier ? [] : transcriptHead(messages, steps, build, machineName);
 
   const toolNameByResult = new Map<string, string>();
   for (const m of messages) {
