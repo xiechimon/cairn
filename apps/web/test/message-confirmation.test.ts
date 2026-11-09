@@ -57,6 +57,24 @@ it.each([{ conversationId: 'build-1' }, { conversationId: 'build-1', message: { 
   expect(newest(qc)).toBeUndefined();
 });
 
+it.each(['build-1', 'replacement-build'])('removes a delivered capsule from its source when the target is %s without relying on GET', async (target) => {
+  const { qc, mutations } = setup();
+  cacheUserMessage(qc, 'build-1', { id: 'queued', content: message.content, createdAt: 2, deliverAfterStop: false });
+  vi.spyOn(api, 'post').mockResolvedValue({ conversationId: target, message });
+  await mutations.sendSteer.mutateAsync({ conversationId: 'build-1', content: message.content, queuedMessageId: 'queued' });
+  expect(newest(qc)?.queuedMessages).toEqual([]);
+  expect(qc.getQueryData<InfiniteData<ConversationMessagesResponse>>(['messages', target, 'pages'])?.pages[0]?.messages).toEqual([message]);
+});
+
+it('retains a queued capsule when delivery fails', async () => {
+  const { qc, mutations } = setup();
+  cacheUserMessage(qc, 'build-1', { id: 'queued', content: message.content, createdAt: 2, deliverAfterStop: false });
+  vi.spyOn(api, 'post').mockRejectedValue(new Error('Delivery refused'));
+  await expect(mutations.sendSteer.mutateAsync({ conversationId: 'build-1', content: message.content, queuedMessageId: 'queued' })).rejects.toThrow('Delivery refused');
+  expect(newest(qc)?.queuedMessages).toHaveLength(1);
+  expect(newest(qc)?.messages).toEqual([]);
+});
+
 it('does not create a success row on submission failure', async () => {
   const { qc, mutations } = setup();
   vi.spyOn(api, 'post').mockRejectedValue(new Error('Submission refused'));

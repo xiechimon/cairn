@@ -217,6 +217,17 @@ for (const chord of ['Meta+Enter', 'Control+Enter']) {
   });
 }
 
+test('send now removes the capsule as soon as delivery is confirmed despite a slow read', async ({ page }) => {
+  const task = await runningTask(page, 3000);
+  await task.input.fill('Deliver exactly once');
+  await task.input.press('Control+Enter');
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
+  await page.getByTestId('steer-queued-message').click();
+  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Deliver exactly once' })).toBeVisible({ timeout: 700 });
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(0, { timeout: 700 });
+  expect(task.steerPending).toEqual(['Deliver exactly once']);
+});
+
 test('send now delivers the queued capsule immediately and plain Enter still steers', async ({ page }) => {
   const task = await runningTask(page);
   await task.input.fill('Queued steer');

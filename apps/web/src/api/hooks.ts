@@ -1083,7 +1083,17 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
       },
       onSuccess: (data, input) => {
-        cacheUserMessage(qc, data.conversationId ?? input.conversationId, data.message);
+        cacheUserMessage(
+          qc,
+          data.conversationId ?? input.conversationId,
+          data.message,
+          input.queuedMessageId === undefined
+            ? undefined
+            : {
+                conversationId: input.conversationId,
+                messageId: input.queuedMessageId,
+              },
+        );
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });
