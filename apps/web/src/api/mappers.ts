@@ -1465,7 +1465,12 @@ function handoffTodoOf(call: ToolCallRecord): string | null {
   return typeof todoId === 'string' && todoId !== '' ? todoId : null;
 }
 
-function createdTodoOf(call: ToolCallRecord): { todoId: string; projectId: string | null } | null {
+function createdTodoOf(call: ToolCallRecord): {
+  todoId: string;
+  projectId: string | null;
+  seq: number | null;
+  title: string | null;
+} | null {
   if (call.name !== 'create_todo' || call.result === undefined || call.isError === true)
     return null;
   let result: unknown = call.result;
@@ -1476,10 +1481,16 @@ function createdTodoOf(call: ToolCallRecord): { todoId: string; projectId: strin
       return null;
     }
   }
-  const todoId = (result as { id?: unknown } | null)?.id;
+  const record = result as { id?: unknown; seqNum?: unknown; title?: unknown } | null;
+  const todoId = record?.id;
   if (typeof todoId !== 'string' || todoId === '') return null;
   const projectId = (call.arguments as { projectId?: unknown } | null)?.projectId;
-  return { todoId, projectId: typeof projectId === 'string' ? projectId : null };
+  return {
+    todoId,
+    projectId: typeof projectId === 'string' ? projectId : null,
+    seq: typeof record?.seqNum === 'number' ? record.seqNum : null,
+    title: typeof record?.title === 'string' && record.title !== '' ? record.title : null,
+  };
 }
 
 export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {

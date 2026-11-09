@@ -534,7 +534,14 @@ export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
-  | { kind: 'task-card'; todoId: string; id: string; projectId: string | null }
+  | {
+      kind: 'task-card';
+      todoId: string;
+      id: string;
+      projectId: string | null;
+      seq: number | null;
+      title: string | null;
+    }
   | {
       kind: 'question';
       id?: string;

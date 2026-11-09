@@ -14,7 +14,7 @@ const created = {
       id: 'c-m2',
       name: 'create_todo',
       arguments: { title: TASK.title, projectId: 'proj-1', spec: 's' },
-      result: { id: TASK.id },
+      result: { id: TASK.id, seqNum: TASK.seqNum, title: TASK.title },
       startedAt: 11,
       endedAt: 12,
     },
@@ -84,7 +84,7 @@ test('a created task the Tasks read no longer lists falls back to a one-line lin
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
   await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
-  await expect(stream.getByTestId('chief-task-created')).toContainText('Created task');
+  await expect(stream.getByTestId('chief-task-created')).toHaveText(`Created task #${TASK.seqNum} ${TASK.title}`);
 });
 
 test('tasks waiting on the owner put no tray above the composer; the greeting count is the Tasks badge', async ({

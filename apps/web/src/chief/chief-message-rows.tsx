@@ -162,10 +162,20 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string):
 
 export const TaskCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
 
-function TaskCardRow({ todoId }: { todoId: string }) {
+function TaskCardRow({
+  todoId,
+  seq,
+  title,
+}: {
+  todoId: string;
+  seq: number | null;
+  title: string | null;
+}) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
   const card = useContext(TaskCardContext)?.(todoId);
+  const shownSeq = glance?.seq ?? seq;
+  const shownTitle = glance?.title ?? title;
   if (card != null) {
     return (
       <MessageScrollerItem
@@ -182,8 +192,9 @@ function TaskCardRow({ todoId }: { todoId: string }) {
       <StatusLine testId="chief-task-created">
         {t('已建任务')}{' '}
         <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-          {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+          {shownSeq != null ? `#${shownSeq}` : t('任务')}
         </ThreadLink>
+        {shownTitle != null ? ` ${shownTitle}` : null}
       </StatusLine>
     </MessageScrollerItem>
   );
@@ -319,7 +330,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
-  if (item.kind === 'task-card') return <TaskCardRow todoId={item.todoId} />;
+  if (item.kind === 'task-card')
+    return <TaskCardRow todoId={item.todoId} seq={item.seq} title={item.title} />;
   if (item.kind === 'digest')
     return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
   if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;

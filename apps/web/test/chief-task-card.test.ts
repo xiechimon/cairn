@@ -39,12 +39,12 @@ describe('a task the Coordinator creates becomes a task card in the conversation
       said('a1', 'assistant', 'Created #126 in cairn and forwarded your words.'),
     ]);
     expect(items.map((item) => item.kind)).toEqual(['user', 'robot', 'task-card']);
-    expect(items[2]).toEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1' });
+    expect(items[2]).toEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1', seq: null, title: null });
   });
 
   test('a turn still streaming its reply already shows the card', () => {
     const items = mapChiefStream([call('m1', 'create_todo', CREATE, JSON.stringify({ id: 'todo-9' }))]);
-    expect(items).toContainEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1' });
+    expect(items).toContainEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1', seq: null, title: null });
   });
 
   test('a task created during a wake turn still gets its card', () => {
@@ -55,7 +55,21 @@ describe('a task the Coordinator creates becomes a task card in the conversation
       said('u2', 'user', 'Thanks'),
     ]);
     expect(items.map((item) => item.kind)).toEqual(['task-card', 'user']);
-    expect(items[0]).toEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1' });
+    expect(items[0]).toEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1', seq: null, title: null });
+  });
+
+  test('the card keeps the created task number and title for when the Tasks read no longer lists it', () => {
+    const items = mapChiefStream([
+      call('m1', 'create_todo', CREATE, JSON.stringify({ id: 'todo-9', seqNum: 126, title: CREATE.title })),
+    ]);
+    expect(items).toContainEqual({
+      kind: 'task-card',
+      todoId: 'todo-9',
+      id: 'm1:task-card',
+      projectId: 'p1',
+      seq: 126,
+      title: 'Enforce public-content checks',
+    });
   });
 
   test('a failed or unfinished create_todo shows no card', () => {

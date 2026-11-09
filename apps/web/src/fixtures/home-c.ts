@@ -64,6 +64,8 @@ const conversation: ChiefContent = {
       id: 'home-c-card-orb',
       todoId: 'home-c-working-c',
       projectId: HOME_C_CRED,
+      seq: 75,
+      title: 'Orb canary round 7',
     },
     {
       kind: 'question',
@@ -106,6 +108,8 @@ const conversation: ChiefContent = {
       id: 'home-c-card-fold',
       todoId: 'home-c-review',
       projectId: PROJECT_ID,
+      seq: 2271,
+      title: 'Fold finished turns into purpose and duration',
     },
   ],
   streamAt: [r7(20, 0), r7(20, 1), r7(20, 1), r7(20, 1), r7(20, 5), r7(20, 6), r7(20, 6)],
