@@ -16,7 +16,7 @@ import {
   Waypoints,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -159,7 +159,7 @@ export function SettingsPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
-  useEffect(() => {
+  useLayoutEffect(() => {
     windowRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;

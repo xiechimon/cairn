@@ -10,7 +10,7 @@ const SHELL_EXIT_BRIDGE_CLS =
   '[transition:visibility_0s_linear_var(--dur-overlay)] data-[ending-style]:invisible';
 
 const VIEWPORT_MECHANISM_CLS =
-  'fixed inset-0 pointer-events-none [&>*]:pointer-events-auto [transition:visibility_0s_linear_var(--dur-fast)] data-[ending-style]:invisible';
+  'fixed inset-0 pointer-events-none [&>*]:pointer-events-auto data-[ending-style]:[transition:opacity_0s_linear_var(--dur-fast)] data-[ending-style]:opacity-0';
 
 export const VIEWPORT_POP_ANIM =
   'duration-100 ease-out group-data-open/dlgvp:animate-in group-data-open/dlgvp:fade-in-0 group-data-open/dlgvp:zoom-in-98';
