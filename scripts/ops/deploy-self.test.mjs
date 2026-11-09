@@ -986,6 +986,7 @@ test('server-only deploys under continuous active work without stopping either d
     files: {
       'apps/server/src/probe.ts': 'export {};\n',
       '.claude/skills/verify-cairn/feature-map.json': '{}\n',
+      'packages/shared/src/tables.ts': 'export const DB_TABLES = ["deploy_lease"];\n',
       'marker.txt': 'previous\n',
     },
   });
@@ -1037,6 +1038,83 @@ test('bootstrap retains the green-check and old-server dispatch gates', () => {
     assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
     assert.ok(!readdirSync(f.state).some((name) => name.startsWith('deploy-bootstrap.')));
   }
+});
+
+test('every recovery tick drains again after the previous refusal resumed claims', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', '--detach', target);
+  mkdirSync(f.state, { recursive: true });
+  mkdirSync(f.backups, { recursive: true });
+  const snapshot = join(f.backups, 'stopped-expired.db');
+  sqlite(f.db, `vacuum into '${snapshot}'`);
+  const owner = '00000000-0000-4000-8000-000000000001';
+  sqlite(
+    f.db,
+    `insert into deploy_lease values ('server','${owner}','draining',1);
+     insert into step(id,status) values ('new-work','claimed');`,
+  );
+  writeFileSync(join(f.state, 'lease-owner'), owner);
+  writeFileSync(
+    join(f.state, 'in-progress'),
+    `phase=restored\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\nruntime=daemon\n`,
+  );
+  for (let tick = 0; tick < 2; tick++) {
+    const result = f.run(DEPLOY, ['--recover']);
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.equal(f.log('systemctl.log'), '', 'recovery must not stop newly claimed work');
+    assert.ok(existsSync(join(f.state, 'in-progress')));
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+    assert.equal(existsSync(join(f.state, 'lease-owner')), false);
+  }
+});
+
+test('recovery without an owner marker cannot replace a competing deployment lease', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  mkdirSync(f.state, { recursive: true });
+  const owner = '00000000-0000-4000-8000-000000000002';
+  sqlite(
+    f.db,
+    `insert into deploy_lease values ('server','${owner}','draining',${Date.now() + 60_000})`,
+  );
+  writeFileSync(
+    join(f.state, 'in-progress'),
+    `phase=restored\ntarget=${target}\nprevious=${f.previous}\nruntime=daemon\n`,
+  );
+  const result = f.run(DEPLOY, ['--recover']);
+  assert.equal(f.log('systemctl.log'), '');
+  assert.equal(result.status, 2, result.stderr);
+  assert.equal(sqlite(f.db, "select owner from deploy_lease where id='server'"), owner);
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'draining');
+});
+
+test('recovery restores domain data without reviving the snapshot lease owner', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', '--detach', target);
+  mkdirSync(f.state, { recursive: true });
+  mkdirSync(f.backups, { recursive: true });
+  const snapshot = join(f.backups, 'stopped-owner.db');
+  const oldOwner = '00000000-0000-4000-8000-000000000001';
+  sqlite(
+    f.db,
+    `insert into deploy_lease values ('server','${oldOwner}','draining',${Date.now() + 3_600_000})`,
+  );
+  sqlite(f.db, `vacuum into '${snapshot}'`);
+  sqlite(f.db, "update deploy_lease set status='accepting',expiresAt=0");
+  writeFileSync(join(f.fake, 'broken-sha'), target);
+  writeFileSync(
+    join(f.state, 'in-progress'),
+    `phase=switching\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\nruntime=daemon\n`,
+  );
+  const result = f.run(DEPLOY, ['--recover']);
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(JSON.parse(readFileSync(join(f.state, 'deployed.json'))).result, 'rolled-back');
+  assert.notEqual(sqlite(f.db, "select owner from deploy_lease where id='server'"), oldOwner);
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
 });
 
 for (const failure of [false, true]) {

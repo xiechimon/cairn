@@ -151,6 +151,7 @@ trap 'exit 143' TERM
 trap 'exit 130' INT
 if [ -s "$STATE/lease-owner" ]; then
   LEASE_OWNER="$(cat "$STATE/lease-owner")"
+  [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || refuse "invalid recovery lease owner"
   if [ ! -e "$STATE/in-progress" ]; then resume_claims || exit 3; fi
 fi
 rm -f "$STATE/last-reason"
@@ -275,7 +276,7 @@ classify_runtime() {
   while IFS= read -r path; do
     case "$path" in
       *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
-      apps/server/* | apps/web/* | integration/test/* | docs/* | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
+      apps/server/* | apps/web/* | integration/test/* | docs/* | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
       *) RUNTIME=daemon ;;
     esac
   done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")
@@ -296,12 +297,8 @@ assert lease['expiresAt'] > time.time() * 1000
 PYLEASE
 }
 
-drain_steps() {
-  [ "$RUNTIME" = daemon ] || return 0
+wait_for_steps() {
   local deadline=$(( $(date +%s) + STEP_WAIT_SECONDS )) running
-  [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
-  printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
-  [ "$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" = 200 ] && assert_lease || refuse "cannot acquire deployment lease"
   while :; do
     [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 1 ] || refuse "deployment lease lost during drain"
     running="$(sqlite3 -readonly "$DB" "select count(*) from step where status='claimed' and machineId is not null")" || refuse "cannot read running steps"
@@ -310,6 +307,14 @@ drain_steps() {
     [ "$(date +%s)" -lt "$deadline" ] || busy "starved: steps never idle ($running still running after ${STEP_WAIT_SECONDS}s drain)"
     sleep 1
   done
+}
+
+drain_steps() {
+  [ "$RUNTIME" = daemon ] || return 0
+  [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+  printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
+  [ "$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" = 200 ] && assert_lease || refuse "cannot acquire deployment lease"
+  wait_for_steps
 }
 
 allow_builds_block() {
@@ -528,7 +533,7 @@ prune_snapshots() {
   find "$BACKUPS" -maxdepth 1 -name 'stopped-*.db' -print | sort -r | tail -n +"$((KEEP_SNAPSHOTS + 1))" | xargs -r rm -f
 }
 
-UNTRACKED_TABLES=" __drizzle_migrations "
+UNTRACKED_TABLES=" __drizzle_migrations deploy_lease "
 HEARTBEAT_COLUMNS=" machine.lastSeenAt machine.capabilities autonomy_state.lastEvaluatedAt "
 
 user_tables() {
@@ -631,7 +636,7 @@ set_in_progress() {
 }
 
 restore_snapshot() {
-  local snapshot="$1" failed_dir="$2" file
+  local snapshot="$1" failed_dir="$2" file lease_tables
   [ -s "$snapshot" ] || return 1
   mkdir -p "$failed_dir" || return 1
   if [ -e "$DB" ] && ! cmp -s "$DB" "$snapshot"; then
@@ -642,6 +647,13 @@ restore_snapshot() {
   rm -f "$DB-wal" "$DB-shm"
   if [ ! -e "$DB" ]; then
     cp "$snapshot" "$DB.restoring" && mv "$DB.restoring" "$DB" || return 1
+  fi
+  if [ -n "$LEASE_OWNER" ]; then
+    lease_tables="$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" || return 1
+    if [ "$lease_tables" = 1 ]; then
+      sqlite3 -cmd '.timeout 10000' "$DB" "insert into deploy_lease(id,owner,status,expiresAt) values ('server','$LEASE_OWNER','draining',$(($(date +%s) * 1000 + 3600000)))
+        on conflict(id) do update set owner=excluded.owner,status=excluded.status,expiresAt=excluded.expiresAt;" || return 1
+    fi
   fi
 }
 
@@ -673,10 +685,18 @@ recover_interrupted() {
     log "restored the $PREVIOUS checkout; running services were not touched"
     return 0
   fi
-  if [ -n "$LEASE_OWNER" ] && [ "$RUNTIME" = daemon ] && [ -s "$DB" ]; then
-    sqlite3 -cmd '.timeout 10000' "$DB" "update deploy_lease set status='draining', expiresAt=$(($(date +%s) * 1000 + 3600000)) where id='server' and owner='$LEASE_OWNER';" || refuse "cannot recover deployment lease"
-    [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 1 ] || refuse "recovery lease belongs to another owner"
-    [ "$(sqlite3 -readonly "$DB" "select count(*) from step where status='claimed' and machineId is not null")" = 0 ] || refuse "recovery needs running steps to finish before replacing the daemon"
+  if [ "$RUNTIME" = daemon ] && [ -s "$DB" ]; then
+    local lease_now
+    [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || refuse "invalid recovery lease owner"
+    printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
+    lease_now="$(($(date +%s) * 1000))"
+    sqlite3 -cmd '.timeout 10000' "$DB" "begin immediate;
+      insert into deploy_lease(id,owner,status,expiresAt) values ('server','$LEASE_OWNER','draining',$((lease_now + 3600000)))
+      on conflict(id) do update set owner=excluded.owner, status=excluded.status, expiresAt=excluded.expiresAt
+      where deploy_lease.owner=excluded.owner or deploy_lease.status='accepting' or deploy_lease.expiresAt <= $lease_now;
+      commit;" || refuse "cannot recover deployment lease"
+    wait_for_steps
   fi
   if [ "$phase" = restoring ] || [ "$phase" = restored ]; then
     stop_or_give_up "$snapshot"
@@ -718,6 +738,7 @@ recover_interrupted() {
   restart_previous "interrupted deploy had no snapshot"
 }
 
+[[ "$STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$STEP_WAIT_SECONDS" -le 1800 ] || refuse "drain deadline must be between 0 and 1800 seconds"
 recover_interrupted
 [ "$RECOVER_ONLY" = 0 ] || exit 0
 
@@ -737,7 +758,6 @@ if [ "$PREVIOUS" = "$TARGET" ]; then
 fi
 assert_deployable
 assert_hold
-[[ "$STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$STEP_WAIT_SECONDS" -le 1800 ] || refuse "drain deadline must be between 0 and 1800 seconds"
 classify_runtime
 if [ "$RUNTIME" = daemon ]; then
   [ "$(lease_request)" = 200 ] || refuse "server lacks the deployment lease endpoint; bootstrap server-only first"
