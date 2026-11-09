@@ -3022,6 +3022,12 @@ const UNDELIVERED_SUMMARY: Record<Undelivered, string> = {
 };
 
 function askUndeliveredOnce(deps: BuildDeps, buildRow: BuildRow, kind: Undelivered): void {
+  const asked = deps.db
+    .select({ id: message.id })
+    .from(message)
+    .where(inArray(message.id, [`no-deliverable-${buildRow.id}`, `no-change-${buildRow.id}`]))
+    .get();
+  if (asked !== undefined) return;
   const reportLine = excerptOf(buildRow.reportLine, '(no report line)');
   const last = excerptOf(lastAgentMessage(deps, buildRow.id), '(the agent left no message)');
   const requestId = `no-deliverable-${buildRow.id}`;

@@ -271,6 +271,32 @@ describe('a step that delivered nothing asks once (task stall class 2)', () => {
   });
 });
 
+describe('a build answered under the old zero-change id is not asked again', () => {
+  test('a continuation that ends without commits after an answered no-change question goes to review', () => {
+    const { todoId, buildId, stepRow } = startSession();
+    H.s.db
+      .insert(message)
+      .values({
+        id: `no-change-${buildId}`,
+        conversationId: buildId,
+        role: 'assistant',
+        content: {
+          kind: 'ask_user_question',
+          requestId: `no-change-${buildId}`,
+          status: 'answered',
+          questions: [{ header: 'No changes', question: 'What next?', options: [] }],
+          answers: [{ text: 'No code change is needed.' }],
+        },
+        createdAt: Date.now(),
+        actor: null,
+      })
+      .run();
+    endStep(stepRow.id, { hasChanges: false });
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+    expect(phaseOf(todoId)).toBe('review');
+  });
+});
+
 describe('answer_question answers one request id on the same build', () => {
   test('the answer resumes the same build on the same session', async () => {
     const { todoId, buildId, stepRow } = await askAndPark();
