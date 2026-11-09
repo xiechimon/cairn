@@ -497,6 +497,7 @@ describe('correction loop', () => {
       const result = transitionTodos(deps, s.team.id, [task.id], 'done', {
         kind: 'agent',
         name: 'Coordinator',
+        stopActor: 'coordinator',
       });
       expect(result.transitioned).toEqual([]);
       expect(result.skipped).toEqual([task.id]);

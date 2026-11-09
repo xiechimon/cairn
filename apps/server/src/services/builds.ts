@@ -53,6 +53,7 @@ import {
   SESSION_BRIEF,
   SESSION_REWORK_BRIEF,
   STOP_MESSAGE,
+  type StopAttribution,
   type TodoOutputKind,
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
@@ -223,8 +224,20 @@ export function toBuildRecord(row: BuildRow): BuildRecord {
     prNumber: row.prNumber,
     diffHash: row.diffHash,
     reportAttachmentId: row.reportAttachmentId,
+    stop: row.stop,
     createdAt: row.createdAt,
   };
+}
+
+function recordStop(db: Db, buildId: string, by: StopAttribution): void {
+  db.update(build)
+    .set({ stop: { ...by, at: nowMs() } })
+    .where(eq(build.id, buildId))
+    .run();
+}
+
+function clearStop(db: Db, buildId: string): void {
+  db.update(build).set({ stop: null }).where(eq(build.id, buildId)).run();
 }
 
 function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
@@ -638,6 +651,7 @@ export function requestStop(
   deps: BuildDeps,
   buildId: string,
   body: { discard: boolean },
+  by: StopAttribution,
 ): { delegated: boolean } {
   const { db } = deps;
   const buildRow = db.select().from(build).where(eq(build.id, buildId)).get();
@@ -654,6 +668,7 @@ export function requestStop(
   if (!active) {
     throw new HttpError(409, 'no active step on this build (stop 只对运行中的任务生效)');
   }
+  recordStop(db, buildId, by);
   if (active.status === 'pending' || active.status === 'waiting_quota') {
     applyStoppedStep(deps, active.id);
     return { delegated: false };
@@ -753,9 +768,11 @@ function releaseZombieQueued(
   deps: BuildDeps,
   buildRow: BuildRow,
   todoRow: typeof todo.$inferSelect,
+  by: StopAttribution,
 ): void {
   const { db } = deps;
   if (todoRow.archivedAt !== null || todoRow.phase !== 'queued') return;
+  recordStop(db, buildRow.id, by);
   if (buildRow.errorMessage === null) {
     db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   }
@@ -779,6 +796,7 @@ function releaseZombieQueued(
 export function cancelBuild(
   deps: BuildDeps,
   buildId: string,
+  by: StopAttribution,
 ): 'stopped' | 'delegated' | 'released' | 'not-found' {
   const { db } = deps;
   const buildRow = db.select().from(build).where(eq(build.id, buildId)).get();
@@ -795,9 +813,10 @@ export function cancelBuild(
   if (!active) {
     const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
     if (!todoRow) return 'released';
-    releaseZombieQueued(deps, buildRow, todoRow);
+    releaseZombieQueued(deps, buildRow, todoRow, by);
     return 'released';
   }
+  recordStop(db, buildId, by);
   if (active.status === 'pending' || active.status === 'waiting_quota') {
     applyStoppedStep(deps, active.id);
     emitRuntimeBuildSpan(deps.db, buildId, 'cancelled');
@@ -867,15 +886,27 @@ export function stopUnclaimedGateSteps(
 
 export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
 
-export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMarkDoneResult {
-  return prepareStopFor(deps, todoId, 'done');
+export function prepareStopForDone(
+  deps: BuildDeps,
+  todoId: string,
+  by: StopAttribution,
+): StopAndMarkDoneResult {
+  return prepareStopFor(deps, todoId, 'done', by);
 }
 
-export function stopActiveStepsAfterExit(deps: BuildDeps, todoId: string): void {
-  prepareStopFor(deps, todoId, 'exit');
+export function stopActiveStepsAfterExit(
+  deps: BuildDeps,
+  todoId: string,
+  by: StopAttribution,
+): void {
+  prepareStopFor(deps, todoId, 'exit', by);
 }
 
-export function stopActiveStepsForArchive(deps: BuildDeps, todoId: string): void {
+export function stopActiveStepsForArchive(
+  deps: BuildDeps,
+  todoId: string,
+  by: StopAttribution,
+): void {
   const rows = deps.db
     .select({ stepRow: step, teamId: todo.teamId })
     .from(step)
@@ -883,6 +914,8 @@ export function stopActiveStepsForArchive(deps: BuildDeps, todoId: string): void
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(and(eq(todo.id, todoId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])))
     .all();
+  for (const buildId of new Set(rows.map((r) => r.stepRow.buildId)))
+    recordStop(deps.db, buildId, by);
   for (const { stepRow, teamId } of rows) {
     deps.db.update(step).set({ archiveStop: 'requested' }).where(eq(step.id, stepRow.id)).run();
     deps.db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
@@ -895,6 +928,7 @@ function prepareStopFor(
   deps: BuildDeps,
   todoId: string,
   after: 'done' | 'exit',
+  by: StopAttribution,
 ): StopAndMarkDoneResult {
   const { db } = deps;
   const todoRow = db.select().from(todo).where(eq(todo.id, todoId)).get();
@@ -912,6 +946,7 @@ function prepareStopFor(
     .all()
     .at(-1);
   if (!active) return { state: 'ready' };
+  recordStop(db, buildId, by);
   if (active.status === 'pending' || active.status === 'waiting_quota') {
     stopStepKeepPhase(deps, active.id);
     return { state: 'ready' };
@@ -951,7 +986,10 @@ export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()):
       )
       .all();
     if (active.length > 0) continue;
-    releaseZombieQueued(deps, buildRow, todoRow);
+    releaseZombieQueued(deps, buildRow, todoRow, {
+      actor: 'system',
+      reason: 'queued build had no active step left',
+    });
     released += 1;
   }
   return released;
@@ -985,6 +1023,7 @@ export function enqueueStep(
       createdAt,
     })
     .run();
+  clearStop(deps.db, buildId);
   if (isBuildStepKind(kind)) {
     deps.db.update(build).set({ reportLine: null }).where(eq(build.id, buildId)).run();
   }
@@ -2483,6 +2522,7 @@ export function applyStepFailure(
     applyStoppedStep(deps, stepRow.id);
     return;
   }
+  clearStop(db, stepRow.buildId);
   releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
@@ -2941,6 +2981,7 @@ export function completeStep(
     applyStoppedStep(deps, stepId);
     return;
   }
+  clearStop(deps.db, stepRow.buildId);
   if (settleParkedStep(deps, stepRow, { status: 'success' })) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) {

@@ -1,4 +1,10 @@
-import type { ChiefNoticeContent, GitIdentity, SecretBox, UserRecord } from '@cairn/shared';
+import type {
+  ChiefNoticeContent,
+  GitIdentity,
+  SecretBox,
+  StopActor,
+  UserRecord,
+} from '@cairn/shared';
 import {
   CHIEF_NOTICE_KIND,
   createSkillBodySchema,
@@ -299,7 +305,11 @@ export async function executeChiefTool(
     githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const chiefActor: TransitionActor = { kind: 'agent', name: 'Coordinator' };
+  const chiefActor: TransitionActor = {
+    kind: 'agent',
+    name: 'Coordinator',
+    stopActor: 'coordinator',
+  };
   assertToolNotRemoved(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
@@ -714,9 +724,10 @@ export async function executeChiefTool(
 
     case 'cancel_builds': {
       const buildIds = strArr(params, 'buildIds');
+      const reason = str(params, 'reason');
+      for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
       for (const buildId of buildIds) {
-        requireTeamBuild(db, buildId, ctx.teamId);
-        cancelBuild(deps, buildId);
+        cancelBuild(deps, buildId, { actor: 'coordinator', reason });
       }
       return json({ cancelled: buildIds });
     }
@@ -903,7 +914,7 @@ export async function executeChiefTool(
   }
 }
 
-export type TransitionActor = { kind: 'user' | 'agent'; name: string };
+export type TransitionActor = { kind: 'user' | 'agent'; name: string; stopActor: StopActor };
 
 export type TransitionDeps = Pick<
   ChiefToolDeps,
@@ -976,7 +987,10 @@ export function transitionTodos(
         const doneFromInProgress =
           to === 'done' && (IN_PROGRESS_PHASES as readonly string[]).includes(owned.phase);
         if ((to === 'closed' && owned.phase !== 'closed') || doneFromInProgress)
-          stopActiveStepsAfterExit(svc, id);
+          stopActiveStepsAfterExit(svc, id, {
+            actor: actor.stopActor,
+            reason: `${to === 'closed' ? 'closed' : 'marked done'} by ${actor.name}`,
+          });
         if (to === 'done' && owned.phase !== 'done' && owned.latestBuildId !== null) {
           insertGateAnnouncement(deps, owned.latestBuildId, DONE_ANNOUNCEMENT, actor.name);
         }

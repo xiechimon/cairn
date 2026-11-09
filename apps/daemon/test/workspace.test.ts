@@ -243,7 +243,7 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
 
   test('merge --no-edit two states: Already up to date / a real merge (when main advances)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
-    const idle = await ws.mergeDefaultBranch(prepared.cwd, prepared.defaultBranch);
+    const idle = await ws.mergeDefaultBranch(prepared.cwd, prepared.defaultBranch, null);
     expect(idle.output).toMatch(/Already up to date/i);
 
     await runGit(['checkout', 'main'], { cwd: seedDir });
@@ -252,7 +252,7 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     await runGit(['commit', '-m', 'main: note'], { cwd: seedDir, env: commitEnv(IDENTITY) });
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
     await gitPrim.fetch(prepared.baseRepoDir, null);
-    const merged = await ws.mergeDefaultBranch(prepared.cwd, prepared.defaultBranch);
+    const merged = await ws.mergeDefaultBranch(prepared.cwd, prepared.defaultBranch, null);
     expect(merged.output).not.toMatch(/Already up to date/i);
     expect(existsSync(join(prepared.cwd, 'main-note.txt'))).toBe(true);
   }, 30_000);

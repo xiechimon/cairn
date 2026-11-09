@@ -198,6 +198,26 @@ test('pre-push: an agent pushing a commit it made as ian is told to commit as th
   );
 });
 
+test('pre-push: merging main into an agent branch does not re-judge commits main already has', (t) => {
+  const r = repo(t);
+  const remote = makeTestTempDir('commit-identity-remote-');
+  t.after(() => releaseTestTempDir(remote));
+  spawnSync('git', ['init', '-q', '--bare', remote]);
+  r.ok(['remote', 'add', 'origin', remote]);
+  r.ok(['push', '-q', 'origin', 'main']);
+  r.ok(['checkout', '-q', '-b', 'feature']);
+  r.ok(['commit', '-q', '--allow-empty', '-m', 'agent work'], bot);
+  r.ok(['push', '-q', 'origin', 'feature']);
+  r.ok(['checkout', '-q', 'main']);
+  r.ok(['commit', '-q', '--allow-empty', '-m', 'landed on main by ian'], owner);
+  r.ok(['push', '-q', 'origin', 'main']);
+  r.ok(['checkout', '-q', 'feature']);
+  r.ok(['merge', '-q', '--no-ff', '--no-edit', 'main'], bot);
+  installHook(r, 'pre-push');
+  const pushed = r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], bot, bot, agentEnv);
+  assert.equal(pushed.status, 0, pushed.stderr);
+});
+
 test('the workflow runs the shared check without any token, on the PR head repository', () => {
   assert.match(workflow, /run: node scripts\/commit-identity\.mjs ci/);
   assert.match(
