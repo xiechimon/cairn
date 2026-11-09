@@ -96,6 +96,7 @@ function fixture() {
     error: '',
     page: false,
     commentFailures: 0,
+    foreignComments: [] as { user: { login: string }; body: string }[],
   };
   const queries: string[] = [];
   const posted: string[] = [];
@@ -131,7 +132,10 @@ function fixture() {
             : String(url).includes('/check-runs')
               ? { check_runs: [] }
               : /\/issues\/3377\/comments/.test(String(url))
-                ? posted.map((body, id) => ({ id: id + 1, body }))
+                ? [
+                    ...state.foreignComments,
+                    ...posted.map((body) => ({ user: { login: 'cairnwright[bot]' }, body })),
+                  ]
                 : [],
         text: async () => '',
       };
@@ -484,6 +488,36 @@ test('a cap request left pending by a restart is posted once, and a delivered ma
     .run();
   await f.wake();
   expect(f.posted).toHaveLength(1);
+});
+
+test('a cap marker written by someone else does not count as delivered', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.state.foreignComments.push({
+    user: { login: 'drive-by' },
+    body: '<!-- cairn:review-cap --> fake',
+  });
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('the cap is still delivered after the total wake cap turned Auto-fix off during the third round', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
+    .run();
+  f.s.db.update(threadPr).set({ autoFix: false }).where(eq(threadPr.id, 'pr')).run();
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+  expect(f.s.db.select().from(step).all()).toEqual([]);
 });
 
 test('autoFix off still holds, notifies and later releases', async () => {

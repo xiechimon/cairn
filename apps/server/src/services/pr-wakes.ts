@@ -25,7 +25,7 @@ import {
   githubCollaboratorPermission,
   githubComment,
   githubCommitCheckRuns,
-  githubIssueCommentBodies,
+  githubIssueComments,
 } from '../lib/github.js';
 import {
   feedbackHighWaterSchema,
@@ -34,7 +34,7 @@ import {
 } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import { type AutonomousToken, githubTokenFetch } from '../lib/github-token.js';
-import { newRecordId } from '../lib/ids.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
 import { reconcilePrReviewFindings } from './pr-review-findings.js';
@@ -65,6 +65,7 @@ const QUEUE_WAIT_MS = 10 * 60_000;
 const GREEN_CONCLUSIONS = new Set(['success', 'skipped', 'neutral']);
 const QUEUE_WAIT_PROMPT_HEAD = '[queue-wait]';
 const CAP_MARKER = '<!-- cairn:review-cap -->';
+const CAIRN_APP_LOGIN = 'cairnwright[bot]';
 export const CAP_REVIEW_FOCUS =
   'every remaining instance of the finding classes listed above across the whole PR diff';
 
@@ -95,7 +96,13 @@ function unmetQueueConditions(
   if ((pull.labels ?? []).includes('coordinator-hold')) return null;
   const queue = runs.find((r) => r.name === QUEUE_CHECK);
   if (!queue?.outputTitle?.startsWith(QUEUE_WAITING_TITLE) || !queue.outputSummary) return null;
-  const checks = runs.filter((r) => !r.name.startsWith('Mergify '));
+  const current = new Map<string, GithubCheckRun>();
+  for (const run of runs) {
+    if (run.name.startsWith('Mergify ')) continue;
+    const seen = current.get(run.name);
+    if (seen === undefined || (run.id ?? 0) > (seen.id ?? 0)) current.set(run.name, run);
+  }
+  const checks = [...current.values()];
   const greenAt = checks.flatMap((r) =>
     r.status === 'completed' &&
     GREEN_CONCLUSIONS.has(r.conclusion ?? '') &&
@@ -117,6 +124,99 @@ function unmetQueueConditions(
     open.push({ indent, unmet: missing });
   }
   return unmet.length === 0 ? null : unmet.join('\n');
+}
+
+function roundRunning(deps: BuildDeps, buildId: string): boolean {
+  return (
+    deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+        ),
+      )
+      .get() !== undefined
+  );
+}
+
+async function deliverReviewCap(
+  deps: BuildDeps,
+  inFlight: Set<string>,
+  input: {
+    row: typeof threadPr.$inferSelect;
+    fetch: FetchLike;
+    token: AutonomousToken;
+    owner: string;
+    repo: string;
+  },
+  findings: PrReviewFinding[] | null,
+): Promise<void> {
+  const { row, token, owner, repo } = input;
+  const ledgerId = `pr-wakes:${row.teamId}:${row.repo}#${row.number}`;
+  const read = () =>
+    ledgerSchema.parse(
+      deps.db.select().from(message).where(eq(message.id, ledgerId)).get()?.content ?? {},
+    );
+  const ledger = read();
+  if (ledger.capRequest === 'delivered' || inFlight.has(ledgerId)) return;
+  const capped =
+    findings !== null &&
+    findings.length > 0 &&
+    ledger.reviews >= REVIEW_ROUND_CAP &&
+    !roundRunning(deps, row.buildId);
+  if (!capped && ledger.capRequest !== 'pending') return;
+  const settle = (next: 'pending' | 'delivered') =>
+    deps.db.transaction(() => {
+      const latest = read();
+      if (latest.capRequest === 'delivered') return;
+      latest.capRequest = next;
+      deps.db
+        .insert(message)
+        .values({
+          id: ledgerId,
+          conversationId: ledgerId,
+          role: 'system',
+          content: latest,
+          createdAt: nowMs(),
+        })
+        .onConflictDoUpdate({ target: message.id, set: { content: latest } })
+        .run();
+    });
+  const fetch = githubTokenFetch(input.fetch, token, { owner, repo });
+  inFlight.add(ledgerId);
+  try {
+    const comments = await githubIssueComments(fetch, token, owner, repo, row.number);
+    if (comments === null) return;
+    const own = new Set(
+      [
+        CAIRN_APP_LOGIN,
+        deps.db.select().from(githubConnection).where(eq(githubConnection.teamId, row.teamId)).get()
+          ?.login,
+      ].flatMap((login) => (login ? [login.toLowerCase()] : [])),
+    );
+    if (comments.some((c) => own.has(c.author.toLowerCase()) && c.body.includes(CAP_MARKER))) {
+      settle('delivered');
+      return;
+    }
+    settle('pending');
+    const classes = [...ledger.findingClasses];
+    for (const finding of findings ?? []) {
+      const title = reviewFindingTitle(finding.body);
+      if (title !== '' && !classes.includes(title)) classes.push(title);
+    }
+    await githubComment(fetch, token, owner, repo, row.number, capComment(row.number, classes));
+    settle('delivered');
+  } catch (error) {
+    if (error instanceof GithubRateLimitedError) throw error;
+    console.warn('Review round cap comment not posted; retrying on the next poll', {
+      pr: row.number,
+      error,
+    });
+  } finally {
+    inFlight.delete(ledgerId);
+  }
 }
 
 function buildQueueWaitPrompt(args: { prNumber: number; prUrl: string | null; unmet: string }) {
@@ -184,6 +284,7 @@ export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
 }
 
 export function createPrWakes(deps: BuildDeps) {
+  const inFlight = new Set<string>();
   const conditional = new Map<string, { fetch: FetchLike; cached: FetchLike }>();
   return async (input: {
     row: typeof threadPr.$inferSelect;
@@ -203,7 +304,10 @@ export function createPrWakes(deps: BuildDeps) {
     } catch (error) {
       if (error instanceof GithubRateLimitedError) throw error;
     }
-    if (!row.autoFix) return;
+    if (!row.autoFix) {
+      await deliverReviewCap(deps, inFlight, input, findings);
+      return;
+    }
     const ledgerId = `pr-wakes:${row.teamId}:${row.repo}#${row.number}`;
     const stored = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
     const ledger = ledgerSchema.parse(stored?.content ?? {});
@@ -362,38 +466,13 @@ export function createPrWakes(deps: BuildDeps) {
       const title = reviewFindingTitle(finding.body);
       if (title !== '' && !ledger.findingClasses.includes(title)) ledger.findingClasses.push(title);
     }
-    const roundRunning =
-      deps.db
-        .select({ id: step.id })
-        .from(step)
-        .where(
-          and(
-            eq(step.buildId, row.buildId),
-            inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-          ),
-        )
-        .get() !== undefined;
-    const capped =
+    if (
       findings !== null &&
       findings.length > 0 &&
       ledger.reviews >= REVIEW_ROUND_CAP &&
-      !roundRunning;
-    if (capped) notices.push('Review round cap (3) reached; rethink or hand to the owner.');
-    let requestCapReview = false;
-    if (ledger.capRequest !== 'delivered' && (capped || ledger.capRequest === 'pending')) {
-      const bodies = await githubIssueCommentBodies(
-        githubTokenFetch(input.fetch, token, { owner, repo }),
-        token,
-        owner,
-        repo,
-        row.number,
-      );
-      if (bodies?.some((body) => body.includes(CAP_MARKER))) ledger.capRequest = 'delivered';
-      else if (bodies !== null) {
-        ledger.capRequest = 'pending';
-        requestCapReview = true;
-      }
-    }
+      !roundRunning(deps, row.buildId)
+    )
+      notices.push('Review round cap (3) reached; rethink or hand to the owner.');
     const unmet = unmetQueueConditions(pull, runs, findings, now);
     if (unmet !== null) {
       const key = `queue:${row.head}:${digest(unmet)}`;
@@ -427,7 +506,6 @@ export function createPrWakes(deps: BuildDeps) {
             .join('\n\n'),
         });
     }
-    let capRequested = false;
     deps.db.transaction(() => {
       const latestLedger = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
       if (digest(latestLedger?.content ?? {}) !== digest(stored?.content ?? {})) return;
@@ -550,7 +628,6 @@ export function createPrWakes(deps: BuildDeps) {
         })
         .onConflictDoUpdate({ target: message.id, set: { content: ledger } })
         .run();
-      capRequested = requestCapReview;
       if (notices.length > 0) {
         const content = `PR Auto-fix needs you: #${row.number} ${notices.join(' ')}`;
         const id = `${ledgerId}:cap:${digest(content)}`;
@@ -562,31 +639,7 @@ export function createPrWakes(deps: BuildDeps) {
         deps.db.update(build).set({ errorMessage: content }).where(eq(build.id, row.buildId)).run();
       }
     });
-    if (capRequested) {
-      try {
-        await githubComment(
-          githubTokenFetch(input.fetch, token, { owner, repo }),
-          token,
-          owner,
-          repo,
-          row.number,
-          capComment(row.number, ledger.findingClasses),
-        );
-        deps.db.transaction(() => {
-          const current = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
-          const latest = ledgerSchema.parse(current?.content ?? {});
-          if (latest.capRequest !== 'pending') return;
-          latest.capRequest = 'delivered';
-          deps.db.update(message).set({ content: latest }).where(eq(message.id, ledgerId)).run();
-        });
-      } catch (error) {
-        if (error instanceof GithubRateLimitedError) throw error;
-        console.warn('Review round cap comment not posted; retrying on the next poll', {
-          pr: row.number,
-          error,
-        });
-      }
-    }
+    await deliverReviewCap(deps, inFlight, input, findings);
     settlePrWakeNotices(deps, row.teamId);
   };
 }

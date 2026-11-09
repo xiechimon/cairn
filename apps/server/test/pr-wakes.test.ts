@@ -1078,6 +1078,23 @@ describe('a green PR waiting for queue conditions wakes its owner with what is u
     expect(prompts(f)[1]).toContain('check-success = merge-route');
   });
 
+  test('a superseded failed attempt of a check does not hide a green rerun', async () => {
+    const f = fixture();
+    green(f, unmet, [
+      {
+        id: 1,
+        name: 'unit',
+        status: 'completed',
+        conclusion: 'failure',
+        completedAt: new Date(minutes(-20)).toISOString(),
+      },
+    ]);
+    const runs = f.mock.checks.get(f.pull.head) ?? [];
+    for (const run of runs) if (run.name === 'unit' && run.conclusion === 'success') run.id = 2;
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(1);
+  });
+
   test.each([
     [
       'a pending check',

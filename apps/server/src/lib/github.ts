@@ -2231,14 +2231,14 @@ export async function githubComment(
   );
 }
 
-export async function githubIssueCommentBodies(
+export async function githubIssueComments(
   fetchImpl: FetchLike,
   token: AutonomousToken,
   owner: string,
   repo: string,
   issueNumber: number,
-): Promise<string[] | null> {
-  const bodies: string[] = [];
+): Promise<{ author: string; body: string }[] | null> {
+  const comments: { author: string; body: string }[] = [];
   for (let page = 1; page <= 10; page += 1) {
     const got = await conditionalGetJson(
       fetchImpl,
@@ -2248,9 +2248,11 @@ export async function githubIssueCommentBodies(
       FETCH_TIMEOUT_MS,
     );
     if (got === null || got.notModified || !Array.isArray(got.data)) return null;
-    const rows = got.data as Array<{ body?: unknown }>;
-    for (const row of rows) if (typeof row?.body === 'string') bodies.push(row.body);
-    if (rows.length < 100) return bodies;
+    const rows = got.data as Array<{ body?: unknown; user?: { login?: unknown } | null }>;
+    for (const row of rows)
+      if (typeof row?.body === 'string' && typeof row.user?.login === 'string')
+        comments.push({ author: row.user.login, body: row.body });
+    if (rows.length < 100) return comments;
   }
   return null;
 }
