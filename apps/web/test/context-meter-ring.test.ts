@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import {
   clampContextPercent,
   ContextMeterRing,
+  contextMeterArcPath,
   MOCK_CONTEXT_PERCENT,
 } from '../src/chief/context-meter-ring.js';
 import { I18nProvider } from '../src/i18n/provider.js';
@@ -17,8 +18,17 @@ describe('clampContextPercent', () => {
   });
 });
 
+describe('contextMeterArcPath', () => {
+  test('returns an arc path without stroke-dasharray semantics', () => {
+    expect(contextMeterArcPath(0)).toBe('');
+    expect(contextMeterArcPath(5)).toMatch(/^M /);
+    expect(contextMeterArcPath(5)).toContain(' A ');
+    expect(contextMeterArcPath(100)).toContain(' A ');
+  });
+});
+
 describe('ContextMeterRing', () => {
-  test('renders a mock meter at the prototype fill', () => {
+  test('renders a mock meter at the prototype fill without dashed circles', () => {
     const html = renderToStaticMarkup(
       createElement(I18nProvider, {
         initialLocale: 'zh',
@@ -28,10 +38,10 @@ describe('ContextMeterRing', () => {
     expect(html).toContain('data-testid="composer-context-meter"');
     expect(html).toContain('data-mock=""');
     expect(html).toContain(`data-percent="${MOCK_CONTEXT_PERCENT}"`);
+    expect(html).not.toContain('stroke-dasharray');
     expect(html).not.toContain('aria-valuenow');
-    expect(html).not.toContain('aria-valuemin');
-    expect(html).not.toContain('aria-valuemax');
     expect(html).toContain('示意');
+    expect(html).toContain('<path ');
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain('size-5.5');
   });

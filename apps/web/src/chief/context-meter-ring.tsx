@@ -10,11 +10,27 @@ const METER_BTN_CLS =
 const VIEW = 24;
 const STROKE = 3;
 const RADIUS = (VIEW - STROKE) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const CX = VIEW / 2;
+const CY = VIEW / 2;
 
 export function clampContextPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+export function contextMeterArcPath(percent: number, cx = CX, cy = CY, radius = RADIUS): string {
+  const filled = clampContextPercent(percent);
+  if (filled <= 0) return '';
+  const startX = cx;
+  const startY = cy - radius;
+  if (filled >= 100) {
+    return `M ${startX} ${startY} A ${radius} ${radius} 0 1 1 ${startX - 0.001} ${startY}`;
+  }
+  const angle = (filled / 100) * Math.PI * 2 - Math.PI / 2;
+  const endX = cx + radius * Math.cos(angle);
+  const endY = cy + radius * Math.sin(angle);
+  const largeArc = filled > 50 ? 1 : 0;
+  return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
 }
 
 export function ContextMeterRing({
@@ -26,7 +42,7 @@ export function ContextMeterRing({
 }) {
   const { t } = useI18n();
   const filled = clampContextPercent(percent);
-  const dash = (filled / 100) * CIRCUMFERENCE;
+  const arc = contextMeterArcPath(filled);
   const label = mock
     ? t('上下文 {percent}%（示意）', { percent: filled })
     : t('上下文 {percent}%', { percent: filled });
@@ -45,27 +61,26 @@ export function ContextMeterRing({
         />
       }
     >
-      <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-5.5 -rotate-90">
+      <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-5.5">
         <circle
-          cx={VIEW / 2}
-          cy={VIEW / 2}
+          cx={CX}
+          cy={CY}
           r={RADIUS}
           fill="none"
           stroke="currentColor"
           strokeWidth={STROKE}
           opacity={0.28}
         />
-        <circle
-          cx={VIEW / 2}
-          cy={VIEW / 2}
-          r={RADIUS}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${CIRCUMFERENCE}`}
-          className="text-foreground"
-        />
+        {arc !== '' && (
+          <path
+            d={arc}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            className="text-foreground"
+          />
+        )}
       </svg>
     </IconTooltip>
   );
