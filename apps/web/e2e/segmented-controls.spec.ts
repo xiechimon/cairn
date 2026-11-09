@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
-const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files';
+const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks';
 
 const CARD_DARK = 'rgb(48, 48, 48)';
 const CARD_LIGHT = 'rgb(255, 255, 255)';
@@ -33,25 +33,25 @@ async function themed(page: Page, theme: 'dark' | 'light', url: string) {
   await page.goto(url);
 }
 
-test('page-tab: unselected hover steps the chip ink — dark + light', async ({ page }) => {
+test('task layout: unselected hover steps the chip ink — dark + light', async ({ page }) => {
   await page.goto(`${PROJ}?scenario=r2-24b`);
-  const files = page.locator('.page-tab', { hasText: '文件' });
-  const tasks = page.locator('.page-tab', { hasText: '任务' });
+  const files = page.getByRole('tab', { name: '网格视图' });
+  const tasks = page.getByRole('tab', { name: '列表视图' });
   await expectInkStep(files, tasks);
 
   await themed(page, 'light', `${PROJ}?scenario=r2-24b`);
   await expectInkStep(
-    page.locator('.page-tab', { hasText: '文件' }),
-    page.locator('.page-tab', { hasText: '任务' }),
+    page.getByRole('tab', { name: '网格视图' }),
+    page.getByRole('tab', { name: '列表视图' }),
   );
 });
 
-test('page-tab: selected chip keeps its fill under hover, same geometry as the rest state', async ({
+test('task layout: selected chip keeps its fill under hover, same geometry as the rest state', async ({
   page,
 }) => {
   await page.goto(`${PROJ}?scenario=r2-24b`);
-  const tasks = page.locator('.page-tab', { hasText: '任务' });
-  const files = page.locator('.page-tab', { hasText: '文件' });
+  const tasks = page.getByRole('tab', { name: '列表视图' });
+  const files = page.getByRole('tab', { name: '网格视图' });
 
   expect(await bg(tasks)).toBe(CARD_DARK);
   await tasks.hover();
@@ -62,8 +62,8 @@ test('page-tab: selected chip keeps its fill under hover, same geometry as the r
   // paints no box (no layout shift under hover)
   const geo = await page.evaluate(() => {
     const [active, plain] = [
-      document.querySelector('.page-tab[aria-selected="true"]')!,
-      document.querySelector('.page-tab[aria-selected="false"]')!,
+      document.querySelector('.prj-tasks-view-btn[aria-selected="true"]')!,
+      document.querySelector('.prj-tasks-view-btn[aria-selected="false"]')!,
     ];
     return {
       activeRadius: getComputedStyle(active).borderRadius,
@@ -83,11 +83,11 @@ test('page-tab: selected chip keeps its fill under hover, same geometry as the r
   expect(round((await files.boundingBox())!)).toEqual(restBox);
 });
 
-test('page-tab group rides the segmented track (canvas, 32px, 2px inset)', async ({ page }) => {
+test('task layout group rides the segmented track (canvas, 32px, 2px inset)', async ({ page }) => {
   await themed(page, 'light', `${PROJ}?scenario=r2-24b`);
   const ring = await page.evaluate(() => {
-    const group = document.querySelector('.page-tabs-group')!;
-    const tab = document.querySelector('.page-tab')!;
+    const group = document.querySelector('[role="tablist"]')!;
+    const tab = document.querySelector('.prj-tasks-view-btn')!;
     const cs = getComputedStyle(group);
     const g = group.getBoundingClientRect();
     const t = tab.getBoundingClientRect();
@@ -106,17 +106,15 @@ test('page-tab group rides the segmented track (canvas, 32px, 2px inset)', async
   expect(ring.insetLeft).toBe(2);
 });
 
-test('page-tab click swaps the active chip and the pane', async ({ page }) => {
-  await page.goto(`${PROJ}?scenario=r2-24b`);
-  const files = page.locator('.page-tab', { hasText: '文件' });
-
-  await files.click();
-  await expect(files).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.prj-files')).toBeVisible();
-
-  await page.locator('.page-tab', { hasText: '任务' }).click();
-  await expect(files).toHaveAttribute('aria-selected', 'false');
-  await expect(page.locator('.prj-files')).toBeHidden();
+test('task layout click swaps rows and cards', async ({ page }) => {
+  await page.goto(`${PROJ}?scenario=prj-tasks`);
+  const grid = page.getByRole('tab', { name: '网格视图' });
+  await grid.click();
+  await expect(grid).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('task-card')).toHaveCount(2);
+  await page.getByRole('tab', { name: '列表视图' }).click();
+  await expect(grid).toHaveAttribute('aria-selected', 'false');
+  await expect(page.getByTestId('task-row')).toHaveCount(2);
 });
 
 test('sched freq: the chosen radio reads against the track, hover steps the rest ink', async ({

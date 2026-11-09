@@ -6,7 +6,7 @@ import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
 import { TokenGate } from './overlay/token-gate.js';
 import { ProjectNewPage } from './pages/project-new-page.js';
-import { ProjectPage } from './pages/project-page.js';
+import { ProjectTasksPage } from './pages/project-page.js';
 import { ProjectHomeRedirect } from './pages/project-redirect.js';
 import { ProjectSettingsPage } from './pages/project-settings-page.js';
 import { SchedulesPage } from './pages/schedules-page.js';
@@ -43,7 +43,7 @@ export const router = createBrowserRouter([
               { path: ACTIVITY_PATH, element: <ActivityPage /> },
               { path: '/app/project/new', element: <ProjectNewPage /> },
               { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
-              { path: '/app/project/:id/files', element: <ProjectPage /> },
+              { path: '/app/project/:id/tasks', element: <ProjectTasksPage /> },
               { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
               { path: '/app/team', element: <SettingsRedirect section="work-routing" /> },
               {
