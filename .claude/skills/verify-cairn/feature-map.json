@@ -236,7 +236,8 @@
         "web": [
           "apps/web/src/chief/chief-settings.tsx",
           "apps/web/src/chief/memory-tab.tsx",
-          "apps/web/src/chief/memory-list.ts"
+          "apps/web/src/chief/memory-list.ts",
+          "apps/web/src/board/project-instructions-field.tsx"
         ],
         "server": [
           "apps/server/src/services/memory.ts",
