@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
+import { backfillRepositoryCaches } from '../../daemon/src/backend/repo-cache-backfill.js';
 import { loadDaemonConfig } from '../../daemon/src/config.js';
 import { gitPrim } from '../../daemon/src/git.js';
 import { ensureStateDirs, statePaths } from '../../daemon/src/state.js';
@@ -65,7 +66,12 @@ async function bindRepo(kind: 'github' | 'local' | 'hosted') {
   return dir;
 }
 
-async function fetchFixture(cache: string, source: string, repository = 'fixture/repository') {
+async function fetchFixture(
+  cache: string,
+  source: string,
+  repository = 'fixture/repository',
+  backfillRoot?: string,
+) {
   const url = `https://github.com/${repository}.git`;
   await gitPrim.setRemoteUrl(cache, url);
   const configIndex = Number(process.env.GIT_CONFIG_COUNT ?? '0');
@@ -73,7 +79,8 @@ async function fetchFixture(cache: string, source: string, repository = 'fixture
   vi.stubEnv(`GIT_CONFIG_KEY_${configIndex}`, `url.${source}.insteadOf`);
   vi.stubEnv(`GIT_CONFIG_VALUE_${configIndex}`, url);
   try {
-    await gitPrim.fetch(cache, null);
+    if (backfillRoot === undefined) await gitPrim.fetch(cache, null);
+    else await backfillRepositoryCaches(backfillRoot, () => {});
   } finally {
     vi.unstubAllEnvs();
   }
@@ -249,6 +256,95 @@ describe('Coordinator repository reads', () => {
       }
     },
   );
+
+  test('live legacy cache: no base branch and obsolete localPath read exact source after daemon backfill', async () => {
+    const source = await bindRepo('github');
+    const content = readFileSync('scripts/owned-process.mjs', 'utf8');
+    writeFileSync(join(source, 'scripts/owned-process.mjs'), content);
+    for (const args of [
+      ['add', 'scripts/owned-process.mjs'],
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.test',
+        'commit',
+        '-m',
+        'actual source',
+      ],
+    ])
+      expect((await runGit(args, { cwd: source })).code).toBe(0);
+    const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: source })).stdout.toString().trim();
+    const workspacesDir = join(H.s.reposDir, 'legacy-workspaces');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', source, cache])).code).toBe(0);
+    await gitPrim.setRemoteUrl(cache, 'https://github.com/fixture/repository.git');
+    H.s.db
+      .update(project)
+      .set({ baseBranch: null, localPath: '/Users/fixture/obsolete/project' })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    const read = async () =>
+      JSON.parse(
+        await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+          projectId: H.projectId,
+          paths: ['scripts/owned-process.mjs'],
+        }),
+      ) as Docs;
+    const pending = await read();
+    expect(pending.files[0]?.content).toBeUndefined();
+    expect(pending.files[0]?.error).toMatch(/repository cache not verified yet.*restart.*daemon/);
+    for (const operation of [
+      () => readFile(repo, H.projectId, 'scripts/owned-process.mjs'),
+      () => readTree(repo, H.projectId),
+      () => readFiles(repo, H.projectId),
+      () => readCommitHistory(repo, H.projectId),
+      () => readCommitDetail(repo, H.projectId, commit),
+    ])
+      await expect(operation()).rejects.toMatchObject({
+        status: 403,
+        message: expect.stringContaining('repository cache not verified yet'),
+      });
+    await fetchFixture(cache, source, 'fixture/repository', workspacesDir);
+    expect((await read()).files[0]).toMatchObject({
+      path: 'scripts/owned-process.mjs',
+      content,
+      commit,
+    });
+    expect(await readFile(repo, H.projectId, 'scripts/owned-process.mjs')).toMatchObject({
+      content,
+      commit,
+    });
+    expect((await readTree(repo, H.projectId)).commit).toBe(commit);
+    expect((await readFiles(repo, H.projectId)).commit).toBe(commit);
+    expect((await readCommitHistory(repo, H.projectId)).commits[0]?.sha).toBe(commit);
+    expect((await readCommitDetail(repo, H.projectId, commit)).sha).toBe(commit);
+  });
+
+  test('failed daemon backfill keeps an actionable refusal until a later pass succeeds', async () => {
+    const source = await bindRepo('github');
+    const workspacesDir = join(H.s.reposDir, 'failed-backfill');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', source, cache])).code).toBe(0);
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    await fetchFixture(
+      cache,
+      join(H.s.reposDir, 'absent-remote'),
+      'fixture/repository',
+      workspacesDir,
+    );
+    await expect(readFile(repo, H.projectId, 'scripts/owned-process.mjs')).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringMatching(/repository cache not verified yet.*restart.*daemon/),
+    });
+    await fetchFixture(cache, source, 'fixture/repository', workspacesDir);
+    expect((await readFile(repo, H.projectId, 'scripts/owned-process.mjs')).content).toBe(
+      'export const spawn = true;\n',
+    );
+  });
 
   test('legacy and failed-retarget caches fail closed until the current origin is fetched', async () => {
     const dir = await bindRepo('github');
@@ -707,7 +803,7 @@ describe('Coordinator repository reads', () => {
       ) as Docs;
     const unverified = await read();
     expect(unverified.files[0]?.content).toBeUndefined();
-    expect(unverified.files[0]?.error).toMatch(/current repository|verified repository/);
+    expect(unverified.files[0]?.error).toMatch(/repository cache not verified yet/);
     expect(
       (await runGit(['update-ref', 'refs/heads/cache-source', commit], { cwd: source })).code,
     ).toBe(0);
