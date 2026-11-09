@@ -1,7 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 import { OWNED_PROCESS_CLI } from './owned-process.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
@@ -31,6 +30,7 @@ export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/prepush-refuse-main.test.mjs',
   'scripts/heavy-slots.test.mjs',
+  'scripts/test-admission.test.mjs',
   'scripts/owned-process.test.mjs',
   'scripts/spawn-ownership.test.mjs',
   'scripts/english-only-gate.test.mjs',
@@ -295,7 +295,6 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
             args[0]?.slice(2) ?? 'local',
             process.env.PREPUSH_FORCE_FULL === 'true',
           );
-  const lease = plan.some((step) => step.includes('e2e')) ? await acquireSlot() : null;
-  runPlan(plan, { cwd: root, env: leaseEnv(lease) });
+  runPlan(plan, { cwd: root, env: process.env });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

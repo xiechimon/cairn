@@ -209,6 +209,24 @@ test('processInfo reads this process', () => {
   assert.equal(processInfo(2 ** 22 + 7), null);
 });
 
+test('owner ancestry includes a container init for direct children and descendants', () => {
+  const table = {
+    1: { pid: 1, ppid: 0, start: 'init', comm: 'node' },
+    20: { pid: 20, ppid: 1, start: 'child', comm: 'node' },
+    30: { pid: 30, ppid: 20, start: 'worker', comm: 'node' },
+  };
+  const info = (pid) => table[pid] ?? null;
+  assert.deepEqual(
+    ownerChain(20, 'parent', info).map((entry) => entry.pid),
+    [1],
+  );
+  assert.deepEqual(
+    ownerChain(30, 'parent', info).map((entry) => entry.pid),
+    [20, 1],
+  );
+  assert.deepEqual(ownerChain(1, 'parent', info), []);
+});
+
 test('the command sees exactly the environment it was given', async () => {
   const owned = spawnOwned('env', [], {
     env: { PATH: process.env.PATH, ONLY: '1' },

@@ -332,6 +332,7 @@ const FULL_PATH_PREFIXES = [
   'scripts/e2e-affected.mjs',
   'scripts/e2e-affected-select.mjs',
   'scripts/heavy-slots.mjs',
+  'scripts/test-admission.mjs',
   'scripts/owned-process.mjs',
   'scripts/timed-partition.mjs',
 ];

@@ -2,7 +2,13 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node
 import { dirname, join } from 'node:path';
 
 const HARNESS_DIRS = ['apps/web/pr-screens'];
-const HARNESS_FILES = ['apps/web/e2e/audit-pages.ts', 'apps/web/e2e/helpers.ts'];
+const HARNESS_FILES = [
+  'apps/web/e2e/audit-pages.ts',
+  'apps/web/e2e/helpers.ts',
+  'scripts/test-admission.mjs',
+  'scripts/heavy-slots.mjs',
+  'scripts/owned-process.mjs',
+];
 const CONFIG_DIR = 'apps/web';
 const CONFIG_PATTERN = /^playwright\.pr-screens.*\.config\.ts$/;
 
