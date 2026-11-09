@@ -81,7 +81,8 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         .get();
       if (thread !== undefined) ackSteer(deps, { id: null, teamId: thread.teamId }, stepId);
     },
-    relayTool: (stepId, name, params) => executeRelayToolCall(deps, null, stepId, name, params),
+    relayTool: (stepId, name, params, toolCallId, signal) =>
+      executeRelayToolCall(deps, null, stepId, name, params, toolCallId, signal),
     askUser: (stepId, body, signal) =>
       machineAsk(deps, null, stepId, body, {
         holdMs: ASK_HOLD_MS,
@@ -126,12 +127,12 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     transcriptDelta: async (stepId, text) => {
       reportTranscriptDelta(deps, null, stepId, text);
     },
-    done: async (stepId, body) => {
+    done: async (stepId, body, observation) => {
       const owned = stepRow(stepId);
       recordStepUsage(deps, owned, body.usage ?? []);
       deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
       releaseUnconsumedSteer(deps.db, owned);
-      finishCoordinatorTurn(deps, owned, body);
+      finishCoordinatorTurn(deps, owned, body, observation);
     },
   };
 }

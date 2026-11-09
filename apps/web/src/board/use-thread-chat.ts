@@ -5,7 +5,7 @@ import {
   type TodoRecord as WireTodo,
 } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
 import { agentTodoStore } from '../api/agent-todo.js';
@@ -14,8 +14,8 @@ import {
   useApiMutations,
   useBuild,
   useBuildChanges,
+  useConversationMessages,
   useMachines,
-  useMessages,
   usePlans,
   useSteps,
   useTodo,
@@ -27,6 +27,7 @@ import { mapPlanDoc, mapPlanVersions, mapTranscript, toDisplayTodo } from '../ap
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
+import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
@@ -45,6 +46,8 @@ export interface ThreadChat {
   load: ThreadChatLoad;
   todo: TodoRecord | null;
   transcript: TranscriptItem[];
+  hasEarlier: boolean;
+  earlier?: EarlierPages;
   buildId: string | null;
   buildLegDone: boolean;
   transcriptSettled: boolean;
@@ -113,14 +116,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const changesQ = useBuildChanges(buildId, live);
   const [changesExpanded, setChangesExpanded] = useState(true);
   const stepsQ = useSteps(buildId, live);
-  const messagesQ = useMessages(buildId, live);
+  const { query: messagesQ, messages, newest } = useConversationMessages(buildId, live);
   const plansQ = usePlans(buildId, live);
   const machinesQ = useMachines(teamId, live);
 
-  const known = useMemo(
-    () => new Set((messagesQ.data?.messages ?? []).map((m) => m.id)),
-    [messagesQ.data],
-  );
+  const known = useMemo(() => new Set(messages.map((m) => m.id)), [messages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     buildId != null ? liveTextStore.getVisible(buildId, known) : '',
   );
@@ -181,7 +181,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     if (!live) return fixtureTranscript ?? [];
     if (wire == null || buildId == null) return [];
     return mapTranscript({
-      messages: messagesQ.data?.messages ?? [],
+      messages,
+      hasEarlier: messagesQ.hasNextPage,
       steps,
       plans: plansQ.data ?? [],
       build: buildQ.data ?? null,
@@ -199,7 +200,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     fixtureTranscript,
     wire,
     buildId,
-    messagesQ.data,
+    messages,
+    messagesQ.hasNextPage,
     steps,
     plansQ.data,
     buildQ.data,
@@ -303,12 +305,27 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     expanded: changesExpanded,
   });
 
+  const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = messagesQ;
+  const loadEarlier = useCallback(() => {
+    void fetchNextPage();
+  }, [fetchNextPage]);
+
   const streamingItem = transcript.findLast((item) => item.kind === 'streaming');
 
   return {
     load,
     todo,
     transcript,
+    hasEarlier: live && messagesQ.hasNextPage,
+    ...(live
+      ? {
+          earlier: {
+            loading: isFetchingNextPage,
+            failed: isFetchNextPageError,
+            onLoad: loadEarlier,
+          },
+        }
+      : {}),
     buildId,
     infoOutput: wire?.output === 'info',
     planDoc: live
@@ -349,7 +366,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
           mutations.sendSteer.variables?.editQueued !== true
         ? mutations.sendSteer.error?.message || t('发送失败，请重试。')
         : null,
-    queuedMessages: live ? messagesQ.data?.queuedMessages : undefined,
+    queuedMessages: live ? newest?.queuedMessages : undefined,
     retry: () => {
       void todoQ.refetch();
     },

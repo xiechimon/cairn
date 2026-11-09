@@ -344,10 +344,18 @@ test('a run marks each unit with a step_error score for the error-rate chart', a
 });
 
 test('a second run writes no second digest for an already digested unit', async () => {
-  const unit = step('s1', 0, 30);
+  const unitId = '00000000000000a1';
+  const unit = step(unitId, 0, 30, { traceId: '000000000000000000000000000000b1' });
   const observations: Observation[] = [
     unit,
-    tool('t1', 's1', 1, 'ask_user', { questions: [{ question: 'Merge now?' }] }),
+    tool(
+      't1',
+      unitId,
+      1,
+      'ask_user',
+      { questions: [{ question: 'Merge now?' }] },
+      { traceId: '000000000000000000000000000000b1' },
+    ),
   ];
   const recorded: Recorded = { digests: [], scores: [] };
   const host = await fakeLangfuse(observations, recorded);
@@ -359,7 +367,7 @@ test('a second run writes no second digest for an already digested unit', async 
   expect(first).toMatchObject({ units: 1, digests: 1, questionUnits: 1 });
   expect(second).toMatchObject({ units: 1, digests: 0, skippedAlreadyDigested: 1 });
   expect(recorded.digests).toHaveLength(1);
-  expect(recorded.digests[0]?.parentSpanId).toBe('s1');
+  expect(recorded.digests[0]?.parentSpanId).toBe(unitId);
   expect(JSON.parse(recorded.digests[0]?.input ?? '{}').owner_questions).toEqual(['Merge now?']);
 });
 

@@ -40,7 +40,6 @@ import { THREAD_PARAM, threadHref } from './thread-copy.js';
 export type SidebarSelected =
   | 'board'
   | 'schedules'
-  | 'team'
   | 'none'
   | '/app/resources/skills'
   | '/app/resources/mcp-servers'

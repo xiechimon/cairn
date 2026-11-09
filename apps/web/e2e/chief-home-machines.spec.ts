@@ -81,10 +81,13 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   page,
 }) => {
   await page.goto(HOME);
-  for (const name of ['任务', '成果']) {
+  for (const [name, tip] of [
+    ['任务', '任务，3 件等你'],
+    ['成果', '成果'],
+  ] as const) {
     const button = page.getByTestId('home-c-pane-buttons').getByRole('button', { name });
     await button.hover();
-    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(name);
+    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(tip);
     await page.mouse.move(0, 0);
     await expect(page.locator('[data-slot="tooltip-content"]')).toHaveCount(0);
   }

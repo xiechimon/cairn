@@ -1,4 +1,5 @@
 import type { TodoRecord } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { wakeFacts } from '../src/services/chief.js';
 
@@ -29,16 +30,31 @@ function todo(over: Partial<Record<keyof TodoRecord, unknown>> = {}): TodoRecord
 }
 
 describe('wakeFacts gate text', () => {
-  test.each(['confirm', 'review'] as const)(
-    '%s gate parks for a person and carries no auto-confirm instruction',
-    (phase) => {
-      const text = wakeFacts('gate', todo({ phase }), null);
-      expect(text).toContain(`停驻在 ${phase} 关口，等人处理`);
-      expect(text).toContain('不要自己放行');
-      expect(text).not.toContain('自动确认规则');
+  test('confirm gate parks for a person and carries no auto-confirm instruction', () => {
+    const text = wakeFacts('gate', todo({ phase: 'confirm' }), null);
+    expect(text).toContain('停驻在 confirm 关口，等人处理');
+    expect(text).toContain('不要自己放行');
+    expect(text).not.toContain('自动确认规则');
+    expect(text).not.toContain('confirm_builds');
+  });
+
+  test.each(['info', 'code'] as const)(
+    'a %s review gate hands acceptance to the Coordinator with accept, rework and close',
+    (output) => {
+      const text = wakeFacts('gate', todo({ phase: 'review', output }), null);
+      expect(text).toContain('验收归你');
+      for (const tool of ['complete_todos', 'message_thread', 'close_todos']) {
+        expect(text).toContain(tool);
+      }
       expect(text).not.toContain('confirm_builds');
     },
   );
+
+  test('complete_todos documents that a review the Coordinator owns is accepted with it', () => {
+    const description = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'complete_todos')?.description;
+    expect(description).toContain('Accepted for a review you own');
+    expect(description).toContain('Rejected at every other confirm/review gate');
+  });
 
   test('settle unchanged', () => {
     const text = wakeFacts('settle', todo(), null);
