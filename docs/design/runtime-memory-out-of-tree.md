@@ -26,8 +26,15 @@ The installed pnpm launcher resolves packageManager before dispatching commands,
 
 ## 5. Evidence and decisions
 
+| Decision | Reason | Reversal |
+| --- | --- | --- |
+| Use existing systemPrompt bridges | Runtime memory never needs a tracked file | Revert the PR |
+| Disable automatic pnpm version management | Bootstrap writes occur before frozen install dispatch | Revert pmOnFail policy |
+| Check the staged diff before commit | An empty worker step must not execute commit hooks | Revert the preflight |
+
+
 Red tests exercise a real Git status during session opening, an empty worker step with a rejecting commit hook, and a real offline pnpm install with an unchanged manifest and byte-identical lockfile assertion. Retain worker edits and real hook failures as controls. Run targeted Vitest with four workers, lint, typecheck, spec:parse and prepush. The codebase regression tests are the recurrence safeguard. Rollback is reverting this change; no migration is needed.
 
 ## 6. Delivery
 
-Issue: #3599. PR: pending creation. Implementation uses the current Codex session; review uses the repository's Codex cloud review bound to the PR head. pnpm-workspace.yaml is protected: keep coordinator-hold on the PR and report it. No runtime memory, internal addresses or live identifiers may enter public evidence.
+Issue: #3599. PR: [#3615](https://github.com/xiechimon/cairn/pull/3615). Implementation uses the current Codex session; review uses the repository's Codex cloud review bound to the PR head. pnpm-workspace.yaml is protected: keep coordinator-hold on the PR and report it. No runtime memory, internal addresses or live identifiers may enter public evidence.
