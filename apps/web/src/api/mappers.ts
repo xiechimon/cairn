@@ -560,23 +560,15 @@ export interface TranscriptInput {
   stopping?: boolean;
   activity?: StepActivity | null;
   agentTodo?: AgentTodo | null;
+  hasEarlier?: boolean;
 }
 
-export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
-  const {
-    messages,
-    steps,
-    plans,
-    build,
-    todo,
-    machineName,
-    userName,
-    liveText,
-    liveThinking = '',
-    stopping = false,
-    activity = null,
-    agentTodo = null,
-  } = input;
+function transcriptHead(
+  messages: TranscriptInput['messages'],
+  steps: TranscriptInput['steps'],
+  build: TranscriptInput['build'],
+  machineName: TranscriptInput['machineName'],
+): TranscriptItem[] {
   const head: TranscriptItem[] = [];
   if (
     build?.triggerSource === 'schedule' &&
@@ -605,6 +597,26 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       });
     }
   }
+  return head;
+}
+
+export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
+  const {
+    messages,
+    steps,
+    plans,
+    build,
+    todo,
+    machineName,
+    userName,
+    liveText,
+    liveThinking = '',
+    stopping = false,
+    activity = null,
+    agentTodo = null,
+    hasEarlier = false,
+  } = input;
+  const head = hasEarlier ? [] : transcriptHead(messages, steps, build, machineName);
 
   const toolNameByResult = new Map<string, string>();
   for (const m of messages) {
@@ -788,9 +800,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
   }
 
-  entries.sort((a, b) => a.at - b.at);
+  const loadedFrom = hasEarlier
+    ? (messages[0]?.createdAt ?? Number.POSITIVE_INFINITY)
+    : Number.NEGATIVE_INFINITY;
+  const loaded = entries.filter((entry) => entry.at >= loadedFrom).sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
-  for (const entry of entries) {
+  for (const entry of loaded) {
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
       if (previous?.kind === 'work') {
