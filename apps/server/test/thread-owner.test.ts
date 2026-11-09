@@ -12,6 +12,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import type { BuildDeps } from '../src/services/builds.js';
+import { transitionTodos } from '../src/services/chief-tools.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { parkFailedBuild } from '../src/services/retry-parking.js';
 import { getTodo, setTodoArchived, setTodoPhase } from '../src/services/todos.js';
@@ -392,6 +393,25 @@ describe('reconcileOwners (#3512)', () => {
     expect(w.notified()).toBe(before);
     const seeded = w.s.db.select().from(todoTable).all();
     expect(seeded.every((row) => row.lastNotifiedOwner !== null)).toBe(true);
+  });
+});
+
+describe('the Coordinator can act on what it owns (#3512)', () => {
+  const coordinator = {
+    kind: 'agent' as const,
+    name: 'Coordinator',
+    stopActor: 'coordinator' as const,
+  };
+
+  test.each([
+    { output: 'info' as const, owner: 'coordinator', done: true },
+    { output: 'code' as const, owner: 'owner', done: false },
+  ])('a human-policy $output review owned by $owner: complete_todos done=$done', (c) => {
+    const w = openWorld({ phase: 'review', policy: 'human', output: c.output });
+    expect(ownerNow(w)).toBe(c.owner);
+    const out = transitionTodos(w.deps, w.s.team.id, [w.todoId], 'done', coordinator);
+    expect(out.transitioned.includes(w.todoId)).toBe(c.done);
+    expect(getTodo(w.deps, w.todoId)?.phase).toBe(c.done ? 'done' : 'review');
   });
 });
 

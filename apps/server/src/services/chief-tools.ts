@@ -68,6 +68,7 @@ import {
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
+import { ownerOf } from './owner.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -933,7 +934,7 @@ export function transitionTodos(
   const reasons: Record<string, string> = {};
   for (const id of todoIds) {
     const owned = deps.db
-      .select({ id: todo.id, phase: todo.phase, latestBuildId: todo.latestBuildId })
+      .select()
       .from(todo)
       .where(and(eq(todo.id, id), eq(todo.teamId, teamId)))
       .get();
@@ -944,7 +945,8 @@ export function transitionTodos(
     if (
       to === 'done' &&
       actor.kind === 'agent' &&
-      (owned.phase === 'review' || owned.phase === 'confirm')
+      (owned.phase === 'review' || owned.phase === 'confirm') &&
+      ownerOf(deps.db, owned) !== 'coordinator'
     ) {
       skipped.push(id);
       reasons[id] =
