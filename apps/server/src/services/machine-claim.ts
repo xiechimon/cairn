@@ -80,7 +80,7 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
-  memoryInjectTeamId,
+  memoryOpsAreTeamScoped,
   memoryOwnerOf,
   type RouteProfile,
   routeProfile,
@@ -617,7 +617,8 @@ async function tryClaim(
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
           agentId: memoryOwnerOf(db, teamId, cand.stepRow.kind),
-          teamId: memoryInjectTeamId(cand.stepRow.kind, teamId),
+          teamId,
+          teamScoped: memoryOpsAreTeamScoped(cand.stepRow.kind),
           threadId: cand.todoRow.id,
           projectId: cand.todoRow.projectId,
         }),
