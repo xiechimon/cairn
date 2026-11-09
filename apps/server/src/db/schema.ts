@@ -52,6 +52,7 @@ import type {
 } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -374,6 +375,7 @@ export const computer = sqliteTable(
     controlLeaseExpiresAt: epochMs('controlLeaseExpiresAt'),
     controlFence: integer('controlFence').notNull().default(0),
     screenGeneration: integer('screenGeneration').notNull().default(0),
+    browserEnabled: bool('browserEnabled').notNull().default(false),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
   },
@@ -1306,4 +1308,15 @@ export const clientMessage = sqliteTable(
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [primaryKey({ columns: [t.scopeId, t.clientMessageId] })],
+);
+
+export const deployLease = sqliteTable(
+  'deploy_lease',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    status: text('status').$type<'accepting' | 'draining'>().notNull(),
+    expiresAt: epochMs('expiresAt').notNull(),
+  },
+  (t) => [check('deploy_lease_status', sql`${t.status} in ('accepting', 'draining')`)],
 );

@@ -108,8 +108,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   };
   const api: MachineApi = {
     ...serverApi,
-    done: async (stepId, body) => {
-      if (!closing) await serverApi.done(stepId, scrubbed(stepId, body));
+    done: async (stepId, body, observation) => {
+      if (!closing) await serverApi.done(stepId, scrubbed(stepId, body), observation);
     },
   };
   const leases = new Map<string, Lease>();

@@ -3,7 +3,6 @@ import { spiralAvatarSvg, spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 import { pressAndExpect } from './helpers.js';
 
 const USER_SRC = spiralAvatarUrl('Xmon Dai');
-const AGENT_SRC = spiralAvatarUrl('r3-builder');
 
 test('no avatar surface reaches a third-party avatar host', async ({ page }) => {
   const hits: string[] = [];
@@ -17,20 +16,13 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   expect(hits).toEqual([]);
 });
 
-test('search agent rows + project task rows are seeded (`Agent 列表` / task-row avatar slots)', async ({
-  page,
-}) => {
+test('search drops agent rows; project task rows stay seeded', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await expect(page.locator('[data-slot="sidebar-nav-row"]').first()).toBeVisible();
   const searchPanel = page.getByRole('dialog', { name: '搜索' });
   await pressAndExpect(page, 'Meta+k', searchPanel);
   await page.keyboard.type('r3-builder');
-  await expect(
-    searchPanel.locator('[data-row-kind="agent"] img').first(),
-  ).toHaveAttribute(
-    'src',
-    AGENT_SRC,
-  );
+  await expect(searchPanel.locator('[data-row-kind="agent"]')).toHaveCount(0);
 
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks');
   await expect(page.locator('.prj-task-avatar img').first()).toHaveAttribute('src', USER_SRC);

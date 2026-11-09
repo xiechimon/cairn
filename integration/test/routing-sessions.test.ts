@@ -7,7 +7,7 @@ import { CAIRN_BENCH_TASKS } from '../eval/routing/bench.mts';
 import { runRoutingRun } from '../eval/routing/driver.mts';
 import { gradeBoundedRun } from '../eval/routing/grade.mts';
 import { REFERENCE_FILES } from './routing-reference.js';
-import { type StubLlm, type StubResponse, startStubLlm } from './stub-llm.js';
+import { handoffStubResponses, type StubLlm, type StubResponse, startStubLlm } from './stub-llm.js';
 
 const nativeToolchain =
   process.platform === 'linux' &&
@@ -33,12 +33,18 @@ test.skipIf(!nativeToolchain)(
     if (!task) throw new Error('Missing slugify task');
     const reference = REFERENCE_FILES.slugify!['lib/slug.mjs']!;
     const command = `node -e 'require("fs").writeFileSync("lib/slug.mjs", "planner changed this")'`;
-    stub = await startStubLlm([
-      { toolCall: { name: 'bash', arguments: { command } } },
-      { content: 'Implement slugify independently.' },
-      { toolCall: { name: 'write', arguments: { path: 'lib/slug.mjs', content: reference } } },
-      { content: 'done' },
-    ]);
+    stub = await startStubLlm(
+      handoffStubResponses(
+        [
+          { toolCall: { name: 'bash', arguments: { command } } },
+          { content: 'Implement slugify independently.' },
+        ],
+        [
+          { toolCall: { name: 'write', arguments: { path: 'lib/slug.mjs', content: reference } } },
+          { content: 'done' },
+        ],
+      ),
+    );
     const row = await runRoutingRun({
       task,
       arm: 'handoff',
@@ -55,11 +61,17 @@ test.skipIf(!nativeToolchain)(
     expect(readFileSync(join(root, 'run/planner/lib/slug.mjs'), 'utf8')).toBe(
       task.seedFiles['lib/slug.mjs'],
     );
+    expect(
+      { status: row.status, stop: row.stop_reason, error: row.error, oracle: row.oracle_pass },
+      'session must finish before oracle_pass is checked',
+    ).toMatchObject({ status: 'fail', stop: 'done', error: undefined });
     expect(row.oracle_pass).toBe(true);
-    expect(row.status).toBe('fail');
     expect(row.planner_violations.join('\n')).toContain(command);
-    const plannerFeedback = JSON.stringify(stub.requests[1]?.messages);
-    expect(plannerFeedback).not.toContain('planner changed this\n');
+    const deniedRequest = stub.requests.find((request) =>
+      JSON.stringify(request.messages).includes('Denied: shell write attempt'),
+    );
+    expect(deniedRequest).toBeDefined();
+    expect(JSON.stringify(deniedRequest?.messages)).not.toContain('planner changed this\n');
   },
 );
 
@@ -75,9 +87,12 @@ async function runSessionCase(options: {
   writeFileSync(join(root, 'sentinel'), 'private-sentinel-1986');
   const task = CAIRN_BENCH_TASKS.find((entry) => entry.id === 'slugify');
   if (!task) throw new Error('Missing slugify task');
-  stub = await startStubLlm([...(options.planner ?? []), ...options.executor], {
-    onConsumed: options.onResponse,
-  });
+  stub = await startStubLlm(
+    options.planner ? handoffStubResponses(options.planner, options.executor) : options.executor,
+    {
+      onConsumed: options.onResponse,
+    },
+  );
   return runRoutingRun({
     task,
     arm: options.planner ? 'handoff' : 'single',

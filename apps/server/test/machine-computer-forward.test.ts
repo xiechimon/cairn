@@ -12,6 +12,8 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import {
+  COMPUTER_BROWSER_DISABLED,
+  COMPUTER_BROWSER_UNAVAILABLE,
   COMPUTER_BUSY,
   COMPUTER_EXECUTION_LEASE_MS,
   COMPUTER_NOT_CONNECTED,
@@ -44,7 +46,7 @@ afterEach(() => {
 function addMachine(
   s: TestServer,
   id: string,
-  capabilities: { computer?: true; ownComputer?: true },
+  capabilities: { computer?: true; ownComputer?: true; browser?: true },
   lastSeenAt = 1,
 ) {
   s.db
@@ -161,6 +163,58 @@ function done(seq: number, text: string, exitCode: number | null = 0): ComputerF
 }
 
 describe('forwardComputerCall target and presence', () => {
+  test('browser tools refuse before creating a starting computer when browser is off', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    connect(s, 'omarchy');
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_navigate',
+        toolCallId: 'browser-1',
+        params: { url: 'https://example.com' },
+      }),
+    ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_DISABLED });
+    expect(s.db.select().from(computerTable).all()).toEqual([]);
+    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
+  });
+
+  test('browser tools refuse when the pinned machine no longer reports browser capability', async () => {
+    const { s, deps, chiefId } = boot();
+    addMachine(s, 'omarchy', { computer: true, browser: true });
+    connect(s, 'omarchy');
+    addStep(s, 'step-stale-browser', 'omarchy');
+    const now = Date.now();
+    s.db
+      .insert(computerTable)
+      .values({
+        id: 'comp-browser',
+        teamId: s.team.id,
+        scopeKey: `chief:${chiefId}`,
+        machineId: 'omarchy',
+        providerRef: computerMachineName(`chief:${chiefId}`),
+        state: 'stopped',
+        browserEnabled: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { mcpServers: [], skills: [], computer: true } })
+      .where(eq(machineTable.id, 'omarchy'))
+      .run();
+    await expect(
+      forwardComputerCall(deps, 'omarchy', 'step-stale-browser', {
+        computer: true,
+        name: 'browser_navigate',
+        toolCallId: 'browser-stale',
+        params: { url: 'https://example.com' },
+      }),
+    ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_UNAVAILABLE });
+    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
+  });
+
   test('an offline target fails at once, sends no stream event and writes no row', async () => {
     const { s, deps } = boot();
     addMachine(s, 'omarchy', { computer: true });
@@ -560,6 +614,35 @@ describe('stop and finish', () => {
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBe('step-a');
     stopStepComputer(ctx.deps, 'step-a');
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+  });
+
+  test('aborting the relay signal cancels the dispatched call instead of abandoning it', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const controller = new AbortController();
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('sleep 99'), {
+      signal: controller.signal,
+    });
+    const id = computerCallId('step-a', 'tc-1');
+    controller.abort();
+    expect((await result).text).toContain('cancelled');
+    expect(callRow(ctx.s, id).state).toBe('cancelled');
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+  });
+
+  test('without a relay signal a transport abort does not cancel the dispatched call', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const transport = new AbortController();
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('sleep 99'));
+    const id = computerCallId('step-a', 'tc-1');
+    transport.abort();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(callRow(ctx.s, id).state).toBe('dispatched');
+    ctx.s.machineHub.stopSignal(ctx.s.team.id, 'step-a');
+    expect((await result).text).toContain('cancelled');
   });
 });
 

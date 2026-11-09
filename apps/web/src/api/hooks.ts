@@ -44,7 +44,6 @@ import type {
   PatchTeamBody,
   PatchUserBody,
   PlanResponse as PlanRow,
-  ProjectCommitDetailResponse,
   ProjectFileResponse,
   ProjectFilesResponse,
   ProjectRecord,
@@ -70,7 +69,12 @@ import type {
   UpdateSkillBody,
   UserRecord,
 } from '@cairn/shared';
-import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
+import {
+  backupHealthSchema,
+  backupNotice,
+  SKILL_ENTRY_FILE,
+  tasksQuerySchema,
+} from '@cairn/shared';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -185,6 +189,13 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
+export const useTasks = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['tasks', teamId],
+    queryFn: async () => tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}`)),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useTodo = (id: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todo', id],
@@ -240,32 +251,27 @@ export const useSteps = (buildId: string | null | undefined, enabled: boolean) =
     enabled: enabled && buildId != null,
   });
 
-export const useMessages = (conversationId: string | null | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['messages', conversationId],
-    queryFn: () =>
-      api.get<ConversationMessagesResponse>(`/api/conversations/${conversationId}/messages`),
-    enabled: enabled && conversationId != null,
-  });
-
-export function useChiefMessages(threadId: string | null, enabled: boolean) {
+export function useConversationMessages(
+  conversationId: string | null | undefined,
+  enabled: boolean,
+) {
   const query = useInfiniteQuery({
-    queryKey: ['messages', threadId, 'pages'],
+    queryKey: ['messages', conversationId, 'pages'],
     queryFn: ({ pageParam }) =>
       api.get<ConversationMessagesResponse>(
-        `/api/conversations/${threadId}/messages${
+        `/api/conversations/${conversationId}/messages${
           pageParam !== null ? `?before=${encodeURIComponent(pageParam)}` : ''
         }`,
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
-    enabled: enabled && threadId != null,
+    enabled: enabled && conversationId != null,
   });
   const messages = useMemo(
     () => [...(query.data?.pages ?? [])].reverse().flatMap((page) => page.messages),
     [query.data],
   );
-  return { query, messages };
+  return { query, messages, newest: query.data?.pages[0] };
 }
 
 export const usePlans = (buildId: string | null | undefined, enabled: boolean) =>
@@ -619,37 +625,6 @@ export const useProjectFile = (
         `/api/projects/${projectId}/file?path=${encodeURIComponent(path ?? '')}${ref !== undefined ? `&ref=${encodeURIComponent(ref)}` : ''}`,
       ),
     enabled: projectId !== undefined && path !== undefined,
-  });
-
-export const useProjectCommits = (projectId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['commits', projectId],
-    queryFn: () =>
-      api.get<{
-        ref: string;
-        commits: {
-          sha: string;
-          shortSha: string;
-          message: string;
-          authorName: string;
-          at: number;
-        }[];
-      }>(`/api/projects/${projectId}/commits`),
-    enabled: enabled && projectId !== undefined,
-  });
-
-export const useProjectCommitDetail = (
-  projectId: string | undefined,
-  sha: string | undefined,
-  enabled: boolean,
-) =>
-  useQuery({
-    queryKey: ['commit-detail', projectId, sha],
-    queryFn: () =>
-      api.get<ProjectCommitDetailResponse>(
-        `/api/projects/${projectId}/commits/${encodeURIComponent(sha ?? '')}`,
-      ),
-    enabled: enabled && projectId !== undefined && sha !== undefined,
   });
 
 export function useApiMutations(teamId: string | undefined) {

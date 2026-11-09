@@ -6,8 +6,6 @@ const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 
-const AGENTS = [{ id: 'agent-1', displayName: 'builder', description: 'Builds features' }];
-
 const WIRE_CARD = {
   id: 'todo-1',
   teamId: TEAM_ID,
@@ -50,17 +48,6 @@ async function openCoordinator(page: Page) {
   await page.route(`**/api/teams/${TEAM_ID}/notifications`, (route) =>
     route.fulfill({ json: { unreadThreadIds: [] } }),
   );
-  const members = [
-    { id: 'member-user', teamId: TEAM_ID, actorId: USER.id, memberType: 'user', actor: USER },
-    ...AGENTS.map((a, i) => ({
-      id: `member-agent-${i}`,
-      teamId: TEAM_ID,
-      actorId: a.id,
-      memberType: 'agent',
-      actor: a,
-    })),
-  ];
-  await page.route(`**/api/teams/${TEAM_ID}/members`, (route) => route.fulfill({ json: members }));
   await page.route('**/api/todos?*', (route) => route.fulfill({ json: [WIRE_CARD] }));
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route('**/api/skills?*', (route) =>
@@ -88,11 +75,11 @@ async function openCoordinator(page: Page) {
       },
     });
   });
-  const membersLoaded = page.waitForResponse(
-    (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
+  const skillsLoaded = page.waitForResponse(
+    (r) => r.url().includes('/api/skills') && r.status() === 200,
   );
   await page.goto('/app');
-  await membersLoaded;
+  await skillsLoaded;
 
   const coordinator = page.getByTestId('home-c');
   await expect(coordinator).toBeVisible();

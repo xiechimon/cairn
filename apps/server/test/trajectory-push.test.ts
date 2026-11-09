@@ -11,7 +11,7 @@ vi.setConfig({ testTimeout: 30_000 });
 
 interface OtlpValue {
   stringValue?: string;
-  intValue?: string;
+  intValue?: string | number;
   doubleValue?: number;
   boolValue?: boolean;
   arrayValue?: { values: OtlpValue[] };
@@ -294,7 +294,8 @@ test('carries GenAI convention fields and cairn.* fields', async () => {
   ]);
   expect(count(toolTurn, 'gen_ai.usage.input_tokens')).toBe(100);
   expect(count(toolTurn, 'gen_ai.usage.output_tokens')).toBe(50);
-  expect(attr(toolTurn, 'gen_ai.usage.cost')?.doubleValue).toBe(0.5);
+  expect(text(toolTurn, 'langfuse.observation.cost_details')).toBe('{"total":0.5}');
+  expect(attr(toolTurn, 'gen_ai.usage.cost')).toBeUndefined();
   expect(attr(toolTurn, 'cairn.cost_usd')).toBeUndefined();
   const planTurn = chats[0] as OtlpSpan;
   expect(count(planTurn, 'gen_ai.usage.cache_read.input_tokens')).toBe(3);

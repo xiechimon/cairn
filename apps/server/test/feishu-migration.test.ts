@@ -47,8 +47,9 @@ test.each(['fresh', 'empty upgrade', 'configured upgrade'])(
     const db = drizzle(sqlite);
     try {
       if (mode !== 'fresh') {
-        migrateUpTo(sqlite, directory, '0131_project_group');
+        migrateUpTo(sqlite, directory, '0133_deploy_lease');
         sqlite.exec(`
+        INSERT INTO deploy_lease (id, owner, status, expiresAt) VALUES ('lease', 'test-owner', 'accepting', 1234);
         INSERT INTO user (id, displayName) VALUES ('owner', 'Test owner');
         INSERT INTO team (id, name, createdAt) VALUES ('retained', 'Retained team', 1);
         INSERT INTO secret (id, teamId, name, valueCipher) VALUES ('personal', 'retained', 'feishu.bot.app-secret', 'user-owned-cipher');
@@ -67,6 +68,7 @@ test.each(['fresh', 'empty upgrade', 'configured upgrade'])(
         }
       }
       const retainedTables = [
+        'deploy_lease',
         'user',
         'team',
         'secret',
