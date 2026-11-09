@@ -375,11 +375,20 @@ function spanRecorder(resource: Attributes, scope: string, processor: SpanProces
 }
 
 function otlpExporter(target: OtlpTarget, timeoutMs: number): OTLPTraceExporter {
-  return new OTLPTraceExporter({
-    url: target.url.href,
-    headers: target.headers,
-    timeoutMillis: timeoutMs,
-  });
+  const ambient = Object.entries(process.env).filter(([key]) =>
+    key.startsWith('OTEL_EXPORTER_OTLP_'),
+  );
+  try {
+    for (const [key] of ambient) delete process.env[key];
+    return new OTLPTraceExporter({
+      url: target.url.href,
+      headers: target.headers,
+      timeoutMillis: timeoutMs,
+      httpAgentOptions: { keepAlive: true, timeout: timeoutMs },
+    });
+  } finally {
+    for (const [key, value] of ambient) process.env[key] = value;
+  }
 }
 
 export async function exportCairnSpans(

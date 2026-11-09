@@ -126,12 +126,12 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     transcriptDelta: async (stepId, text) => {
       reportTranscriptDelta(deps, null, stepId, text);
     },
-    done: async (stepId, body) => {
+    done: async (stepId, body, observation) => {
       const owned = stepRow(stepId);
       recordStepUsage(deps, owned, body.usage ?? []);
       deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
       releaseUnconsumedSteer(deps.db, owned);
-      finishCoordinatorTurn(deps, owned, body);
+      finishCoordinatorTurn(deps, owned, body, observation);
     },
   };
 }

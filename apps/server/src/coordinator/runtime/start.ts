@@ -5,6 +5,7 @@ import {
   coordinatorCompactionSettings,
   type ModelRef,
 } from './compaction.js';
+import { generationTelemetryExtension } from './generation-telemetry.js';
 import type { MachineApi } from './machine-api.js';
 import { createCoordinatorModels } from './models.js';
 import { createThreadHarnesses } from './thread-harnesses.js';
@@ -26,8 +27,16 @@ export async function startRuntime(config: RuntimeConfig, api: MachineApi) {
   const compaction = coordinatorCompactionExtension(() =>
     active === null ? null : { provider: active.provider, modelId: config.summaryModelId },
   );
+  const threads = new Map<string, string>();
   const harnesses = createThreadHarnesses(config.storageDir, models.models, context, {
-    extensions: [tools, compaction],
+    extensions: [
+      tools,
+      compaction,
+      generationTelemetryExtension(async () => {
+        const stepId = await gate.current();
+        return { threadId: threads.get(stepId) ?? '', stepId };
+      }),
+    ],
     settings: () => ({
       compaction: coordinatorCompactionSettings(
         models.models
@@ -47,21 +56,26 @@ export async function startRuntime(config: RuntimeConfig, api: MachineApi) {
         await api.done(claimed.step.id, body);
         return body;
       }
-      return runCoordinatorTurn(
-        {
-          harness,
-          models,
-          api,
-          context,
-          heartbeatMs: config.heartbeatMs,
-          now: Date.now,
-          gate,
-          onModel: (ref) => {
-            active = ref;
+      threads.set(claimed.step.id, claimed.chief?.threadId ?? '');
+      try {
+        return await runCoordinatorTurn(
+          {
+            harness,
+            models,
+            api,
+            context,
+            heartbeatMs: config.heartbeatMs,
+            now: Date.now,
+            gate,
+            onModel: (ref) => {
+              active = ref;
+            },
           },
-        },
-        claimed,
-      );
+          claimed,
+        );
+      } finally {
+        threads.delete(claimed.step.id);
+      }
     },
     close: () => harnesses.close(),
   };

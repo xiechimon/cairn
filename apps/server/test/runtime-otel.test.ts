@@ -1,5 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { transcriptPromptRowId } from '@cairn/shared';
 import {
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
@@ -13,6 +14,7 @@ import {
   chiefMessage,
   chiefThread,
   machine as machineTable,
+  message as messageTable,
   project as projectTable,
   schedule,
   step as stepTable,
@@ -641,4 +643,50 @@ describe('Coordinator turn export', () => {
     expect(stepAttrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
     expect(stepAttrs['langfuse.trace.name']).toBeUndefined();
   });
+});
+
+test('worker step roots export their own transcript input and final reply only', async () => {
+  const { s, buildId, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
+  s.db
+    .insert(messageTable)
+    .values([
+      {
+        id: transcriptPromptRowId(stepId),
+        conversationId: buildId,
+        role: 'user',
+        content: 'implement the owner request',
+        createdAt: 1100,
+      },
+      {
+        id: `msg-${stepId}-1`,
+        conversationId: buildId,
+        role: 'assistant',
+        content: [{ type: 'text', text: 'implementation is complete' }],
+        createdAt: 1900,
+      },
+      {
+        id: 'msg-other-step-1',
+        conversationId: buildId,
+        role: 'assistant',
+        content: 'unrelated reply',
+        createdAt: 1901,
+      },
+    ])
+    .run();
+  const captured = capture();
+  emitRuntimeStepSpan(s.db, stepId, env);
+  await flushRuntimeOtel();
+  const attrs = Object.fromEntries(
+    captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.attributes.map((attribute) => [
+      attribute.key,
+      attribute.value,
+    ]),
+  );
+  expect(JSON.stringify(attrs['langfuse.observation.input'])).toContain(
+    'implement the owner request',
+  );
+  expect(JSON.stringify(attrs['langfuse.observation.output'])).toContain(
+    'implementation is complete',
+  );
+  expect(JSON.stringify(attrs)).not.toContain('unrelated reply');
 });

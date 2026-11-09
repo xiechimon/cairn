@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { type AddressInfo, Socket } from 'node:net';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   type CairnSpan,
@@ -34,6 +34,8 @@ interface Capture {
 
 const servers: Server[] = [];
 afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
   for (const server of servers.splice(0)) server.close();
 });
 
@@ -234,5 +236,73 @@ describe('createCairnTracing', () => {
     await tracing.forceFlush();
     expect(failures).toHaveLength(1);
     await tracing.shutdown();
+  });
+});
+
+describe('SDK exporter configuration isolation', () => {
+  test.each(['direct', 'batched'] as const)(
+    '%s excludes ambient collector headers and restores the environment',
+    async (mode) => {
+      const sink = await capture();
+      vi.stubEnv('OTEL_EXPORTER_OTLP_HEADERS', 'x-other-collector=generic,authorization=ambient');
+      vi.stubEnv('OTEL_EXPORTER_OTLP_TRACES_HEADERS', 'x-trace-collector=trace');
+      if (mode === 'direct') {
+        await exportCairnSpans(sink.target, {}, 'cairn.test', spans());
+      } else {
+        const tracing = createCairnTracing(sink.target, {}, 'cairn.test');
+        tracing.record(spans());
+        await tracing.shutdown();
+      }
+      expect(sink.requests[0]?.headers.authorization).toBe(sink.target.headers.authorization);
+      expect(sink.requests[0]?.headers['x-other-collector']).toBeUndefined();
+      expect(sink.requests[0]?.headers['x-trace-collector']).toBeUndefined();
+      expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+        'x-other-collector=generic,authorization=ambient',
+      );
+      expect(process.env.OTEL_EXPORTER_OTLP_TRACES_HEADERS).toBe('x-trace-collector=trace');
+    },
+  );
+
+  test('restores ambient configuration when exporter construction throws', () => {
+    vi.stubEnv('OTEL_EXPORTER_OTLP_HEADERS', 'x-other-collector=generic');
+    expect(() =>
+      createCairnTracing(
+        { url: new URL('http://127.0.0.1'), headers: {} },
+        {},
+        'cairn.test',
+        undefined,
+        -1,
+      ),
+    ).toThrow();
+    expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe('x-other-collector=generic');
+  });
+
+  test('bounds a connection that never reaches TCP connect', async () => {
+    const sockets: Socket[] = [];
+    const guards: ReturnType<typeof setTimeout>[] = [];
+    vi.spyOn(Socket.prototype, 'connect').mockImplementation(function (this: Socket) {
+      Object.defineProperty(this, 'connecting', { value: true, configurable: true });
+      sockets.push(this);
+      guards.push(setTimeout(() => this.destroy(new Error('connect guard expired')), 800));
+      return this;
+    });
+    const started = Date.now();
+    try {
+      await expect(
+        exportCairnSpans(
+          { url: new URL('http://127.0.0.1:1/v1/traces'), headers: {} },
+          {},
+          'cairn.test',
+          spans(),
+          50,
+        ),
+      ).rejects.toThrow();
+      expect(sockets.length).toBeGreaterThan(0);
+      expect(Date.now() - started).toBeLessThan(500);
+      expect(sockets.every((socket) => socket.destroyed)).toBe(true);
+    } finally {
+      for (const guard of guards) clearTimeout(guard);
+      for (const socket of sockets) socket.destroy();
+    }
   });
 });

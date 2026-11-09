@@ -7,6 +7,8 @@ import {
   LANGFUSE_ATTR,
   langfuseEnvironmentAttributes,
   langfuseTraceAttributes,
+  type OtelObservation,
+  observationAttributes,
   otelEnvironment,
   otelErrorMessage,
   otelResourceAttributes,
@@ -14,6 +16,7 @@ import {
   runtimeBuildAttributes,
   stepAttributes,
   type TokenCounts,
+  transcriptPromptRowId,
 } from '@cairn/shared';
 import {
   type CairnSpan,
@@ -26,9 +29,9 @@ import {
   otlpTraceIdOfStep,
   parseOtlpTarget,
 } from '@cairn/shared/otel';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, or, sql } from 'drizzle-orm';
 import type { Db } from './db/client.js';
-import { build, chiefMessage, machine, schedule, step, todo } from './db/schema.js';
+import { build, chiefMessage, machine, message, schedule, step, todo } from './db/schema.js';
 import { githubUnattributedCounts } from './lib/github-token.js';
 import { parseChiefTrigger } from './services/chief.js';
 import { stepRuntimeFor } from './services/dispatch-eligibility.js';
@@ -97,6 +100,7 @@ export function emitRuntimeStepSpan(
   db: Db,
   stepId: string,
   env: NodeJS.ProcessEnv = process.env,
+  observation: OtelObservation = {},
 ): void {
   const target = runtimeTarget(env);
   if (target === null) return;
@@ -125,6 +129,46 @@ export function emitRuntimeStepSpan(
       ? (stepFailureReason(db, row) ?? otelErrorMessage(buildRow?.errorMessage))
       : undefined;
   const traceId = otlpTraceIdOfStep({ kind: row.kind, buildId: row.buildId, stepId: row.id });
+  const prefix = `msg-${row.id}-`;
+  const transcript = isTurn
+    ? []
+    : db
+        .select({ role: message.role, content: message.content })
+        .from(message)
+        .where(
+          and(
+            eq(message.conversationId, row.buildId),
+            or(
+              eq(message.id, transcriptPromptRowId(row.id)),
+              sql`substr(${message.id}, 1, ${prefix.length}) = ${prefix}`,
+            ),
+          ),
+        )
+        .orderBy(asc(message.createdAt))
+        .all()
+        .flatMap((entry) => {
+          const content =
+            typeof entry.content === 'string'
+              ? entry.content
+              : Array.isArray(entry.content)
+                ? entry.content.filter(
+                    (block: unknown) =>
+                      typeof block === 'object' &&
+                      block !== null &&
+                      'type' in block &&
+                      block.type === 'text',
+                  )
+                : [];
+          return typeof content === 'string' || content.length > 0
+            ? [{ role: entry.role, content }]
+            : [];
+        });
+  const payload = isTurn
+    ? observation
+    : {
+        input: transcript.filter((entry) => entry.role === 'user'),
+        output: transcript.filter((entry) => entry.role === 'assistant').slice(-1),
+      };
   push(target, env, [
     {
       spanId: otlpStepSpanIdOfBuild(row.buildId, row.id),
@@ -137,6 +181,7 @@ export function emitRuntimeStepSpan(
       endMs: end,
       attributes: {
         ...attribution,
+        ...observationAttributes(payload),
         ...stepAttributes({
           stepId: row.id,
           kind: row.kind,
@@ -225,6 +270,8 @@ export function emitRuntimeBuildSpan(
 export type CoordinatorTurnSpanRecord =
   | {
       kind: 'chat';
+      input?: unknown;
+      output?: unknown;
       at: number;
       provider: string;
       model: string;
@@ -271,6 +318,7 @@ export function emitCoordinatorTurnSpans(
         startMs: record.at,
         endMs: record.at,
         attributes: {
+          ...observationAttributes(record),
           ...chatAttributes(
             {
               provider: record.provider,

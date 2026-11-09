@@ -50,13 +50,13 @@ import {
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
+import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
 
 const loadedConfig = loadConfig();
 const logSecrets = [loadedConfig.authToken ?? ''];
 const logger = createServerLogger(logSecrets, {
   level: process.env.LOG_LEVEL ?? 'info',
-  // pino-pretty cannot load its transport worker from a single-file bundle.
   ...(process.env.NODE_ENV === 'production' || BUNDLED_FORM
     ? {}
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
@@ -249,6 +249,7 @@ const server = serve(
   },
 );
 
+const drainHttp = createHttpDrain(server);
 const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
 computerScreens.attach(server);
@@ -276,8 +277,7 @@ async function shutdown(): Promise<void> {
   ]);
   killInFlightPick();
   computerScreens.close();
-  server.close();
-  await shutdownRuntimeOtel();
+  await drainHttp(shutdownRuntimeOtel);
   await (await tsnetStarting)?.stop();
   close();
   process.exit(0);

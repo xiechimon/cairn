@@ -4,6 +4,7 @@ import type {
   MachineAskResponse,
   MachineDoneBody,
   MachineTokenResponse,
+  OtelObservation,
   StepRecord,
   TranscriptRow,
 } from '@cairn/shared';
@@ -21,5 +22,5 @@ export interface MachineApi {
   transcriptRow(stepId: string, row: TranscriptRow, entryId?: string): Promise<void>;
   mapUserEntry?(stepId: string, entryId: string): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
-  done(stepId: string, body: MachineDoneBody): Promise<void>;
+  done(stepId: string, body: MachineDoneBody, observation?: OtelObservation): Promise<void>;
 }
