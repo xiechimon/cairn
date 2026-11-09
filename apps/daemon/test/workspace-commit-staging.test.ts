@@ -155,6 +155,8 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
     writeFileSync(join(userRepo, 'config.txt'), 'alpha\nbeta\ngamma-upstream\n');
     await git(userRepo, ['commit', '-am', 'upstream: gamma']);
     await gitPrim.fetch(prepared.baseRepoDir, null);
+    await git(prepared.cwd, ['config', 'user.name', IDENTITY.name]);
+    await git(prepared.cwd, ['config', 'user.email', IDENTITY.email]);
 
     await ws.mergeDefaultBranch(prepared.cwd, prepared.defaultBranch, null);
 
@@ -168,6 +170,40 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
     const next = await ws.commitAll(prepared.cwd, 'build: after merge', IDENTITY);
     expect(next.setupDrift).toContain('config.txt');
     expect(await committedPaths(prepared.cwd)).toEqual(['after.txt']);
+  }, 60_000);
+
+  test('a deletion or rename the agent already staged is committed without re-adding the removed path', async () => {
+    await seedRepo(userRepo);
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const prepared = await ws.prepare(prepareInput());
+    await git(prepared.cwd, ['mv', 'README.md', 'GUIDE.md']);
+
+    const result = await ws.commitAll(prepared.cwd, 'build: rename readme', IDENTITY);
+
+    expect(result.committed).toBe(true);
+    expect(
+      await git(prepared.cwd, ['ls-tree', '--name-only', 'HEAD', 'README.md', 'GUIDE.md']),
+    ).toBe('GUIDE.md');
+    expect(await git(prepared.cwd, ['ls-files', 'README.md'])).toBe('');
+  }, 60_000);
+
+  test('agent edits that existed before a resume hook touched the same file stay the agent change', async () => {
+    await seedRepo(userRepo);
+    writeFileSync(
+      join(userRepo, '.agents', 'resume'),
+      '#!/bin/sh\necho "resumed: true" >> pnpm-lock.yaml\n',
+    );
+    await git(userRepo, ['commit', '-am', 'append-only resume hook']);
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const first = await ws.prepare(prepareInput());
+    writeFileSync(join(first.cwd, 'pnpm-lock.yaml'), 'lockfileVersion: 9\nagent-dep: 1\n');
+    const resumed = await new WorkspaceManager({ logger: quietLogger() }).prepare(prepareInput());
+    expect(resumed.reused).toBe(true);
+
+    const result = await ws.commitAll(resumed.cwd, 'build: dep', IDENTITY);
+
+    expect(await committedPaths(resumed.cwd)).toContain('pnpm-lock.yaml');
+    expect(result.setupDrift).not.toContain('pnpm-lock.yaml');
   }, 60_000);
 
   test('an agent making a setup-written script executable is the agent change and is committed', async () => {
