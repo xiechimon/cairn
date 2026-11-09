@@ -144,6 +144,7 @@ export async function importGithubIssue(
       title: neutralizeIssueAttachmentTokens(detail.title),
       spec: `${names.some((name) => name.toLowerCase() === 'correction') ? `${CORRECTION_PROMPT}\n\n` : ''}${neutralizeIssueAttachmentTokens(detail.body ?? '')}`,
       tagIds,
+      correctionRequired: names.some((name) => name.toLowerCase() === 'correction'),
       createdBy: opts.createdBy ?? deps.user.id,
       ownerId: deps.user.id,
       sourceKind: 'github-issue',
