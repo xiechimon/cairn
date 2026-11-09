@@ -183,12 +183,22 @@ export interface StepDigest {
   owner_questions: string[];
 }
 
-export function unitCost(unit: Observation, trace: Observation[]): number | null {
-  const generations = trace.filter(
-    (o) => o.type === 'GENERATION' && o.parentObservationId === unit.id,
-  );
+export interface UnitSpend {
+  cost: number | null;
+  models: string[];
+}
+
+export function unitSpend(generations: Observation[]): UnitSpend | null {
   if (generations.length === 0) return null;
-  return generations.reduce((sum, o) => sum + (o.totalCost ?? 0), 0);
+  const priced = generations.every((g) => g.totalCost != null);
+  return {
+    cost: priced ? generations.reduce((sum, g) => sum + (g.totalCost ?? 0), 0) : null,
+    models: [...new Set(generations.map((g) => g.providedModelName ?? g.model ?? 'unknown model'))],
+  };
+}
+
+function childGenerations(unit: Observation, observations: Observation[]): Observation[] {
+  return observations.filter((o) => o.type === 'GENERATION' && o.parentObservationId === unit.id);
 }
 
 export function buildStepDigest(unit: Observation, trace: Observation[], now: number): StepDigest {
@@ -229,7 +239,7 @@ export function buildStepDigest(unit: Observation, trace: Observation[], now: nu
       edits_or_writes: tools.filter((t) => EDIT_TOOLS.has(toolName(t).toLowerCase())).length,
       generations: trace.filter((o) => o.type === 'GENERATION' && o.parentObservationId === unit.id)
         .length,
-      cost_usd: unitCost(unit, trace),
+      cost_usd: unitSpend(childGenerations(unit, trace))?.cost ?? null,
       max_same_call_repeats: maxRepeats(tools.map((t) => `${toolName(t)} ${asText(t.input)}`)),
       max_same_error_repeats: maxRepeats(
         errors.map((t) => `${toolName(t)} ${clip(asText(t.output), 400)}`),
@@ -412,21 +422,22 @@ export async function runShadow(
     fromStartTime: iso(baselineStart),
     toStartTime: iso(options.now),
   });
-  const spendByUnit = new Map<string, { cost: number; model: string }>();
+  const generationsByUnit = new Map<string, Observation[]>();
   for (const g of generations)
     if (g.parentObservationId)
-      spendByUnit.set(g.parentObservationId, {
-        cost: (spendByUnit.get(g.parentObservationId)?.cost ?? 0) + (g.totalCost ?? 0),
-        model: g.providedModelName ?? g.model ?? 'unknown model',
-      });
+      generationsByUnit.set(g.parentObservationId, [
+        ...(generationsByUnit.get(g.parentObservationId) ?? []),
+        g,
+      ]);
   const samples: CostSample[] = candidates.flatMap((u) => {
-    const spend = spendByUnit.get(u.id);
-    return spend === undefined || spend.cost <= 0
+    const spend = unitSpend(generationsByUnit.get(u.id) ?? []);
+    const model = spend?.models.length === 1 ? spend.models[0] : undefined;
+    return spend?.cost == null || spend.cost <= 0 || model === undefined
       ? []
       : [
           {
             unitId: u.id,
-            role: `${u.name ?? ''} on ${spend.model}`,
+            role: `${u.name ?? ''} on ${model}`,
             endedAt: ms(u.endTime),
             cost: spend.cost,
           },

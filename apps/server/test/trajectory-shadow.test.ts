@@ -10,6 +10,7 @@ import {
   type Observation,
   runShadow,
   STEP_DIGEST_NAME,
+  unitSpend,
 } from '../src/trajectory-shadow.js';
 
 const T0 = Date.parse('2026-11-08T10:00:00.000Z');
@@ -191,6 +192,41 @@ test('the digest lists owner question text from ask_user calls only', () => {
   expect(buildStepDigest(unit, [unit], T0).owner_questions).toEqual([]);
 });
 
+function generation(id: string, model: string, totalCost: number | null): Observation {
+  return {
+    id,
+    traceId: 'trace-1',
+    type: 'GENERATION',
+    name: `chat ${model}`,
+    startTime: at(1),
+    endTime: at(1),
+    parentObservationId: 's1',
+    providedModelName: model,
+    totalCost,
+  };
+}
+
+test('unit spend keeps an unpriced generation unknown and lists every model', () => {
+  expect(unitSpend([])).toBeNull();
+  expect(
+    unitSpend([generation('g1', 'gpt-6.1-sol', 0.2), generation('g2', 'gpt-6.1-sol', null)]),
+  ).toEqual({
+    cost: null,
+    models: ['gpt-6.1-sol'],
+  });
+  expect(
+    unitSpend([generation('g1', 'gpt-6.1-sol', 0.2), generation('g2', 'claude-sonnet-5-5', 0.1)]),
+  ).toEqual({ cost: 0.30000000000000004, models: ['gpt-6.1-sol', 'claude-sonnet-5-5'] });
+  const unit = step('s1', 0, 30);
+  expect(
+    buildStepDigest(
+      unit,
+      [unit, generation('g1', 'gpt-6.1-sol', 0.2), generation('g2', 'gpt-6.1-sol', null)],
+      T0,
+    ).facts.cost_usd,
+  ).toBeNull();
+});
+
 function sample(
   unitId: string,
   endedAt: number,
@@ -327,7 +363,7 @@ test('a second run writes no second digest for an already digested unit', async 
   expect(JSON.parse(recorded.digests[0]?.input ?? '{}').owner_questions).toEqual(['Merge now?']);
 });
 
-test('a run scores cost against the trailing week and skips unpriced units', async () => {
+test('a run scores cost against the trailing week and skips unpriced and mixed-model units', async () => {
   const observations: Observation[] = [];
   const costs = [1, 2, 3, 2, 2, 9];
   costs.forEach((cost, i) => {
@@ -347,6 +383,40 @@ test('a run scores cost against the trailing week and skips unpriced units', asy
     });
   });
   observations.push(step('no-gen', -50, -45, { traceId: 'trace-x' }));
+  observations.push(step('mixed', -30, -25, { traceId: 'trace-z' }));
+  observations.push({
+    id: 'g-mixed-a',
+    traceId: 'trace-z',
+    type: 'GENERATION',
+    name: 'chat gpt-6.1-sol',
+    startTime: at(-29),
+    endTime: at(-29),
+    parentObservationId: 'mixed',
+    totalCost: 50,
+    providedModelName: 'gpt-6.1-sol',
+  });
+  observations.push({
+    id: 'g-mixed-b',
+    traceId: 'trace-z',
+    type: 'GENERATION',
+    name: 'chat claude-sonnet-5-5',
+    startTime: at(-28),
+    endTime: at(-28),
+    parentObservationId: 'mixed',
+    totalCost: 50,
+    providedModelName: 'claude-sonnet-5-5',
+  });
+  observations.push({
+    id: 'g-partial',
+    traceId: 'trace-y',
+    type: 'GENERATION',
+    name: 'chat gpt',
+    startTime: at(-38),
+    endTime: at(-38),
+    parentObservationId: 'unpriced',
+    totalCost: null,
+    providedModelName: 'gpt-6.1-sol',
+  });
   observations.push(step('unpriced', -40, -35, { traceId: 'trace-y' }));
   observations.push({
     id: 'g-unpriced',
@@ -356,7 +426,7 @@ test('a run scores cost against the trailing week and skips unpriced units', asy
     startTime: at(-39),
     endTime: at(-39),
     parentObservationId: 'unpriced',
-    totalCost: 0,
+    totalCost: 5,
     providedModelName: 'gpt-6.1-sol',
   });
   const recorded: Recorded = { digests: [], scores: [] };
@@ -366,7 +436,7 @@ test('a run scores cost against the trailing week and skips unpriced units', asy
     { url: new URL(`${host}/otel/v1/traces`), headers: {} },
     { now: T0, sinceMs: 2 * 60 * MIN, settleMs: 0, dryRun: false },
   );
-  expect(result.units).toBe(3);
+  expect(result.units).toBe(4);
   const costScores = recorded.scores.filter((s) => s.name === 'cost_z');
   expect(costScores).toHaveLength(1);
   expect(costScores[0]).toMatchObject({ observationId: 's5' });
