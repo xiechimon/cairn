@@ -44,7 +44,13 @@ test('digits respect composition, modifiers, other dialogs, typed answers and or
   for (let n = 1; n <= 8; n++) await page.keyboard.press(String(n));
   await page.keyboard.press('1');
   for (const theme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme: theme });
+    await page.evaluate((value) => localStorage.setItem('cairn-theme', value), theme);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(option(0)).toBeVisible();
+    await composer.focus();
+    await page.keyboard.press('1');
+    await expect(option(0)).toHaveAttribute('aria-pressed', 'true');
     await page.getByTestId('chief-composer-block').screenshot({ path: testInfo.outputPath(`generic-question-${theme}.png`) });
   }
   await composer.dispatchEvent('keydown', { key: '2', code: 'Numpad2' });
