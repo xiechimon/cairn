@@ -42,4 +42,4 @@ The negative control uses the exact main version of `runtime/provider.ts`, with 
 
 ## 6. Delivery
 
-Issue: [#3625](https://github.com/xiechimon/cairn/issues/3625). The PR links this design and records its own number in its delivery section. Implementation and verification use this Codex session; required review is the head-bound Codex cloud review in a fresh context. Run targeted Vitest with `--maxWorkers=4`, then lint, typecheck, spec parsing and prepush. Keep real-provider and owner live verification listed as uncovered until the owner runs them.
+Issue: [#3625](https://github.com/xiechimon/cairn/issues/3625). PR: [#3626](https://github.com/xiechimon/cairn/pull/3626). The PR links this design in its delivery section. Implementation and verification use this Codex session; required review is the head-bound Codex cloud review in a fresh context. Run targeted Vitest with `--maxWorkers=4`, then lint, typecheck, spec parsing and prepush. Keep real-provider and owner live verification listed as uncovered until the owner runs them.
