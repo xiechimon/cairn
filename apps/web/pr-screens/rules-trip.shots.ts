@@ -66,6 +66,22 @@ const MUTATIONS: Record<string, (page: Page) => Promise<void>> = {
     page.evaluate(() => {
       document.body.insertAdjacentHTML('afterbegin', '<div style="padding:5px">trip</div>');
     }),
+  V22: (page) =>
+    page.evaluate(() => {
+      document.body.insertAdjacentHTML('afterbegin', '<span style="text-transform:uppercase;letter-spacing:0.1em">paid this month</span>');
+    }),
+  V23: (page) =>
+    page.evaluate(() => {
+      document.body.insertAdjacentHTML('afterbegin', '<h2 style="font-weight:900;font-style:italic">Inbox</h2>');
+    }),
+  V24: (page) =>
+    page.evaluate(() => {
+      document.body.insertAdjacentHTML('afterbegin', '<div style="transition:all 200ms ease;width:20px;height:20px">t</div>');
+    }),
+  T4: (page) =>
+    page.evaluate(() => {
+      document.body.insertAdjacentHTML('afterbegin', '<button style="width:60px;height:30px">Save!</button>');
+    }),
   T1: (page) =>
     page.evaluate(() => {
       document.body.insertAdjacentHTML('afterbegin', '<span>查看 thread</span>');
@@ -91,7 +107,7 @@ for (const [id, mutate] of Object.entries(MUTATIONS)) {
   test(`${id} reports a new finding after a violating change`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(PAGE_URL);
-    await expect(page.getByTestId('team-agent-card').first()).toBeVisible();
+    await expect(page.getByTestId('routing-rule-new-coordinator')).toBeVisible();
     const before = new Set((await RULES[id]!(page)).map((f) => f.key));
     await mutate(page);
     const after = await RULES[id]!(page);

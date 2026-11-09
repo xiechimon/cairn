@@ -472,7 +472,7 @@ export const EN: Record<string, string> = {
   未配置模型: 'No model configured',
 
   // —— api-keys route (r2 19, 02 §8 canon note) ——
-  '尚无 API 密钥。': 'No API keys yet.',
+  '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入机器，也让 MCP 客户端能访问你的工作台。':
     'API keys connect machines from the command line and let MCP clients reach your workbench.',
   新建密钥: 'New key',
@@ -490,7 +490,7 @@ export const EN: Record<string, string> = {
   自定义: 'Custom',
   '搜索技能...': 'Search skills...',
   排序: 'Sort',
-  '尚无技能。': 'No skills yet.',
+  尚无技能: 'No skills yet',
   // spec 13 + XMON-109（spec 13 回摆）技能面：双入口口径——本地目录或页面
   // 新建都会出现在这里（{dir} = SKILLS_DIR_DEFAULT）。
   '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。':
@@ -531,11 +531,11 @@ export const EN: Record<string, string> = {
   '来源未通过校验。': 'The source failed validation.',
   '拉取来源失败——稍后重试。': 'Fetching the source failed — try again later.',
   '导入失败，请重试。': 'Import failed, please retry.',
-  '尚无 MCP 服务器。': 'No MCP servers yet.',
+  '尚无 MCP 服务器': 'No MCP servers yet',
   // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
   '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
     'Reads the mcpServers section of ~/.claude.json on the cairn server machine — add entries there and refresh to see them here. MCP servers give Agents extra tools; authorization happens per Agent, on its own page.',
-  '尚无密钥。': 'No secrets yet.',
+  尚无密钥: 'No secrets yet',
   '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
     'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
   添加密钥: 'Add secret',
@@ -587,10 +587,10 @@ export const EN: Record<string, string> = {
   整机迁移: 'Migrate all agents',
   状态: 'Status',
   删除机器: 'Delete machine',
-  '删除后，这台机器要重新注册才能再接任务。':
-    'Once deleted, the machine has to enroll again before it takes work.',
+  '删除后，这台机器要重新注册才能再接任务':
+    'Once deleted, the machine has to enroll again before it takes work',
   '确定删除这台机器？此操作不可撤销。': 'Delete this machine? This cannot be undone.',
-  '尚无机器。': 'No machines yet.',
+  尚无机器: 'No machines yet',
   '在要执行任务的机器上运行注册命令，它就会出现在这里。':
     'Run the enroll command on the machine that should run tasks and it appears here.',
   '整机迁移失败，请重试。': 'Migration failed. Try again.',
@@ -805,7 +805,7 @@ export const EN: Record<string, string> = {
   // #1251 visible pending reasons (queue blocked face): missing capability =
   // the fix, offline = waiting.
   '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':
-    'Queued: no machine meets the capability requirements (missing {missing}) — installs unlock it on the next heartbeat ({ahead} ahead)',
+    'Queued: no machine meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed ({ahead} ahead)',
   '排队中：等 {machine} 上线（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online ({ahead} ahead)',
   '排队中：等机器上线（前面 {ahead} 个）':
@@ -842,7 +842,7 @@ export const EN: Record<string, string> = {
   '等待模型响应...': 'Waiting for the model...',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
   // #918 skill facts: live-panel entries (read / denied) + the detail summary.
-  '▶ skill: {n}': '▶ skill: {n}',
+  'skill: {n}': 'skill: {n}',
   '✕ skill: {n}（已挡下）': '✕ skill: {n} (blocked)',
   '技能：{n}': 'Skills: {n}',
   '挡下：{n}': 'Blocked: {n}',
@@ -1009,7 +1009,7 @@ export const EN: Record<string, string> = {
   未登录: 'Not signed in',
   '在该机器上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。':
     'Add ANTHROPIC_*_MODEL slots to env in ~/.claude/settings.json on that machine and its model slots show up here.',
-  '尚未添加服务商。': 'No providers yet.',
+  尚未添加服务商: 'No providers yet',
   // #231/#243 OAuth 落地 reason 三译(providers-page 喂 connectError 行)
   '授权已被取消。': 'Authorization was cancelled.',
   '令牌交换失败，请稍后重试。': 'Token exchange failed — please try again.',
@@ -1541,7 +1541,7 @@ export const EN: Record<string, string> = {
   模型与账户: 'Models & accounts',
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
-  '还没有路由规则。': 'No routing rules yet.',
+  还没有路由规则: 'No routing rules yet',
   '先创建 Coordinator 规则，它才能回答你的消息。':
     'Create the Coordinator rule first so it can answer your messages.',
   '这条路由还没有规则，选好运行时与模型后创建。':
@@ -1743,7 +1743,7 @@ export const EN: Record<string, string> = {
   'No team is available for this schedule.': 'No team is available for this schedule.',
   'Create a thread before scheduling it.': 'Create a thread before scheduling it.',
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
-  'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
+  'Scheduled tasks could not be loaded': 'Scheduled tasks could not be loaded',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
   等待审核: 'Review pending',
   草稿: 'Draft',
@@ -1816,7 +1816,7 @@ export const EN: Record<string, string> = {
   配对二维码: 'Pairing QR code',
   '手机将连接到 {origin}': 'Your phone will connect to {origin}',
   '生成配对码失败，请重试。': 'Could not create a pairing code. Try again.',
-  '这台电脑暂时没有手机可用的线路。': 'This computer has no route your phone can use yet.',
+  这台电脑暂时没有手机可用的线路: 'This computer has no route your phone can use yet',
   '请先登录 Tailscale：{url}': 'Sign in to Tailscale first: {url}',
   '设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。':
     'Set CAIRN_TSNET=1 and restart to reach this computer from your phone over Tailscale.',

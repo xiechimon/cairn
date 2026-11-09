@@ -385,7 +385,7 @@ export function AccountsSection() {
                 <EmptyState
                   testId="resource-empty"
                   icon={Monitor}
-                  title={t('尚无机器。')}
+                  title={t('尚无机器')}
                   description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
                 />
               }
