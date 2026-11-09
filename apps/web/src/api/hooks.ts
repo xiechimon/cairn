@@ -44,7 +44,6 @@ import type {
   PatchTeamBody,
   PatchUserBody,
   PlanResponse as PlanRow,
-  ProjectCommitDetailResponse,
   ProjectFileResponse,
   ProjectFilesResponse,
   ProjectRecord,
@@ -619,37 +618,6 @@ export const useProjectFile = (
         `/api/projects/${projectId}/file?path=${encodeURIComponent(path ?? '')}${ref !== undefined ? `&ref=${encodeURIComponent(ref)}` : ''}`,
       ),
     enabled: projectId !== undefined && path !== undefined,
-  });
-
-export const useProjectCommits = (projectId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['commits', projectId],
-    queryFn: () =>
-      api.get<{
-        ref: string;
-        commits: {
-          sha: string;
-          shortSha: string;
-          message: string;
-          authorName: string;
-          at: number;
-        }[];
-      }>(`/api/projects/${projectId}/commits`),
-    enabled: enabled && projectId !== undefined,
-  });
-
-export const useProjectCommitDetail = (
-  projectId: string | undefined,
-  sha: string | undefined,
-  enabled: boolean,
-) =>
-  useQuery({
-    queryKey: ['commit-detail', projectId, sha],
-    queryFn: () =>
-      api.get<ProjectCommitDetailResponse>(
-        `/api/projects/${projectId}/commits/${encodeURIComponent(sha ?? '')}`,
-      ),
-    enabled: enabled && projectId !== undefined && sha !== undefined,
   });
 
 export function useApiMutations(teamId: string | undefined) {

@@ -155,7 +155,6 @@ node .../scripts/drive-project-new-form.mjs    # new-project form (spec 12/#360,
 node .../scripts/probe-github-oauth.mjs        # GitHub auth + repo picker (spec 12/#361, github-oauth-picker.md)
 node .../scripts/probe-local-repos.mjs         # local project API three states (spec 12/#359, local-repo-api.md)
 node .../scripts/drive-1030-local-files.mjs    # local project Files tab opening read face + unreachable degradation (#1030, project-files-local.md; three phases: local readable / hosted control / deleted-repo degradation)
-node .../scripts/drive-1102-commit-detail.mjs  # history-row commit detail face (#1102, project-commit-detail.md; three phases: hosted five criteria + browser click row switch / local root commit all-new / deleted-repo degradation)
 node .../scripts/drive-1007-pages.mjs           # pages-domain live face (#1007): schedules registry Dialog real user path + settings-page Card structural face
 node .../scripts/drive-1010-select.mjs          # select.tsx handwritten component retirement to registry compound select (#1010): schedules time/minute Select real user path + registry structural artifacts (Popup role=presentation / inner Select.List role=listbox no aria-label / trigger button aria-controls to listbox) + dual-theme incremental-face contrast measurement; live 22/22 PASS, evidence docs/verify/1010/
 node .../scripts/drive-attachments.mjs / drive-branch-sync.mjs / drive-failed-send.mjs / drive-mentions.mjs / drive-tags.mjs  # M7 six-feature family (each feature file)

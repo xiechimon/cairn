@@ -3,7 +3,6 @@ import {
   type ChiefDigestItem,
   type ChiefReportContent,
   type ClaudeLogin,
-  type DocumentDiffFile,
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
@@ -164,15 +163,6 @@ export interface ScheduleRecord {
   };
 }
 
-export interface ProjectCommitRow {
-  id: string;
-  shortSha: string;
-  message: string;
-  authorName: string;
-  at: number;
-  files?: DocumentDiffFile[];
-}
-
 export interface ProjectContent {
   name: string;
   branch: string;
@@ -184,7 +174,6 @@ export interface ProjectContent {
   description: string | null;
   icon?: ProjectIcon;
   color?: ProjectColor;
-  commits?: ProjectCommitRow[];
   fileContents?: Record<string, string>;
 }
 

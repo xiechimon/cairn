@@ -170,40 +170,6 @@ export const projectContent: ProjectContent = {
       '',
     ].join('\n'),
   },
-  commits: [
-    {
-      id: 'f3d9c1b7a2e5480db6c1a9f0e2d7b4c8a1e5f903',
-      shortSha: 'f3d9c1b',
-      message: 'docs: README',
-      authorName: 'r3-builder',
-      at: r7(11, 2),
-      files: [
-        {
-          path: 'README.md',
-          additions: 3,
-          deletions: 0,
-          hunks: [
-            {
-              header: '@@ -0,0 +1,3 @@',
-              lines: [
-                `+# ${PROJECT_NAME}`,
-                '+',
-                `+托管演示仓:任务全生命周期走查(待开始 → 规划中 → 待确认 → 执行中 → 待验收 → 已完成)。`,
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: '0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d',
-      shortSha: '0a1b2c3',
-      message: `init ${PROJECT_NAME}`,
-      authorName: 'Cairn',
-      at: r7(9, 41),
-      files: [],
-    },
-  ],
 };
 export function localTodo(seqNum: number, spec: string, now: number): TodoRecord {
   return {

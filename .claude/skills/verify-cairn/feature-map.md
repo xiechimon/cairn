@@ -836,20 +836,19 @@ Reach:
 
 ### project-files
 
-**Project files and commits** (shipped, centrality 3). The files tab of a project: the tree, file viewer and commit detail.
+**Project files** (shipped, centrality 3). The remaining project file tree and viewer, pending retirement in #3479.
 
-States: A file tree with a viewer and a commit history with commit detail; unavailable for some project kinds.
+States: A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.
 
 Reach:
 
 1. `open /app/project/<id of a project listed by the projects API>/files`
-2. `click testid:history-message`
 
 - Web routes: `/app/project/:id/files`
 - Keyboard shortcuts in its code: `A`, `D`, `P`, `R`, `T`
-- Test ids in its code: `history-message`, `history-meta`, `task-card`, `task-meta`, `task-row`, `task-status`
-- Verify recipes: [.claude/skills/verify-cairn/features/project-files-drill.md](features/project-files-drill.md), [.claude/skills/verify-cairn/features/project-files-local.md](features/project-files-local.md), [.claude/skills/verify-cairn/features/project-commit-detail.md](features/project-commit-detail.md)
-- Research: **gap**: no note on whether a files tab belongs in an agent product and how others show it
+- Test ids in its code: `task-card`, `task-meta`, `task-row`, `task-status`
+- Verify recipes: [.claude/skills/verify-cairn/features/project-files-drill.md](features/project-files-drill.md), [.claude/skills/verify-cairn/features/project-files-local.md](features/project-files-local.md)
+- Research: [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md)
 - Frontend design: **gap**: the files tab has no design
 - Backend design: **gap**: no design for reading files and commits from local and hosted repos
 - Evidence: `apps/web/e2e/project-files-tree.spec.ts`, `apps/web/e2e/project-commit-detail.spec.ts`

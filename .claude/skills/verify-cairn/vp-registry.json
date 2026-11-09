@@ -1121,21 +1121,6 @@
         }
       }
     },
-    "project-commit-detail": {
-      "recipe": "features/project-commit-detail.md",
-      "cases": {
-        "commit-detail": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1102-commit-detail.mjs",
-          "args": [],
-          "needs": [
-            "stack"
-          ],
-          "status": "current",
-          "purpose": "Project history row opens commit diff for hosted, local and unreachable repos with REST and browser checks.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
-        }
-      }
-    },
     "project-files-drill": {
       "recipe": "features/project-files-drill.md",
       "cases": {
@@ -1160,7 +1145,8 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
+          "note": "Project history controls were retired in #3479; this probe still asserts their presence. The remaining files surface is being retired next.",
           "purpose": "Local project Files tab opens on a git worktree with a non-main default branch, hosted repos show no regression, and an unreachable local path degrades to a readable message with an API 404 and reason=not_found.",
           "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
         }
