@@ -47,6 +47,17 @@ describe('a task the Coordinator creates becomes a task card in the conversation
     expect(items).toContainEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1' });
   });
 
+  test('a task created during a wake turn still gets its card', () => {
+    const items = mapChiefStream([
+      said('user-wake', 'user', '[wake:settle] provenance=watch:todo-1\nTask #8 merged.'),
+      call('m1', 'create_todo', CREATE, { id: 'todo-9' }),
+      said('a1', 'assistant', 'Opened the follow-up.'),
+      said('u2', 'user', 'Thanks'),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(['task-card', 'user']);
+    expect(items[0]).toEqual({ kind: 'task-card', todoId: 'todo-9', id: 'm1:task-card', projectId: 'p1' });
+  });
+
   test('a failed or unfinished create_todo shows no card', () => {
     const items = mapChiefStream([
       call('m1', 'create_todo', CREATE, { error: 'no project' }, true),

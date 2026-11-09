@@ -197,11 +197,12 @@ export function HomeC({
         <TaskCard
           entry={entry}
           facts={taskCardFacts(fullStream ?? [], todoId)}
+          now={now}
           onOpen={() => openThread(todoId)}
         />
       );
     },
-    [taskById, fullStream, openThread],
+    [taskById, fullStream, openThread, now],
   );
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);

@@ -1591,8 +1591,11 @@ function collectChiefStream(
       }
     }
     const call = toolCallOfContent(m.content);
-    if (call !== null && eventTurn) continue;
     if (call !== null) {
+      const created = createdTodoOf(call);
+      if (created !== null)
+        pendingCards.push({ kind: 'task-card', id: `${m.id}:task-card`, ...created });
+      if (eventTurn) continue;
       pendingTools.push({
         label: pillOf(call),
         ...(call.startedAt !== undefined && call.endedAt !== undefined
@@ -1606,9 +1609,6 @@ function collectChiefStream(
       const handoffTodoId = handoffTodoOf(call);
       if (handoffTodoId !== null)
         items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
-      const created = createdTodoOf(call);
-      if (created !== null)
-        pendingCards.push({ kind: 'task-card', id: `${m.id}:task-card`, ...created });
       continue;
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;

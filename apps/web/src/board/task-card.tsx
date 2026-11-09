@@ -3,16 +3,19 @@ import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { ACCENT_INK } from '../phase.js';
+import { relativeTime } from './rel-time.js';
 import type { TaskCardFacts } from './task-card-facts.js';
 import { glyphOf, type TaskEntry, taskRowCopy } from './tasks-sections.js';
 
 export function TaskCard({
   entry,
   facts,
+  now,
   onOpen,
 }: {
   entry: TaskEntry;
   facts: TaskCardFacts;
+  now: number;
   onOpen: () => void;
 }) {
   const { t } = useI18n();
@@ -51,6 +54,7 @@ export function TaskCard({
           )}
           <span className={cn(copy.waiting && `${ACCENT_INK} font-medium`)}>{t(copy.word)}</span>
           {facts.updates > 0 && <span>· {t('{n} 次更新', { n: facts.updates })}</span>}
+          <span data-slot="task-card-age">· {relativeTime(entry.todo.phaseAt, now, t)}</span>
         </span>
       </span>
       <span

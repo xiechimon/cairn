@@ -67,7 +67,7 @@ test('a task the Coordinator created shows as a card after its reply, with statu
   const card = stream.locator('[data-slot="task-card"]');
   await expect(card).toHaveCount(1);
   await expect(card.locator('[data-slot="task-card-title"]')).toHaveText(TASK.title);
-  await expect(card.locator('[data-slot="task-card-status"]')).toHaveText(/^In progress\s*· updates: 2$/);
+  await expect(card.locator('[data-slot="task-card-status"]')).toHaveText(/^In progress\s*· updates: 2\s*· 12m ago$/);
   await expect(card.locator('[data-slot="task-card-latest"]')).toHaveText(
     'Latest: prepush has the check; CI is next',
   );
