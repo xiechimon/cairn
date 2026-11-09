@@ -13,10 +13,9 @@ import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
-import type { AgentRef, FixtureSet, TodoRecord } from '../fixtures/records.js';
+import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Clock, Kanban, Search, Settings, X } from '../icons/index.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
@@ -87,11 +86,6 @@ interface TodoRowItem {
   phaseAt: number;
   projectId?: string;
   projectName?: string;
-}
-interface AgentRowItem {
-  id: string;
-  displayName: string;
-  avatarUrl?: string | null;
 }
 interface ProjectRowItem {
   id: string;
@@ -203,12 +197,6 @@ export function SearchPanel({
   const chipProblems = chips.map((chip) =>
     chipProblem(chip, useServer ? server.filters : localSearch?.filters),
   );
-  const agents: AgentRowItem[] =
-    useServer || q === '' || hasFilters
-      ? []
-      : [...new Set(fixture.todos.map((t) => t.agent))]
-          .filter((agent): agent is AgentRef => agent != null)
-          .filter((agent) => agent.displayName.toLowerCase().includes(q));
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const liveProjects = live ? (projectsQ.data ?? []) : undefined;
@@ -250,7 +238,7 @@ export function SearchPanel({
     activeContext?.commands.filter(
       (command) => q === '' || command.label.toLowerCase().includes(q),
     ) ?? [];
-  const hitCount = commands.length + todos.length + agents.length + projects.length;
+  const hitCount = commands.length + todos.length + projects.length;
 
   const go = (pathname: string) => {
     navigate({ pathname, search });
@@ -284,7 +272,6 @@ export function SearchPanel({
       : [
           ...todos.map((todo) => () => goThread(todo.id)),
           ...projects.map((project) => () => go(`/app/project/${project.id}`)),
-          ...agents.map(() => () => go('/app/team')),
           ...(showViewAll ? [openActivity] : []),
         ]),
   ];
@@ -530,46 +517,17 @@ export function SearchPanel({
                     })}
                   </>
                 )}
-                {agents.length > 0 && (
-                  <>
-                    <div className={GROUP_LABEL}>Agents</div>
-                    {agents.map((agent, index) => {
-                      const rowIndex = base + todos.length + projects.length + index;
-                      return (
-                        <Button
-                          variant="ghost"
-                          key={agent.id}
-                          data-row-kind="agent"
-                          data-row-index={rowIndex}
-                          data-selected={cursor === rowIndex ? '' : undefined}
-                          className={`${ROW_BASE} ${rowLitClasses(cursor === rowIndex, kbd)}`}
-                          onClick={() => go('/app/team')}
-                        >
-                          <SeededAvatar
-                            className="size-4.5 flex-none"
-                            name={agent.displayName}
-                            src={agent.avatarUrl}
-                            fallback="/avatar-robot-1.svg"
-                          />
-                          <span className="truncate">{agent.displayName}</span>
-                        </Button>
-                      );
-                    })}
-                  </>
-                )}
                 {showViewAll && (
                   <>
                     <div className={GROUP_LABEL}>{t('没找到想要的？')}</div>
                     <Button
                       variant="ghost"
                       data-row-kind="activity"
-                      data-row-index={base + todos.length + projects.length + agents.length}
+                      data-row-index={base + todos.length + projects.length}
                       data-selected={
-                        cursor === base + todos.length + projects.length + agents.length
-                          ? ''
-                          : undefined
+                        cursor === base + todos.length + projects.length ? '' : undefined
                       }
-                      className={`${ROW_BASE} ${rowLitClasses(cursor === base + todos.length + projects.length + agents.length, kbd)}`}
+                      className={`${ROW_BASE} ${rowLitClasses(cursor === base + todos.length + projects.length, kbd)}`}
                       onClick={openActivity}
                     >
                       <Activity width={15} height={15} />
