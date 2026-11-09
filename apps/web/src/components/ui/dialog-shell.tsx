@@ -65,6 +65,7 @@ interface DialogShellProps {
   title?: string;
   subtitle?: ReactNode;
   headerCenter?: ReactNode;
+  headerAction?: ReactNode;
   open?: boolean;
   onClose: () => void;
   children: ReactNode;
@@ -111,6 +112,7 @@ export function DialogShell({
   title,
   subtitle,
   headerCenter,
+  headerAction,
   open = true,
   onClose,
   children,
@@ -213,6 +215,14 @@ export function DialogShell({
               {subtitle != null && (
                 <DialogDescription className={DIALOG_SUBTITLE_CLS}>{subtitle}</DialogDescription>
               )}
+            </div>
+          )}
+          {headerAction != null && headerCenter == null && (
+            <div
+              data-slot="dialog-head-action"
+              className="-mt-0.5 flex flex-none items-center gap-2"
+            >
+              {headerAction}
             </div>
           )}
         </div>

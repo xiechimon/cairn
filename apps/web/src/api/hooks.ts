@@ -627,6 +627,20 @@ export const useProjectFile = (
     enabled: projectId !== undefined && path !== undefined,
   });
 
+export function usePatchProject(teamId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; body: PatchProjectBody }) =>
+      api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
+    onSuccess: (record) => {
+      qc.setQueryData<ProjectRecord[]>(['projects', teamId], (records) =>
+        records?.map((project) => (project.id === record.id ? record : project)),
+      );
+      void qc.invalidateQueries();
+    },
+  });
+}
+
 export function useApiMutations(teamId: string | undefined) {
   const qc = useQueryClient();
   const invalidateAll = () => {
@@ -838,11 +852,7 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<ProjectRecord>('/api/projects', { ...body, ...(teamId ? { teamId } : {}) }),
       onSuccess: invalidateAll,
     }),
-    patchProject: useMutation({
-      mutationFn: (input: { id: string; body: PatchProjectBody }) =>
-        api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
-      onSuccess: invalidateAll,
-    }),
+    patchProject: usePatchProject(teamId),
     patchAutonomy: useMutation({
       mutationFn: (input: { id: string; body: PatchAutonomyBody }) =>
         api.patch<AutonomyRecord>(`/api/projects/${input.id}/autonomy`, input.body),
@@ -1019,7 +1029,12 @@ export function useApiMutations(teamId: string | undefined) {
     deleteMemory: useMutation({
       mutationFn: (input: { memoryId: string }) =>
         api.del<void>(`/api/teams/${teamId}/memories/${input.memoryId}`),
-      onSuccess: invalidateAll,
+      onSuccess: (_data, input) => {
+        qc.setQueryData<MemoryRecord[]>(['memories', teamId], (records) =>
+          records?.filter((record) => record.id !== input.memoryId),
+        );
+        invalidateAll();
+      },
     }),
     sendSteer: useMutation({
       mutationFn: (input: {
