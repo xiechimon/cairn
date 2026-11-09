@@ -41,7 +41,26 @@ async function messages(threadId = H.threadId) {
 }
 
 describe('worker reports in the chief conversation', () => {
-  test.each(['done', 'failed', 'review'] as const)(
+  test.each(['failed', 'review'] as const)(
+    '%s persists and publishes a system report; any wake comes from the owner reconciler',
+    async (phase) => {
+      const { deps, todoId } = await seedTask(true);
+      const publish = vi.spyOn(H.s.convHub, 'publishMessage');
+      setTodoPhase(deps, todoId, phase);
+      const rows = await messages();
+      expect(rows).toHaveLength(1);
+      expect(JSON.parse(rows[0]!.content as string)).toEqual({
+        kind: 'thread-report',
+        todoId,
+        phase,
+        seqNum: 1,
+        title: 'Repair board counts',
+      });
+      expect(publish).toHaveBeenCalledWith(H.threadId, expect.objectContaining(rows[0]));
+    },
+  );
+
+  test.each(['done'] as const)(
     '%s persists and publishes a system report before the wake reply',
     async (phase) => {
       const { deps, todoId } = await seedTask(true);
@@ -62,7 +81,7 @@ describe('worker reports in the chief conversation', () => {
         ...(phase === 'done' ? { verified: false } : {}),
       });
       expect(publish).toHaveBeenCalledWith(H.threadId, expect.objectContaining(report));
-      expect(wake.prompt).toMatch(/^\[wake:(settle|failed|gate)\]/);
+      expect(wake.prompt).toMatch(/^\[wake:settle\]/);
       expect(report.createdAt).toBeLessThanOrEqual(wake.createdAt);
       upsertChiefRow(deps, {
         id: `reply-${wake.id}`,

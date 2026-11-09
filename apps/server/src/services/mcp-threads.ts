@@ -26,6 +26,7 @@ import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
 import type { ChiefToolDeps } from './chief-tools.js';
 import { steerChiefMessage, stopChiefTurn } from './chief-turns.js';
 import { readConversationPage } from './conversation-page.js';
+import { OWNED_CANDIDATE, ownerOf } from './owner.js';
 import { assertProjectWritable } from './project-writable.js';
 import { containsLike, escapeLike } from './search.js';
 import { drainTaskMessageQueue, queueTaskMessage } from './task-message-queue.js';
@@ -333,14 +334,14 @@ export async function executeThreadMcpTool(
           and(
             eq(todo.teamId, teamId),
             eq(project.teamId, teamId),
-            inArray(todo.phase, ['confirm', 'review', 'failed']),
-            sql`${todo.archivedAt} is null`,
+            OWNED_CANDIDATE,
             or(eq(todo.ownerId, deps.user.id), sql`${todo.ownerId} is null`),
             projectId === undefined ? undefined : eq(todo.projectId, projectId),
           ),
         )
         .orderBy(desc(todo.phaseAt))
         .all()
+        .filter(({ row }) => ownerOf(db, row) === 'owner')
         .map(({ row }) => ({
           id: row.id,
           projectId: row.projectId,

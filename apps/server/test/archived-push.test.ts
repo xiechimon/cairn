@@ -12,9 +12,9 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
+import { reconcileOwners } from '../src/services/owner.js';
 import { pushToUserSafely, queuePushDigest, sweepPushDigest } from '../src/services/push.js';
-import { notifyThreadPhase } from '../src/services/thread-push.js';
-import { createTodo, getTodo, setTodoPhase } from '../src/services/todos.js';
+import { createTodo, setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, req } from './helpers.js';
 
 async function world(phase: Phase = 'building') {
@@ -85,12 +85,11 @@ test.each(['done', 'failed', 'confirm', 'review'] as const)(
   },
 );
 
-test('a phase record captured before archive cannot send or queue a notification', async () => {
+test('the owner sweep sends nothing for a task archived before its phase changed', async () => {
   const s = await world();
-  const captured = getTodo(s.svc, s.record.id);
-  if (!captured) throw new Error('Missing task');
   expect((await req(s.app, 'POST', `/api/todos/${s.record.id}/archive`)).status).toBe(200);
-  notifyThreadPhase(s.svc, captured, 'done');
+  s.db.update(todo).set({ phase: 'confirm' }).where(eq(todo.id, s.record.id)).run();
+  reconcileOwners(s.svc);
   expect(s.send).not.toHaveBeenCalled();
   expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
 });

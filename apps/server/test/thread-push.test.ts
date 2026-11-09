@@ -130,7 +130,7 @@ describe('terminal thread push routing (#1784: push only when a human is needed)
   );
 
   test.each(terminalCases)(
-    'failed pushes only once retries stop: $triggerSource / $sourceKind / exhausted=$retriesExhausted',
+    'failed never pushes to the person, the Coordinator owns it: $triggerSource / $sourceKind / exhausted=$retriesExhausted',
     ({ triggerSource, sourceKind, retriesExhausted }) => {
       const s = world({ triggerSource, ...(sourceKind ? { sourceKind } : {}) });
       if (retriesExhausted) exhaustRetries(s);
@@ -139,12 +139,8 @@ describe('terminal thread push routing (#1784: push only when a human is needed)
         .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
       setTodoPhase(s.svc, s.record.id, 'failed');
       setTodoPhase(s.svc, s.record.id, 'failed');
-      expect(send).toHaveBeenCalledTimes(retriesExhausted ? 1 : 0);
+      expect(send).not.toHaveBeenCalled();
       expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
-      if (retriesExhausted)
-        expect(JSON.parse(String(send.mock.calls[0]?.[1])).notification.navigate).toBe(
-          `https://cairn.local/app/todo/${s.record.id}`,
-        );
     },
   );
 
@@ -380,7 +376,7 @@ describe('human attention push', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  test('auto-confirmable plan does not push', () => {
+  test('an auto-confirmable plan still waits on the person and pushes once', () => {
     const s = world({ policy: 'autonomous' });
     s.db.update(todo).set({ phase: 'planning' }).where(eq(todo.id, s.record.id)).run();
     s.db
@@ -398,10 +394,10 @@ describe('human attention push', () => {
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
     setTodoPhase(s.svc, s.record.id, 'confirm', { hasPlan: true });
-    expect(send).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
-  test('worker question pushes once even when transcript delivery is retried', () => {
+  test('a worker question does not push to the person: the Coordinator owns it', () => {
     const s = world({ policy: 'autonomous' });
     const send = vi
       .spyOn(webpush, 'sendNotification')
@@ -421,17 +417,12 @@ describe('human attention push', () => {
     };
     upsertMessage(s.svc, row);
     upsertMessage(s.svc, row);
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(String(send.mock.calls[0]?.[1])).notification.navigate).toContain(
-      `/app/todo/${s.record.id}`,
-    );
-    expect(JSON.parse(String(send.mock.calls[0]?.[1])).notification.title).toBe('需要你决定');
-    send.mockClear();
+    expect(send).not.toHaveBeenCalled();
     setTodoPhase(s.svc, s.record.id, 'review');
     expect(send).not.toHaveBeenCalled();
   });
 
-  test('an unattended failure whose error requests a human pushes once (#1784)', () => {
+  test('an unattended failure whose error requests a human goes to the Coordinator, not a push', () => {
     const s = world({ triggerSource: 'schedule', userStarted: false, policy: 'autonomous' });
     s.db
       .insert(step)
@@ -449,7 +440,7 @@ describe('human attention push', () => {
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
     applyStepFailure(s.svc, row, '转人工处理: blocked on an owner decision');
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
     expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
   });
 });
@@ -457,12 +448,10 @@ describe('human attention push', () => {
 test.each([
   ['confirm', '方案已就绪'],
   ['review', '构建待审核'],
-  ['failed', '任务失败'],
 ] as const)('preserves the Chinese title for %s', (phase, title) => {
   const s = world();
   if (phase === 'confirm')
     s.db.update(todo).set({ phase: 'planning' }).where(eq(todo.id, s.record.id)).run();
-  if (phase === 'failed') exhaustRetries(s);
   const send = vi
     .spyOn(webpush, 'sendNotification')
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -609,7 +598,7 @@ test('clearing one tab retains suppression for another tab viewing the same thre
   expect((await req(s.app, 'DELETE', path, { todoId: s.record.id, tabId: 'second' })).status).toBe(
     200,
   );
-  exhaustRetries(s);
-  setTodoPhase(s.svc, s.record.id, 'failed');
+  setTodoPhase(s.svc, s.record.id, 'planning');
+  setTodoPhase(s.svc, s.record.id, 'confirm');
   expect(send).toHaveBeenCalledTimes(1);
 });

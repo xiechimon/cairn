@@ -482,17 +482,12 @@ describe('worker question hardening', () => {
     expect(row.content).toBe('plain text');
   });
 
-  test('the push and notification body is capped and scrubbed', async () => {
+  test('the Coordinator question wake caps and scrubs the question text', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
     const secret = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH';
-    const bodies: string[] = [];
-    const push = await import('../src/services/thread-push.js');
-    const spy = vi.spyOn(push, 'pushWorkerQuestion').mockImplementation((_d, _c, body) => {
-      bodies.push(body);
-    });
     await askWorkerQuestion(
       deps(),
       claimed,
@@ -508,10 +503,16 @@ describe('worker question hardening', () => {
       },
       { holdMs: 0 },
     );
-    spy.mockRestore();
-    expect(bodies).toHaveLength(1);
-    expect(bodies[0]!.length).toBeLessThanOrEqual(120);
-    expect(bodies[0]).not.toContain(secret);
+    const wakes = H.s.db
+      .select()
+      .from(step)
+      .where(eq(step.kind, 'chief'))
+      .all()
+      .filter((row) => row.prompt?.includes(`watch:${todoId}`));
+    expect(wakes).toHaveLength(1);
+    const line = wakes[0]!.prompt!.split('\n').find((l) => l.startsWith(`- requestId ${REQUEST}`))!;
+    expect(line.length).toBeLessThanOrEqual(400);
+    expect(wakes[0]!.prompt).not.toContain(secret);
   });
 });
 

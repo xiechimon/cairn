@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { conversationBranch } from '@cairn/shared';
-import { eq, sql } from 'drizzle-orm';
+import { eq, ne, sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
@@ -18,11 +18,12 @@ import {
 } from '../src/db/schema.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { listNeedsYou, sweepFailedRetries } from '../src/services/needs-you.js';
+import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { createPrFeedbackPoller } from '../src/services/pr-feedback.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import { profileForStep } from '../src/services/routing-rules.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import { getTodo } from '../src/services/todos.js';
 import { readWorkerQuestion } from '../src/services/worker-question-store.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { bootServer, req, type TestServer } from './helpers.js';
@@ -233,7 +234,7 @@ function fixture() {
     mock.checks.set(pull.head, [
       { id, name: 'unit', status: 'completed', conclusion: 'failure', summary },
     ]);
-  const steps = () => s.db.select().from(stepTable).all();
+  const steps = () => s.db.select().from(stepTable).where(ne(stepTable.kind, 'chief')).all();
   const settle = () => s.db.update(stepTable).set({ status: 'done' }).run();
   const comment = (id: number, author = 'reviewer', body = `fix ${id}`) => {
     mock.comments.push({ id, user: { login: author }, body });
@@ -601,7 +602,7 @@ describe('D109 S3 persistence and poller handoff', () => {
       await watchFor(f.s, f.mock).sweep();
       f.settle();
     }
-    expect(listNeedsYou(f.s.svc, f.s.team.id).current.map((i) => i.todo.id)).toContain(f.t.todoId);
+    expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
     await sweepFailedRetries(f.s.svc);
     expect(f.steps()).toHaveLength(3);
   });
@@ -926,8 +927,7 @@ test.each(['done', 'building', 'review', 'failed'] as const)(
     f.s.db.update(buildTable).set({ errorMessage: null }).run();
     f.mock.failing.add(`octo/demo#${f.t.prNumber}`);
     await watchFor(f.s, f.mock).sweep();
-    const item = listNeedsYou(f.s.svc, f.s.team.id).current.find((i) => i.todo.id === f.t.todoId);
-    expect(item).toMatchObject({ reason: 'failed' });
+    expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
     expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('Total wake cap (10)');
     await sweepFailedRetries(f.s.svc);
     expect(f.steps()).toHaveLength(10);
@@ -995,6 +995,6 @@ test('a per-kind cap observed during a session survives disabling Auto-fix and s
   f.s.db.update(threadPrTable).set({ autoFix: false }).run();
   f.settle();
   await watchFor(f.s, f.mock).sweep();
-  expect(listNeedsYou(f.s.svc, f.s.team.id).current.map((i) => i.todo.id)).toContain(f.t.todoId);
+  expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
   expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('CI fix cap (3 per head)');
 });

@@ -5912,6 +5912,21 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               ],
               "type": "string",
             },
+            "owner": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "owner",
+                    "coordinator",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+              "default": null,
+            },
             "ownerId": {
               "type": [
                 "string",
@@ -6208,6 +6223,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
             "sourceKind",
             "sourceRef",
             "output",
+            "owner",
           ],
           "type": "object",
         },
@@ -9962,6 +9978,21 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       ],
       "type": "string",
     },
+    "owner": {
+      "anyOf": [
+        {
+          "enum": [
+            "owner",
+            "coordinator",
+          ],
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
+      ],
+      "default": null,
+    },
     "ownerId": {
       "type": [
         "string",
@@ -10258,6 +10289,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
     "sourceKind",
     "sourceRef",
     "output",
+    "owner",
   ],
   "type": "object",
 }

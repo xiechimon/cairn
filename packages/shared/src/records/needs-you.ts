@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { todoRecordSchema } from './todo.js';
 
-export const NEEDS_YOU_REASONS = ['failed', 'confirm', 'review'] as const;
+export const NEEDS_YOU_REASONS = ['confirm', 'review'] as const;
 export const needsYouReasonSchema = z.enum(NEEDS_YOU_REASONS);
 export type NeedsYouReason = z.infer<typeof needsYouReasonSchema>;
 

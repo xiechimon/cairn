@@ -14,7 +14,7 @@ import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
-import { listNeedsYou } from './needs-you.js';
+import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
 import { messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
@@ -182,47 +182,41 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
       .get()?.line;
     return line === undefined || line === null || line === '' ? null : tidy(line, LINE_MAX);
   };
-  const asking = db
+  const items = db
     .select()
     .from(todo)
-    .where(
-      and(
-        eq(todo.teamId, ctx.teamId),
-        isNull(todo.archivedAt),
-        eq(todo.awaitingReply, true),
-        ne(todo.phase, 'closed'),
-        isNotNull(todo.latestBuildId),
-      ),
-    )
+    .where(and(eq(todo.teamId, ctx.teamId), OWNED_CANDIDATE, isNotNull(todo.latestBuildId)))
     .orderBy(desc(todo.phaseAt))
-    .all();
-  const askingIds = new Set(asking.map((row) => row.id));
-  const questions = asking.map((row) => ({
-    todoId: row.id,
-    seqNum: row.seqNum,
-    title: tidy(row.title, TITLE_MAX),
-    kind: 'question' as const,
-    line: lineOf(row.latestBuildId),
-    questions: pendingWorkerQuestions(db, row.latestBuildId as string).map((content) => ({
-      requestId: content.requestId,
-      items: content.questions.map((q) => ({
-        header: tidy(q.header, QUESTION_TEXT_MAX),
-        question: tidy(q.question, QUESTION_TEXT_MAX),
-        options: q.options.slice(0, OPTION_LABELS_MAX).map((o) => tidy(o.label, QUESTION_TEXT_MAX)),
-      })),
-    })),
-  }));
-  const waiting = listNeedsYou({ db }, ctx.teamId);
-  const others = [...waiting.current, ...waiting.stale]
-    .filter((entry) => !askingIds.has(entry.todo.id))
-    .map((entry) => ({
-      todoId: entry.todo.id,
-      seqNum: entry.todo.seqNum,
-      title: tidy(entry.todo.title, TITLE_MAX),
-      kind: entry.reason,
-      line: lineOf(entry.todo.latestBuildId ?? null),
-    }));
-  return json({ items: [...questions, ...others] });
+    .all()
+    .flatMap((row) => {
+      const ownership = ownershipOf(db, row);
+      if (ownership === null) return [];
+      const item = {
+        todoId: row.id,
+        seqNum: row.seqNum,
+        title: tidy(row.title, TITLE_MAX),
+        owner: ownership.owner,
+        kind: ownership.reason,
+        line: lineOf(row.latestBuildId),
+      };
+      if (ownership.reason !== 'question') return [item];
+      return [
+        {
+          ...item,
+          questions: pendingWorkerQuestions(db, row.latestBuildId as string).map((content) => ({
+            requestId: content.requestId,
+            items: content.questions.map((q) => ({
+              header: tidy(q.header, QUESTION_TEXT_MAX),
+              question: tidy(q.question, QUESTION_TEXT_MAX),
+              options: q.options
+                .slice(0, OPTION_LABELS_MAX)
+                .map((o) => tidy(o.label, QUESTION_TEXT_MAX)),
+            })),
+          })),
+        },
+      ];
+    });
+  return json({ items });
 }
 
 export async function executeRouterTool(

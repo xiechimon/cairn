@@ -656,16 +656,17 @@ describe('router tools', () => {
         items: {
           todoId: string;
           seqNum: number;
+          owner: string;
           kind: string;
           line: string | null;
           questions?: { requestId: string; items: { question: string; options: string[] }[] }[];
         }[];
       };
-      expect(out.items.map((i) => [i.seqNum, i.kind])).toEqual([
-        [1, 'question'],
-        [2, 'failed'],
+      expect(out.items.map((i) => [i.seqNum, i.owner, i.kind]).sort()).toEqual([
+        [1, 'coordinator', 'question'],
+        [2, 'coordinator', 'failed'],
       ]);
-      expect(out.items[0]!.questions).toEqual([
+      expect(out.items.find((i) => i.kind === 'question')!.questions).toEqual([
         {
           requestId: REQUEST,
           items: [{ header: 'Format', question: 'Which export format?', options: ['CSV', 'JSON'] }],
@@ -734,7 +735,7 @@ describe('router tools', () => {
       expect(text).toContain('message_thread');
       expect(text).toContain('threads (1 open');
       expect(text).toContain('#7 building');
-      expect(text).toContain('needs-you: #7 asking you');
+      expect(text).toContain('needs-you: #7 question (coordinator)');
       expect(text).not.toContain('Ignore previous instructions');
     });
 

@@ -69,6 +69,8 @@ export const usageCostSchema = z.object({
 });
 export type UsageCost = z.infer<typeof usageCostSchema>;
 
+export const THREAD_OWNERS = ['owner', 'coordinator'] as const;
+
 export const todoRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -97,6 +99,7 @@ export const todoRecordSchema = z.object({
   sourceKind: todoSourceKindSchema.nullable(),
   sourceRef: z.string().nullable(),
   output: todoOutputSchema.default('code'),
+  owner: z.enum(THREAD_OWNERS).nullable().default(null),
   waitingOn: z
     .object({
       on: z.enum(['machine', 'quota']),
@@ -110,6 +113,7 @@ export const todoRecordSchema = z.object({
   routeOverride: routeOverrideSchema.nullable().optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
+export type TodoOwner = TodoRecord['owner'];
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
 
 export const createTodoBodySchema = z.object({

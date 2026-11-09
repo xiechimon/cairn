@@ -7,7 +7,7 @@ import {
   reviewFindingBadge,
   stripWorkBranchNote,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, ne } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, project, step, threadPr, todo } from '../src/db/schema.js';
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
@@ -381,7 +381,7 @@ test.each([true, false])(
     await f.wake();
     await f.wake();
     expect(f.state.draft).toBe(true);
-    expect(f.s.db.select().from(step).all()).toEqual([]);
+    expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toEqual([]);
     expect(JSON.stringify(f.s.db.select().from(message).all())).toContain(
       'Review round cap (3) reached; rethink or hand to the owner.',
     );
