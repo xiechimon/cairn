@@ -465,12 +465,14 @@ export function MotionSection() {
                 </div>
                 <div className="relative h-1 flex-auto rounded-full bg-(--running-track)">
                   <span
-                    className="absolute -top-1.5 size-4 rounded-full bg-primary shadow-(--e1)"
+                    className="absolute inset-y-0 right-4 left-0"
                     style={{
-                      left: played ? 'calc(100% - 1rem)' : 0,
-                      transition: reduceMotion ? 'none' : `left ${duration} var(${m.ease})`,
+                      translate: played ? '100% 0' : '0 0',
+                      transition: reduceMotion ? 'none' : `translate ${duration} var(${m.ease})`,
                     }}
-                  />
+                  >
+                    <span className="absolute -top-1.5 left-0 size-4 rounded-full bg-primary shadow-(--e1)" />
+                  </span>
                 </div>
                 <div className="w-14 flex-none text-right text-meta text-content-secondary tabular-nums">
                   {duration}

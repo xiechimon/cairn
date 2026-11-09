@@ -28,7 +28,6 @@ const OTHER_SECRET_VALUE = 'it-other-secret-value';
 const FIXTURE_URL = 'https://fixture.example/ci-sharding';
 const FIXTURE_COST = 0.0123;
 const REPORT_MARK = 'WEB-SEARCH-REPORT: time-balanced sharding';
-const EVIDENCE_DIR = '/tmp/d63-ws-evidence';
 
 interface ExaRequest {
   path: string;
@@ -203,8 +202,9 @@ describe('Phase 1b: a pi info step uses web_search through the daemon tool', () 
       number
     >;
 
-    mkdirSync(EVIDENCE_DIR, { recursive: true });
-    const evidencePath = join(EVIDENCE_DIR, `web-search-pi-${buildId}.json`);
+    const evidenceDir = join(home, 'evidence');
+    mkdirSync(evidenceDir, { recursive: true });
+    const evidencePath = join(evidenceDir, `web-search-pi-${buildId}.json`);
     writeFileSync(
       evidencePath,
       JSON.stringify(

@@ -1,6 +1,8 @@
-# 24 · Run brief written to a worktree file (supersedes 17·A9)
+# 24 · Historical worktree-file runtime brief (superseded by #3599)
 
-> Scope: move each step's agent brief from the systemPrompt channel into a context file in the task worktree, loaded through the CLI's native memory mechanism. It answers three questions: why A9 rejected this back then, and whether those two reasons still hold today; how far to follow Multica; and which new failure surfaces appear after the switch, with the guardrail for each.
+> Status: superseded by [runtime guidance without workspace writes](../design/runtime-memory-out-of-tree.md), PR [#3615](https://github.com/xiechimon/cairn/pull/3615). The file-writing, reconciliation and cleanup instructions below are historical and must not be implemented. Runtime guidance now uses the existing systemPrompt bridges; repository guidance remains native and read-only.
+
+> Historical scope: move each step's agent brief from the systemPrompt channel into a context file in the task worktree, loaded through the CLI's native memory mechanism. It answers three questions: why A9 rejected this back then, and whether those two reasons still hold today; how far to follow Multica; and which new failure surfaces appear after the switch, with the guardrail for each.
 >
 > References: spec 17 (origin of A9, marked superseded here), spec 14 (skills execution surface; directory scan rules unchanged), Multica source (`execenv/runtime_config.go`, `runtime_config_sections.go`, `repocache/cache.go`, `local_worktree.go`), issues #958 and #917.
 

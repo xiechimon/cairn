@@ -1,13 +1,13 @@
 import {
   Activity,
   Archive,
+  CalendarClock,
   Clock,
   FolderGit2,
   Inbox,
   LayoutGrid,
   Plus,
   Search,
-  Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
 import { BrandGlyph } from '../components/brand-glyph.js';
@@ -166,7 +166,7 @@ export function ProjectsSection() {
             trailing="Yesterday"
           />
           <ListRow
-            icon={<Sparkles className="size-4" />}
+            icon={<CalendarClock className="size-4" />}
             title="weekly-report.md"
             subtitle="Scheduled task · 3 KB"
             trailing="Oct 27"

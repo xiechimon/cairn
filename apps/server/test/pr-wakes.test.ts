@@ -628,14 +628,14 @@ describe('D109 S3 persistence and poller handoff', () => {
     expect(f.steps()).toEqual([]);
   });
 
-  test('an exhausted cap is Needs-you and cannot be retried by the failure sweep', async () => {
+  test('an exhausted cap goes to the Coordinator, then to the owner once its turn ends, and the failure sweep never retries it', async () => {
     const f = fixture();
     for (let id = 1; id <= 4; id += 1) {
       f.fail(id);
       await watchFor(f.s, f.mock).sweep();
       f.settle();
     }
-    expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
+    expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('owner');
     await sweepFailedRetries(f.s.svc);
     expect(f.steps()).toHaveLength(3);
   });

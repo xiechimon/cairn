@@ -1,6 +1,7 @@
 {
   "repo": "xiechimon/cairn",
   "pending": {
+    "docs/design/memory-inplace-edit.md": "owner-approved design in PR #3677; layout implementation owned by PR #3666",
     "docs/research/agent-small-computer-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/ai-frontend-quality-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/branch-model-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
@@ -23,11 +24,6 @@
     "docs/research/review-gate-alternatives.md": "branch origin/docs/review-gate-alternatives"
   },
   "batches": [
-    {
-      "id": "B1",
-      "title": "Coordinator context and memory",
-      "scope": "How the never-ending Coordinator conversation assembles each turn and what it remembers: the context budget, compaction, history tools, memory rows, promotion and invalidation. Design the data model and failure modes, and the memory view in Coordinator settings."
-    },
     {
       "id": "B2",
       "title": "What reaches ian: needs-you, questions, daily report, push",
@@ -76,7 +72,7 @@
     {
       "id": "B11",
       "title": "Peripheral surfaces",
-      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
+      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
     },
     {
       "id": "B12",
@@ -210,20 +206,20 @@
       ],
       "research": [
         "docs/research/coordinator-compaction-2026-11-07.md",
-        "docs/research/personal-agent-memory-2026-11-07.md"
+        "docs/research/personal-agent-memory-2026-11-07.md",
+        "docs/research/coordinator-context-2026-11-08.md"
       ],
       "frontendDesign": {
         "na": "compaction is invisible by design; the transcript keeps full history"
       },
-      "backendDesign": {
-        "gap": "the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes"
-      },
+      "backendDesign": [
+        "docs/design/coordinator-context-backend.md"
+      ],
       "evidence": [
         "integration/test/coordinator-context-assemble.test.ts",
         "apps/server/test/chief-history.test.ts",
         "apps/server/test/coordinator/compaction.test.ts"
-      ],
-      "batch": "B1"
+      ]
     },
     {
       "id": "memory",
@@ -253,20 +249,21 @@
       ],
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",
-        "docs/research/research-loop-plan.md"
+        "docs/research/research-loop-plan.md",
+        "docs/research/memory-2026-11-08.md"
       ],
-      "frontendDesign": {
-        "gap": "the memory list in Coordinator settings has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for memory keys, scope, consolidation, promotion and invalidation"
-      },
+      "frontendDesign": [
+        "docs/design/memory-inplace-edit.md"
+      ],
+      "backendDesign": [
+        "docs/design/memory-backend.md",
+        "docs/design/memory-inplace-edit.md"
+      ],
       "evidence": [
         "apps/server/test/memory-consolidation.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"
-      ],
-      "batch": "B1"
+      ]
     },
     {
       "id": "coordinator-dispatch",
@@ -2486,46 +2483,6 @@
       "evidence": [
         "apps/web/e2e/account-feishu.spec.ts",
         "apps/server/test/feishu-config.test.ts"
-      ],
-      "batch": "B11"
-    },
-    {
-      "id": "feature-releases",
-      "name": "Feature flags and releases",
-      "summary": "Per-user feature flags and the account page list where the owner releases them.",
-      "states": "A list of flags in the account settings with a release action for the owner.",
-      "centrality": 4,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/routes/feature-releases.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-flags.ts",
-          "apps/server/src/services/feature-flags.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/flags",
-          "/api/flags/:key/release"
-        ]
-      },
-      "reach": [
-        "settings account"
-      ],
-      "research": {
-        "gap": "no note on per-user flags for a single-user product"
-      },
-      "frontendDesign": {
-        "gap": "the releases list has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for flag defaults and release"
-      },
-      "evidence": [
-        "apps/web/e2e/account-feature-releases.spec.ts",
-        "apps/server/test/feature-flags.test.ts"
       ],
       "batch": "B11"
     },

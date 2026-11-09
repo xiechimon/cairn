@@ -92,7 +92,7 @@ describe('palette roles', () => {
 });
 
 describe('DESIGN-RULES carries the anti-slop rules', () => {
-  test.each(['V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'T3'])(
+  test.each(['V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'T3', 'V22', 'V23', 'V24', 'T4'])(
     '%s is a row with a measured baseline',
     (id) => {
       const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));

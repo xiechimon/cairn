@@ -171,6 +171,7 @@ export async function updateProject(
     body.name !== undefined ||
     body.group !== undefined ||
     body.splitPolicy !== undefined ||
+    body.evidenceStore !== undefined ||
     body.description !== undefined ||
     body.instructions !== undefined ||
     body.maxConcurrent !== undefined ||
@@ -183,7 +184,7 @@ export async function updateProject(
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of group/name/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color)',
+      'invalid body: nothing to update (at least one of group/name/splitPolicy/evidenceStore/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color)',
     );
   }
 
@@ -292,6 +293,7 @@ export async function updateProject(
       name: nextName,
       group: body.group !== undefined ? body.group : row.group,
       splitPolicy: nextSplitPolicy,
+      evidenceStore: body.evidenceStore ?? row.evidenceStore,
       repoKind: nextRepoKind,
       githubRepo: nextGithubRepo,
       localPath: nextLocalPath,

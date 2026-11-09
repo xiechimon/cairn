@@ -19,7 +19,51 @@ describe('SKILL_DIR_NAME_RE (directory-name safety domain)', () => {
   });
 });
 
-describe('parseSkillFrontmatter (lifted from server, semantics unchanged)', () => {
+describe('parseSkillFrontmatter', () => {
+  it.each([
+    [
+      'name: deploy # identity\ndescription: >-\n  Deploy the app\n  after checking CI',
+      { name: 'deploy', description: 'Deploy the app after checking CI' },
+    ],
+    [
+      "name: 'it''s-valid'\ndescription: \"line\\nnext\"",
+      { name: "it's-valid", description: 'line\nnext' },
+    ],
+    ['name: &identity deploy\ndescription: *identity', { name: 'deploy', description: 'deploy' }],
+    [
+      '{name: deploy, description: "a: b # literal"}',
+      { name: 'deploy', description: 'a: b # literal' },
+    ],
+  ])('reads valid YAML metadata %s', (metadata, expected) => {
+    expect(parseSkillFrontmatter(`---\n${metadata}\n---\n`)).toEqual(expected);
+  });
+
+  it.each([
+    'name: a\nname: b\ndescription: text',
+    'name: [unfinished',
+    'name: !custom a\ndescription: text',
+    'name: *missing\ndescription: text',
+    '__proto__: {name: forged}\nname: [not, text]\ndescription: {nested: value}',
+    '- name: a\n- description: b',
+  ])('refuses invalid or non-string metadata %s', (metadata) => {
+    expect(parseSkillFrontmatter(`---\n${metadata}\n---\n`)).toEqual({});
+  });
+  it('accepts BOM and CRLF fences without changing the body', () => {
+    expect(
+      splitSkillEntry('\uFEFF--- \r\nname: deploy\r\ndescription: text\r\n--- \r\n\r\nbody\r\n'),
+    ).toEqual({
+      name: 'deploy',
+      description: 'text',
+      body: 'body\r\n',
+    });
+  });
+
+  it('never expands recursive collection aliases to read scalar metadata', () => {
+    expect(
+      parseSkillFrontmatter('---\nname: &loop [*loop]\ndescription: &more [*more, *more]\n---\n'),
+    ).toEqual({});
+  });
+
   it('parses single-line name/description', () => {
     expect(parseSkillFrontmatter('---\nname: a\ndescription: b\n---\n')).toEqual({
       name: 'a',
@@ -29,7 +73,7 @@ describe('parseSkillFrontmatter (lifted from server, semantics unchanged)', () =
   it('no frontmatter block -> empty object', () => {
     expect(parseSkillFrontmatter('no frontmatter')).toEqual({});
   });
-  it('quoted values stripped of quotes; folded block scalars not accepted', () => {
+  it('unquotes string scalars and omits empty folded scalars', () => {
     expect(parseSkillFrontmatter('---\nname: "quoted"\n---\n')).toEqual({ name: 'quoted' });
     expect(parseSkillFrontmatter('---\ndescription: >\n---\n')).toEqual({});
   });
@@ -63,8 +107,10 @@ describe('buildSkillEntry ↔ splitSkillEntry round-trip', () => {
     expect(splitSkillEntry('# 直接正文\n')).toEqual({ body: '# 直接正文\n' });
   });
 
-  it('quoted description round-trip failure (the shape the client pre-check must block)', () => {
-    const split = splitSkillEntry(buildSkillEntry('a', '"quoted"', ''));
-    expect(split.description).toBe('quoted');
-  });
+  it.each(['"quoted"', 'a: b # literal', 'first\nsecond', 'yes', '[not a collection]'])(
+    'preserves YAML-sensitive descriptions %j',
+    (description) => {
+      expect(splitSkillEntry(buildSkillEntry('a', description, '')).description).toBe(description);
+    },
+  );
 });

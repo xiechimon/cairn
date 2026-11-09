@@ -32,7 +32,7 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
     api,
     provider: config.providerId,
     baseUrl,
-    input: m.input ?? ['text'],
+    input: m.input ?? ['text', 'image'],
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     reasoning: subscription,
     contextWindow: m.contextWindow ?? DEFAULT_CONTEXT_WINDOW,

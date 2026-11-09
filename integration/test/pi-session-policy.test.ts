@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { BRIEF_MARKER_BEGIN } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -7,7 +8,11 @@ import { commitEnv, runGit } from '../../apps/daemon/src/git.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import { provider as providerTable, tokenUsage } from '../../apps/server/src/db/schema.js';
+import {
+  build as buildTable,
+  provider as providerTable,
+  tokenUsage,
+} from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
@@ -36,6 +41,7 @@ async function seedHijackRepo(): Promise<string> {
   const dir = join(makeTestTempDir('cairn-policy-user-'), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# policy repo\n');
+  writeFileSync(join(dir, 'AGENTS.md'), 'repository-policy-guidance-sentinel\n');
   mkdirSync(join(dir, '.pi'));
   writeFileSync(join(dir, '.pi', 'SYSTEM.md'), `${HIJACK_MARKER}\n`);
   await runGit(['add', '-A'], { cwd: dir });
@@ -56,7 +62,7 @@ beforeAll(async () => {
       toolCall: {
         name: 'bash',
         arguments: {
-          command: 'printf "policy probe\\n" >> README.md',
+          command: 'test -z "$(git status --porcelain)" && printf "policy probe\\n" >> README.md',
         },
       },
     },
@@ -142,6 +148,15 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     expect(flat).not.toContain('PI-TRUST-HIJACK-MARKER');
 
     expect(flat).toContain(TASK_SPEC);
+    expect(flat).toContain('You are an expert coding assistant operating inside pi');
+    expect(flat).toContain('repository-policy-guidance-sentinel');
+    expect(flat).toContain('For UI tasks, attach light and dark screenshots');
+    const workspace = join(paths.workspacesDir, buildId);
+    expect(readFileSync(join(workspace, 'AGENTS.md'), 'utf8')).toBe(
+      'repository-policy-guidance-sentinel\n',
+    );
+    expect(readFileSync(join(workspace, 'README.md'), 'utf8')).toContain('policy probe');
+    expect((await runGit(['status', '--porcelain'], { cwd: workspace })).stdout).toBe('');
 
     expect((stub.requests[0] as unknown as Record<string, unknown>).prompt_cache_retention).toBe(
       '24h',
@@ -174,4 +189,39 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     expect(dbRows).toHaveLength(1);
     expect(dbRows[0]!.costTotal).toBeCloseTo(4020, 6);
   }, 180_000);
+
+  test('legacy context fails through the real daemon before a model request and keeps file bytes', async () => {
+    const repo = await seedHijackRepo();
+    const legacy = `${BRIEF_MARKER_BEGIN}\nprivate-stale-memory\n`;
+    writeFileSync(join(repo, 'AGENTS.md'), legacy);
+    await runGit(['add', 'AGENTS.md'], { cwd: repo });
+    await runGit(['commit', '-m', 'legacy context'], { cwd: repo, env: commitEnv(IDENTITY) });
+    const world = await seedWorld(
+      server.url,
+      server.teamId,
+      { title: 'Legacy context', spec: 'Continue.' },
+      { repoKind: 'local', localPath: repo, projectName: 'legacy-policy' },
+    );
+    const before = stub.requests.length;
+    const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
+      todoIds: [world.todoId],
+    });
+    expect(started.status).toBe(201);
+    const id = (started.body as { builds: { id: string }[] }).builds[0]!.id;
+    await waitFor(
+      () =>
+        server.db
+          .select()
+          .from(buildTable)
+          .where(eq(buildTable.id, id))
+          .get()
+          ?.errorMessage?.includes('Legacy runtime guidance') === true,
+      30_000,
+    );
+    expect(stub.requests).toHaveLength(before);
+    expect(readFileSync(join(paths.workspacesDir, id, 'AGENTS.md'), 'utf8')).toBe(legacy);
+    expect(
+      (await runGit(['status', '--porcelain'], { cwd: join(paths.workspacesDir, id) })).stdout,
+    ).toBe('');
+  }, 60_000);
 });

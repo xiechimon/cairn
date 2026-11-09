@@ -43,7 +43,7 @@ The two resource surfaces are unified into a **local file read-only** model:
 - **machine-wire break**: the claim payload's `mcpServers` field switches from `McpEndpoint[]` (server-resolved endpoints) to `string[]` (slug list, daemon resolves by itself). The version-wall constant is bumped — old daemons no longer receive MCP config (treated as no-MCP running), no mixed-shape delivery.
 
 **server**
-- The skills service rewritten to local-directory scan: `readdirSync` one-level subdirectories + check `SKILL.md` in each + reuse the existing minimal frontmatter parser (name/description, the folded-block scalar fallback unchanged). Directory missing = empty set (no crash).
+- The skills service rewritten to local-directory scan: `readdirSync` one-level subdirectories + check `SKILL.md` in each + parse name/description as non-empty YAML string scalars, including quoted, folded and literal block scalars. Missing or invalid metadata falls back to the directory name and a null description. Directory missing = empty set (no crash).
 - New claude.json read seam: read the `mcpServers` section of `~/.claude.json` → zod-validate each entry (stdio: command/args/env; http: url/headers) → bad entries skip without killing the whole → project `McpServerRecord[]` (**env/headers values do not leave the server**, only the `hasCredential`/`credentialKeys` projection). File missing / bad JSON / no mcpServers key = empty set.
 - `GET /api/skills?teamId=` and `GET /api/teams/{id}/mcp-servers` read endpoints switch source (the two seams above); the skills POST/scan endpoints, the mcp-servers POST/PATCH/DELETE endpoints all deleted.
 - One drizzle migration: `DROP TABLE skill`, `DROP TABLE mcp_server`; within the same migration export the two tables' existing rows to `~/.pacman/legacy-export-<ts>.json` (upgrade guardrail), and clear the agent table's `skills`/`mcpServers` two columns to `'[]'` (old ids die with the tables, no dead references remain). The ticket does not hardcode the migration number, numbered main's tail +1 at merge time.
@@ -78,7 +78,7 @@ The two resource surfaces are unified into a **local file read-only** model:
 
 Testing leans end to end and boundary behavior, not implementation details.
 
-- **server integration tests**: directory-scan six states (directory missing / empty directory / subdirectory with no SKILL.md / nested skill / folded frontmatter fallback / normal multiple skills); claude.json parse five states (file missing / bad JSON / no mcpServers key / one bad entry skipped / http+stdio mixed normal); the projection surface asserts env/headers values do not exit the interface.
+- **server integration tests**: directory-scan six states (directory missing / empty directory / subdirectory with no SKILL.md / nested skill / folded frontmatter metadata / normal multiple skills); claude.json parse five states (file missing / bad JSON / no mcpServers key / one bad entry skipped / http+stdio mixed normal); the projection surface asserts env/headers values do not exit the interface.
 - **migration test**: build an old DB with rows → migrate → the two tables absent, the legacy-export file landed with complete content, the agent two columns empty.
 - **daemon unit tests**: slug → config resolution (normal / unknown slug skipped / bad entry skipped); `mcpConfigPath` env override.
 - **web e2e**: skills page no new entry + list renders the local source; MCP page same; agent edit-surface checkbox candidates consistent with the local source; the old route `/app/resources/skills/import` 404s or redirects.

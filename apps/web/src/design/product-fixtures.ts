@@ -494,6 +494,7 @@ export const GALLERY_PROJECT: ProjectRecord = {
   name: PROJECT_TITLE,
   teamId: TEAM,
   splitPolicy: 'human',
+  evidenceStore: 'repository',
   repoKind: 'github',
   githubRepo: 'xiechimon/cairn',
   baseBranch: 'release',

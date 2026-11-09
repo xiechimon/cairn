@@ -361,10 +361,12 @@ test('testsRead counts a note the feature registry cites, so deleting it runs th
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
     ['node', 'scripts/english-only-gate.mjs'],
+    ['node', 'scripts/public-content-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md', 'AGENTS.md'],
   ]);
   assert.deepEqual(prepushPlan(['docs/lessons.md'], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
+    ['node', 'scripts/public-content-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md'],
   ]);
   assert.deepEqual(
@@ -481,6 +483,7 @@ test('lesson entries use the same document checks as other Markdown', () => {
     for (const path of ['docs/lessons/1656-new-entry.md', 'docs/lessons/README.md'])
       assert.deepEqual(prepushPlan([path], mode), [
         ['node', 'scripts/english-only-gate.mjs'],
+        ['node', 'scripts/public-content-gate.mjs'],
         ['node', 'scripts/doc-reader-tests.mjs', path],
       ]);
 });
@@ -489,6 +492,7 @@ test('local code checks retain fast checks and advisory dead-class', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
     'node scripts/english-only-gate.mjs',
+    'node scripts/public-content-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
@@ -529,6 +533,7 @@ test('code changes keep suites in CI and out of local plans', () => {
       assert.ok(!plan.some((step) => step.includes('e2e:affected')));
       assert.deepEqual(prepushPlan(paths, 'ci', forceFull), [
         ['node', 'scripts/english-only-gate.mjs'],
+        ['node', 'scripts/public-content-gate.mjs'],
         ['node', 'scripts/journal-newline-gate.mjs'],
         ['node', 'scripts/ui-debt-gate.mjs'],
         ['node', 'scripts/ui-drift-gate.mjs'],
@@ -593,6 +598,7 @@ test('a docs-only data change still runs every test that reads the changed file'
   const data = 'docs/verify/920/wire-new/manifest-new.json';
   assert.deepEqual(prepushPlan(['docs/lessons/README.md', data], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
+    ['node', 'scripts/public-content-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/README.md', data],
   ]);
   assert.ok(
@@ -756,7 +762,7 @@ test('CLI skips real document changes and rejects a missing base', () => {
       env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main' }),
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /PASS \(2 checks\)/);
+    assert.match(result.stdout, /PASS \(3 checks\)/);
     const forced = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
@@ -834,7 +840,7 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(2 checks\)/);
+    assert.match(result.stdout, /PASS \(3 checks\)/);
     assert.doesNotMatch(result.stderr, /may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -857,7 +863,7 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(2 checks\)/);
+    assert.match(result.stdout, /PASS \(3 checks\)/);
     assert.match(result.stderr, /git fetch origin main failed.*may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
