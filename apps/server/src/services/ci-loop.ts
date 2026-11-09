@@ -1016,7 +1016,6 @@ export function createCiPoller(
     ) {
       hintOnce(cand.buildId, CI_FIX_GREEN_EVENT, 0);
     }
-    setTodoPhase(deps, cand.todoId, 'review');
     maybeEnqueueIndependentReview(deps, todoRow, cand.buildId);
     const lastVerifyAt = deps.db
       .select({ at: step.createdAt })
@@ -1035,6 +1034,22 @@ export function createCiPoller(
           lastVerifyAt + 1,
         ),
     });
+    const gateStepQueued = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, cand.buildId),
+          inArray(step.kind, ['review', 'verify']),
+          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+        ),
+      )
+      .get();
+    if (gateStepQueued !== undefined) {
+      tally.pending += 1;
+      return;
+    }
+    setTodoPhase(deps, cand.todoId, 'review');
     tally.advanced += 1;
   }
 
