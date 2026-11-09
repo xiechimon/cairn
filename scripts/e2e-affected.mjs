@@ -14,12 +14,6 @@ import {
   selectSpecs,
   workspacePackages,
 } from './e2e-affected-select.mjs';
-import {
-  acquireSlot,
-  leaseEnv,
-  slotPortReport,
-  writeSlotPlaywrightConfig,
-} from './heavy-slots.mjs';
 import { runOwned } from './owned-process.mjs';
 import { partitionByWeight } from './timed-partition.mjs';
 
@@ -81,25 +75,7 @@ function shardOf(selection, shard) {
 
 async function runPlaywright(specs, full) {
   const args = ['exec', 'playwright', 'test'];
-  const env = { ...leaseEnv(lease), E2E_PORT: PORT };
-  if (lease !== null) {
-    const conflict = slotPortReport({ slot: lease.slot });
-    if (conflict !== null) {
-      console.error(conflict);
-      process.exit(1);
-    }
-    const slotRun = writeSlotPlaywrightConfig({
-      slot: lease.slot,
-      env: process.env,
-      webDir: WEB_DIR,
-    });
-    args.push('--config', slotRun.path);
-    env.E2E_PORT = String(slotRun.port);
-    env.E2E_DIST_DIR = slotRun.distDir;
-    console.log(
-      `[e2e:affected] slot ${lease.slot}: E2E_PORT=${slotRun.port}, build output ${slotRun.distDir}`,
-    );
-  }
+  const env = { ...process.env, E2E_PORT: PORT };
   args.push('--reporter=list', ...specs.map((spec) => `e2e/${spec}`));
   if (!full) args.push('--workers', process.env.E2E_AFFECTED_WORKERS ?? '2');
   process.exit(await runOwned('pnpm', args, { cwd: WEB_DIR, env, name: 'e2e' }));
@@ -164,5 +140,4 @@ if (shard !== undefined) {
 console.log(`  ${run.join(' ')}`);
 
 if (dryRun || run.length === 0) process.exit(0);
-const lease = await acquireSlot();
 await runPlaywright(run, full);

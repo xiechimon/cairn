@@ -94,6 +94,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/todos/todo-archive': todo,
       '/api/needs-you': { current: [], stale: [] },
       '/api/prs': [],
+      '/api/tasks': { entries: [] },
       '/api/builds/build-archive': build,
       '/api/builds/build-archive/gate': { state: null },
       '/api/builds/build-archive/steps': [

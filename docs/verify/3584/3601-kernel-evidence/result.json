@@ -1,0 +1,17 @@
+{
+  "pr": 3601,
+  "issue": 3584,
+  "failure_classes": [
+    "inherited host slot environment",
+    "racer timer assumptions",
+    "asynchronous stale-record reclaim race",
+    "repeated descriptor close"
+  ],
+  "runtime_tests": 45,
+  "vitest_tests": 49,
+  "playwright_tests": 4,
+  "cross_namespace_guard_inode": 74324307,
+  "mocked": "Three outer lease files, stale metadata, helper failures and one deliberately delayed racer",
+  "not_covered": "Native macOS runtime and concurrent old-code claimers that ignore kernel guards",
+  "preload": "import childProcess from 'node:child_process';\nimport { syncBuiltinESMExports } from 'node:module';\nconst spawn = childProcess.spawn;\nlet holderStarts = 0;\nchildProcess.spawn = function (command, args, options) {\n  if (args?.[0] === '--input-type=module' && args[2]?.includes('process.env.START_GATE') && holderStarts++ === 7) {\n    args = [...args];\n    args[2] = args[2].replace('while (process.env.START_GATE', 'await new Promise((done) => setTimeout(done, 3500));\\nwhile (process.env.START_GATE');\n  }\n  return spawn(command, args, options);\n};\nsyncBuiltinESMExports();\n"
+}

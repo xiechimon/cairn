@@ -2,7 +2,7 @@ const SUMMARY_MARKER = 'You are a context summarization assistant.';
 const MAX_SUMMARY_ATTEMPTS = 4;
 const SUMMARY_OUTPUT_BUDGET = 512;
 const CEILING_ERROR =
-  /maximum context length|prompt is too long|exceeds the context window|context length exceeded|input token count/i;
+  /maximum context length|prompt is too long|exceeds the context window|context[_ ]length[_ ]exceeded|input token count/i;
 
 interface ChatMessage {
   role?: string;
@@ -11,10 +11,13 @@ interface ChatMessage {
 
 interface ChatBody {
   system?: unknown;
+  instructions?: unknown;
   thinking?: unknown;
   messages?: ChatMessage[];
+  input?: ChatMessage[];
   max_tokens?: number;
   max_completion_tokens?: number;
+  max_output_tokens?: number;
 }
 
 interface SummaryAdjustment {
@@ -36,11 +39,14 @@ function minimumSummaryOutput(body: ChatBody): number {
   ) {
     return thinking.budget_tokens + 1;
   }
-  return 1;
+  return Array.isArray(body.input) ? 16 : 1;
 }
 
 function withOutput(body: ChatBody, tokens: number): ChatBody {
   const output = Math.max(tokens, minimumSummaryOutput(body));
+  if (Array.isArray(body.input)) {
+    return body.max_output_tokens === undefined ? body : { ...body, max_output_tokens: output };
+  }
   if (body.max_completion_tokens !== undefined && body.max_tokens === undefined) {
     return { ...body, max_completion_tokens: output };
   }
@@ -103,13 +109,17 @@ export function adjustSummaryBody(body: ChatBody, errorText: string): SummaryAdj
   const input = inputMatch ? Number(inputMatch[1]) : null;
   const output = outputMatch
     ? Number(outputMatch[1])
-    : (body.max_tokens ?? body.max_completion_tokens ?? 0);
+    : (body.max_tokens ?? body.max_completion_tokens ?? body.max_output_tokens ?? 0);
   if (window !== null && input !== null) {
     const fitted = window - input - 1;
-    if (fitted >= minimumOutput && output > fitted) {
+    if (
+      fitted >= minimumOutput &&
+      output > fitted &&
+      (!Array.isArray(body.input) || body.max_output_tokens !== undefined)
+    ) {
       return {
         body: withOutput(body, fitted),
-        line: `compaction summary exceeded the context window (provider input ${input}, requested output ${output}, window ${window}); retrying with max_tokens ${fitted}`,
+        line: `compaction summary exceeded the context window (provider input ${input}, requested output ${output}, window ${window}); retrying with ${Array.isArray(body.input) ? 'max_output_tokens' : 'max_tokens'} ${fitted}`,
       };
     }
   }
@@ -118,9 +128,10 @@ export function adjustSummaryBody(body: ChatBody, errorText: string): SummaryAdj
     const fit = ((window - retryOutput) / input) * 0.9;
     ratio = !Number.isFinite(fit) || fit <= 0 ? 0.25 : Math.min(0.5, Math.max(0.05, fit));
   }
-  if (!Array.isArray(body.messages)) return null;
+  const source = body.messages ?? body.input;
+  if (!Array.isArray(source)) return null;
   let changed = false;
-  const messages = body.messages.map((message) => {
+  const messages = source.map((message) => {
     if (message.role !== 'user') return message;
     const content = message.content;
     let next: unknown = content;
@@ -145,7 +156,9 @@ export function adjustSummaryBody(body: ChatBody, errorText: string): SummaryAdj
     return { ...message, content: next };
   });
   if (!changed) return null;
-  const shrunk: ChatBody = { ...body, messages };
+  const shrunk: ChatBody = Array.isArray(body.input)
+    ? { ...body, input: messages }
+    : { ...body, messages };
   const estimatedInput = input !== null ? Math.max(1, Math.ceil(input * ratio)) : null;
   let adjusted = shrunk;
   if (window !== null && estimatedInput !== null) {
@@ -176,19 +189,20 @@ export function compactionCeilingFetch(
     } catch {
       return inner(input, init);
     }
-    if (
-      parsed === null ||
-      typeof parsed !== 'object' ||
-      !('messages' in parsed) ||
-      !Array.isArray(parsed.messages) ||
-      parsed.messages.some((message: unknown) => message === null || typeof message !== 'object')
-    ) {
+    if (parsed === null || typeof parsed !== 'object') {
       return inner(input, init);
     }
     let current = parsed as ChatBody;
-    const messages = parsed.messages as ChatMessage[];
+    const messages = current.messages ?? current.input;
+    if (
+      !Array.isArray(messages) ||
+      messages.some((message: unknown) => message === null || typeof message !== 'object')
+    ) {
+      return inner(input, init);
+    }
     const summarySystemMessage =
       isSummaryPrompt(current.system) ||
+      isSummaryPrompt(current.instructions) ||
       messages.some(
         (message) =>
           (message.role === 'system' || message.role === 'developer') &&
@@ -228,7 +242,7 @@ function isSummaryPrompt(content: unknown): boolean {
       part !== null &&
       typeof part === 'object' &&
       'type' in part &&
-      part.type === 'text' &&
+      (part.type === 'text' || part.type === 'input_text') &&
       'text' in part &&
       typeof part.text === 'string' &&
       part.text.startsWith(SUMMARY_MARKER),

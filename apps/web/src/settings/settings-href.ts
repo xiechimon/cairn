@@ -10,7 +10,6 @@ export const SETTINGS_SECTION_IDS = [
   'skills',
   'mcp',
   'secrets',
-  'team',
   'api-keys',
   'remote',
 ] as const;

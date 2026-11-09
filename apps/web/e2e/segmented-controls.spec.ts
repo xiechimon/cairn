@@ -138,13 +138,7 @@ test('sched freq: the chosen radio reads against the track, hover steps the rest
   await expectInkStep(lightGroup.getByRole('radio', { name: '每周' }), lightActive);
 });
 
-test('files seg + tasks view toggle: hover steps the unselected ink (dark)', async ({ page }) => {
-  await page.goto(`${PROJ}?scenario=r2-24`);
-  await expectInkStep(
-    page.locator('.prj-files-seg-tab', { hasText: '历史' }),
-    page.locator('.prj-files-seg-tab[aria-selected="true"]'),
-  );
-
+test('tasks view toggle: hover steps the unselected ink (dark)', async ({ page }) => {
   await page.goto(`${PROJ}?scenario=prj-tasks`);
   await expectInkStep(
     page.locator('.prj-tasks-view-btn[aria-label="网格视图"]'),

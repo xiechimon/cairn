@@ -12,6 +12,7 @@ import type { PrCardModel } from '../components/thread/pr-card-model.js';
 import { PrList } from '../components/thread/pr-list.js';
 import { ProposalCard } from '../components/thread/proposal-card.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
+import { TaskRow } from '../components/thread/task-row.js';
 import { UsageStrip } from '../components/thread/usage-strip.js';
 import { Button } from '../components/ui/button.js';
 import { toastSuccess } from '../components/ui/toaster.js';
@@ -511,6 +512,68 @@ export function ScheduledSection() {
             { value: 'cron', label: 'Custom cron' },
           ]}
         />
+      </Specimen>
+    </Section>
+  );
+}
+
+export function TaskRowSection() {
+  return (
+    <Section
+      id="task-row"
+      title="Task row"
+      lede="A row in the Tasks panel: status glyph, title and age, then the status word with what is waiting, then where to act. Only rows waiting on the owner take the accent and an action line; a running row carries the 6px running dot."
+    >
+      <Specimen
+        id="task-row"
+        title="Task row"
+        stage="canvas"
+        code="<TaskRow title glyph word what where age waiting running onOpen />"
+      >
+        <div className="flex w-full max-w-110 flex-col">
+          <TaskRow
+            title="Inventory MCP servers across machines and keep secrets local"
+            glyph="three-quarter"
+            word="Ready for review"
+            what="PR #3558: all checks passed (41/41)"
+            where="Merge on the PR card"
+            age="22 min ago"
+            waiting
+            running={false}
+            onOpen={() => toastSuccess('Task opened')}
+          />
+          <TaskRow
+            title="Remove Feishu entirely, or keep the notification channel?"
+            glyph="question"
+            word="Needs input"
+            what="Coordinator asks before creating a task"
+            where="Choose on the question card"
+            age="8 min ago"
+            waiting
+            running={false}
+          />
+          <TaskRow
+            title="Enforce public-content checks in hooks and CI"
+            glyph="ring"
+            word="Working"
+            what="Building."
+            where={null}
+            age="12 min"
+            waiting={false}
+            running
+          />
+          <TaskRow
+            title="Unify the task issue lifecycle"
+            glyph="done"
+            word="Done"
+            what="PR #3551 merged"
+            where={null}
+            age="2 h ago"
+            waiting={false}
+            running={false}
+            muted
+          />
+        </div>
       </Specimen>
     </Section>
   );

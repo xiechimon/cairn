@@ -104,8 +104,8 @@
                 "message": "Seam discipline (D60): the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
               },
               {
-                "group": ["@opentelemetry/*", "@opentelemetry/*/*"],
-                "message": "Seam discipline (observability-4): OpenTelemetry packages may only be consumed through the thin bridge module apps/daemon/src/backend/otel.ts, and only when CAIRN_OTEL_ENDPOINT is configured."
+                "group": ["@opentelemetry/*", "@opentelemetry/*/*", "@langfuse/*"],
+                "message": "Seam discipline (observability-4): the OpenTelemetry SDK is consumed only through the bridge packages/shared/src/otel.ts, and convention keys (@opentelemetry/semantic-conventions, @langfuse/core) only through packages/shared/src/genai-conventions.ts."
               }
             ],
             "paths": {
@@ -120,6 +120,16 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["packages/shared/src/otel.ts", "packages/shared/src/genai-conventions.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
     {
       "includes": [
         "apps/daemon/src/backend/**",
@@ -260,8 +270,8 @@
                     "message": "Seam discipline (D60): the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
                   },
                   {
-                    "group": ["@opentelemetry/*", "@opentelemetry/*/*"],
-                    "message": "Seam discipline (observability-4): OpenTelemetry packages may only be consumed through the thin bridge module apps/daemon/src/backend/otel.ts, and only when CAIRN_OTEL_ENDPOINT is configured."
+                    "group": ["@opentelemetry/*", "@opentelemetry/*/*", "@langfuse/*"],
+                    "message": "Seam discipline (observability-4): the OpenTelemetry SDK is consumed only through the bridge packages/shared/src/otel.ts, and convention keys (@opentelemetry/semantic-conventions, @langfuse/core) only through packages/shared/src/genai-conventions.ts."
                   },
                   {
                     "group": [
