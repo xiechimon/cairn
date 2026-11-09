@@ -2,6 +2,7 @@ import type { MachineDoneBody } from '@cairn/shared';
 import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { SHORT_RETENTION_MS } from '../src/coordinator/runtime/cold-slim.js';
 import {
   build,
   chiefThread,
@@ -339,11 +340,15 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       ['turn-a', 21_000],
       ['turn-b', 23_456],
     ]);
-    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+    const ctx = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(ctx).toMatchObject({
       tokens: 23_456,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
+    const lastAt = turnRows().find((r) => r.stepId === 'turn-b')?.createdAt;
+    expect(lastAt).toEqual(expect.any(Number));
+    expect(ctx?.resumeUntil).toBe(lastAt! + SHORT_RETENTION_MS);
   });
 
   test('flag on: a turn without contextTokens (claude-code) leaves the meter empty', async () => {

@@ -111,22 +111,30 @@ export function lastTurnContext(
       .from(coordinatorConversation)
       .where(eq(coordinatorConversation.threadId, last.threadId))
       .get() ?? null;
+  const resume = contextResumeOf({
+    now: nowMs(),
+    retentionMs,
+    lastUsage: {
+      createdAt: last.createdAt,
+      cacheRead: last.cacheRead,
+      input: last.input,
+      contextTokens: last.tokens,
+      model: last.model,
+    },
+    lastColdSlimAt: coldSlim?.at ?? null,
+    lastColdSlimStepId: coldSlim?.stepId ?? null,
+    lastUsageStepId: last.stepId,
+  });
+  const resumeUntil =
+    resume === 'compacted' && coldSlim?.at != null
+      ? coldSlim.at + retentionMs
+      : resume === 'warm'
+        ? last.createdAt + retentionMs
+        : undefined;
   return {
     tokens: last.tokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
-    resume: contextResumeOf({
-      now: nowMs(),
-      retentionMs,
-      lastUsage: {
-        createdAt: last.createdAt,
-        cacheRead: last.cacheRead,
-        input: last.input,
-        contextTokens: last.tokens,
-        model: last.model,
-      },
-      lastColdSlimAt: coldSlim?.at ?? null,
-      lastColdSlimStepId: coldSlim?.stepId ?? null,
-      lastUsageStepId: last.stepId,
-    }),
+    resume,
+    ...(resumeUntil !== undefined ? { resumeUntil } : {}),
   };
 }
