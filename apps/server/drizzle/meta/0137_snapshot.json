@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9449a9df-ea3c-48b0-a20f-e5e7730797b5",
+  "id": "ba9c6c10-4185-4ee6-8e0f-c423261e76c2",
   "prevId": "275a608b-c6dc-4a7c-b483-75f6aa264f38",
   "tables": {
     "agent_memory": {
@@ -869,13 +869,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "evidenceStore": {
-          "name": "evidenceStore",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "stop": {
           "name": "stop",
           "type": "text",
@@ -888,6 +881,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "evidenceStore": {
+          "name": "evidenceStore",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },
@@ -2264,6 +2264,20 @@
         },
         "lastMirroredEntryId": {
           "name": "lastMirroredEntryId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lastColdSlimAt": {
+          "name": "lastColdSlimAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lastColdSlimStepId": {
+          "name": "lastColdSlimStepId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -3914,14 +3928,6 @@
           "autoincrement": false,
           "default": "'human'"
         },
-        "evidenceStore": {
-          "name": "evidenceStore",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'attachments'"
-        },
         "description": {
           "name": "description",
           "type": "text",
@@ -4005,6 +4011,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "evidenceStore": {
+          "name": "evidenceStore",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'attachments'"
         }
       },
       "indexes": {},
@@ -5295,13 +5309,6 @@
         },
         "prompt": {
           "name": "prompt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "promptOrigin": {
-          "name": "promptOrigin",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

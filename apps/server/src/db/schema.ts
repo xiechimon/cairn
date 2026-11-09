@@ -924,6 +924,8 @@ export const coordinatorConversation = sqliteTable('coordinator_conversation', {
   threadId: text('threadId').primaryKey(),
   conversationId: text('conversationId').notNull(),
   lastMirroredEntryId: text('lastMirroredEntryId'),
+  lastColdSlimAt: epochMs('lastColdSlimAt'),
+  lastColdSlimStepId: text('lastColdSlimStepId'),
   piVersion: text('piVersion').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
 });
