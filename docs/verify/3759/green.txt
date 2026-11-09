@@ -1,14 +1,7 @@
-[heavy-slots] acquired slot 1/2
+Head: e344edf89e976693041684bbef65a51c1dc8f8af
+Command: pnpm exec vitest run <20 targeted memory and prompt-consumer files> --maxWorkers=4
 
- RUN  v5.0.1 REPO
-
-
- Test Files  14 passed (14)
-      Tests  119 passed (119)
-   Start at  12:38:10
-   Duration  11.53s (import 41%, tests 41%, transform 17%, setup 1%)
-
-     Import  |@xiechimon/cairn| 419 modules were evaluated 4455 times · 16.83s total, 41% of tracked time
-             ~2.75s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
-             learn more: https://vitest.dev/guide/improving-performance#test-isolation
-
+ Test Files  20 passed (20)
+      Tests  226 passed (226)
+   Start at  12:57:19
+   Duration  18.28s (tests 53%, import 30%, transform 17%, setup 1%)

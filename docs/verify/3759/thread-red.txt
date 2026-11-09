@@ -1,0 +1,41 @@
+Head before fix: 534879bd117a2a2b61eeddce4e16c65a5b2349ad
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 REPO
+
+ ❯ |@xiechimon/cairn| test/memory-document-injection.test.ts (14 tests | 1 failed | 13 skipped) 114ms
+   × empty injection ensures one persisted index 113ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/memory-document-injection.test.ts > empty injection ensures one persisted index
+AssertionError: expected [ [ 'MEMORY.md', '', …(1) ] ] to deeply equal [ [ 'MEMORY.md', '', null ] ]
+
+- Expected
++ Received
+
+  [
+    [
+      "MEMORY.md",
+      "",
+-     null,
++     "chief-01a1c20f-a944-7331-8338-c976e74a4995",
+    ],
+  ]
+
+ ❯ test/memory-document-injection.test.ts:100:64
+     98|   injectMemories(H.s.db, scope);
+     99|   const indexes = listStoredMemoryEntries(H.s.db, scope).filter((m) =>…
+    100|   expect(indexes.map((m) => [m.title, m.content, m.threadId])).toEqual…
+       |                                                                ^
+    101| });
+    102|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  12:46:06
+   Duration  2.27s (transform 62%, import 31%, tests 5%, setup 1%)
+
