@@ -551,6 +551,12 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
     });
     expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
+    expect(lastContextBearingTurnUsage(H.s.db, H.threadId)).toBeNull();
+    expect(lastTurnUsageForColdResume(H.s.db, H.threadId)).toMatchObject({
+      model: 'claude-code/claude-haiku-5-5',
+      contextTokens: null,
+      stepId: 'turn-no-ctx',
+    });
   });
 
   test('flag on: the window comes from the model that ran the last turn, from its provider catalog', async () => {
