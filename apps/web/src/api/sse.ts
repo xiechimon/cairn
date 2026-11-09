@@ -227,9 +227,12 @@ export function startConversationStream(
         }
         case 'message': {
           const row = ev.message as TranscriptRow;
+          const targetConversationId =
+            conversationMessageEventSchema.shape.conversationId.safeParse(ev.conversationId).data ??
+            conversationId;
           cacheUserMessage(
             qc,
-            conversationId,
+            targetConversationId,
             row,
             conversationMessageEventSchema.shape.deliveredQueue.safeParse(ev.deliveredQueue).data,
           );
@@ -240,6 +243,8 @@ export function startConversationStream(
             liveThinkingStore.noteSettled(conversationId, row.id);
           }
           void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
+          if (targetConversationId !== conversationId)
+            void invalidateConverged(qc, { queryKey: ['messages', targetConversationId] });
           void invalidateConverged(qc, { queryKey: ['plans'] });
           onMessage?.(row);
           break;

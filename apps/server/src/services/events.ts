@@ -143,11 +143,18 @@ export class ConversationStreamHub {
     } else if (isThinkingOnlyRow(message.content)) {
       this.thinkingBuffers.delete(conversationId);
     }
-    this.publish(conversationId, {
+    const event: ConversationMessageEvent = {
       type: 'message',
       message,
       ...(deliveredQueue === undefined ? {} : { deliveredQueue }),
-    });
+    };
+    this.publish(conversationId, event);
+    if (
+      message.role === 'user' &&
+      deliveredQueue !== undefined &&
+      deliveredQueue.conversationId !== conversationId
+    )
+      this.publish(deliveredQueue.conversationId, { ...event, conversationId });
   }
 
   publishTextDelta(conversationId: string, text: string): void {

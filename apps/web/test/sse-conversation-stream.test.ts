@@ -66,6 +66,33 @@ afterEach(() => {
 });
 
 describe('confirmed user message visibility', () => {
+  it('hands a source-stream rollover confirmation to the target cache before subscribing there', () => {
+    const qc = freshClient();
+    const onMessage = vi.fn();
+    const delivered = { id: 'delivered-rollover', role: 'user', content: 'Identical words', createdAt: 5 };
+    const keep = { id: 'keep-queued', content: delivered.content, createdAt: 2 };
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null, queuedMessages: [{ ...keep, id: 'source-queued' }, keep] };
+    qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
+    const stopSource = startConversationStream(CONV, qc, { onMessage });
+    const source = FakeEventSource.instances.at(-1)!;
+    source.fireOpen();
+    const event = { type: 'message', conversationId: 'replacement-build', message: delivered, deliveredQueue: { conversationId: CONV, messageId: 'source-queued' } };
+    source.push(event);
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toMatchObject({ pages: [{ messages: [], queuedMessages: [keep] }] });
+    expect(qc.getQueryData(['messages', 'replacement-build', 'pages'])).toMatchObject({ pages: [{ messages: [delivered] }] });
+    expect(onMessage).toHaveBeenCalledWith(delivered);
+    const stopTarget = startConversationStream('replacement-build', qc, {});
+    const target = FakeEventSource.instances.at(-1)!;
+    target.fireOpen();
+    target.push({ type: 'message', message: delivered, deliveredQueue: event.deliveredQueue });
+    source.push(event);
+    expect(qc.getQueryData(['messages', 'replacement-build', 'pages'])).toMatchObject({ pages: [{ messages: [delivered] }] });
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toMatchObject({ pages: [{ messages: [], queuedMessages: [keep] }] });
+    stopSource();
+    stopTarget();
+    qc.clear();
+  });
+
   it.each([CONV, 'replacement-build'])('correlates automatic queue delivery into %s by identity, not equal content', (target) => {
     const qc = freshClient();
     const delivered = { id: 'delivered', role: 'user', content: 'Identical words', createdAt: 5 };

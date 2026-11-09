@@ -346,54 +346,104 @@ test('idle discard is rejected without changing earlier rounds', async () => {
   expect(w.s.db.select().from(step).all()).toHaveLength(1);
 });
 
-test('a closed PR continuation carries the remaining queue into the new build', async () => {
-  let pullState = 'open';
-  const w = await runningTask({
-    githubFetch: async () => Response.json({ state: pullState, merged: false }),
-  });
-  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
-  w.s.db
-    .update(project)
-    .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
-    .where(eq(project.id, task.projectId))
-    .run();
-  w.s.db
-    .update(build)
-    .set({ prNumber: 43, prUrl: 'https://github.com/demo-owner/demo-repo/pull/43' })
-    .where(eq(build.id, 'build'))
-    .run();
-  expect((await w.send({ content: 'A', mode: 'queue' })).status).toBe(201);
-  expect((await w.send({ content: 'B', mode: 'queue' })).status).toBe(201);
-  const [queuedA, queuedB] = (await w.face()).queuedMessages!;
-  const published = vi.spyOn(w.s.convHub, 'publishMessage');
-  pullState = 'closed';
-  expect((await w.finish('success')).status).toBe(200);
-  const newBuildId = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!.latestBuildId!;
-  expect(newBuildId).not.toBe('build');
-  expect(published).toHaveBeenCalledWith(
-    newBuildId,
-    expect.objectContaining({ role: 'user', content: 'A' }),
-    { conversationId: 'build', messageId: queuedA!.id },
-  );
-  const response = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
-    messages: expect.arrayContaining([expect.objectContaining({ role: 'user', content: 'A' })]),
-    queuedMessages: [{ ...queuedB, conversationId: newBuildId }],
-    steerPending: [],
-  });
-  expect(await w.face()).toMatchObject({ queuedMessages: [] });
-  expect(w.s.db.select().from(message).where(eq(message.content, 'A')).all()).toHaveLength(1);
-  const next = w.s.db.select().from(step).where(eq(step.buildId, newBuildId)).get()!;
-  expect(next).toMatchObject({ status: 'pending', prompt: 'A' });
-  const machineId = w.s.db.select().from(step).where(eq(step.id, 'running')).get()!.machineId;
-  w.s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, next.id)).run();
-  expect((await w.finish('success', next.id)).status).toBe(200);
-  expect(w.s.db.select().from(step).where(eq(step.buildId, newBuildId)).all()).toMatchObject([
-    { id: next.id, status: 'done', prompt: 'A' },
-    { status: 'pending', prompt: 'B' },
-  ]);
-  expect(w.s.db.select().from(message).where(eq(message.content, 'B')).all()).toHaveLength(1);
-  const finalResponse = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
-  expect(await finalResponse.json()).toMatchObject({ queuedMessages: [] });
-});
+test.each(['success', 'stopped', 'manual', 'local'] as const)(
+  'a %s rollover confirms delivery to the source subscription and carries the remaining queue',
+  async (kind) => {
+    let pullState = 'open';
+    const w = await runningTask({
+      githubFetch: async () => Response.json({ state: pullState, merged: false }),
+    });
+    const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
+    w.s.db
+      .update(project)
+      .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
+      .where(eq(project.id, task.projectId))
+      .run();
+    w.s.db
+      .update(build)
+      .set({ prNumber: 43, prUrl: 'https://github.com/demo-owner/demo-repo/pull/43' })
+      .where(eq(build.id, 'build'))
+      .run();
+    expect(
+      (await w.send({ content: 'A', mode: 'queue', deliverAfterStop: kind === 'stopped' })).status,
+    ).toBe(201);
+    expect((await w.send({ content: 'B', mode: 'queue' })).status).toBe(201);
+    const [queuedA, queuedB] = (await w.face()).queuedMessages!;
+    if (kind === 'local') {
+      w.s.db
+        .update(project)
+        .set({ repoKind: 'local', githubRepo: null })
+        .where(eq(project.id, task.projectId))
+        .run();
+      w.s.db
+        .insert(step)
+        .values({
+          id: 'landed-merge',
+          buildId: 'build',
+          kind: 'merge',
+          status: 'done',
+          checkpointCommit: 'a'.repeat(40),
+          createdAt: 1,
+        })
+        .run();
+    }
+    const frames: object[] = [];
+    const stopSource = w.s.convHub.subscribe('build', {
+      nextSeq: () => 1,
+      send: async (frame) => {
+        frames.push(frame);
+      },
+    });
+    const published = vi.spyOn(w.s.convHub, 'publishMessage');
+    pullState = 'closed';
+    if (kind === 'manual') {
+      w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, 'running')).run();
+      w.s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, 'task')).run();
+      expect((await w.send({ content: 'A', queuedMessageId: queuedA!.id })).status).toBe(201);
+    } else expect((await w.finish(kind === 'stopped' ? 'stopped' : 'success')).status).toBe(200);
+    const newBuildId = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!.latestBuildId!;
+    expect(newBuildId).not.toBe('build');
+    expect(w.s.convHub.subscriberCount(newBuildId)).toBe(0);
+    expect(frames.filter((frame) => (frame as { type: string }).type === 'message')).toEqual([
+      {
+        type: 'message',
+        conversationId: newBuildId,
+        message: expect.objectContaining({ role: 'user', content: 'A' }),
+        deliveredQueue: { conversationId: 'build', messageId: queuedA!.id },
+      },
+    ]);
+    stopSource();
+    expect(published).toHaveBeenCalledWith(
+      newBuildId,
+      expect.objectContaining({ role: 'user', content: 'A' }),
+      { conversationId: 'build', messageId: queuedA!.id },
+    );
+    const response = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      messages: expect.arrayContaining([expect.objectContaining({ role: 'user', content: 'A' })]),
+      queuedMessages: [{ ...queuedB, conversationId: newBuildId }],
+      steerPending: [],
+    });
+    expect(await w.face()).toMatchObject({ queuedMessages: [] });
+    expect(w.s.db.select().from(message).where(eq(message.content, 'A')).all()).toHaveLength(1);
+    const next = w.s.db.select().from(step).where(eq(step.buildId, newBuildId)).get()!;
+    expect(next).toMatchObject({ status: 'pending', prompt: 'A' });
+    const machineId = w.s.db.select().from(step).where(eq(step.id, 'running')).get()!.machineId;
+    w.s.db
+      .update(step)
+      .set({ status: 'claimed', machineId, sessionId: 'builder-session' })
+      .where(eq(step.id, next.id))
+      .run();
+    w.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, 'task')).run();
+    const finished = await w.finish('success', next.id);
+    expect(finished.status, JSON.stringify(await finished.json())).toBe(200);
+    expect(w.s.db.select().from(step).where(eq(step.buildId, newBuildId)).all()).toMatchObject([
+      { id: next.id, status: 'done', prompt: 'A' },
+      { status: 'pending', prompt: 'B' },
+    ]);
+    expect(w.s.db.select().from(message).where(eq(message.content, 'B')).all()).toHaveLength(1);
+    const finalResponse = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
+    expect(await finalResponse.json()).toMatchObject({ queuedMessages: [] });
+  },
+);

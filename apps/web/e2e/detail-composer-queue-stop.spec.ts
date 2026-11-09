@@ -87,10 +87,19 @@ async function runningTask(page: Page, readDelay = 0) {
     }
   };
   await page.addInitScript(() => {
+    const streams: FakeEventSource[] = [];
     class FakeEventSource extends EventTarget {
+      readonly url: string;
       readyState = 1;
-      close() {}
+      onmessage: ((event: { data: string }) => void) | null = null;
+      constructor(url: string) {
+        super();
+        this.url = url;
+        streams.push(this);
+      }
+      close() { this.readyState = 2; }
     }
+    Object.defineProperty(window, '__streams', { value: streams });
     Object.defineProperty(window, 'EventSource', { value: FakeEventSource });
   });
   await page.route('**/api/**', async (route) => {
@@ -183,7 +192,24 @@ async function runningTask(page: Page, readDelay = 0) {
   await page.goto(`/app/todo/${task.id}`);
   const input = page.getByTestId('composer-card').getByRole('textbox');
   await expect(input).toBeEnabled();
-  return { input, sent, stops, steerPending, queuedMessages, finish, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
+  const rollover = async () => {
+    const source = build.id;
+    const queued = queuedMessages.shift()!;
+    const message = { id: 'rollover-delivered', role: 'user', content: queued.content, createdAt: Date.now() };
+    build.id = 'replacement-build';
+    task.latestBuildId = build.id;
+    task.v += 1;
+    messages.push(message);
+    steps[0]!.buildId = build.id;
+    await page.evaluate((event) => {
+      const streams = (window as unknown as { __streams: { url: string; readyState: number; onmessage: ((event: { data: string }) => void) | null }[] }).__streams;
+      const active = streams.find((stream) => stream.url.includes(`/conversations/${event.deliveredQueue.conversationId}/stream`) && stream.readyState === 1);
+      if (!active) throw new Error('Source conversation is not subscribed');
+      if (streams.some((stream) => stream.url.includes(`/conversations/${event.conversationId}/stream`))) throw new Error('Target subscribed before rollover');
+      active.onmessage?.({ data: JSON.stringify(event) });
+    }, { type: 'message', conversationId: build.id, message, deliveredQueue: { conversationId: source, messageId: queued.id } });
+  };
+  return { input, sent, stops, steerPending, queuedMessages, finish, rollover, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
 }
 
 test('a confirmed queue capsule is visible before a slow transcript read without becoming a delivered bubble', async ({ page }) => {
@@ -216,6 +242,17 @@ for (const chord of ['Meta+Enter', 'Control+Enter']) {
     expect(task.turns()).toBe(1);
   });
 }
+
+test('rollover confirms the bubble through the source stream before the target GET finishes', async ({ page }) => {
+  const task = await runningTask(page, 3000);
+  await task.input.fill('Continue on the replacement build');
+  await task.input.press('Control+Enter');
+  await expect(page.getByTestId('queued-message')).toBeVisible();
+  await task.rollover();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __streams: { url: string; readyState: number }[] }).__streams.some((stream) => stream.url.includes('/conversations/replacement-build/stream') && stream.readyState === 1)), { timeout: 700 }).toBe(true);
+  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Continue on the replacement build' })).toHaveCount(1, { timeout: 700 });
+  await expect(page.getByTestId('queued-message')).toHaveCount(0, { timeout: 700 });
+});
 
 test('send now removes the capsule as soon as delivery is confirmed despite a slow read', async ({ page }) => {
   const task = await runningTask(page, 3000);
