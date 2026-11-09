@@ -118,7 +118,8 @@ Layout of the Tasks surface, same on all three clients:
 - Two tabs, `Active` and `Up next` (Duet, Seen). Active lists `Ready for review`, `Needs input`, `Working`, then `Resolved` collapsed, each header with its count: Duet's order (Seen, DataCamp image), by owner decision.
 - Both needs-you sections use ochre. Duet's green and amber pair is not copied: V5 gives ochre to "waiting on you" and green only to a 6px running dot (Read).
 - The leading circle sits where Duet's checkbox is (Seen), but in cairn it is the status glyph, not a control. A task resolves from evidence (merge, close), not a tick; `Close` stays in the task's `…` menu. Inferred from the merge-gate design; section 7.
-- Badge: the count of `needs_input` plus `ready_for_review`, on the iOS `Tasks` tab, the desktop tray and the web Tasks toggle. One number everywhere.
+- Standalone Coordinator questions: a question the Coordinator asks the owner before any task exists is stored as a `chief_message` with no todo (Read, `chief-questions.ts` `createOrGetQuestion`), and today's iOS inbox lists it beside tasks (Read, `AppModel.swift` `inbox`). In Tasks it is a row at the top of `Needs input` with the Coordinator glyph, the question header as its title and `Asked you a question.` as its reason; it opens the question card (`cairn://question/<requestId>`, web `/app?question=<requestId>`). The same server read that returns tasks with `section` returns these pending questions as `needs_input` entries, so no client assembles them. It leaves Tasks when answered.
+- Badge: the count of `needs_input` (tasks and standalone questions) plus `ready_for_review`, on the iOS `Tasks` tab, the desktop tray and the web Tasks toggle. One number everywhere.
 - The `+` button (Duet, Seen) opens the Chat composer focused, so a new task still enters through the Coordinator. Search and sort (Duet, Seen) come after the first iOS PR.
 - `Manage schedules` is a quiet link under Resolved, as the a326b prototype already has it (Seen, prototype capture).
 
@@ -194,7 +195,7 @@ Each step keeps DESIGN-RULES L1 to L7 for list rows (Read); the gate tests in `a
 
 ### 4.2 Layout change
 
-- Tabs become `Chat` (the Coordinator) and `Tasks` (2.4), replacing `Needs you` and `Coordinator`, in Duet's order and with Duet's tab-bar shape (Seen). The `Needs you` inbox becomes the top of `Tasks`. Pending Coordinator questions to the owner surface as their task's `Needs input` row, plus inline in Chat.
+- Tabs become `Chat` (the Coordinator) and `Tasks` (2.4), replacing `Needs you` and `Coordinator`, in Duet's order and with Duet's tab-bar shape (Seen). The `Needs you` inbox becomes the top of `Tasks`. Pending Coordinator questions to the owner surface as their task's `Needs input` row, or as a standalone question row when no task exists yet (2.4), plus inline in Chat.
 - Home tab on cold start: `Chat`, following Duet by owner decision. No source states Duet's launch tab; the product page's phone frame shows Chat (Read), and Duet's brief and "needs you" messages land in the main thread (Read, help article), so Chat is the Duet default as far as public material shows. Inferred. This replaces the 2026-10-31 decision that the phone opens on the needs-you inbox; a notification tap still opens its sub-thread directly.
 - `≡` in both tabs opens the drawer (Duet, Seen); picking a project filters Chat and Tasks to it, and a chip under the title clears it.
 - Two tabs, not three (2.7).
@@ -202,7 +203,7 @@ Each step keeps DESIGN-RULES L1 to L7 for list rows (Read); the gate tests in `a
 
 ### 4.3 "Needs you" on the phone without APNs
 
-The owner chose free signing (4.4). The free Apple Developer tier has no Push notifications capability (Read, capabilities table: Push notifications and Time Sensitive Notifications are ADP and ADEP only), so the native app cannot receive APNs. Background modes are allowed on the free tier (Read, same table). The trigger stays one: the reconciler's change to `owner` (`thread-owner-field.md`, invariant 3, Read).
+The owner chose free signing (4.4). The free Apple Developer tier has no Push notifications capability (Read, capabilities table: Push notifications and Time Sensitive Notifications are ADP and ADEP only), so the native app cannot receive APNs. Background modes are allowed on the free tier (Read, same table). The triggers stay as they are: the reconciler's change to `owner` (`thread-owner-field.md`, invariant 3, Read), and a new Coordinator question to the owner, which already sends Web Push from `createOrGetQuestion` (Read, `chief-questions.ts`, `pushToUserSafely`).
 
 | Option | Reaches a locked phone with the app closed | Latency | Work | Mark |
 |---|---|---|---|---|
@@ -300,7 +301,7 @@ The desktop borrows from Duet rather than copying it: it keeps the wide web layo
 
 - **Window**: `BrowserWindow.loadURL(<server origin>)`, the same SPA, so the desktop layout is the web layout in section 3 with nothing desktop-only in the UI. First run asks for the server URL or a pairing link; single instance.
 - **Tray badge**: the needs-you count from 2.4, the same number as the iOS tab badge. Linux shows it in the tray icon (StatusNotifierItem on waybar, unverified on Wayland, Inferred), macOS on the dock and menu bar. It is derived from task state and never cleared on focus: it drops only when a task leaves `needs_input` or `ready_for_review`, so tray, web toggle and iOS tab always show the same number. Inferred.
-- **Notifications**: the main process subscribes to the team stream (`GET /api/teams/:id/stream`, Read, `routes-core.ts`) and raises an OS notification for each ownership notification the reconciler writes (`notifyOwnership`, Read, `notifications.ts`). It does not use Web Push inside Electron (Inferred: the desktop is online whenever it can notify, and the stream already carries the events). Suppressed when the thread is on screen, through the same presence heartbeat. Clicking opens `/app?thread=<todoId>`.
+- **Notifications**: the main process subscribes to the team stream (`GET /api/teams/:id/stream`, Read, `routes-core.ts`) and raises an OS notification for each ownership notification the reconciler writes (`notifyOwnership`) and for each pending Coordinator question to the owner (`notifyChiefMessage`), both in `notifications.ts` (Read). A question notification opens `/app?question=<requestId>`. It does not use Web Push inside Electron (Inferred: the desktop is online whenever it can notify, and the stream already carries the events). Suppressed when the thread is on screen, through the same presence heartbeat. Clicking opens `/app?thread=<todoId>`.
 - **Deep links**: register `cairn://` with `setAsDefaultProtocolClient`, handle `open-url` on macOS and `second-instance` on Linux and Windows (Read, stack note), and map each link to the web route in section 3, step 7. `cairn://new?q=` opens a draft and never runs.
 - **Update and packaging**: electron-builder and electron-updater; AppImage for the Linux desktop, an unsigned DMG for the Mac. Signing and notarization cost money (D9).
 - Later slices, not here: "use this computer as a worker" (it touches `apps/daemon/src/credentials.ts` and `apps/server/src/routes-machine.ts`, owner-routed security surfaces), and the bundled server for stranger installs.
@@ -312,7 +313,7 @@ Each PR is independent off `main` unless it says otherwise, and each ends with s
 | # | PR | Area | Depends on |
 |---|---|---|---|
 | 1 | `docs`: update `mobile-information-architecture.md` to Chat and Tasks, `section`, drawer, deep links | docs | this document accepted |
-| 2 | `server`: `sectionOf` and a nullable `section` on `TodoRecord`; one Tasks read returning unarchived rows plus rows archived in the last 7 days; table test over phase, owner, reason, archive and age | server, shared | — |
+| 2 | `server`: `sectionOf` and a nullable `section` on `TodoRecord`; one Tasks read returning unarchived rows, rows archived in the last 7 days and pending standalone Coordinator questions; table test over phase, owner, reason, archive and age | server, shared | — |
 | 3 | `server`: `project.group` column; `projectId` written on owner messages sent from a project view and on task-card messages; test that a project filter returns them | server | — |
 | 4 | `web`: Tasks panel with Active and Up next, sections from `section`, badge on the toggle (lands the useful part of the a326b prototype) | web | 2 |
 | 5 | `web`: sidebar with Coordinator row, project dots, groups and `Move to group`; task rows removed from the sidebar | web | 3, 4 |
