@@ -4,7 +4,11 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { taskIssueClose as taskIssueCloseTable, todo as todoTable } from '../src/db/schema.js';
+import {
+  taskIssueClose as taskIssueCloseTable,
+  team as teamTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
 import {
@@ -13,6 +17,7 @@ import {
 } from '../src/services/github-connection.js';
 import {
   createTaskIssueSync,
+  TASK_ISSUE_RETRY_MS,
   TASK_ISSUE_WRITES_PER_SWEEP,
 } from '../src/services/task-issue-sync.js';
 import { flushSelfIssueWrites, setTodoPhase } from '../src/services/todos.js';
@@ -901,10 +906,10 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     const { s, id, sync } = await startedTask(mock);
     await call(s.app, 'DELETE', `/api/todos/${id}`);
     mock.set(`PATCH ${issuePath(101)}`, { status: 502, body: { message: 'bad gateway' } });
-    await sync.sweep();
+    await sync.sweep(1_000);
     expect(s.db.select().from(taskIssueCloseTable).all()).toHaveLength(1);
     mock.set(`PATCH ${issuePath(101)}`, { status: 200, body: { number: 101, state: 'closed' } });
-    await sync.sweep();
+    await sync.sweep(1_000 + TASK_ISSUE_RETRY_MS);
     expect(s.db.select().from(taskIssueCloseTable).all()).toEqual([]);
     s.dispose();
   });
@@ -914,10 +919,10 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     const { s, id, sync } = await startedTask(mock);
     setRow(s, id, { phase: 'closed' });
     mock.set(`POST ${issuePath(101)}/comments`, { status: 502, body: { message: 'bad gateway' } });
-    await sync.sweep();
+    await sync.sweep(1_000);
     expect(writes(mock)).toEqual([]);
     mock.set(`POST ${issuePath(101)}/comments`, { status: 201, body: { id: 1 } });
-    await sync.sweep();
+    await sync.sweep(1_000 + TASK_ISSUE_RETRY_MS);
     expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
     expect(comments(mock).at(-1)).toBe('Cairn：这个任务已取消，这里的 issue 关闭（未计划）。');
     s.dispose();
@@ -955,6 +960,55 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     mock.set(`PATCH ${issuePath(101)}`, { status: 502, body: { message: 'bad gateway' } });
     await sync.sweep();
     expect(comments(mock)).toHaveLength(TASK_ISSUE_WRITES_PER_SWEEP);
+    s.dispose();
+  });
+
+  test('tombstones of a team without a GitHub token do not block another team', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    s.db.insert(teamTable).values({ id: 'team-b', name: 'B', createdAt: 1 }).run();
+    for (let n = 0; n < TASK_ISSUE_WRITES_PER_SWEEP + 5; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-b-${n}`,
+          teamId: 'team-b',
+          sourceRef: 'github:other/repo#9',
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+    }
+    setRow(s, id, { phase: 'closed' });
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    s.dispose();
+  });
+
+  test('items that keep failing back off, so later items get their turn', async () => {
+    const mock = lifecycleMock();
+    const { s, id, sync } = await startedTask(mock);
+    for (let n = 0; n < TASK_ISSUE_WRITES_PER_SWEEP; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-${n}`,
+          teamId: s.team.id,
+          sourceRef: `github:${REPO}#9${n}`,
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+      mock.set(`POST ${issuePath(Number(`9${n}`))}/comments`, {
+        status: 502,
+        body: { message: 'bad gateway' },
+      });
+    }
+    setRow(s, id, { phase: 'closed' });
+    await sync.sweep(1_000);
+    expect(writes(mock)).toEqual([]);
+    await sync.sweep(30_000);
+    expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
     s.dispose();
   });
 

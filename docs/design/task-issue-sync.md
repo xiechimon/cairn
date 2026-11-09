@@ -45,7 +45,7 @@ The sweep runs with the PR watch, once a minute. A change on the board reaches G
 
 | Failure | Behavior |
 |---|---|
-| No token, or GitHub unreachable | the row stays divergent; the next sweep retries |
+| No token, or GitHub unreachable | the item stays pending and backs off per item (1 minute, doubling to 1 hour), so it never blocks other teams or rows; a missing token uses no budget |
 | The issue cannot be read | treated as unknown: the reconciler writes the desired state |
 | The issue was deleted on GitHub (404/410) | records the desired state and stops retrying |
 | The successor's issue is not created yet | waits; the comment always names the successor's issue |

@@ -17,6 +17,10 @@ type TodoRow = typeof todo.$inferSelect;
 
 export const TASK_ISSUE_WRITES_PER_SWEEP = 20;
 
+export const TASK_ISSUE_RETRY_MS = 60_000;
+
+const TASK_ISSUE_RETRY_MAX_MS = 3_600_000;
+
 export type DesiredIssue =
   | { state: 'open'; comment: string }
   | { state: 'closed'; stateReason: 'completed' | 'not_planned'; comment: string };
@@ -120,14 +124,23 @@ function forgetLandedStates(deps: Pick<TodoDeps, 'db'>): void {
     .run();
 }
 
+type Outcome = 'written' | 'recorded' | 'deferred';
+
 export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLike }) {
   let sweeping = false;
+  const retries = new Map<string, { failures: number; until: number }>();
+
+  function backOff(key: string, now: number): void {
+    const failures = (retries.get(key)?.failures ?? 0) + 1;
+    const delay = Math.min(TASK_ISSUE_RETRY_MS * 2 ** (failures - 1), TASK_ISSUE_RETRY_MAX_MS);
+    retries.set(key, { failures, until: now + delay });
+  }
 
   async function settle(
     teamId: string,
     sourceRef: string,
     desired: DesiredIssue,
-  ): Promise<'written' | 'recorded' | 'deferred'> {
+  ): Promise<Outcome> {
     const parsed = parseGithubIssueSourceRef(sourceRef);
     if (parsed === null) return 'recorded';
     const token = await autonomousToken({ ...deps, githubFetch: run.githubFetch }, teamId, parsed);
@@ -150,7 +163,7 @@ export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLik
   }
 
   return {
-    async sweep(): Promise<TaskIssueSyncTally> {
+    async sweep(now = Date.now()): Promise<TaskIssueSyncTally> {
       const tally: TaskIssueSyncTally = {
         tombstones: 0,
         rows: 0,
@@ -163,7 +176,7 @@ export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLik
       try {
         forgetLandedStates(deps);
         let attempts = 0;
-        const items: { label: string; run: () => Promise<void> }[] = [];
+        const items: { key: string; label: string; run: () => Promise<Outcome> }[] = [];
         const tombstones = deps.db
           .select()
           .from(taskIssueClose)
@@ -171,6 +184,7 @@ export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLik
           .all();
         for (const tomb of tombstones) {
           items.push({
+            key: `tomb:${tomb.id}`,
             label: `closing ${tomb.sourceRef}`,
             run: async () => {
               tally.tombstones += 1;
@@ -179,10 +193,10 @@ export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLik
                 stateReason: 'not_planned',
                 comment: tomb.comment,
               });
-              tally[outcome] += 1;
               if (outcome !== 'deferred') {
                 deps.db.delete(taskIssueClose).where(eq(taskIssueClose.id, tomb.id)).run();
               }
+              return outcome;
             },
           });
         }
@@ -191,27 +205,38 @@ export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLik
           const sourceRef = row.sourceRef;
           if (desired === null || desired === 'wait' || sourceRef === null) continue;
           items.push({
+            key: `todo:${row.id}:${desired.state}`,
             label: `settling ${sourceRef}`,
             run: async () => {
               tally.rows += 1;
               const outcome = await settle(row.teamId, sourceRef, desired);
-              tally[outcome] += 1;
-              if (outcome === 'deferred') return;
-              deps.db
-                .update(todo)
-                .set({ issueState: desired.state })
-                .where(and(eq(todo.id, row.id), eq(todo.sourceRef, sourceRef)))
-                .run();
+              if (outcome !== 'deferred') {
+                deps.db
+                  .update(todo)
+                  .set({ issueState: desired.state })
+                  .where(and(eq(todo.id, row.id), eq(todo.sourceRef, sourceRef)))
+                  .run();
+              }
+              return outcome;
             },
           });
         }
         for (const item of items) {
           if (attempts >= TASK_ISSUE_WRITES_PER_SWEEP) break;
-          attempts += 1;
+          if (now < (retries.get(item.key)?.until ?? 0)) continue;
           try {
-            await item.run();
+            const outcome = await item.run();
+            tally[outcome] += 1;
+            if (outcome === 'deferred') {
+              backOff(item.key, now);
+              continue;
+            }
+            attempts += 1;
+            retries.delete(item.key);
           } catch (error) {
+            attempts += 1;
             tally.deferred += 1;
+            backOff(item.key, now);
             console.warn(`task issue sync: ${item.label} deferred`, error);
             if (isRateLimited(error)) break;
           }
