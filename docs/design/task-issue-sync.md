@@ -26,7 +26,7 @@ cairn opens one GitHub issue per task in a GitHub-linked project (`sourceKind = 
 | `done`, not archived | no opinion | - | the landing path owns it |
 | anything else (`todo` … `failed`) | open | `reopened` | reopened |
 
-2. `todo.issueState` records the state cairn last wrote or observed: `open`, `closed` or null for unknown. The reconciler acts only when desired and recorded differ.
+2. `todo.issueState` records the state cairn last wrote or observed: `open`, `closed` or null for unknown. The reconciler acts only when desired and recorded differ. A `done` task that is not archived forgets its recorded state (the landing path may have closed the issue), so reactivating it reads the issue again.
 3. Before writing, the reconciler reads the issue. When GitHub already shows the desired state, it records that state and writes nothing, so it posts no comment. A person who closes an active task's issue by hand is not overruled: desired `open` equals recorded `open`.
 4. A deleted task, or a task moved to a project that cannot hold its issue, leaves a row in `task_issue_close` (team, issue ref, comment). The same sweep closes it as `not_planned` and then deletes the row.
 5. Writes happen only inside the sweep. The sweep is single-flight and handles rows one at a time, so two writes for the same issue never race.
@@ -49,7 +49,7 @@ The sweep runs with the PR watch, once a minute. A change on the board reaches G
 | The issue cannot be read | treated as unknown: the reconciler writes the desired state |
 | The issue was deleted on GitHub (404/410) | records the desired state and stops retrying |
 | The successor's issue is not created yet | waits; the comment always names the successor's issue |
-| Rate limit | at most 20 issue writes per sweep; the rest wait for the next sweep |
+| Rate limit, or many failing writes | at most 20 attempts per sweep, failed ones included; a rate limit stops the sweep; the rest wait for the next one |
 | The comment posts but the state write fails | the comment goes first, so a retry can repeat the comment but never loses it |
 | Upgrade with existing tasks | the migration records active self-issue tasks as `open`, so the first sweep never reopens an issue a person closed; cancelled and archived ones stay unknown and are settled |
 

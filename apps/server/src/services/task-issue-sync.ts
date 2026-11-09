@@ -4,6 +4,7 @@ import { taskIssueClose, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import {
   type FetchLike,
+  GithubRateLimitedError,
   githubCloseIssue,
   githubIssueState,
   githubReopenIssue,
@@ -101,6 +102,24 @@ function divergentRows(deps: Pick<TodoDeps, 'db'>): TodoRow[] {
 const isGone = (error: unknown) =>
   error instanceof HttpError && (error.status === 404 || error.status === 410);
 
+const isRateLimited = (error: unknown) =>
+  error instanceof GithubRateLimitedError || (error instanceof HttpError && error.status === 429);
+
+function forgetLandedStates(deps: Pick<TodoDeps, 'db'>): void {
+  deps.db
+    .update(todo)
+    .set({ issueState: null })
+    .where(
+      and(
+        eq(todo.sourceKind, 'github-issue-self'),
+        eq(todo.phase, 'done'),
+        isNull(todo.archivedAt),
+        isNotNull(todo.issueState),
+      ),
+    )
+    .run();
+}
+
 export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLike }) {
   let sweeping = false;
 
@@ -142,47 +161,59 @@ export function createTaskIssueSync(deps: TodoDeps, run: { githubFetch: FetchLik
       if (sweeping) return tally;
       sweeping = true;
       try {
-        const budget = () => tally.written + tally.recorded < TASK_ISSUE_WRITES_PER_SWEEP;
+        forgetLandedStates(deps);
+        let attempts = 0;
+        const items: { label: string; run: () => Promise<void> }[] = [];
         const tombstones = deps.db
           .select()
           .from(taskIssueClose)
           .orderBy(asc(taskIssueClose.createdAt))
           .all();
         for (const tomb of tombstones) {
-          if (!budget()) break;
-          tally.tombstones += 1;
-          try {
-            const outcome = await settle(tomb.teamId, tomb.sourceRef, {
-              state: 'closed',
-              stateReason: 'not_planned',
-              comment: tomb.comment,
-            });
-            tally[outcome] += 1;
-            if (outcome !== 'deferred') {
-              deps.db.delete(taskIssueClose).where(eq(taskIssueClose.id, tomb.id)).run();
-            }
-          } catch (error) {
-            tally.deferred += 1;
-            console.warn(`task issue sync: closing ${tomb.sourceRef} deferred`, error);
-          }
+          items.push({
+            label: `closing ${tomb.sourceRef}`,
+            run: async () => {
+              tally.tombstones += 1;
+              const outcome = await settle(tomb.teamId, tomb.sourceRef, {
+                state: 'closed',
+                stateReason: 'not_planned',
+                comment: tomb.comment,
+              });
+              tally[outcome] += 1;
+              if (outcome !== 'deferred') {
+                deps.db.delete(taskIssueClose).where(eq(taskIssueClose.id, tomb.id)).run();
+              }
+            },
+          });
         }
         for (const row of divergentRows(deps)) {
-          if (!budget()) break;
           const desired = desiredIssue(deps, row);
-          if (desired === null || desired === 'wait' || row.sourceRef === null) continue;
-          tally.rows += 1;
+          const sourceRef = row.sourceRef;
+          if (desired === null || desired === 'wait' || sourceRef === null) continue;
+          items.push({
+            label: `settling ${sourceRef}`,
+            run: async () => {
+              tally.rows += 1;
+              const outcome = await settle(row.teamId, sourceRef, desired);
+              tally[outcome] += 1;
+              if (outcome === 'deferred') return;
+              deps.db
+                .update(todo)
+                .set({ issueState: desired.state })
+                .where(and(eq(todo.id, row.id), eq(todo.sourceRef, sourceRef)))
+                .run();
+            },
+          });
+        }
+        for (const item of items) {
+          if (attempts >= TASK_ISSUE_WRITES_PER_SWEEP) break;
+          attempts += 1;
           try {
-            const outcome = await settle(row.teamId, row.sourceRef, desired);
-            tally[outcome] += 1;
-            if (outcome === 'deferred') continue;
-            deps.db
-              .update(todo)
-              .set({ issueState: desired.state })
-              .where(and(eq(todo.id, row.id), eq(todo.sourceRef, row.sourceRef)))
-              .run();
+            await item.run();
           } catch (error) {
             tally.deferred += 1;
-            console.warn(`task issue sync: settling ${row.sourceRef} deferred`, error);
+            console.warn(`task issue sync: ${item.label} deferred`, error);
+            if (isRateLimited(error)) break;
           }
         }
       } finally {

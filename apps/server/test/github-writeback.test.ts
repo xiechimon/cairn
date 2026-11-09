@@ -923,6 +923,66 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     s.dispose();
   });
 
+  test('a done task forgets its recorded state, so reactivating it reopens the issue its merge closed', async () => {
+    const mock = lifecycleMock('closed');
+    const { s, id, sync } = await startedTask(mock);
+    setRow(s, id, { phase: 'done', lastRunAt: 5 });
+    await sync.sweep();
+    expect(s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.issueState).toBeNull();
+    expect((await call(s.app, 'POST', `/api/todos/${id}/reset`, { body: {} })).status).toBeLessThan(
+      300,
+    );
+    await sync.sweep();
+    expect(writes(mock)).toEqual([{ state: 'open', state_reason: 'reopened' }]);
+    s.dispose();
+  });
+
+  test('failed writes count against the per-sweep budget', async () => {
+    const mock = lifecycleMock();
+    const { s, sync } = await startedTask(mock);
+    for (let n = 0; n < TASK_ISSUE_WRITES_PER_SWEEP + 10; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-${n}`,
+          teamId: s.team.id,
+          sourceRef: `github:${REPO}#101`,
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+    }
+    mock.set(`PATCH ${issuePath(101)}`, { status: 502, body: { message: 'bad gateway' } });
+    await sync.sweep();
+    expect(comments(mock)).toHaveLength(TASK_ISSUE_WRITES_PER_SWEEP);
+    s.dispose();
+  });
+
+  test('a rate limit stops the sweep at once', async () => {
+    const mock = lifecycleMock();
+    const { s, sync } = await startedTask(mock);
+    for (let n = 0; n < 5; n++) {
+      s.db
+        .insert(taskIssueCloseTable)
+        .values({
+          id: `tomb-${n}`,
+          teamId: s.team.id,
+          sourceRef: `github:${REPO}#101`,
+          comment: 'x',
+          createdAt: n,
+        })
+        .run();
+    }
+    mock.set(`POST ${issuePath(101)}/comments`, {
+      status: 429,
+      body: { message: 'rate limited' },
+      headers: { 'retry-after': '60' },
+    });
+    await sync.sweep();
+    expect(mock.callsTo('POST', `${issuePath(101)}/comments`)).toHaveLength(1);
+    s.dispose();
+  });
+
   test('an issue GitHub reports gone (410) is recorded and not retried', async () => {
     const mock = lifecycleMock();
     const { s, id, sync } = await startedTask(mock);
