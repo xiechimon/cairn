@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
 
@@ -66,22 +66,19 @@ export function lastTurnContext(
     .select({ tokens: chiefTurnUsage.contextTokens, model: chiefTurnUsage.model })
     .from(chiefTurnUsage)
     .where(
-      and(
-        isNotNull(chiefTurnUsage.contextTokens),
-        threadId !== undefined
-          ? eq(chiefTurnUsage.threadId, threadId)
-          : inArray(
-              chiefTurnUsage.threadId,
-              db
-                .select({ id: chiefThread.id })
-                .from(chiefThread)
-                .where(eq(chiefThread.chiefId, chiefRow.id)),
-            ),
-      ),
+      threadId !== undefined
+        ? eq(chiefTurnUsage.threadId, threadId)
+        : inArray(
+            chiefTurnUsage.threadId,
+            db
+              .select({ id: chiefThread.id })
+              .from(chiefThread)
+              .where(eq(chiefThread.chiefId, chiefRow.id)),
+          ),
     )
     .orderBy(desc(chiefTurnUsage.createdAt))
     .get();
-  if (last?.tokens == null) return null;
+  if (last == null || last.tokens == null) return null;
   return {
     tokens: last.tokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),

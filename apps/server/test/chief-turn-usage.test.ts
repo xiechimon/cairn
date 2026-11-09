@@ -345,10 +345,29 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     });
   });
 
-  test('flag on: a turn without contextTokens (claude-code) leaves the meter on the last known value or empty', async () => {
+  test('flag on: a turn without contextTokens (claude-code) leaves the meter empty', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-cc');
     await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'success',
+      usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+  });
+
+  test('flag on: a later turn without contextTokens hides the meter instead of keeping the prior percent', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-prior-ctx');
+    await finishStep(deps(), machineId, 'turn-prior-ctx', {
+      status: 'success',
+      usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 1810,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    claimedStep(machineId, 'turn-no-ctx', { createdAt: Date.now() + 5 });
+    await finishStep(deps(), machineId, 'turn-no-ctx', {
       status: 'success',
       usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
     });
