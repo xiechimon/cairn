@@ -296,7 +296,9 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     );
     expect(
       prompts.some((p) =>
-        p.startsWith(`[wake:gate] ${provenance}${ref} 停驻在 review 关口，等人处理。`),
+        p.startsWith(
+          `[wake:gate] ${provenance}${ref} 已交付工作分支上的改动（没有可合并的 PR），验收归你，不归用户：`,
+        ),
       ),
     ).toBe(true);
     for (const prompt of prompts) expect(prompt).not.toContain('【GitHub issue 原文');
