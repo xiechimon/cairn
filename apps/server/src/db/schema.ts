@@ -374,6 +374,7 @@ export const computer = sqliteTable(
     controlLeaseExpiresAt: epochMs('controlLeaseExpiresAt'),
     controlFence: integer('controlFence').notNull().default(0),
     screenGeneration: integer('screenGeneration').notNull().default(0),
+    browserEnabled: bool('browserEnabled').notNull().default(false),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
   },

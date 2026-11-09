@@ -4,16 +4,18 @@ import {
   COMPUTER_FEED_TOOLS,
   type ComputerCommand,
   type ComputerRecord,
+  chiefIdFormat,
 } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, computerCall, machine } from '../db/schema.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   computerCallOwnerUserId,
   ownedPrivateComputer,
   privateComputerWhere,
 } from './computer-access.js';
-import { feedOf } from './machine-computer.js';
+import { computerMachineName, feedOf } from './machine-computer.js';
 
 export function clampCommandsLimit(raw: string | undefined): number {
   const asked = Number(raw);
@@ -34,8 +36,90 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
       scopeKey: row.scopeKey,
       state: row.state,
       controlHolder: row.controlHolder,
+      browserEnabled: row.browserEnabled,
       machine: { id: row.machineId, name: machineName, online: machineOnline },
     }));
+}
+
+function machineOffersBrowser(
+  row: typeof machine.$inferSelect | undefined,
+): row is typeof machine.$inferSelect {
+  return row !== undefined && row.capabilities?.browser === true;
+}
+
+export function setComputerBrowserEnabled(
+  db: Db,
+  teamId: string,
+  userId: string,
+  computerId: string,
+  browserEnabled: boolean,
+): ComputerRecord | null {
+  const owned = ownedPrivateComputer(db, teamId, userId, computerId);
+  if (!owned) return null;
+  if (browserEnabled) {
+    const host = db.select().from(machine).where(eq(machine.id, owned.machineId)).get();
+    if (!machineOffersBrowser(host)) return null;
+  }
+  db.update(computer)
+    .set({ browserEnabled, updatedAt: nowMs() })
+    .where(eq(computer.id, computerId))
+    .run();
+  return listComputers(db, teamId, userId).find((row) => row.id === computerId) ?? null;
+}
+
+export type EnsureComputerBrowserResult =
+  | { ok: true; computer: ComputerRecord }
+  | { ok: false; reason: 'missing_machine' | 'unsupported' | 'machine_mismatch' };
+
+export function ensureComputerBrowserEnabled(
+  db: Db,
+  teamId: string,
+  userId: string,
+  machineId: string,
+  browserEnabled: boolean,
+): EnsureComputerBrowserResult {
+  const host = db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.id, machineId), eq(machine.teamId, teamId)))
+    .get();
+  if (host === undefined) return { ok: false, reason: 'missing_machine' };
+  if (browserEnabled && !machineOffersBrowser(host)) {
+    return { ok: false, reason: 'unsupported' };
+  }
+  const scopeKey = `chief:${chiefIdFormat(userId, teamId)}`;
+  const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
+  const now = nowMs();
+  if (existing === undefined) {
+    if (!browserEnabled) return { ok: false, reason: 'missing_machine' };
+    const id = newRecordId();
+    db.insert(computer)
+      .values({
+        id,
+        teamId,
+        scopeKey,
+        machineId,
+        providerRef: computerMachineName(scopeKey),
+        state: 'stopped',
+        browserEnabled,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const created = listComputers(db, teamId, userId).find((row) => row.id === id);
+    if (created === undefined) return { ok: false, reason: 'missing_machine' };
+    return { ok: true, computer: created };
+  }
+  if (existing.machineId !== machineId) {
+    return { ok: false, reason: 'machine_mismatch' };
+  }
+  db.update(computer)
+    .set({ browserEnabled, updatedAt: now })
+    .where(eq(computer.id, existing.id))
+    .run();
+  const updated = listComputers(db, teamId, userId).find((row) => row.id === existing.id);
+  if (updated === undefined) return { ok: false, reason: 'missing_machine' };
+  return { ok: true, computer: updated };
 }
 
 export function recentComputerCommands(
