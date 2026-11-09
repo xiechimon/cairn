@@ -1,3 +1,4 @@
+import type { StepPromptOrigin } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -66,7 +67,7 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
     case 'user':
       return 'mt-4';
     default:
-      return '';
+      return prev?.kind === 'step-prompt' ? 'mt-1.5' : '';
   }
 }
 
@@ -232,6 +233,8 @@ function Row({
           {t(item.text)}
         </StatusLine>
       );
+    case 'step-prompt':
+      return <StepPromptRow item={item} t={t} />;
     case 'scheduled':
       return (
         <div
@@ -630,15 +633,87 @@ function FailRow({
           .join('\n')}
         t={t}
       />
-      <DialogShell title={t('原始错误')} open={rawOpen} onClose={() => setRawOpen(false)} size="l">
-        <pre
-          className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
-          data-testid="fail-raw-error"
-        >
-          {item.raw ?? item.title}
-        </pre>
-      </DialogShell>
+      <RawTextDialog
+        title={t('原始错误')}
+        text={item.raw ?? item.title}
+        open={rawOpen}
+        onClose={() => setRawOpen(false)}
+        testId="fail-raw-error"
+      />
     </div>
+  );
+}
+
+function RawTextDialog({
+  title,
+  text,
+  open,
+  onClose,
+  testId,
+}: {
+  title: string;
+  text: string;
+  open: boolean;
+  onClose: () => void;
+  testId: string;
+}) {
+  return (
+    <DialogShell title={title} open={open} onClose={onClose} size="l">
+      <pre
+        className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+        data-testid={testId}
+      >
+        {text}
+      </pre>
+    </DialogShell>
+  );
+}
+
+function stepPromptLine(origin: StepPromptOrigin, t: TFunc): string {
+  switch (origin.kind) {
+    case 'ci-fix': {
+      const vars = { round: origin.round, max: origin.roundsMax };
+      return origin.trigger === 'pre-push'
+        ? t('CI 修复第 {round}/{max} 轮：推送前检查未通过', vars)
+        : t('CI 修复第 {round}/{max} 轮：CI 检查未通过', vars);
+    }
+    case 'merge-conflict':
+      return t('解冲突第 {round}/{max} 轮：PR 与默认分支冲突', {
+        round: origin.round,
+        max: origin.roundsMax,
+      });
+    case 'rework':
+      return t('按反馈返工，继续本会话');
+  }
+}
+
+function StepPromptRow({
+  item,
+  t,
+}: {
+  item: Extract<TranscriptItem, { kind: 'step-prompt' }>;
+  t: TFunc;
+}) {
+  const [rawOpen, setRawOpen] = useState(false);
+  const log = item.origin.kind === 'ci-fix';
+  return (
+    <StatusLine className="mt-5" testId="transcript-step-prompt">
+      {stepPromptLine(item.origin, t)}
+      <Button
+        variant="ghost"
+        className="ml-2 h-6 cursor-pointer rounded-none border-none bg-transparent p-0 align-baseline text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent dark:hover:text-(--foreground)"
+        onClick={() => setRawOpen(true)}
+      >
+        {log ? t('查看原始日志') : t('查看完整指令')}
+      </Button>
+      <RawTextDialog
+        title={log ? t('原始日志') : t('完整指令')}
+        text={item.raw}
+        open={rawOpen}
+        onClose={() => setRawOpen(false)}
+        testId="step-prompt-raw"
+      />
+    </StatusLine>
   );
 }
 

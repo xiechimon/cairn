@@ -11,6 +11,7 @@ import type {
   SecretBox,
   StepJournalRow,
   StepKind,
+  StepPromptOrigin,
   StepRecord,
   TriggerSource,
   UserRecord,
@@ -1017,6 +1018,7 @@ export function enqueueStep(
   prompt?: string,
   freshSession?: boolean,
   byPerson?: boolean,
+  promptOrigin?: StepPromptOrigin,
 ): StepRecord {
   const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (byPerson !== true && current && retryIsParked(current.errorMessage ?? ''))
@@ -1032,6 +1034,7 @@ export function enqueueStep(
       machineId: null,
       status: 'pending',
       prompt: prompt ?? null,
+      promptOrigin: promptOrigin ?? null,
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
@@ -1103,6 +1106,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
     ...(r.status === 'waiting_quota' && r.quotaBlock !== null
       ? { quotaWait: toQuotaWait(r.quotaBlock) }
       : {}),
+    ...(r.promptOrigin !== null ? { promptOrigin: r.promptOrigin } : {}),
   }));
 }
 
@@ -1746,6 +1750,7 @@ export async function applyBuildStepAction(
       `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
       false,
       origin === 'person',
+      { kind: 'rework' },
     );
     return;
   }
