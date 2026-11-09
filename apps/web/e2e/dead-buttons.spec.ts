@@ -7,7 +7,7 @@ test('feedback route is gone — old URL redirects to the home', async ({ page }
   await expect(page.locator('[data-route="feedback"]')).toHaveCount(0);
 });
 
-test('project files pane: no export button, static branch chip, wired `文件|历史` segment', async ({
+test('project files pane: no export button, static branch chip, no history segment', async ({
   page,
 }) => {
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24');
@@ -19,16 +19,8 @@ test('project files pane: no export button, static branch chip, wired `文件|�
   await expect(chip).toContainText('main');
   expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
 
-  const segTabs = page.locator('.prj-files-seg-tab');
-  await expect(segTabs).toHaveCount(2);
-  await segTabs.nth(1).click();
-  await expect(segTabs.nth(1)).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.prj-history-row').first()).toBeVisible();
-  await expect(page.locator('.prj-file-row')).toHaveCount(0);
-  await segTabs.nth(0).click();
-  await expect(segTabs.nth(0)).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.prj-files-seg-tab')).toHaveCount(0);
   await expect(page.locator('.prj-file-row').first()).toBeVisible();
-  await expect(page.locator('.prj-history-row')).toHaveCount(0);
 });
 
 test('schedules empty state drops the `查看文档` button; `新建定时` really opens and saves (#149, #1037)', async ({

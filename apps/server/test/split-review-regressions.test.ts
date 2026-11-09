@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { team } from '../src/db/schema.js';
 import { homeMachineRejectReason } from '../src/services/dispatch-eligibility.js';
-import { bootServer, req } from './helpers.js';
+import { bootServer, req, teamPausedForTest } from './helpers.js';
 
 const selectedModel = { provider: 'claude-code', modelId: 'selected' };
 
@@ -35,8 +35,8 @@ test('pause-only PATCH preserves every first-PR field, including dismissal and r
     ).toBe(200);
     expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()).toEqual({
       ...before,
-      autonomyPaused: true,
     });
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(true);
   } finally {
     s.dispose();
   }

@@ -12,6 +12,7 @@ vi.setConfig({ testTimeout: 60_000 });
 const serverDir = resolve(import.meta.dirname, '..');
 const repoRoot = resolve(serverDir, '../..');
 const TOKEN = 'container-test-token-0123456789abcdef';
+const RELAYED = { headers: { via: '1.1 relay.example' } };
 const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
 
 const children: ChildProcess[] = [];
@@ -164,7 +165,7 @@ describe('container mode: CAIRN_REQUIRE_TOKEN', () => {
     const booted = await boot({});
     await untilOnline(booted);
     const base = `http://127.0.0.1:${booted.port}`;
-    expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
+    expect((await fetch(`${base}/api/user/me`, RELAYED)).status).toBe(401);
     expect(booted.output()).not.toMatch(CJK);
   });
 });
@@ -189,7 +190,10 @@ describe('#2057 safe bare-server defaults on a real process', () => {
     const booted = await boot({ HOST: undefined });
     await untilOnline(booted);
     const base = `http://127.0.0.1:${booted.port}`;
-    expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
+    expect((await fetch(`${base}/api/user/me`, RELAYED)).status).toBe(401);
+    expect((await fetch(`${base}/api/user/me`)).status).toBe(
+      process.platform === 'linux' ? 200 : 401,
+    );
     const tokenPath = join(booted.home, ACCESS_TOKEN_FILE_NAME);
     expect(statSync(tokenPath).mode & 0o777).toBe(0o600);
     const token = storedToken(booted.home);
@@ -251,7 +255,7 @@ describe('#2057 safe bare-server defaults on a real process', () => {
     const booted = await boot({ HOST: '0.0.0.0', CAIRN_TOKEN: TOKEN });
     await untilOnline(booted);
     const base = `http://127.0.0.1:${booted.port}`;
-    expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
+    expect((await fetch(`${base}/api/user/me`, RELAYED)).status).toBe(401);
     expect(
       (await fetch(`${base}/api/user/me`, { headers: { authorization: `Bearer ${TOKEN}` } }))
         .status,
@@ -293,7 +297,9 @@ describe('#2057 safe bare-server defaults on a real process', () => {
     });
     expect(stream.status).toBe(200);
     controller.abort();
-    expect((await fetch(`${base}/api/teams/${teamId}/stream?token=wrong`)).status).toBe(401);
+    expect((await fetch(`${base}/api/teams/${teamId}/stream?token=wrong`, RELAYED)).status).toBe(
+      401,
+    );
     const callback = await fetch(`${base}/api/oauth/callback?code=x&state=bogus`, {
       redirect: 'manual',
     });

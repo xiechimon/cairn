@@ -199,7 +199,7 @@ describe('gate 1 (B-C10): plan step with no plan document -> confirm unreachable
 });
 
 describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -> review unreachable', () => {
-  test('done success + hasChanges=false -> failure wrap-up "build produced zero changes"', async () => {
+  test('done success + hasChanges=false -> needs_input with a no-change question for the Coordinator (task stall S12)', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -211,9 +211,14 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
         hasChanges: false,
         sessionId: 'pi-b1',
       });
-      expect(w.todoRow().phase).toBe('failed');
-      expect(w.buildRow(buildId).errorMessage).toBe('构建零改动');
-      expect(w.stepRow(buildStep.step.id).status).toBe('failed');
+      expect(w.todoRow().phase).toBe('needs_input');
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
+      expect(w.stepRow(buildStep.step.id).status).toBe('done');
+      expect(
+        w
+          .messagesOf(buildId)
+          .some((m) => String(JSON.stringify(m.content)).includes('Not delivered')),
+      ).toBe(true);
     } finally {
       w.s.dispose();
     }
@@ -248,7 +253,7 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
     }
   });
 
-  test('failure mode 3 (B-C14 fake-completion shape): done success with zero artifact and zero errorMessage -> wrapped up as failure', async () => {
+  test('failure mode 3 (B-C14 fake-completion shape): done success with zero artifact never reaches review', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -258,9 +263,8 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
         hasChanges: false,
         sessionId: 'pi-b4',
       });
-      expect(w.todoRow().phase).toBe('failed');
-      expect(w.stepRow(buildStep.step.id).status).toBe('failed');
-      expect(w.buildRow(buildId).errorMessage).toBe('构建零改动');
+      expect(w.todoRow().phase).toBe('needs_input');
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
     } finally {
       w.s.dispose();
     }
@@ -368,7 +372,7 @@ describe('gate 2 drift naming (#1195): branch drift is no longer "build produced
     }
   });
 
-  test('failure mode 9: legacy daemon payload (no drift field) -> "build produced zero changes" unchanged', async () => {
+  test('failure mode 9: legacy daemon payload (no drift field) -> the zero-change question, not review', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -378,7 +382,8 @@ describe('gate 2 drift naming (#1195): branch drift is no longer "build produced
         hasChanges: false,
         sessionId: 'pi-d3',
       });
-      expect(w.buildRow(buildId).errorMessage).toBe('构建零改动');
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
+      expect(w.todoRow().phase).toBe('needs_input');
     } finally {
       w.s.dispose();
     }
@@ -496,7 +501,7 @@ describe('build step fallback report (#1492)', () => {
     }
   });
 
-  test('artifact-gate failure (build produced zero changes) also writes a fallback report', async () => {
+  test('a zero-change end writes no failure report: it is a question, not a failure', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -505,7 +510,8 @@ describe('build step fallback report (#1492)', () => {
       const report = w
         .messagesOf(buildId)
         .find((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
-      expect(String(report?.content)).toContain('构建零改动');
+      expect(report).toBeUndefined();
+      expect(w.todoRow().phase).toBe('needs_input');
     } finally {
       w.s.dispose();
     }

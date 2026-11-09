@@ -7,9 +7,9 @@
   "squareBoxes": [
     {
       "file": "apps/web/src/chief/chief-settings.tsx",
-      "anchor": "rounded-none border-0 border-b border-border",
+      "anchor": "rounded-none border-0 text-left",
       "kind": "deviation",
-      "reason": "Coordinator 设置 agent row (#1398): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule, and a divider on a rounded box would curl up at both ends, so the box stays square. Its paint is that one bottom rule; the card's --radius-card corners stay the visible shape."
+      "reason": "Coordinator settings Model and machine row: a full-width Button deep-link inside the settings card. The Button's transparent border would hide the card's divide-y rule on a multi-row card, and a radius on the button would curl the card corners, so the box stays square. The card's --radius-card corners stay the visible shape."
     },
     {
       "file": "apps/web/src/resources/parts.tsx",

@@ -12,6 +12,7 @@ import type { FetchLike } from '../src/lib/github.js';
 import {
   addChiefWatch,
   composeChiefSystemPrompt,
+  enqueueOwnershipWake,
   triggerChiefWakes,
   wakeFacts,
 } from '../src/services/chief.js';
@@ -221,10 +222,12 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     const res = await call(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
     expect(res.status).toBe(201);
     const threadId = ((await res.json()) as { thread: { id: string } }).thread.id;
-    for (const phase of ['confirm', 'review', 'failed', 'done'] as const) {
+    for (const phase of ['review', 'failed', 'done'] as const) {
+      s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, todoId)).run();
       const record = getTodo(deps(), todoId)!;
       addChiefWatch(deps(), { teamId: s.team.id, todo: record, projectName: 'alpha', threadId });
-      triggerChiefWakes(deps(), { ...record, phase }, phase);
+      if (phase === 'done') triggerChiefWakes(deps(), record, phase);
+      else enqueueOwnershipWake(deps(), record, phase);
     }
     const prompts = s.db
       .select()
@@ -235,7 +238,6 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
       .filter((p) => p.startsWith('[wake:'));
     expect(prompts.map((p) => /^\[wake:(\w+)\]/.exec(p)?.[1]).sort()).toEqual([
       'failed',
-      'gate',
       'gate',
       'settle',
     ]);
@@ -257,7 +259,7 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     }
   }
 
-  test('W1: gate / settle / failed three wakes all carry the title only inside the fence, instruction sentence writes only the #number', async () => {
+  test('W1: gate / settle / failed wakes all carry the title only inside the fence, instruction sentence writes only the #number', async () => {
     const todoId = await importIssue();
     const prompts = await wakePrompts(todoId);
     const { seqNum } = getTodo(deps(), todoId)!;
@@ -292,11 +294,13 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     expect(prompts).toContain(
       `[wake:failed] ${provenance}${ref} 运行失败。请先调用 machines 等工具核实环境；需要用户决定或动手时，用 ask_user 或 notify_user 做法证式说明（失败原因/定性/工作保全位置/环境建议），否则不发消息。`,
     );
-    for (const head of [`停驻在 confirm 关口，等人处理。`, `停驻在 review 关口，等人处理。`]) {
-      expect(prompts.some((p) => p.startsWith(`[wake:gate] ${provenance}${ref} ${head}`))).toBe(
-        true,
-      );
-    }
+    expect(
+      prompts.some((p) =>
+        p.startsWith(
+          `[wake:gate] ${provenance}${ref} 已交付工作分支上的改动（没有可合并的 PR），验收归你，不归用户：`,
+        ),
+      ),
+    ).toBe(true);
     for (const prompt of prompts) expect(prompt).not.toContain('【GitHub issue 原文');
     const plain = getTodo(deps(), id)!;
     for (const source of [

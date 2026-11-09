@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
+import { type CommitIdentityPolicy, localCommitViolation } from '@cairn/shared';
 import { afterEach, expect, expectTypeOf, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../src/config.js';
@@ -10,11 +12,7 @@ import {
   tokenValue,
   type UserToken,
 } from '../src/lib/github-token.js';
-import {
-  appCommitIdentity,
-  appGithubFetch,
-  appTokenOrNull,
-} from '../src/services/github-app-token.js';
+import { appGithubFetch, appTokenOrNull } from '../src/services/github-app-token.js';
 import * as connection from '../src/services/github-connection.js';
 
 const repo = { owner: 'octo', repo: 'alpha' };
@@ -66,6 +64,8 @@ test('unconfigured and missing sockets return structured reasons without throwin
   vi.stubEnv('CAIRN_APP_TOKEN_SOCKET', '');
   expect(loadConfig().githubAppTokenSocket).toBeNull();
   vi.stubEnv('CAIRN_APP_TOKEN_SOCKET', '/configured/app.sock');
+  vi.stubEnv('CAIRN_GITHUB_APP_SLUG', 'cairnwright');
+  vi.stubEnv('CAIRN_GITHUB_APP_BOT_ID', '347615582');
   expect(loadConfig().githubAppTokenSocket).toBe('/configured/app.sock');
   expect(
     await appTokenOrNull({ config: { githubAppTokenSocket: null }, onReason }, repo),
@@ -376,46 +376,38 @@ test('step minimum validity forces the mint to replace a near-expiry cached inst
   expect(refreshes).toEqual([false, true]);
 });
 
-test('the software commit identity is the App bot user, looked up once per slug', async () => {
-  const { deps } = await mint();
-  const fetch = vi.fn(async (input: string | URL) =>
-    String(input).includes('/installation/repositories')
-      ? installed()
-      : Response.json({ login: 'cairnwright[bot]', id: 347615582, type: 'Bot' }),
-  );
-  vi.stubGlobal('fetch', fetch);
-  const identity = {
+test('the App commit identity comes from configuration, never from a minted token', () => {
+  vi.stubEnv('CAIRN_AUTH', 'off');
+  vi.stubEnv('CAIRN_APP_TOKEN_SOCKET', '');
+  vi.stubEnv('CAIRN_GITHUB_APP_SLUG', '');
+  vi.stubEnv('CAIRN_GITHUB_APP_BOT_ID', '');
+  expect(loadConfig().githubAppIdentity).toBeNull();
+  vi.stubEnv('CAIRN_GITHUB_APP_SLUG', 'cairnwright');
+  vi.stubEnv('CAIRN_GITHUB_APP_BOT_ID', '347615582');
+  const identity = loadConfig().githubAppIdentity;
+  expect(identity).toEqual({
     name: 'cairnwright[bot]',
     email: '347615582+cairnwright[bot]@users.noreply.github.com',
-  };
-  expect(await appCommitIdentity(deps)).toEqual(identity);
-  expect(await appCommitIdentity(deps)).toEqual(identity);
-  expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([
-    'https://api.github.com/installation/repositories?per_page=100&page=1',
-    'https://api.github.com/users/cairnwright%5Bbot%5D',
-  ]);
+  });
+  if (identity === null) throw new Error('identity expected');
+  const policy = JSON.parse(
+    readFileSync(new URL('../../../packages/shared/commit-identity.json', import.meta.url), 'utf8'),
+  ) as CommitIdentityPolicy;
+  expect(localCommitViolation(policy, identity, identity, {})).toBeNull();
+  expect(localCommitViolation(policy, identity, identity, { CAIRN_STEP_ID: 'step' })).toBeNull();
 });
 
-test('without an App there is no software identity, and a configured App that fails is an error', async () => {
-  expect(await appCommitIdentity({ config: { githubAppTokenSocket: null } })).toBeNull();
-  await expect(
-    appCommitIdentity({ config: { githubAppTokenSocket: '/missing/app.sock' } }),
-  ).rejects.toThrow();
-  const { deps } = await mint({
-    payload: {
-      token: 'x',
-      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-      installationId: 1,
-      appSlug: 'other-app',
-    },
-  });
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (input: string | URL) =>
-      String(input).includes('/installation/repositories')
-        ? installed()
-        : Response.json({ login: 'someone-else', id: 1, type: 'User' }),
-    ),
-  );
-  await expect(appCommitIdentity(deps)).rejects.toThrow(/other-app\[bot\]/);
+test('a half-configured App identity, or a token socket without one, refuses to start', () => {
+  vi.stubEnv('CAIRN_AUTH', 'off');
+  vi.stubEnv('CAIRN_APP_TOKEN_SOCKET', '');
+  vi.stubEnv('CAIRN_GITHUB_APP_SLUG', 'cairnwright');
+  vi.stubEnv('CAIRN_GITHUB_APP_BOT_ID', '');
+  expect(() => loadConfig()).toThrow(/CAIRN_GITHUB_APP_BOT_ID/);
+  vi.stubEnv('CAIRN_GITHUB_APP_SLUG', 'cairnwright');
+  vi.stubEnv('CAIRN_GITHUB_APP_BOT_ID', 'not-a-number');
+  expect(() => loadConfig()).toThrow();
+  vi.stubEnv('CAIRN_GITHUB_APP_SLUG', '');
+  vi.stubEnv('CAIRN_GITHUB_APP_BOT_ID', '');
+  vi.stubEnv('CAIRN_APP_TOKEN_SOCKET', '/configured/app.sock');
+  expect(() => loadConfig()).toThrow(/CAIRN_GITHUB_APP_SLUG/);
 });

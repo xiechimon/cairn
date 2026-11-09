@@ -1,12 +1,5 @@
 import { useSearchParams } from 'react-router';
-import {
-  useMachines,
-  useMembers,
-  useProjectFiles,
-  useProjects,
-  useSkills,
-  useTodos,
-} from '../api/hooks.js';
+import { useMachines, useProjectFiles, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -19,7 +12,6 @@ export function useThreadMentions(projectId: string | undefined): {
   const { live, teamId } = useLiveData();
   const [searchParams] = useSearchParams();
   const todosQ = useTodos(teamId, live);
-  const membersQ = useMembers(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const skillsQ = useSkills(teamId, live);
   const machinesQ = useMachines(teamId, live);
@@ -33,14 +25,7 @@ export function useThreadMentions(projectId: string | undefined): {
           seq: t.seqNum,
           subtitle: t.phase,
         })),
-        agent: (membersQ.data ?? [])
-          .filter((m) => m.memberType === 'agent')
-          .map((m) => ({
-            id: m.actorId,
-            label: (m.actor as { displayName?: string } | undefined)?.displayName ?? m.actorId,
-            subtitle:
-              (m.actor as { description?: string | null } | undefined)?.description ?? undefined,
-          })),
+        agent: [],
         project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
         skill: (skillsQ.data ?? []).map((s) => ({
           id: s.id,

@@ -10,7 +10,7 @@ import {
   ticketDedupeKey,
   ticketDedupeMarker,
 } from '@cairn/shared';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -20,7 +20,6 @@ import {
   gateVerdict,
   message,
   step,
-  team,
   todo,
 } from '../db/schema.js';
 import { githubCreateIssue } from '../lib/github.js';
@@ -50,9 +49,9 @@ import { type GateVerdictView, isFullSha, mergeReadiness } from './merge-gate/re
 import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdict-line.js';
 import { githubGatePort } from './merge-gate-github.js';
 import { effectiveModel } from './model-fallback.js';
+import { reconcileOwners } from './owner.js';
 import { projectMergeConfigOf } from './projects.js';
 import { coordinatorProfile, profileForStep, routeForStep } from './routing-rules.js';
-import { notifyEvaluatedReview, pendingReviewPushEntry } from './thread-push.js';
 import { insertMessageRow } from './transcript.js';
 
 export const MERGE_GATE_RUN_KIND = 'merge_gate_run';
@@ -108,7 +107,6 @@ export async function evaluateMergeGate(
   if (buildRow?.prNumber == null) return null;
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (todoRow === undefined) return null;
-  const reviewPushEntry = pendingReviewPushEntry(deps, buildId);
   const projectRow = projectOfTodo(deps.db, todoRow);
   const repo = githubRepoOfProject(projectRow);
   if (repo === null || projectRow === undefined) return null;
@@ -138,8 +136,6 @@ export async function evaluateMergeGate(
           opts.now ?? nowMs(),
         )
       : false;
-  if (githubPaused && cache.autonomyPause.get(`${repo.owner}/${repo.repo}`)?.paused === true)
-    deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, todoRow.teamId)).run();
   const harness = deps.harnessEval ?? productionHarnessEvalConfig();
   const facts = await readGateGithubFacts(
     port,
@@ -417,7 +413,7 @@ export async function evaluateMergeGate(
       },
     })
     .run();
-  notifyEvaluatedReview(deps, buildId, readiness, reviewPushEntry);
+  reconcileOwners(deps, [todoRow.id]);
   const plan = planGateStatusWrite({
     policy: readiness.policy,
     readiness,
@@ -432,13 +428,19 @@ export async function evaluateMergeGate(
   const latestReview = reviewSteps.at(-1);
   if (latestReview !== undefined && latestReview.status === 'done') {
     const modelId = reviewModelOf(latestReview);
+    const reviewRowPrefix = `msg-${latestReview.id}-`;
     const rawOutput = deps.db
       .select()
       .from(message)
-      .where(eq(message.conversationId, buildId))
+      .where(
+        and(
+          eq(message.conversationId, buildId),
+          eq(message.role, 'assistant'),
+          eq(sql`substr(${message.id}, 1, ${reviewRowPrefix.length})`, reviewRowPrefix),
+        ),
+      )
       .orderBy(asc(message.createdAt))
       .all()
-      .filter((row) => row.role === 'assistant')
       .map((row) => (typeof row.content === 'string' ? row.content : JSON.stringify(row.content)))
       .join('\n');
     const storedReview = stored.find((item) => item.stepId === latestReview.id);

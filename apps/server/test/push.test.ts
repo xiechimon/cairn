@@ -13,6 +13,7 @@ import {
 import { createServer, type Server } from 'node:https';
 import { dirname, join } from 'node:path';
 import { pushSubscriptionBodySchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -23,6 +24,7 @@ import {
   chiefThread,
   pushDigestItem,
   pushSubscription,
+  todo as todoTable,
 } from '../src/db/schema.js';
 import { finishTodoDone } from '../src/services/builds.js';
 import { createOrGetQuestion } from '../src/services/chief-questions.js';
@@ -149,8 +151,11 @@ async function subscribe(
   if (res.status !== 201) throw new Error(`subscribe: ${res.status}`);
 }
 
-async function makeTodo(s: ReturnType<typeof bootServer>) {
-  const projectId = await postProject(s.app);
+async function makeTodo(
+  s: ReturnType<typeof bootServer>,
+  mergePolicy: 'human' | 'autonomous' = 'human',
+) {
+  const projectId = await postProject(s.app, 'demo', { mergePolicy });
   const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: '写周报',
     spec: '',
@@ -800,7 +805,7 @@ describe('phase pushes reach only needs-human events (#1784); 410 prunes', () =>
     return s.db.select().from(pushDigestItem).all();
   }
 
-  test('PATCH todo phase to confirm with no open decision sends and queues nothing', async () => {
+  test('PATCH todo phase to confirm pushes once to the person and queues no digest', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
@@ -808,8 +813,7 @@ describe('phase pushes reach only needs-human events (#1784); 410 prunes', () =>
       const todo = await makeTodo(s);
       const response = await req(s.app, 'PATCH', `/api/todos/${todo.id}`, { phase: 'confirm' });
       expect(response.status).toBe(200);
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(fake.requests).toHaveLength(0);
+      await expect.poll(() => fake.requests.length, { timeout: 1500 }).toBe(1);
       expect(digestRows(s)).toHaveLength(0);
     } finally {
       fake.close();
@@ -822,9 +826,8 @@ describe('phase pushes reach only needs-human events (#1784); 410 prunes', () =>
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
       await subscribe(s.app, s.team.id, fake.endpoint('/review'), 'https://cairn.example');
-      const todo = await makeTodo(s);
-      setTodoPhase(s.svc, todo.id, 'confirm');
-      setTodoPhase(s.svc, todo.id, 'building');
+      const todo = await makeTodo(s, 'autonomous');
+      s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, todo.id)).run();
       setTodoPhase(s.svc, todo.id, 'review');
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(fake.requests).toHaveLength(0);
@@ -874,8 +877,7 @@ describe('phase pushes reach only needs-human events (#1784); 410 prunes', () =>
     try {
       await subscribe(s.app, s.team.id, fake.endpoint('/failed'), 'https://cairn.example');
       const todo = await makeTodo(s);
-      setTodoPhase(s.svc, todo.id, 'confirm');
-      setTodoPhase(s.svc, todo.id, 'building');
+      s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, todo.id)).run();
       setTodoPhase(s.svc, todo.id, 'failed');
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(fake.requests).toHaveLength(0);

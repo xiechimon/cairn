@@ -132,6 +132,19 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
     expect(keys.some((f) => f.queryKey?.[0] === 'plans')).toBe(true);
   });
 
+  it('a Coordinator message refreshes the Tasks read, where its questions are listed', () => {
+    const qc = freshClient();
+    const invalidate = vi.spyOn(qc, 'invalidateQueries');
+    const es = startStream(qc);
+    es.push({
+      type: 'message',
+      message: { id: 'm-q', role: 'assistant', content: 'question', createdAt: 1 },
+    });
+
+    const keys = invalidate.mock.calls.map(([filters]) => filters as { queryKey?: string[] });
+    expect(keys.some((f) => f.queryKey?.[0] === 'tasks')).toBe(true);
+  });
+
   it('message event (tool row): does not record handoff, buffer kept', () => {
     const qc = freshClient();
     const es = startStream(qc);

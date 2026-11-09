@@ -56,7 +56,7 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   message_todo: { todoId: s, content: s },
   confirm_builds: { buildIds: sArr },
   merge_builds: { buildIds: sArr },
-  cancel_builds: { buildIds: sArr },
+  cancel_builds: { buildIds: sArr, reason: s.optional() },
   complete_todos: { todoIds: sArr },
   close_todos: { todoIds: sArr },
   reopen_todos: { todoIds: sArr },
@@ -138,10 +138,15 @@ export async function executeMcpTool(
     vapidKeys: deps.vapidKeys,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     oauthClient: deps.oauthClient,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const mcpActor: TransitionActor = { kind: 'user', name: deps.user.displayName };
+  const mcpActor: TransitionActor = {
+    kind: 'user',
+    name: deps.user.displayName,
+    stopActor: 'mcp',
+  };
   switch (name) {
     case 'start_thread':
     case 'threads_waiting_on_me':
@@ -261,10 +266,9 @@ export async function executeMcpTool(
     }
     case 'cancel_builds': {
       const buildIds = strArrOf(args, 'buildIds');
-      for (const buildId of buildIds) {
-        requireTeamBuild(db, buildId, ctx.teamId);
-        cancelBuild(svc, buildId);
-      }
+      const reason = optStr(args, 'reason') ?? `cancel_builds over MCP by ${deps.user.displayName}`;
+      for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
+      for (const buildId of buildIds) cancelBuild(svc, buildId, { actor: 'mcp', reason });
       return json({ cancelled: buildIds });
     }
     case 'complete_todos':

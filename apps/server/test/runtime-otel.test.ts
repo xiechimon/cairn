@@ -1,3 +1,6 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { transcriptPromptRowId } from '@cairn/shared';
 import {
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
@@ -5,18 +8,24 @@ import {
   otlpTraceIdOfTurn,
 } from '@cairn/shared/otel';
 import { eq } from 'drizzle-orm';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import {
   build as buildTable,
   chiefMessage,
   chiefThread,
   machine as machineTable,
+  message as messageTable,
   project as projectTable,
   schedule,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { emitRuntimeBuildSpan, emitRuntimeStepSpan } from '../src/runtime-otel.js';
+import {
+  emitRuntimeBuildSpan,
+  emitRuntimeStepSpan,
+  flushRuntimeOtel,
+  shutdownRuntimeOtel,
+} from '../src/runtime-otel.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 interface CapturedOtlp {
@@ -40,26 +49,45 @@ interface CapturedOtlp {
   };
 }
 
-function captureFetch() {
-  const captured: CapturedOtlp[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string, init: RequestInit) => {
-      captured.push({
-        url: String(url),
-        authorization: (init.headers as Record<string, string>).authorization,
-        body: JSON.parse(String(init.body)),
+const received: CapturedOtlp[] = [];
+let server: Server | undefined;
+let silent: Server | undefined;
+
+beforeAll(async () => {
+  server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      received.push({
+        url: `http://127.0.0.1${req.url ?? ''}`,
+        authorization: req.headers.authorization,
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
       });
-      return new Response('{}', { status: 200 });
-    }),
-  );
-  return captured;
+      res.setHeader('content-type', 'application/json');
+      res.end('{}');
+    });
+  });
+  await new Promise<void>((done) => server?.listen(0, '127.0.0.1', done));
+  env.CAIRN_OTEL_ENDPOINT = `http://pk:sk@127.0.0.1:${(server.address() as AddressInfo).port}/api/public/otel`;
+  silent = createServer(() => {});
+  await new Promise<void>((done) => silent?.listen(0, '127.0.0.1', done));
+});
+
+afterAll(async () => {
+  await shutdownRuntimeOtel();
+  server?.close();
+  silent?.closeAllConnections();
+  silent?.close();
+});
+
+function capture(): CapturedOtlp[] {
+  received.splice(0);
+  return received;
 }
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const d of disposables.splice(0)) d();
-  vi.unstubAllGlobals();
 });
 
 interface World {
@@ -125,32 +153,34 @@ function makeWorld(stepRow: {
 }
 
 const env = {
-  CAIRN_OTEL_ENDPOINT: 'http://pk:sk@127.0.0.1:3000/api/public/otel',
+  CAIRN_OTEL_ENDPOINT: '',
   CAIRN_OTEL_HEADERS: 'x-langfuse-ingestion-version=4',
 };
 
 describe('emitRuntimeStepSpan', () => {
-  test('does nothing when no endpoint is configured', () => {
+  test('does nothing when no endpoint is configured', async () => {
     const { s, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, {});
+    await flushRuntimeOtel();
     expect(captured).toEqual([]);
   });
 
-  test('does nothing on malformed config and never throws', () => {
+  test('does nothing on malformed config and never throws', async () => {
     const { s, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
-    const captured = captureFetch();
+    const captured = capture();
     expect(() => emitRuntimeStepSpan(s.db, stepId, { CAIRN_OTEL_ENDPOINT: '::bad' })).not.toThrow();
     expect(captured).toEqual([]);
   });
 
-  test('pushes a step span on the derived trace, parented to the derived root span', () => {
+  test('pushes a step span on the derived trace, parented to the derived root span', async () => {
     const { s, buildId, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     expect(captured).toHaveLength(1);
     const sent = captured[0]!;
-    expect(sent.url).toBe('http://127.0.0.1:3000/api/public/otel/v1/traces');
+    expect(new URL(sent.url).pathname).toBe('/api/public/otel/v1/traces');
     expect(sent.authorization).toBe(`Basic ${Buffer.from('pk:sk').toString('base64')}`);
     const scope = sent.body.resourceSpans[0]?.scopeSpans[0];
     expect(sent.body.resourceSpans[0]?.resource.attributes).toEqual([
@@ -164,7 +194,7 @@ describe('emitRuntimeStepSpan', () => {
     expect(span.spanId).toBe(otlpStepSpanIdOfBuild(buildId, stepId));
     expect(span.parentSpanId).toBe(otlpRootSpanIdOfBuild(buildId));
     expect(span.name).toBe('step build');
-    expect(span.status).toBeUndefined();
+    expect(span.status?.code ?? 0).toBe(0);
     const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
     expect(attrs['cairn.error_message']).toBeUndefined();
     expect(attrs['cairn.step_id']).toEqual({ stringValue: stepId });
@@ -174,30 +204,32 @@ describe('emitRuntimeStepSpan', () => {
 
   test.each(['plan', 'build', 'verify', 'review', 'merge', 'session'] as const)(
     'exports the todo session on a %s step before the build root is emitted',
-    (kind) => {
+    async (kind) => {
       const { s, stepId, todoId } = makeWorld({
         status: 'done',
         claimedAt: 1000,
         finishedAt: 2000,
       });
       s.db.update(stepTable).set({ kind }).where(eq(stepTable.id, stepId)).run();
-      const captured = captureFetch();
+      const captured = capture();
       emitRuntimeStepSpan(s.db, stepId, env);
+      await flushRuntimeOtel();
       expect(captured).toHaveLength(1);
       const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
       const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
-      expect(attrs['langfuse.session.id']).toEqual({ stringValue: todoId });
+      expect(attrs['langfuse.session.id']).toBeUndefined();
       expect(attrs['session.id']).toEqual({ stringValue: todoId });
       expect(attrs['langfuse.trace.name']).toBeUndefined();
       expect(attrs['langfuse.trace.tags']).toBeUndefined();
     },
   );
 
-  test('does not invent a session when the step has no build row', () => {
+  test('does not invent a session when the step has no build row', async () => {
     const { s, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
     s.db.update(stepTable).set({ buildId: 'missing-build' }).where(eq(stepTable.id, stepId)).run();
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     expect(captured).toHaveLength(1);
     const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
@@ -205,14 +237,15 @@ describe('emitRuntimeStepSpan', () => {
     expect(attrs['session.id']).toBeUndefined();
   });
 
-  test('marks failed steps as error and re-reads finishedAt after the terminal update', () => {
+  test('marks failed steps as error and re-reads finishedAt after the terminal update', async () => {
     const { s, buildId, stepId } = makeWorld({
       status: 'failed',
       claimedAt: 1000,
       finishedAt: 2000,
     });
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     expect(span.status).toEqual({ code: 2, message: 'failed' });
     expect(span.traceId).toBe(otlpTraceIdOfBuild(buildId));
@@ -231,15 +264,16 @@ describe('emitRuntimeStepSpan', () => {
       '<redacted> at https://<ip>:443/v1?<redacted>',
     ],
     ['ignores blank reasons', ' \n ', undefined],
-  ])('%s', (_name, reason, expected) => {
+  ])('%s', async (_name, reason, expected) => {
     const { s, buildId, stepId } = makeWorld({
       status: 'failed',
       claimedAt: 1000,
       finishedAt: 2000,
     });
     s.db.update(buildTable).set({ errorMessage: reason }).where(eq(buildTable.id, buildId)).run();
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
     expect(span.status).toEqual({ code: 2, message: expected ?? 'failed' });
@@ -248,7 +282,7 @@ describe('emitRuntimeStepSpan', () => {
     );
   });
 
-  test('exports persisted step identity and fallback model without guessing missing models', () => {
+  test('exports persisted step identity and fallback model without guessing missing models', async () => {
     const { s, buildId, stepId, todoId } = makeWorld({
       status: 'done',
       claimedAt: 1000,
@@ -264,8 +298,9 @@ describe('emitRuntimeStepSpan', () => {
       .set({ errorMessage: 'stale failure' })
       .where(eq(buildTable.id, buildId))
       .run();
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     let span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     let attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
     expect(attrs['cairn.build_id']).toEqual({ stringValue: buildId });
@@ -276,7 +311,7 @@ describe('emitRuntimeStepSpan', () => {
     expect(attrs['gen_ai.provider.name']).toBeUndefined();
     expect(attrs['cairn.runtime']).toBeUndefined();
     expect(attrs['cairn.error_message']).toBeUndefined();
-    expect(span.status).toBeUndefined();
+    expect(span.status?.code ?? 0).toBe(0);
     s.db
       .update(stepTable)
       .set({
@@ -289,6 +324,7 @@ describe('emitRuntimeStepSpan', () => {
       .where(eq(stepTable.id, stepId))
       .run();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     span = captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
     expect(attrs['gen_ai.provider.name']).toEqual({ stringValue: 'anthropic' });
@@ -296,7 +332,7 @@ describe('emitRuntimeStepSpan', () => {
     expect(attrs['cairn.runtime']).toEqual({ stringValue: 'pi' });
   });
 
-  test('prefers a scheduled step reason and ignores a reason belonging to another step', () => {
+  test('prefers a scheduled step reason and ignores a reason belonging to another step', async () => {
     const { s, buildId, stepId, todoId } = makeWorld({
       status: 'failed',
       claimedAt: 1000,
@@ -326,8 +362,9 @@ describe('emitRuntimeStepSpan', () => {
       .set({ scheduleId: 'otel-schedule' })
       .where(eq(stepTable.id, stepId))
       .run();
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     expect(captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.status?.message).toBe(
       'step reason',
     );
@@ -337,24 +374,27 @@ describe('emitRuntimeStepSpan', () => {
       .where(eq(schedule.id, 'otel-schedule'))
       .run();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     expect(captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.status?.message).toBe(
       'build reason',
     );
   });
 
-  test('skips steps that were never claimed', () => {
+  test('skips steps that were never claimed', async () => {
     const { s, stepId } = makeWorld({ status: 'pending', claimedAt: null, finishedAt: null });
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     expect(captured).toEqual([]);
   });
 });
 
 describe('emitRuntimeBuildSpan', () => {
-  test('pushes the invoke_agent root span covering the build lifetime', () => {
+  test('pushes the invoke_agent root span covering the build lifetime', async () => {
     const { s, buildId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeBuildSpan(s.db, buildId, 'done', env);
+    await flushRuntimeOtel();
     expect(captured).toHaveLength(1);
     const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     expect(span.traceId).toBe(otlpTraceIdOfBuild(buildId));
@@ -370,7 +410,7 @@ describe('emitRuntimeBuildSpan', () => {
 
   test.each(['failed', 'cancelled'] as const)(
     'exports the todo and sanitized reason on a %s build root',
-    (outcome) => {
+    async (outcome) => {
       const { s, buildId, todoId } = makeWorld({
         status: 'failed',
         claimedAt: 1000,
@@ -381,8 +421,9 @@ describe('emitRuntimeBuildSpan', () => {
         .set({ errorMessage: 'OAuth failed\nBearer secret at http://192.0.2.1' })
         .where(eq(buildTable.id, buildId))
         .run();
-      const captured = captureFetch();
+      const captured = capture();
       emitRuntimeBuildSpan(s.db, buildId, outcome, env);
+      await flushRuntimeOtel();
       const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
       const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
       expect(span.status).toEqual({ code: 2, message: 'OAuth failed <redacted> at http://<ip>' });
@@ -391,11 +432,13 @@ describe('emitRuntimeBuildSpan', () => {
     },
   );
 
-  test('marks failed and cancelled builds as error', () => {
+  test('marks failed and cancelled builds as error', async () => {
     const { s, buildId } = makeWorld({ status: 'failed', claimedAt: 1000, finishedAt: 2000 });
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeBuildSpan(s.db, buildId, 'failed', env);
+    await flushRuntimeOtel();
     emitRuntimeBuildSpan(s.db, buildId, 'cancelled', env);
+    await flushRuntimeOtel();
     expect(captured).toHaveLength(2);
     expect(captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.status).toEqual({
       code: 2,
@@ -407,10 +450,11 @@ describe('emitRuntimeBuildSpan', () => {
     });
   });
 
-  test('does nothing when no endpoint is configured', () => {
+  test('does nothing when no endpoint is configured', async () => {
     const { s, buildId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeBuildSpan(s.db, buildId, 'done', {});
+    await flushRuntimeOtel();
     expect(captured).toEqual([]);
   });
 });
@@ -440,10 +484,11 @@ describe('Coordinator turn export', () => {
     return Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
   }
 
-  test('exports the turn as the root of its own trace grouped by thread session', () => {
+  test('exports the turn as the root of its own trace grouped by thread session', async () => {
     const { s, stepId } = chiefTurn(null);
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, { ...env, CAIRN_OTEL_ENVIRONMENT: 'prod' });
+    await flushRuntimeOtel();
     expect(captured).toHaveLength(1);
     const request = captured[0]!.body.resourceSpans[0]!;
     expect(request.resource.attributes).toEqual([
@@ -457,7 +502,7 @@ describe('Coordinator turn export', () => {
     expect(span.name).toBe('coordinator turn');
     const attrs = attrsOf(span);
     expect(attrs['langfuse.trace.name']).toEqual({ stringValue: 'coordinator turn' });
-    expect(attrs['langfuse.session.id']).toEqual({ stringValue: 'chief-thread-9' });
+    expect(attrs['langfuse.session.id']).toBeUndefined();
     expect(attrs['session.id']).toEqual({ stringValue: 'chief-thread-9' });
     expect(attrs['langfuse.trace.tags']).toEqual({
       arrayValue: { values: [{ stringValue: 'cairn' }, { stringValue: 'coordinator' }] },
@@ -479,7 +524,7 @@ describe('Coordinator turn export', () => {
     expect(attrs['cairn.chief_trigger']).toEqual({ stringValue: 'user' });
   });
 
-  test('exports the chief step error record without adding build identity attributes', () => {
+  test('exports the chief step error record without adding build identity attributes', async () => {
     const { s, stepId } = chiefTurn(null);
     s.db
       .insert(chiefThread)
@@ -509,8 +554,9 @@ describe('Coordinator turn export', () => {
       })
       .run();
     s.db.update(stepTable).set({ status: 'failed' }).where(eq(stepTable.id, stepId)).run();
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     expect(span.status).toEqual({ code: 2, message: 'OAuth revoked <redacted>' });
     expect(attrsOf(span)['cairn.error_message']).toEqual({
@@ -519,17 +565,19 @@ describe('Coordinator turn export', () => {
     expect(attrsOf(span)['cairn.build_id']).toBeUndefined();
   });
 
-  test('never exports the turn prompt', () => {
+  test('never exports the turn prompt', async () => {
     const { s, stepId } = chiefTurn('please use token sk-ant-api03-supersecretvalue');
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     expect(JSON.stringify(captured[0]!.body)).not.toContain('supersecretvalue');
   });
 
-  test('omits environment attributes when CAIRN_OTEL_ENVIRONMENT is unset', () => {
+  test('omits environment attributes when CAIRN_OTEL_ENVIRONMENT is unset', async () => {
     const { s, stepId } = chiefTurn(null);
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
+    await flushRuntimeOtel();
     const request = captured[0]!.body.resourceSpans[0]!;
     expect(request.resource.attributes).toEqual([
       { key: 'service.name', value: { stringValue: 'cairn' } },
@@ -539,50 +587,106 @@ describe('Coordinator turn export', () => {
     expect(attrs['deployment.environment']).toBeUndefined();
   });
 
-  test('exports nothing when the endpoint is unset', () => {
+  test('exports nothing when the endpoint is unset', async () => {
     const { s, stepId } = chiefTurn(null);
-    const captured = captureFetch();
+    const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, { CAIRN_OTEL_ENVIRONMENT: 'prod' });
+    await flushRuntimeOtel();
     expect(captured).toEqual([]);
   });
 
-  test('a collector that never answers neither blocks nor throws', () => {
+  test('a collector that never answers neither blocks nor throws', async () => {
     const { s, stepId } = chiefTurn(null);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise(() => {})),
-    );
+    const port = (silent as Server).address() as AddressInfo;
     const started = Date.now();
-    expect(() => emitRuntimeStepSpan(s.db, stepId, env)).not.toThrow();
+    expect(() =>
+      emitRuntimeStepSpan(s.db, stepId, {
+        CAIRN_OTEL_ENDPOINT: `http://127.0.0.1:${port.port}/otel`,
+      }),
+    ).not.toThrow();
     expect(Date.now() - started).toBeLessThan(200);
   });
 
-  test('a collector that rejects the request does not surface an unhandled error', async () => {
+  test('a collector that refuses the connection does not surface an unhandled error', async () => {
     const { s, stepId } = chiefTurn(null);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        throw new Error('connect ECONNREFUSED');
-      }),
+    expect(() =>
+      emitRuntimeStepSpan(s.db, stepId, { CAIRN_OTEL_ENDPOINT: 'http://127.0.0.1:1/otel' }),
+    ).not.toThrow();
+    await flushRuntimeOtel();
+  }, 15_000);
+
+  test('shutdown delivers a span emitted just before it', async () => {
+    const { s, stepId } = chiefTurn(null);
+    const captured = capture();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    await shutdownRuntimeOtel();
+    expect(captured).toHaveLength(1);
+    expect(captured[0]?.body.resourceSpans[0]?.scopeSpans[0]?.spans[0]?.name).toBe(
+      'coordinator turn',
     );
-    expect(() => emitRuntimeStepSpan(s.db, stepId, env)).not.toThrow();
-    await new Promise((resolve) => setTimeout(resolve, 20));
   });
 
-  test('build root and steps carry the session and environment', () => {
+  test('build root and steps carry the session and environment', async () => {
     const { s, buildId, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
-    const captured = captureFetch();
+    const captured = capture();
     const withEnv = { ...env, CAIRN_OTEL_ENVIRONMENT: 'prod' };
     emitRuntimeBuildSpan(s.db, buildId, 'done', withEnv);
+    await flushRuntimeOtel();
     emitRuntimeStepSpan(s.db, stepId, withEnv);
+    await flushRuntimeOtel();
     const root = attrsOf(captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
     expect(root['langfuse.trace.name']).toEqual({ stringValue: 'build' });
-    expect(root['langfuse.session.id']).toEqual({ stringValue: expect.stringMatching(/^todo-/) });
+    expect(root['session.id']).toEqual({ stringValue: expect.stringMatching(/^todo-/) });
     expect(root['langfuse.environment']).toEqual({ stringValue: 'prod' });
     const stepAttrs = attrsOf(captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
-    expect(stepAttrs['langfuse.session.id']).toEqual(root['langfuse.session.id']);
     expect(stepAttrs['session.id']).toEqual(root['session.id']);
     expect(stepAttrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
     expect(stepAttrs['langfuse.trace.name']).toBeUndefined();
   });
+});
+
+test('worker step roots export their own transcript input and final reply only', async () => {
+  const { s, buildId, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
+  s.db
+    .insert(messageTable)
+    .values([
+      {
+        id: transcriptPromptRowId(stepId),
+        conversationId: buildId,
+        role: 'user',
+        content: 'implement the owner request',
+        createdAt: 1100,
+      },
+      {
+        id: `msg-${stepId}-1`,
+        conversationId: buildId,
+        role: 'assistant',
+        content: [{ type: 'text', text: 'implementation is complete' }],
+        createdAt: 1900,
+      },
+      {
+        id: 'msg-other-step-1',
+        conversationId: buildId,
+        role: 'assistant',
+        content: 'unrelated reply',
+        createdAt: 1901,
+      },
+    ])
+    .run();
+  const captured = capture();
+  emitRuntimeStepSpan(s.db, stepId, env);
+  await flushRuntimeOtel();
+  const attrs = Object.fromEntries(
+    captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.attributes.map((attribute) => [
+      attribute.key,
+      attribute.value,
+    ]),
+  );
+  expect(JSON.stringify(attrs['langfuse.observation.input'])).toContain(
+    'implement the owner request',
+  );
+  expect(JSON.stringify(attrs['langfuse.observation.output'])).toContain(
+    'implementation is complete',
+  );
+  expect(JSON.stringify(attrs)).not.toContain('unrelated reply');
 });

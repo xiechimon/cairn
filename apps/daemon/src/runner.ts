@@ -7,6 +7,7 @@ import type {
   AgentSessionHandle,
   AgentTodoItem,
   AgentTokenUsage,
+  AnswerDeliveryVia,
   BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
@@ -28,8 +29,10 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendAnswers,
   appendBlockerHandoff,
   appendConfirmedPlanNote,
+  appendDecisionsNote,
   appendPlanLocationNote,
   appendReportLocationNote,
   appendWorkBranchNote,
@@ -203,9 +206,9 @@ export function streamTimeoutMessage(
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
   if (!todo) return claimed.instruction ?? '';
-  const taskText = appendBlockerHandoff(
-    buildTaskPromptText(todo.title, todo.spec, todo),
-    todo.blockerHandoff,
+  const taskText = appendDecisionsNote(
+    appendBlockerHandoff(buildTaskPromptText(todo.title, todo.spec, todo), todo.blockerHandoff),
+    todo.decisions,
   );
   const instruction = claimed.instruction ?? null;
   if (instruction !== null && instruction.trim() !== '') {
@@ -215,6 +218,13 @@ export function buildTaskPrompt(claimed: ClaimedStep): string {
     return composeTaskPromptWithInstruction(taskText, buildPlanFirstRoundInstruction());
   }
   return taskText;
+}
+
+function carriedAnswers(claimed: ClaimedStep): { requestId: string; text: string }[] {
+  const carried = new Set(claimed.answerIds ?? []);
+  return (claimed.todo?.decisions ?? [])
+    .filter((decision) => carried.has(decision.requestId))
+    .map((decision) => ({ requestId: decision.requestId, text: decision.answer }));
 }
 
 function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
@@ -464,7 +474,10 @@ async function runClaimedStep(
     (isChief || isReview || isVerify
       ? (claimed.instruction ?? '')
       : claimed.session.action === 'continue' && claimed.session.sessionId
-        ? (claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind])
+        ? appendAnswers(
+            claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind],
+            carriedAnswers(claimed),
+          )
         : buildTaskPrompt(claimed));
   const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
   const readonlyWorkspace = !isChief && claimed.todo?.output === 'info';
@@ -922,6 +935,13 @@ async function runClaimedStep(
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
   let askKeepAlive: (() => void) | null = null;
+  const answeredPolls = new Set<string>();
+  const ackAnswers = async (answerIds: readonly string[], via: AnswerDeliveryVia) => {
+    if (answerIds.length === 0) return;
+    await client.steerAck?.(stepId, { answerIds: [...answerIds], via }).catch((err: unknown) => {
+      logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  };
   const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
     if (client.askUser === undefined) throw new Error('ask channel unavailable');
     const requestId = `ask-${randomUUID()}`;
@@ -937,6 +957,9 @@ async function runClaimedStep(
         },
         { signal: askAbort.signal },
       );
+      if (response.status === 'answered' && !askAbort.signal.aborted) {
+        answeredPolls.add(requestId);
+      }
       return JSON.stringify(response);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1575,6 +1598,7 @@ async function runClaimedStep(
     }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     deps.sessionHandles?.set(stepId, handle);
+    let promptDelivered = false;
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
@@ -1584,9 +1608,19 @@ async function runClaimedStep(
     if (pass === 0) armDurationCap();
     try {
       for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
+        if (!promptDelivered) {
+          promptDelivered = true;
+          await ackAnswers(claimed.answerIds ?? [], 'session-start');
+        }
         if (ev.type === 'toolcall_end') {
           if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
           else runningToolCalls.delete(ev.call.id);
+          if (ev.call.result !== undefined && answeredPolls.size > 0) {
+            const result = JSON.stringify(ev.call.result);
+            const reached = [...answeredPolls].filter((id) => result.includes(id));
+            for (const id of reached) answeredPolls.delete(id);
+            await ackAnswers(reached, 'poll');
+          }
         }
         armWatchdog(streamTimeouts.idle, 'idle');
         armBodyTimeout();
@@ -1974,8 +2008,16 @@ async function runClaimedStep(
         withCoAuthor(commitMessage, tokenRes.coAuthor ?? null),
         stepIdentity,
       );
+      if (committed.setupDrift.length > 0) {
+        transcript.upsert({
+          id: `setup-drift-${stepId}`,
+          role: 'system',
+          content: `Workspace setup changed ${committed.setupDrift.join(', ')}; these changes were left out of the commit because the agent did not make them.`,
+          createdAt: now(),
+        });
+      }
       if (claimed.step.kind === 'merge') {
-        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch);
+        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, creds.git);
         transcript.upsert({
           id: `merge-${stepId}`,
           role: 'system',

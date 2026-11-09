@@ -76,11 +76,11 @@ describe('phase entry upserts an unread notification', () => {
     expect(await listUnread(w)).toEqual([w.todoId]);
   });
 
-  test('entering failed', async () => {
+  test('entering failed notifies no one: the Coordinator owns failures', async () => {
     const w = await world();
     setTodoPhase(w.svc, w.todoId, 'building');
     setTodoPhase(w.svc, w.todoId, 'failed');
-    expect(rowOf(w)).toMatchObject({ type: 'todo_failed', readAt: null });
+    expect(rowOf(w)).toBeUndefined();
   });
 
   test('entering review', async () => {

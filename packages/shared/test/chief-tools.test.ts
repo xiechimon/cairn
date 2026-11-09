@@ -162,11 +162,12 @@ describe('47-item vocabulary', () => {
 });
 
 describe('D60 router tools', () => {
-  it('are five tools outside the 47-item base vocabulary, so the base count stays 47', () => {
+  it('are six tools outside the 47-item base vocabulary, so the base count stays 47', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([
       'open_thread',
       'message_thread',
       'stop_thread',
+      'answer_question',
       'threads',
       'needs_you',
     ]);
@@ -185,7 +186,7 @@ describe('D60 router tools', () => {
     ]);
   });
 
-  it('require the todo id on the three thread actions and content on message_thread', () => {
+  it('require the todo id on the thread actions, content on message_thread and a reason on stop_thread', () => {
     const required = (name: string) => {
       const params = CHIEF_ROUTER_TOOLS.find((t) => t.name === name)?.parameters as {
         required?: string[];
@@ -193,7 +194,7 @@ describe('D60 router tools', () => {
       return params.required;
     };
     expect(required('open_thread')).toEqual(['todoId']);
-    expect(required('stop_thread')).toEqual(['todoId']);
+    expect(required('stop_thread')).toEqual(['todoId', 'reason']);
     expect(required('message_thread')).toEqual(['todoId', 'content']);
     expect(required('threads')).toBeUndefined();
     expect(required('needs_you')).toBeUndefined();

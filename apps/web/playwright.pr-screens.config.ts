@@ -1,6 +1,9 @@
 import { defineConfig } from '@playwright/test';
+import { admitTestRun, testRunPort } from '../../scripts/test-admission.mjs';
 
-const PORT = Number(process.env.E2E_PORT ?? 8399);
+const lease = await admitTestRun();
+
+const PORT = await testRunPort(process.env.E2E_PORT ?? 8399);
 
 export default defineConfig({
   testDir: './pr-screens',
@@ -19,7 +22,7 @@ export default defineConfig({
   webServer: {
     command: `pnpm exec vite build --mode fixture && pnpm exec vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: `http://127.0.0.1:${PORT}/app`,
-    reuseExistingServer: true,
+    reuseExistingServer: lease === null,
     timeout: 120_000,
   },
 });

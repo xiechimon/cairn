@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 import { RULE_IDS, RULES } from './rules.js';
 
-const PAGE_URL = '/app/team?scenario=12';
+const PAGE_URL = '/app/settings/work-routing?scenario=12';
 
 const MUTATIONS: Record<string, (page: Page) => Promise<void>> = {
   C1: (page) =>

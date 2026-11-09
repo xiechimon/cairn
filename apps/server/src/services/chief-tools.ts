@@ -1,9 +1,16 @@
-import type { ChiefNoticeContent, SecretBox, UserRecord } from '@cairn/shared';
+import type {
+  ChiefNoticeContent,
+  GitIdentity,
+  SecretBox,
+  StopActor,
+  UserRecord,
+} from '@cairn/shared';
 import {
   CHIEF_NOTICE_KIND,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
+  isWaitingPhase,
   MEMORY_LAYERS,
   MERGE_HUMAN_ONLY_COPY,
   type MemoryLayer,
@@ -28,7 +35,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
-import { readAttachmentMeta } from './attachments.js';
+import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
 import {
   advanceSplitWaves,
   applyBuildStepAction,
@@ -62,6 +69,7 @@ import {
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
+import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -81,6 +89,7 @@ import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -300,9 +309,14 @@ export async function executeChiefTool(
     vapidKeys: deps.vapidKeys,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const chiefActor: TransitionActor = { kind: 'agent', name: 'Coordinator' };
+  const chiefActor: TransitionActor = {
+    kind: 'agent',
+    name: 'Coordinator',
+    stopActor: 'coordinator',
+  };
   assertToolNotRemoved(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
@@ -527,7 +541,7 @@ export async function executeChiefTool(
     case 'workflow_runs':
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
-      const attachmentId = str(params, 'attachmentId');
+      const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
       return json(readAttachmentMeta(deps, ctx.teamId, attachmentId));
     }
     case 'conversation': {
@@ -591,8 +605,16 @@ export async function executeChiefTool(
       return json({ deleted });
     }
     case 'close_todos': {
+      const supersededBy = optStr(params, 'supersededBy');
       return json(
-        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'closed', chiefActor),
+        transitionTodos(
+          deps,
+          ctx.teamId,
+          strArr(params, 'todoIds'),
+          'closed',
+          chiefActor,
+          supersededBy !== undefined ? { supersededBy } : {},
+        ),
       );
     }
     case 'reopen_todos':
@@ -768,9 +790,10 @@ export async function executeChiefTool(
 
     case 'cancel_builds': {
       const buildIds = strArr(params, 'buildIds');
+      const reason = str(params, 'reason');
+      for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
       for (const buildId of buildIds) {
-        requireTeamBuild(db, buildId, ctx.teamId);
-        cancelBuild(deps, buildId);
+        cancelBuild(deps, buildId, { actor: 'coordinator', reason });
       }
       return json({ cancelled: buildIds });
     }
@@ -957,7 +980,7 @@ export async function executeChiefTool(
   }
 }
 
-export type TransitionActor = { kind: 'user' | 'agent'; name: string };
+export type TransitionActor = { kind: 'user' | 'agent'; name: string; stopActor: StopActor };
 
 export type TransitionDeps = Pick<
   ChiefToolDeps,
@@ -970,6 +993,7 @@ export function transitionTodos(
   todoIds: string[],
   to: 'closed' | 'todo' | 'done',
   actor: TransitionActor,
+  opts: { supersededBy?: string } = {},
 ): { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> } {
   const svc = {
     db: deps.db,
@@ -979,12 +1003,18 @@ export function transitionTodos(
     vapidKeys: deps.vapidKeys,
     convHub: deps.convHub,
   };
+  if (opts.supersededBy !== undefined) {
+    requireTeamTodo(deps.db, opts.supersededBy, teamId);
+    if (todoIds.includes(opts.supersededBy)) {
+      throw new HttpError(400, 'supersededBy must name a todo that is not being closed');
+    }
+  }
   const transitioned: string[] = [];
   const skipped: string[] = [];
   const reasons: Record<string, string> = {};
   for (const id of todoIds) {
     const owned = deps.db
-      .select({ id: todo.id, phase: todo.phase, latestBuildId: todo.latestBuildId })
+      .select()
       .from(todo)
       .where(and(eq(todo.id, id), eq(todo.teamId, teamId)))
       .get();
@@ -995,7 +1025,8 @@ export function transitionTodos(
     if (
       to === 'done' &&
       actor.kind === 'agent' &&
-      (owned.phase === 'review' || owned.phase === 'confirm')
+      isWaitingPhase(owned.phase) &&
+      !coordinatorAcceptsReview(ownershipOf(deps.db, owned))
     ) {
       skipped.push(id);
       reasons[id] =
@@ -1004,12 +1035,22 @@ export function transitionTodos(
     }
     try {
       const record = setTodoPhase(svc, id, to);
+      if (record && to === 'closed') {
+        deps.db
+          .update(todo)
+          .set({ supersededBy: opts.supersededBy ?? null })
+          .where(eq(todo.id, id))
+          .run();
+      }
       if (record) {
         transitioned.push(id);
         const doneFromInProgress =
           to === 'done' && (IN_PROGRESS_PHASES as readonly string[]).includes(owned.phase);
         if ((to === 'closed' && owned.phase !== 'closed') || doneFromInProgress)
-          stopActiveStepsAfterExit(svc, id);
+          stopActiveStepsAfterExit(svc, id, {
+            actor: actor.stopActor,
+            reason: `${to === 'closed' ? 'closed' : 'marked done'} by ${actor.name}`,
+          });
         if (to === 'done' && owned.phase !== 'done' && owned.latestBuildId !== null) {
           insertGateAnnouncement(deps, owned.latestBuildId, DONE_ANNOUNCEMENT, actor.name);
         }
@@ -1046,6 +1087,7 @@ function buildDeps(deps: ChiefToolDeps) {
     reposDir: deps.reposDir,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     githubFetch: deps.githubFetch,
     oauthClient: deps.oauthClient,
   };
@@ -1151,7 +1193,7 @@ export async function executeWorkerMemoryTool(
       );
     }
     case 'attachment': {
-      const attachmentId = str(params, 'attachmentId');
+      const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
       if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {
         throw new HttpError(404, `attachment ${attachmentId}`);
       }

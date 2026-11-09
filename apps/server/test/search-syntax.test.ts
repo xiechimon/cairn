@@ -87,6 +87,7 @@ function corpus() {
     'planning',
     'confirm',
     'building',
+    'needs_input',
     'review',
     'done',
     'failed',
@@ -103,9 +104,13 @@ describe('search filters: is:', () => {
     expect(titles(await run(s, 'is:failed'))).toEqual(['web failed', 'api failed']);
   });
 
-  test('is:waiting matches confirm and review (the web needs-you phases)', async () => {
+  test('is:waiting matches confirm, needs_input and review (the web needs-you phases)', async () => {
     const { s } = corpus();
-    expect(titles(await run(s, 'is:waiting'))).toEqual(['web confirm', 'web review']);
+    expect(titles(await run(s, 'is:waiting'))).toEqual([
+      'web confirm',
+      'web needs_input',
+      'web review',
+    ]);
   });
 
   test('is:review matches review only', async () => {
@@ -149,6 +154,7 @@ describe('search filters: is:', () => {
     expect(titles(await run(s, '-is:failed -is:done -is:running'))).toEqual([
       'web todo',
       'web confirm',
+      'web needs_input',
       'web review',
     ]);
   });

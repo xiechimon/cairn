@@ -136,7 +136,7 @@ export const CARD_FACES: { label: string; todo: TodoRecord }[] = [
   },
   {
     label: 'Waiting on you',
-    todo: todo({ title: 'Choose the export format', phase: 'review', awaitingReply: true }),
+    todo: todo({ title: 'Choose the export format', phase: 'needs_input' }),
   },
   {
     label: 'Confirm plan',
@@ -531,6 +531,7 @@ export function sharedTodo(patch: {
     createdBy: null,
     ownerId: null,
     sourceBuildId: null,
+    owner: null,
     output: 'code',
   };
 }

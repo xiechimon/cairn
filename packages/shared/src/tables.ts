@@ -37,6 +37,7 @@ export const DB_TABLES = [
   'gate_verdict',
   'gate_state',
   'autonomy_state',
+  'autonomy_pause',
   'member_activity',
   'build_feedback',
   'build_outcome_backfill',
@@ -65,6 +66,8 @@ export const DB_TABLES = [
   'coordinator_entry',
   'coordinator_lease',
   'data_migration',
+  'task_issue_close',
+  'deploy_lease',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -73,6 +76,7 @@ export const JOIN_ONLY_TABLES = ['todo_tag'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'steer_pending',
+  'autonomy_pause',
   'step_route',
   'paired_device',
   'branch_sync',
@@ -117,4 +121,6 @@ export const INTERNAL_ONLY_TABLES = [
   'coordinator_entry',
   'coordinator_lease',
   'data_migration',
+  'task_issue_close',
+  'deploy_lease',
 ] as const;

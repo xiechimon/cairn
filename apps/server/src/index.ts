@@ -23,8 +23,10 @@ import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
+import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
+import { shutdownRuntimeOtel } from './runtime-otel.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
   setCoordinatorInServer,
@@ -36,6 +38,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import {
@@ -49,13 +52,13 @@ import {
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
+import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
 
 const loadedConfig = loadConfig();
 const logSecrets = [loadedConfig.authToken ?? ''];
 const logger = createServerLogger(logSecrets, {
   level: process.env.LOG_LEVEL ?? 'info',
-  // pino-pretty cannot load its transport worker from a single-file bundle.
   ...(process.env.NODE_ENV === 'production' || BUNDLED_FORM
     ? {}
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
@@ -104,6 +107,8 @@ if (concurrencyBackfilled > 0) {
     'machine concurrency backfilled to recommendation',
   );
 }
+const ownersSeeded = seedOwnerCheckpoints(db);
+if (ownersSeeded > 0) logger.info({ tasks: ownersSeeded }, 'thread owner checkpoints seeded');
 const hub = new TeamStreamHub();
 const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();
@@ -139,6 +144,7 @@ const app = createApp(
     oauthStates: new Map(),
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
+    githubAppIdentity: config.githubAppIdentity,
     githubFetch,
     reposDir,
     attachmentsDir,
@@ -148,6 +154,7 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
+    loopbackOwner: loopbackOwnerFor(config),
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },
@@ -171,6 +178,7 @@ const scheduler = createScheduler(
     githubFetch,
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
+    githubAppIdentity: config.githubAppIdentity,
   },
   {
     tickMs: config.schedulerTickMs,
@@ -226,6 +234,7 @@ const coordinator = config.coordinatorInServer
         githubFetch,
         oauthClient: config.githubOauth,
         githubAppTokenSocket: config.githubAppTokenSocket,
+        githubAppIdentity: config.githubAppIdentity,
       },
       storageDir: coordinatorStoreDir(config.dataDir),
       logger,
@@ -248,6 +257,7 @@ const server = serve(
   },
 );
 
+const drainHttp = createHttpDrain(server);
 const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
 computerScreens.attach(server);
@@ -275,7 +285,7 @@ async function shutdown(): Promise<void> {
   ]);
   killInFlightPick();
   computerScreens.close();
-  server.close();
+  await drainHttp(shutdownRuntimeOtel);
   await (await tsnetStarting)?.stop();
   close();
   process.exit(0);

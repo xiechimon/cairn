@@ -15,6 +15,7 @@ import { type FetchLike, githubPull } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
+import { teamAutonomyPaused } from './github-autonomy-brake.js';
 import { userTokenOrNull } from './github-connection.js';
 import { projectMergeConfigOf } from './projects.js';
 
@@ -127,7 +128,7 @@ export function autonomousMergePolicy(
   }
   const teamRow = db.select().from(team).where(eq(team.id, teamId)).get();
   return {
-    autonomyPaused: teamRow?.autonomyPaused !== false,
+    autonomyPaused: teamRow === undefined || teamAutonomyPaused(db, teamId),
     dailyCapReached: count >= (teamRow?.maxAutonomousMergesPerDay ?? 0),
   };
 }

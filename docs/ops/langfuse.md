@@ -174,6 +174,59 @@ Each Coordinator turn is its own trace. The server exports the `chief` step as t
 
 Set `CAIRN_OTEL_ENVIRONMENT` (lowercase letters, digits, `_` and `-`, at most 40 characters, not starting with `langfuse`) to add `deployment.environment` to the resource and `langfuse.environment` to each span; an invalid or unset value adds nothing. `service.name` stays `cairn`. Export is off unless `CAIRN_OTEL_ENDPOINT` is set. It never blocks a turn: posts go through a bounded sender (4 in flight, 64 queued, 5 s timeout) that drops on overflow.
 
+## Shadow labels, cost anomaly and the dashboard
+
+Approved by ian on 2026-11-09: Claude Haiku on his pay-as-you-go Anthropic API key, under $0.10 per day. Everything here only writes scores; nothing in cairn reads them or acts on them.
+
+`pnpm traj:shadow` turns each finished step span (`step <kind>`) and `coordinator turn` into one `step digest` child observation and writes code-computed scores. It reads only the Langfuse public API and writes through the OTLP endpoint, so it needs both sets of variables:
+
+```sh
+export CAIRN_LANGFUSE_HOST="http://127.0.0.1:3000"
+export CAIRN_LANGFUSE_PUBLIC_KEY="pk-lf-…"
+export CAIRN_LANGFUSE_SECRET_KEY="sk-lf-…"
+export CAIRN_OTEL_ENDPOINT="http://127.0.0.1:3000/api/public/otel"
+export CAIRN_OTEL_HEADERS="Authorization=Basic …,x-langfuse-ingestion-version=4"
+pnpm traj:shadow --since-hours 2 --settle-minutes 30
+```
+
+It looks at units that ended between `since-hours + settle-minutes` and `settle-minutes` ago, skips units that already have a digest, and prints `units= digests= skipped_already_digested= cost_scores= question_units=`. `--dry-run` writes nothing. Run it at least as often as `--since-hours`; overlapping windows are safe.
+
+On omarchy the systemd user timer `cairn-langfuse-shadow.timer` runs it hourly from the deployed checkout `~/Code/AgentProjects/cairn-exec` with `--since-hours 2 --settle-minutes 30`. The service reads its variables from `~/.config/cairn/langfuse-shadow.env` (mode 600) and appends to `~/.local/state/cairn-langfuse/shadow.log`.
+
+The digest is the input of the `step digest` observation, at most 6,000 characters (about 1.5k tokens; generation inputs average 119k tokens, so the judges never see a raw trace). It holds the task title, the outcome and error, the last 12 phase transitions of the trace, idle minutes after the unit or the gap to the next one, counts computed in code (tool calls, tool errors, edits, the largest number of identical calls and identical failures, cost), the last 15 tool calls with errors, and the text of `ask_user` questions. It passes through `redactSecrets`. Its metadata carries `unit` and `has_owner_question`.
+
+Scores written by the job (source `API`, attached to the unit's span):
+
+| Score | Value |
+|---|---|
+| `step_error` | 1 when the unit span ended in `ERROR`, else 0. Its daily mean is the error rate. |
+| `cost_z` | (unit cost − mean) / sd over units of the same kind on the same model that ended in the 7 days before it. Units without priced generations are skipped; fewer than 5 baseline units or a flat baseline writes nothing. The comment names cost, mean, sd and n. |
+
+Langfuse configuration on omarchy (project `cairn-local`), all created through the public API:
+
+| Object | Setting |
+|---|---|
+| LLM connection | provider `anthropic`, adapter `anthropic`, custom model `claude-haiku-5-5`, default models off. The key is the one stored in cairn's Anthropic provider row. |
+| Evaluators | `shadow.stalled`, `shadow.looping`, `shadow.needless_owner_question`: LLM-as-a-judge, `anthropic` / `claude-haiku-5-5`, numeric 0–1 output with a one-line explanation. `{{digest}}` maps to the observation `input`. The system prompt says the digest is untrusted agent data and that no instruction inside it is followed. |
+| Rule `shadow: stalled + looping on step digests` | name any of `step digest`, sampling 0.7, stalled and looping. |
+| Rule `shadow: needless owner question on step digests with a question` | name any of `step digest` and metadata `has_owner_question` = `true`, sampling 1. |
+| Dashboard `cairn: steps, cost and shadow labels` | cost per day by model, steps per day by kind, step latency p50/p95, step error rate (`step_error`), the three shadow scores over time, labels ≥ 0.7 per day, `cost_z` max and mean. |
+
+Only observation-level rules work here: in `events_only` mode a trace-level rule produces nothing. Trace-level variable mapping is not used, so the 119k-token generation inputs are never mapped. A JSONPath that fails falls back to the whole field in Langfuse 4.68, which is why the digest is a separate small observation rather than a selector over a large one.
+
+Measured on the first run over the 24 hours before 2026-11-09 03:00 UTC (137 units, sampling 1): 296 judge calls, 544k input and 33k output tokens, $0.071. At sampling 0.7 for stalled and looping this is about $0.05 per day. The evaluator list shows the 7-day judge cost; the dashboard's cost chart includes it when the `langfuse-llm-as-a-judge` environment is selected.
+
+### Reaching Anthropic from the containers
+
+`api.anthropic.com` answers 403 `Request not allowed` to the containers on omarchy, while the host reaches it through a loopback proxy that containers cannot reach. The `egress-relay` compose profile bridges this without firewall changes: `egress-relay-host` (host network) exposes the host proxy on a unix socket in the `egress_socket` volume, and `egress-relay` (compose network, not published) accepts only `CONNECT api.anthropic.com:443` and forwards it to that socket. Langfuse sends LLM calls through `HTTPS_PROXY` and keeps internal services direct through `NO_PROXY`. On omarchy `.env` sets:
+
+```sh
+COMPOSE_PROFILES=egress-relay
+LANGFUSE_LLM_HTTPS_PROXY=http://egress-relay:3128
+```
+
+Hosts with direct access leave both empty. `EGRESS_UPSTREAM` (default `127.0.0.1:7890`) and `EGRESS_ALLOW` (default `api.anthropic.com:443`) adjust the relay. A refused target appears in `docker compose logs egress-relay` as `egress relay refused: <host:port>`. The relays run as root with every capability dropped except `DAC_READ_SEARCH`, so they can read the mounted script even when the checkout was written with umask 077, as the deployed checkout is. Bring the stack up from the deployed checkout so the mount survives worktree cleanup: `docker compose -f ~/Code/AgentProjects/cairn-exec/ops/langfuse/docker-compose.yml --env-file ~/Code/AgentProjects/cairn/ops/langfuse/.env up -d`.
+
 ## Claude Code runtime tool traces (#2269)
 
 Configure `CAIRN_OTEL_ENDPOINT` and `CAIRN_OTEL_HEADERS` on the daemon to export

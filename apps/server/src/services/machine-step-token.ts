@@ -62,7 +62,7 @@ export async function stepToken(
         : null;
   }
   return {
-    commitIdentity: await softwareCommitIdentity(deps),
+    commitIdentity: softwareCommitIdentity(deps),
     coAuthor:
       todoRow &&
       stepRow?.scheduleId == null &&
@@ -124,6 +124,7 @@ function chiefStepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     git: null,
+    commitIdentity: softwareCommitIdentity(deps),
     coAuthor: null,
   };
 }

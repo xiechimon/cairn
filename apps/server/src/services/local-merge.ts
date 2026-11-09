@@ -20,7 +20,7 @@ import { localGateFacts } from './local-merge-facts.js';
 import type { MachineDeps } from './machine-deps.js';
 import { publishStepStatus, upsertMessage } from './machine-deps.js';
 import type { mergeReadiness } from './merge-gate/readiness.js';
-import { notifyTodoPhase } from './notifications.js';
+import { notifyTodo } from './notifications.js';
 import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { getTodo, setTodoPhase } from './todos.js';
 
@@ -81,7 +81,7 @@ export async function enqueueLocalMerge(
         : `${todoRow.title}\n\nCloses ${source.owner}/${source.repo}#${source.issueNumber}`,
       coAuthor,
     ),
-    identity: (await softwareCommitIdentity(deps)) ?? localCommitIdentity(deps.user.displayName),
+    identity: softwareCommitIdentity(deps) ?? localCommitIdentity(deps.user.displayName),
   });
   deps.db.transaction(() => {
     claimAutonomousMerge(deps.db, buildId);
@@ -143,10 +143,10 @@ export function applyLocalMergeReport(
   if (result.outcome === 'merged') {
     completeStep(deps, row.id);
   } else if (record.latestBuildId === row.buildId && record.phase === 'review') {
-    const notice = notifyTodoPhase(
+    const notice = notifyTodo(
       deps,
       record,
-      'review',
+      'build_review',
       `Local merge ${result.outcome}: ${result.reason}`,
     );
     upsertMessage(deps, {

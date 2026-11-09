@@ -5,12 +5,17 @@ import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
-import { messageRoleSchema, transcriptRowSchema } from '../records/message.js';
+import {
+  answerDeliveryViaSchema,
+  messageRoleSchema,
+  transcriptRowSchema,
+} from '../records/message.js';
 import { claudeCodeReportSchema } from '../records/model-source.js';
 import { PROJECT_REPO_KINDS } from '../records/project.js';
 import { INFO_REPORT_MAX_BYTES } from '../records/report.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
+import { taskDecisionSchema } from '../records/todo.js';
 import { verifyVerdictSchema } from '../records/verify.js';
 import { skillInjectionFactsSchema } from '../skill-injection-check.js';
 import {
@@ -159,6 +164,7 @@ export const claimedStepSchema = z.object({
     priorMachineId: z.string().optional(),
   }),
   instruction: z.string().nullable().optional(),
+  answerIds: z.array(z.string().min(1)).optional(),
   todo: z
     .object({
       id: recordId,
@@ -174,6 +180,7 @@ export const claimedStepSchema = z.object({
       sourceKind: z.string().nullable().optional(),
       sourceRef: z.string().nullable().optional(),
       blockerHandoff: blockerHandoffSchema.optional(),
+      decisions: z.array(taskDecisionSchema).optional(),
       output: z.string().nullable().optional(),
     })
     .optional(),
@@ -259,10 +266,23 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
 
+export const steerAnswerSchema = z.object({
+  requestId: z.string().min(1),
+  text: z.string(),
+});
+export type SteerAnswer = z.infer<typeof steerAnswerSchema>;
+
 export const machineSteerResponseSchema = z.object({
   content: z.string().nullable(),
+  answers: z.array(steerAnswerSchema).optional(),
 });
 export type MachineSteerResponse = z.infer<typeof machineSteerResponseSchema>;
+
+export const machineSteerAckBodySchema = z.object({
+  answerIds: z.array(z.string().min(1)).max(100).optional(),
+  via: answerDeliveryViaSchema.optional(),
+});
+export type MachineSteerAckBody = z.infer<typeof machineSteerAckBodySchema>;
 
 export const machineStopResponseSchema = z.object({
   discard: z.boolean().nullable(),
@@ -482,7 +502,7 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'POST',
     path: '/api/machine/steer/ack',
     reason:
-      '[design] #1938 steer delivery ack: the chief keeps a steered message queued until the daemon reports it reached the live session (?stepId=)',
+      '[design] #1938 steer delivery ack: the chief keeps a steered message queued until the daemon reports it reached the live session (?stepId=); #3512 the optional body {answerIds, via: poll | steer | session-start} is the only way an answer is marked delivered',
   },
   {
     method: 'GET',

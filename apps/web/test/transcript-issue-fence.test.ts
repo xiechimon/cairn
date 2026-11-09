@@ -41,6 +41,7 @@ const WIRE: WireTodo = {
   sourceBuildId: null,
   sourceKind: 'github-issue',
   sourceRef: 'github:octo/alpha#7',
+  owner: null,
   output: 'code',
 };
 

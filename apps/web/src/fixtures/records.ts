@@ -3,7 +3,6 @@ import {
   type ChiefDigestItem,
   type ChiefReportContent,
   type ClaudeLogin,
-  type DocumentDiffFile,
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
@@ -21,6 +20,9 @@ import {
   type TagRecord,
   type ThreadMessageContent,
   type ThreadReportContent,
+  type TodoOutputKind,
+  type TodoOwner,
+  type TodoSection,
   type UsageCost,
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
@@ -66,7 +68,6 @@ export interface TodoRecord {
   buildHistory: BuildRef[];
   sourceTodo: string | null;
   v: number;
-  awaitingReply?: boolean;
   chiefCreated?: boolean;
   waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };
   quotaWait?: QuotaWait | null;
@@ -74,6 +75,9 @@ export interface TodoRecord {
   sourceRef?: string | null;
   usageCost?: UsageCost;
   verified?: boolean;
+  owner?: TodoOwner;
+  output?: TodoOutputKind;
+  section?: TodoSection | null;
   routeOverride?: {
     machineId?: string;
     requiredCapabilities?: {
@@ -165,15 +169,6 @@ export interface ScheduleRecord {
   };
 }
 
-export interface ProjectCommitRow {
-  id: string;
-  shortSha: string;
-  message: string;
-  authorName: string;
-  at: number;
-  files?: DocumentDiffFile[];
-}
-
 export interface ProjectContent {
   name: string;
   branch: string;
@@ -185,7 +180,6 @@ export interface ProjectContent {
   description: string | null;
   icon?: ProjectIcon;
   color?: ProjectColor;
-  commits?: ProjectCommitRow[];
   fileContents?: Record<string, string>;
 }
 
@@ -289,6 +283,7 @@ export interface MachineRow {
     executor?: MachineExecutor;
     computer?: true;
     ownComputer?: true;
+    browser?: true;
   } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
@@ -603,7 +598,7 @@ export interface ChiefThreadRef {
   active?: boolean;
 }
 
-export type ChiefSettingsTab = 'agent' | 'charter' | 'memory' | 'watches';
+export type ChiefSettingsTab = 'routing' | 'charter' | 'memory' | 'watches';
 
 export interface ModelOption {
   provider: string;

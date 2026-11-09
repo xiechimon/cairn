@@ -2,9 +2,12 @@ import type {
   ActiveRun,
   AutonomyGateReason,
   AutonomyKind,
+  AutonomyPauseMarker,
+  AutonomyPauseSource,
   AutonomySettings,
   BlockerHandoffRecord,
   BuildEvidence,
+  BuildStop,
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
@@ -42,12 +45,14 @@ import type {
   SnoozeMode,
   SplitPolicy,
   StepKind,
+  TaskDecision,
   TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
 } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -74,7 +79,6 @@ export const team = sqliteTable('team', {
   plan: text('plan').notNull().default('free'),
   claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
   avatarStyle: text('avatarStyle'),
-  autonomyPaused: bool('autonomyPaused').notNull().default(false),
   coAuthorTrailer: bool('coAuthorTrailer').notNull().default(true),
   requestInstructorReview: bool('requestInstructorReview').notNull().default(false),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
@@ -85,9 +89,32 @@ export const team = sqliteTable('team', {
   namedPrompts: json<NamedPromptOverrides | null>('namedPrompts'),
 });
 
+export const autonomyPause = sqliteTable(
+  'autonomy_pause',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    source: text('source').$type<AutonomyPauseSource>().notNull(),
+    reason: text('reason').notNull(),
+    markers: json<AutonomyPauseMarker[]>('markers').notNull(),
+    publishError: text('publishError'),
+    openedAt: epochMs('openedAt').notNull(),
+    resolvedAt: epochMs('resolvedAt'),
+    resolvedBy: text('resolvedBy').$type<'markers' | 'owner'>(),
+    requestKey: text('requestKey'),
+  },
+  (t) => [
+    index('autonomy_pause_team_resolved_idx').on(t.teamId, t.resolvedAt),
+    uniqueIndex('autonomy_pause_team_request_key_idx').on(t.teamId, t.requestKey),
+  ],
+);
+
 export const project = sqliteTable('project', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  group: text('group'),
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
@@ -140,8 +167,12 @@ export const todo = sqliteTable(
     sourceBuildId: text('sourceBuildId'),
     sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
     sourceRef: text('sourceRef'),
+    issueState: text('issueState').$type<'open' | 'closed' | null>(),
+    supersededBy: text('supersededBy'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
-    awaitingReply: bool('awaitingReply').notNull().default(false),
+    decisions: json<TaskDecision[]>('decisions').notNull().default(sql`'[]'`),
+    lastNotifiedOwner: text('lastNotifiedOwner').default('none'),
+    lastNotifiedWork: text('lastNotifiedWork').default(''),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
@@ -149,6 +180,16 @@ export const todo = sqliteTable(
   },
   (t) => [index('todo_phase_idx').on(t.phase)],
 );
+
+export const taskIssueClose = sqliteTable('task_issue_close', {
+  id: text('id').primaryKey(),
+  teamId: text('teamId')
+    .notNull()
+    .references(() => team.id),
+  sourceRef: text('sourceRef').notNull(),
+  comment: text('comment').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
+});
 
 export const tag = sqliteTable('tag', {
   id: text('id').primaryKey(),
@@ -193,6 +234,7 @@ export const build = sqliteTable('build', {
   harnessHash: text('harnessHash'),
   reportAttachmentId: text('reportAttachmentId'),
   reportLine: text('reportLine'),
+  stop: json<BuildStop | null>('stop'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -333,6 +375,7 @@ export const computer = sqliteTable(
     controlLeaseExpiresAt: epochMs('controlLeaseExpiresAt'),
     controlFence: integer('controlFence').notNull().default(0),
     screenGeneration: integer('screenGeneration').notNull().default(0),
+    browserEnabled: bool('browserEnabled').notNull().default(false),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
   },
@@ -1284,4 +1327,15 @@ export const clientMessage = sqliteTable(
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [primaryKey({ columns: [t.scopeId, t.clientMessageId] })],
+);
+
+export const deployLease = sqliteTable(
+  'deploy_lease',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    status: text('status').$type<'accepting' | 'draining'>().notNull(),
+    expiresAt: epochMs('expiresAt').notNull(),
+  },
+  (t) => [check('deploy_lease_status', sql`${t.status} in ('accepting', 'draining')`)],
 );

@@ -69,6 +69,26 @@ export const usageCostSchema = z.object({
 });
 export type UsageCost = z.infer<typeof usageCostSchema>;
 
+export const taskDecisionSchema = z.object({
+  requestId: z.string(),
+  question: z.string(),
+  answer: z.string(),
+  by: z.enum(['person', 'coordinator']),
+  at: epochMs,
+});
+export type TaskDecision = z.infer<typeof taskDecisionSchema>;
+
+export const THREAD_OWNERS = ['owner', 'coordinator'] as const;
+
+export const todoSectionSchema = z.enum([
+  'needs_input',
+  'ready_for_review',
+  'up_next',
+  'working',
+  'resolved',
+]);
+export type TodoSection = z.infer<typeof todoSectionSchema>;
+
 export const todoRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -97,6 +117,8 @@ export const todoRecordSchema = z.object({
   sourceKind: todoSourceKindSchema.nullable(),
   sourceRef: z.string().nullable(),
   output: todoOutputSchema.default('code'),
+  owner: z.enum(THREAD_OWNERS).nullable().default(null),
+  section: todoSectionSchema.nullable().optional(),
   waitingOn: z
     .object({
       on: z.enum(['machine', 'quota']),
@@ -106,10 +128,11 @@ export const todoRecordSchema = z.object({
   quotaWait: quotaWaitSchema.nullable().optional(),
   usageCost: usageCostSchema.optional(),
   verified: z.boolean().optional(),
-  awaitingReply: z.boolean().optional(),
+  decisions: z.array(taskDecisionSchema).optional(),
   routeOverride: routeOverrideSchema.nullable().optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
+export type TodoOwner = TodoRecord['owner'];
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
 
 export const createTodoBodySchema = z.object({

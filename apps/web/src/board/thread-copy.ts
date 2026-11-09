@@ -13,13 +13,13 @@ const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
 };
 
 export function threadStatus(todo: TodoRecord): ThreadStatus {
-  if (todo.awaitingReply === true) return 'needs-you';
   switch (todo.phase) {
     case 'queued':
     case 'planning':
     case 'building':
       return 'running';
     case 'confirm':
+    case 'needs_input':
     case 'review':
       return 'needs-you';
     case 'failed':
@@ -55,9 +55,6 @@ export interface ThreadCopy {
 }
 
 export function threadCopy(todo: TodoRecord): ThreadCopy {
-  if (todo.awaitingReply === true) {
-    return { state: STATUS_WORDS.needsYou, reason: '在问你一个问题。', primary: '回答' };
-  }
   if (todo.quotaWait != null) {
     return {
       state: STATUS_WORDS.running,
@@ -68,6 +65,8 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
     };
   }
   switch (todo.phase) {
+    case 'needs_input':
+      return { state: STATUS_WORDS.needsYou, reason: '在问你一个问题。', primary: '回答' };
     case 'confirm':
       return {
         state: STATUS_WORDS.needsYou,
@@ -97,6 +96,6 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
 export function threadTone(todo: TodoRecord): StoneTone {
   if (todo.phase === 'done' || todo.phase === 'closed') return 'resolved';
   if (todo.snoozeMode != null) return 'idle';
-  if (todo.phase === 'review' && todo.awaitingReply !== true) return 'review';
+  if (todo.phase === 'review') return 'review';
   return THREAD_TONE[threadStatus(todo)];
 }

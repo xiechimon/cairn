@@ -1,4 +1,4 @@
-import type { MachineDoneBody, ModelUsage } from '@cairn/shared';
+import type { MachineDoneBody, ModelUsage, OtelObservation } from '@cairn/shared';
 import {
   CHIEF_TURN_ERROR_KIND,
   formatSkillRouteSection,
@@ -115,6 +115,7 @@ export function finishCoordinatorTurn(
   deps: MachineDeps,
   stepRow: StepRow,
   outcome: MachineDoneBody,
+  observation?: OtelObservation,
 ): void {
   const { db } = deps;
   db.update(step)
@@ -155,7 +156,7 @@ export function finishCoordinatorTurn(
       createdAt: nowMs(),
     });
   }
-  emitRuntimeStepSpan(deps.db, stepRow.id);
+  emitRuntimeStepSpan(deps.db, stepRow.id, process.env, observation);
 }
 
 export function recordStepUsage(

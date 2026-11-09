@@ -1,6 +1,6 @@
 import { cn } from 'cn';
 import { FileDiff, X } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -230,7 +230,9 @@ function ThreadBody({
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}
-          spec={todo.spec.trim() !== '' ? todo.spec : undefined}
+          spec={todo.spec.trim() !== '' && !chat.hasEarlier ? todo.spec : undefined}
+          hasEarlier={chat.hasEarlier}
+          {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
           autoScroll={chat.transcript.length > 0}
           running={threadStatus(todo) === 'running'}
           settled={chat.transcriptSettled}
@@ -315,7 +317,7 @@ export function SideChat({
   const showsChanges = view === 'changes';
 
   const panelRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const releaseCovered = (target: EventTarget | null) => {
       const panel = panelRef.current;
       if (panel === null || !(target instanceof HTMLElement)) return;
@@ -334,7 +336,7 @@ export function SideChat({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       if (document.querySelector(OPEN_SURFACE) !== null) return;
