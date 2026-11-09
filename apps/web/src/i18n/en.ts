@@ -198,8 +198,6 @@ export const EN: Record<string, string> = {
   目前用团队密钥: 'Team secrets for now',
   目前跟随机器上限: 'Machine limits for now',
   保存项目说明: 'Save instructions',
-  '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':
-    'Every thread and the Coordinator read these in this project, after the repository AGENTS.md.',
   '例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。':
     'For example: repository content is English; run pnpm lint after changes; never force push.',
   '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
@@ -1181,15 +1179,37 @@ export const EN: Record<string, string> = {
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
-  '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。':
-    'No memories yet. The Coordinator stores experience worth keeping here as it works.',
+  'Coordinator 在所有项目里都会用到的笔记。': 'Notes the Coordinator uses across every project.',
+  '像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。':
+    'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
+  自动记忆: 'Auto memory',
+  'Coordinator 在这个项目里工作时自己写下的笔记。':
+    'Notes the Coordinator writes itself as it works in this project.',
+  'Coordinator 还没有记下团队笔记。': 'The Coordinator has not written team notes yet.',
+  'Coordinator 还没有在这个项目里记下笔记。':
+    'The Coordinator has not written notes in this project yet.',
+  可自动注入: 'Eligible for automatic injection',
+  记忆文件: 'Memory files',
+  '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
+  正在加载记忆: 'Loading memories',
+  '打开记忆：{title}': 'Open memory: {title}',
+  '可检索 · 不自动注入': 'Searchable · not injected automatically',
+  核心: 'Core',
+  '更新于 {date}': 'Updated {date}',
+  更新于: 'Updated',
+  概要: 'Summary',
+  '删除…': 'Delete…',
+  删除这条记忆: 'Delete this memory',
+  '删除这条记忆？': 'Delete this memory?',
+  删除记忆: 'Delete memory',
+  '正在删除…': 'Deleting…',
+  '只删除这条记忆，不影响保存它的对话。':
+    'Deletes only this memory, not the conversation it was saved from.',
+  '没有删除成功，记忆保持原样，请重试。': 'The memory was not deleted and is unchanged. Try again.',
+  '离线中。记忆只能查看，重新连接后才能删除。':
+    'Offline. Memories are read-only until you reconnect.',
   模型与机器: 'Model & machine',
 
-  // —— #499 记忆 tab 的搜索与排序（配额头 + 搜索框 + 排序档）——
-  // `记忆 · {n} / {max}`：{max} = shared MEMORY_QUOTA_PER_AGENT 插值，不写死
-  // 数字；`搜索记忆…` = shared MEMORY_UI_COPY.searchPlaceholder（经 t() 消费、
-  // 不作字面量出现，i18n-coverage COMPUTED_KEYS 登记）。
-  '记忆 · {n} / {max}': 'Memory · {n} / {max}',
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
