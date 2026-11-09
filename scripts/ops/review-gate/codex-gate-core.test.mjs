@@ -772,6 +772,18 @@ test('the newest deferral reply names the issue, in any letter case', () => {
     41,
   );
   assert.equal(deferredIssue({ replies: ['out of scope for this PR, tracked in #12a'] }), null);
+  assert.equal(
+    deferredIssue({ replies: ['Do not use `out of scope for this PR, tracked in #999` here'] }),
+    null,
+  );
+  assert.equal(
+    deferredIssue({ replies: ['Do not reply `valid, out of scope for this PR, tracked in #999`'] }),
+    null,
+  );
+  assert.equal(
+    deferredIssue({ replies: ['Class: retry.\nvalid, out of scope for this PR, tracked in #7'] }),
+    7,
+  );
 });
 
 test('a deferral is judged on any Codex thread as soon as it is written, never on a human thread', () => {
