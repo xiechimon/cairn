@@ -1,17 +1,16 @@
 import type { ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
-import { AlarmClockOff, ChevronDown, Folder } from 'lucide-react';
+import { ChevronDown, Folder } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PROJECT_ICON_COMPONENTS } from '../../board/project-icon-map.js';
-import { ACCENT_INK } from '../../phase.js';
-import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { Button } from '../ui/button.js';
 
 export interface SidebarProjectRowProps {
   name: string;
   icon?: ProjectIcon | null | undefined;
   active?: boolean;
-  muted?: boolean;
+  nested?: boolean;
+  waiting?: string | null;
   onClick?: () => void;
   menu?: ReactNode;
 }
@@ -49,7 +48,8 @@ export function SidebarProjectRow({
   name,
   icon,
   active = false,
-  muted = false,
+  nested = false,
+  waiting = null,
   onClick,
   menu,
 }: SidebarProjectRowProps) {
@@ -64,14 +64,27 @@ export function SidebarProjectRow({
         active
           ? 'font-semibold text-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover'
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
-        muted && !active && 'text-content-tertiary',
-        menu != null && 'pr-8',
+        nested && 'pl-6',
+        menu != null &&
+          'group-focus-within/project:pr-8 group-hover/project:pr-8 group-has-aria-expanded/project:pr-8 [@media(hover:none)]:pr-8',
       )}
     >
       <ProjectGlyph icon={icon} />
-      <span className="min-w-0 truncate" title={name}>
+      <span className="min-w-0 flex-1 truncate text-left" title={name}>
         {name}
       </span>
+      {waiting != null && (
+        <span
+          role="img"
+          aria-label={waiting}
+          data-slot="needs-you-dot"
+          className={cn(
+            'size-1.5 flex-none rounded-full bg-(--card-button)',
+            menu != null &&
+              '[@media(hover:hover)]:group-focus-within/project:invisible [@media(hover:hover)]:group-hover/project:invisible [@media(hover:hover)]:group-has-aria-expanded/project:invisible',
+          )}
+        />
+      )}
     </Button>
   );
   if (menu == null) return button;
@@ -85,155 +98,32 @@ export function SidebarProjectRow({
   );
 }
 
-export type SidebarThreadState = 'needs-you' | 'running' | 'idle' | 'done' | 'failed';
-
-const STATE_GLYPH: Record<SidebarThreadState, { kind: GlyphKind; ink: string }> = {
-  'needs-you': { kind: 'half', ink: ACCENT_INK },
-  running: { kind: 'working', ink: 'text-content-secondary' },
-  idle: { kind: 'todo', ink: 'text-content-tertiary' },
-  done: { kind: 'done', ink: 'text-content-dim' },
-  failed: { kind: 'failed', ink: 'text-content-tertiary' },
-};
-
-export interface SidebarThreadRowProps {
-  title: string;
-  state: SidebarThreadState;
-  open?: boolean;
-  snoozed?: boolean;
-  tag?: string;
-  elapsed?: string | null;
-  hoverTime?: string | null;
-  tooltip?: string;
-  onClick?: () => void;
-}
-
-export function SidebarThreadRow({
-  title,
-  state,
-  open = false,
-  snoozed = false,
-  tag,
-  elapsed,
-  hoverTime,
-  tooltip,
-  onClick,
-}: SidebarThreadRowProps) {
-  const glyph = STATE_GLYPH[state];
-  const lifted = state === 'running' && !open;
-  return (
-    <div
-      data-slot="sidebar-thread-row"
-      data-state={state}
-      data-open={open ? '' : undefined}
-      className={cn(
-        'group/thread relative flex h-7 items-center rounded-(--radius-control)',
-        open && 'bg-sidebar-hover text-foreground',
-        lifted && 'bg-card shadow-(--e1)',
-        !open && !lifted && 'hover:bg-sidebar-hover',
-      )}
-    >
-      <Button
-        variant="ghost"
-        onClick={onClick}
-        aria-current={open ? 'true' : undefined}
-        title={tooltip}
-        className={cn(
-          'h-7 min-w-0 flex-1 justify-start gap-2 px-2 text-ui font-normal hover:bg-transparent dark:hover:bg-transparent',
-          snoozed || state === 'done' ? 'text-content-tertiary' : 'text-content-secondary',
-          (open || state === 'needs-you' || state === 'running') && 'text-foreground',
-        )}
-      >
-        {snoozed ? (
-          <AlarmClockOff className="size-3.5 flex-none text-content-tertiary" strokeWidth={1.75} />
-        ) : (
-          <StatusGlyph kind={glyph.kind} className={glyph.ink} />
-        )}
-        <span data-slot="sidebar-thread-title" className="min-w-0 flex-1 truncate text-left">
-          {title}
-        </span>
-      </Button>
-      {tag != null && (
-        <span
-          data-slot="sidebar-thread-tag"
-          className="mr-2 flex-none rounded-sm bg-foreground/6 px-1.5 text-caption leading-4 text-content-secondary"
-        >
-          {tag}
-        </span>
-      )}
-      {elapsed != null && (
-        <span
-          data-slot="sidebar-thread-meta"
-          className="mr-2 flex-none text-caption text-content-tertiary tabular-nums"
-        >
-          {elapsed}
-        </span>
-      )}
-      {hoverTime != null && (
-        <span
-          data-slot="sidebar-thread-hover-time"
-          className="pointer-events-none absolute top-1/2 right-0 hidden -translate-y-1/2 rounded-r-(--radius-control) bg-sidebar-hover pr-2 pl-2 text-caption text-content-tertiary tabular-nums group-focus-within/thread:inline group-hover/thread:inline"
-        >
-          {hoverTime}
-        </span>
-      )}
-    </div>
-  );
-}
-
-export function SidebarGroupHeader({
-  label,
-  count,
-  accent = false,
+export function SidebarProjectGroupHeader({
+  name,
   expanded,
   onToggle,
-  testId,
 }: {
-  label: string;
-  count: number;
-  accent?: boolean;
-  expanded?: boolean;
-  onToggle?: () => void;
-  testId?: string;
+  name: string;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
-  const body = (
-    <>
-      {label}
-      <span className="tabular-nums">{count}</span>
-      {expanded !== undefined && (
-        <ChevronDown
-          aria-hidden
-          className={cn(
-            'size-3.5 text-content-dim transition-transform duration-150',
-            !expanded && '-rotate-90',
-          )}
-          strokeWidth={1.75}
-        />
-      )}
-    </>
-  );
-  const className = cn(
-    'flex h-6 w-full items-center justify-start gap-1.5 pr-1 pl-2.5 text-caption font-medium',
-    accent ? 'text-foreground' : 'text-content-tertiary',
-  );
-  if (onToggle === undefined) {
-    return (
-      <div data-testid={testId} className={className}>
-        {body}
-      </div>
-    );
-  }
   return (
     <Button
       variant="ghost"
-      data-testid={testId}
+      data-testid="project-group-header"
       aria-expanded={expanded}
       onClick={onToggle}
-      className={cn(
-        className,
-        'h-6 cursor-pointer rounded-(--radius-control) border-none bg-transparent hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent',
-      )}
+      className="mt-3 h-6 w-full cursor-pointer justify-start gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent"
     >
-      {body}
+      <span className="min-w-0 truncate">{name}</span>
+      <ChevronDown
+        aria-hidden
+        className={cn(
+          'size-3.5 flex-none text-content-dim transition-transform duration-150',
+          !expanded && '-rotate-90',
+        )}
+        strokeWidth={1.75}
+      />
     </Button>
   );
 }

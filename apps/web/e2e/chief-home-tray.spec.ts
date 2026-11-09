@@ -117,11 +117,11 @@ test('no needs-you thread and no question means no tray and a plain tab title', 
   await expect(page).toHaveTitle('Cairn');
 });
 
-test('a pending question counts as needs-you in the badge and tab title, and the conversation says it is waiting', async ({
+test('a pending question counts as needs-you on the Tasks toggle and tab title, and the conversation says it is waiting', async ({
   page,
 }) => {
   await openWithQuestion(page);
-  await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveText('1');
+  await expect(page.getByTestId('tasks-badge')).toHaveText('1');
   await expect(page).toHaveTitle('(1) Cairn');
   const stream = page.getByTestId('chief-stream');
   await expect(stream).toContainText('Waiting for your answer');

@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, PROJECT, TASK, THREAD } from './chief-home-mock';
+import { mockLive, PROJECT, taskEntry, THREAD } from './chief-home-mock';
 
-const MIN = 60_000;
 const LONG = 'Rework the credential relay so a machine that reconnects mid-run keeps its lease';
 
 async function open(page: Page) {
@@ -12,37 +11,25 @@ async function open(page: Page) {
       ...PROJECT,
       id: `proj-${i + 2}`,
       name,
+      group: i < 2 ? null : 'Side projects',
     })),
+    { ...PROJECT, id: 'proj-old', name: 'attic', archivedAt: now },
   ];
-  const todo = (id: string, title: string, phase: string, ago: number, extra = {}) => ({
-    ...TASK,
-    id,
-    title,
-    phase,
-    phaseAt: now - ago * MIN,
-    ...extra,
-  });
-  const todos = [
-    todo('t-ask', 'Pick a provider for the first run', 'confirm', 5),
-    todo('t-rev', LONG, 'review', 40),
-    todo('t-fail', 'Failed deploy to staging', 'failed', 180),
-    todo('t-run', 'Run the build', 'building', 12),
-    todo('t-run2', LONG, 'planning', 3, { projectId: 'proj-2' }),
-    todo('t-idle', 'Draft the release notes', 'todo', 600),
-    todo('t-done', 'Finished work', 'done', 2),
-    todo('t-arch', 'Archived work', 'building', 1, { archivedAt: now }),
+  const tasks = [
+    taskEntry({ id: 't-ask', title: 'Pick a provider', phase: 'confirm', section: 'needs_input' }),
+    taskEntry({ id: 't-run', title: LONG, phase: 'building', section: 'working', projectId: 'proj-4' }),
   ];
-  await mockLive(page, { threads: [THREAD], messages: [], todos, projects });
-  await page.goto('/app');
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [], tasks, projects });
+  await page.goto('/app?project=proj-2');
   if (page.viewportSize()!.width < 640) {
     await page.getByRole('button', { name: '展开侧边栏' }).click();
   }
-  await expect(page.getByTestId('thread-groups')).toBeVisible();
+  await expect(page.locator('aside [data-slot="sidebar-project-row"]').first()).toBeVisible();
 }
 
 const probe = (page: Page) =>
   page.evaluate(() => {
-    const rows = [...document.querySelectorAll<HTMLElement>('aside [data-slot="sidebar-thread-row"]')];
+    const rows = [...document.querySelectorAll<HTMLElement>('aside [data-slot="sidebar-project-row"]')];
     const list = document.querySelector<HTMLElement>('aside nav')!;
     const rgb = (value: string) => {
       const m = value.match(/rgba?\(([^)]+)\)/);
@@ -84,21 +71,21 @@ const probe = (page: Page) =>
       hues: hues.size,
       rows: rows.map((row) => {
         const rect = row.getBoundingClientRect();
-        const title = row.querySelector<HTMLElement>('[data-slot="sidebar-thread-title"]')!;
-        const glyph = row.querySelector('svg')!;
+        const title = row.querySelector<HTMLElement>('span[title]')!;
+        const dot = row.querySelector('[data-slot="needs-you-dot"]');
+        const glyph = row.querySelector('[data-slot="project-glyph"]')!;
         return {
-          state: row.dataset.state,
+          name: title.textContent,
           titleShare: title.getBoundingClientRect().width / rect.width,
           neutralGlyph: neutral(glyph),
-          tag: row.querySelector('[data-slot="sidebar-thread-tag"]')?.textContent ?? null,
-          meta: row.querySelector('[data-slot="sidebar-thread-meta"]')?.textContent ?? null,
-          bg: getComputedStyle(row).backgroundColor,
+          dotHue: dot === null ? null : hue(rgb(getComputedStyle(dot).backgroundColor)!),
+          hasTime: /\d+\s*(天|小时|分|d|h|m)\b/.test(row.textContent ?? ''),
           borderHue: hue(rgb(getComputedStyle(row).borderTopColor) ?? { r: 0, g: 0, b: 0 }),
         };
       }),
       avatars: list.querySelectorAll('.project-avatar').length,
-      headers: [...document.querySelectorAll('aside [data-testid^="thread-group-"]')].map(
-        (el) => (el as HTMLElement).dataset.testid,
+      headers: [...document.querySelectorAll<HTMLElement>('aside [data-testid="project-group-header"]')].map(
+        (el) => el.textContent,
       ),
     };
   });
@@ -113,26 +100,26 @@ for (const scheme of ['dark', 'light'] as const) {
 
       expect(m.hues, 'L1: distinct chromatic hues in the list').toBeLessThanOrEqual(2);
       expect(m.avatars, 'L3: colored letter avatars').toBe(0);
-      expect(m.headers, 'L5: group order').toEqual([
-        'thread-group-needs-you',
-        'thread-group-running',
-        'thread-group-done',
+      expect(m.headers, 'L5: owner groups after the ungrouped projects').toEqual(['Side projects']);
+      expect(m.rows.map((row) => row.name), 'L5: archived projects show nowhere').toEqual([
+        'cairn',
+        'atlas',
+        'harbor',
+        'ledger',
+        'orchard',
+        'quarry',
+        'signal',
       ]);
-      expect(m.rows.length).toBeGreaterThan(0);
       for (const row of m.rows) {
-        const shares = row.tag !== null || row.meta !== null ? 0.55 : 0.8;
-        expect(row.titleShare, `L4: title share of a ${row.state} row`).toBeGreaterThanOrEqual(shares);
-        if (row.state !== 'needs-you') {
-          expect(row.neutralGlyph, `L2: glyph of a ${row.state} row is neutral`).toBe(true);
-        }
-        if (row.state === 'failed') expect(row.tag, 'L2: failed carries a text tag').toBe('失败');
-        if (row.state !== 'running') expect(row.meta, 'L6: resting time only on running').toBeNull();
+        expect(row.titleShare, `L4: title share of ${row.name}`).toBeGreaterThanOrEqual(0.55);
+        expect(row.neutralGlyph, `L2: glyph of ${row.name} is neutral`).toBe(true);
+        expect(row.hasTime, `L6: ${row.name} holds no time text`).toBe(false);
         expect(row.borderHue, 'L7: no hued border').toBeNull();
       }
-      const running = m.rows.find((r) => r.state === 'running')!;
-      expect(running.meta, 'L6: running shows elapsed').not.toBeNull();
-      const resting = m.rows.find((r) => r.state === 'idle')!;
-      expect(running.bg, 'L7: running row differs from a resting row').not.toBe(resting.bg);
+      expect(
+        m.rows.filter((row) => row.dotHue !== null).map((row) => row.name),
+        'L2: only a project with a task waiting on the owner takes the accent',
+      ).toEqual(['cairn']);
     });
   }
 }

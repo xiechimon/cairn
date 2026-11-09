@@ -11,17 +11,19 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
-import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
+import {
+  ProjectGlyph,
+  SidebarProjectGroupHeader,
+  SidebarProjectRow,
+} from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
-import type { TodoRecord } from '../fixtures/records.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
@@ -29,13 +31,9 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
-import { needsYouCount } from './needs-you.js';
 import { coordinatorSearch } from './open-composer.js';
-import { splitProjectsByArchive } from './project-archive.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
-import { SidebarThreadGroups } from './sidebar-thread-groups.js';
-import { groupThreads, visibleTodos } from './sidebar-threads.js';
-import { THREAD_PARAM, threadHref } from './thread-copy.js';
+import { sidebarProjects } from './sidebar-projects.js';
 
 export type SidebarSelected =
   | 'board'
@@ -53,6 +51,7 @@ export interface SidebarProject {
   name: string;
   icon?: ProjectIcon | null | undefined;
   color?: ProjectColor | null | undefined;
+  group?: string | null | undefined;
   archivedAt?: number | null | undefined;
 }
 
@@ -68,21 +67,34 @@ interface BoardSidebarProps {
   usageNav?: boolean;
   selected?: SidebarSelected;
   projects?: SidebarProject[];
-  todos?: TodoRecord[];
-  onArchiveProject?: (id: string, archived: boolean) => void;
+  waiting?: ReadonlySet<string>;
+  onArchiveProject?: (id: string) => void;
+  onMoveProject?: (id: string, group: string | null) => void;
   projectsState?: 'loading' | 'error';
   onRetryProjects?: () => void;
 }
 
 export const GROUP_STORAGE_KEYS = {
   project: 'cairn.sidebarProjectsCollapsed',
+  groups: 'cairn.sidebarGroupsCollapsed',
 } as const;
+
+const NOTHING_WAITING: ReadonlySet<string> = new Set();
 
 function readProjectsCollapsed(storage: Storage | null): boolean {
   try {
     return storage?.getItem(GROUP_STORAGE_KEYS.project) === '1';
   } catch {
     return false;
+  }
+}
+
+function readGroupsCollapsed(storage: Storage | null): ReadonlySet<string> {
+  try {
+    const stored: unknown = JSON.parse(storage?.getItem(GROUP_STORAGE_KEYS.groups) ?? '[]');
+    return new Set(Array.isArray(stored) ? stored.filter((name) => typeof name === 'string') : []);
+  } catch {
+    return new Set();
   }
 }
 
@@ -138,17 +150,6 @@ function SidebarFooterIcon({
   );
 }
 
-function AttentionBadge({ count }: { count: number }) {
-  return (
-    <span
-      data-testid="attention-badge"
-      className="ml-auto min-w-5 flex-none rounded-full bg-(--card-button) px-1.5 text-center text-caption leading-4 font-semibold tabular-nums text-(--text-on-accent)"
-    >
-      {count}
-    </span>
-  );
-}
-
 export function BoardSidebar({
   collapsed = false,
   onToggle,
@@ -159,8 +160,9 @@ export function BoardSidebar({
   usageNav = false,
   selected = 'board',
   projects,
-  todos,
+  waiting = NOTHING_WAITING,
   onArchiveProject,
+  onMoveProject,
   projectsState,
   onRetryProjects,
 }: BoardSidebarProps) {
@@ -178,40 +180,52 @@ export function BoardSidebar({
   };
   const plain = `?${baseParams}`;
   const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
-  const threadParams = new URLSearchParams(baseParams);
-  if (projectParam !== null) threadParams.set('project', projectParam);
-  const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
-  const { active: projectRows, archived: archivedRows } = useMemo(
-    () => splitProjectsByArchive((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
+  const layout = useMemo(
+    () => sidebarProjects((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
     [projects],
   );
-  const activeProject = [...projectRows, ...archivedRows].some((row) => row.id === projectParam)
+  const listed = useMemo(
+    () => [...layout.ungrouped, ...layout.groups.flatMap((group) => group.projects)],
+    [layout],
+  );
+  const groupNames = useMemo(() => layout.groups.map((group) => group.name), [layout]);
+  const activeProject = (projects ?? [CANON_PROJECT]).some((row) => row.id === projectParam)
     ? projectParam
     : null;
-  const [archivedOpen, setArchivedOpen] = useState(false);
-  const archivedExpanded = archivedOpen || archivedRows.some((row) => row.id === activeProject);
-  const projectMenu = (row: SidebarProject, archived: boolean) =>
-    onArchiveProject === undefined ? undefined : (
+  const waitingLabel = t('有任务在等你');
+  const projectMenu = (row: SidebarProject) =>
+    onArchiveProject === undefined || onMoveProject === undefined ? undefined : (
       <SidebarProjectMenu
         name={row.name}
-        archived={archived}
-        onToggleArchive={() => onArchiveProject(row.id, !archived)}
+        group={row.group ?? null}
+        groups={groupNames}
+        onMove={(group) => onMoveProject(row.id, group)}
+        onArchive={() => onArchiveProject(row.id)}
       />
     );
-  const shownTodos = useMemo(
-    () => visibleTodos(todos ?? [], new Set(archivedRows.map((row) => row.id)), activeProject),
-    [todos, archivedRows, activeProject],
+  const projectRow = (row: SidebarProject, nested: boolean) => (
+    <SidebarProjectRow
+      key={row.id}
+      name={row.name}
+      icon={row.icon}
+      nested={nested}
+      waiting={waiting.has(row.id) ? waitingLabel : null}
+      active={activeProject === row.id}
+      onClick={() => navigate(projectHref(row.id))}
+      menu={projectMenu(row)}
+    />
   );
-  const threadGroups = useMemo(
-    () => groupThreads(shownTodos, activeProject),
-    [shownTodos, activeProject],
+  const [groupsCollapsed, setGroupsCollapsed] = useState(() =>
+    readGroupsCollapsed(safeLocalStorage()),
   );
-  const chiefRoot = useOptionalChiefRoot();
-  const attention = needsYouCount(shownTodos, chiefRoot?.pendingQuestions.length ?? 0);
-  const projectNames = useMemo(
-    () => new Map([...projectRows, ...archivedRows].map((row) => [row.id, row.name])),
-    [projectRows, archivedRows],
-  );
+  const toggleGroup = useCallback((name: string) => {
+    setGroupsCollapsed((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(name)) next.add(name);
+      safeSetItem(GROUP_STORAGE_KEYS.groups, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
 
   const [projectsCollapsed, setProjectsCollapsed] = useState(() =>
     readProjectsCollapsed(safeLocalStorage()),
@@ -224,7 +238,6 @@ export function BoardSidebar({
   }, []);
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
-  const coordinatorLabel = attention > 0 ? `${t('Coordinator')} ${attention}` : t('Coordinator');
   const coordinatorActive = selected === 'board' && activeProject === null;
 
   const settingsLink = {
@@ -277,11 +290,8 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link {...railLink(coordinatorTarget, coordinatorActive, coordinatorLabel)}>
+          <Link {...railLink(coordinatorTarget, coordinatorActive, t('Coordinator'))}>
             <BrandGlyph className={ICON} />
-            {attention > 0 && (
-              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
-            )}
           </Link>
           <Button
             variant="ghost"
@@ -298,11 +308,17 @@ export function BoardSidebar({
             />
           </Button>
           {!projectsCollapsed &&
-            projectRows.map((row) => {
+            listed.map((row) => {
               const href = projectHref(row.id);
               return (
                 <Link key={row.id} {...railLink(href, activeProject === row.id, row.name)}>
                   <ProjectGlyph name={row.name} icon={row.icon} />
+                  {waiting.has(row.id) && (
+                    <span
+                      data-slot="needs-you-dot"
+                      className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
+                    />
+                  )}
                 </Link>
               );
             })}
@@ -368,34 +384,21 @@ export function BoardSidebar({
       </div>
 
       <div className="mt-2 flex flex-none flex-col gap-px">
-        <div className="relative">
-          <SidebarNavRow
-            icon={<BrandGlyph className="size-4" />}
-            label={t('Coordinator')}
-            active={coordinatorActive}
-            onClick={() => navigate(coordinatorTarget)}
-          />
-          {attention > 0 && (
-            <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2">
-              <AttentionBadge count={attention} />
-            </span>
-          )}
-        </div>
+        <SidebarNavRow
+          icon={<BrandGlyph className="size-4" />}
+          label={t('Coordinator')}
+          active={coordinatorActive}
+          onClick={() => navigate(coordinatorTarget)}
+        />
       </div>
 
       <nav
         ref={navRef}
         className={`-mx-1 mt-3 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 ${scrollFadeClassName()}`}
       >
-        <SidebarThreadGroups
-          groups={threadGroups}
-          openThreadId={openThreadId}
-          projectNames={projectNames}
-          onOpen={(id) => navigate(threadHref(id, threadParams.toString()))}
-        />
         <div
           data-testid="project-group"
-          className="mt-3 mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
+          className="mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
         >
           <Button
             variant="ghost"
@@ -448,48 +451,23 @@ export function BoardSidebar({
             </Button>
           </div>
         )}
-        {!projectsCollapsed &&
-          projectRows.map((row) => (
-            <SidebarProjectRow
-              key={row.id}
-              name={row.name}
-              icon={row.icon}
-              active={activeProject === row.id}
-              onClick={() => navigate(projectHref(row.id))}
-              menu={projectMenu(row, false)}
-            />
-          ))}
-        {archivedRows.length > 0 && (
-          <div data-testid="archived-group" className="mt-2 flex flex-col gap-px">
-            <Button
-              variant="ghost"
-              className={`sidebar-group group h-6 w-full cursor-pointer justify-start gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent ${FOCUS} ${
-                archivedExpanded ? '' : 'sidebar-group--collapsed'
-              }`}
-              aria-expanded={archivedExpanded}
-              onClick={() => setArchivedOpen((prev) => !prev)}
-            >
-              {t('已归档')}
-              <span className="tabular-nums">{archivedRows.length}</span>
-              <ChevronDown
-                aria-hidden
-                className="sidebar-group-chevron size-3.5 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
-                strokeWidth={STROKE}
-              />
-            </Button>
-            {archivedExpanded &&
-              archivedRows.map((row) => (
-                <SidebarProjectRow
-                  key={row.id}
-                  name={row.name}
-                  icon={row.icon}
-                  muted
-                  active={activeProject === row.id}
-                  onClick={() => navigate(projectHref(row.id))}
-                  menu={projectMenu(row, true)}
-                />
-              ))}
-          </div>
+        {!projectsCollapsed && (
+          <>
+            {layout.ungrouped.map((row) => projectRow(row, false))}
+            {layout.groups.map((group) => {
+              const expanded = !groupsCollapsed.has(group.name);
+              return (
+                <div key={group.name} className="flex flex-col gap-px">
+                  <SidebarProjectGroupHeader
+                    name={group.name}
+                    expanded={expanded}
+                    onToggle={() => toggleGroup(group.name)}
+                  />
+                  {expanded && group.projects.map((row) => projectRow(row, true))}
+                </div>
+              );
+            })}
+          </>
         )}
       </nav>
 

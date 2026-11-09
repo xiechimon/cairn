@@ -69,17 +69,17 @@ Anti-slop rules (audit `docs/research/ui-ux-audit-2026-11-06.md`, section on AI 
 
 ## 3b. Lists and sidebars
 
-Source: the owner's reference-versus-ours review of the sidebar (#3144, 2026-11-06) against Amp and t3code. A list is any group of three or more rows that stand for entities (threads, projects, tasks). Measure inside the list container (`aside`, `[data-testid=thread-groups]`, a `ListCard`).
+Source: the owner's reference-versus-ours review of the sidebar (#3144, 2026-11-06) against Amp and t3code. A list is any group of three or more rows that stand for entities (threads, projects, tasks). Measure inside the list container (`aside`, the Tasks panel, a `ListCard`).
 
 | Id | Rule | Check |
 |---|---|---|
 | L1 | At most 2 distinct hues in a list, the accent included. Count the computed colors of glyphs, text, fills and borders whose HSL saturation is above 0.15 and lightness between 0.1 and 0.9, bucket them by 30 degrees of hue; neutrals and the ink ladder do not count. | M distinct chromatic hue buckets in the container is <= 2 |
-| L2 | Status in a row is a monochrome glyph (ink ladder) or a muted text tag, never a multi-color icon. Only the one state that needs the user may take the accent (needs-you glyph and its count); failed is a text tag (`Failed`), not a red icon. | M every `[data-slot=sidebar-thread-row]` glyph color is neutral unless `data-state=needs-you`; failed rows contain a `sidebar-thread-tag` |
+| L2 | Status in a row is a monochrome glyph (ink ladder) or a muted text tag, never a multi-color icon. Only the one state that needs the user may take the accent (needs-you glyph and its count); failed is a text tag (`Failed`), not a red icon. | M every `[data-slot=sidebar-project-row]` glyph color is neutral; the only chromatic mark in the row is `[data-slot=needs-you-dot]` |
 | L3 | No colored letter or tinted tile avatars in a list row. A row has no avatar or one neutral 16px type icon in `ink-3`. | M no row descendant has a chromatic background and a one-letter text; `.project-avatar` count is 0 |
-| L4 | The title gets the row. The title box is at least 80% of the row width, or 55% when the row also carries a running elapsed time or a failed tag, at the 248px sidebar and the 288px phone drawer. Nothing else shares the line. | M `title.width / row.width` is >= 0.8 for every thread row, >= 0.55 for a row with a tag or elapsed time |
-| L5 | Group by status with a count header, in this order: needs you, in progress, done (folded). Order comes from `threadStatus`; no thread becomes done by age. Archived threads show nowhere in the list. | G `test/sidebar-threads.test.ts`; M header order in the DOM |
-| L6 | Time shows only on running rows (elapsed) or on hover. A resting non-running row holds no time text, and the hover time takes no layout. | M resting `[data-slot=sidebar-thread-meta]` exists only inside `data-state=running` |
-| L7 | The running row and the open row carry one subtle emphasis step, a surface lift or the hover fill, never a color change or a border in a hue. | M computed background of the running or open row differs from a resting row; its border color is neutral |
+| L4 | The title gets the row. The title box is at least 80% of a task row's width, or 55% when the row also carries a time, a tag, or a project row's glyph, needs-you dot and menu slot, at the 248px sidebar and the 288px phone drawer. Nothing else shares the line. | M `title.width / row.width` is >= 0.55 for every sidebar project row |
+| L5 | The sidebar lists the Coordinator, then unarchived projects: ungrouped first, then each owner-made group in name order, with no group header when the owner made none. It holds no task rows and no counts. Tasks group by the server's `section` in the Tasks panel, in this order: ready for review, needs input, working, resolved (folded). Archived projects show nowhere in the sidebar. | G `test/sidebar-projects.test.ts`, `test/tasks-sections.test.ts`; M header order in the DOM |
+| L6 | A sidebar row holds no time text; a task's age shows in the Tasks panel. | M no `aside` row text matches a duration |
+| L7 | The open row carries one subtle emphasis step (weight, a surface lift or the hover fill), never a color change or a border in a hue. | M every row's border color is neutral |
 
 ## 4. Text, language, access
 

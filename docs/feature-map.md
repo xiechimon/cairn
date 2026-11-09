@@ -78,7 +78,7 @@
 | [Search and activity](#search-and-activity) | 3 | shipped | gap | yes | gap | B7 |
 | [Secrets](#secrets) | 3 | shipped | yes | gap | yes | B10 |
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
-| [Sidebar and thread list](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
+| [Sidebar](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
 | [Feature flags and releases](#feature-releases) | 4 | shipped | gap | gap | gap | B11 |
 | [Feishu integration](#feishu) | 4 | shipped | gap | gap | gap | B11 |
@@ -157,7 +157,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 |---|---|---|
 | [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model behind D56<br>Frontend design: the schedules page and detail dialog have no design<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
-| [Sidebar and thread list](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
+| [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
 ### B8 · Composer, attachments and project files
 
@@ -607,7 +607,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### sidebar
 
-**Sidebar and thread list** (shipped). The sidebar with the Coordinator row, projects and thread groups, unread marks and the project menu.
+**Sidebar** (shipped). The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.
 
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
