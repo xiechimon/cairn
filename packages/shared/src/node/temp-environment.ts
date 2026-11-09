@@ -17,8 +17,8 @@ export function createTempEnvironment(env: NodeJS.ProcessEnv = process.env) {
     env.CAIRN_TEST_TEMP_ROOT ?? join(env.HOME || homedir(), '.cache/lane-tmp'),
   );
   const parent =
-    env.CAIRN_TEST_TEMP_ROOT && env.TMPDIR === join(configuredRoot, 'tmp')
-      ? env.TMPDIR
+    env.CAIRN_TEST_TEMP_ROOT && env.CAIRN_RUNTIME_TEMP_ROOT === join(configuredRoot, 'tmp')
+      ? env.CAIRN_RUNTIME_TEMP_ROOT
       : configuredRoot;
   mkdirSync(parent, { recursive: true, mode: 0o700 });
   const root = mkdtempSync(join(parent, 'ct-'));
@@ -27,7 +27,12 @@ export function createTempEnvironment(env: NodeJS.ProcessEnv = process.env) {
   const lease = openSync(root, 'r');
   return {
     root,
-    env: { TMPDIR: runtime, CAIRN_TEST_TEMP_ROOT: root, CAIRN_HEAVY_SLOTS_DIR: slots },
+    env: {
+      TMPDIR: runtime,
+      CAIRN_RUNTIME_TEMP_ROOT: runtime,
+      CAIRN_TEST_TEMP_ROOT: root,
+      CAIRN_HEAVY_SLOTS_DIR: slots,
+    },
     cleanup() {
       try {
         rmSync(root, { recursive: true, force: true });

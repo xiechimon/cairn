@@ -222,3 +222,17 @@ createTempEnvironment();`);
     run.cleanup();
   }
 });
+
+test('nested runtime ownership survives a child TMPDIR override', () => {
+  const run =
+    fixture(`import { createTempEnvironment } from ${JSON.stringify(new URL('../packages/shared/src/node/temp-environment.ts', import.meta.url).href)};
+console.log('TEMP:' + JSON.stringify({ home: process.env.CAIRN_TEST_TEMP_ROOT, runId: process.env.CAIRN_TEST_RUN_ID }));
+process.env.TMPDIR = process.env.CAIRN_TEST_TEMP_ROOT;
+createTempEnvironment();`);
+  try {
+    assert.equal(run.result.status, 0, run.result.stderr);
+    assert.equal(existsSync(run.allocation.home), false);
+  } finally {
+    run.cleanup();
+  }
+});

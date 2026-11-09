@@ -242,3 +242,23 @@ test('wrapper refuses an unusable root before starting the command', () => {
   assert.notEqual(result.status, 0);
   assert.equal(existsSync(join(home, 'started')), false);
 });
+
+test('inspection failure protection is independent of permission-bit enforcement', () => {
+  const preload = `import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+fs.chmodSync = () => {};
+syncBuiltinESMExports();`;
+  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      `data:text/javascript;base64,${Buffer.from(preload).toString('base64')}`,
+      '--test',
+      '--test-name-pattern=an unreadable process inspection',
+      join(import.meta.dirname, 'temp-reclaim.test.mjs'),
+    ],
+    { env, encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});

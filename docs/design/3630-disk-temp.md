@@ -16,10 +16,12 @@ SIGKILL can leave private roots; guard reclaims stale ct-/lane-/step- roots usin
 
 ## Decisions
 
-Use one shared environment constructor for paired defaults, consumed by test supervision, daemon and launcher CLI. Pin Linux lease directory to /tmp/cairn-heavy-slots and use the existing Darwin getconf convention. Do not change heavy-slot admission while #3601 is open. Only files truly allocating temp work migrate; fixtures, protocol paths, container paths and fixed tiny coordination locks remain. Host files stay in scratch for the owner to apply.
+Use one shared environment constructor for paired defaults, consumed by test supervision, daemon and launcher CLI. Pin Linux lease directory to /tmp/cairn-heavy-slots and use the existing Darwin getconf convention. Preserve the shared heavy-slot admission established by merged PR #3601. Only files truly allocating temp work migrate; fixtures, protocol paths, container paths and fixed tiny coordination locks remain. Host files stay in scratch for the owner to apply.
 
 ## 6. Delivery
 
 Implementation: current Codex session. Review: head-bound Codex cloud review. PR: [#3638](https://github.com/xiechimon/cairn/pull/3638). Coordinator design review approved in chat on 2026-11-09. No live Coordinator writes are authorized. The owner added a configurable 5 GiB cap: measure logical file bytes in lane-tmp, delete oldest owned non-live roots until under budget, and warn when live or protected content prevents reaching it. The cap runs independently of the age threshold. Symlinks are counted without traversing them; filesystem metadata is outside the logical-byte budget.
 
 Runtime layout: each private root owns a `tmp` child for TMPDIR; CAIRN_TEST_TEMP_ROOT points at the root for strictly tracked helper allocations. Nested runs inherit ownership below that runtime child, so a killed daemon and framework caches are reclaimed with the supervisor without being misreported as helper leaks. Helper leaks and unknown entries beside `tmp` remain failures. Process tests inspect real self/child `/proc` entries through a scoped view, while a separate inaccessible-process test proves conservative retention; production still scans every same-user process.
+
+Forward CAIRN_RUNTIME_TEMP_ROOT together with CAIRN_TEST_TEMP_ROOT when passing a step environment to children. This ownership metadata preserves the validated parent runtime subtree when a task overrides TMPDIR, so interrupted child runtimes remain reclaimable by their supervisor. Use a directory in place of maps for inspection-failure fixtures: reading it fails even when permission bits are bypassed.

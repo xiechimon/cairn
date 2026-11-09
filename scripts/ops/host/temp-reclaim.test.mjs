@@ -1,15 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import {
-  chmodSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  symlinkSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createTempEnvironment } from '../../../packages/shared/src/node/temp-environment.ts';
@@ -143,14 +135,9 @@ test('an unreadable process inspection preserves stale roots and over-cap roots'
   const pid = join(proc, '123');
   mkdirSync(join(pid, 'fd'), { recursive: true });
   symlinkSync(home, join(pid, 'cwd'));
-  writeFileSync(join(pid, 'maps'), '');
-  chmodSync(join(pid, 'maps'), 0);
-  try {
-    runGuard({ ...options, processRoot: proc, maxDiskBytes: 0, warn() {} });
-    assert.equal(existsSync(path), true);
-  } finally {
-    chmodSync(join(pid, 'maps'), 0o600);
-  }
+  mkdirSync(join(pid, 'maps'));
+  runGuard({ ...options, processRoot: proc, maxDiskBytes: 0, warn() {} });
+  assert.equal(existsSync(path), true);
 });
 
 test('a private root keeps its idle owner protected by a directory descriptor', () => {
