@@ -98,6 +98,28 @@ test('authenticated submission selects the second project and polls all three re
   }
 });
 
+test('poll returns the whole build transcript across message pages', async () => {
+  const { s, env, fetcher } = world();
+  const client = new HarborSubmission(env, fetcher);
+  const task = await client.submit('Create the requested file.');
+  s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, task.todoId)).run();
+  const ids = Array.from({ length: 250 }, (_, i) => `m-${String(i).padStart(4, '0')}`);
+  s.db
+    .insert(message)
+    .values(
+      ids.map((id, i) => ({
+        id,
+        conversationId: task.buildId,
+        role: 'assistant' as const,
+        content: `step ${i}`,
+        createdAt: 1_000 + i,
+      })),
+    )
+    .run();
+  const result = await client.poll(task, { timeoutMs: 1000, intervalMs: 1 });
+  expect((result.messages.messages as { id: string }[]).map((row) => row.id)).toEqual(ids);
+});
+
 test.each(['', 'incorrect', 'machine'])(
   'server credential %j fails before creating records',
   async (credential) => {
