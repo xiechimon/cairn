@@ -9,22 +9,32 @@ if (!Array.isArray(allowlist) || allowlist.some((path) => typeof path !== 'strin
   throw new Error('Invalid public-content path allowlist');
 
 const percent = String.raw`\b\d+(?:\.\d+)?\s*%`;
-const quota = String.raw`(?:\b(?:usage|quota|limit|remaining|weekly(?:\s+window)?|5[- ]hour(?:\s+window)?)\b|\u989d\u5ea6)`;
+const quota = String.raw`(?:\b(?:quota|(?:weekly|5[- ]hour)\s+window)\b|\u989d\u5ea6)`;
 const adjacent = String.raw`[^\n;.!?%]{0,24}(?:\r?\n[^\n;.!?%]{0,24})?`;
 const quotaPercent = new RegExp(
   `${quota}${adjacent}${percent}|${percent}${adjacent}${quota}`,
   'gi',
 );
+const label = String.raw`(?:^|[{"'\u0060,|])[ \t>*_-]*(?:(?:current|total|account|subscription|weekly)[ \t]+)?(?:usage|limit|remaining)[ \t"'\u0060*_]*[:=]`;
+const labeledPercent = new RegExp(`${label}${adjacent}${percent}`, 'gim');
+const provider = String.raw`\b(?:claude|codex|anthropic|openai|gemini)\b`;
+const usage = String.raw`\b(?:usage|limit|remaining)\b`;
+const providerPercent = new RegExp(
+  `${provider}${adjacent}${usage}${adjacent}${percent}|${percent}${adjacent}${usage}${adjacent}${provider}`,
+  'gi',
+);
 const reset =
   /\bresets?\s+(?:at\s+(?:\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)\b|\d{4}-\d{2}-\d{2})|in\s+\d+(?:\.\d+)?\s*(?:s(?:ec(?:ond)?s?)?|m(?:in(?:ute)?s?)?|h(?:ours?|rs?)?|days?)\b)/gi;
 const rateLimit =
-  /\b(?:x-ratelimit-(?:remaining|limit|reset)\s*[:=]\s*\d|rate[- ]limit\s+(?:status\s*[:=]\s*\S+|(?:remaining|reset|used)\s*[:=]\s*\d|(?:exceeded|exhausted|reached)\b))/gi;
+  /\b(?:x-ratelimit-(?:remaining|limit|reset)\s*[:=]\s*\d|rate[- ]limit\s+(?:status\s*[:=]\s*(?:exceeded|exhausted|reached|limited|blocked|throttled|429)\b|(?:remaining|reset|used)\s*[:=]\s*\d|(?:exceeded|exhausted|reached)\b))/gi;
 const identifier =
   /\b(?:team|project|machine|thread|build|trace|session)(?:[_ -]?id)?\b(?:["'`\s]*[:=]["'`\s]*|\s+["'`]?)([A-Za-z0-9_-]+)(?![A-Za-z0-9_-])/gi;
 const idShape =
   /^(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25}|[A-Za-z0-9_-]{21})$/i;
 const rules = [
   ['quota/usage', quotaPercent],
+  ['quota/usage', labeledPercent],
+  ['quota/usage', providerPercent],
   ['quota/usage', reset],
   ['quota/usage', rateLimit],
   ['identifier', identifier],
@@ -82,7 +92,7 @@ function scanSnapshot(commit, parents = []) {
       ? parents.map((parent) => [parent, commit])
       : [['--root', commit]];
   const command = commit ? ['diff-tree', '-r', '--no-commit-id'] : ['diff'];
-  const options = ['--no-ext-diff', '--no-textconv', '--no-color', '--no-renames'];
+  const options = ['--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '--text'];
   const changedByParent = ranges.map(
     (range) =>
       new Set(

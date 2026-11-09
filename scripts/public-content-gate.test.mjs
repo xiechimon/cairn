@@ -41,6 +41,12 @@ for (const text of [
   `project: \`${uuid}\``,
   'usage: 37.5\u0025',
   'resets in ' + '2h',
+  'remaining: 63\u0025',
+  'limit = 37\u0025',
+  'Claude usage is 37\u0025',
+  '37\u0025 remaining for Codex',
+  'const status = "Usage: 37\u0025";',
+  '{"usage":"37\u0025"}',
 ]) {
   test(`blocks synthetic disclosure: ${text.split(':')[0]}`, () => {
     assert.equal(fileViolations('docs/ops/example.md', text).length, 1);
@@ -62,6 +68,13 @@ for (const text of [
   'teamId: example-team',
   'build a useful implementation',
   'coverage 95%; usage is documented separately',
+  'Raise the coverage limit to 95%',
+  'The remaining 10% is padding',
+  'Disk usage: 15%',
+  'Memory usage is 15%',
+  'coverage limit: 95%',
+  'rate-limit status: enabled',
+  'rate-limit status: disabled',
 ]) {
   test(`allows near-miss: ${text}`, () => {
     assert.deepEqual(fileViolations('docs/ops/example.md', text), []);
@@ -331,6 +344,33 @@ test('a merge resolution that combines a key and value from different parents is
   git('commit', '-qm', 'synthetic merge resolution');
   assert.equal(run('--base', base).status, 1);
 });
+
+for (const attribute of ['binary', '-diff']) {
+  test(`Git ${attribute} attributes cannot hide staged or historical text disclosures`, (t) => {
+    const { cwd, git, run } = repository(t);
+    writeFileSync(join(cwd, '.gitattributes'), `*.md ${attribute}\n`);
+    writeFileSync(join(cwd, 'example.md'), 'Usage: 37\u0025\n');
+    git('add', '.gitattributes', 'example.md');
+    assert.equal(run('--staged').status, 1);
+    git('commit', '-qm', 'synthetic attributed disclosure');
+    assert.equal(run().status, 1);
+    writeFileSync(join(cwd, 'example.md'), 'safe\n');
+    git('add', 'example.md');
+    git('commit', '-qm', 'synthetic attributed cleanup');
+    assert.equal(run().status, 1);
+  });
+
+  test(`Git ${attribute} attributes preserve benign text and actual binary near-misses`, (t) => {
+    const { cwd, git, run } = repository(t);
+    writeFileSync(join(cwd, '.gitattributes'), `*.md ${attribute}\n`);
+    writeFileSync(join(cwd, 'example.md'), 'Raise the coverage limit to 95%\n');
+    writeFileSync(join(cwd, 'binary.md'), Buffer.from('Usage: 37\u0025\0'));
+    git('add', '.gitattributes', 'example.md', 'binary.md');
+    assert.equal(run('--staged').status, 0);
+    git('commit', '-qm', 'synthetic attributed near misses');
+    assert.equal(run().status, 0);
+  });
+}
 
 test('invalid options and missing base fail closed', (t) => {
   const { run } = repository(t);
