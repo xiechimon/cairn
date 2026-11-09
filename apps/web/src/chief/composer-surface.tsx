@@ -15,7 +15,12 @@ import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import type { ComposerBinding } from './composer-binding.js';
-import { ContextMeterRing, contextPercentOf, MOCK_CONTEXT_PERCENT } from './context-meter-ring.js';
+import {
+  ContextMeterRing,
+  contextPercentOf,
+  contextResumeOf,
+  MOCK_CONTEXT_PERCENT,
+} from './context-meter-ring.js';
 
 export const TOOL_BTN_CLS =
   "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
@@ -95,6 +100,7 @@ export function ComposerSurface({
   const { live, teamId } = useLiveData();
   const chiefQ = useChief(teamId, live);
   const contextPercent = contextPercentOf(chiefQ.data?.context);
+  const contextResume = contextResumeOf(chiefQ.data?.context);
   const wire = useComposerWire({
     editable,
     draft: binding.draft,
@@ -295,6 +301,7 @@ export function ComposerSurface({
         <ContextMeterRing
           percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
           mock={contextPercent == null}
+          resume={contextResume}
         />
         {tools}
         {running && turnElapsed != null && (
