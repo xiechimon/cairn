@@ -5,7 +5,7 @@ import {
   parseVerifyPromptMeta,
   RESEARCH_STUCK_SOURCE_KIND,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
@@ -1065,7 +1065,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       .run();
     await w.poller.sweep();
     const verifies = () => w.allSteps().filter((row) => row.kind === 'verify');
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('building');
     expect(verifies()).toHaveLength(1);
     expect(parseVerifyPromptMeta(verifies()[0]?.prompt ?? null)?.expectedHeadSha).toBe(delivered);
 
@@ -1074,6 +1074,9 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       .set({ status: 'done', finishedAt: w.base + 1 })
       .where(eq(stepTable.id, verifies()[0]?.id ?? ''))
       .run();
+    await w.poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(1);
     w.s.db
       .insert(stepTable)
       .values({
@@ -1092,13 +1095,44 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       { githubFetch: w.mock.fetch },
     );
     await restarted.sweep();
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('building');
     expect(verifies()).toHaveLength(2);
     expect(verifies().map((row) => parseVerifyPromptMeta(row.prompt)?.expectedHeadSha)).toEqual(
       expect.arrayContaining([delivered, fixed]),
     );
-    await w.poller.sweep();
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', createdAt: w.base + 3_500, finishedAt: w.base + 4_000 })
+      .where(and(eq(stepTable.kind, 'verify'), eq(stepTable.status, 'pending')))
+      .run();
+    await restarted.sweep();
+    expect(w.todoRow().phase).toBe('review');
     expect(verifies()).toHaveLength(2);
+  });
+
+  test('a queued independent review keeps the task out of review until it finishes', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-review-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'review',
+        status: 'pending',
+        createdAt: w.base,
+      })
+      .run();
+    await w.poller.sweep();
+    expect(w.todoRow().phase).toBe('building');
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: w.base + 1 })
+      .where(eq(stepTable.id, `step-review-${w.buildId}`))
+      .run();
+    await w.poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
   });
 
   test('after green the candidate leaves the grind-green set: another sweep no longer reads checks (moves to the #1403 reconcile surface)', async () => {

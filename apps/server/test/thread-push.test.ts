@@ -232,7 +232,9 @@ test('completion reserved until a claimed step stops does not push to its operat
   const send = vi
     .spyOn(webpush, 'sendNotification')
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
-  expect(prepareStopForDone(s.svc, s.record.id)).toEqual({ state: 'stopping' });
+  expect(prepareStopForDone(s.svc, s.record.id, { actor: 'person', reason: 'test stop' })).toEqual({
+    state: 'stopping',
+  });
   expect(send).not.toHaveBeenCalled();
   applyStoppedStep(s.svc, 'claimed');
   applyStoppedStep(s.svc, 'claimed');

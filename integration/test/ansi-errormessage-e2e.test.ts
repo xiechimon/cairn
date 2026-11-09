@@ -15,7 +15,7 @@ import { type StubLlm, startStubLlm } from './stub-llm.js';
 const BIOME_FIXTURE = fileURLToPath(new URL('./fixtures/biome-ansi-coloured.txt', import.meta.url));
 
 const EXPECTED_HEAD =
-  'git commit failed (1): apps/daemon/test/1262-ansi-probe.ts:1:7 lint/correctness/noUnusedVariables';
+  'git commit failed (exit 1): apps/daemon/test/1262-ansi-probe.ts:1:7 lint/correctness/noUnusedVariables';
 
 let stub: StubLlm;
 let server: RealServer;

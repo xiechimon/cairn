@@ -97,7 +97,11 @@ const CHILD_SETTLED: Phase[] = ['done', 'closed'];
 
 const childTodo = alias(todo, 'child_todo');
 
-const ISSUE_INTAKE_ACTOR: TransitionActor = { kind: 'agent', name: 'GitHub issue intake' };
+const ISSUE_INTAKE_ACTOR: TransitionActor = {
+  kind: 'agent',
+  name: 'GitHub issue intake',
+  stopActor: 'system',
+};
 
 export interface IssueIntakeLogger {
   info(obj: object, msg: string): void;

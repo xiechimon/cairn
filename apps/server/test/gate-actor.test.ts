@@ -165,6 +165,7 @@ describe('#900 chief may not self-pass the review gate (complete_todos)', () => 
       const out = transitionTodos(chiefDeps(s), s.team.id, [s.todoId], 'done', {
         kind: 'user',
         name: s.user.displayName,
+        stopActor: 'person',
       });
       expect(out.transitioned).toContain(s.todoId);
       const row = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get()!;

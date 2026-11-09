@@ -380,8 +380,9 @@ export async function startStack({
       );
       const result = JSON.parse(await git(['show', `${branch}:canary-result.json`], repo));
       const messages = await api('GET', `/api/conversations/${buildId}/messages`);
-      const hook = messages.messages.find((entry) =>
-        entry.content.includes('CAIRN_CANARY_RESULT='),
+      const hook = messages.messages.find(
+        (entry) =>
+          typeof entry.content === 'string' && entry.content.includes('CAIRN_CANARY_RESULT='),
       );
       const noteResult = hook?.content.split('CAIRN_CANARY_RESULT=')[1]?.split('\n')[0];
       if (!noteResult || JSON.stringify(JSON.parse(noteResult)) !== JSON.stringify(result))

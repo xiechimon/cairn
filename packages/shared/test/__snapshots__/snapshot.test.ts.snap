@@ -6311,6 +6311,42 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "null",
               ],
             },
+            "stop": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actor": {
+                      "enum": [
+                        "person",
+                        "coordinator",
+                        "mcp",
+                        "system",
+                      ],
+                      "type": "string",
+                    },
+                    "at": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "reason": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "actor",
+                    "reason",
+                    "at",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "todoId": {
               "type": "string",
             },
@@ -8214,6 +8250,42 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > bui
       "type": [
         "string",
         "null",
+      ],
+    },
+    "stop": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": [
+                "person",
+                "coordinator",
+                "mcp",
+                "system",
+              ],
+              "type": "string",
+            },
+            "at": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "reason": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "actor",
+            "reason",
+            "at",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "todoId": {

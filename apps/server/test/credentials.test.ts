@@ -1,10 +1,9 @@
 import { and, eq } from 'drizzle-orm';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { routingRule, step as stepTable } from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
-import * as appToken from '../src/services/github-app-token.js';
 import { stepToken } from '../src/services/machine-step-token.js';
 import { createProvider } from '../src/services/providers.js';
 import { createSecret } from '../src/services/secrets.js';
@@ -263,7 +262,7 @@ test('finished steps retain provider-key responses', async () => {
   }
 });
 
-test('a step commits as the App bot user when the App is configured, and as nobody in particular without one', async () => {
+test('a step commits as the configured App bot user from configuration, and as nobody in particular without one', async () => {
   const s = await withRoutedStack();
   const machineId = insertMachine(s, { name: 'identity' });
   const stepId = addStep(s, s.buildId, 'build');
@@ -284,16 +283,15 @@ test('a step commits as the App bot user when the App is configured, and as nobo
     name: 'cairnwright[bot]',
     email: '347615582+cairnwright[bot]@users.noreply.github.com',
   };
-  const lookup = vi.spyOn(appToken, 'appCommitIdentity').mockResolvedValue(bot);
-  try {
-    expect(
-      (await stepToken({ ...deps, githubAppTokenSocket: '/app.sock' }, machineId, stepId))
-        .commitIdentity,
-    ).toEqual(bot);
-    expect(lookup).toHaveBeenLastCalledWith({ config: { githubAppTokenSocket: '/app.sock' } });
-  } finally {
-    lookup.mockRestore();
-  }
+  expect(
+    (
+      await stepToken(
+        { ...deps, githubAppTokenSocket: null, githubAppIdentity: bot },
+        machineId,
+        stepId,
+      )
+    ).commitIdentity,
+  ).toEqual(bot);
 });
 
 describe('resolveStepCredentials routing', () => {

@@ -255,7 +255,10 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/builds/:id/stop', async (c) => {
     const body = parseWith(buildStopBodySchema, await jsonBody(c), 'body');
-    const result = requestStop(svc, c.req.param('id'), body);
+    const result = requestStop(svc, c.req.param('id'), body, {
+      actor: 'person',
+      reason: `stopped from the task page by ${svc.user.displayName}`,
+    });
     if (!result.delegated) await drainTaskMessageQueue(svc, c.req.param('id'));
     return c.json(result, result.delegated ? 202 : 200);
   });

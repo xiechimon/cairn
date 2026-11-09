@@ -7,6 +7,7 @@ import type {
   AutonomySettings,
   BlockerHandoffRecord,
   BuildEvidence,
+  BuildStop,
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
@@ -216,6 +217,7 @@ export const build = sqliteTable('build', {
   harnessHash: text('harnessHash'),
   reportAttachmentId: text('reportAttachmentId'),
   reportLine: text('reportLine'),
+  stop: json<BuildStop | null>('stop'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

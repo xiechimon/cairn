@@ -31,18 +31,44 @@ export async function startModel(port, parentPid) {
       model: 'canary-model',
     };
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    for (const choices of [
-      [
-        {
-          index: 0,
-          delta: { role: 'assistant', content: 'The canary hook completed.' },
-          finish_reason: null,
-        },
-      ],
-      [{ index: 0, delta: {}, finish_reason: 'stop' }],
-    ])
-      res.write(`data: ${JSON.stringify({ ...base, choices })}\n\n`);
+    const deliver = requests.length === 1;
+    const turn = deliver
+      ? [
+          [
+            {
+              index: 0,
+              delta: {
+                role: 'assistant',
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: 'call_canary_deliver',
+                    type: 'function',
+                    function: {
+                      name: 'bash',
+                      arguments: JSON.stringify({ command: 'git add --all' }),
+                    },
+                  },
+                ],
+              },
+              finish_reason: null,
+            },
+          ],
+          [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
+        ]
+      : [
+          [
+            {
+              index: 0,
+              delta: { role: 'assistant', content: 'The canary hook completed.' },
+              finish_reason: null,
+            },
+          ],
+          [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        ];
+    for (const choices of turn) res.write(`data: ${JSON.stringify({ ...base, choices })}\n\n`);
     res.end('data: [DONE]\n\n', () => {
+      if (deliver) return;
       server.close();
       server.closeIdleConnections();
     });
