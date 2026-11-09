@@ -49,8 +49,9 @@ function openWorld(
     output?: 'code' | 'info';
     failure?: Failure;
     prNumber?: number;
-    repo?: 'github' | 'local';
+    repo?: 'github' | 'local' | 'hosted';
     hasChanges?: boolean;
+    shipRoute?: 'merge-gate' | 'local-merge' | 'custom';
   } = {},
 ): World {
   const s = bootServer();
@@ -67,11 +68,16 @@ function openWorld(
       id: projectId,
       name: `owner-${suffix}`,
       teamId: s.team.id,
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: opts.policy ?? 'autonomous' },
+      autonomy: {
+        ...DEFAULT_AUTONOMY_SETTINGS,
+        mergePolicy: opts.policy ?? 'autonomous',
+        ...(opts.shipRoute !== undefined ? { shipRoute: opts.shipRoute } : {}),
+      },
       ...(opts.prNumber !== undefined || opts.repo === 'github'
         ? { repoKind: 'github', githubRepo: 'acme/app' }
         : {}),
       ...(opts.repo === 'local' ? { repoKind: 'local', localPath: '/srv/app' } : {}),
+      ...(opts.repo === 'hosted' ? { repoKind: 'hosted', repoName: 'app' } : {}),
     })
     .run();
   s.db
@@ -160,8 +166,9 @@ describe('ownerOf (#3512)', () => {
     question?: boolean;
     gate?: 'transient' | 'human' | 'ready' | 'stale';
     prNumber?: number;
-    repo?: 'github' | 'local';
+    repo?: 'github' | 'local' | 'hosted';
     hasChanges?: boolean;
+    shipRoute?: 'merge-gate' | 'local-merge' | 'custom';
     archived?: boolean;
     owner: TodoOwner;
   }[] = [
@@ -190,11 +197,26 @@ describe('ownerOf (#3512)', () => {
       owner: 'owner',
     },
     {
-      name: 'code review, autonomous, local repository with changes',
+      name: 'code review, autonomous, local repository with changes: a person lands it',
       phase: 'review',
       repo: 'local',
       hasChanges: true,
-      owner: null,
+      owner: 'owner',
+    },
+    {
+      name: 'code review, autonomous, hosted repository with changes: a person lands it',
+      phase: 'review',
+      repo: 'hosted',
+      hasChanges: true,
+      owner: 'owner',
+    },
+    {
+      name: 'code review, autonomous, local repository, custom ship route without a PR',
+      phase: 'review',
+      repo: 'local',
+      hasChanges: true,
+      shipRoute: 'custom',
+      owner: 'coordinator',
     },
     {
       name: 'code review, autonomous, local repository without changes',
@@ -279,6 +301,7 @@ describe('ownerOf (#3512)', () => {
       ...(c.prNumber !== undefined ? { prNumber: c.prNumber } : {}),
       ...(c.repo !== undefined ? { repo: c.repo } : {}),
       ...(c.hasChanges !== undefined ? { hasChanges: c.hasChanges } : {}),
+      ...(c.shipRoute !== undefined ? { shipRoute: c.shipRoute } : {}),
     });
     if (c.question) {
       await ask(w, 'ask-0000000a');

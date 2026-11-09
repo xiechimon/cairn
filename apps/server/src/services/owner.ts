@@ -12,7 +12,7 @@ import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
 import { projectRepoRef } from './git.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
-import { projectMergeConfigOf } from './projects.js';
+import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { endSnoozeOn } from './snooze.js';
 import { getTodo } from './todos.js';
@@ -84,7 +84,13 @@ function reviewOwnership(db: Db, row: TodoRow): Ownership | null {
   }
   if (prGate) return null;
   const repo = projectRepoRef(projectRow, '');
-  return repo !== null && repo.kind !== 'github' && row.hasChanges ? null : coordinatorReview;
+  const personLands =
+    repo !== null &&
+    repo.kind !== 'github' &&
+    row.hasChanges &&
+    projectRow !== undefined &&
+    projectShipRouteOf(projectRow) !== 'custom';
+  return personLands ? { owner: 'owner', reason: 'review', workKey } : coordinatorReview;
 }
 
 function failedOwnership(db: Db, row: TodoRow): Ownership | null {
