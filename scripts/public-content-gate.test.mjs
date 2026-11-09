@@ -17,6 +17,7 @@ import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 const uuid = ['12345678', '1234', '4567', '89ab', '123456789abc'].join('-');
 const nanoid = 'AbCdEfGhIjKlMnOpQrSt1';
 const ulid = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+const publicRepositoryNodePrefix = '_kwDOUSKs6c';
 
 for (const text of [
   'Usage: 37\u0025',
@@ -83,12 +84,20 @@ for (const text of [
 
 for (const prefix of ['PRRT', 'PRR', 'PRRC', 'IC', 'PR', 'I', 'D', 'DC']) {
   test(`allows synthetic public GitHub ${prefix} node IDs without ignoring quotas`, () => {
-    const id = `${prefix}_kwDO`.padEnd(21, 'A');
+    const id = `${prefix}${publicRepositoryNodePrefix}`.padEnd(21, 'A');
     assert.equal(id.length, 21);
     assert.deepEqual(fileViolations('docs/review.md', `thread ${id}`), []);
     assert.deepEqual(fileViolations('docs/review.md', `thread ${id}; quota: 37\u0025`), [
       { line: 1, kind: 'quota/usage' },
     ]);
+  });
+  test(`GitHub ${prefix} node IDs from other repositories remain blocked`, () => {
+    for (const length of [21, 26, 30]) {
+      const id = `${prefix}_kwDO`.padEnd(length, 'A');
+      assert.deepEqual(fileViolations('docs/review.md', `thread ${id}`), [
+        { line: 1, kind: 'identifier' },
+      ]);
+    }
   });
 }
 
@@ -170,26 +179,39 @@ function repository(t) {
   return { cwd, git, run };
 }
 
-test('commit messages may cite a public GitHub thread but not a private identifier', (t) => {
-  const { git, run } = repository(t);
-  git('commit', '--allow-empty', '-qm', `Resolve thread ${'PRRT_kwDO'.padEnd(21, 'A')}`);
-  assert.equal(run().status, 0);
-  git('commit', '--allow-empty', '-qm', `Record thread ${nanoid}`);
-  assert.equal(run().status, 1);
-});
+for (const [kind, id] of [
+  ['private identifier', nanoid],
+  ['foreign repository node', 'PRRT_kwDO'.padEnd(21, 'A')],
+]) {
+  test(`commit messages accept this public repository's thread but reject a ${kind}`, (t) => {
+    const { git, run } = repository(t);
+    const publicNode = `PRRT${publicRepositoryNodePrefix}`.padEnd(21, 'A');
+    git('commit', '--allow-empty', '-qm', `Resolve thread ${publicNode}`);
+    assert.equal(run().status, 0);
+    git('commit', '--allow-empty', '-qm', `Record thread ${id}`);
+    assert.equal(run().status, 1);
+  });
+}
 
 test('GitHub node IDs are benign in staged text and committed snapshots', (t) => {
   const { cwd, git, run } = repository(t);
-  writeFileSync(join(cwd, 'example.md'), `thread: ${'PRRT_kwDO'.padEnd(21, 'A')}\n`);
+  const publicNode = `PRRT${publicRepositoryNodePrefix}`.padEnd(21, 'A');
+  writeFileSync(join(cwd, 'example.md'), `thread: ${publicNode}\n`);
   git('add', 'example.md');
   assert.equal(run('--staged').status, 0);
   git('commit', '-qm', 'synthetic public reference');
   assert.equal(run().status, 0);
+  writeFileSync(join(cwd, 'example.md'), `thread: ${'PRRT_kwDO'.padEnd(21, 'A')}\n`);
+  git('add', 'example.md');
+  assert.equal(run('--staged').status, 1);
+  git('commit', '-qm', 'synthetic foreign reference');
+  assert.equal(run().status, 1);
+  const foreignHead = git('rev-parse', 'HEAD').trim();
   writeFileSync(join(cwd, 'example.md'), `teamId: ${nanoid}\n`);
   git('add', 'example.md');
   assert.equal(run('--staged').status, 1);
   git('commit', '-qm', 'synthetic private reference');
-  assert.equal(run().status, 1);
+  assert.equal(run('--base', foreignHead).status, 1);
 });
 
 test('staged scan reads index, not unstaged content, and redacts diagnostics', (t) => {
