@@ -265,8 +265,14 @@ export function answerQuestion(
     }
     return { header: question.header, choices: answer.choices };
   });
-  const next: AskUserQuestionContent = { ...content, status: 'answered', answers: validated };
-  writeQuestion(deps.db, input.threadId, input.requestId, next, nowMs());
+  const answeredAt = nowMs();
+  const next: AskUserQuestionContent = {
+    ...content,
+    status: 'answered',
+    answers: validated,
+    answeredAt,
+  };
+  writeQuestion(deps.db, input.threadId, input.requestId, next, answeredAt);
   publishRow(deps, input.threadId, input.requestId);
   return next;
 }
