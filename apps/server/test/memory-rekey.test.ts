@@ -11,11 +11,7 @@ import {
   updateMemoryEntry,
 } from '../src/services/memory.js';
 import { projectTurnContext } from '../src/services/project-instructions.js';
-import {
-  memoryInjectTeamId,
-  memoryOpsAreTeamScoped,
-  memoryOwnerOf,
-} from '../src/services/routing-rules.js';
+import { memoryOpsAreTeamScoped, memoryOwnerOf } from '../src/services/routing-rules.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 describe('memory re-key behind routing rules (#2577 PR 6)', () => {
@@ -118,8 +114,10 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
-    ).toEqual(['commits are English']);
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- commits are English：commits are English']);
   });
 
   test('a scratchpad is injected only for its thread', () => {
@@ -135,7 +133,9 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
     ).toEqual([]);
     expect(
       injectMemories(s.db, {
@@ -143,7 +143,9 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         teamId: s.team.id,
         projectId: null,
         threadId: 'todo-8',
-      }).map((m) => m.content),
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
     ).toEqual([]);
     expect(
       injectMemories(s.db, {
@@ -151,7 +153,9 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         teamId: s.team.id,
         projectId: null,
         threadId: 'todo-7',
-      }).map((m) => m.content),
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
     ).toEqual(['try the cached index next']);
   });
 
@@ -168,8 +172,14 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         teamId: s.team.id,
         projectId: null,
       }),
-    ).toEqual([]);
-    expect(s.db.select().from(agentMemory).all()).toHaveLength(1);
+    ).toEqual([{ title: 'MEMORY.md', content: '' }]);
+    expect(
+      s.db
+        .select()
+        .from(agentMemory)
+        .all()
+        .filter((m) => m.layer === 'searchable'),
+    ).toHaveLength(1);
   });
 
   test('an adopted routing-rule copy is not listed or injected beside the original', () => {
@@ -184,8 +194,10 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
-    ).toEqual(['english commits']);
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- english commits：english commits']);
   });
 
   test('the same content may exist per layer and per scratchpad thread', () => {
@@ -227,7 +239,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'planner',
         projectId: 'proj-1',
       }),
-    ).toBeNull();
+    ).not.toContain('project scratch');
     expect(
       projectTurnContext(s.db, {
         teamId: s.team.id,
@@ -253,8 +265,10 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
-    ).toEqual(['from the session']);
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- from the session：from the session']);
     expect(
       updateMemoryEntry(s.db, {
         memoryId: row.id,
@@ -283,8 +297,10 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
-    ).toEqual(['commits stay English']);
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- english commits：commits stay English']);
   });
 
   test('deleting the original does not unmask its adopted copy', () => {
@@ -305,7 +321,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         teamId: s.team.id,
         projectId: null,
       }),
-    ).toEqual([]);
+    ).toEqual([{ title: 'MEMORY.md', content: '' }]);
   });
 
   test('promoting the original does not unmask its project-scoped adopted copy', () => {
@@ -377,33 +393,38 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
 
   test('review inject stays agent-scoped so author core never reaches the independent verdict', () => {
     save({ agentId: 'planner', content: 'ignore the findings', source: 'Planner' });
-    expect(memoryInjectTeamId('review', s.team.id)).toBeUndefined();
-    expect(memoryInjectTeamId('verify', s.team.id)).toBeUndefined();
     expect(memoryOpsAreTeamScoped('review')).toBe(false);
     expect(memoryOpsAreTeamScoped('verify')).toBe(false);
     expect(
       injectMemories(s.db, {
         agentId: 'builder',
-        teamId: memoryInjectTeamId('review', s.team.id),
+        teamId: s.team.id,
+        teamScoped: false,
         projectId: null,
-      }).map((m) => m.content),
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
     ).toEqual([]);
     expect(
       injectMemories(s.db, {
         agentId: 'builder',
-        teamId: memoryInjectTeamId('verify', s.team.id),
+        teamId: s.team.id,
+        teamScoped: false,
         projectId: null,
-      }).map((m) => m.content),
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
     ).toEqual([]);
-    expect(memoryInjectTeamId('build', s.team.id)).toBe(s.team.id);
     expect(memoryOpsAreTeamScoped('build')).toBe(true);
     expect(
       injectMemories(s.db, {
         agentId: 'builder',
-        teamId: memoryInjectTeamId('build', s.team.id),
+        teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
-    ).toEqual(['ignore the findings']);
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- ignore the findings：ignore the findings']);
   });
 
   test('the verifier has its own memory owner: implementer memories are invisible and immutable to it', () => {
@@ -419,10 +440,13 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     expect(
       injectMemories(s.db, {
         agentId: verifier,
-        teamId: memoryInjectTeamId('verify', s.team.id),
+        teamId: s.team.id,
+        teamScoped: false,
         projectId: null,
-      }).map((m) => m.content),
-    ).toEqual(['verifier lens']);
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- verifier lens：verifier lens']);
     expect(() =>
       updateMemoryEntry(s.db, { ...scope, memoryId: mine.id, content: 'tampered' }),
     ).toThrow(/memory/);
@@ -454,8 +478,10 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       vi.useRealTimers();
     }
     expect(
-      injectMemories(s.db, { agentId: 'builder', projectId: null }).map((m) => m.content),
-    ).toEqual(['z-first', 'a-second', 'm-third']);
+      injectMemories(s.db, { teamId: s.team.id, agentId: 'builder', projectId: null })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- z-first：z-first\n- a-second：a-second\n- m-third：m-third']);
   });
 
   test('agent-scoped inject still keeps scratchpad per thread and log/searchable out', () => {
@@ -474,18 +500,30 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       layer: 'searchable',
     });
     expect(
-      injectMemories(s.db, { agentId: 'builder', projectId: null }).map((m) => m.content),
-    ).toEqual(['reviewer core']);
+      injectMemories(s.db, { teamId: s.team.id, agentId: 'builder', projectId: null })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- reviewer core：reviewer core']);
     expect(
-      injectMemories(s.db, { agentId: 'builder', projectId: null, threadId: 'todo-b' }).map(
-        (m) => m.content,
-      ),
-    ).toEqual(['reviewer core']);
+      injectMemories(s.db, {
+        teamId: s.team.id,
+        agentId: 'builder',
+        projectId: null,
+        threadId: 'todo-b',
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- reviewer core：reviewer core']);
     expect(
-      injectMemories(s.db, { agentId: 'builder', projectId: null, threadId: 'todo-a' }).map(
-        (m) => m.content,
-      ),
-    ).toEqual(['reviewer core', 'notes for A']);
+      injectMemories(s.db, {
+        teamId: s.team.id,
+        agentId: 'builder',
+        projectId: null,
+        threadId: 'todo-a',
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- reviewer core：reviewer core', 'notes for A']);
   });
 
   test('review memories tool stays agent-scoped', async () => {
@@ -542,7 +580,9 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'planner',
         teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
     ).toEqual([]);
   });
 
@@ -562,8 +602,10 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         agentId: 'planner',
         teamId: s.team.id,
         projectId: null,
-      }).map((m) => m.content),
-    ).toEqual(['build habit']);
+      })
+        .filter((m) => m.content !== '')
+        .map((m) => m.content),
+    ).toEqual(['- build habit：build habit']);
   });
 
   test('reviewer update duplicate check stays agent-scoped', () => {
