@@ -1001,7 +1001,7 @@ export const WORKER_ASK_USER_TOOL: RemoteToolDef = CHIEF_REMOTE_TOOLS.find(
 
 export const WORKER_THREAD_REPORT_TOOL: RemoteToolDef = {
   name: 'thread_report',
-  description: `Write the one-line report the Coordinator conversation shows for this thread (at most ${THREAD_REPORT_LINE_MAX} characters, your own words, plain text). Call it before you finish, ask the user a question, or give up.`,
+  description: `Write the one-line report the Coordinator conversation shows for this thread (at most ${THREAD_REPORT_LINE_MAX} characters, your own words, plain text). Call it before you finish or ask the user a question.`,
   parameters: obj({ line: str(`The report line, at most ${THREAD_REPORT_LINE_MAX} characters.`) }, [
     'line',
   ]),
