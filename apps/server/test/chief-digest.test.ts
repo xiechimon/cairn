@@ -26,6 +26,7 @@ import {
   CHIEF_DIGEST_THRESHOLD_CHARS,
   planChiefDigests,
 } from '../src/services/chief-digest.js';
+import { foldMemoryIndexes } from '../src/services/memory.js';
 import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 
 const COORDINATOR_RULE = 'route-digest';
@@ -301,7 +302,7 @@ describe('chief long-chat digests (#1939)', () => {
     expect(w.digestSteps().filter((r) => r.status === 'pending')).toHaveLength(0);
   });
 
-  test('a remembered item that already exists links to the existing memory', async () => {
+  test.each([false, true])('links an existing memory (folded=%s)', async (folded) => {
     const w = await setup();
     w.s.db
       .insert(agentMemory)
@@ -318,6 +319,7 @@ describe('chief long-chat digests (#1939)', () => {
         updatedAt: 1,
       })
       .run();
+    if (folded) foldMemoryIndexes(w.s.db);
     w.plan(TODAY_0830);
     const claimed = await w.claim();
     if (!claimed) throw new Error('no digest step');
@@ -328,7 +330,7 @@ describe('chief long-chat digests (#1939)', () => {
     expect(content.items[3]?.memory?.id).toBe('mem-old');
     expect(
       w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, COORDINATOR_RULE)).all(),
-    ).toHaveLength(1);
+    ).toHaveLength(folded ? 2 : 1);
   });
 
   test('a failed run writes nothing, keeps the session and backs off', async () => {

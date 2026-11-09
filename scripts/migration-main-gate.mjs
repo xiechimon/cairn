@@ -27,6 +27,7 @@ try {
     added.has(`apps/server/drizzle/${entry.tag}.sql`),
   );
   let failures = 0;
+  let shiftSuffix = false;
   for (const [index, entry] of entries.entries()) {
     const file = `apps/server/drizzle/${entry.tag}.sql`;
     const collision = main.some(
@@ -35,12 +36,16 @@ try {
         existing.tag === entry.tag ||
         Number(existing.tag.split('_')[0]) === Number(entry.tag.split('_')[0]),
     );
-    if (collision || entry.when <= latest) {
+    shiftSuffix ||= collision;
+    if (shiftSuffix || entry.when <= latest) {
       const next = String(highest + 1 + index).padStart(4, '0');
-      const repair = collision ? `renumber to ${next} and set when` : 'set when';
-      console.error(
-        `${file}: ${collision ? 'migration number or tag already exists on origin/main' : 'when must exceed origin/main maximum'}; ${repair} to the current time in ms`,
-      );
+      const repair = shiftSuffix ? `renumber to ${next} and set when` : 'set when';
+      const reason = collision
+        ? 'migration number or tag already exists on origin/main'
+        : shiftSuffix
+          ? 'shift migration suffix after origin/main collision'
+          : 'when must exceed origin/main maximum';
+      console.error(`${file}: ${reason}; ${repair} to the current time in ms`);
       failures++;
     }
   }
