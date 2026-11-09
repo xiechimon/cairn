@@ -56,8 +56,8 @@
     },
     {
       "id": "B8",
-      "title": "Composer, attachments and project files",
-      "scope": "Everything typed or attached before a message is sent and the files a project shows: mentions, slash commands, named prompts, drafts that survive a restart, attachments, and the files and commits tab. Research claude.ai, Amp and t3code; design the draft and attachment model and the files view."
+      "title": "Composer and attachments",
+      "scope": "Everything typed or attached before a message is sent: mentions, slash commands, named prompts, drafts that survive a restart and attachments. Research claude.ai, Amp and t3code; design the draft and attachment model."
     },
     {
       "id": "B9",
@@ -72,7 +72,7 @@
     {
       "id": "B11",
       "title": "Peripheral surfaces",
-      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
+      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
     },
     {
       "id": "B12",
@@ -1563,11 +1563,7 @@
           "/api/projects/:id/${action}",
           "/api/projects/:id/autonomy",
           "/api/projects/:id/branches",
-          "/api/projects/:id/file",
           "/api/projects/:id/files",
-          "/api/projects/:id/tree",
-          "/api/projects/:id/commits",
-          "/api/projects/:id/commits/:sha",
           "/api/fs/list",
           "/api/fs/pick"
         ]
@@ -2419,45 +2415,6 @@
         "apps/server/test/deploy-lease.test.ts",
         "integration/test/deploy-server-restart.test.ts",
         "scripts/ops/deploy-self.test.mjs"
-      ],
-      "batch": "B11"
-    },
-    {
-      "id": "feishu",
-      "name": "Feishu integration",
-      "summary": "Team settings for a Feishu bot connection.",
-      "states": "Not connected, connected, or failing, in the account settings.",
-      "centrality": 4,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/routes/feishu-settings.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-feishu.ts",
-          "apps/server/src/services/feishu.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/teams/:id/feishu"
-        ]
-      },
-      "reach": [
-        "settings account"
-      ],
-      "research": {
-        "gap": "no note on why Feishu and what it delivers"
-      },
-      "frontendDesign": {
-        "gap": "the Feishu settings have no design"
-      },
-      "backendDesign": {
-        "gap": "no design for the Feishu delivery path"
-      },
-      "evidence": [
-        "apps/web/e2e/account-feishu.spec.ts",
-        "apps/server/test/feishu-config.test.ts"
       ],
       "batch": "B11"
     },

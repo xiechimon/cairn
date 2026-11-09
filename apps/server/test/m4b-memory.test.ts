@@ -3,6 +3,7 @@ import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agentMemory, build as buildTable } from '../src/db/schema.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
+import { listMemoryEntries } from '../src/services/memory.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
 async function call(
@@ -182,7 +183,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     expect(JSON.parse(((await del.json()) as { text: string }).text)).toEqual({
       deleted: rows[0]!.id,
     });
-    expect(s.db.select().from(agentMemory).all()).toHaveLength(0);
+    expect(listMemoryEntries(s.db, { agentId: OWNER_ID, teamId: s.team.id })).toHaveLength(0);
     s.dispose();
   });
 
@@ -232,7 +233,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
       body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
     });
     expect(done.status).toBe(200);
-    expect(s.db.select().from(agentMemory).all()).toHaveLength(0);
+    expect(listMemoryEntries(s.db, { agentId: OWNER_ID, teamId: s.team.id })).toHaveLength(0);
     const builds = s.db.select().from(buildTable).all();
     expect(builds).toHaveLength(1);
     s.dispose();
@@ -250,7 +251,10 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     });
     const step2 = await claimNextTask(s, token, projectId);
     expect(step2.todo?.id).not.toBe(todoId);
-    expect(step2.agent?.memories).toEqual([{ title: '注入验证', content: '第二轮应见我' }]);
+    expect(step2.agent?.memories).toEqual([
+      { title: 'MEMORY.md', content: '' },
+      { title: 'MEMORY.md', content: '- 注入验证：第二轮应见我' },
+    ]);
     s.dispose();
   });
 
@@ -278,7 +282,10 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     const projectId2 = await postProject(s.app, 'p2');
     expect(projectId2).not.toBe(projectId);
     const step2 = await claimNextTask(s, token, projectId2);
-    expect(step2.agent?.memories).toEqual([{ title: '全局', content: 'g' }]);
+    expect(step2.agent?.memories).toEqual([
+      { title: 'MEMORY.md', content: '- 全局：g' },
+      { title: 'MEMORY.md', content: '' },
+    ]);
     s.dispose();
   });
 
@@ -307,8 +314,8 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     const step2 = await claimNextTask(s, token, projectId);
 
     expect(step2.agent?.memories).toEqual([
-      { title: '项目一', content: 'p1' },
-      { title: '全局', content: 'g' },
+      { title: 'MEMORY.md', content: '- 全局：g' },
+      { title: 'MEMORY.md', content: '- 项目一：p1' },
     ]);
     const stamped = Object.fromEntries(
       s.db
@@ -319,7 +326,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     );
     expect(stamped['mem-retired']).toBe(false);
     expect(stamped['mem-other']).toBe(false);
-    expect(stamped['mem-global']).toBe(true);
+    expect(stamped['mem-global']).toBe(false);
     expect(Object.values(stamped).filter(Boolean)).toHaveLength(2);
     s.dispose();
   });

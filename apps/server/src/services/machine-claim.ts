@@ -12,6 +12,7 @@ import {
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   parseLocalMergeInstruction,
+  parseVerifyPromptMeta,
   type RemoteToolDef,
   type SkillInjectionRecord,
   type StepKind,
@@ -80,7 +81,7 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
-  memoryInjectTeamId,
+  memoryOpsAreTeamScoped,
   memoryOwnerOf,
   type RouteProfile,
   routeProfile,
@@ -357,6 +358,7 @@ async function tryClaim(
   teamId: string,
   origin: string,
   maxWorkers: number | undefined,
+  supportsAttachmentVerify: boolean,
   stillAuthorized: () => boolean,
 ): Promise<ClaimedStep | null> {
   if (!stillAuthorized()) return null;
@@ -383,6 +385,12 @@ async function tryClaim(
   if (chiefAhead) return chiefAhead;
 
   for (const cand of workerCands) {
+    if (
+      cand.stepRow.kind === 'verify' &&
+      parseVerifyPromptMeta(cand.stepRow.prompt)?.evidence === 'attachments' &&
+      !supportsAttachmentVerify
+    )
+      continue;
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
     if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
@@ -617,7 +625,8 @@ async function tryClaim(
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
           agentId: memoryOwnerOf(db, teamId, cand.stepRow.kind),
-          teamId: memoryInjectTeamId(cand.stepRow.kind, teamId),
+          teamId,
+          teamScoped: memoryOpsAreTeamScoped(cand.stepRow.kind),
           threadId: cand.todoRow.id,
           projectId: cand.todoRow.projectId,
         }),
@@ -662,9 +671,25 @@ export async function claimStep(
   const stillAuthorized = () => authorized() && readDeployLease(deps.db).status === 'accepting';
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
-  const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
+  const first = await tryClaim(
+    deps,
+    machineId,
+    teamId,
+    origin,
+    body?.maxWorkers,
+    body?.verifyAttachments === true,
+    stillAuthorized,
+  );
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
   if (signal?.aborted || !stillAuthorized()) return null;
-  return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
+  return tryClaim(
+    deps,
+    machineId,
+    teamId,
+    origin,
+    body?.maxWorkers,
+    body?.verifyAttachments === true,
+    stillAuthorized,
+  );
 }

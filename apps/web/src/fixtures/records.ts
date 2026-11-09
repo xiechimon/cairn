@@ -172,8 +172,6 @@ export interface ScheduleRecord {
 
 export interface ProjectContent {
   name: string;
-  branch: string;
-  files: string[];
   repoName: string;
   hosted: boolean;
   repoKind?: ProjectRepoKind;
@@ -181,7 +179,6 @@ export interface ProjectContent {
   description: string | null;
   icon?: ProjectIcon;
   color?: ProjectColor;
-  fileContents?: Record<string, string>;
 }
 
 export interface TeamAgentCard {
@@ -234,7 +231,6 @@ export interface FixtureSet {
   schedules?: ScheduleRecord[];
   scheduleForm?: 'hourly' | 'daily' | 'weekly' | 'once';
   project?: ProjectContent;
-  projectTab?: 'tasks' | 'files';
   team?: TeamContent;
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;

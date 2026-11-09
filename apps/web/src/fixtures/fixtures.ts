@@ -79,7 +79,7 @@ export {
   PROBE_TOOL_PILLS,
   r8OverlayContent,
 } from './detail.js';
-export { projectFixture, projectLocalFiles, projectTasks, projectTasksEmpty } from './projects.js';
+export { projectFixture, projectLocalTasks, projectTasksEmpty } from './projects.js';
 export {
   agentTodoLive,
   boardFailed,

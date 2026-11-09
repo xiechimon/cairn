@@ -693,6 +693,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "const": "coordinator",
       "type": "string",
     },
+    "verifyAttachments": {
+      "const": true,
+      "type": "boolean",
+    },
   },
   "type": "object",
 }
@@ -5269,71 +5273,6 @@ exports[`body/envelope schema snapshots > projectFileResponse > projectFileRespo
 }
 `;
 
-exports[`body/envelope schema snapshots > projectTreeResponse > projectTreeResponse.json 1`] = `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "commit": {
-      "type": "string",
-    },
-    "entries": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string",
-          },
-          "path": {
-            "type": "string",
-          },
-          "size": {
-            "anyOf": [
-              {
-                "maximum": 9007199254740991,
-                "minimum": -9007199254740991,
-                "type": "integer",
-              },
-              {
-                "type": "null",
-              },
-            ],
-          },
-          "type": {
-            "enum": [
-              "blob",
-              "tree",
-            ],
-            "type": "string",
-          },
-        },
-        "required": [
-          "name",
-          "path",
-          "type",
-          "size",
-        ],
-        "type": "object",
-      },
-      "type": "array",
-    },
-    "path": {
-      "type": "string",
-    },
-    "ref": {
-      "type": "string",
-    },
-  },
-  "required": [
-    "ref",
-    "commit",
-    "path",
-    "entries",
-  ],
-  "type": "object",
-}
-`;
-
 exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7786,7 +7725,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "branch_sync",
   "github_connection",
   "claude_subscription",
-  "feishu_binding",
   "skill_audit",
   "gate_digest",
   "gate_round",
@@ -7828,18 +7766,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
 
 exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint vocabulary (02 §6.1) 1`] = `
 [
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/feishu",
-  },
-  {
-    "method": "PUT",
-    "path": "/api/teams/{id}/feishu",
-  },
-  {
-    "method": "DELETE",
-    "path": "/api/teams/{id}/feishu",
-  },
   {
     "method": "GET",
     "note": "保形返回 seed 用户（02 §2.1）",
@@ -8039,22 +7965,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/projects/{id}/builds",
-  },
-  {
-    "method": "GET",
-    "note": "读裸库 ref 树（02 §3）",
-    "path": "/api/projects/{id}/tree",
-    "query": [
-      "ref",
-    ],
-  },
-  {
-    "method": "GET",
-    "path": "/api/projects/{id}/file",
-    "query": [
-      "path",
-      "ref",
-    ],
   },
   {
     "method": "GET",

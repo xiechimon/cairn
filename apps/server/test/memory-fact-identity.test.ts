@@ -2,7 +2,6 @@ import { MEMORY_INDEX_TITLE, MEMORY_QUOTA_PER_TEAM } from '@cairn/shared';
 import { expect, test } from 'vitest';
 import {
   foldMemoryIndexes,
-  injectMemoriesCapped,
   isMemoryIndex,
   listStoredMemoryEntries,
   MEMORY_VERSION_RETENTION_MS,
@@ -31,10 +30,6 @@ test('fact IDs survive folding and retention in the active REST response used by
   const first = await save('release', 'Squash only.');
   const second = await save('proof', 'Attach evidence.');
   foldMemoryIndexes(H.s.db, 10_000);
-  expect(injectMemoriesCapped(H.s.db, scope(), Infinity).memories.map((row) => row.id)).toEqual([
-    first.id,
-    second.id,
-  ]);
   purgeExpiredMemoryVersions(H.s.db, 10_001 + MEMORY_VERSION_RETENTION_MS);
   const response = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/memories`);
   expect(response.status).toBe(200);

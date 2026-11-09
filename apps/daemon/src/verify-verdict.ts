@@ -18,6 +18,7 @@ function capReason(text: string, limit: number = REASON_CHAR_LIMIT): string {
 
 export function extractVerifyVerdict(
   messages: readonly TranscriptMessageLike[],
+  options: { strict?: boolean } = {},
 ): VerifyVerdictExtraction {
   let schemaFailure: string | null = null;
   let degraded: VerifyVerdict | null = null;
@@ -31,7 +32,7 @@ export function extractVerifyVerdict(
     if (fence !== null) candidates.push(fence);
     candidates.push(text);
     for (const raw of candidates) {
-      const span = extractJsonSpan(raw);
+      const span = options.strict === true ? null : extractJsonSpan(raw);
       for (const slice of [raw, span]) {
         if (slice === null) continue;
         try {
@@ -45,10 +46,11 @@ export function extractVerifyVerdict(
             );
             schemaFailure = capReason(parts.join('; '));
           }
-          if (degraded === null) degraded = tryDegradedVerdict(parsed);
+          if (options.strict !== true && degraded === null) degraded = tryDegradedVerdict(parsed);
         } catch {}
       }
     }
+    if (options.strict === true) break;
   }
   if (degraded !== null) return { status: 'ok', verdict: degraded };
   return {

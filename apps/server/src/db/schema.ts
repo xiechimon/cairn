@@ -1263,25 +1263,6 @@ export const buildOutcomeBackfill = sqliteTable('build_outcome_backfill', {
   checkedAt: epochMs('checkedAt').notNull(),
 });
 
-export const feishuBinding = sqliteTable(
-  'feishu_binding',
-  {
-    teamId: text('teamId')
-      .primaryKey()
-      .references(() => team.id, { onDelete: 'cascade' }),
-    userId: text('userId')
-      .notNull()
-      .references(() => user.id),
-    openId: text('openId').notNull(),
-    cairnOrigin: text('cairnOrigin').notNull(),
-    appIdCipher: text('appIdCipher').notNull(),
-    appSecretCipher: text('appSecretCipher').notNull(),
-    createdAt: epochMs('createdAt').notNull(),
-    updatedAt: epochMs('updatedAt').notNull(),
-  },
-  (t) => [uniqueIndex('feishu_binding_openId_unique').on(t.openId)],
-);
-
 export const scheduleReport = sqliteTable(
   'schedule_report',
   {

@@ -5,11 +5,8 @@ import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import {
-  agentMemory,
-  step as stepTable,
-  todo as todoTable,
-} from '../../apps/server/src/db/schema.js';
+import { step as stepTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
+import { listMemoryEntries } from '../../apps/server/src/services/memory.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
@@ -116,7 +113,7 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     build1 = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
     await waitFor(() => {
-      const rows = server.db.select().from(agentMemory).all();
+      const rows = listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID });
       if (rows.length > 0) {
         if (stepStatusAtWrite === null) {
           stepStatusAtWrite =
@@ -129,7 +126,7 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     }, 120_000);
     expect(stepStatusAtWrite).toBe('claimed');
 
-    const rows = server.db.select().from(agentMemory).all();
+    const rows = listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       agentId: AGENT_ID,
@@ -142,7 +139,9 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     });
 
     await waitFor(() => server.todoPhase(world1.todoId) === 'review', 120_000);
-    expect(server.db.select().from(agentMemory).all()).toHaveLength(1);
+    expect(listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(
+      1,
+    );
   }, 150_000);
 
   test('no-instruction turn: zero writes + read-side injection trace visible on the wire (04 appendix A)', async () => {
@@ -158,7 +157,9 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
 
     await waitFor(() => server.todoPhase(world2.todoId) === 'review', 120_000);
 
-    expect(server.db.select().from(agentMemory).all()).toHaveLength(1);
+    expect(listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(
+      1,
+    );
     const todo2 = server.db.select().from(todoTable).where(eq(todoTable.id, world2.todoId)).get();
     expect(todo2?.phase).toBe('review');
 
