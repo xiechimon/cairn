@@ -15,7 +15,7 @@ function LiveThreadReportReply({ todoId }: { todoId: string }) {
   const sendKey = useSendKey();
   const [open, setOpen] = useState(false);
   const todo = todos.data?.find((candidate) => candidate.id === todoId);
-  if (todo === undefined || todo.awaitingReply !== true) return null;
+  if (todo === undefined || todo.phase !== 'needs_input') return null;
   const send = async (content: string) => {
     await mutations.messageThread.mutateAsync({
       todoId,

@@ -237,7 +237,7 @@ describe('protocol vocabulary snapshot (02 §5/§6 canonical)', () => {
     expect({ LOCAL_STORAGE_KEYS, THIRD_PARTY_CLIENT_KEYS }).toMatchSnapshot();
   });
 
-  it('phase nine values + board columns + semantics (02 §4.1)', () => {
+  it('phase ten values + board columns + semantics (02 §4.1)', () => {
     expect({ PHASE_VALUES, PHASE_SEMANTICS, BOARD_COLUMNS }).toMatchSnapshot();
   });
 

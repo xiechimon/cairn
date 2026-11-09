@@ -74,6 +74,17 @@ export function buildTaskPromptText(title: string, spec: string, source?: TaskSo
   return isIssueSourcedTask(source) ? fenceIssueText(source?.sourceRef, text) : text;
 }
 
+export function specWithDecisions(
+  spec: string,
+  decisions: readonly { requestId: string; question: string; answer: string }[],
+): string {
+  if (decisions.length === 0) return spec;
+  const lines = decisions.map(
+    (d) => `- Question (${d.requestId}): ${d.question}\n  Decision: ${d.answer}`,
+  );
+  return `${spec}\n\nDecisions already made on this task. They override the brief where the two conflict; do not ask them again:\n${lines.join('\n')}`;
+}
+
 export const TRANSCRIPT_PROMPT_ROW_ID_PREFIX = 'user-';
 
 export function transcriptPromptRowId(stepId: string): string {

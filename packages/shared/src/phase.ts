@@ -4,6 +4,7 @@ export const PHASE_VALUES = [
   'planning',
   'confirm',
   'building',
+  'needs_input',
   'review',
   'done',
   'failed',
@@ -18,6 +19,7 @@ export const PHASE_SEMANTICS: Readonly<Record<Phase, string>> = {
   planning: '读仓库写计划',
   confirm: '计划就绪等你',
   building: '在改',
+  needs_input: 'agent 问了问题，等按 requestId 回答',
   review: '改动就绪等你（`待验收`≡`审核` 同 phase，CONTEXT.md 裁决）',
   done: '已接受，若选了则已合并',
   failed: 'run 停在错误上',
@@ -61,6 +63,7 @@ export function boardColumnFor(phase: Phase): BoardColumn | null {
     case 'building':
       return '执行中';
     case 'confirm':
+    case 'needs_input':
     case 'review':
     case 'failed':
       return '待处理';

@@ -24,7 +24,7 @@ export type ThreadActionKind = 'start' | 'approve' | 'finish' | 'retry' | 'unarc
 
 export function threadActionOf(todo: TodoRecord, running: boolean): ThreadActionKind | null {
   if (todo.archivedAt != null) return 'unarchive';
-  if (todo.awaitingReply === true || running) return null;
+  if (todo.phase === 'needs_input' || running) return null;
   switch (todo.phase) {
     case 'todo':
       return 'start';
