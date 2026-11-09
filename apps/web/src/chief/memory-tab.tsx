@@ -44,10 +44,12 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLParagraphElement>(null);
   const detailBodyRef = useRef<HTMLDListElement>(null);
   const memories = memoriesQ.data ?? [];
   const open = memories.find((memory) => memory.id === openId) ?? null;
   const deleting = mutations.deleteMemory;
+  const deletePending = deleting.isPending || (deleting.isSuccess && memoriesQ.isFetching);
 
   const scopeLabel = (memory: MemoryRecord) =>
     memory.projectId === null
@@ -62,16 +64,14 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
     setConfirming(true);
   };
   const confirmDelete = () => {
-    if (open === null) return;
+    if (open === null || deletePending) return;
     deleting.mutate(
       { memoryId: open.id },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          await memoriesQ.refetch({ cancelRefetch: false });
           setConfirming(false);
           setOpenId(null);
-          requestAnimationFrame(() =>
-            listRef.current?.querySelector<HTMLElement>('[data-slot="memory-row"]')?.focus(),
-          );
         },
       },
     );
@@ -183,7 +183,11 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
   const content = open === null ? null : splitMemoryContent(open.content);
   return (
     <div>
-      <p className="mt-4 text-meta text-content-tertiary">
+      <p
+        ref={summaryRef}
+        tabIndex={-1}
+        className="mt-4 text-meta text-content-tertiary outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-(--focus-ring)"
+      >
         {memories.length > 0
           ? t('已存 {n} 条，上限 {max} 条 · 不是每条都会自动注入', {
               n: memories.length,
@@ -240,15 +244,26 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
         open={open !== null && confirming}
         title={t('删除这条记忆？')}
         ariaLabel={t('删除这条记忆')}
+        finalFocus={() => {
+          if (open !== null) return true;
+          return (
+            (memoriesQ.isFetching || memoriesQ.isError
+              ? null
+              : listRef.current?.querySelector<HTMLElement>('[data-slot="memory-row"]')) ??
+            summaryRef.current
+          );
+        }}
         onClose={() => {
-          if (!deleting.isPending) setConfirming(false);
+          if (!deletePending) setConfirming(false);
         }}
         footer={
           <AlertDialogActions
             cancelLabel={t('取消')}
-            confirmLabel={deleting.isPending ? t('正在删除…') : t('删除记忆')}
-            confirmDisabled={deleting.isPending}
-            onCancel={() => setConfirming(false)}
+            confirmLabel={deletePending ? t('正在删除…') : t('删除记忆')}
+            confirmDisabled={deletePending}
+            onCancel={() => {
+              if (!deletePending) setConfirming(false);
+            }}
             onConfirm={confirmDelete}
           />
         }

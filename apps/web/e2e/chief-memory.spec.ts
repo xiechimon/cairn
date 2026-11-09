@@ -41,7 +41,7 @@ const MEMORIES = [
 
 type ListReply = 'ok' | 'fail' | 'hang';
 
-async function openMemory(page: Page, options: { list?: ListReply; projects?: ListReply; deleteFails?: boolean; memories?: typeof MEMORIES } = {}) {
+async function openMemory(page: Page, options: { list?: ListReply; projects?: ListReply; refresh?: Promise<void>; deleteFails?: boolean; memories?: typeof MEMORIES } = {}) {
   const memories = structuredClone(options.memories ?? MEMORIES);
   const deleted: string[] = [];
   let listReply = options.list ?? 'ok';
@@ -53,6 +53,7 @@ async function openMemory(page: Page, options: { list?: ListReply; projects?: Li
       return json(PROJECTS);
     }
     if (p === '/api/teams/t1/memories') {
+      if (deleted.length > 0 && options.refresh !== undefined) return options.refresh.then(() => json(memories));
       if (listReply === 'hang') return new Promise<void>(() => {});
       if (listReply === 'fail') return json({ error: 'boom' }, 500);
       return json(memories);
@@ -259,4 +260,37 @@ test('project lookup failure offers retry and recovers the list with real projec
 test('a project absent from a successful lookup is still shown as removed', async ({ page }) => {
   await openMemory(page, { memories: [row('m-gone', '保留的记忆', '仍可查看。', 'removed', NOV_8)] });
   await expect(page.getByTestId('memory-list').getByRole('heading', { name: /已移除的项目/ })).toBeVisible();
+});
+
+for (const last of [false, true]) {
+  test(`delete waits for the refreshed list and focuses ${last ? 'the stable summary after the last row' : 'a surviving row'}`, async ({ page }) => {
+    let release = () => {};
+    const refresh = new Promise<void>((resolve) => { release = resolve; });
+    await openMemory(page, { memories: MEMORIES.slice(0, last ? 1 : 2), refresh });
+    await memoryRow(page, '验证命令').click();
+    await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
+    const confirm = page.getByRole('alertdialog');
+    const refreshed = page.waitForRequest(request => request.method() === 'GET' && new URL(request.url()).pathname === '/api/teams/t1/memories');
+    await confirm.getByRole('button', { name: '删除记忆' }).click();
+    await refreshed;
+    try {
+      await expect(confirm.getByRole('button', { name: '正在删除…' })).toBeVisible();
+    } finally {
+      release();
+    }
+    await expect(confirm).toBeHidden();
+    await expect(memoryRow(page, '验证命令')).toHaveCount(0);
+    await settled(page);
+    await expect(last ? page.getByRole('paragraph').filter({ hasText: /^记忆$/ }) : memoryRow(page, '无障碍检查')).toBeFocused();
+  });
+}
+
+test('delete waits for closure and focuses the summary when no rows remain', async ({ page }) => {
+  await openMemory(page, { memories: MEMORIES.slice(0, 1) });
+  await memoryRow(page, '验证命令').click();
+  await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '删除记忆' }).click();
+  await expect(page.getByRole('heading', { name: '尚无记忆。' })).toBeVisible();
+  await settled(page);
+  await expect(page.getByRole('paragraph').filter({ hasText: /^记忆$/ })).toBeFocused();
 });

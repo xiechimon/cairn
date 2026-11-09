@@ -7,8 +7,8 @@
   "files": {
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
-      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer).",
-      "hash": "e8317e0495455920e2e493b5a94ceebb8056c1d8a3550072a69208db0702cf96"
+      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666).",
+      "hash": "c4a87d5e2d622a8c54390f11b2751bb3ccf8c4d739d3e0addece5e758fbae0fa"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
