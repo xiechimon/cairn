@@ -21,6 +21,7 @@ import {
   type GitCredentialSource,
   LOCAL_ERROR_REASON_COPY,
   LocalRepoUnreachableError,
+  normalizedRepoRef,
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
@@ -99,16 +100,7 @@ function readSetupDrift(file: string): PathFingerprints {
 
 const CONV_DIR_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function normalizedRepoRef(url: string): string {
-  let ref = url.trim();
-  if (ref.endsWith('/')) ref = ref.slice(0, -1);
-  if (ref.endsWith('.git')) ref = ref.slice(0, -4);
-  const scp = /^([^@/]+)@([^:/]+):(.+)$/.exec(ref);
-  if (scp) return `${scp[2]}/${scp[3]}`;
-  const scheme = /^[a-z][a-z0-9+.-]*:\/\/(?:([^@/]+)@)?([^/]+)\/(.+)$/i.exec(ref);
-  if (scheme) return `${scheme[2]}/${scheme[3]}`;
-  return ref;
-}
+export { normalizedRepoRef } from '@cairn/shared';
 
 async function localSourceUsable(
   localPath: string,
@@ -255,6 +247,7 @@ export class WorkspaceManager implements WorktreeOps {
             (cred) => gitPrim.clone(cloneUrl, baseRepoDir, cred),
             () => rmSync(baseRepoDir, { recursive: true, force: true }),
           );
+          await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
         }
       } else {
         const origin = await gitPrim.originConfigUrl(baseRepoDir);

@@ -80,9 +80,9 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
-- Research: [docs/research/coordinator-compaction-2026-11-07.md](../../../docs/research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md)
+- Research: [docs/research/coordinator-compaction-2026-11-07.md](../../../docs/research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/coordinator-context-2026-11-08.md](../../../docs/research/coordinator-context-2026-11-08.md)
 - Frontend design: n/a: compaction is invisible by design; the transcript keeps full history
-- Backend design: **gap**: the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes
+- Backend design: [docs/design/coordinator-context-backend.md](../../../docs/design/coordinator-context-backend.md)
 - Evidence: `integration/test/coordinator-context-assemble.test.ts`, `apps/server/test/chief-history.test.ts`, `apps/server/test/coordinator/compaction.test.ts`
 
 ### coordinator-dispatch
@@ -177,9 +177,9 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md)
-- Frontend design: **gap**: the memory list in Coordinator settings has no design
-- Backend design: **gap**: no design for memory keys, scope, consolidation, promotion and invalidation
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md)
+- Frontend design: [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
+- Backend design: [docs/design/memory-backend.md](../../../docs/design/memory-backend.md), [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
 - Evidence: `apps/server/test/memory-consolidation.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
 
 ### merge-gate
@@ -431,8 +431,9 @@ States: Running, waiting on the user, done, snoozed or archived; the thread open
 Reach:
 
 1. `open /app`
-2. `click testid:thread-group-running`
-3. `click testid:side-chat-action`
+2. `click testid:tasks-toggle`
+3. `click testid:tasks-section`
+4. `click testid:side-chat-action`
 
 - Web routes: `/app/todo/:id`
 - Keyboard shortcuts in its code: `B`, `C`, `P`
@@ -994,23 +995,23 @@ Reach:
 
 ### sidebar
 
-**Sidebar and thread list** (shipped, centrality 3). The sidebar with the Coordinator row, projects and thread groups, unread marks and the project menu.
+**Sidebar** (shipped, centrality 3). The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.
 
-States: Groups for needs-you, running and done threads, projects with archived ones folded, an attention badge, and loading or error rows.
+States: Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.
 
 Reach:
 
 1. `open /app`
-2. `click testid:thread-groups`
-3. `click testid:project-group`
+2. `click testid:project-group`
+3. `click testid:project-group-header`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `archived-group`, `attention-badge`, `done-threads-toggle`, `project-group`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`, `thread-group-done`, `thread-group-needs-you`, `thread-group-running`, `thread-groups`
+- Test ids in its code: `project-group`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: **gap**: no design for unread and read marks across devices
-- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-project-threads.spec.ts`, `apps/server/test/unread-notifications.test.ts`
+- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/server/test/unread-notifications.test.ts`
 
 ### skills
 

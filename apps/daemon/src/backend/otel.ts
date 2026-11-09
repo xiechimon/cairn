@@ -1,8 +1,9 @@
-import { randomBytes } from 'node:crypto';
 import {
+  type Attributes,
   chatAttributes,
   executeToolAttributes,
   langfuseEnvironmentAttributes,
+  observationAttributes,
   otelEnvironment,
   otelResourceAttributes,
   type ProviderModelRef,
@@ -10,24 +11,44 @@ import {
   type TokenCounts,
 } from '@cairn/shared';
 import {
-  createOtlpSender,
-  OTLP_SPAN_KIND,
-  OTLP_STATUS_ERROR,
-  type OtlpSender,
-  type OtlpSpan,
-  type OtlpTarget,
-  otlpAttributes,
-  otlpNanos,
-  otlpTraceparent,
-  otlpTracesRequest,
+  type CairnSpan,
+  type CairnTracing,
+  createCairnTracing,
   parseOtlpTarget,
   type StepOtelContext,
   stepOtelContext,
+  traceparentFor,
 } from '@cairn/shared/otel';
 
 const SCOPE = 'cairn.daemon';
 
-const sender = createOtlpSender();
+const tracings = new Map<string, CairnTracing>();
+
+function tracingFor(ctx: StepOtelContext, log?: (message: string) => void): CairnTracing {
+  const environment = ctx.environment ?? null;
+  const key = JSON.stringify([ctx.tracesUrl, ctx.headers, environment]);
+  let tracing = tracings.get(key);
+  if (tracing === undefined) {
+    tracing = createCairnTracing(
+      { url: new URL(ctx.tracesUrl), headers: ctx.headers },
+      otelResourceAttributes(environment),
+      SCOPE,
+      (error) => log?.(`otel push failed: ${error.message}`),
+    );
+    tracings.set(key, tracing);
+  }
+  return tracing;
+}
+
+export async function flushDaemonOtel(): Promise<void> {
+  await Promise.all([...tracings.values()].map((tracing) => tracing.forceFlush()));
+}
+
+export async function shutdownDaemonOtel(): Promise<void> {
+  const open = [...tracings.values()];
+  tracings.clear();
+  await Promise.all(open.map((tracing) => tracing.shutdown()));
+}
 
 export interface DaemonOtel {
   contextFor(buildId: string, stepId: string, kind?: string): StepOtelContext;
@@ -48,7 +69,7 @@ export function daemonOtelFromEnv(env: NodeJS.ProcessEnv): DaemonOtel | null {
 
 export function claudeTelemetryEnv(ctx: StepOtelContext): Record<string, string> {
   return {
-    TRACEPARENT: otlpTraceparent(ctx.traceId, ctx.stepSpanId),
+    TRACEPARENT: traceparentFor(ctx.traceId, ctx.stepSpanId),
     ...claudeCliEnv({}),
   };
 }
@@ -90,7 +111,8 @@ function jsonText(value: unknown): string {
 }
 
 export class PiStepSpanSink {
-  private readonly spans: OtlpSpan[] = [];
+  private readonly spans: CairnSpan[] = [];
+  private input: Attributes = {};
   private readonly openTools = new Map<string, OpenToolSpan>();
 
   constructor(
@@ -98,8 +120,15 @@ export class PiStepSpanSink {
     private readonly fallback: ProviderModelRef,
     private readonly log?: (msg: string) => void,
     private readonly redact?: <T>(value: T) => T,
-    private readonly out: OtlpSender = sender,
   ) {}
+
+  private get parent() {
+    return { traceId: this.ctx.traceId, spanId: this.ctx.stepSpanId };
+  }
+
+  request(messages: unknown): void {
+    this.input = observationAttributes({ input: this.redact?.(messages) ?? messages });
+  }
 
   chat(
     at: number,
@@ -111,25 +140,25 @@ export class PiStepSpanSink {
       rawFinishReason?: string;
       usage?: TokenCounts;
       costUsd?: number;
+      output?: unknown;
     },
   ): void {
     const model = turn.model ?? this.fallback.model ?? '';
     this.spans.push({
-      traceId: this.ctx.traceId,
-      spanId: randomBytes(8).toString('hex'),
-      parentSpanId: this.ctx.stepSpanId,
+      parent: this.parent,
       name: `chat ${model}`.trim(),
-      kind: OTLP_SPAN_KIND.client,
-      startTimeUnixNano: otlpNanos(at),
-      endTimeUnixNano: otlpNanos(at),
-      attributes: otlpAttributes({
+      kind: 'client',
+      startMs: at,
+      endMs: at,
+      attributes: {
         ...chatAttributes(turn, this.fallback),
+        ...this.input,
+        ...observationAttributes({ output: this.redact?.(turn.output) ?? turn.output }),
         ...langfuseEnvironmentAttributes(this.ctx.environment),
-      }),
-      ...(turn.finishReason === 'error'
-        ? { status: { code: OTLP_STATUS_ERROR, message: 'error' } }
-        : {}),
+      },
+      ...(turn.finishReason === 'error' ? { error: 'error' } : {}),
     });
+    this.input = {};
   }
 
   toolStart(id: string, at: number, name: string, args: unknown): void {
@@ -141,17 +170,13 @@ export class PiStepSpanSink {
     const open = this.openTools.get(id);
     if (open === undefined) return;
     this.openTools.delete(id);
-    const start = open.at;
-    const end = Math.max(start, at);
     this.spans.push({
-      traceId: this.ctx.traceId,
-      spanId: randomBytes(8).toString('hex'),
-      parentSpanId: this.ctx.stepSpanId,
+      parent: this.parent,
       name: `execute_tool ${open.name}`,
-      kind: OTLP_SPAN_KIND.internal,
-      startTimeUnixNano: otlpNanos(start),
-      endTimeUnixNano: otlpNanos(end),
-      attributes: otlpAttributes({
+      kind: 'internal',
+      startMs: open.at,
+      endMs: Math.max(open.at, at),
+      attributes: {
         ...executeToolAttributes({
           name: open.name,
           callId: id,
@@ -159,8 +184,8 @@ export class PiStepSpanSink {
           result: jsonText(result),
         }),
         ...langfuseEnvironmentAttributes(this.ctx.environment),
-      }),
-      ...(isError ? { status: { code: OTLP_STATUS_ERROR, message: 'tool error' } } : {}),
+      },
+      ...(isError ? { error: 'tool error' } : {}),
     });
   }
 
@@ -170,20 +195,10 @@ export class PiStepSpanSink {
       this.toolEnd(id, now, undefined, false);
     }
     if (this.spans.length === 0) return;
-    const target: OtlpTarget = { url: new URL(this.ctx.tracesUrl), headers: this.ctx.headers };
     try {
-      const request = otlpTracesRequest(
-        otelResourceAttributes(this.ctx.environment),
-        SCOPE,
-        this.spans,
-      );
-      const redacted = redactSecrets(this.redact?.(request) ?? request).value as ReturnType<
-        typeof otlpTracesRequest
-      >;
-      const accepted = this.out.send(target, redacted, (error) =>
-        this.log?.(`otel push failed: ${error instanceof Error ? error.message : String(error)}`),
-      );
-      if (!accepted) this.log?.('otel push dropped: export queue is full');
+      const spans = this.spans.splice(0);
+      const redacted = redactSecrets(this.redact?.(spans) ?? spans).value as CairnSpan[];
+      tracingFor(this.ctx, this.log).record(redacted);
     } catch (error) {
       this.log?.(`otel push failed: ${error instanceof Error ? error.message : String(error)}`);
     }
