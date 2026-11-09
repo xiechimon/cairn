@@ -2231,6 +2231,30 @@ export async function githubComment(
   );
 }
 
+export async function githubIssueCommentBodies(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+): Promise<string[] | null> {
+  const bodies: string[] = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const got = await conditionalGetJson(
+      fetchImpl,
+      `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      token,
+      null,
+      FETCH_TIMEOUT_MS,
+    );
+    if (got === null || got.notModified || !Array.isArray(got.data)) return null;
+    const rows = got.data as Array<{ body?: unknown }>;
+    for (const row of rows) if (typeof row?.body === 'string') bodies.push(row.body);
+    if (rows.length < 100) return bodies;
+  }
+  return null;
+}
+
 export function githubReplyReviewThread(
   fetchImpl: FetchLike,
   token: AutonomousToken,

@@ -1026,6 +1026,9 @@ describe('a green PR waiting for queue conditions wakes its owner with what is u
     '    - [ ] `check-success = pr-size`',
     '    - [X] `-draft`',
     '    - [X] `#files <= 80`',
+    '    - [X] any of:',
+    '      - [X] `check-success = check`',
+    '      - [ ] `check-skipped = check`',
   ].join('\n');
   const green = (f: ReturnType<typeof fixture>, summary = unmet, extra: RunSpec[] = []) =>
     f.mock.checks.set(f.pull.head, [
@@ -1058,6 +1061,7 @@ describe('a green PR waiting for queue conditions wakes its owner with what is u
     expect(prompt).toContain('check-success = pr-size');
     expect(prompt).not.toContain('-draft');
     expect(prompt).not.toContain('#files <= 80');
+    expect(prompt).not.toContain('check-skipped = check');
     f.settle();
     await watchFor(f.s, f.mock).sweep(minutes(20));
     expect(f.steps()).toHaveLength(1);

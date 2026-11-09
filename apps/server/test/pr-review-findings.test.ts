@@ -130,7 +130,9 @@ function fixture() {
               }
             : String(url).includes('/check-runs')
               ? { check_runs: [] }
-              : [],
+              : /\/issues\/3377\/comments/.test(String(url))
+                ? posted.map((body, id) => ({ id: id + 1, body }))
+                : [],
         text: async () => '',
       };
     if (!String(url).endsWith('/graphql')) {
@@ -410,7 +412,7 @@ test('the findings wake asks for whole-class fixes in one push, P0/P1 fixed, and
   expect(prompt).toContain('只推送一次');
   expect(prompt).toContain('P0/P1 必须修复');
   expect(prompt).toContain('`valid, out of scope for this PR, tracked in #N`');
-  expect(prompt).toContain('先新建 issue');
+  expect(prompt).toContain('先新建或复用一个跟踪它的 issue');
   expect(prompt).not.toContain('@mergifyio');
 });
 
@@ -423,6 +425,8 @@ test('the review round cap stops wakes, lists every finding class raised, and as
     .run();
   await f.wake();
   expect(f.s.db.select().from(step).all()).toHaveLength(1);
+  f.state.findingId = 'RT_1b';
+  await f.wake();
   expect(f.posted).toEqual([]);
   f.s.db.update(step).set({ status: 'done' }).run();
   f.state.findingId = 'RT_2';
@@ -453,6 +457,31 @@ test('a failed cap comment is retried on the next poll and then posted once', as
   await f.wake();
   expect(f.posted).toEqual([]);
   await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+});
+
+test('a cap request left pending by a restart is posted once, and a delivered marker is never reposted', async () => {
+  const f = fixture();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({
+      id,
+      conversationId: id,
+      role: 'system',
+      content: { reviews: 3, capRequest: 'pending' },
+      createdAt: 1,
+    })
+    .run();
+  await f.wake();
+  await f.wake();
+  expect(f.posted).toHaveLength(1);
+  f.s.db
+    .update(message)
+    .set({ content: { reviews: 3, capRequest: 'pending' } })
+    .where(eq(message.id, id))
+    .run();
   await f.wake();
   expect(f.posted).toHaveLength(1);
 });

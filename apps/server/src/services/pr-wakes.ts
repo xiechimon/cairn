@@ -25,6 +25,7 @@ import {
   githubCollaboratorPermission,
   githubComment,
   githubCommitCheckRuns,
+  githubIssueCommentBodies,
 } from '../lib/github.js';
 import {
   feedbackHighWaterSchema,
@@ -52,7 +53,7 @@ const ledgerSchema = z.object({
   repeated: z.boolean().default(false),
   pendingNotice: z.object({ buildId: z.string(), content: z.string() }).nullable().default(null),
   findingClasses: z.array(z.string()).default([]),
-  capRequest: z.string().nullable().default(null),
+  capRequest: z.enum(['pending', 'delivered']).nullable().default(null),
 });
 
 type WakeKind = 'conflict' | 'ci' | 'review' | 'queue';
@@ -63,6 +64,7 @@ const QUEUE_WAITING_TITLE = 'Waiting for queue conditions';
 const QUEUE_WAIT_MS = 10 * 60_000;
 const GREEN_CONCLUSIONS = new Set(['success', 'skipped', 'neutral']);
 const QUEUE_WAIT_PROMPT_HEAD = '[queue-wait]';
+const CAP_MARKER = '<!-- cairn:review-cap -->';
 export const CAP_REVIEW_FOCUS =
   'every remaining instance of the finding classes listed above across the whole PR diff';
 
@@ -72,6 +74,7 @@ export function focusedCodexReview(focus: string): string {
 
 function capComment(prNumber: number, classes: string[]): string {
   return [
+    CAP_MARKER,
     `Review round cap (${REVIEW_ROUND_CAP}) reached on #${prNumber}: cairn stops auto-fix wakes on this PR. Finding classes raised so far:`,
     '',
     ...classes.map((title) => `- ${title.replaceAll('@', '@\u200b')}`),
@@ -102,11 +105,18 @@ function unmetQueueConditions(
   );
   if (checks.length === 0 || greenAt.length !== checks.length) return null;
   if (now - Math.max(...greenAt) < QUEUE_WAIT_MS) return null;
-  const unmet = queue.outputSummary
-    .split('\n')
-    .filter((line) => /^\s*- \[ \] /.test(line))
-    .join('\n');
-  return unmet === '' ? null : unmet;
+  const open: { indent: number; unmet: boolean }[] = [];
+  const unmet: string[] = [];
+  for (const line of queue.outputSummary.split('\n')) {
+    const item = /^(\s*)- \[([ xX])\] /.exec(line);
+    if (item === null) continue;
+    const indent = item[1]?.length ?? 0;
+    while ((open.at(-1)?.indent ?? -1) >= indent) open.pop();
+    const missing = item[2] === ' ';
+    if (missing && open.every((parent) => parent.unmet)) unmet.push(line);
+    open.push({ indent, unmet: missing });
+  }
+  return unmet.length === 0 ? null : unmet.join('\n');
 }
 
 function buildQueueWaitPrompt(args: { prNumber: number; prUrl: string | null; unmet: string }) {
@@ -352,10 +362,38 @@ export function createPrWakes(deps: BuildDeps) {
       const title = reviewFindingTitle(finding.body);
       if (title !== '' && !ledger.findingClasses.includes(title)) ledger.findingClasses.push(title);
     }
-    const capped = findings !== null && findings.length > 0 && ledger.reviews >= REVIEW_ROUND_CAP;
+    const roundRunning =
+      deps.db
+        .select({ id: step.id })
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, row.buildId),
+            inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+          ),
+        )
+        .get() !== undefined;
+    const capped =
+      findings !== null &&
+      findings.length > 0 &&
+      ledger.reviews >= REVIEW_ROUND_CAP &&
+      !roundRunning;
     if (capped) notices.push('Review round cap (3) reached; rethink or hand to the owner.');
-    const requestCapReview = capped && ledger.capRequest === null;
-    if (requestCapReview) ledger.capRequest = row.head;
+    let requestCapReview = false;
+    if (ledger.capRequest !== 'delivered' && (capped || ledger.capRequest === 'pending')) {
+      const bodies = await githubIssueCommentBodies(
+        githubTokenFetch(input.fetch, token, { owner, repo }),
+        token,
+        owner,
+        repo,
+        row.number,
+      );
+      if (bodies?.some((body) => body.includes(CAP_MARKER))) ledger.capRequest = 'delivered';
+      else if (bodies !== null) {
+        ledger.capRequest = 'pending';
+        requestCapReview = true;
+      }
+    }
     const unmet = unmetQueueConditions(pull, runs, findings, now);
     if (unmet !== null) {
       const key = `queue:${row.head}:${digest(unmet)}`;
@@ -534,14 +572,14 @@ export function createPrWakes(deps: BuildDeps) {
           row.number,
           capComment(row.number, ledger.findingClasses),
         );
-      } catch (error) {
         deps.db.transaction(() => {
           const current = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
           const latest = ledgerSchema.parse(current?.content ?? {});
-          if (latest.capRequest !== row.head) return;
-          latest.capRequest = null;
+          if (latest.capRequest !== 'pending') return;
+          latest.capRequest = 'delivered';
           deps.db.update(message).set({ content: latest }).where(eq(message.id, ledgerId)).run();
         });
+      } catch (error) {
         if (error instanceof GithubRateLimitedError) throw error;
         console.warn('Review round cap comment not posted; retrying on the next poll', {
           pr: row.number,
