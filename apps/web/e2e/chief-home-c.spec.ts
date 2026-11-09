@@ -37,7 +37,7 @@ test('the removed surfaces are gone: thread switcher, task panel, digest and per
   await expect(page.getByTestId('task-panel-toggle')).toHaveCount(0);
   await expect(page.getByTestId('home-sections')).toHaveCount(0);
   await expect(page.getByTestId('chief-brief')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-thread-row')).toHaveCount(0);
+  await expect(page.locator('[data-slot="sidebar-thread-row"]')).toHaveCount(0);
   await expect(page.getByTestId('group-archived')).toHaveCount(0);
   await expect(page.locator('.chief-fab')).toHaveCount(0);
 });
@@ -217,14 +217,15 @@ test('the home lands at the newest message, with the needs-you tray pinned above
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]').first()).toBeInViewport();
 });
 
-test('the sidebar Coordinator badge counts the Needs you items plus the pending question', async ({ page }) => {
+test('the tab title carries the Tasks count on every page and the sidebar carries no count', async ({
+  page,
+}) => {
   await page.goto(home('home-c'));
-  const badge = page.getByRole('complementary').getByTestId('attention-badge');
-  const needsYouCount = await needsYou(page).getByTestId('needs-you-count').textContent();
-  expect(needsYouCount).toBe('3');
-  await expect(badge).toHaveText('4');
+  await expect(page.getByTestId('tasks-badge')).toHaveText('3');
+  await expect(page).toHaveTitle('(3) Cairn');
+  await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveCount(0);
   await page.goto('/app/schedules?scenario=home-c');
-  await expect(badge).toHaveText('4');
+  await expect(page).toHaveTitle('(3) Cairn');
 });
 
 test('the earlier-messages divider shows only when the conversation reports earlier messages', async ({
