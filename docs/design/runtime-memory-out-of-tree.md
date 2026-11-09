@@ -10,7 +10,7 @@ Keep worker runtime instructions, team memory and skill catalogs in the existing
 | --- | --- | --- |
 | New and resumed Pi sessions | Compose the runtime prompt in memory; let the SDK load repository context | Prompt composition errors fail the step before opening the session |
 | New and resumed Claude sessions | Append the runtime prompt through the SDK; include AGENTS.md only when native CLAUDE.md is absent | Repository read errors fail before session open |
-| ACP sessions | Retain the existing prompt delivery bridge | Existing session error handling |
+| ACP sessions, including Gemini new/load/resume | Prefix runtime guidance to each delivered user prompt through the existing ACP bridge; never submit a guidance-only turn | Existing session error handling |
 | Session completion, open failure, stream failure and stop | Leave repository files unchanged; no brief cleanup | Existing session outcome handling |
 | Commit after setup/resume | Exclude fingerprint-matching setup drift, then check the staged diff | Empty index returns committed=false; real Git errors propagate |
 | Worker changes after setup | Stage and commit worker changes, preserving hook failures | Existing commit errors remain failures |

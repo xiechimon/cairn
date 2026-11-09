@@ -37,3 +37,10 @@ pnpm prepush
 ## Limits
 
 The model is a deterministic local stub. The Claude repository-guidance fallback is covered through the runner seam and pure composer; this verification does not log in to a real Claude account. Existing contaminated workspaces and previously published commits are not rewritten. Historical marker diagnostics and staging exclusion remain in place. Deployment acceptance requires the deployed daemon SHA and a fresh task workspace after merge.
+
+
+## Review round 1: incomplete prompt bridge migration
+
+Codex cloud review on 6d1947f80 identified an adapter-only guard in the ACP prompt bridge. That guard dropped Gemini runtime guidance after removal of its file carrier. New, load and resume requests all reproduced the loss: the stdio peer received only `new turn`, instead of the description, memory, project instructions and user prompt. Three tests failed before removing the guard; two no-user-prompt controls passed. The bridge now handles Gemini and adapters through one condition, preserving the absence of a user turn on prompt-free continuation. Targeted coverage includes the existing adapter and runner paths as well as all three Gemini entry paths.
+
+The recurrence safeguard is in the codebase: a shared prompt assembly condition, backed by wire-facing ACP regression tests. No thread reply or resolution is performed; findings are answered in one bot PR summary comment per review round.
