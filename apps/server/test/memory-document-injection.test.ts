@@ -93,11 +93,11 @@ test('section 4: worker injection bounds each team and project index independent
 });
 
 test('empty injection ensures one persisted index', () => {
-  const scope = teamScope();
+  const scope = { ...teamScope(), threadId: H.threadId };
   injectMemories(H.s.db, scope);
   injectMemories(H.s.db, scope);
   const indexes = listStoredMemoryEntries(H.s.db, scope).filter((m) => m.layer === 'core');
-  expect(indexes.map((m) => [m.title, m.content])).toEqual([['MEMORY.md', '']]);
+  expect(indexes.map((m) => [m.title, m.content, m.threadId])).toEqual([['MEMORY.md', '', null]]);
 });
 
 test.each(['system', 'step', 'project', 'worker'] as const)(

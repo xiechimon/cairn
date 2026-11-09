@@ -8,20 +8,7 @@ import {
   type MemoryLayer,
   memoryRecordSchema,
 } from '@cairn/shared';
-import {
-  and,
-  asc,
-  count,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  lt,
-  ne,
-  or,
-  type SQL,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agentMemory, memorySaveConflict } from '../db/schema.js';
@@ -172,7 +159,9 @@ export function ensureMemoryIndex(
     return tx
       .insert(agentMemory)
       .values({
-        ...scope,
+        agentId: scope.agentId,
+        teamId: scope.teamId,
+        projectId: scope.projectId,
         id: `${MEMORY_INDEX_ID_PREFIX}${newRecordId()}`,
         title: MEMORY_INDEX_TITLE,
         content: '',
@@ -248,7 +237,7 @@ export function injectMemoryDocuments(
     memories.push(...pads.map(({ id, title, content }) => ({ id, title, content })));
     const fileCount =
       tx
-        .select({ count: count() })
+        .select({ count: sql<number>`count(*)` })
         .from(agentMemory)
         .where(and(owner, project, stillValid, eq(agentMemory.layer, 'searchable')))
         .get()?.count ?? 0;
