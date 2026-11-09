@@ -88,6 +88,7 @@ import { useAuth } from './auth.js';
 import { api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { cacheUserMessage } from './message-cache.js';
+import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
@@ -572,15 +573,15 @@ export function useChief(teamId: string | undefined, enabled: boolean, threadId?
     },
     enabled: enabled && teamId !== undefined,
   });
-  const resumeExpiresAt = query.data?.context?.resumeExpiresAt;
+  const resumeExpiresInMs = query.data?.context?.resumeExpiresInMs;
+  const dataUpdatedAt = query.dataUpdatedAt;
   useEffect(() => {
-    if (!enabled || teamId === undefined || resumeExpiresAt == null) return;
-    const delay = Math.max(0, resumeExpiresAt - Date.now());
+    if (!enabled || teamId === undefined || resumeExpiresInMs == null) return;
     const timer = window.setTimeout(() => {
       void qc.invalidateQueries({ queryKey: ['chief', teamId, threadId ?? null] });
-    }, delay);
+    }, resumeRefreshDelayMs(resumeExpiresInMs));
     return () => window.clearTimeout(timer);
-  }, [enabled, teamId, threadId, resumeExpiresAt, qc]);
+  }, [enabled, teamId, threadId, resumeExpiresInMs, dataUpdatedAt, qc]);
   return query;
 }
 

@@ -178,6 +178,7 @@ export function lastTurnContext(
   contextWindow: number;
   resume: ContextResume;
   resumeExpiresAt?: number;
+  resumeExpiresInMs?: number;
 } | null {
   if (threadId !== undefined) {
     const owned = db
@@ -210,8 +211,9 @@ export function lastTurnContext(
       .where(eq(coordinatorConversation.threadId, last.threadId))
       .get() ?? null;
   const lastColdSlimAt = coldSlim?.at ?? null;
+  const now = nowMs();
   const resume = contextResumeOf({
-    now: nowMs(),
+    now,
     retentionMs,
     lastUsage: {
       createdAt: last.createdAt,
@@ -235,6 +237,11 @@ export function lastTurnContext(
     tokens: last.contextTokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
     resume,
-    ...(resumeExpiresAt !== null ? { resumeExpiresAt } : {}),
+    ...(resumeExpiresAt !== null
+      ? {
+          resumeExpiresAt,
+          resumeExpiresInMs: Math.max(0, resumeExpiresAt - now),
+        }
+      : {}),
   };
 }

@@ -357,6 +357,10 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     const turnB = turnRows().find((r) => r.stepId === 'turn-b');
     expect(turnB).toBeDefined();
     expect(context?.resumeExpiresAt).toBe((turnB?.createdAt ?? 0) + SHORT_RETENTION_MS);
+    expect(context?.resumeExpiresInMs).toBeGreaterThan(0);
+    expect((context?.resumeExpiresAt ?? 0) - (context?.resumeExpiresInMs ?? 0)).toBeLessThanOrEqual(
+      Date.now() + 100,
+    );
   });
 
   test('flag on: a coordinator model-route change reports cold resume', async () => {
@@ -382,6 +386,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       resume: 'cold',
     });
     expect(after?.resumeExpiresAt).toBeUndefined();
+    expect(after?.resumeExpiresInMs).toBeUndefined();
   });
 
   test('flag on: a turn without contextTokens (claude-code) leaves the meter empty', async () => {
