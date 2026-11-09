@@ -27,8 +27,12 @@ describe('ContextMeterRing', () => {
     );
     expect(html).toContain('data-testid="composer-context-meter"');
     expect(html).toContain('data-mock=""');
-    expect(html).toContain(`aria-valuenow="${MOCK_CONTEXT_PERCENT}"`);
+    expect(html).toContain(`data-percent="${MOCK_CONTEXT_PERCENT}"`);
+    expect(html).not.toContain('aria-valuenow');
+    expect(html).not.toContain('aria-valuemin');
+    expect(html).not.toContain('aria-valuemax');
     expect(html).toContain('示意');
+    expect(html).toContain('aria-hidden="true"');
     expect(html).toContain('size-5.5');
   });
 });

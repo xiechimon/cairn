@@ -40,9 +40,7 @@ export function ContextMeterRing({
           type="button"
           data-testid="composer-context-meter"
           data-mock={mock ? '' : undefined}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={filled}
+          data-percent={filled}
           className={METER_BTN_CLS}
         />
       }
