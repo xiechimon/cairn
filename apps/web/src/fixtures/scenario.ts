@@ -349,7 +349,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'r8-81': detailR8Fresh,
       'r8-82': detailR8DeleteFresh,
       '100': chiefGated,
-      '101': chiefSettings('agent'),
+      '101': chiefSettings('routing'),
       '102': chiefSettings('charter'),
       '103': chiefSettings('memory'),
       '104': chiefSettings('watches'),

@@ -69,7 +69,7 @@ test('empty-state card centered and growth-proof: memo matches watches (#772)', 
   });
 
   for (const [scenario, copy] of [
-    ['103', /No Agent selected yet/],
+    ['103', /No memories yet/],
     ['104', /Nothing being watched yet/],
   ] as const) {
     await page.goto(`/app?scenario=${scenario}`);
@@ -88,13 +88,23 @@ test('empty-state card centered and growth-proof: memo matches watches (#772)', 
   }
 });
 
-test('Agent tab has no `派发方式` row: the settings slot was removed, neighbor decision faces intact (#903+#1260)', async ({ page }) => {
+test('模型与机器 tab is one work-routing row: no Agent or dispatch leftovers (#903+#1260)', async ({
+  page,
+}) => {
   await page.goto(AGENT_TAB);
+  await expect(page.getByRole('tab', { name: '模型与机器' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByRole('tab', { name: 'Agent' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '派发方式' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '派发方式' })).toHaveCount(0);
 
-  await expect(page.getByRole('button', { name: '未设置' })).toHaveCount(1);
-  await expect(page.getByTestId('chief-follows-agent')).toBeVisible();
+  const row = page.getByTestId('chief-routing-row');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('模型与机器');
+  await expect(row).toContainText('跟随 coordinator 路由规则');
+  await expect(page.getByRole('button', { name: '未设置' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '压缩模型' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '机器', exact: true })).toHaveCount(0);
 });
