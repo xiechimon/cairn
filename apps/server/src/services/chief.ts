@@ -918,7 +918,7 @@ export function rewindChiefThread(
     .where(and(eq(chiefMessage.id, body.messageId), eq(chiefMessage.threadId, threadId)))
     .get();
   if (!anchor) throw new HttpError(404, `chief message ${body.messageId}`);
-  if (anchor.role !== 'user') {
+  if (anchor.role !== 'user' || anchor.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
     throw new HttpError(400, 'rewind anchor must be a user message');
   }
   if (anchor.projectId !== null) requireUnarchivedProject(deps.db, anchor.projectId);

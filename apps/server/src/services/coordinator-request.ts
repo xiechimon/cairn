@@ -13,6 +13,7 @@ import {
   type TaskRequest,
   type TaskSegment,
   type TodoRecord,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   uncoveredText,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
@@ -42,6 +43,9 @@ function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): 
     .all();
   const byId = new Map(rows.map((row) => [row.id, row]));
   return messageIds.map((id) => {
+    if (id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+      throw new HttpError(400, `message ${id} is a transcript prompt, not owner words`);
+    }
     const row = byId.get(id);
     const question = row === undefined ? null : askQuestionContentOf(row.content);
     if (question !== null && isOwnerAnswered(question)) {
