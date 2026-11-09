@@ -71,6 +71,7 @@ class GithubMock {
   requests: string[] = [];
   authorizations: string[] = [];
   notModified = 0;
+  threads: 'none' | 'failing' | null = null;
   fetch = vi.fn((input: string | URL, init?: { headers?: Record<string, string> }) => {
     const url = String(input);
     this.requests.push(url);
@@ -103,6 +104,29 @@ class GithubMock {
         text: () => Promise.resolve(JSON.stringify(body)),
       });
     };
+    if (url.endsWith('/graphql') && this.threads !== null) {
+      if (this.threads === 'failing') return send(502, { message: 'bad gateway' });
+      const spec = [...this.pulls.values()][0];
+      return send(200, {
+        data: {
+          repository: {
+            label: { id: 'LABEL_node' },
+            pullRequest: {
+              timelineItems: { nodes: [] },
+              id: 'PR_node',
+              state: 'OPEN',
+              isDraft: spec?.draft ?? false,
+              headRefOid: spec?.head ?? HEAD_A,
+              labels: {
+                nodes: (spec?.labels ?? []).map((name) => ({ name })),
+                pageInfo: { hasNextPage: false },
+              },
+              reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+            },
+          },
+        },
+      });
+    }
     const pull = /\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/.exec(url);
     if (pull) {
       const key = `${(pull[1] ?? '').toLowerCase()}#${pull[2]}`;
@@ -1030,7 +1054,8 @@ describe('a green PR waiting for queue conditions wakes its owner with what is u
     '      - [X] `check-success = check`',
     '      - [ ] `check-skipped = check`',
   ].join('\n');
-  const green = (f: ReturnType<typeof fixture>, summary = unmet, extra: RunSpec[] = []) =>
+  const green = (f: ReturnType<typeof fixture>, summary = unmet, extra: RunSpec[] = []) => {
+    f.mock.threads ??= 'none';
     f.mock.checks.set(f.pull.head, [
       {
         name: 'unit',
@@ -1047,6 +1072,7 @@ describe('a green PR waiting for queue conditions wakes its owner with what is u
       waiting(summary),
       ...extra,
     ]);
+  };
   const prompts = (f: ReturnType<typeof fixture>) => f.steps().map((s) => s.prompt ?? '');
 
   test('ten minutes after the last check turned green, one wake lists only the unmet conditions', async () => {
@@ -1076,6 +1102,17 @@ describe('a green PR waiting for queue conditions wakes its owner with what is u
     await watchFor(f.s, f.mock).sweep(minutes(12));
     expect(f.steps()).toHaveLength(2);
     expect(prompts(f)[1]).toContain('check-success = merge-route');
+  });
+
+  test('an unreadable review-findings snapshot is unknown, so no queue wake fires', async () => {
+    const f = fixture();
+    green(f);
+    f.mock.threads = 'failing';
+    await watchFor(f.s, f.mock).sweep(minutes(30));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(0);
+    f.mock.threads = 'none';
+    await watchFor(f.s, f.mock).sweep(minutes(31));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(1);
   });
 
   test('a superseded failed attempt of a check does not hide a green rerun', async () => {

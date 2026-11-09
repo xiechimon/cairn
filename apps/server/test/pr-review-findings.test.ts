@@ -96,6 +96,8 @@ function fixture() {
     error: '',
     page: false,
     commentFailures: 0,
+    token: 'fake',
+    poster: 'cairnwright[bot]',
     foreignComments: [] as { user: { login: string }; body: string }[],
   };
   const queries: string[] = [];
@@ -134,7 +136,7 @@ function fixture() {
               : /\/issues\/3377\/comments/.test(String(url))
                 ? [
                     ...state.foreignComments,
-                    ...posted.map((body) => ({ user: { login: 'cairnwright[bot]' }, body })),
+                    ...posted.map((body) => ({ user: { login: state.poster }, body })),
                   ]
                 : [],
         text: async () => '',
@@ -248,7 +250,7 @@ function fixture() {
   const input = () => ({
     row: row(),
     fetch,
-    token: 'fake' as AutonomousToken,
+    token: state.token as AutonomousToken,
     owner: 'o',
     repo: 'r',
     now: 1000,
@@ -467,6 +469,14 @@ test('a failed cap comment is retried on the next poll and then posted once', as
 
 test('a cap request left pending by a restart is posted once, and a delivered marker is never reposted', async () => {
   const f = fixture();
+  registerAppToken(
+    'staging-app' as AppToken,
+    Date.now() + 3600000,
+    (inner) => inner,
+    'cairn-staging',
+  );
+  f.state.token = 'staging-app';
+  f.state.poster = 'cairn-staging[bot]';
   const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
   f.s.db
     .insert(message)
@@ -492,15 +502,23 @@ test('a cap request left pending by a restart is posted once, and a delivered ma
 
 test('a cap marker written by someone else does not count as delivered', async () => {
   const f = fixture();
+  registerAppToken(
+    'staging-app' as AppToken,
+    Date.now() + 3600000,
+    (inner) => inner,
+    'cairn-staging',
+  );
+  f.state.token = 'staging-app';
+  f.state.poster = 'cairn-staging[bot]';
   const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
   f.s.db
     .insert(message)
     .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
     .run();
-  f.state.foreignComments.push({
-    user: { login: 'drive-by' },
-    body: '<!-- cairn:review-cap --> fake',
-  });
+  f.state.foreignComments.push(
+    { user: { login: 'drive-by' }, body: '<!-- cairn:review-cap --> fake' },
+    { user: { login: 'cairnwright[bot]' }, body: '<!-- cairn:review-cap --> other deployment' },
+  );
   await f.wake();
   await f.wake();
   expect(f.posted).toHaveLength(1);

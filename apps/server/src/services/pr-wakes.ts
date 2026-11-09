@@ -33,7 +33,7 @@ import {
   isCairnIdentity,
 } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
-import { type AutonomousToken, githubTokenFetch } from '../lib/github-token.js';
+import { type AutonomousToken, githubAppBotLogin, githubTokenFetch } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
@@ -65,7 +65,6 @@ const QUEUE_WAIT_MS = 10 * 60_000;
 const GREEN_CONCLUSIONS = new Set(['success', 'skipped', 'neutral']);
 const QUEUE_WAIT_PROMPT_HEAD = '[queue-wait]';
 const CAP_MARKER = '<!-- cairn:review-cap -->';
-const CAIRN_APP_LOGIN = 'cairnwright[bot]';
 export const CAP_REVIEW_FOCUS =
   'every remaining instance of the finding classes listed above across the whole PR diff';
 
@@ -92,7 +91,7 @@ function unmetQueueConditions(
   findings: PrReviewFinding[] | null,
   now: number,
 ): string | null {
-  if (runs === null || (findings ?? []).length > 0 || pull.draft) return null;
+  if (runs === null || findings === null || findings.length > 0 || pull.draft) return null;
   if ((pull.labels ?? []).includes('coordinator-hold')) return null;
   const queue = runs.find((r) => r.name === QUEUE_CHECK);
   if (!queue?.outputTitle?.startsWith(QUEUE_WAITING_TITLE) || !queue.outputSummary) return null;
@@ -191,7 +190,7 @@ async function deliverReviewCap(
     if (comments === null) return;
     const own = new Set(
       [
-        CAIRN_APP_LOGIN,
+        githubAppBotLogin(token),
         deps.db.select().from(githubConnection).where(eq(githubConnection.teamId, row.teamId)).get()
           ?.login,
       ].flatMap((login) => (login ? [login.toLowerCase()] : [])),
