@@ -7,6 +7,7 @@ import {
   phaseSchema,
   snoozeTodoBodySchema,
   type TodoRecord,
+  tasksQuerySchema,
   threadMessageBodySchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
@@ -34,6 +35,7 @@ import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { assertProjectWritable } from './services/project-writable.js';
 import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
+import { listTasks } from './services/tasks.js';
 import { messageThreadAsUser } from './services/thread-message.js';
 import {
   createTodo,
@@ -62,6 +64,11 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/todos', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     return c.json(listTodos(svc, { teamId, archived: c.req.query('archived') === '1' }));
+  });
+
+  app.get('/api/tasks', (c) => {
+    const teamId = c.req.query('teamId') ?? ctx.team.id;
+    return c.json(tasksQuerySchema.parse(listTasks(svc, teamId)));
   });
 
   app.get('/api/needs-you', (c) => {

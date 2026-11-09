@@ -1,4 +1,9 @@
-import { ASK_USER_QUESTION_KIND, type NeedsYouReason, type TodoOwner } from '@cairn/shared';
+import {
+  ASK_USER_QUESTION_KIND,
+  type NeedsYouReason,
+  type TodoOwner,
+  type TodoSection,
+} from '@cairn/shared';
 import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, gateState, message, project, todo } from '../db/schema.js';
@@ -108,6 +113,23 @@ export function ownershipOf(db: Db, row: TodoRow): Ownership | null {
 
 export function ownerOf(db: Db, row: TodoRow): TodoOwner {
   return ownershipOf(db, row)?.owner ?? null;
+}
+
+export const TASKS_RECENT_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function sectionOf(
+  row: Pick<TodoRow, 'phase' | 'phaseAt' | 'archivedAt'>,
+  ownership: Ownership | null,
+  now = Date.now(),
+): TodoSection | null {
+  if (row.phase === 'done' || row.phase === 'closed') {
+    return row.phaseAt >= now - TASKS_RECENT_MS ? 'resolved' : null;
+  }
+  if (row.archivedAt !== null) return null;
+  if (ownership?.owner === 'owner') {
+    return ownership.reason === 'review' ? 'ready_for_review' : 'needs_input';
+  }
+  return row.phase === 'todo' ? 'up_next' : 'working';
 }
 
 export function coordinatorAcceptsReview(ownership: Ownership | null): boolean {

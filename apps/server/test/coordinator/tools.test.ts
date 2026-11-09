@@ -28,13 +28,20 @@ function storagePath(): string {
   return join(dir, 'coordinator.sqlite');
 }
 
+const validPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
 type FauxContext = { messages: { role: string; content: unknown }[] };
 
 function toolThenAnswer(name: string, args: Parameters<typeof fauxToolCall>[1]) {
   const seenResults: string[] = [];
+  const seenMessages: FauxContext[] = [];
   const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
   faux.setResponses(
-    Array(4).fill((c: FauxContext) => {
+    Array(50).fill((c: FauxContext) => {
+      seenMessages.push(c);
       const last = c.messages.at(-1);
       if (last?.role === 'toolResult') {
         seenResults.push(JSON.stringify(last.content));
@@ -43,7 +50,7 @@ function toolThenAnswer(name: string, args: Parameters<typeof fauxToolCall>[1]) 
       return fauxAssistantMessage([fauxToolCall(name, args)], { stopReason: 'toolUse' });
     }),
   );
-  return { coordinatorModels: createCoordinatorModels([faux.provider]), seenResults };
+  return { coordinatorModels: createCoordinatorModels([faux.provider]), seenResults, seenMessages };
 }
 
 describe('coordinator tools', () => {
@@ -93,6 +100,163 @@ describe('coordinator tools', () => {
     expect(api.dones.map((d) => d.body.status)).toEqual(['success']);
     await harness.close(ctx);
   });
+
+  it('feeds attachment image bytes to the model as image content without text truncation', async () => {
+    const data = Buffer.concat([
+      validPng,
+      Buffer.alloc(COORDINATOR_TOOL_OUTPUT_MAX_BYTES * 2),
+    ]).toString('base64');
+    const { coordinatorModels, seenResults } = toolThenAnswer('attachment', {
+      attachmentId: 'team/image.png',
+    });
+    const api = fakeMachineApi();
+    api.relayTool = async () =>
+      JSON.stringify({
+        id: 'image',
+        fileName: 'image.png',
+        mimeType: 'image/png',
+        sizeBytes: data.length,
+        encoding: 'base64',
+        content: data,
+      });
+    const gate = createStepGate();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [coordinatorToolsExtension(api, gate)],
+    });
+    try {
+      await runCoordinatorTurn(
+        {
+          harness,
+          models: coordinatorModels,
+          api,
+          context: ctx,
+          heartbeatMs: 1000,
+          now: () => 1,
+          gate,
+        },
+        chiefStep('step-image', 'Describe the attached image'),
+      );
+      const image = (
+        JSON.parse(seenResults[0]!) as { type: string; data?: string; mimeType?: string }[]
+      ).find((block) => block.type === 'image');
+      expect(image?.mimeType).toBe('image/png');
+      expect(image?.data === data).toBe(true);
+    } finally {
+      await harness.close(ctx);
+    }
+  });
+
+  it.each([
+    {
+      label: 'oversized PNG',
+      mimeType: 'image/png',
+      bytes: Buffer.concat([validPng, Buffer.alloc(8 * 1024 * 1024)]),
+      readable: true,
+    },
+    {
+      label: 'BMP',
+      mimeType: 'image/bmp',
+      bytes: Buffer.from(
+        '424d3a000000000000003600000028000000010000000100000001001800000000000400000000000000000000000000000000000000000000ff00',
+        'hex',
+      ),
+      readable: true,
+    },
+    {
+      label: 'SVG',
+      mimeType: 'image/svg+xml',
+      bytes: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+      readable: false,
+    },
+    { label: 'corrupt PNG', mimeType: 'image/png', bytes: Buffer.from('broken'), readable: false },
+  ])(
+    'validates and bounds $label before persisting model image content',
+    async ({ mimeType, bytes, readable }) => {
+      const { coordinatorModels, seenResults } = toolThenAnswer('attachment', {
+        attachmentId: 'image',
+      });
+      const api = fakeMachineApi();
+      api.relayTool = async () =>
+        JSON.stringify({ mimeType, encoding: 'base64', content: bytes.toString('base64') });
+      const gate = createStepGate();
+      const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+        extensions: [coordinatorToolsExtension(api, gate)],
+      });
+      try {
+        await runCoordinatorTurn(
+          {
+            harness,
+            models: coordinatorModels,
+            api,
+            context: ctx,
+            heartbeatMs: 1000,
+            now: () => 1,
+            gate,
+          },
+          chiefStep('image-check', 'Describe the image'),
+        );
+        const output = JSON.parse(seenResults[0]!) as {
+          type: string;
+          data?: string;
+          mimeType?: string;
+        }[];
+        const image = output.find((block) => block.type === 'image');
+        expect(Boolean(image)).toBe(readable);
+        if (readable) {
+          expect(image?.mimeType).toBe('image/png');
+          expect((image?.data?.length ?? Infinity) <= 4.5 * 1024 * 1024).toBe(true);
+        } else {
+          expect(seenResults[0]).toContain('cannot decode');
+        }
+      } finally {
+        await harness.close(ctx);
+      }
+    },
+  );
+
+  it.each([
+    { label: 'byte budget', count: 2, padding: 2 * 1024 * 1024, expected: 1 },
+    { label: 'image count', count: 21, padding: 0, expected: 20 },
+  ])(
+    'bounds accumulated image $label on every provider request',
+    async ({ count, padding, expected }) => {
+      const { coordinatorModels, seenMessages } = toolThenAnswer('attachment', {
+        attachmentId: 'image',
+      });
+      const api = fakeMachineApi();
+      const data = Buffer.concat([validPng, Buffer.alloc(padding)]).toString('base64');
+      api.relayTool = async () =>
+        JSON.stringify({ mimeType: 'image/png', encoding: 'base64', content: data });
+      const gate = createStepGate();
+      const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+        extensions: [coordinatorToolsExtension(api, gate)],
+      });
+      try {
+        for (let i = 0; i < count; i++) {
+          await runCoordinatorTurn(
+            {
+              harness,
+              models: coordinatorModels,
+              api,
+              context: ctx,
+              heartbeatMs: 1000,
+              now: () => i + 1,
+              gate,
+            },
+            chiefStep(`image-${i}`, 'Describe the next image'),
+          );
+        }
+        const blocks = seenMessages
+          .at(-1)!
+          .messages.flatMap((message) =>
+            Array.isArray(message.content) ? (message.content as { type: string }[]) : [],
+          );
+        expect(blocks.filter((block) => block.type === 'image')).toHaveLength(expected);
+      } finally {
+        await harness.close(ctx);
+      }
+    },
+  );
 
   it('turns a relay failure into an error result instead of failing the turn', async () => {
     const { coordinatorModels, seenResults } = toolThenAnswer('todos', {});

@@ -74,8 +74,10 @@ const NUM_CLS =
   'grid size-5 shrink-0 place-items-center rounded-(--cds-radius-sm) border text-caption leading-none font-semibold';
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
-const ATTACHED_CARD_CLS =
-  '@container relative flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) border border-b-0 border-border bg-card shadow-(--e1)';
+const DOCK_CARD_CLS =
+  '@container relative z-1 flex max-h-[40dvh] min-h-0 flex-col overflow-hidden bg-card';
+const ATTACHED_CARD_CLS = `${DOCK_CARD_CLS} rounded-t-(--radius-composer) shadow-(--shadow-composer-cap) group-has-[.chief-composer:focus-within]/composer:shadow-(--shadow-composer-cap-focus)`;
+const DETACHED_CARD_CLS = `${DOCK_CARD_CLS} rounded-(--radius-composer) shadow-[inset_0_0_0_var(--hairline)_var(--composer-ring)]`;
 const OPTION_ROW_CLS =
   'h-auto w-full items-start justify-start gap-2.5 whitespace-normal rounded-md px-2 py-1.5 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
@@ -414,7 +416,7 @@ export function ChiefQuestionCard({
       data-testid="chief-question-card"
       data-status={item.status}
       data-collapsed={collapsed ? '' : undefined}
-      className={ATTACHED_CARD_CLS}
+      className={bound ? ATTACHED_CARD_CLS : DETACHED_CARD_CLS}
     >
       <div
         className={`flex flex-none items-center gap-1 px-3.5 pt-2 pb-1${collapsed ? '' : ' max-[640px]:absolute max-[640px]:top-0.5 max-[640px]:right-1 max-[640px]:z-10 max-[640px]:p-0'}`}
