@@ -8,6 +8,7 @@ import {
   chiefThread,
   chiefTurnUsage,
   provider as providerTable,
+  routingRule,
   step as stepTable,
   todo,
   tokenUsage,
@@ -329,12 +330,12 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     claimedStep(machineId, 'turn-a');
     await finishStep(deps(), machineId, 'turn-a', {
       status: 'success',
-      usage: [usage('pi/glm', 9000, 40000, { contextTokens: 21_000 })],
+      usage: [usage('stub-gw/stub-model', 9000, 40000, { contextTokens: 21_000 })],
     });
     claimedStep(machineId, 'turn-b', { createdAt: Date.now() + 5 });
     await finishStep(deps(), machineId, 'turn-b', {
       status: 'success',
-      usage: [usage('pi/glm', 6000, 50000, { contextTokens: 23_456 })],
+      usage: [usage('stub-gw/stub-model', 6000, 50000, { contextTokens: 23_456 })],
     });
     expect(turnRows().map((r) => [r.stepId, r.contextTokens])).toEqual([
       ['turn-a', 21_000],
@@ -349,6 +350,31 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     const turnB = turnRows().find((r) => r.stepId === 'turn-b');
     expect(turnB).toBeDefined();
     expect(context?.resumeExpiresAt).toBe((turnB?.createdAt ?? 0) + SHORT_RETENTION_MS);
+  });
+
+  test('flag on: a coordinator model-route change reports cold resume', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-route-a');
+    await finishStep(deps(), machineId, 'turn-route-a', {
+      status: 'success',
+      usage: [usage('stub-gw/stub-model', 1000, 800, { contextTokens: 1810 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 1810,
+      resume: 'warm',
+    });
+    H.s.db
+      .update(routingRule)
+      .set({ modelId: 'stub-model-2', updatedAt: Date.now() })
+      .where(eq(routingRule.use, 'coordinator'))
+      .run();
+    const after = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(after).toMatchObject({
+      tokens: 1810,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+      resume: 'cold',
+    });
+    expect(after?.resumeExpiresAt).toBeUndefined();
   });
 
   test('flag on: a turn without contextTokens (claude-code) leaves the meter empty', async () => {
@@ -428,12 +454,12 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
     await finishStep(deps(), machineId, 'turn-fallback', {
       status: 'success',
-      usage: [usage('other-gw/fallback-model', 100, 0, { contextTokens: 120 })],
+      usage: [usage('other-gw/fallback-model', 100, 800, { contextTokens: 120 })],
     });
     expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
       tokens: 120,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
-      resume: 'warm',
+      resume: 'cold',
     });
   });
 });

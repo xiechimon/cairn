@@ -9,6 +9,7 @@ import {
 import type { Db } from '../db/client.js';
 import { chiefThread, chiefTurnUsage, coordinatorConversation, provider } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { coordinatorProfile } from './routing-rules.js';
 
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
@@ -55,6 +56,12 @@ function contextWindowOf(db: Db, teamId: string, usageModel: string): number {
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
   return providerRow?.models.find((m) => m.id === modelId)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+}
+
+function activeRouterModel(db: Db, teamId: string): string | null {
+  const profile = coordinatorProfile(db, teamId);
+  if (profile?.provider == null || profile.modelId == null || profile.modelId === '') return null;
+  return `${profile.provider}/${profile.modelId}`;
 }
 
 export function lastTurnContext(
@@ -131,6 +138,7 @@ export function lastTurnContext(
     lastColdSlimAt,
     lastColdSlimStepId: coldSlim?.stepId ?? null,
     lastUsageStepId: last.stepId,
+    activeModel: activeRouterModel(db, chiefRow.teamId),
   });
   const resumeExpiresAt = resumeExpiresAtOf({
     resume,
