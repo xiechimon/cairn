@@ -2,6 +2,7 @@ import type {
   AgentTodo,
   BranchSyncRecord,
   BuildRecord,
+  ConversationMessageEvent,
   ConversationStepEvent,
   NotificationRecord,
   StepActivity,
@@ -130,7 +131,11 @@ export class ConversationStreamHub {
     return this.byConv.get(conversationId)?.size ?? 0;
   }
 
-  publishMessage(conversationId: string, message: TranscriptRow): void {
+  publishMessage(
+    conversationId: string,
+    message: TranscriptRow,
+    deliveredQueue?: ConversationMessageEvent['deliveredQueue'],
+  ): void {
     if (endsLiveTextBuffer(message)) {
       this.textBuffers.delete(conversationId);
       this.lastActivity.delete(conversationId);
@@ -138,7 +143,18 @@ export class ConversationStreamHub {
     } else if (isThinkingOnlyRow(message.content)) {
       this.thinkingBuffers.delete(conversationId);
     }
-    this.publish(conversationId, { type: 'message', message });
+    const event: ConversationMessageEvent = {
+      type: 'message',
+      message,
+      ...(deliveredQueue === undefined ? {} : { deliveredQueue }),
+    };
+    this.publish(conversationId, event);
+    if (
+      message.role === 'user' &&
+      deliveredQueue !== undefined &&
+      deliveredQueue.conversationId !== conversationId
+    )
+      this.publish(deliveredQueue.conversationId, { ...event, conversationId });
   }
 
   publishTextDelta(conversationId: string, text: string): void {

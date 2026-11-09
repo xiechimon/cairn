@@ -36,7 +36,9 @@ test('project instructions save, survive reload and clear back to empty', async 
     route.fulfill({ json: { defaultBranch: 'main', branches: [{ name: 'main', isDefault: true }] } }),
   );
 
+  const openMemoryTab = () => page.getByRole('tab', { name: '记忆' }).click();
   await page.goto('/app/project/rules-project/settings');
+  await openMemoryTab();
   const input = page.getByTestId('project-instructions-input');
   const save = page.getByRole('button', { name: '保存项目说明' });
   await expect(input).toHaveValue('');
@@ -46,11 +48,13 @@ test('project instructions save, survive reload and clear back to empty', async 
   await expect.poll(() => patches).toEqual([{ instructions: '仓库内容用英文；不要 force push。' }]);
   await expect(save).toBeDisabled();
   await page.reload();
+  await openMemoryTab();
   await expect(input).toHaveValue('仓库内容用英文；不要 force push。');
   await input.fill('   ');
   await save.click();
   await expect.poll(() => patches.at(-1)).toEqual({ instructions: null });
   await page.reload();
+  await openMemoryTab();
   await expect(input).toHaveValue('');
   expect(pageErrors).toEqual([]);
 });
