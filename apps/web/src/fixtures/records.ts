@@ -60,6 +60,7 @@ export interface TodoRecord {
   seqNum: number;
   orderIndex: number;
   tagIds: string[];
+  githubLabelIds?: string[];
   assignment: AssignmentRecord | null;
   agent: AgentRef | null;
   latestBuildId: string | null;

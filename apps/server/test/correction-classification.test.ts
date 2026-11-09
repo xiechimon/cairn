@@ -286,9 +286,13 @@ describe('internal correction classification', () => {
         }),
       ).toEqual(tasks);
       expect(opened.db.all('SELECT * FROM tag ORDER BY id')).toEqual(labels);
-      expect(opened.db.all('SELECT * FROM todo_tag ORDER BY todoId')).toEqual(links);
+      expect(
+        opened.db.all(`SELECT todoId, tagId FROM todo_tag
+        UNION ALL SELECT todoId, labelId AS tagId FROM todo_github_label ORDER BY todoId`),
+      ).toEqual(links);
       expect(opened.db.all('PRAGMA foreign_key_check')).toEqual([]);
       opened.db.run('DELETE FROM todo_tag');
+      opened.db.run('DELETE FROM todo_github_label');
       expect(isCorrectionTask(opened.db, 'local-fix')).toBe(true);
       expect(isCorrectionTask(opened.db, 'github-fix')).toBe(true);
       expect(isCorrectionTask(opened.db, 'ordinary')).toBe(false);

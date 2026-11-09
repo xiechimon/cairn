@@ -7,12 +7,14 @@ import {
   parseAttachmentTokenLines,
   todoRecordSchema,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
+  githubLabel,
   project as projectTable,
   tag as tagTable,
+  todoGithubLabel,
   todo as todoTable,
   todoTag,
 } from '../src/db/schema.js';
@@ -20,6 +22,7 @@ import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { importGithubIssue } from '../src/services/github-issues.js';
+import { syncGithubLabels } from '../src/services/github-labels.js';
 import {
   bootServer,
   issueApiKey,
@@ -162,8 +165,8 @@ function defaultRoutes(overrides: Record<string, GhResponse | ((url: URL) => GhR
   };
 }
 
-function projectTags(s: TestServer, projectId: string) {
-  return s.db.select().from(tagTable).where(eq(tagTable.projectId, projectId)).all();
+function projectLabels(s: TestServer, projectId: string) {
+  return s.db.select().from(githubLabel).where(eq(githubLabel.projectId, projectId)).all();
 }
 
 describe('GET /api/projects/{id}/github/issues (B4-B11)', () => {
@@ -299,9 +302,16 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
   test('C16 github project creation does not seed the 6 words; plain/local project seeding unchanged', async () => {
     const s = bootServer();
     const ghId = await postGithubProject(s.app);
-    expect(projectTags(s, ghId)).toHaveLength(0);
+    expect(projectLabels(s, ghId)).toHaveLength(0);
     const plainId = await postProject(s.app);
-    expect(projectTags(s, plainId).map((t) => t.name)).toEqual(FIXED_TAGS.map((t) => t.name));
+    expect(
+      s.db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.projectId, plainId))
+        .all()
+        .map((t) => t.name),
+    ).toEqual(FIXED_TAGS.map((t) => t.name));
     s.dispose();
   });
 
@@ -314,7 +324,7 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
       body: { number: 7 },
     });
     expect(r1.status).toBe(201);
-    const tags = projectTags(s, projectId);
+    const tags = projectLabels(s, projectId);
     expect(tags.map((t) => t.name).sort()).toEqual(['area:auth', 'bug', 'help wanted']);
     const bug = tags.find((t) => t.name === 'bug')!;
     expect(bug.color).toBe('#d73a4a');
@@ -322,7 +332,7 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
       body: { number: 7 },
     });
     expect(r2.status).toBe(409);
-    expect(projectTags(s, projectId)).toHaveLength(3);
+    expect(projectLabels(s, projectId)).toHaveLength(3);
     s.dispose();
   });
 
@@ -343,19 +353,23 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
     const s = bootServer({ githubFetch: mock.impl });
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
+    syncGithubLabels(s.db, projectId, [{ name: 'bug', color: '6366f1' }]);
     await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
       body: { name: 'bug', color: '#6366f1' },
     });
     await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
       body: { number: 9 },
     });
-    const bug = projectTags(s, projectId).find((t) => t.name === 'bug')!;
+    const bug = projectLabels(s, projectId).find((t) => t.name === 'bug')!;
     expect(bug.color).toBe('#fbca04');
-    expect(projectTags(s, projectId).filter((t) => t.name === 'bug')).toHaveLength(1);
+    expect(projectLabels(s, projectId).filter((t) => t.name === 'bug')).toHaveLength(1);
+    expect(
+      s.db.select().from(tagTable).where(eq(tagTable.projectId, projectId)).all(),
+    ).toMatchObject([{ name: 'bug', color: '#6366f1' }]);
     s.dispose();
   });
 
-  test('C14 repo-side label deleted: row kept, attached todo_tag untouched', async () => {
+  test('C14 upstream-deleted labels and dedicated associations are retained', async () => {
     const mock = ghMock(defaultRoutes());
     const s = bootServer({ githubFetch: mock.impl });
     seedConnection(s);
@@ -367,19 +381,25 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
         })
       ).json(),
     );
-    expect(first.tagIds).toHaveLength(2);
+    expect(first.githubLabelIds).toHaveLength(2);
+    expect(first.tagIds).toEqual([]);
     mock.set(LABELS_PATH, { body: [{ name: 'bug', color: 'd73a4a' }] });
     await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
       body: { number: 9 },
     });
-    const tags = projectTags(s, projectId);
+    const tags = projectLabels(s, projectId);
     expect(tags.map((t) => t.name).sort()).toEqual(['area:auth', 'bug', 'help wanted']);
     const reloaded = todoRecordSchema.parse(
       await (await call(s.app, 'GET', `/api/todos/${first.id}`)).json(),
     );
-    expect(reloaded.tagIds).toHaveLength(2);
-    const links = s.db.select().from(todoTag).where(eq(todoTag.todoId, first.id)).all();
+    expect(reloaded.githubLabelIds).toHaveLength(2);
+    const links = s.db
+      .select()
+      .from(todoGithubLabel)
+      .where(eq(todoGithubLabel.todoId, first.id))
+      .all();
     expect(links).toHaveLength(2);
+    expect(s.db.select().from(todoTag).where(eq(todoTag.todoId, first.id)).all()).toEqual([]);
     s.dispose();
   });
 });
@@ -481,11 +501,12 @@ describe('POST /api/projects/{id}/github/issues/import (D17-D22)', () => {
     expect(record.sourceRef).toBe(`github:${REPO}#7`);
     expect(record.projectId).toBe(projectId);
     expect(record.phase).toBe('todo');
-    const tagNames = projectTags(s, projectId)
-      .filter((t) => record.tagIds.includes(t.id))
+    expect(record.tagIds).toEqual([]);
+    const labelNames = projectLabels(s, projectId)
+      .filter((t) => (record.githubLabelIds ?? []).includes(t.id))
       .map((t) => t.name)
       .sort();
-    expect(tagNames).toEqual(['area:auth', 'bug']);
+    expect(labelNames).toEqual(['area:auth', 'bug']);
     s.dispose();
   });
 
@@ -499,6 +520,48 @@ describe('POST /api/projects/{id}/github/issues/import (D17-D22)', () => {
     });
     const record = todoRecordSchema.parse(await res.json());
     expect(record.spec).toBe('');
+    s.dispose();
+  });
+
+  test('failed association insertion leaves no imported task and releases the import claim', async () => {
+    const mock = ghMock(defaultRoutes());
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const before = s.db.select().from(todoTable).all();
+    s.db.run(sql`CREATE TRIGGER reject_import_label BEFORE INSERT ON todo_github_label
+      BEGIN SELECT RAISE(ABORT, 'import label blocked'); END`);
+    const failed = await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
+      body: { number: 7 },
+    });
+    expect(failed.status).toBe(500);
+    expect(s.db.select().from(todoTable).all()).toEqual(before);
+    expect(s.db.select().from(todoGithubLabel).all()).toEqual([]);
+    s.db.run('DROP TRIGGER reject_import_label');
+    expect(
+      (
+        await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
+          body: { number: 7 },
+        })
+      ).status,
+    ).toBe(201);
+    s.dispose();
+  });
+
+  test('label-sync failure rolls back prior vocabulary color changes', async () => {
+    const s = bootServer();
+    const projectId = await postGithubProject(s.app);
+    syncGithubLabels(s.db, projectId, [{ name: 'bug', color: '112233' }]);
+    const before = projectLabels(s, projectId);
+    s.db.run(sql`CREATE TRIGGER reject_vocabulary BEFORE INSERT ON github_label
+      BEGIN SELECT RAISE(ABORT, 'vocabulary blocked'); END`);
+    expect(() =>
+      syncGithubLabels(s.db, projectId, [
+        { name: 'bug', color: '445566' },
+        { name: 'new label', color: null },
+      ]),
+    ).toThrow();
+    expect(projectLabels(s, projectId)).toEqual(before);
     s.dispose();
   });
 
@@ -596,6 +659,10 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
       });
       todoId = ((await todoRes.json()) as { id: string }).id;
     }
+    if (kind === 'github')
+      await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+        body: { name: 'generic-only', color: '#000000' },
+      });
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       body: { todoIds: [todoId] },
     });
@@ -659,13 +726,16 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
     const one = todoRecordSchema.parse(
       await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json(),
     );
-    const names = projectTags(s, one.projectId)
-      .filter((t) => one.tagIds.includes(t.id))
+    const names = projectLabels(s, one.projectId)
+      .filter((t) => (one.githubLabelIds ?? []).includes(t.id))
       .map((t) => t.name)
       .sort();
     expect(names).toEqual(['bug', 'help wanted']);
-    const bad = await relay(s.app, token, step.step.id, { tags: ['bug', 'not-in-project'] });
+    const bad = await relay(s.app, token, step.step.id, { tags: ['bug', 'generic-only'] });
     expect(bad.status).toBe(400);
+    expect(
+      todoRecordSchema.parse(await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json()),
+    ).toEqual(one);
     const empty = await relay(s.app, token, step.step.id, {});
     expect(empty.status).toBe(400);
     s.dispose();
@@ -678,7 +748,8 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
     const one = todoRecordSchema.parse(
       await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json(),
     );
-    expect(one.tagIds).toHaveLength(1);
+    expect(one.githubLabelIds).toHaveLength(1);
+    expect(one.tagIds).toEqual([]);
     s.dispose();
   });
 
@@ -731,8 +802,8 @@ describe('todo provenance two columns (#446 D6)', () => {
     );
     const rows = s.db
       .select()
-      .from(tagTable)
-      .where(and(eq(tagTable.projectId, projectId), eq(tagTable.name, 'bug')))
+      .from(githubLabel)
+      .where(and(eq(githubLabel.projectId, projectId), eq(githubLabel.name, 'bug')))
       .all();
     expect(rows).toHaveLength(1);
     expect(record.createdBy).not.toBeNull();

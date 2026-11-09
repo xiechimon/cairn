@@ -192,6 +192,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     seqNum: w.seqNum,
     orderIndex: w.orderIndex,
     tagIds: w.tagIds,
+    githubLabelIds: w.githubLabelIds ?? [],
     assignment: null,
     agent: null,
     latestBuildId: w.latestBuildId,

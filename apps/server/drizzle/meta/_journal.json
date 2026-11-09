@@ -960,6 +960,13 @@
       "when": 1794257434678,
       "tag": "0140_retire_feishu",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "6",
+      "when": 1794261802299,
+      "tag": "0141_github_label_isolation",
+      "breakpoints": true
     }
   ]
 }
