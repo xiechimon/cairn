@@ -1,6 +1,6 @@
 # Answer delivery record
 
-Status: proposed. Replaces the per-path delivery bookkeeping that #3467 grew over nine review rounds. Owner of the decision: the coordinator (2026-11-08).
+Status: accepted (coordinator review on #3512, 2026-11-08). Replaces the per-path delivery bookkeeping that #3467 grew over nine review rounds. Owner of the decision: the coordinator (2026-11-08).
 
 ## Problem
 
