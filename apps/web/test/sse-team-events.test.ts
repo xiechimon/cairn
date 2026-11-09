@@ -40,6 +40,7 @@ describe('team event → invalidation keys', () => {
     expect(keys).toEqual([
       `notifications/${TEAM}`,
       `chiefThreads/${TEAM}`,
+      `chief/${TEAM}`,
       'todos',
       `tasks/${TEAM}`,
     ]);
