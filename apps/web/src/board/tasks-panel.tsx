@@ -11,7 +11,7 @@ import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { PrList } from '../components/thread/pr-list.js';
 import { prByThread } from '../components/thread/pr-panel-model.js';
-import { TaskRow, type TaskRowGlyph } from '../components/thread/task-row.js';
+import { TaskRow } from '../components/thread/task-row.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { ACCENT_INK } from '../phase.js';
@@ -20,6 +20,7 @@ import {
   ACTIVE_SECTIONS,
   type ActiveSection,
   bySection,
+  glyphOf,
   isWaiting,
   type Phrase,
   type QuestionTarget,
@@ -34,21 +35,6 @@ import {
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 
 export type TasksTab = 'active' | 'next';
-
-function glyphOf(entry: TaskEntry): TaskRowGlyph {
-  switch (entry.section) {
-    case 'ready_for_review':
-      return 'three-quarter';
-    case 'needs_input':
-      return 'half';
-    case 'resolved':
-      return entry.todo.phase === 'closed' ? 'closed' : 'done';
-    case 'up_next':
-      return 'todo';
-    case 'working':
-      return 'ring';
-  }
-}
 
 function SectionHeader({
   section,

@@ -160,24 +160,38 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string):
   });
 }
 
-export const HandoffCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
+export const TaskCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
 
-function HandoffRow({ todoId }: { todoId: string }) {
+function TaskCardRow({ todoId }: { todoId: string }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
-  const renderCard = useContext(HandoffCardContext);
-  const card = renderCard?.(todoId);
+  const card = useContext(TaskCardContext)?.(todoId);
   if (card != null) {
     return (
       <MessageScrollerItem
         style={SCROLLER_ITEM_STYLE}
-        data-testid="chief-handoff-card"
-        className="pb-3"
+        data-testid="chief-task-card"
+        className={EVENT_ROW_CLS}
       >
         {card}
       </MessageScrollerItem>
     );
   }
+  return (
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
+      <StatusLine testId="chief-task-created">
+        {t('已建任务')}{' '}
+        <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
+          {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+        </ThreadLink>
+      </StatusLine>
+    </MessageScrollerItem>
+  );
+}
+
+function HandoffRow({ todoId }: { todoId: string }) {
+  const { t } = useI18n();
+  const glance = useContext(TodoGlanceContext)?.get(todoId);
   return (
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
       <StatusLine testId="chief-handoff">
@@ -200,6 +214,7 @@ export function chiefStreamRowKey(
     case 'thinking':
     case 'question':
     case 'handoff':
+    case 'task-card':
     case 'digest':
     case 'stopped':
     case 'thread-report':
@@ -304,6 +319,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
+  if (item.kind === 'task-card') return <TaskCardRow todoId={item.todoId} />;
   if (item.kind === 'digest')
     return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
   if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
