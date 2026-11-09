@@ -24,7 +24,6 @@ import {
 } from './routes-helpers.js';
 import { attachmentIdsInUserText } from './services/attachment-authorization.js';
 import {
-  advanceSplitWaves,
   prepareStopForDone,
   stopActiveStepsAfterExit,
   stopActiveStepsForArchive,
@@ -144,7 +143,6 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       throw err;
     }
     if (!record) throw notFound(`todo ${id}`);
-    if (body.phase === 'done' && prior?.phase !== 'failed') advanceSplitWaves(svc, id);
     const closing = record.phase === 'closed' && prior?.phase !== 'closed';
     const exited =
       prior != null &&
@@ -219,7 +217,6 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       throw err;
     }
     if (!record) throw notFound(`todo ${id}`);
-    if (prior.phase !== 'failed') advanceSplitWaves(svc, id);
     return c.json({ state: 'done' as const, todo: record });
   });
 

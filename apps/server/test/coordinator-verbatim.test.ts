@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   ASK_USER_QUESTION_KIND,
   buildTaskPromptText,
+  type CoordinatorCreateTodoParams,
   fencedTitle,
   ISSUE_FENCE_OPEN,
   renderTaskText,
@@ -13,14 +14,24 @@ import { describe, expect, test } from 'vitest';
 import { chiefMessage, todo as todoTable } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { wakeFacts } from '../src/services/chief.js';
+import { createRequestTodo } from '../src/services/coordinator-request.js';
 import { createTodo, getTodo, updateAutonomousTodo } from '../src/services/todos.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { req } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 
 registerChiefHarness();
 
 const ownerMessage = (content: string) => seedOwnerMessage(H.s.db, H.threadId, content);
+
+function unstartedRequest(params: Omit<CoordinatorCreateTodoParams, 'projectId'>) {
+  return createRequestTodo(
+    toolDeps(),
+    ctx(),
+    { projectId: H.projectId, ...params },
+    { createdBy: H.userId, ownerId: H.userId },
+  );
+}
 
 type Created = { id: string; title: string; spec: string; uncovered?: string[] };
 const row = (id: string) => H.s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()!;
@@ -176,10 +187,7 @@ describe('splitting one request', () => {
 
   test('W4 re-splitting a corrected issue child keeps the correction owner-authored', async () => {
     const issue = issueTask('Fix the crash on save.', 9);
-    const child = (await relay('create_todo', {
-      projectId: H.projectId,
-      sourceTodoId: issue.id,
-    })) as Created;
+    const child = unstartedRequest({ sourceTodoId: issue.id });
     const token = `![c.png](attachment:${H.teamId}/fixatt.png)`;
     const correction = ownerMessage(`只修崩溃，不动 CI。\n${token}`);
     await relay('update_todo', { todoId: child.id, addMessageIds: [correction] });
@@ -209,10 +217,7 @@ describe('splitting one request', () => {
 
   test('R3 the orchestration prompt fences only the issue quote', async () => {
     const issue = issueTask('Fix the crash on save.', 11);
-    const child = (await relay('create_todo', {
-      projectId: H.projectId,
-      sourceTodoId: issue.id,
-    })) as Created;
+    const child = unstartedRequest({ sourceTodoId: issue.id });
     await relay('update_todo', { todoId: child.id, addMessageIds: [ownerMessage('只修崩溃。')] });
     const res = await req(H.s.app, 'POST', `/api/todos/${child.id}/orchestrate`);
     expect(res.status).toBe(201);
@@ -340,21 +345,14 @@ describe('owner answers and appended words', () => {
 
   test('appending to an issue split grants only the owner message attachments', async () => {
     const issue = issueTask(`Fix the crash.\n![x.png](attachment:${H.teamId}/issueatt.png)`, 8);
-    const child = (await relay('create_todo', {
-      projectId: H.projectId,
-      sourceTodoId: issue.id,
-      quotes: ['Fix the crash.'],
-    })) as Created;
+    const child = unstartedRequest({ sourceTodoId: issue.id, quotes: ['Fix the crash.'] });
     const note = ownerMessage(`见截图\n![y.png](attachment:${H.teamId}/owneratt.png)`);
     await relay('update_todo', { todoId: child.id, addMessageIds: [note] });
     expect(row(child.id).userSpecAttachmentIds).toEqual(['owneratt']);
   });
 
   test('a failing routing change appends nothing', async () => {
-    const created = (await relay('create_todo', {
-      projectId: H.projectId,
-      messageIds: [ownerMessage('原话')],
-    })) as Created;
+    const created = unstartedRequest({ messageIds: [ownerMessage('原话')] });
     await expect(
       relay('update_todo', {
         todoId: created.id,
@@ -367,10 +365,7 @@ describe('owner answers and appended words', () => {
   });
 
   test('W7 an owner edit in the board replaces the segments and survives a later append', async () => {
-    const created = (await relay('create_todo', {
-      projectId: H.projectId,
-      messageIds: [ownerMessage('原话')],
-    })) as Created;
+    const created = unstartedRequest({ messageIds: [ownerMessage('原话')] });
     const res = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, { spec: '我改过的原话' });
     expect(res.status).toBe(200);
     expect(row(created.id).request?.segments.map((seg) => [seg.source.kind, seg.text])).toEqual([
@@ -392,10 +387,7 @@ describe('owner answers and appended words', () => {
     'title provenance survives a $name board edit independently of spec',
     async ({ patch, fences }) => {
       const issue = issueTask('Third-party title and body', 77);
-      const child = (await relay('create_todo', {
-        projectId: H.projectId,
-        sourceTodoId: issue.id,
-      })) as Created;
+      const child = unstartedRequest({ sourceTodoId: issue.id });
       const response = await req(H.s.app, 'PATCH', `/api/todos/${child.id}`, patch);
       expect(response.status).toBe(200);
       const stored = row(child.id);
@@ -413,6 +405,21 @@ describe('owner answers and appended words', () => {
       expect(fenceOpens(wakeFacts('settle', getTodo(H.s, child.id)!, null))).toBe(fences);
     },
   );
+
+  test('auto-started tasks refuse append and retain their cited owner words', async () => {
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [ownerMessage('Original owner request')],
+    })) as Created;
+    expect(row(created.id).phase).toBe('queued');
+    await expect(
+      relay('update_todo', {
+        todoId: created.id,
+        addMessageIds: [ownerMessage('Later correction')],
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(row(created.id).spec).toBe('Original owner request');
+  });
 
   test('W9 other writers cannot rewrite a request task', async () => {
     const created = (await relay('create_todo', {

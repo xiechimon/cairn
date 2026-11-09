@@ -45,6 +45,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
 import { triggerChiefWakes } from './chief.js';
 import { assertCorrectionDone } from './correction.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
@@ -351,10 +352,14 @@ export function createAutonomousTodo(
   const orderRow = db
     .select({ n: input.orderFirst === true ? min(todo.orderIndex) : max(todo.orderIndex) })
     .from(todo)
-    .where(and(eq(todo.projectId, input.projectId), eq(todo.phase, 'todo')))
+    .where(and(eq(todo.projectId, input.projectId), inArray(todo.phase, ['todo', 'queued'])))
     .get();
   const now = nowMs();
   const id = newRecordId();
+  const blockedBy =
+    input.blockedBy === undefined
+      ? undefined
+      : checkBlockedBy(db, { id, teamId: input.teamId, latestBuildId: null }, input.blockedBy);
   const title =
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
   const selfIssue =
@@ -398,9 +403,7 @@ export function createAutonomousTodo(
           ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
           : {}),
         ...(input.request !== undefined ? { request: input.request } : {}),
-        ...(input.blockedBy !== undefined && input.blockedBy.length > 0
-          ? { blockedBy: input.blockedBy }
-          : {}),
+        ...(blockedBy !== undefined ? { blockedBy } : {}),
       })
       .run();
     for (const tagId of tagIds) {
@@ -441,6 +444,7 @@ export function updateAutonomousTodo(
     orderIndex?: number;
     projectId?: string;
     routeOverride?: RouteOverride | null;
+    blockedBy?: string[];
   },
   opts: {
     manualPhase?: boolean;
@@ -463,6 +467,7 @@ export function updateAutonomousTodo(
   }
 
   const sets: Partial<TodoRow> = {};
+  if (patch.blockedBy !== undefined) sets.blockedBy = checkBlockedBy(db, row, patch.blockedBy);
   const tagIds = patch.tagIds === undefined ? undefined : [...new Set(patch.tagIds)];
   const move =
     patch.projectId !== undefined && patch.projectId !== row.projectId
@@ -558,6 +563,8 @@ export function updateAutonomousTodo(
     insertGateAnnouncement(deps, row.latestBuildId, DONE_ANNOUNCEMENT, deps.user.displayName);
   }
 
+  if (sets.blockedBy !== undefined && row.latestBuildId !== null)
+    holdBlockedBuild(db, row.latestBuildId);
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
@@ -686,6 +693,7 @@ export function setTodoPhase(
     deps.hub.publishTodoDoc(record.teamId, record);
     notifyPhaseEntry(deps, record, row.phase, to);
     if (to === 'done') settleSplitOnDone(deps, id);
+    if (to === 'done' || to === 'review') releaseBlockedSteps(deps);
     return record;
   });
 }
@@ -697,20 +705,6 @@ export function childrenOfTodo(db: Db, parentId: string): TodoRow[] {
     .where(eq(todo.sourceTodo, parentId))
     .orderBy(asc(todo.seqNum))
     .all();
-}
-
-export function splitBlockersSatisfied(db: Db, row: TodoRow): boolean {
-  const ids = row.blockedBy ?? [];
-  if (ids.length === 0) return true;
-  const done = new Set(
-    db
-      .select({ id: todo.id })
-      .from(todo)
-      .where(and(inArray(todo.id, ids), eq(todo.phase, 'done')))
-      .all()
-      .map((r) => r.id),
-  );
-  return ids.every((id) => done.has(id));
 }
 
 export function settleSplitOnDone(deps: TodoDeps, childId: string): void {

@@ -47,9 +47,11 @@ describe('#1219 the chief cancel -> re-dispatch chain', () => {
   test('cancel a queued build: the todo falls back + a later open_thread succeeds + the new step is claimed within seconds', async () => {
     insertMachine(H.s, 'machine-rerun');
     pinSessionRoute(H.s, 'machine-rerun');
-    const todoRec = (await relay('create_todo', ownerTodo('被取消后重派'))) as { id: string };
-    const started = (await relay('open_thread', { todoId: todoRec.id })) as { buildId: string };
-    const buildId = started.buildId;
+    const todoRec = (await relay('create_todo', ownerTodo('被取消后重派'))) as {
+      id: string;
+      buildId: string;
+    };
+    const buildId = todoRec.buildId;
 
     const cancelled = (await relay('cancel_builds', {
       buildIds: [buildId],
