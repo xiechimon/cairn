@@ -7,6 +7,8 @@ const DESIGN = join(SRC, 'design');
 const COMPONENTS = join(SRC, 'components');
 
 const NOT_IN_GALLERY: Record<string, string> = {
+  'chat/earlier-loader.tsx':
+    'Renders nothing: it requests earlier history pages when the reader nears the top and restores the reading position.',
   'ui/alert-dialog.tsx':
     'Registry copy with no consumer; confirm surfaces use alert-dialog-shell.tsx, shown in the Dialog section.',
   'model-select-core.tsx':

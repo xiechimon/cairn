@@ -154,7 +154,7 @@ test('a failed thread offers a reply that reruns it; an empty reply cannot be se
   expect(sent).toHaveLength(0);
 });
 
-test('while a reply is in flight the box is read-only; on success the thread leaves Needs you and the conversation records it', async ({
+test('while a reply is in flight the box is read-only; on success the thread leaves Needs you without a visible relay marker', async ({
   page,
 }) => {
   let release = () => {};
@@ -201,7 +201,8 @@ test('while a reply is in flight the box is read-only; on success the thread lea
   delivered = true;
   release();
   await expect(target).toHaveCount(0);
-  await expect(page.getByTestId('thread-message-marker')).toContainText('You told #7 directly: Do A');
+  await expect(page.getByTestId('thread-message-marker')).toHaveCount(0);
+  await expect(page.getByTestId('home-c')).not.toContainText('You told #7 directly: Do A');
 });
 
 async function recordCoordinatorSends(page: Page): Promise<string[]> {

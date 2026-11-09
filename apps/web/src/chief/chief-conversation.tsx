@@ -18,8 +18,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useConnected } from '../api/connection-state.js';
-import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
+import { useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { useLiveSeconds } from '../components/chat/live-row.js';
@@ -47,7 +48,6 @@ import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { AnswerComposer } from './answer-composer.js';
-import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import {
   ChiefConnectionBanner,
@@ -64,7 +64,6 @@ import { awaitingStream } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
-import type { ChiefEarlier } from './use-chief-surface.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
@@ -104,7 +103,7 @@ export interface ChiefConversationProps {
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
-  earlier?: ChiefEarlier;
+  earlier?: EarlierPages;
   hero?: ReactNode;
   below?: ReactNode;
   heroCollapsed?: boolean;
@@ -176,7 +175,6 @@ export function ChiefConversation({
   const answerActive = mode === 'answer';
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
-  const membersQ = useMembers(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const skillsQ = useSkills(teamId, live);
   const machinesQ = useMachines(teamId, live);
@@ -187,14 +185,7 @@ export function ChiefConversation({
       seq: td.seqNum,
       subtitle: td.phase,
     })),
-    agent: (membersQ.data ?? [])
-      .filter((m) => m.memberType === 'agent')
-      .map((m) => ({
-        id: m.actorId,
-        label: (m.actor as { displayName?: string } | undefined)?.displayName ?? m.actorId,
-        subtitle:
-          (m.actor as { description?: string | null } | undefined)?.description ?? undefined,
-      })),
+    agent: [],
     project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
     skill: (skillsQ.data ?? []).map((s) => ({
       id: s.id,
@@ -449,7 +440,7 @@ export function ChiefConversation({
       data-testid="chief-gate"
       className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-182 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
     >
-      <span>{t('请先为 Coordinator 选择一个 Agent。')}</span>
+      <span>{t('请先在工作路由里配置 Coordinator。')}</span>
       <Button className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`} onClick={onSettings}>
         {t('设置')}
       </Button>
@@ -499,7 +490,7 @@ export function ChiefConversation({
               onReply={stageReply}
             />
             {earlier != null && (
-              <ChiefEarlierLoader
+              <EarlierLoader
                 earlier={earlier}
                 hasEarlier={chief.hasEarlier === true}
                 rowCount={rows.length}

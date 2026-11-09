@@ -103,20 +103,17 @@ for (const theme of ['light', 'dark'] as const) {
     const cards = page.locator('.settings-card');
     await expect(cards, 'S2').toHaveCount(1);
     await expect(cards, 'S2').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
-    await expect(cards.getByRole('button', { name: '未设置' }), 'S2').toHaveCount(1);
-    await expect(cards.getByTestId('chief-follows-agent'), 'S2').toHaveCount(1);
+    const routingRow = cards.getByTestId('chief-routing-row');
+    await expect(routingRow, 'S2').toHaveCount(1);
+    await expect(routingRow, 'S2').toContainText('模型与机器');
     const heights = await cards
       .locator('> .settings-row')
       .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
-    expect(heights.length, 'S2').toBe(2);
+    expect(heights.length, 'S2').toBe(1);
     for (const h of heights) expect(h, 'S2').toBeGreaterThanOrEqual(52);
-    const agentRow = cards.locator('> .settings-row').first();
-    await expect(agentRow, 'S2: divider').toHaveCSS('border-bottom-width', '1px');
-    await expect(agentRow, 'S2: divider').toHaveCSS(
-      'border-bottom-color',
-      await probe(page, 'color', 'var(--border)'),
-    );
-    await expect(agentRow, 'S2: no top edge').toHaveCSS('border-top-width', '0px');
+    const modelRow = cards.locator('> .settings-row').first();
+    await expect(modelRow, 'S2: no bottom edge on sole row').toHaveCSS('border-bottom-width', '0px');
+    await expect(modelRow, 'S2: no top edge').toHaveCSS('border-top-width', '0px');
 
     await page.goto(SETTINGS('102'));
     const charterCard = page.locator('.settings-card');
@@ -129,7 +126,7 @@ for (const theme of ['light', 'dark'] as const) {
     );
 
     for (const [tab, copy] of [
-      ['103', /尚未选择 Agent/],
+      ['103', /尚无记忆/],
       ['104', /暂无跟进事项/],
     ] as const) {
       await page.goto(SETTINGS(tab));
