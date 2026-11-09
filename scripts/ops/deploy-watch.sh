@@ -74,6 +74,9 @@ deploy_newest_green() {
 lag_reason() {
   if [ -e "$STATE/hold" ]; then
     echo "a deploy hold is set: $(head -n1 "$STATE/hold")"
+  elif [ -s "$STATE/last-attempt" ] && [[ "$(cat "$STATE/last-attempt")" == *"exit 75" ]] &&
+    [ -s "$STATE/last-reason" ]; then
+    cat "$STATE/last-reason"
   elif [ -s "$STATE/last-attempt" ]; then
     echo "last attempt: $(cat "$STATE/last-attempt"); see $STATE/last-attempt.log on the host"
   else
