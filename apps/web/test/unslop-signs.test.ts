@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { EN } from '../src/i18n/en.js';
 
 const SRC = new URL('../src/', import.meta.url).pathname;
+const SHARED_SRC = new URL('../../../packages/shared/src/', import.meta.url).pathname;
 
 interface Sign {
   id: string;
@@ -148,7 +149,28 @@ function endsLikeASentenceLabel(text: string): boolean {
   return !/[。.!！？?]/.test(text.slice(0, -1).replace(/\{[^}]*\}/g, ''));
 }
 
-const labelLiterals = (text: string) => [...text.matchAll(LABEL_LITERAL)].map((m) => m[2] ?? '');
+const LABEL_CONSTANT = /\b(?:title|label|aria-label)(?:=\{|:\s*)t\(\s*([A-Z_]\w*)\.(\w+)\s*[,)]/g;
+
+function copyConstantsIn(text: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const block of text.matchAll(/\bconst ([A-Z_]\w*) = \{([\s\S]*?)\n\}/g)) {
+    for (const prop of (block[2] ?? '').matchAll(/(\w+):\s*'((?:\\.|[^'\\])*)'/g)) {
+      found.set(`${block[1]}.${prop[1]}`, prop[2] ?? '');
+    }
+  }
+  return found;
+}
+
+const copyConstants = new Map(
+  [...walk(SRC), ...walk(SHARED_SRC)]
+    .filter((path) => /\.tsx?$/.test(path))
+    .flatMap((path) => [...copyConstantsIn(readFileSync(path, 'utf8'))]),
+);
+
+const labelLiterals = (text: string, constants: Map<string, string> = copyConstants) => [
+  ...[...text.matchAll(LABEL_LITERAL)].map((m) => m[2] ?? ''),
+  ...[...text.matchAll(LABEL_CONSTANT)].flatMap((m) => constants.get(`${m[1]}.${m[2]}`) ?? []),
+];
 
 const uiStrings = [
   ...new Set([
@@ -223,8 +245,10 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ["title={t('确定删除该任务？此操作不可撤销。')}", false],
     ["title={t('尚无密钥')}", false],
     ["label: t('Loading…')", false],
+    ["export const PAGE_COPY = {\n  empty: '尚无技能。',\n} as const;\ntitle={t(PAGE_COPY.empty)}", true],
+    ["export const PAGE_COPY = {\n  empty: '尚无技能',\n} as const;\ntitle={t(PAGE_COPY.empty)}", false],
   ])('label literal %s ends in a period: %s', (snippet, expected) => {
-    expect(labelLiterals(snippet).some(endsLikeASentenceLabel)).toBe(expected);
+    expect(labelLiterals(snippet, copyConstantsIn(snippet)).some(endsLikeASentenceLabel)).toBe(expected);
   });
 
   test('plain copy passes', () => {

@@ -484,7 +484,7 @@ export const EN: Record<string, string> = {
   自定义: 'Custom',
   '搜索技能...': 'Search skills...',
   排序: 'Sort',
-  '尚无技能。': 'No skills yet.',
+  尚无技能: 'No skills yet',
   // spec 13 + XMON-109（spec 13 回摆）技能面：双入口口径——本地目录或页面
   // 新建都会出现在这里（{dir} = SKILLS_DIR_DEFAULT）。
   '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。':
