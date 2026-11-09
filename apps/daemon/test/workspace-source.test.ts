@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -131,6 +132,13 @@ describe('dual execution-source selection (github-shape localPath acceleration s
     expect(logger.lines).toContainEqual(`[workspace] Repo source: local-path ${userRepo}`);
     const origin = await gitPrim.remoteUrl(prepared.baseRepoDir);
     expect(origin).toBe(truthDir);
+    expect(
+      (
+        await runGit(['rev-parse', `${repositoryCacheRefPrefix(truthDir)}/heads/main`], {
+          cwd: prepared.baseRepoDir,
+        })
+      ).stdout.trim(),
+    ).toBe(v2);
     expect(await gitPrim.head(prepared.cwd)).toBe(v2);
     expect(readFileSync(join(prepared.cwd, 'README.md'), 'utf8')).toBe('# v2\n');
   }, 30_000);
@@ -157,6 +165,13 @@ describe('dual execution-source selection (github-shape localPath acceleration s
 
   test('D6 localPath absent → straight truth clone, no source-selection log (zero drift)', async () => {
     const prepared = await ws.prepare(prepareInput(null));
+    expect(
+      (
+        await runGit(['rev-parse', `${repositoryCacheRefPrefix(truthDir)}/heads/main`], {
+          cwd: prepared.baseRepoDir,
+        })
+      ).stdout.trim(),
+    ).toBe(await gitPrim.head(prepared.cwd));
     expect(existsSync(join(prepared.cwd, 'README.md'))).toBe(true);
     expect(logger.lines.some((l) => l.includes('Repo source'))).toBe(false);
     expect(logger.lines.some((l) => l.includes('Cloning'))).toBe(true);

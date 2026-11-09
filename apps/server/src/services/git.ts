@@ -19,6 +19,7 @@ import {
   projectMergeConfigSchema,
   type SecretBox,
 } from '@cairn/shared';
+import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build as buildTable, project, todo as todoTable } from '../db/schema.js';
@@ -274,8 +275,52 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
   throw notFound(`repository binding for project ${projectId}`);
 }
 
-async function resolveCommitOr404(dir: string, ref: string): Promise<string> {
-  const commit = await systemGitOps.resolveCommit(dir, ref);
+async function resolveReadCommit(
+  ctx: RepoCtx,
+  projectId: string,
+  dir: string,
+  ref: string,
+): Promise<string | null> {
+  if (ctx.workspacesDir === undefined || dir !== join(ctx.workspacesDir, projectId, 'repo')) {
+    return systemGitOps.resolveCommit(dir, ref);
+  }
+  const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+  if (row?.repoKind !== 'github') return systemGitOps.resolveCommit(dir, ref);
+  const binding = githubRepoOfProject(row);
+  if (binding === null) throw new HttpError(409, 'project repository binding changed during read');
+  const prefix = repositoryCacheRefPrefix(githubCloneUrl(binding));
+  const shortName = !ref.startsWith('refs/') && ref !== 'HEAD' && !/^[0-9a-f]{40,64}$/i.test(ref);
+  const candidates: string[] = [];
+  if (shortName || ref.startsWith('refs/tags/')) {
+    const tag = ref.replace(/^refs\/tags\//, '');
+    candidates.push(`${prefix}/tags/${tag}`, `refs/tags/${tag}`);
+  }
+  if (shortName || ref.startsWith('refs/heads/') || ref.startsWith('refs/remotes/origin/')) {
+    candidates.push(`${prefix}/heads/${ref.replace(/^refs\/(?:heads|remotes\/origin)\//, '')}`);
+  }
+  let commit: string | null = null;
+  for (const candidate of [...candidates, ref]) {
+    commit = await systemGitOps.resolveCommit(dir, candidate);
+    if (commit !== null) break;
+  }
+  if (commit === null) return null;
+  const reachable = await runGit(
+    ['for-each-ref', `--contains=${commit}`, '--format=%(refname)', `${prefix}/`],
+    { cwd: dir, timeoutMs: 15000 },
+  );
+  if (reachable.code !== 0 || reachable.stdout.toString('utf8').trim() === '') {
+    throw new HttpError(403, 'commit is not reachable from the current repository verified refs');
+  }
+  return commit;
+}
+
+async function resolveCommitOr404(
+  ctx: RepoCtx,
+  projectId: string,
+  dir: string,
+  ref: string,
+): Promise<string> {
+  const commit = await resolveReadCommit(ctx, projectId, dir, ref);
   if (commit === null) throw notFound(`ref ${ref}`);
   return commit;
 }
@@ -288,7 +333,7 @@ export async function readTree(
 ): Promise<ProjectTreeResponse> {
   const dir = await requireRepoReadDir(ctx, projectId);
   const ref = refParam ?? 'HEAD';
-  const commit = await resolveCommitOr404(dir, ref);
+  const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
   const subPath = pathParam !== undefined && pathParam !== '' ? pathParam : undefined;
   const entries = await systemGitOps.lsTree(dir, commit, subPath);
   return { ref, commit, path: subPath ?? '', entries };
@@ -305,7 +350,7 @@ export async function readFiles(
 ): Promise<ProjectFilesResponse> {
   const dir = await requireRepoReadDir(ctx, projectId);
   const ref = refParam ?? 'HEAD';
-  const commit = await resolveCommitOr404(dir, ref);
+  const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
   const parsed = limitParam === undefined || limitParam === '' ? NaN : Number(limitParam);
   const limit = Number.isInteger(parsed)
     ? Math.min(Math.max(parsed, 1), PROJECT_FILES_MAX_LIMIT)
@@ -332,21 +377,9 @@ export async function readFile(
   let ref = refParam ?? 'HEAD';
   if (ctx.workspacesDir !== undefined && dir === join(ctx.workspacesDir, projectId, 'repo')) {
     const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
-    if (refParam !== undefined) {
-      const branch = refParam.replace(/^refs\/heads\//, '');
-      const remoteRef = `refs/remotes/origin/${branch}`;
-      const explicitBranch = refParam.startsWith('refs/heads/');
-      const shortName = !refParam.startsWith('refs/') && refParam !== 'HEAD';
-      const tag = shortName ? await systemGitOps.resolveCommit(dir, `refs/tags/${refParam}`) : null;
-      if (
-        (explicitBranch || (shortName && tag === null)) &&
-        (await systemGitOps.resolveCommit(dir, remoteRef))
-      ) {
-        ref = remoteRef;
-      }
-    } else if (row?.baseBranch != null) {
+    if (refParam === undefined && row?.baseBranch != null) {
       ref = `refs/remotes/origin/${row.baseBranch}`;
-    } else {
+    } else if (refParam === undefined) {
       const head = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
         cwd: dir,
         timeoutMs: 15000,
@@ -379,7 +412,7 @@ export async function readFile(
       }
     }
   }
-  const commit = await resolveCommitOr404(dir, ref);
+  const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
   if (options.maxBytes !== undefined) {
     const sizeResult = await runGit(['cat-file', '-s', `${commit}:${path}`], {
       cwd: dir,
@@ -434,7 +467,7 @@ export async function readCommitHistory(
   const dir = await requireRepoReadDir(ctx, projectId);
   const { defaultBranch } = await systemGitOps.listBranches(dir);
   const ref = refParam ?? defaultBranch ?? 'HEAD';
-  const commit = await systemGitOps.resolveCommit(dir, ref);
+  const commit = await resolveReadCommit(ctx, projectId, dir, ref);
   if (commit === null) return { ref, commits: [] };
   const r = await runGit(
     ['log', `--max-count=${COMMITS_LIMIT}`, '--format=%H%x00%h%x00%aI%x00%an%x00%s', commit],
@@ -464,7 +497,7 @@ export async function readCommitDetail(
   sha: string,
 ): Promise<ProjectCommitDetailResponse> {
   const dir = await requireRepoReadDir(ctx, projectId);
-  const commit = await resolveCommitOr404(dir, sha);
+  const commit = await resolveCommitOr404(ctx, projectId, dir, sha);
   const r = await runGit(
     ['show', '--format=%H%x00%h%x00%aI%x00%an%x00%s', '--patch', '--first-parent', commit],
     { cwd: dir, timeoutMs: 30_000 },

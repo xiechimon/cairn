@@ -247,6 +247,7 @@ export class WorkspaceManager implements WorktreeOps {
             (cred) => gitPrim.clone(cloneUrl, baseRepoDir, cred),
             () => rmSync(baseRepoDir, { recursive: true, force: true }),
           );
+          await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
         }
       } else {
         const origin = await gitPrim.originConfigUrl(baseRepoDir);
