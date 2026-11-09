@@ -881,6 +881,74 @@ describe('a self-created issue follows its task when the task stops (#3418 lifec
     s.dispose();
   });
 
+  test('deleting while the issue is still being created closes it once it exists', async () => {
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const mock = lifecycleMock();
+    const s = bootServer({
+      githubFetch: async (input, init) => {
+        if ((init?.method ?? 'GET') === 'POST' && new URL(String(input)).pathname === ISSUES_PATH)
+          await gate;
+        return mock.impl(input, init);
+      },
+    });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await call(s.app, 'DELETE', `/api/todos/${created.id}`);
+    release();
+    await flushSelfIssueWrites();
+    await flushSelfIssueWrites();
+    expect(closes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock)).toEqual(['Cairn：这个任务已删除，这里的 issue 关闭（未计划）。']);
+    s.dispose();
+  });
+
+  test('cancel then reopen in quick succession leaves the issue open', async () => {
+    let issueState: 'open' | 'closed' = 'open';
+    let release = (): void => undefined;
+    const slowClose = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const mock = lifecycleMock();
+    const s = bootServer({
+      githubFetch: async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        const method = init?.method ?? 'GET';
+        if (path === issuePath(101) && method === 'GET') {
+          await mock.impl(input, init);
+          return {
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            json: async () => ({ ...CREATED_ISSUE, state: issueState }),
+            text: async () => '',
+          };
+        }
+        if (path === issuePath(101) && method === 'PATCH') {
+          const next = (JSON.parse(String(init?.body)) as { state: 'open' | 'closed' }).state;
+          if (next === 'closed') await slowClose;
+          issueState = next;
+        }
+        return mock.impl(input, init);
+      },
+    });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await flushSelfIssueWrites();
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { phase: 'closed' } });
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { phase: 'todo' } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    release();
+    await flushSelfIssueWrites();
+    await flushSelfIssueWrites();
+    expect(issueState).toBe('open');
+    s.dispose();
+  });
+
   test('an imported issue is never closed when its task is cancelled', async () => {
     const mock = lifecycleMock();
     const { s, id } = await startedTask(mock);

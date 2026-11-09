@@ -1,6 +1,6 @@
 import { type GithubRepoRef, parseGithubIssueSourceRef } from '@cairn/shared';
 import type { todo } from '../db/schema.js';
-import { type FetchLike, githubUpdatePullBody } from '../lib/github.js';
+import { type FetchLike, githubPull, githubUpdatePullBody } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 
 type TaskSource = Pick<typeof todo.$inferSelect, 'sourceKind' | 'sourceRef'>;
@@ -17,17 +17,14 @@ function taskIssueNumber(row: TaskSource, repo: GithubRepoRef): number | null {
   return sameRepo ? issue.issueNumber : null;
 }
 
-function bodyClosingTaskIssue(body: string, row: TaskSource, repo: GithubRepoRef): string | null {
-  const issueNumber = taskIssueNumber(row, repo);
-  if (issueNumber === null) return null;
+const INERT_MARKDOWN = /```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|<!--[\s\S]*?(?:-->|$)|`[^`\n]*`/g;
+
+function closesIssue(body: string, issueNumber: number, repo: GithubRepoRef): boolean {
   const qualified = `${escapeRegExp(repo.owner)}/${escapeRegExp(repo.repo)}`;
-  const linked = new RegExp(
+  return new RegExp(
     `(?<![\\w-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:\\s*:\\s*|\\s+)(?:${qualified})?#${issueNumber}(?!\\d)`,
     'i',
-  );
-  if (linked.test(body)) return null;
-  const kept = body.trimEnd();
-  return `${kept}${kept === '' ? '' : '\n\n'}Closes #${issueNumber}\n`;
+  ).test(body.replace(INERT_MARKDOWN, ' '));
 }
 
 export async function ensurePullClosesTaskIssue(
@@ -36,10 +33,16 @@ export async function ensurePullClosesTaskIssue(
   repo: GithubRepoRef,
   prNumber: number,
   row: TaskSource,
-  body: string,
+  seenBody: string,
 ): Promise<string | null> {
-  const next = bodyClosingTaskIssue(body, row, repo);
-  if (next === null) return null;
+  const issueNumber = taskIssueNumber(row, repo);
+  if (issueNumber === null || closesIssue(seenBody, issueNumber, repo)) return null;
+  const page = await githubPull(fetchImpl, token, repo.owner, repo.repo, prNumber);
+  if (page?.pull == null) throw new Error(`PR #${prNumber} body unreadable`);
+  const current = page.pull.body;
+  if (closesIssue(current, issueNumber, repo)) return null;
+  const kept = current.trimEnd();
+  const next = `${kept}${kept === '' ? '' : '\n\n'}Closes #${issueNumber}\n`;
   await githubUpdatePullBody(fetchImpl, token, repo.owner, repo.repo, prNumber, next);
   return next;
 }

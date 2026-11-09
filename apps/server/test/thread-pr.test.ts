@@ -1097,6 +1097,45 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
     expect(mock.bodyEdits).toEqual([]);
   });
 
+  test.each([
+    ['a fenced code block', '```\nCloses #77\n```'],
+    ['an HTML comment', '<!-- Closes #77 -->'],
+    ['an inline code span', 'run `closes #77` later'],
+  ])('a keyword only inside %s does not count, so the line is appended', async (_name, inert) => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1025,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#77',
+    });
+    mock.pulls.set('octo/demo#1025', { body: inert });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`${inert}\n\nCloses #77\n`]);
+  });
+
+  test('the edit appends to the body as it is now, not to the body the sweep read earlier', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1027,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#79',
+    });
+    mock.pulls.set('octo/demo#1027', { body: 'old' });
+    let reads = 0;
+    const inner = mock.fetch.getMockImplementation();
+    mock.fetch.mockImplementation((input, init) => {
+      if (init?.method !== 'PATCH' && String(input).endsWith('/pulls/1027')) {
+        reads += 1;
+        if (reads === 2) mock.pulls.set('octo/demo#1027', { body: 'edited meanwhile' });
+      }
+      return inner!(input, init);
+    });
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['edited meanwhile\n\nCloses #79\n']);
+  });
+
   test('an imported issue from the same repo is closed the same way', async () => {
     const s = boot();
     const mock = new GithubMock();

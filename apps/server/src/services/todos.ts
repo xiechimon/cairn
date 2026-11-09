@@ -753,6 +753,13 @@ export async function flushSelfIssueWrites(): Promise<void> {
 
 type IssueClose = { stateReason: 'completed' | 'not_planned'; comment: string };
 
+const DELETED_TASK_CLOSE: IssueClose = {
+  stateReason: 'not_planned',
+  comment: 'Cairn：这个任务已删除，这里的 issue 关闭（未计划）。',
+};
+
+const issueSettleChains = new Map<string, Promise<void>>();
+
 const isShelved = (row: TodoRow) => row.phase === 'closed' || row.archivedAt !== null;
 
 function issueRefText(ref: string | null, repo: GithubRepoRef): string | null {
@@ -771,12 +778,7 @@ function selfIssueSettleOf(
   after: TodoRow | null,
   successor: TodoRow | undefined,
 ): IssueClose | 'reopen' | null {
-  if (after === null) {
-    return {
-      stateReason: 'not_planned',
-      comment: 'Cairn：这个任务已删除，这里的 issue 关闭（未计划）。',
-    };
-  }
+  if (after === null) return DELETED_TASK_CLOSE;
   if (isShelved(before) && !isShelved(after)) return after.phase === 'done' ? null : 'reopen';
   if (isShelved(before) || !isShelved(after)) return null;
   if (successor !== undefined) {
@@ -803,11 +805,12 @@ function selfIssueSettleOf(
       };
 }
 
-function trackIssueSettle(work: Promise<void>, label: string): void {
+function trackIssueSettle(work: Promise<void>, label: string): Promise<void> {
   const pending: Promise<void> = work
     .catch((error: unknown) => console.warn(`${label} failed`, error))
     .finally(() => issueSettlesInFlight.delete(pending));
   issueSettlesInFlight.add(pending);
+  return pending;
 }
 
 function issueWriteToken(deps: TodoDeps, teamId: string, repo: GithubRepoRef) {
@@ -868,6 +871,7 @@ function scheduleSelfIssueSettle(
   if (before.sourceKind !== 'github-issue-self') return;
   if (selfIssueSettleOf(deps, before, after, successor) === null) return;
   const creating = Promise.all([
+    issueSettleChains.get(before.id),
     selfIssueInFlight.get(before.id),
     successor === undefined ? undefined : selfIssueInFlight.get(successor.id),
   ]);
@@ -879,7 +883,11 @@ function scheduleSelfIssueSettle(
     const settle = selfIssueSettleOf(deps, before, after, latestSuccessor);
     if (settle !== null) await settleIssue(deps, current.teamId, current.sourceRef, settle);
   });
-  trackIssueSettle(work, `settling the issue of todo ${before.id}`);
+  const chained = trackIssueSettle(work, `settling the issue of todo ${before.id}`);
+  issueSettleChains.set(before.id, chained);
+  void chained.then(() => {
+    if (issueSettleChains.get(before.id) === chained) issueSettleChains.delete(before.id);
+  });
 }
 
 function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): GithubRepoRef | null {
@@ -927,7 +935,16 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     body: row.spec,
   });
   const fresh = getRow(deps, todoId);
-  if (!fresh || fresh.sourceRef !== row.sourceRef) return null;
+  if (!fresh) {
+    await settleIssue(
+      deps,
+      row.teamId,
+      githubIssueSourceRef(owner, repo, number),
+      DELETED_TASK_CLOSE,
+    );
+    return null;
+  }
+  if (fresh.sourceRef !== row.sourceRef) return null;
   const ref = githubIssueSourceRef(owner, repo, number);
   db.update(todo)
     .set({ sourceRef: ref, v: fresh.v + 1 })
