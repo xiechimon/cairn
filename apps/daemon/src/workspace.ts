@@ -60,7 +60,8 @@ async function worktreeFingerprint(cwd: string, path: string): Promise<string> {
     const head = existsSync(join(full, '.git')) ? await gitPrim.head(full) : null;
     return `dir:${head ?? 'none'}`;
   }
-  return `file:${createHash('sha256').update(readFileSync(full)).digest('hex')}`;
+  const executable = (stat.mode & 0o111) !== 0 ? 'x' : '-';
+  return `file:${executable}:${createHash('sha256').update(readFileSync(full)).digest('hex')}`;
 }
 
 function isDanglingLink(full: string): boolean {

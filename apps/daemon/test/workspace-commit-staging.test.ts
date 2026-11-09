@@ -138,6 +138,21 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
     expect(result.setupDrift).toEqual(['pnpm-lock.yaml']);
   }, 60_000);
 
+  test('an agent making a setup-written script executable is the agent change and is committed', async () => {
+    await seedRepo(userRepo, 'printf "#!/bin/sh\\necho hi\\n" > tool.sh\n');
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const prepared = await ws.prepare(prepareInput());
+    writeFileSync(join(prepared.cwd, 'feature.txt'), 'agent work\n');
+    const first = await ws.commitAll(prepared.cwd, 'build: feature', IDENTITY);
+    expect(first.setupDrift).toContain('tool.sh');
+
+    chmodSync(join(prepared.cwd, 'tool.sh'), 0o755);
+    const result = await ws.commitAll(prepared.cwd, 'build: make tool executable', IDENTITY);
+
+    expect(await committedPaths(prepared.cwd)).toEqual(['tool.sh']);
+    expect(result.setupDrift).not.toContain('tool.sh');
+  }, 60_000);
+
   test('a path the setup hook also staged is still setup drift and stays out of the commit', async () => {
     await seedRepo(userRepo, 'git add pnpm-lock.yaml\n');
     const ws = new WorkspaceManager({ logger: quietLogger() });
