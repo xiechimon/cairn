@@ -812,7 +812,7 @@ describe('a self-created issue follows its task when the task stops (#3418 lifec
       s.team.id,
       [id],
       'closed',
-      { kind: 'agent', name: 'Coordinator' },
+      { kind: 'agent', name: 'Coordinator', stopActor: 'coordinator' },
       { supersededBy: successor.id },
     );
     expect(result.transitioned).toEqual([id]);
