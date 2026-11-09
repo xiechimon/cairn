@@ -563,11 +563,7 @@ export const EN: Record<string, string> = {
   历史: 'History',
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
-  // #1097 files-pane folder drill-down
-  目录导航: 'Directory navigation',
   根目录: 'Root',
-  '此目录为空。': 'This folder is empty.',
-  '文件树读取失败。': 'Failed to read the file tree.',
   '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
@@ -630,7 +626,6 @@ export const EN: Record<string, string> = {
   // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
   额度空: 'out of quota',
   限流: 'rate limited',
-  请选择一个文件查看: 'Select a file to view',
   // #202 文件查看器三态（loading / error / 不可预览）
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
@@ -1077,13 +1072,6 @@ export const EN: Record<string, string> = {
 
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
-
-  // —— local 项目 Files tab 读面（#1030 开闸；不可达降级文案）——
-  '本地仓库当前无法读取。': 'The local repository cannot be read right now.',
-
-  // —— github 项目 Files tab 诚实降级面（#704 / B-C1：文件在 GitHub，外链承接）——
-  'GitHub 仓库项目的文件在 GitHub 上查看': 'Files for GitHub repository projects live on GitHub',
-  '打开 GitHub 仓库': 'Open the GitHub repository',
 
   // —— #403/#445 看板筛选面（仓库 chip 组 + 类型 popover + 空结果态）——
   类型: 'Type',

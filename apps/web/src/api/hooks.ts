@@ -44,10 +44,8 @@ import type {
   PatchTeamBody,
   PatchUserBody,
   PlanResponse as PlanRow,
-  ProjectFileResponse,
   ProjectFilesResponse,
   ProjectRecord,
-  ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
   ProviderTestResult,
@@ -586,25 +584,6 @@ export const useNotifications = (teamId: string | undefined, enabled: boolean) =
     enabled: enabled && teamId !== undefined,
   });
 
-export const useProjectTree = (
-  projectId: string | undefined,
-  ref: string | undefined,
-  path: string | undefined,
-) =>
-  useQuery({
-    queryKey: ['tree', projectId, ref, path],
-    queryFn: () => {
-      const qs = new URLSearchParams();
-      if (ref !== undefined) qs.set('ref', ref);
-      if (path !== undefined && path !== '') qs.set('path', path);
-      const query = qs.toString();
-      return api.get<ProjectTreeResponse>(
-        `/api/projects/${projectId}/tree${query !== '' ? `?${query}` : ''}`,
-      );
-    },
-    enabled: projectId !== undefined,
-  });
-
 export const useProjectFiles = (projectId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['files', projectId],
@@ -613,20 +592,6 @@ export const useProjectFiles = (projectId: string | undefined, enabled: boolean)
     enabled: projectId !== undefined && enabled,
     retry: false,
     staleTime: 5 * 60 * 1000,
-  });
-
-export const useProjectFile = (
-  projectId: string | undefined,
-  path: string | undefined,
-  ref: string | undefined,
-) =>
-  useQuery({
-    queryKey: ['file', projectId, path, ref],
-    queryFn: () =>
-      api.get<ProjectFileResponse>(
-        `/api/projects/${projectId}/file?path=${encodeURIComponent(path ?? '')}${ref !== undefined ? `&ref=${encodeURIComponent(ref)}` : ''}`,
-      ),
-    enabled: projectId !== undefined && path !== undefined,
   });
 
 export function usePatchProject(teamId: string | undefined) {
