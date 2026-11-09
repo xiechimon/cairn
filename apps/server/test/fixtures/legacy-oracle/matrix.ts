@@ -446,6 +446,7 @@ function runChunk(cells: readonly Cell[], dir: string): MatrixFailure[] {
   };
   const sqlite = new Database(migratedPath);
   sqlite.close();
+  openDbWithHandle(migratedPath).close();
   const opened = openDbWithHandle(migratedPath);
   const failures: MatrixFailure[] = [];
   try {
