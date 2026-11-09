@@ -1,8 +1,11 @@
 import { PackageCheck } from 'lucide-react';
+import { usePrs } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { StoneTrail } from '../components/stone/stone-group.js';
+import { prByThread } from '../components/thread/pr-panel-model.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -28,6 +31,8 @@ interface WorkPanelProps {
 export function WorkPanel({ todos, now, onClose, onOpenThread, todosQuery }: WorkPanelProps) {
   const { t } = useI18n();
   const title = t('成果');
+  const { live: connected, teamId } = useLiveData();
+  const prOf = prByThread(usePrs(teamId, undefined, connected).data);
   const made = todos
     .filter((todo) => threadStatus(todo) === 'done' && todo.archivedAt == null)
     .sort((a, b) => b.phaseAt - a.phaseAt);
@@ -42,16 +47,20 @@ export function WorkPanel({ todos, now, onClose, onOpenThread, todosQuery }: Wor
       />
     ) : (
       <StoneTrail className="px-0">
-        {made.map((todo) => (
-          <ThreadRow
-            key={todo.id}
-            title={todo.title}
-            tone="resolved"
-            reason={t(threadCopy(todo).reason)}
-            age={relativeTime(todo.phaseAt, now, t)}
-            onOpen={() => onOpenThread(todo.id)}
-          />
-        ))}
+        {made.map((todo) => {
+          const pr = prOf.get(todo.id);
+          return (
+            <ThreadRow
+              key={todo.id}
+              {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
+              title={todo.title}
+              tone="resolved"
+              reason={t(threadCopy(todo).reason)}
+              age={relativeTime(todo.phaseAt, now, t)}
+              onOpen={() => onOpenThread(todo.id)}
+            />
+          );
+        })}
       </StoneTrail>
     );
   return (
