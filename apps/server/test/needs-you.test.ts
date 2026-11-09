@@ -146,7 +146,7 @@ describe('needs you (#1800)', () => {
     expect(
       w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
     ).toBe('Task parked: model unavailable (glm-5.3). Update model routing before retrying.');
-    expect(groups(w).current).toHaveLength(1);
+    expect(getTodo(w.deps, w.todoId)?.owner).toBe('coordinator');
     expect(
       w.s.db
         .select()
@@ -172,7 +172,7 @@ describe('needs you (#1800)', () => {
     expect(buildCount(w)).toBe(1);
   });
 
-  test('parking a watched model rejection emits a notice without a Coordinator re-orchestration step', () => {
+  test('parking a watched model rejection emits a notice and exactly one Coordinator failure wake', () => {
     const w = openWorld();
     const thread = coordinatorThreadRow(w.deps, ensureChief(w.deps, w.s.team.id));
     addChiefWatch(w.deps, {
@@ -183,9 +183,8 @@ describe('needs you (#1800)', () => {
     });
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
     applyStepFailure(w.deps, row, 'model_not_found: glm-5.3');
-    expect(
-      w.s.db.select().from(stepTable).where(eq(stepTable.buildId, thread.id)).all(),
-    ).toHaveLength(0);
+    const wakes = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, thread.id)).all();
+    expect(wakes.map((wake) => wake.prompt?.split(']')[0])).toEqual(['[wake:failed']);
     expect(
       w.s.db
         .select()
@@ -456,7 +455,7 @@ describe('needs you (#1800)', () => {
     ).toContain('4 failed builds');
     await sweepFailedRetries(w.deps);
     expect(buildCount(w)).toBe(4);
-    expect(groups(w).current).toHaveLength(1);
+    expect(getTodo(w.deps, w.todoId)?.owner).toBe('coordinator');
     expect(() =>
       startBuilds(w.deps, { projectId: w.projectId, todoIds: [w.todoId], triggerSource: 'chief' }),
     ).toThrow(/parked/i);
@@ -640,7 +639,7 @@ describe('needs you (#1800)', () => {
 
     expect(phaseOf(w)).toBe('failed');
     expect(buildCount(w)).toBe(buildsAfterRetry);
-    expect(groups(w).current.map((entry) => entry.reason)).toEqual(['failed']);
+    expect(getTodo(w.deps, w.todoId)?.owner).toBe('coordinator');
     expect(groups(w).stale).toEqual([]);
   });
 
@@ -655,7 +654,7 @@ describe('needs you (#1800)', () => {
 
     expect(phaseOf(w)).toBe('failed');
     expect(buildCount(w)).toBe(builds);
-    expect(groups(w).current.map((entry) => entry.reason)).toEqual(['failed']);
+    expect(getTodo(w.deps, w.todoId)?.owner).toBe('coordinator');
   });
 
   test('a missing-credential failure is not retried and enters the current group', async () => {
@@ -668,7 +667,7 @@ describe('needs you (#1800)', () => {
 
     expect(phaseOf(w)).toBe('failed');
     expect(buildCount(w)).toBe(builds);
-    expect(groups(w).current.map((entry) => entry.reason)).toEqual(['failed']);
+    expect(getTodo(w.deps, w.todoId)?.owner).toBe('coordinator');
   });
 
   test.each([
@@ -692,7 +691,7 @@ describe('needs you (#1800)', () => {
     expect(phaseOf(w)).toBe(needsHuman ? 'failed' : 'queued');
     expect(buildCount(w)).toBe(needsHuman ? 1 : 2);
     expect(failureNeedsHuman(errorMessage)).toBe(needsHuman);
-    expect(groups(w).current.map((entry) => entry.reason)).toEqual(needsHuman ? ['failed'] : []);
+    expect(getTodo(w.deps, w.todoId)?.owner).toBe(needsHuman ? 'coordinator' : null);
   });
 
   test('plan confirmations and human reviews enter needs you; an autonomous review does not', () => {
@@ -753,7 +752,7 @@ describe('needs you (#1800)', () => {
 
     expect(phaseOf(w)).toBe('failed');
     expect(buildCount(w)).toBe(builds);
-    expect(groups(w).current.map((entry) => entry.reason)).toEqual(['failed']);
+    expect(getTodo(w.deps, w.todoId)?.owner).toBe('coordinator');
   });
 
   test('the scheduler tick retries a transient failure', async () => {

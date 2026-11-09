@@ -11,7 +11,9 @@ import {
   chiefMessage,
   chief as chiefTable,
   chiefThread,
+  notification,
   step as stepTable,
+  todo,
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
@@ -100,14 +102,13 @@ beforeAll(async () => {
       },
     },
     { content: '探针行已写入 README.md 并提交。' },
-    { content: '「探针任务」已完成，停在 review 等待确认。确认没问题后请告诉我合并。' },
     { content: '合并只由人触发，我不能代合。请在 web 界面 review 关口点「完成」触发合并。' },
     { content: '合并执行完成。' },
     { content: '「探针任务」已合并完成，状态为 done。README.md 已落地到项目根目录。' },
     { toolCall: { name: 'watch_todos', arguments: { todoIds: ['__SECOND__'] } } },
     { toolCall: { name: 'open_thread', arguments: { todoId: '__SECOND__' } } },
     { content: '已开第二个 thread。' },
-    { status: 400 },
+    { status: 400, errorMessage: 'invalid api key' },
     { toolCall: { name: 'machines', arguments: {} } },
     {
       content:
@@ -168,8 +169,8 @@ beforeAll(async () => {
   });
   script[0] = watch(world.todoId);
   script[1] = open(world.todoId);
-  script[9] = watch(todo2Id);
-  script[10] = open(todo2Id);
+  script[8] = watch(todo2Id);
+  script[9] = open(todo2Id);
 
   const patch = await api(
     server.url,
@@ -193,7 +194,7 @@ afterAll(async () => {
 });
 
 describe('M4b watch/wake three-trigger E2E (r5 §3.5 reference run)', () => {
-  test('dispatch auto-watch (reason canon) + gate wake parks at review and reports', async () => {
+  test('dispatch auto-watch (reason canon); a human review goes to the owner, not a Coordinator wake', async () => {
     const sent = await api(server.url, 'POST', `/api/teams/${server.teamId}/chief/threads`, {
       content: `开始执行「探针任务」（todo ${world.todoId}），直接执行不做规划。`,
     });
@@ -211,19 +212,19 @@ describe('M4b watch/wake three-trigger E2E (r5 §3.5 reference run)', () => {
     expect(watch.reason).toBe(CHIEF_WATCH_REASON_DISPATCH);
 
     await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
-    await waitFor(() => wakeSteps('[wake:gate]').length > 0, 120_000);
-    const gateStep = wakeSteps('[wake:gate]')[0]!;
-    await waitFor(() => {
-      const row = server.db.select().from(stepTable).where(eq(stepTable.id, gateStep.id)).get();
-      return row?.status === 'done';
-    }, 120_000);
-    const doneGate = server.db.select().from(stepTable).where(eq(stepTable.id, gateStep.id)).get()!;
-    expect((doneGate.claimedAt ?? 0) - gateStep.createdAt).toBeLessThan(10_000);
-    expect(logLines().some((l) => l.includes(`continue session ${threadId}`))).toBe(true);
-    expect(threadMessages()).toContain('停在 review 等待确认');
+    await waitFor(
+      () =>
+        server.db.select().from(notification).where(eq(notification.entityId, world.todoId)).get()
+          ?.type === 'build_review',
+      60_000,
+    );
+    await waitThreadIdle();
+    expect(wakeSteps('[wake:gate]')).toEqual([]);
+    expect(server.db.select().from(todo).where(eq(todo.id, world.todoId)).get()).toMatchObject({
+      lastNotifiedOwner: 'owner',
+    });
     expect(chiefWatches().map((w) => w.todoId)).toContain(world.todoId);
 
-    await waitThreadIdle();
     chiefSessionFile = expectSessionDurable();
     chiefSessionId = server.db
       .select()
@@ -264,7 +265,7 @@ describe('M4b watch/wake three-trigger E2E (r5 §3.5 reference run)', () => {
     ).toBe(chiefSessionId);
   }, 150_000);
 
-  test('failed wake: step failed → chief calls machines first, then evidence-style report + watch release', async () => {
+  test('failed wake: a failure that needs a person wakes the Coordinator once; machines first, then evidence-style report + watch release', async () => {
     await waitThreadIdle();
     const sent = await api(
       server.url,
@@ -293,5 +294,6 @@ describe('M4b watch/wake three-trigger E2E (r5 §3.5 reference run)', () => {
     expect(machinesIdx).toBeLessThan(reportIdx);
 
     await waitFor(() => !chiefWatches().some((w) => w.todoId === todo2Id), 60_000);
+    expect(wakeSteps('[wake:failed]')).toHaveLength(1);
   }, 150_000);
 });

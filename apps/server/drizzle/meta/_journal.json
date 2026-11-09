@@ -883,6 +883,13 @@
       "when": 1794198018500,
       "tag": "0129_task_issue_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "6",
+      "when": 1794200191199,
+      "tag": "0130_thread_owner_checkpoint",
+      "breakpoints": true
     }
   ]
 }

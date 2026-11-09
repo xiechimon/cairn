@@ -1,10 +1,11 @@
-import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS, DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { build, chiefMessage, message, plan, step, todo } from '../src/db/schema.js';
-import { addChiefWatch, triggerChiefWakes } from '../src/services/chief.js';
+import { build, chiefMessage, message, plan, project, step, todo } from '../src/db/schema.js';
+import { addChiefWatch } from '../src/services/chief.js';
 import { finishStep } from '../src/services/machines.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
+import { reconcileOwners } from '../src/services/owner.js';
 import { getTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { insertMachine } from './helpers.js';
@@ -21,10 +22,16 @@ function seedGate() {
       title: 'Gate',
       spec: '',
       seqNum: 1,
-      phase: 'confirm',
+      phase: 'review',
+      output: 'info',
       phaseAt: 1,
       latestBuildId: 'gate-build',
     })
+    .run();
+  H.s.db
+    .update(project)
+    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
+    .where(eq(project.id, H.projectId))
     .run();
   H.s.db
     .insert(build)
@@ -51,7 +58,7 @@ function gateSteps() {
   return H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).all();
 }
 
-test('confirm wake prompt stays bounded and carries no build transcript', () => {
+test('review gate wake prompt stays bounded and carries no build transcript', () => {
   const { deps, record } = seedGate();
   H.s.db
     .insert(message)
@@ -67,9 +74,9 @@ test('confirm wake prompt stays bounded and carries no build transcript', () => 
     .insert(plan)
     .values({ id: 'new', buildId: 'gate-build', version: 1, content: 'Plan body', createdAt: 1 })
     .run();
-  triggerChiefWakes(deps, record, 'confirm');
+  reconcileOwners(deps, [record.id]);
   const prompt = gateSteps().at(-1)!.prompt!;
-  expect(prompt).toContain('Gate todo=gate-todo build=gate-build phase=confirm');
+  expect(prompt).toContain('Gate todo=gate-todo build=gate-build phase=review');
   expect(prompt).not.toContain('history');
   expect(prompt).not.toContain('Plan body');
   expect(prompt.length).toBeLessThan(2000);
@@ -193,7 +200,7 @@ test('conversation summarises tool payloads and makes progress past an oversized
 
 test('failed gate turn retries once with a fresh session then posts a visible system line', async () => {
   const { deps, record } = seedGate();
-  triggerChiefWakes(deps, record, 'confirm');
+  reconcileOwners(deps, [record.id]);
   const machineId = insertMachine(H.s);
   const finishDeps = {
     ...H.s.svc,

@@ -186,7 +186,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
     s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, 'resolved')).run();
     const waiting = await call<{ id: string }[]>(client, 'threads_waiting_on_me', { projectId });
     expect(waiting.map((t: { id: string }) => t.id).sort()).toEqual(
-      [threadId, 'needs-review', 'needs-answer'].sort(),
+      [threadId, 'needs-review'].sort(),
     );
     const read = await call(client, 'read_thread', { threadId });
     expect(read.thread.status).toBe('waiting_on_you');
@@ -197,7 +197,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
       answers: [{ header: 'Scope', text: 'The public API' }],
     });
     const after = await call<{ id: string }[]>(client, 'threads_waiting_on_me', {});
-    expect(after.map((t: { id: string }) => t.id).sort()).toEqual(['needs-answer', 'needs-review']);
+    expect(after.map((t: { id: string }) => t.id).sort()).toEqual(['needs-review']);
     const duplicate = await client.callTool({
       name: 'reply_thread',
       arguments: {

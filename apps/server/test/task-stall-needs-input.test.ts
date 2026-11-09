@@ -400,13 +400,12 @@ describe('decisions are stored on the task and survive restarts', () => {
 });
 
 describe('every surface that lists work waiting on a person includes needs_input', () => {
-  test('the needs-you inbox lists a needs_input task as a question', async () => {
+  test('a needs_input question is Coordinator-owned and stays out of the person inbox', async () => {
     const { todoId, stepRow } = await askAndPark();
     endStep(stepRow.id);
+    expect(getTodo(deps(), todoId)?.owner).toBe('coordinator');
     const waiting = listNeedsYou({ db: H.s.db }, H.teamId);
-    expect(waiting.current.map((entry) => [entry.todo.id, entry.reason])).toEqual([
-      [todoId, 'question'],
-    ]);
+    expect(waiting.current.map((entry) => entry.todo.id)).not.toContain(todoId);
   });
 
   test('an agent cannot complete a task that waits for an answer', async () => {

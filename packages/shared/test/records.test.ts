@@ -59,6 +59,7 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     sourceKind: null,
     sourceRef: null,
     output: 'code',
+    owner: 'owner',
   };
 
   it('parses the full observed field set', () => {
