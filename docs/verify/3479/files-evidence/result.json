@@ -1,0 +1,49 @@
+{
+  "base": "8a8725b045fcfd06d9b362eb352fe9bd4c28a7f0",
+  "results": [
+    {
+      "width": 1440,
+      "theme": "dark",
+      "oldEntryExited": true,
+      "fileNavigationAbsent": true,
+      "tasksOpenThread": true,
+      "browsingRequests": 0,
+      "projectHomeOverflow": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "oldEntryExited": true,
+      "fileNavigationAbsent": true,
+      "tasksOpenThread": true,
+      "browsingRequests": 0,
+      "projectHomeOverflow": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "oldEntryExited": true,
+      "fileNavigationAbsent": true,
+      "tasksOpenThread": true,
+      "browsingRequests": 0,
+      "projectHomeOverflow": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "oldEntryExited": true,
+      "fileNavigationAbsent": true,
+      "tasksOpenThread": true,
+      "browsingRequests": 0,
+      "projectHomeOverflow": 0
+    }
+  ],
+  "stored": {
+    "id": "fhvriR7TtzL7eJiAgljZd",
+    "projectId": "MdFEV-cWUZWy362uzesqQ",
+    "title": "Keep core project tasks"
+  },
+  "provider": "not exercised",
+  "auth": "off",
+  "surface": "isolated live"
+}
