@@ -16,8 +16,18 @@ const runners = {
   playwright: join(require.resolve('@playwright/test/package.json'), '../cli.js'),
   node: undefined,
 };
-function deadPid() {
-  return spawnSync(process.execPath, ['-p', 'process.pid'], { encoding: 'utf8' }).stdout.trim();
+function deadPid(env) {
+  const result = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      'console.log(JSON.stringify({pid:process.pid,slots:process.env.CAIRN_HEAVY_SLOTS_DIR}))',
+    ],
+    { encoding: 'utf8', env },
+  );
+  const probe = JSON.parse(result.stdout);
+  assert.equal(probe.slots, env.CAIRN_HEAVY_SLOTS_DIR);
+  return String(probe.pid);
 }
 function fixture(t) {
   const root = makeTestTempDir('heavy-admission-');
@@ -66,6 +76,7 @@ test('actual worker admission', async () => {
   );
   const env = {
     ...process.env,
+    CAIRN_OWNED_MODE: 'group',
     CI: '',
     CAIRN_HEAVY_SLOTS: '1',
     CAIRN_HEAVY_SLOTS_DIR: join(root, 'locks'),
@@ -139,7 +150,7 @@ test('two direct Vitest runs serialize with one slot', async (t) => {
 });
 test('direct Vitest reclaims a dead lease before starting its worker', async (t) => {
   const { root, env, start, writeOwner } = fixture(t);
-  const dead = deadPid();
+  const dead = deadPid(env);
   writeOwner({ pid: Number(dead) });
   writeFileSync(join(root, 'release'), 'go');
   const run = start(vitestArgs, { DEAD_PID: dead });
@@ -179,7 +190,7 @@ export default { ...base, globalSetup: undefined, testDir: './e2e', webServer: {
     join(web, 'e2e/probe.spec.ts'),
     "import { test } from '@playwright/test'; test('probe', () => {});\n",
   );
-  const dead = deadPid();
+  const dead = deadPid(env);
   writeOwner();
   const run = start(['exec', 'playwright', 'test', '--config=probe.config.ts'], {}, web);
   await until(run);
@@ -270,7 +281,7 @@ for (const kind of ['slot', 'ticket']) {
     const server = createServer((connection) => connection.end());
     await new Promise((done) => server.listen(socket, done));
     t.after(() => server.close());
-    const dead = Number(deadPid());
+    const dead = Number(deadPid(env));
     const path = join(
       env.CAIRN_HEAVY_SLOTS_DIR,
       kind === 'slot' ? 'slot-1.lock' : `queue-000000000000001-${String(dead).padStart(10, '0')}`,

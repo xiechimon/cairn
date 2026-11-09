@@ -2,7 +2,9 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
+  closeSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -21,6 +23,15 @@ const POLL_MS = 250;
 const PARTIAL_WRITE_GRACE_MS = 2_000;
 const DEFAULT_E2E_PORT = 8398;
 const PORT_STRIDE = 10;
+const LOCK_SCRIPT = `
+import errno, fcntl, sys
+try:
+    fcntl.flock(3, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError as error:
+    if error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+        raise
+    sys.exit(75)
+`;
 const PID_NAMESPACE = process.platform === 'linux' ? readlinkSync('/proc/self/ns/pid') : 'host';
 
 export function slotCount(env) {
@@ -181,16 +192,6 @@ async function holderState(path, legacyPid) {
   return { state: Date.now() - modified < PARTIAL_WRITE_GRACE_MS ? 'held' : 'stale' };
 }
 
-function createExclusive(path, record) {
-  try {
-    writeFileSync(path, JSON.stringify(record), { flag: 'wx' });
-    return true;
-  } catch (error) {
-    if (error.code === 'EEXIST') return false;
-    throw error;
-  }
-}
-
 export function slotLockDir(
   env,
   platform = process.platform,
@@ -253,33 +254,46 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
   const claim = async () => {
     for (let slot = 1; slot <= count; slot++) {
       const path = slotPath(slot);
-      if (!createExclusive(path, record)) {
-        if ((await holderState(path)).state !== 'stale') continue;
-        const reclaiming = `${path}.reclaiming`;
-        if (!createExclusive(reclaiming, record)) {
-          if ((await holderState(reclaiming)).state === 'stale') unlinkSync(reclaiming);
-          continue;
-        }
-        try {
-          if ((await holderState(path)).state === 'stale') unlinkSync(path);
-          if (!createExclusive(path, record)) continue;
-        } finally {
-          unlinkSync(reclaiming);
-        }
+      const descriptor = openSync(`${path}.guard`, 'a');
+      let retained = false;
+      try {
+        const lock = spawnSync('python3', ['-I', '-c', LOCK_SCRIPT], {
+          env: { ...process.env, ...env },
+          encoding: 'utf8',
+          stdio: ['ignore', 'ignore', 'pipe', descriptor],
+        });
+        if (lock.error) throw lock.error;
+        if (lock.status === 75) continue;
+        if (lock.status !== 0)
+          throw new Error(
+            `heavy-slots: kernel lock failed (${lock.signal ?? lock.status}): ${lock.stderr?.trim() ?? ''}`,
+          );
+        if ((await holderState(path)).state === 'held') continue;
+        writeFileSync(path, JSON.stringify(record));
+        let released = false;
+        const release = () => {
+          if (released) return;
+          released = true;
+          process.off('exit', release);
+          try {
+            try {
+              if (JSON.parse(readFileSync(path, 'utf8')).token === token) unlinkSync(path);
+            } catch (error) {
+              if (error.code !== 'ENOENT') throw error;
+            }
+          } finally {
+            closeSync(descriptor);
+            closeProbe();
+          }
+        };
+        retained = true;
+        claimed = true;
+        process.once('exit', release);
+        log(`[heavy-slots] acquired slot ${slot}/${count}`);
+        return { slot, owner: process.pid, release };
+      } finally {
+        if (!retained) closeSync(descriptor);
       }
-      const release = () => {
-        process.off('exit', release);
-        try {
-          if (JSON.parse(readFileSync(path, 'utf8')).token === token) unlinkSync(path);
-        } catch (error) {
-          if (error.code !== 'ENOENT') throw error;
-        }
-        closeProbe();
-      };
-      claimed = true;
-      process.once('exit', release);
-      log(`[heavy-slots] acquired slot ${slot}/${count}`);
-      return { slot, owner: process.pid, release };
     }
     return null;
   };

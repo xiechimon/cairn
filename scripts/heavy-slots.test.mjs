@@ -40,6 +40,7 @@ function sandbox(slots) {
   const dir = mkdtempSync(join(tmpdir(), 'heavy-slots-test-'));
   const env = {
     ...scrubGateEnv(),
+    CAIRN_OWNED_MODE: 'group',
     CAIRN_HEAVY_SLOTS: String(slots),
     CAIRN_HEAVY_SLOTS_DIR: join(dir, 'locks'),
     TMPDIR: join(dir, 'tmp'),
@@ -59,7 +60,13 @@ function watch(command, args, options) {
     child,
     out: '',
     err: '',
-    exited: new Promise((done) => child.on('close', done)),
+    closed: false,
+    exited: new Promise((done) =>
+      child.on('close', (code) => {
+        watched.closed = true;
+        done(code);
+      }),
+    ),
   };
   child.stdout.on('data', (chunk) => {
     watched.out += chunk;
@@ -73,8 +80,10 @@ function watch(command, args, options) {
 async function until(watched, stream, pattern, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs;
   while (!pattern.test(watched[stream])) {
-    if (Date.now() > deadline)
-      assert.fail(`${pattern} never appeared on ${stream}: ${watched.out}${watched.err}`);
+    if (watched.closed || Date.now() > deadline)
+      assert.fail(
+        `${pattern} never appeared on ${stream} (exit ${watched.child.exitCode}, signal ${watched.child.signalCode}): ${watched.out}${watched.err}`,
+      );
     await sleep(20);
   }
 }
@@ -104,10 +113,13 @@ const startHolder = (env, { wait = true, lingerMs = 60_000 } = {}) =>
       '-e',
       `
 import { existsSync } from 'node:fs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { acquireSlot } from ${JSON.stringify(moduleUrl)};
-while (process.env.START_GATE && !existsSync(process.env.START_GATE)) {}
+if (process.env.START_GATE) console.log('READY');
+while (process.env.START_GATE && !existsSync(process.env.START_GATE)) await sleep(20);
 const lease = await acquireSlot({ env: process.env, wait: ${wait} });
 console.log(lease ? 'SLOT ' + lease.slot : 'NONE');
+while (process.env.START_GATE && !existsSync(process.env.START_GATE + '.release')) await sleep(20);
 setTimeout(() => process.exit(0), ${lingerMs});
 `,
     ],
@@ -319,11 +331,13 @@ test('simultaneous grabs for the last slot: exactly one wins, every round', asyn
         START_GATE: gate,
       };
       const racers = Array.from({ length: 8 }, () =>
-        startHolder(roundEnv, { wait: false, lingerMs: 1_500 }),
+        startHolder(roundEnv, { wait: false, lingerMs: 0 }),
       );
-      await sleep(1_000);
+      await Promise.all(racers.map((racer) => until(racer, 'out', /READY/)));
       writeFileSync(gate, '');
-      await Promise.all(racers.map((racer) => racer.exited));
+      await Promise.all(racers.map((racer) => until(racer, 'out', /SLOT 1|NONE/)));
+      writeFileSync(`${gate}.release`, '');
+      assert.deepEqual(await Promise.all(racers.map((racer) => racer.exited)), Array(8).fill(0));
       const winners = racers.filter((racer) => /SLOT 1/.test(racer.out));
       const losers = racers.filter((racer) => /NONE/.test(racer.out));
       assert.equal(winners.length, 1, `round ${round}: ${racers.map((r) => r.out).join('|')}`);
@@ -341,21 +355,29 @@ test('simultaneous reclaim of one dead holder: exactly one process inherits the 
       const locks = join(dir, `locks-${round}`);
       const gate = join(dir, `go-${round}`);
       mkdirSync(locks, { recursive: true });
+      const roundEnv = { ...env, CAIRN_HEAVY_SLOTS_DIR: locks, START_GATE: gate };
       const dead = spawnSync(
         process.execPath,
-        ['-e', 'process.stdout.write(String(process.pid))'],
+        [
+          '-e',
+          'process.stdout.write(JSON.stringify({pid: process.pid, slots: process.env.CAIRN_HEAVY_SLOTS_DIR}))',
+        ],
         {
           encoding: 'utf8',
+          env: roundEnv,
         },
       ).stdout;
-      writeFileSync(join(locks, 'slot-1.lock'), JSON.stringify({ pid: Number(dead) }));
-      const roundEnv = { ...env, CAIRN_HEAVY_SLOTS_DIR: locks, START_GATE: gate };
+      const probe = JSON.parse(dead);
+      assert.equal(probe.slots, locks);
+      writeFileSync(join(locks, 'slot-1.lock'), JSON.stringify({ pid: probe.pid }));
       const racers = Array.from({ length: 8 }, () =>
-        startHolder(roundEnv, { wait: false, lingerMs: 1_500 }),
+        startHolder(roundEnv, { wait: false, lingerMs: 0 }),
       );
-      await sleep(1_000);
+      await Promise.all(racers.map((racer) => until(racer, 'out', /READY/)));
       writeFileSync(gate, '');
-      await Promise.all(racers.map((racer) => racer.exited));
+      await Promise.all(racers.map((racer) => until(racer, 'out', /SLOT 1|NONE/)));
+      writeFileSync(`${gate}.release`, '');
+      assert.deepEqual(await Promise.all(racers.map((racer) => racer.exited)), Array(8).fill(0));
       const winners = racers.filter((racer) => /SLOT 1/.test(racer.out));
       assert.equal(
         winners.length,
@@ -599,6 +621,96 @@ test('local prepush ignores a squatted slot port because fast checks do not bind
     assert.doesNotMatch(prepush.err, /is held by pid|acquired slot/);
     assert.match(prepush.out, /\[prepush\] node scripts\/ui-debt-gate\.mjs/);
     assert.equal(existsSync(env.CAIRN_HEAVY_SLOTS_DIR), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('stale owner metadata cannot grant a second lease while the first run is alive', async () => {
+  const { env, cleanup } = sandbox(1);
+  try {
+    const holder = startHolder(env);
+    await until(holder, 'out', /SLOT 1/);
+    const dead = spawnSync(process.execPath, ['-p', 'process.pid'], { env, encoding: 'utf8' });
+    assert.equal(dead.status, 0, dead.stderr);
+    writeFileSync(
+      join(env.CAIRN_HEAVY_SLOTS_DIR, 'slot-1.lock'),
+      JSON.stringify({ pid: Number(dead.stdout) }),
+    );
+    const contender = startHolder(env, { wait: false, lingerMs: 0 });
+    assert.equal(await contender.exited, 0, contender.err);
+    assert.match(contender.out, /NONE/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('repeated release preserves the guard inode and a later lease', () => {
+  const { env, cleanup } = sandbox(1);
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+import assert from 'node:assert/strict';
+import { statSync } from 'node:fs';
+import { acquireSlot } from ${JSON.stringify(moduleUrl)};
+const path = process.env.CAIRN_HEAVY_SLOTS_DIR + '/slot-1.lock.guard';
+const first = await acquireSlot();
+const inode = statSync(path).ino;
+first.release();
+first.release();
+const second = await acquireSlot();
+assert.equal(statSync(path).ino, inode);
+first.release();
+second.release();
+`,
+      ],
+      { env, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    cleanup();
+  }
+});
+
+test('kernel helper failures propagate and release candidate descriptors', () => {
+  const { dir, env, cleanup } = sandbox(1);
+  try {
+    const python = spawnSync('python3', ['-I', '-c', 'import sys; print(sys.executable)'], {
+      env,
+      encoding: 'utf8',
+    });
+    assert.equal(python.status, 0, python.stderr);
+    const bin = join(dir, 'bin');
+    const missing = join(dir, 'missing');
+    mkdirSync(bin);
+    mkdirSync(missing);
+    writeFileSync(
+      join(bin, 'python3'),
+      `#!${python.stdout.trim()}\nimport fcntl, sys\nfcntl.flock(3, fcntl.LOCK_EX | fcntl.LOCK_NB)\nsys.exit(7)\n`,
+      { mode: 0o755 },
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+import assert from 'node:assert/strict';
+import { acquireSlot } from ${JSON.stringify(moduleUrl)};
+await assert.rejects(acquireSlot({ wait: false, env: { ...process.env, PATH: ${JSON.stringify(missing)} } }), { code: 'ENOENT' });
+await assert.rejects(acquireSlot({ wait: false, env: { ...process.env, PATH: ${JSON.stringify(bin)} } }), /kernel lock failed \\(7\\)/);
+const lease = await acquireSlot({ wait: false });
+assert.ok(lease);
+lease.release();
+`,
+      ],
+      { env, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
   } finally {
     cleanup();
   }
