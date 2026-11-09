@@ -1,5 +1,11 @@
-import { ENV_VARS } from '@cairn/shared';
-import type { ImageContent, Message, TextContent, ToolResultMessage } from '@earendil-works/pi-ai';
+import { ENV_VARS, parseAttachmentTokenLines } from '@cairn/shared';
+import type {
+  AssistantMessage,
+  ImageContent,
+  Message,
+  TextContent,
+  ToolResultMessage,
+} from '@earendil-works/pi-ai';
 
 export const COLD_RECENT_EXCHANGES = 8;
 export const TOOL_RESULT_KEEP_FULL = 3;
@@ -86,15 +92,65 @@ export function truncateOldToolResults(
   });
 }
 
+export function imageOmissionNote(attachmentId: string | null, attachmentKey?: string): string {
+  if (attachmentId !== null && attachmentId !== '') {
+    const key =
+      attachmentKey === undefined || attachmentKey === '' ? '' : ` (attachment:${attachmentKey})`;
+    return `[Image omitted after use; attachmentId ${attachmentId}${key}. Use the attachment tool or read_history to reopen.]`;
+  }
+  return '[Image omitted after use; no attachmentId in this message. Use read_history if needed.]';
+}
+
+function attachmentRefsFromContent(content: readonly (TextContent | ImageContent)[]): {
+  attachmentId: string;
+  key: string;
+}[] {
+  const refs: { attachmentId: string; key: string }[] = [];
+  for (const block of content) {
+    if (block.type !== 'text') continue;
+    for (const ref of parseAttachmentTokenLines(block.text)) {
+      refs.push({ attachmentId: ref.attachmentId, key: ref.key });
+    }
+  }
+  return refs;
+}
+
+function idFromImageBlock(block: ImageContent): { attachmentId: string; key?: string } | null {
+  const extra = block as ImageContent & {
+    attachmentId?: unknown;
+    id?: unknown;
+    url?: unknown;
+  };
+  if (typeof extra.attachmentId === 'string' && extra.attachmentId !== '') {
+    return { attachmentId: extra.attachmentId };
+  }
+  if (typeof extra.id === 'string' && extra.id !== '') {
+    return { attachmentId: extra.id };
+  }
+  if (typeof extra.url === 'string' && extra.url !== '') {
+    const base = extra.url.split(/[\\/]/).at(-1)?.split('?')[0] ?? '';
+    if (base !== '') return { attachmentId: base };
+  }
+  return null;
+}
+
 function omitImageBlocks(
   content: readonly (TextContent | ImageContent)[],
-  note: string,
 ): (TextContent | ImageContent)[] | null {
+  const refs = attachmentRefsFromContent(content);
+  let refIndex = 0;
   let replaced = false;
   const next = content.map((block) => {
     if (block.type !== 'image') return block;
     replaced = true;
-    return { type: 'text' as const, text: note };
+    const fromBlock = idFromImageBlock(block);
+    const ref = refs[refIndex++];
+    const attachmentId = fromBlock?.attachmentId ?? ref?.attachmentId ?? null;
+    const key = fromBlock?.key ?? ref?.key;
+    return {
+      type: 'text' as const,
+      text: imageOmissionNote(attachmentId, key),
+    };
   });
   return replaced ? next : null;
 }
@@ -105,15 +161,14 @@ export function stripConsumedImages(
 ): Message[] {
   const keepRecent = options?.keepRecentMessages ?? 1;
   const cutoff = Math.max(0, messages.length - keepRecent);
-  const note = '[Image omitted after use; reopen via attachment id / read_history if needed.]';
   return messages.map((message, index) => {
     if (index >= cutoff) return message;
     if (message.role === 'user' && typeof message.content !== 'string') {
-      const content = omitImageBlocks(message.content, note);
+      const content = omitImageBlocks(message.content);
       return content === null ? message : { ...message, content };
     }
     if (message.role === 'toolResult') {
-      const content = omitImageBlocks(message.content, note);
+      const content = omitImageBlocks(message.content);
       return content === null ? message : { ...message, content };
     }
     return message;
@@ -128,6 +183,30 @@ function isWakeOnlyUser(message: Message): boolean {
       : message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n');
   const trimmed = text.trim();
   return /^\[wake:/i.test(trimmed) || /^wake:/i.test(trimmed);
+}
+
+export function isPureToolCallAssistant(message: Message): boolean {
+  if (message.role !== 'assistant') return false;
+  const assistant = message as AssistantMessage;
+  if (!Array.isArray(assistant.content) || assistant.content.length === 0) return false;
+  let sawTool = false;
+  for (const block of assistant.content) {
+    if (block.type === 'toolCall') {
+      sawTool = true;
+      continue;
+    }
+    if (block.type === 'text' && block.text.trim() === '') continue;
+    return false;
+  }
+  return sawTool;
+}
+
+function priorAssistant(body: readonly Message[], before: number): Message | undefined {
+  for (let i = before - 1; i >= 0; i--) {
+    const message = body[i];
+    if (message?.role === 'assistant') return message;
+  }
+  return undefined;
 }
 
 function isSummaryUser(message: Message): boolean {
@@ -146,20 +225,29 @@ export function selectColdMessageWindow(
   const system = messages.filter((message) => message.role === 'system');
   const summaries = messages.filter(isSummaryUser);
   const body = messages.filter((message) => message.role !== 'system' && !isSummaryUser(message));
+  const currentUserIndex = body.findLastIndex((message) => message.role === 'user');
   const kept: Message[] = [];
   let exchanges = 0;
   for (let i = body.length - 1; i >= 0; i--) {
     const message = body[i];
     if (message === undefined) continue;
-    if (message.role === 'user' && isWakeOnlyUser(message)) continue;
+    if (message.role === 'user' && isWakeOnlyUser(message) && i !== currentUserIndex) continue;
+    if (isPureToolCallAssistant(message)) continue;
+    if (message.role === 'toolResult') {
+      const owner = priorAssistant(body, i);
+      if (owner !== undefined && isPureToolCallAssistant(owner)) continue;
+    }
     kept.push(message);
     if (message.role === 'user') {
       exchanges += 1;
       if (exchanges >= recentExchanges) {
         for (let j = i - 1; j >= 0; j--) {
           const prior = body[j];
-          if (prior?.role === 'toolResult') kept.push(prior);
-          else break;
+          if (prior?.role === 'toolResult') {
+            const owner = priorAssistant(body, j);
+            if (owner !== undefined && isPureToolCallAssistant(owner)) continue;
+            kept.push(prior);
+          } else break;
         }
         break;
       }
