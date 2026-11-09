@@ -1,0 +1,10 @@
+✔ owner ancestry includes a container init for direct children and descendants (1.207058ms)
+✔ a descendant reuses a live lease held by container PID 1 (32.820096ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81.513539

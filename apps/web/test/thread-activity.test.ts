@@ -10,7 +10,7 @@ import type { ChiefStreamItem } from '../src/fixtures/records.js';
 let counter = 0;
 const nextId = () => `row-${counter++}`;
 
-function message(seq: number, excerpt = 'hello', by: 'user' | 'coordinator' = 'user') {
+function message(seq: number, excerpt = 'hello', by: 'user' | 'coordinator' = 'coordinator') {
   return {
     kind: 'thread-message',
     id: nextId(),
@@ -46,6 +46,26 @@ const kinds = (entries: ReturnType<typeof groupThreadEvents>) =>
   entries.map((entry) => entry.item.kind);
 
 describe('groupThreadEvents', () => {
+  test('user relay markers are hidden without changing source rows or the original message', () => {
+    const original = user();
+    const relay = message(2, 'hi', 'user');
+    const rows = toRows([original, relay]);
+    const snapshot = structuredClone(rows);
+    expect(groupThreadEvents(rows, never)).toEqual([{ item: original, i: 0 }]);
+    expect(rows).toEqual(snapshot);
+  });
+
+  test('hidden relay markers do not appear in activity counts or expanded events', () => {
+    const coordinator = message(2, 'continue', 'coordinator');
+    const status = report(2, 'review');
+    const entries = groupThreadEvents(
+      toRows([message(2, 'hello', 'user'), coordinator, message(2, 'again', 'user'), status]),
+      never,
+    );
+    expect(activities(entries)[0]?.events).toEqual([coordinator, status]);
+    expect(activitySummary(activities(entries)[0] as ThreadActivity).messages).toBe(1);
+    expect(entries[0]?.i).toBe(1);
+  });
   test('consecutive events about one thread coalesce into one row', () => {
     const entries = groupThreadEvents(
       toRows([message(2), message(2, 'again'), report(2, 'review')]),

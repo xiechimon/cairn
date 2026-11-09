@@ -608,7 +608,7 @@ export interface ChiefThreadRef {
   active?: boolean;
 }
 
-export type ChiefSettingsTab = 'agent' | 'charter' | 'memory' | 'watches';
+export type ChiefSettingsTab = 'routing' | 'charter' | 'memory' | 'watches';
 
 export interface ModelOption {
   provider: string;

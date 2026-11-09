@@ -194,6 +194,9 @@ export async function mockLive(
       return json({ thread: THREAD }, 201);
     }
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
+    if (/^\/api\/conversations\/[^/]+\/messages$/.test(p)) {
+      return json({ messages: [], nextCursor: null });
+    }
     if (p === '/api/todos') return json(state.todos ?? [TASK]);
     if (p === '/api/tasks') return json({ entries: state.tasks ?? [] });
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);

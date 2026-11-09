@@ -198,11 +198,7 @@ export function BoardPage() {
       <div className={`board-sheet ${SHEET_PANEL}`}>
         <div className="relative flex min-h-0 min-w-0 flex-1">
           {chiefView === 'settings' ? (
-            <ChiefSettings
-              chief={chiefData}
-              onBack={() => setChiefView('none')}
-              machines={fixture.resources?.machines}
-            />
+            <ChiefSettings chief={chiefData} onBack={() => setChiefView('none')} />
           ) : projectLookup === 'loading' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <ProjectsLoading />

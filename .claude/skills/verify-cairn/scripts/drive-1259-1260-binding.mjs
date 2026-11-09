@@ -348,7 +348,7 @@ await shot(page, 'f4-chief-drawer.png');
 await page.getByRole('button', { name: /设置|总管设置/ }).first().click().catch(() => {});
 await page.waitForTimeout(500);
 
-const infoCard = await page.getByTestId('chief-follows-agent').count();
+const infoCard = await page.getByTestId('chief-routing-row').count();
 const compressBtn = await page.getByRole('button', { name: '压缩模型' }).count();
 const machineBtn = await page.getByRole('button', { name: '机器', exact: true }).count();
 check('F5 设置面只读信息卡在位 + 压缩模型/机器选择器退役', infoCard === 1 && compressBtn === 0 && machineBtn === 0, `info=${infoCard} compress=${compressBtn} machine=${machineBtn}`);

@@ -2,23 +2,21 @@ import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_TEAM } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useApiMutations, useChief, useMachines, useMemories } from '../api/hooks.js';
+import { useApiMutations, useChief, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SETTINGS_HINT_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
-import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/records.js';
+import type { ChiefContent, ChiefSettingsTab } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
-import { ChiefSpiralFace } from './chief-spiral-face.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
 
 const TABS: { id: ChiefSettingsTab; label: string }[] = [
-  { id: 'agent', label: 'Agent' },
+  { id: 'routing', label: '模型与机器' },
   { id: 'charter', label: '章程' },
   { id: 'memory', label: '记忆' },
   { id: 'watches', label: '关注与提醒' },
@@ -31,38 +29,16 @@ const EMPTY_ROW_CLS = cn(
 
 const ENTRY_ROW_CLS = cn(SETTINGS_ROW_CLS, 'flex-col items-start justify-center gap-0.5 py-2');
 
-const ROW_AVATAR_CLS =
-  'grid size-6 flex-none place-items-center rounded-full border border-(--border) bg-(--card) text-meta text-(--foreground)';
-const ROW_AVATAR_IMG_CLS =
-  'grid size-6 flex-none place-items-center rounded-full border-none bg-none [&_img]:block [&_img]:size-6 [&_img]:rounded-full';
-
-export function ChiefSettings({
-  chief,
-  onBack,
-  machines,
-}: {
-  chief: ChiefContent;
-  onBack: () => void;
-  machines?: MachineRow[];
-}) {
+export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: () => void }) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<ChiefSettingsTab>(chief.tab ?? 'agent');
+  const [tab, setTab] = useState<ChiefSettingsTab>(chief.tab ?? 'routing');
   const { live, teamId } = useLiveData();
   const chiefQ = useChief(teamId, live);
-  const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
   const charter = live ? (chiefQ.data?.chief.charter ?? '') : '';
-  const boundAgent =
-    live && chiefQ.data?.agentActor != null
-      ? {
-          id: chiefQ.data.agentActor.id,
-          name: chiefQ.data.agentActor.displayName,
-          avatarUrl: chiefQ.data.agentActor.avatarUrl,
-        }
-      : null;
   const [charterOpen, setCharterOpen] = useState(false);
   const navigate = useNavigate();
-  const memoriesQ = useMemories(teamId, live && boundAgent != null);
+  const memoriesQ = useMemories(teamId, live);
   const memories = memoriesQ.data ?? [];
   const watches = live ? (chiefQ.data?.watches ?? []) : [];
   const wakes = live ? (chiefQ.data?.wakes ?? []) : [];
@@ -70,13 +46,6 @@ export function ChiefSettings({
     ? (value: string) =>
         mutations.patchChief.mutate({ charter: value }, { onSuccess: () => setCharterOpen(false) })
     : undefined;
-  const boundMachineId = live ? (chiefQ.data?.agentActor?.machineId ?? null) : null;
-  const boundModelId = live ? (chiefQ.data?.agentActor?.modelId ?? null) : null;
-  const boundMachineName =
-    boundMachineId !== null
-      ? ((live ? (machinesQ.data ?? []) : (machines ?? [])).find((m) => m.id === boundMachineId)
-          ?.name ?? null)
-      : null;
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header
@@ -110,48 +79,25 @@ export function ChiefSettings({
             options={TABS.map((item) => ({ value: item.id, label: t(item.label) }))}
           />
 
-          {tab === 'agent' && (
+          {tab === 'routing' && (
             <SettingsCard className="mt-4">
               <Button
                 variant="ghost"
+                data-testid="chief-routing-row"
                 className={cn(
                   SETTINGS_ROW_CLS,
-                  "h-auto w-full cursor-pointer justify-start gap-3 rounded-none border-0 border-b border-border text-left text-ui font-normal text-foreground hover:bg-transparent dark:hover:bg-transparent [&_svg:first-child]:text-content-tertiary [&_svg:not([class*='size-'])]:size-auto",
+                  "h-auto w-full cursor-pointer justify-start gap-3 rounded-none border-0 text-left text-ui font-normal text-foreground hover:bg-transparent dark:hover:bg-transparent [&_svg:not([class*='size-'])]:size-auto",
                 )}
                 onClick={() => navigate(COORDINATOR_ROUTING_HREF)}
               >
-                {boundAgent != null ? (
-                  boundAgent.avatarUrl != null ? (
-                    <span className={ROW_AVATAR_IMG_CLS}>
-                      <SeededAvatar
-                        className="size-6"
-                        name={boundAgent.name}
-                        src={boundAgent.avatarUrl}
-                        fallback="/avatar-robot-1.svg"
-                      />
-                    </span>
-                  ) : (
-                    <span className={ROW_AVATAR_CLS}>{boundAgent.name.charAt(0)}</span>
-                  )
-                ) : (
-                  <ChiefSpiralFace size={24} />
-                )}
-                <span>{boundAgent != null ? boundAgent.name : t('未设置')}</span>
-                <ChevronRight width={14} height={14} className="ml-auto text-content-tertiary" />
-              </Button>
-              <div className={SETTINGS_ROW_CLS} data-testid="chief-follows-agent">
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-ui text-foreground">{t('模型与归属机')}</span>
+                  <span className="text-ui text-foreground">{t('模型与机器')}</span>
                   <span className={SETTINGS_HINT_CLS}>
-                    {boundAgent != null && boundModelId !== null
-                      ? t('跟随绑定 Agent：模型 {model} · 归属机 {machine}', {
-                          model: boundModelId,
-                          machine: boundMachineName ?? t('未设归属机'),
-                        })
-                      : t('跟随 coordinator 路由规则，在路由设置里调整。')}
+                    {t('跟随 coordinator 路由规则，在路由设置里调整。')}
                   </span>
                 </span>
-              </div>
+                <ChevronRight width={14} height={14} className="ml-auto text-content-tertiary" />
+              </Button>
             </SettingsCard>
           )}
 
@@ -177,32 +123,26 @@ export function ChiefSettings({
           )}
 
           {tab === 'memory' &&
-            (live && boundAgent != null ? (
-              memoriesQ.data != null ? (
-                <div>
+            (live && memoriesQ.data == null ? null : (
+              <div>
+                {live ? (
                   <p className="mt-4 text-meta text-content-tertiary">
                     {t('记忆 · {n} / {max}', { n: memories.length, max: MEMORY_QUOTA_PER_TEAM })}
                   </p>
-                  <SettingsCard className="mt-2">
-                    {memories.length === 0 ? (
-                      <p className={EMPTY_ROW_CLS}>{t(MEMORY_EMPTY_COPY)}</p>
-                    ) : (
-                      memories.map((memory) => (
-                        <div key={memory.id} className={ENTRY_ROW_CLS}>
-                          <span className="text-ui text-foreground">{memory.title}</span>
-                          <span className="text-meta text-content-secondary">{memory.content}</span>
-                        </div>
-                      ))
-                    )}
-                  </SettingsCard>
-                </div>
-              ) : null
-            ) : (
-              <SettingsCard className="mt-4">
-                <div className={EMPTY_ROW_CLS}>
-                  {t('尚未选择 Agent。请先在「Agent」页选定 Agent，记忆将保存在该 Agent 上。')}
-                </div>
-              </SettingsCard>
+                ) : null}
+                <SettingsCard className={live ? 'mt-2' : 'mt-4'}>
+                  {memories.length === 0 ? (
+                    <p className={EMPTY_ROW_CLS}>{t(MEMORY_EMPTY_COPY)}</p>
+                  ) : (
+                    memories.map((memory) => (
+                      <div key={memory.id} className={ENTRY_ROW_CLS}>
+                        <span className="text-ui text-foreground">{memory.title}</span>
+                        <span className="text-meta text-content-secondary">{memory.content}</span>
+                      </div>
+                    ))
+                  )}
+                </SettingsCard>
+              </div>
             ))}
 
           {tab === 'watches' && (

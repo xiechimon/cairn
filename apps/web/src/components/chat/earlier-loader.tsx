@@ -1,5 +1,4 @@
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import type { ChiefEarlier } from './use-chief-surface.js';
 
 const LOAD_EDGE = 200;
 const READER_EVENTS = ['scroll', 'wheel', 'touchmove'] as const;
@@ -43,13 +42,19 @@ function wantsEarlier(viewport: HTMLElement): boolean {
   return fits || viewport.scrollTop <= LOAD_EDGE;
 }
 
-export function ChiefEarlierLoader({
+export interface EarlierPages {
+  loading: boolean;
+  failed: boolean;
+  onLoad: () => void;
+}
+
+export function EarlierLoader({
   earlier,
   hasEarlier,
   rowCount,
   viewportRef,
 }: {
-  earlier: ChiefEarlier;
+  earlier: EarlierPages;
   hasEarlier: boolean;
   rowCount: number;
   viewportRef: RefObject<HTMLDivElement | null>;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { overlayHarness } from './pr-screens-harness.mjs';
@@ -53,6 +53,47 @@ test('a harness without the live files skips them instead of failing', () => {
 test('an empty harness copies nothing and does not throw', () => {
   assert.deepEqual(overlayHarness(tree({}), tree({})), []);
 });
+
+for (const [suffix, spec] of [
+  ['', 'capture.shots.ts'],
+  ['-live', 'live.shots.ts'],
+  ['-trip', 'rules-trip.shots.ts'],
+  ['-compare', 'compare.shots.ts'],
+]) {
+  test(`screenshot overlay loads the actual ${suffix || 'fixture'} config on an old tree`, () => {
+    const repo = join(import.meta.dirname, '..');
+    const to = tree({
+      'package.json': '{"type":"module"}',
+      'scripts/heavy-slots.mjs': 'throw new Error("old allocator");',
+      'scripts/owned-process.mjs': 'throw new Error("old ownership helper");',
+    });
+    overlayHarness(repo, to);
+    symlinkSync(join(repo, 'node_modules'), join(to, 'node_modules'));
+    writeFileSync(
+      join(to, 'apps/web/pr-screens', spec),
+      "import { test } from '@playwright/test'; test('overlay probe', () => {});\n",
+    );
+    const absent = join(to, 'absent-slots');
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(repo, 'node_modules/@playwright/test/cli.js'),
+        'test',
+        '--list',
+        `--config=playwright.pr-screens${suffix}.config.ts`,
+      ],
+      {
+        cwd: join(to, 'apps/web'),
+        env: { ...process.env, CI: 'true', CAIRN_HEAVY_SLOTS_DIR: absent },
+        encoding: 'utf8',
+        timeout: 15_000,
+      },
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /overlay probe/);
+    assert.equal(existsSync(absent), false);
+  });
+}
 
 const screensRoot = new URL('../apps/web/pr-screens/', import.meta.url);
 const instant = '2026-10-31T06:00:00.000Z';

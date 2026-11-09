@@ -455,7 +455,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### account-and-team
 
-**Account and team** (shipped). The user's account, the team, its members and the PR attribution settings.
+**Account and team** (shipped). The user's account, the team record and the PR attribution settings.
 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](design/references/settings)
