@@ -147,6 +147,9 @@ export const EN: Record<string, string> = {
     'Lets agents operate apps on this computer. macOS needs Accessibility permission.',
   浏览器: 'Browser',
   '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
+  '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',
+  '这台机器已不再报告浏览器能力；可关闭已保存的偏好。':
+    'This machine no longer reports browser capability; you can turn off the saved preference.',
   '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
     'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',

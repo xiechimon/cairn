@@ -483,7 +483,15 @@ test('with a machine listed the panel still shows its card and the screen placeh
   const panel = await open(
     page,
     { computers: [computer()], commands: [command(1)] },
-    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+    [
+      {
+        id: 'm1',
+        name: 'omarchy',
+        online: true,
+        runningSteps: 0,
+        capabilities: { browser: true },
+      },
+    ],
   );
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(2);
   const card = panel.locator('[data-slot="list-card"]').nth(1);

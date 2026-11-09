@@ -984,6 +984,7 @@
       "routes": {
         "server": [
           "/api/computers",
+          "/api/computers/:id",
           "/api/computers/:id/commands",
           "/api/teams/:teamId/computers/**"
         ]
