@@ -1537,6 +1537,7 @@ export interface GithubPullPanel {
   mergeableState: string | null;
   additions: number;
   deletions: number;
+  labels?: string[];
 }
 
 export interface GithubPullPanelPage {
@@ -1567,6 +1568,7 @@ export async function githubPullPanel(
     mergeable_state?: unknown;
     additions?: unknown;
     deletions?: unknown;
+    labels?: unknown;
     head?: { sha?: unknown; ref?: unknown } | null;
     base?: { sha?: unknown; ref?: unknown } | null;
   };
@@ -1590,6 +1592,11 @@ export async function githubPullPanel(
       mergeableState: optString(raw.mergeable_state),
       additions: typeof raw.additions === 'number' ? raw.additions : 0,
       deletions: typeof raw.deletions === 'number' ? raw.deletions : 0,
+      labels: Array.isArray(raw.labels)
+        ? raw.labels.flatMap((label: { name?: unknown } | null) =>
+            typeof label?.name === 'string' ? [label.name] : [],
+          )
+        : [],
     },
   };
 }
@@ -1601,6 +1608,7 @@ export interface GithubCheckRun {
   conclusion: string | null;
   outputTitle: string | null;
   outputSummary: string | null;
+  completedAt?: number | null;
 }
 
 export interface GithubCheckRunsPage {
@@ -1640,6 +1648,10 @@ export async function githubCommitCheckRuns(
       conclusion: typeof entry.conclusion === 'string' ? entry.conclusion : null,
       outputTitle: typeof output?.title === 'string' ? output.title : null,
       outputSummary: typeof output?.summary === 'string' ? output.summary : null,
+      completedAt:
+        typeof entry.completed_at === 'string' && Number.isFinite(Date.parse(entry.completed_at))
+          ? Date.parse(entry.completed_at)
+          : null,
     });
   }
   return { notModified: false, etag: got.etag, checkRuns };
@@ -2235,6 +2247,32 @@ export async function githubComment(
     token,
     { body },
   );
+}
+
+export async function githubIssueComments(
+  fetchImpl: FetchLike,
+  token: AutonomousToken,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+): Promise<{ author: string; body: string }[] | null> {
+  const comments: { author: string; body: string }[] = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const got = await conditionalGetJson(
+      fetchImpl,
+      `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      token,
+      null,
+      FETCH_TIMEOUT_MS,
+    );
+    if (got === null || got.notModified || !Array.isArray(got.data)) return null;
+    const rows = got.data as Array<{ body?: unknown; user?: { login?: unknown } | null }>;
+    for (const row of rows)
+      if (typeof row?.body === 'string' && typeof row.user?.login === 'string')
+        comments.push({ author: row.user.login, body: row.body });
+    if (rows.length < 100) return comments;
+  }
+  return null;
 }
 
 export function githubReplyReviewThread(
