@@ -26,9 +26,9 @@ import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/proje
 import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
-import { tasksFromFixture, tasksFromQuery } from '../board/tasks-sections.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
+import { useTasksView } from '../board/use-tasks-view.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
@@ -101,13 +101,7 @@ export function BoardPage() {
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
   const todos = live ? liveTodos : fixtureTodos;
-  const tasks = useMemo(
-    () =>
-      live
-        ? tasksFromQuery(tasksQ.data)
-        : tasksFromFixture(fixtureTodos, fixture.chief?.stream ?? []),
-    [live, tasksQ.data, fixtureTodos, fixture],
-  );
+  const tasks = useTasksView(fixture);
   const machines = useMemo(
     () => (live ? mapMachines(machinesQ.data ?? []) : fixture.resources?.machines),
     [live, machinesQ.data, fixture],

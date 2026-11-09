@@ -1,6 +1,7 @@
 {
   "repo": "xiechimon/cairn",
   "pending": {
+    "docs/design/memory-inplace-edit.md": "owner-approved design in PR #3677; layout implementation owned by PR #3666",
     "docs/research/agent-small-computer-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/ai-frontend-quality-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/branch-model-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
@@ -23,11 +24,6 @@
     "docs/research/review-gate-alternatives.md": "branch origin/docs/review-gate-alternatives"
   },
   "batches": [
-    {
-      "id": "B1",
-      "title": "Coordinator context and memory",
-      "scope": "How the never-ending Coordinator conversation assembles each turn and what it remembers: the context budget, compaction, history tools, memory rows, promotion and invalidation. Design the data model and failure modes, and the memory view in Coordinator settings."
-    },
     {
       "id": "B2",
       "title": "What reaches ian: needs-you, questions, daily report, push",
@@ -76,7 +72,7 @@
     {
       "id": "B11",
       "title": "Peripheral surfaces",
-      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, feature releases, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
+      "scope": "Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it."
     },
     {
       "id": "B12",
@@ -210,26 +206,26 @@
       ],
       "research": [
         "docs/research/coordinator-compaction-2026-11-07.md",
-        "docs/research/personal-agent-memory-2026-11-07.md"
+        "docs/research/personal-agent-memory-2026-11-07.md",
+        "docs/research/coordinator-context-2026-11-08.md"
       ],
       "frontendDesign": {
         "na": "compaction is invisible by design; the transcript keeps full history"
       },
-      "backendDesign": {
-        "gap": "the compaction research recommends a scheme, but no design states the budget, the summary storage and the failure modes"
-      },
+      "backendDesign": [
+        "docs/design/coordinator-context-backend.md"
+      ],
       "evidence": [
         "integration/test/coordinator-context-assemble.test.ts",
         "apps/server/test/chief-history.test.ts",
         "apps/server/test/coordinator/compaction.test.ts"
-      ],
-      "batch": "B1"
+      ]
     },
     {
       "id": "memory",
       "name": "Memory",
-      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.",
-      "states": "Coordinator settings list the memories in use; a memory can be deleted or promoted from project to team.",
+      "summary": "Team and project memory injected into later turns; D123 plans direct in-place edits of MEMORY.md and memory files.",
+      "states": "Shipped: settings list, delete and project-to-team promotion. Planned D123 replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -253,20 +249,22 @@
       ],
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",
-        "docs/research/research-loop-plan.md"
+        "docs/research/research-loop-plan.md",
+        "docs/research/memory-2026-11-08.md",
+        "docs/research/memory-inplace-edit-2026-11-09.md"
       ],
-      "frontendDesign": {
-        "gap": "the memory list in Coordinator settings has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for memory keys, scope, consolidation, promotion and invalidation"
-      },
+      "frontendDesign": [
+        "docs/design/memory-inplace-edit.md"
+      ],
+      "backendDesign": [
+        "docs/design/memory-backend.md",
+        "docs/design/memory-inplace-edit.md"
+      ],
       "evidence": [
         "apps/server/test/memory-consolidation.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"
-      ],
-      "batch": "B1"
+      ]
     },
     {
       "id": "coordinator-dispatch",
@@ -533,7 +531,8 @@
       },
       "reach": [
         "open /app",
-        "click testid:thread-group-running",
+        "click testid:tasks-toggle",
+        "click testid:tasks-section",
         "click testid:side-chat-action"
       ],
       "verify": [
@@ -1783,16 +1782,16 @@
     },
     {
       "id": "sidebar",
-      "name": "Sidebar and thread list",
-      "summary": "The sidebar with the Coordinator row, projects and thread groups, unread marks and the project menu.",
-      "states": "Groups for needs-you, running and done threads, projects with archived ones folded, an attention badge, and loading or error rows.",
+      "name": "Sidebar",
+      "summary": "The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.",
+      "states": "Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/sidebar.tsx",
           "apps/web/src/board/app-sidebar.tsx",
-          "apps/web/src/board/sidebar-thread-groups.tsx"
+          "apps/web/src/board/sidebar-projects.ts"
         ],
         "server": [
           "apps/server/src/services/notifications.ts"
@@ -1805,8 +1804,8 @@
       },
       "reach": [
         "open /app",
-        "click testid:thread-groups",
-        "click testid:project-group"
+        "click testid:project-group",
+        "click testid:project-group-header"
       ],
       "research": [
         "docs/research/sidebar-coordinator-icon-2026-11-08.md"
@@ -1820,7 +1819,7 @@
       },
       "evidence": [
         "apps/web/e2e/sidebar-nav.spec.ts",
-        "apps/web/e2e/sidebar-project-threads.spec.ts",
+        "apps/web/e2e/sidebar-projects.spec.ts",
         "apps/server/test/unread-notifications.test.ts"
       ],
       "batch": "B7"
@@ -2415,32 +2414,38 @@
         ],
         "server": [
           "apps/server/src/services/backup-status.ts",
-          "apps/server/src/services/deploy-status.ts"
+          "apps/server/src/services/deploy-status.ts",
+          "apps/server/src/routes-deploy.ts",
+          "apps/server/src/services/deploy-lease.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/server/backup",
-          "/api/server/deploy"
+          "/api/server/deploy",
+          "/api/server/deploy/lease"
         ]
       },
       "reach": [
         "open /app",
         "click testid:backup-warning"
       ],
-      "research": {
-        "gap": "no note on how self-hosted products report backup and update health"
-      },
+      "research": [
+        "docs/research/deploy-drain-2026-11-09.md"
+      ],
       "frontendDesign": {
         "gap": "the banners have no design"
       },
-      "backendDesign": {
-        "gap": "no design for the backup and deploy probes"
-      },
+      "backendDesign": [
+        "docs/ops/deploy-drain-design.md"
+      ],
       "evidence": [
         "apps/web/e2e/chief-home-backup.spec.ts",
         "apps/server/test/backup-status.test.ts",
-        "apps/server/test/deploy-status.test.ts"
+        "apps/server/test/deploy-status.test.ts",
+        "apps/server/test/deploy-lease.test.ts",
+        "integration/test/deploy-server-restart.test.ts",
+        "scripts/ops/deploy-self.test.mjs"
       ],
       "batch": "B11"
     },
@@ -2480,46 +2485,6 @@
       "evidence": [
         "apps/web/e2e/account-feishu.spec.ts",
         "apps/server/test/feishu-config.test.ts"
-      ],
-      "batch": "B11"
-    },
-    {
-      "id": "feature-releases",
-      "name": "Feature flags and releases",
-      "summary": "Per-user feature flags and the account page list where the owner releases them.",
-      "states": "A list of flags in the account settings with a release action for the owner.",
-      "centrality": 4,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/routes/feature-releases.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-flags.ts",
-          "apps/server/src/services/feature-flags.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/flags",
-          "/api/flags/:key/release"
-        ]
-      },
-      "reach": [
-        "settings account"
-      ],
-      "research": {
-        "gap": "no note on per-user flags for a single-user product"
-      },
-      "frontendDesign": {
-        "gap": "the releases list has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for flag defaults and release"
-      },
-      "evidence": [
-        "apps/web/e2e/account-feature-releases.spec.ts",
-        "apps/server/test/feature-flags.test.ts"
       ],
       "batch": "B11"
     },

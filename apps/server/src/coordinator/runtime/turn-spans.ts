@@ -18,23 +18,6 @@ export function turnSpanRecords(
     const message = entry.model?.[0];
     if (AssistantEntry.is(entry) && message?.role === 'assistant') {
       const at = message.timestamp ?? now();
-      records.push({
-        kind: 'chat',
-        at,
-        provider: message.provider,
-        model: message.model,
-        ...(message.responseModel !== undefined ? { responseModel: message.responseModel } : {}),
-        finishReason: message.stopReason,
-        ...(message.rawStopReason !== undefined ? { rawFinishReason: message.rawStopReason } : {}),
-        usage: {
-          input: message.usage.input,
-          output: message.usage.output,
-          cacheRead: message.usage.cacheRead,
-          cacheWrite: message.usage.cacheWrite,
-        },
-        ...(message.usage.cost?.total !== undefined ? { costUsd: message.usage.cost.total } : {}),
-        ...(message.errorMessage !== undefined ? { errorMessage: message.errorMessage } : {}),
-      });
       for (const block of message.content) {
         if (block.type === 'toolCall') {
           open.set(block.id, { name: block.name, arguments: block.arguments, at });
