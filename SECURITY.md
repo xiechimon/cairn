@@ -35,7 +35,7 @@ Cairn runs AI agents that execute code on machines you register. By design an ag
 
 Tailscale identity grants owner access only on the private `0600` Unix socket, never on TCP loopback or Funnel. The socket and its private parent directory must belong to the server uid; same-uid processes and root are trusted. Widening socket permissions invalidates this boundary.
 
-Requests whose `X-Forwarded-For` is one of the serving node's own Tailscale addresses come from the server machine itself, where any local user can reach Serve, so they get no identity; browsers on that machine use the loopback rule below.
+Requests whose `X-Forwarded-For` is one of the serving node's own Tailscale addresses come from the server machine itself, where any local user can reach Serve, so they get no identity. Until LocalAPI has reported those addresses once, every request carrying `X-Forwarded-For` gets no identity on the socket listener; the last reported set survives a failed refresh. Browsers on that machine use the loopback rule below.
 
 An untagged node's own user login takes priority. If unavailable, or if the server is tagged, only the explicit socket-scoped allowlist applies. Missing identity, other users and tagged sources still need a token. The sidecar strips client-supplied identity headers and withholds identity for sharees. System Serve must rewrite identity headers and connect directly to the private socket.
 
@@ -49,7 +49,7 @@ An agent doing something harmful with permissions you granted it is a configurat
 
 On Linux, a browser on the server machine reaches `/api/*` as the owner without a token when all of these hold:
 
-- the TCP peer is `127.0.0.1` or `::1`, and `/proc/net/tcp` or `/proc/net/tcp6` shows the client socket is owned by the server uid;
+- the TCP peer is `127.0.0.1` or `::1`, and `/proc/net/tcp` or `/proc/net/tcp6` shows the client socket as a live, established socket (nonzero inode) owned by the server uid; orphaned or closing rows never count;
 - `Host` is `127.0.0.1`, `localhost` or `[::1]` with the server's own port, which refuses DNS-rebinding names;
 - the request carries no relay header (`Forwarded`, `Via`, `X-Forwarded-*`, `X-Real-IP`, `X-Client-IP`, `CF-Connecting-IP`, `True-Client-IP`, `Tailscale-*`).
 

@@ -8,7 +8,10 @@ const IPV4_LOOPBACK = '127.0.0.1';
 const IPV6_LOOPBACK = '::1';
 const LOOPBACK_HOST_NAMES = [IPV4_LOOPBACK, 'localhost', `[${IPV6_LOOPBACK}]`];
 const HTTP_DEFAULT_PORT = 80;
+const STATE_FIELD = 3;
 const UID_FIELD = 7;
+const INODE_FIELD = 9;
+const TCP_ESTABLISHED = '01';
 const RELAY_HEADERS = [
   'forwarded',
   'via',
@@ -94,7 +97,9 @@ export function peerUidFromTables(
       const fields = line.trim().split(/\s+/);
       if (
         !endpointMatches(fields[1], peer, connection.remotePort) ||
-        !endpointMatches(fields[2], local, connection.localPort)
+        !endpointMatches(fields[2], local, connection.localPort) ||
+        fields[STATE_FIELD] !== TCP_ESTABLISHED ||
+        !/^[1-9][0-9]*$/.test(fields[INODE_FIELD] ?? '')
       )
         continue;
       const uid = Number(fields[UID_FIELD]);

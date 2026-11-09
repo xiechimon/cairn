@@ -211,6 +211,27 @@ test('the socket tables map a loopback client 4-tuple to its uid', () => {
   expect(peer('10.0.0.5', 0xd431)).toBeNull();
 });
 
+test.each([
+  ['FIN_WAIT2 orphan', '05', '0'],
+  ['TIME_WAIT orphan', '06', '0'],
+  ['FIN_WAIT1 orphan', '04', '0'],
+  ['half-closed live socket', '05', '16'],
+  ['inode-less established', '01', '0'],
+])('a %s row never vouches for a uid', (_name, state, inode) => {
+  const tcp = [
+    TCP_HEADER,
+    `   0: 0100007F:D431 0100007F:2253 ${state} 00000000:00000000 00:00000000 00000000     0        0 ${inode} 1 0 20 4 30 10 -1`,
+  ].join('\n');
+  expect(
+    peerUidFromTables([tcp], {
+      remoteAddress: '127.0.0.1',
+      remotePort: 0xd431,
+      localAddress: '127.0.0.1',
+      localPort: 0x2253,
+    }),
+  ).toBeNull();
+});
+
 test.runIf(process.platform === 'linux')(
   'the live socket table names this process as the owner of its own loopback client',
   async () => {
