@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "dcc56307-afad-4e79-a2dc-1e9a34b058a2",
+  "id": "cde508aa-38fa-437f-8811-63ece2f18800",
   "prevId": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
   "tables": {
     "agent_memory": {
@@ -2391,6 +2391,49 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "deploy_lease": {
+      "name": "deploy_lease",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "deploy_lease_status": {
+          "name": "deploy_lease_status",
+          "value": "\"deploy_lease\".\"status\" in ('accepting', 'draining')"
+        }
+      }
     },
     "due_event": {
       "name": "due_event",
@@ -6370,13 +6413,6 @@
           "notNull": false,
           "autoincrement": false,
           "default": "''"
-        },
-        "coordinatorTurn": {
-          "name": "coordinatorTurn",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

@@ -67,6 +67,7 @@ export const DB_TABLES = [
   'coordinator_lease',
   'data_migration',
   'task_issue_close',
+  'deploy_lease',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -121,4 +122,5 @@ export const INTERNAL_ONLY_TABLES = [
   'coordinator_lease',
   'data_migration',
   'task_issue_close',
+  'deploy_lease',
 ] as const;

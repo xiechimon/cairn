@@ -98,6 +98,8 @@ export function otelErrorMessage(reason: string | null | undefined): string | un
 }
 
 export const LANGFUSE_ATTR = {
+  input: LangfuseOtelSpanAttributes.OBSERVATION_INPUT,
+  output: LangfuseOtelSpanAttributes.OBSERVATION_OUTPUT,
   traceName: LangfuseOtelSpanAttributes.TRACE_NAME,
   traceTags: LangfuseOtelSpanAttributes.TRACE_TAGS,
   sessionId: LangfuseOtelSpanAttributes.TRACE_SESSION_ID,
@@ -334,4 +336,41 @@ export function executeToolAttributes(call: {
     [GENAI_ATTR.toolCallArguments]: call.arguments,
     [GENAI_ATTR.toolCallResult]: call.result,
   });
+}
+
+export interface OtelObservation {
+  input?: unknown;
+  output?: unknown;
+}
+
+export function observationAttributes(observation: OtelObservation): Attributes {
+  const entries: Attributes = {};
+  for (const [field, key] of [
+    ['input', LANGFUSE_ATTR.input],
+    ['output', LANGFUSE_ATTR.output],
+  ] as const) {
+    const value = observation[field];
+    if (value === undefined) continue;
+    const redacted = redactSecrets(value).value;
+    const text = typeof redacted === 'string' ? redacted : JSON.stringify(redacted);
+    if (text === undefined) continue;
+    if (Buffer.byteLength(text, 'utf8') <= 32_768) {
+      entries[key] = text;
+    } else if (Array.isArray(redacted)) {
+      entries[key] = JSON.stringify(
+        redacted.slice(-16).map((entry: unknown) => {
+          if (typeof entry !== 'object' || entry === null)
+            return `${JSON.stringify(entry)?.slice(0, 256)} [truncated]`;
+          const message = entry as Record<string, unknown>;
+          return {
+            role: String(message.role ?? 'user').slice(0, 32),
+            content: `${(typeof message.content === 'string' ? message.content : (JSON.stringify(message.content) ?? '')).slice(0, 256)} [truncated]`,
+          };
+        }),
+      );
+    } else {
+      entries[key] = JSON.stringify(`${text.slice(0, 4_000)} [truncated]`);
+    }
+  }
+  return entries;
 }

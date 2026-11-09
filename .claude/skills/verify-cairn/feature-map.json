@@ -2415,32 +2415,38 @@
         ],
         "server": [
           "apps/server/src/services/backup-status.ts",
-          "apps/server/src/services/deploy-status.ts"
+          "apps/server/src/services/deploy-status.ts",
+          "apps/server/src/routes-deploy.ts",
+          "apps/server/src/services/deploy-lease.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/server/backup",
-          "/api/server/deploy"
+          "/api/server/deploy",
+          "/api/server/deploy/lease"
         ]
       },
       "reach": [
         "open /app",
         "click testid:backup-warning"
       ],
-      "research": {
-        "gap": "no note on how self-hosted products report backup and update health"
-      },
+      "research": [
+        "docs/research/deploy-drain-2026-11-09.md"
+      ],
       "frontendDesign": {
         "gap": "the banners have no design"
       },
-      "backendDesign": {
-        "gap": "no design for the backup and deploy probes"
-      },
+      "backendDesign": [
+        "docs/ops/deploy-drain-design.md"
+      ],
       "evidence": [
         "apps/web/e2e/chief-home-backup.spec.ts",
         "apps/server/test/backup-status.test.ts",
-        "apps/server/test/deploy-status.test.ts"
+        "apps/server/test/deploy-status.test.ts",
+        "apps/server/test/deploy-lease.test.ts",
+        "integration/test/deploy-server-restart.test.ts",
+        "scripts/ops/deploy-self.test.mjs"
       ],
       "batch": "B11"
     },
