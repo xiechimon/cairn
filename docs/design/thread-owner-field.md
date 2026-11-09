@@ -10,7 +10,7 @@ Whether a thread waits on the person, the Coordinator or a machine was computed 
 
 1. Every task has one owner: `owner` | `coordinator` | `machine-update` | `null` (nobody waits: running, idle, done). It is computed in one server function, `ownerOf(task)`, from the task's phase, pending questions, escalations, parking and the running machine's capability.
 2. `ownerOf` is computed on read and never stored. The server puts it on every `TodoRecord` it returns (`owner`), so every view reads the same value. No view computes ownership itself.
-3. Wakes come from one reconciler, `reconcileOwners()`. It recomputes `ownerOf` for the affected tasks after write events (a task, step, question or machine write) and for all open tasks in a periodic sweep, and diffs against a stored `lastNotifiedOwner` per task. A change to `coordinator` enqueues one Coordinator wake with the reason; a change to `owner` sends the owner notification and push; then `lastNotifiedOwner` is updated. A write path that forgets to trigger the reconciler is late by one sweep, never lost. No other code enqueues ownership wakes or notifications.
+3. Wakes come from one reconciler, `reconcileOwners()`. It recomputes `ownerOf` and the actionable-work key for the affected tasks after write events (a task, step, question or machine write) and for all open tasks in a periodic sweep, and diffs against a stored checkpoint `lastNotified = {owner, workKey}` per task. `workKey` is a stable hash of the sorted ids of the pending items that make the owner what it is (question request ids, escalation ids, the failing build or step id, the review build id). Any change to the pair notifies: a new owner, or new actionable work under the same owner (a second question, a new failure). A change to `coordinator` work enqueues one Coordinator wake with the reason; a change to `owner` work sends the owner notification and push; then the checkpoint is updated. A write path that forgets to trigger the reconciler, or an intermediate change that came and went between runs, is late by one sweep, never lost. No other code enqueues ownership wakes or notifications.
 4. Every view reads `owner` only: the server inbox (`/api/needs-you`, the daily report), the Coordinator `needs_you` tool, and on the web the home, sidebar, project home, tasks panel, row copy and tray. The copy names the actor from `owner`, never from the phase.
 5. `ownerOf` rules:
    - `confirm`, and `review` of a code task under the human merge policy: `owner`.
@@ -39,7 +39,7 @@ File and function names refer to the #3467 and #3471 branches (`server/stall-nee
 
 ## Migration
 
-- Add `lastNotifiedOwner` (nullable text) to the todo row; on first boot set it to the current `ownerOf` for every open task, so the change does not fire a burst of wakes for existing tasks.
+- Add `lastNotified` (nullable JSON `{owner, workKey}`) to the todo row; on first boot set it to the current pair for every open task, so the change does not fire a burst of wakes for existing tasks.
 - Add `owner` to `TodoRecord` as a computed field.
 - `waitingOn` drops `owner`, `coordinator` and `machine-update` in the same PR.
 - `NEEDS_YOU_REASONS` keeps `question`, `confirm`, `review`; `failed` leaves the owner inbox.
@@ -48,7 +48,7 @@ File and function names refer to the #3467 and #3471 branches (`server/stall-nee
 ## Tests
 
 1. `ownerOf` table test over every phase × question × escalation × parking × capability combination.
-2. The reconciler fires once per change: a change to `coordinator` enqueues exactly one wake, also for a parked failure with no watch; a change to `owner` sends one notification; a Coordinator-owned phase sends none; an unchanged owner sends nothing.
+2. The reconciler fires once per change of `{owner, workKey}`: a change to `coordinator` enqueues exactly one wake, also for a parked failure with no watch; a change to `owner` sends one notification; a Coordinator-owned phase sends none; a second question under the same owner wakes again; an unchanged pair (same owner, same pending items) sends nothing.
 3. A missed call site is caught: change a task's inputs without triggering the reconciler, run the sweep, and the wake or notification fires.
 4. First boot after migration sends no wakes for existing tasks.
 5. Server inbox, `needs_you` tool, home, sidebar, project home, tasks panel and tray all list the same tasks for the same fixtures (one parity test over the shared fixture set).
