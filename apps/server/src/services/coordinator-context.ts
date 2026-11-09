@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
 
@@ -62,23 +62,29 @@ export function lastTurnContext(
       .get();
     if (owned === undefined) return null;
   }
+  const scope =
+    threadId !== undefined
+      ? eq(chiefTurnUsage.threadId, threadId)
+      : inArray(
+          chiefTurnUsage.threadId,
+          db
+            .select({ id: chiefThread.id })
+            .from(chiefThread)
+            .where(eq(chiefThread.chiefId, chiefRow.id)),
+        );
+  const latest = db
+    .select({ stepId: chiefTurnUsage.stepId })
+    .from(chiefTurnUsage)
+    .where(scope)
+    .orderBy(desc(chiefTurnUsage.createdAt))
+    .get();
+  if (latest == null) return null;
   const last = db
     .select({ tokens: chiefTurnUsage.contextTokens, model: chiefTurnUsage.model })
     .from(chiefTurnUsage)
-    .where(
-      threadId !== undefined
-        ? eq(chiefTurnUsage.threadId, threadId)
-        : inArray(
-            chiefTurnUsage.threadId,
-            db
-              .select({ id: chiefThread.id })
-              .from(chiefThread)
-              .where(eq(chiefThread.chiefId, chiefRow.id)),
-          ),
-    )
-    .orderBy(desc(chiefTurnUsage.createdAt))
+    .where(and(eq(chiefTurnUsage.stepId, latest.stepId), isNotNull(chiefTurnUsage.contextTokens)))
     .get();
-  if (last == null || last.tokens == null) return null;
+  if (last?.tokens == null) return null;
   return {
     tokens: last.tokens,
     contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),

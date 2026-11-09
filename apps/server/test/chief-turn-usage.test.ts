@@ -355,6 +355,23 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
   });
 
+  test('flag on: a multi-model turn keeps the context-bearing model for the meter', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-multi');
+    await finishStep(deps(), machineId, 'turn-multi', {
+      status: 'success',
+      usage: [usage('pi/model-a', 100, 0, { contextTokens: 5_000 }), usage('pi/model-b', 50, 0)],
+    });
+    expect(turnRows().map((r) => [r.model, r.contextTokens])).toEqual([
+      ['pi/model-a', 5_000],
+      ['pi/model-b', null],
+    ]);
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 5_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+  });
+
   test('flag on: a later turn without contextTokens hides the meter instead of keeping the prior percent', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-prior-ctx');
