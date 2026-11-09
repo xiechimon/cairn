@@ -53,6 +53,8 @@ The `pr-size` check fails a PR above 3000 changed lines outside the generated
 paths in `GENERATED_PATHS` of `scripts/pr-size.mjs` (feature maps,
 `.mergify.yml`, lockfiles, snapshots, drizzle meta, `docs/verify/**`), and
 lists the largest files. Split such a PR into independent PRs off `main`.
+To re-report a head without pushing, run
+`gh workflow run pr-size.yml -f pr=<n>` (no input re-reports every open PR).
 The same workflow labels each PR `size:XS` to `size:XXL`, also leaving out
 tests, for context only.
 A section containing only fenced code or HTML comments is unanswered.
