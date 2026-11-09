@@ -38,7 +38,7 @@ export function ThinkingRow({
           aria-label={t(open ? '收起思考' : '展开思考')}
         >
           <TraceLine className={AGENT_LINE_CLS}>
-            <TraceTitle className="italic">{open ? t('思考') : preview}</TraceTitle>
+            <TraceTitle>{open ? t('思考') : preview}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent>

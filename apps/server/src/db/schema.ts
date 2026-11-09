@@ -175,6 +175,7 @@ export const todo = sqliteTable(
     decisions: json<TaskDecision[]>('decisions').notNull().default(sql`'[]'`),
     lastNotifiedOwner: text('lastNotifiedOwner').default('none'),
     lastNotifiedWork: text('lastNotifiedWork').default(''),
+    coordinatorTurn: json<CoordinatorTurn>('coordinatorTurn'),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
@@ -594,23 +595,6 @@ export const stepRoute = sqliteTable(
   (t) => [index('step_route_team_decided_idx').on(t.teamId, t.decidedAt)],
 );
 
-export const featureFlag = sqliteTable(
-  'feature_flag',
-  {
-    id: text('id').primaryKey(),
-    key: text('key').notNull(),
-    userId: text('userId').references(() => user.id),
-    enabled: bool('enabled').notNull(),
-    updatedAt: epochMs('updatedAt').notNull(),
-  },
-  (t) => [
-    uniqueIndex('feature_flag_key_global_unique').on(t.key).where(sql`${t.userId} IS NULL`),
-    uniqueIndex('feature_flag_key_user_unique')
-      .on(t.key, t.userId)
-      .where(sql`${t.userId} IS NOT NULL`),
-  ],
-);
-
 export const agentMemory = sqliteTable('agent_memory', {
   id: text('id').primaryKey(),
   agentId: text('agentId').notNull(),
@@ -705,6 +689,8 @@ export const pushDigestItem = sqliteTable('push_digest_item', {
   href: text('href').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export type CoordinatorTurn = { stepId: string; workKey: string };
 
 type HarnessEvalAttemptState = 'claimed' | 'dispatched' | 'dispatch_uncertain' | 'terminal';
 type HarnessEvalAttemptOutcome =

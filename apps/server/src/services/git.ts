@@ -18,6 +18,7 @@ import {
   projectMergeConfigSchema,
   type SecretBox,
 } from '@cairn/shared';
+import { parsePatch } from 'diff';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build as buildTable, project, todo as todoTable } from '../db/schema.js';
@@ -379,42 +380,23 @@ export async function readCommitDetail(
 }
 
 export function parseUnifiedDiff(text: string): DocumentDiffFile[] {
-  const files: DocumentDiffFile[] = [];
-  let current: DocumentDiffFile | null = null;
-  let hunk: { header: string; lines: string[] } | null = null;
-  const lines = text.replace(/\n$/, '').split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    if (line.startsWith('diff --git ')) {
-      current = { path: '', additions: 0, deletions: 0, hunks: [] };
-      files.push(current);
-      hunk = null;
-      continue;
-    }
-    if (current === null) continue;
-    if (line.startsWith('+++ ')) {
-      const p = line.slice(4).trim();
-      if (p !== '/dev/null') current.path = p.replace(/^b\//, '');
-      continue;
-    }
-    if (line.startsWith('--- ')) {
-      const p = line.slice(4).trim();
-      if (current.path === '' && p !== '/dev/null') current.path = p.replace(/^a\//, '');
-      continue;
-    }
-    if (line.startsWith('@@')) {
-      hunk = { header: `${line.split(' @@')[0] ?? ''} @@`, lines: [] };
-      current.hunks.push(hunk);
-      continue;
-    }
-    if (hunk === null) continue;
-    if (line.startsWith('\\')) continue;
-    if (line === '') continue;
-    hunk.lines.push(line);
-    if (line.startsWith('+')) current.additions += 1;
-    else if (line.startsWith('-')) current.deletions += 1;
-  }
-  return files.filter((f) => f.path !== '' && f.hunks.length > 0);
+  return parsePatch(text).flatMap((patch) => {
+    const name = patch.newFileName === '/dev/null' ? patch.oldFileName : patch.newFileName;
+    if (name === undefined || name === '/dev/null' || patch.hunks.length === 0) return [];
+    const hunks = patch.hunks.map((hunk) => ({
+      header: `@@ -${hunk.oldStart - (hunk.oldLines === 0 ? 1 : 0)}${hunk.oldLines === 1 ? '' : `,${hunk.oldLines}`} +${hunk.newStart - (hunk.newLines === 0 ? 1 : 0)}${hunk.newLines === 1 ? '' : `,${hunk.newLines}`} @@`,
+      lines: hunk.lines.filter((line) => !line.startsWith('\\')),
+    }));
+    const lines = hunks.flatMap((hunk) => hunk.lines);
+    return [
+      {
+        path: name.replace(/^[ab]\//, ''),
+        additions: lines.filter((line) => line.startsWith('+')).length,
+        deletions: lines.filter((line) => line.startsWith('-')).length,
+        hunks,
+      },
+    ];
+  });
 }
 
 export function diffTextNamesAFile(text: string): boolean {

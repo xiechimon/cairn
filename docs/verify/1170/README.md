@@ -11,6 +11,6 @@
 | C | refresh re-pull + materialization relay | `c-manifest-before.json` / `c-manifest-after.json` (same id `my-live-skill`, SKILL.md sha256 `9dfa1e23…` → `fb01a52d…`), `c-skill-audit-rows.json` (create x2 + update x2, actor=member), C1 hand-built skill 409 note |
 | D | red-state face (real refusals) | `d-red-states.json`: SSRF per-shape (http://127.0.0.1, private segment 192.168.1.5, non-GitHub host), localPath landing inside the skill root, binary files, over the per-file limit (512001 > 512000); `d-red-ui.png` = inline error line in the dialog + the server's original text |
 
-## Known boundary (frozen by measurement, not a defect)
+## Historical boundary (superseded by YAML support)
 
-- folded-shape frontmatter of the `skills/academy-guide` kind in `anthropics/skills` (`description: >`) falls back to the minimal parser's default → import 400 "description is required" — same law as `parseSkillFrontmatter`'s existing parsing semantics (shared records/skill.ts header note: folded block scalars are not handled). When picking an import target, choose a directory with a single-line description (`skills/pdf` is one).
+- The 2026-10-10 run used the former minimal parser: folded frontmatter such as `description: >` produced an import 400 "description is required". That result describes the measured version, not the current contract. The YAML adapter now accepts non-empty string scalars, including folded and literal block scalars; import targets no longer require single-line descriptions. Current parser and regression evidence: [foundation library replacement](../../research/foundation-library-replacement-2026-11-09.md).

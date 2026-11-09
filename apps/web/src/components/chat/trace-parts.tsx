@@ -4,6 +4,7 @@ import type { TFunc } from '../../i18n/translate.js';
 import { Button } from '../ui/button.js';
 
 export interface TraceCounts {
+  setup: number;
   think: number;
   read: number;
   search: number;
@@ -15,6 +16,7 @@ export interface TraceCounts {
 }
 
 export const EMPTY_TRACE_COUNTS: TraceCounts = {
+  setup: 0,
   think: 0,
   read: 0,
   search: 0,
@@ -36,6 +38,7 @@ export const RUNNING_VERB =
 
 const SUMMARY_PARTS = {
   past: {
+    setup: '准备了工作区',
     think: '思考 {n} 次',
     read: '读了 {n} 个文件',
     search: '搜索 {n} 次',
@@ -45,6 +48,7 @@ const SUMMARY_PARTS = {
     tool: '调用 {n} 个工具',
   },
   present: {
+    setup: '正在准备工作区',
     think: '正在思考',
     read: '正在读 {n} 个文件',
     search: '正在搜索 {n} 次',
@@ -55,7 +59,7 @@ const SUMMARY_PARTS = {
   },
 } as const;
 
-const SUMMARY_KINDS = ['think', 'read', 'search', 'run', 'edit', 'push', 'tool'] as const;
+const SUMMARY_KINDS = ['setup', 'think', 'read', 'search', 'run', 'edit', 'push', 'tool'] as const;
 
 function lowerFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1);
@@ -119,7 +123,7 @@ export function TraceGroupSummary({
       <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
         <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
         {failed != null && (
-          <span className="ml-1 text-destructive" data-trace-failed="">
+          <span className="ml-1" data-trace-failed="">
             {failed}
           </span>
         )}

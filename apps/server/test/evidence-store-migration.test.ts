@@ -1,8 +1,9 @@
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
 
 test('migration initializes only existing cairn projects and never reassigns modes', () => {
@@ -53,11 +54,28 @@ test('evidence migration upgrades the latest main database without replacing its
   const directory = makeTestTempDir('cairn-evidence-main-upgrade-');
   const sqlite = new Database(join(directory, 'db.sqlite'));
   try {
-    migrateUpTo(sqlite, directory, '0133_deploy_lease');
+    const journal = JSON.parse(
+      readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+    ) as { entries: { idx: number; tag: string; when: number }[] };
+    const index = journal.entries.findIndex((entry) => entry.tag.endsWith('_evidence_store'));
+    expect(index).toBe(journal.entries.length - 1);
+    const evidence = journal.entries[index];
+    const previous = journal.entries[index - 1];
+    if (evidence === undefined || previous === undefined)
+      throw new Error('Evidence migration must follow the existing main migrations');
+    expect(evidence.idx).toBe(previous.idx + 1);
+    expect(evidence.when).toBeGreaterThan(
+      Math.max(...journal.entries.slice(0, index).map((entry) => entry.when)),
+    );
+    migrateUpTo(sqlite, directory, previous.tag);
     migrateAll(sqlite);
     expect(sqlite.prepare('SELECT evidenceStore FROM project').all()).toEqual([]);
     expect(sqlite.prepare('SELECT evidenceStore FROM build').all()).toEqual([]);
     expect(sqlite.prepare('SELECT browserEnabled FROM computer').all()).toEqual([]);
+    expect(sqlite.prepare('SELECT coordinatorTurn FROM todo').all()).toEqual([]);
+    expect(
+      sqlite.prepare("SELECT name FROM sqlite_master WHERE name = 'feature_flag'").get(),
+    ).toBeUndefined();
     expect(
       sqlite.prepare('SELECT name FROM sqlite_master WHERE name = ?').get('deploy_lease'),
     ).toBeDefined();

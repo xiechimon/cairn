@@ -328,7 +328,7 @@ export function RoutingSettingsPage() {
               testId="routing-settings-empty"
               className="mt-2"
               icon={Route}
-              title={t('还没有路由规则。')}
+              title={t('还没有路由规则')}
               description={t('先创建 Coordinator 规则，它才能回答你的消息。')}
             />
           )}

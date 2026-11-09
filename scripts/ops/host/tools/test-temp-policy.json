@@ -1,5 +1,7 @@
 {
   "maxAgeMinutes": 120,
+  "nanoidMaxAgeMinutes": 360,
+  "maxDiskBytes": 5368709120,
   "warnAbovePercent": 80,
   "warningIntervalMinutes": 60,
   "prefixes": [
