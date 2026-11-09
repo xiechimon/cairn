@@ -81,6 +81,34 @@ for (const text of [
   });
 }
 
+for (const prefix of ['PRRT', 'PRR', 'PRRC', 'IC', 'PR', 'I', 'D', 'DC']) {
+  test(`allows synthetic public GitHub ${prefix} node IDs without ignoring quotas`, () => {
+    const id = `${prefix}_kwDO`.padEnd(21, 'A');
+    assert.equal(id.length, 21);
+    assert.deepEqual(fileViolations('docs/review.md', `thread ${id}`), []);
+    assert.deepEqual(fileViolations('docs/review.md', `thread ${id}; quota: 37\u0025`), [
+      { line: 1, kind: 'quota/usage' },
+    ]);
+  });
+}
+
+test('private identifier shapes and GitHub-like near-misses remain blocked', () => {
+  for (const id of [
+    nanoid,
+    ulid,
+    uuid,
+    'TEAM_kwDO'.padEnd(21, 'A'),
+    'PRRT_kxDO'.padEnd(21, 'A'),
+    'PRRT_kwDX'.padEnd(21, 'A'),
+    'prrt_kwDO'.padEnd(21, 'A'),
+  ]) {
+    for (const key of ['team', 'project', 'machine', 'thread', 'build', 'trace', 'session'])
+      assert.deepEqual(fileViolations('docs/review.md', `${key}: ${id}`), [
+        { line: 1, kind: 'identifier' },
+      ]);
+  }
+});
+
 test('path allowlist exempts fixture identifiers but not quota disclosures', () => {
   for (const path of [
     'apps/server/test/id.test.ts',
@@ -141,6 +169,28 @@ function repository(t) {
     });
   return { cwd, git, run };
 }
+
+test('commit messages may cite a public GitHub thread but not a private identifier', (t) => {
+  const { git, run } = repository(t);
+  git('commit', '--allow-empty', '-qm', `Resolve thread ${'PRRT_kwDO'.padEnd(21, 'A')}`);
+  assert.equal(run().status, 0);
+  git('commit', '--allow-empty', '-qm', `Record thread ${nanoid}`);
+  assert.equal(run().status, 1);
+});
+
+test('GitHub node IDs are benign in staged text and committed snapshots', (t) => {
+  const { cwd, git, run } = repository(t);
+  writeFileSync(join(cwd, 'example.md'), `thread: ${'PRRT_kwDO'.padEnd(21, 'A')}\n`);
+  git('add', 'example.md');
+  assert.equal(run('--staged').status, 0);
+  git('commit', '-qm', 'synthetic public reference');
+  assert.equal(run().status, 0);
+  writeFileSync(join(cwd, 'example.md'), `teamId: ${nanoid}\n`);
+  git('add', 'example.md');
+  assert.equal(run('--staged').status, 1);
+  git('commit', '-qm', 'synthetic private reference');
+  assert.equal(run().status, 1);
+});
 
 test('staged scan reads index, not unstaged content, and redacts diagnostics', (t) => {
   const { cwd, git, run } = repository(t);

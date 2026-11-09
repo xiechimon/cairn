@@ -31,6 +31,7 @@ const identifier =
   /\b(?:team|project|machine|thread|build|trace|session)(?:[_ -]?id)?\b(?:["'`\s]*[:=]["'`\s]*|\s+["'`]?)([A-Za-z0-9_-]+)(?![A-Za-z0-9_-])/gi;
 const idShape =
   /^(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25}|[A-Za-z0-9_-]{21})$/i;
+const githubNodeId = /^(?:PRRT|PRR|PRRC|IC|PR|I|D|DC)_kwDO[A-Za-z0-9_-]+$/;
 const rules = [
   ['quota/usage', quotaPercent],
   ['quota/usage', labeledPercent],
@@ -64,7 +65,8 @@ export function fileViolations(path, content, additions) {
   for (const [kind, pattern] of rules) {
     if (fixture && kind === 'identifier') continue;
     for (const match of content.matchAll(pattern)) {
-      if (kind === 'identifier' && !idShape.test(match[1])) continue;
+      if (kind === 'identifier' && (!idShape.test(match[1]) || githubNodeId.test(match[1])))
+        continue;
       if (/\n[ \t\r]*\n/.test(match[0])) continue;
       const first = lineAt(match.index);
       const last = lineAt(match.index + match[0].length - 1);
