@@ -234,7 +234,9 @@
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-settings.tsx"
+          "apps/web/src/chief/chief-settings.tsx",
+          "apps/web/src/chief/memory-tab.tsx",
+          "apps/web/src/chief/memory-list.ts"
         ],
         "server": [
           "apps/server/src/services/memory.ts",
@@ -262,6 +264,8 @@
         "gap": "no design for memory keys, scope, consolidation, promotion and invalidation"
       },
       "evidence": [
+        "apps/web/e2e/chief-memory.spec.ts",
+        "apps/web/test/memory-list.test.ts",
         "apps/server/test/memory-consolidation.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"

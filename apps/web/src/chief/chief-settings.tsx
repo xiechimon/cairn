@@ -1,8 +1,7 @@
-import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_TEAM } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useApiMutations, useChief, useMemories } from '../api/hooks.js';
+import { useApiMutations, useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -14,6 +13,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
+import { MemoryTab } from './memory-tab.js';
 
 const TABS: { id: ChiefSettingsTab; label: string }[] = [
   { id: 'routing', label: '模型与机器' },
@@ -38,8 +38,6 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
   const charter = live ? (chiefQ.data?.chief.charter ?? '') : '';
   const [charterOpen, setCharterOpen] = useState(false);
   const navigate = useNavigate();
-  const memoriesQ = useMemories(teamId, live);
-  const memories = memoriesQ.data ?? [];
   const watches = live ? (chiefQ.data?.watches ?? []) : [];
   const wakes = live ? (chiefQ.data?.wakes ?? []) : [];
   const saveCharter = live
@@ -122,28 +120,7 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
             </>
           )}
 
-          {tab === 'memory' &&
-            (live && memoriesQ.data == null ? null : (
-              <div>
-                {live ? (
-                  <p className="mt-4 text-meta text-content-tertiary">
-                    {t('记忆 · {n} / {max}', { n: memories.length, max: MEMORY_QUOTA_PER_TEAM })}
-                  </p>
-                ) : null}
-                <SettingsCard className={live ? 'mt-2' : 'mt-4'}>
-                  {memories.length === 0 ? (
-                    <p className={EMPTY_ROW_CLS}>{t(MEMORY_EMPTY_COPY)}</p>
-                  ) : (
-                    memories.map((memory) => (
-                      <div key={memory.id} className={ENTRY_ROW_CLS}>
-                        <span className="text-ui text-foreground">{memory.title}</span>
-                        <span className="text-meta text-content-secondary">{memory.content}</span>
-                      </div>
-                    ))
-                  )}
-                </SettingsCard>
-              </div>
-            ))}
+          {tab === 'memory' && <MemoryTab live={live} teamId={teamId} />}
 
           {tab === 'watches' && (
             <SettingsCard className="mt-4">

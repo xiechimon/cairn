@@ -1158,15 +1158,33 @@ export const EN: Record<string, string> = {
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
-  '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。':
-    'No memories yet. The Coordinator stores experience worth keeping here as it works.',
+  '尚无记忆。': 'No memories yet.',
+  'Coordinator 会在工作中将值得沉淀的经验存入此处。':
+    'The Coordinator stores experience worth keeping here as it works.',
+  '已存 {n} 条，上限 {max} 条 · 不是每条都会自动注入':
+    '{n} of {max} stored · not every entry is injected automatically',
+  '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
+  正在加载记忆: 'Loading memories',
+  已移除的项目: 'Removed project',
+  '打开记忆：{title}': 'Open memory: {title}',
+  可检索: 'Searchable',
+  '可检索 · 不自动注入': 'Searchable · not injected automatically',
+  核心: 'Core',
+  '更新于 {date}': 'Updated {date}',
+  更新于: 'Updated',
+  概要: 'Summary',
+  '删除…': 'Delete…',
+  删除这条记忆: 'Delete this memory',
+  '删除这条记忆？': 'Delete this memory?',
+  删除记忆: 'Delete memory',
+  '正在删除…': 'Deleting…',
+  '只删除这条记忆，不影响保存它的对话。':
+    'Deletes only this memory, not the conversation it was saved from.',
+  '没有删除成功，记忆保持原样，请重试。': 'The memory was not deleted and is unchanged. Try again.',
+  '离线中。记忆只能查看，重新连接后才能删除。':
+    'Offline. Memories are read-only until you reconnect.',
   模型与机器: 'Model & machine',
 
-  // —— #499 记忆 tab 的搜索与排序（配额头 + 搜索框 + 排序档）——
-  // `记忆 · {n} / {max}`：{max} = shared MEMORY_QUOTA_PER_AGENT 插值，不写死
-  // 数字；`搜索记忆…` = shared MEMORY_UI_COPY.searchPlaceholder（经 t() 消费、
-  // 不作字面量出现，i18n-coverage COMPUTED_KEYS 登记）。
-  '记忆 · {n} / {max}': 'Memory · {n} / {max}',
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
