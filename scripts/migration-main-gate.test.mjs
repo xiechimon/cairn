@@ -10,7 +10,7 @@ const journal = 'apps/server/drizzle/meta/_journal.json';
 const common = { idx: 136, tag: '0136_base', when: 1000 };
 const main = { idx: 137, tag: '0137_cold_slim_markers', when: 3000 };
 
-function fixture(t, added) {
+function fixture(t, added = []) {
   const cwd = makeTestTempDir('migration-main-gate-');
   t.after(() => releaseTestTempDir(cwd));
   const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -30,8 +30,8 @@ function fixture(t, added) {
   write([common]);
   commit();
   const base = git('rev-parse', 'HEAD');
-  write([common, ...(added ? [added] : [])]);
-  if (added) commit();
+  write([common, ...added]);
+  if (added.length) commit();
   const head = git('rev-parse', 'HEAD');
   git('switch', '-q', '--detach', base);
   write([common, main]);
@@ -48,19 +48,59 @@ for (const [name, added] of [
   ['equal timestamp', { idx: 138, tag: '0138_pr', when: 3000 }],
 ]) {
   test(`rejects ${name} against main that advanced after branching`, (t) => {
-    const { run } = fixture(t, added);
+    const { run } = fixture(t, [added]);
     const result = run();
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.ok(result.stderr.includes(`apps/server/drizzle/${added.tag}.sql`), result.stderr);
-    assert.ok(
-      result.stderr.includes('renumber to 0138 and set when to the current time in ms'),
-      result.stderr,
-    );
+    const repair = name.startsWith('reused')
+      ? 'renumber to 0138 and set when to the current time in ms'
+      : 'set when to the current time in ms';
+    assert.ok(result.stderr.includes(`; ${repair}\n`), result.stderr);
   });
 }
 
+test('timestamp-only repair preserves the second added migration number', (t) => {
+  const { run } = fixture(t, [
+    { idx: 138, tag: '0138_pr', when: 4000 },
+    { idx: 139, tag: '0139_pr', when: 2000 },
+  ]);
+  const result = run();
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.equal(
+    result.stderr,
+    'apps/server/drizzle/0139_pr.sql: when must exceed origin/main maximum; set when to the current time in ms\n',
+  );
+});
+
+test('two colliding additions receive distinct repair numbers in journal order', (t) => {
+  const { run } = fixture(t, [
+    { idx: 136, tag: '0136_pr', when: 4000 },
+    { idx: 137, tag: '0137_pr', when: 5000 },
+  ]);
+  const result = run();
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.equal(
+    result.stderr,
+    'apps/server/drizzle/0136_pr.sql: migration number or tag already exists on origin/main; renumber to 0138 and set when to the current time in ms\n' +
+      'apps/server/drizzle/0137_pr.sql: migration number or tag already exists on origin/main; renumber to 0139 and set when to the current time in ms\n',
+  );
+});
+
+test('collision repair counts valid added migrations before the failing entry', (t) => {
+  const { run } = fixture(t, [
+    { idx: 138, tag: '0138_pr', when: 4000 },
+    { idx: 137, tag: '0137_pr', when: 5000 },
+  ]);
+  const result = run();
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.equal(
+    result.stderr,
+    'apps/server/drizzle/0137_pr.sql: migration number or tag already exists on origin/main; renumber to 0139 and set when to the current time in ms\n',
+  );
+});
+
 test('accepts main highest + 1 with a newer timestamp', (t) => {
-  const { run } = fixture(t, { idx: 138, tag: '0138_pr', when: 4000 });
+  const { run } = fixture(t, [{ idx: 138, tag: '0138_pr', when: 4000 }]);
   assert.equal(run().status, 0);
 });
 

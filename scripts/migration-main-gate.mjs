@@ -23,12 +23,12 @@ try {
   );
   const highest = Math.max(-1, ...main.map((entry) => entry.idx));
   const latest = Math.max(0, ...main.map((entry) => entry.when));
-  const next = String(highest + 1).padStart(4, '0');
-  const entries = JSON.parse(readFileSync(journal, 'utf8')).entries;
+  const entries = JSON.parse(readFileSync(journal, 'utf8')).entries.filter((entry) =>
+    added.has(`apps/server/drizzle/${entry.tag}.sql`),
+  );
   let failures = 0;
-  for (const entry of entries) {
+  for (const [index, entry] of entries.entries()) {
     const file = `apps/server/drizzle/${entry.tag}.sql`;
-    if (!added.has(file)) continue;
     const collision = main.some(
       (existing) =>
         existing.idx === entry.idx ||
@@ -36,8 +36,10 @@ try {
         Number(existing.tag.split('_')[0]) === Number(entry.tag.split('_')[0]),
     );
     if (collision || entry.when <= latest) {
+      const next = String(highest + 1 + index).padStart(4, '0');
+      const repair = collision ? `renumber to ${next} and set when` : 'set when';
       console.error(
-        `${file}: ${collision ? 'migration number or tag already exists on origin/main' : 'when must exceed origin/main maximum'}; renumber to ${next} and set when to the current time in ms`,
+        `${file}: ${collision ? 'migration number or tag already exists on origin/main' : 'when must exceed origin/main maximum'}; ${repair} to the current time in ms`,
       );
       failures++;
     }
