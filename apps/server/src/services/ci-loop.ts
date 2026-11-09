@@ -37,6 +37,7 @@ import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
+import { syncAutonomyPauses } from './github-autonomy-brake.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
 import { githubText } from './github-text.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
@@ -1016,7 +1017,6 @@ export function createCiPoller(
     ) {
       hintOnce(cand.buildId, CI_FIX_GREEN_EVENT, 0);
     }
-    setTodoPhase(deps, cand.todoId, 'review');
     maybeEnqueueIndependentReview(deps, todoRow, cand.buildId);
     const lastVerifyAt = deps.db
       .select({ at: step.createdAt })
@@ -1035,6 +1035,22 @@ export function createCiPoller(
           lastVerifyAt + 1,
         ),
     });
+    const gateStepQueued = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, cand.buildId),
+          inArray(step.kind, ['review', 'verify']),
+          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+        ),
+      )
+      .get();
+    if (gateStepQueued !== undefined) {
+      tally.pending += 1;
+      return;
+    }
+    setTodoPhase(deps, cand.todoId, 'review');
     tally.advanced += 1;
   }
 
@@ -1052,6 +1068,7 @@ export function createCiPoller(
     sweepStartedAt = nowMs();
     await recoverAutonomousMerges(deps, run.githubFetch, now, CI_POLL_INTERVAL_MS);
     try {
+      await syncAutonomyPauses({ ...deps, githubFetch: run.githubFetch });
       await recoverRedAutonomousMain(deps, run.githubFetch);
     } catch (error) {
       run.logger?.info(

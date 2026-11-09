@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
+import type { GitIdentity } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { routingRule, step as stepTable } from '../src/db/schema.js';
+import { machine as machineTable, routingRule, step as stepTable } from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
@@ -29,8 +31,12 @@ function setSessionProvider(s: TestServer, provider: string): void {
     .run();
 }
 
-async function withRoutedStack(opts: { secretsGranted?: boolean } = {}) {
-  const s = bootServer();
+async function withRoutedStack(
+  opts: { secretsGranted?: boolean; githubAppIdentity?: GitIdentity } = {},
+) {
+  const s = bootServer(
+    opts.githubAppIdentity === undefined ? {} : { githubAppIdentity: opts.githubAppIdentity },
+  );
   const keysvc = { db: s.db, box: s.secretBox };
   createProvider(keysvc, {
     teamId: s.team.id,
@@ -260,6 +266,68 @@ test('finished steps retain provider-key responses', async () => {
       apiKey: RELAY_KEY,
     });
   }
+});
+
+test('a step commits as the configured App bot user from configuration, and as nobody in particular without one', async () => {
+  const s = await withRoutedStack();
+  const machineId = insertMachine(s, { name: 'identity' });
+  const stepId = addStep(s, s.buildId, 'build');
+  s.db
+    .update(stepTable)
+    .set({ machineId, status: 'claimed' })
+    .where(eq(stepTable.id, stepId))
+    .run();
+  const deps = {
+    ...s.svc,
+    box: s.secretBox,
+    reposDir: s.reposDir,
+    attachmentsDir: s.attachmentsDir,
+    skillsDir: s.skillsDir,
+  };
+  expect((await stepToken(deps, machineId, stepId)).commitIdentity).toBeNull();
+  const bot = {
+    name: 'cairnwright[bot]',
+    email: '347615582+cairnwright[bot]@users.noreply.github.com',
+  };
+  expect(
+    (
+      await stepToken(
+        { ...deps, githubAppTokenSocket: null, githubAppIdentity: bot },
+        machineId,
+        stepId,
+      )
+    ).commitIdentity,
+  ).toEqual(bot);
+});
+
+test('the machine token route hands the configured App identity to a first claim and to a retry', async () => {
+  const bot = {
+    name: 'cairnwright[bot]',
+    email: '347615582+cairnwright[bot]@users.noreply.github.com',
+  };
+  const s = await withRoutedStack({ githubAppIdentity: bot });
+  const machineId = insertMachine(s, { name: 'route-identity' });
+  const machineToken = 'route-identity-machine-auth';
+  s.db
+    .update(machineTable)
+    .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+    .where(eq(machineTable.id, machineId))
+    .run();
+  const headers = { authorization: `Bearer ${machineToken}` };
+  s.db
+    .update(stepTable)
+    .set({ machineId, status: 'claimed' })
+    .where(eq(stepTable.id, s.stepId))
+    .run();
+  const first = await s.app.request(`/api/machine/token/${s.stepId}`, { headers });
+  expect(first.status).toBe(200);
+  expect(((await first.json()) as { commitIdentity: unknown }).commitIdentity).toEqual(bot);
+  s.db.update(stepTable).set({ status: 'failed' }).where(eq(stepTable.id, s.stepId)).run();
+  const retry = addStep(s, s.buildId, 'build');
+  s.db.update(stepTable).set({ machineId, status: 'claimed' }).where(eq(stepTable.id, retry)).run();
+  const retried = await s.app.request(`/api/machine/token/${retry}`, { headers });
+  expect(retried.status).toBe(200);
+  expect(((await retried.json()) as { commitIdentity: unknown }).commitIdentity).toEqual(bot);
 });
 
 describe('resolveStepCredentials routing', () => {

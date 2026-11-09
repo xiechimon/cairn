@@ -1,7 +1,11 @@
+import { createHash } from 'node:crypto';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
+  readlinkSync,
   rmSync,
   statSync,
   utimesSync,
@@ -12,6 +16,7 @@ import {
   type BoundGitCredentials,
   BRIEF_MARKER_BEGIN,
   BRIEF_RECONCILE_FILENAMES,
+  type CommitIdentity,
   conversationBranch,
   type GitCredentialSource,
   LOCAL_ERROR_REASON_COPY,
@@ -19,6 +24,7 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
+  type PushPublication,
   READONLY_EXPORT_MARKER,
   ReadOnlyWorkspaceError,
   RemoteBranchDivergedError,
@@ -34,11 +40,62 @@ import {
   withGitNetRetries,
 } from './git.js';
 import type { DaemonLogger } from './log.js';
+import { attributeStepCommits } from './step-attribution.js';
 import {
   runWorkspaceHook,
   WorkspaceHookError,
   workspaceHookErrorMessage,
 } from './workspace-hooks.js';
+
+const SETUP_DRIFT_FILE = 'cairn-setup-drift.json';
+
+type PathFingerprints = Record<string, string>;
+
+async function worktreeFingerprint(cwd: string, path: string): Promise<string> {
+  const full = join(cwd, path);
+  if (!existsSync(full) && !isDanglingLink(full)) return 'absent';
+  const stat = lstatSync(full);
+  if (stat.isSymbolicLink()) return `link:${readlinkSync(full)}`;
+  if (stat.isDirectory()) {
+    const head = existsSync(join(full, '.git')) ? await gitPrim.head(full) : null;
+    return `dir:${head ?? 'none'}`;
+  }
+  const executable = (stat.mode & 0o111) !== 0 ? 'x' : '-';
+  return `file:${executable}:${createHash('sha256').update(readFileSync(full)).digest('hex')}`;
+}
+
+function isDanglingLink(full: string): boolean {
+  try {
+    return lstatSync(full).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+async function fingerprintsOf(cwd: string, paths: readonly string[]): Promise<PathFingerprints> {
+  const index = await gitPrim.indexEntries(cwd, paths);
+  const entries = await Promise.all(
+    paths.map(
+      async (path) =>
+        [
+          path,
+          `${await worktreeFingerprint(cwd, path)}|index:${index.get(path) ?? 'absent'}`,
+        ] as const,
+    ),
+  );
+  return Object.fromEntries(entries);
+}
+
+function readSetupDrift(file: string): PathFingerprints {
+  if (!existsSync(file)) return {};
+  const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  return Object.fromEntries(
+    Object.entries(parsed).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+}
 
 const CONV_DIR_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -311,13 +368,15 @@ export class WorkspaceManager implements WorktreeOps {
     credentials: BoundGitCredentials | null,
   ): Promise<WorkspaceHookNoteData[]> {
     try {
-      const note = await runWorkspaceHook({
-        cwd,
-        name,
-        credentials,
-        timeoutMs: this.hookTimeoutMs,
-        log: (line) => this.logger.workspace(line),
-      });
+      const note = await this.recordingSetupDrift(cwd, () =>
+        runWorkspaceHook({
+          cwd,
+          name,
+          credentials,
+          timeoutMs: this.hookTimeoutMs,
+          log: (line) => this.logger.workspace(line),
+        }),
+      );
       return note === null ? [] : [note];
     } catch (err) {
       if (err instanceof WorkspaceHookError) {
@@ -334,9 +393,50 @@ export class WorkspaceManager implements WorktreeOps {
     }
   }
 
-  async commitAll(cwd: string, message: string, identity: { name: string; email: string }) {
+  private async recordingSetupDrift<T>(cwd: string, run: () => Promise<T>): Promise<T> {
+    const before = await fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd));
+    try {
+      return await run();
+    } finally {
+      if (existsSync(cwd)) {
+        const after = await fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd));
+        const file = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
+        const drift = readSetupDrift(file);
+        for (const path of new Set([...Object.keys(before), ...Object.keys(after)])) {
+          if (before[path] === after[path]) continue;
+          const agentOwned = before[path] !== undefined && drift[path] !== before[path];
+          const now = after[path];
+          if (now === undefined || agentOwned) delete drift[path];
+          else drift[path] = now;
+        }
+        writeFileSync(file, JSON.stringify(drift));
+      }
+    }
+  }
+
+  async commitAll(
+    cwd: string,
+    message: string,
+    identity: CommitIdentity,
+  ): Promise<{ committed: boolean; head: string | null; setupDrift: string[] }> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
-    await gitPrim.addAll(cwd);
+    const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
+    const drift = readSetupDrift(driftFile);
+    const dirty = await gitPrim.dirtyPaths(cwd);
+    const current = await fingerprintsOf(cwd, dirty);
+    const setupDrift = dirty.filter(
+      (path) => drift[path] !== undefined && drift[path] === current[path],
+    );
+    const driftSet = new Set(setupDrift);
+    await gitPrim.addPaths(
+      cwd,
+      dirty.filter((path) => !driftSet.has(path)),
+    );
+    await gitPrim.unstagePaths(cwd, setupDrift);
+    writeFileSync(driftFile, JSON.stringify(await fingerprintsOf(cwd, setupDrift)));
+    for (const path of setupDrift) {
+      this.logger.workspace(`workspace setup drift left out of the commit: ${path}`);
+    }
     const leaked = await gitPrim.stagedPathsContaining(cwd, BRIEF_MARKER_BEGIN, [
       ...BRIEF_RECONCILE_FILENAMES,
     ]);
@@ -344,9 +444,9 @@ export class WorkspaceManager implements WorktreeOps {
       await gitPrim.unstagePath(cwd, path);
       this.logger.workspace(`brief marker dropped from commit: ${path}`);
     }
-    const committed = await gitPrim.commit(cwd, message, identity);
+    const committed = await gitPrim.commit(cwd, message, identity, this.hookTimeoutMs);
     const head = await gitPrim.head(cwd);
-    return { committed, head };
+    return { committed, head, setupDrift };
   }
 
   async briefMarkerInRef(cwd: string, ref: string): Promise<string[]> {
@@ -355,8 +455,14 @@ export class WorkspaceManager implements WorktreeOps {
     ]);
   }
 
-  async push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void> {
+  async push(
+    cwd: string,
+    branch: string,
+    credentials: BoundGitCredentials | null,
+    publication: PushPublication,
+  ): Promise<void> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
+    await attributeStepCommits({ ...publication, dir: cwd, branch, credential: credentials });
     await withGitNetRetries(() =>
       gitPrim.push(cwd, branch, credentials, (local, remote) =>
         this.logger.workspace(
@@ -366,8 +472,39 @@ export class WorkspaceManager implements WorktreeOps {
     );
   }
 
-  async mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }> {
+  async mergeDefaultBranch(
+    cwd: string,
+    defaultBranch: string,
+    credentials: BoundGitCredentials | null,
+  ): Promise<{ output: string }> {
+    const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
+    const drift = readSetupDrift(driftFile);
+    const recorded = Object.keys(drift);
+    const current = await fingerprintsOf(cwd, recorded);
+    const setupDrift = recorded.filter((path) => drift[path] === current[path]);
+    if (setupDrift.length === 0) {
+      return { output: await gitPrim.mergeNoEdit(cwd, `origin/${defaultBranch}`) };
+    }
+    await gitPrim.resetPathsToHead(cwd, setupDrift);
+    writeFileSync(driftFile, JSON.stringify({}));
+    this.logger.workspace(`setup drift reset before merge: ${setupDrift.join(', ')}`);
     const output = await gitPrim.mergeNoEdit(cwd, `origin/${defaultBranch}`);
+    try {
+      await this.recordingSetupDrift(cwd, () =>
+        runWorkspaceHook({
+          cwd,
+          name: 'setup',
+          credentials,
+          timeoutMs: this.hookTimeoutMs,
+          log: (line) => this.logger.workspace(line),
+        }),
+      );
+    } catch (err) {
+      if (err instanceof WorkspaceHookError) {
+        throw new Error(workspaceHookErrorMessage(err.note), { cause: err });
+      }
+      throw err;
+    }
     return { output };
   }
 

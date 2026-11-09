@@ -1,3 +1,4 @@
+import type { GitIdentity } from '@cairn/shared';
 import type { AppToken, AppTokenReason, AutonomousToken, UserToken } from '../lib/github-token.js';
 import { unattributed } from '../lib/github-token.js';
 import { appTokenOrNull } from './github-app-token.js';
@@ -53,4 +54,8 @@ export async function githubReadToken(
       repo,
     )) ?? (await userTokenOrNull(deps, teamId))
   );
+}
+
+export function softwareCommitIdentity(deps: GithubTokenDeps): GitIdentity | null {
+  return deps.githubAppIdentity ?? null;
 }

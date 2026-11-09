@@ -122,7 +122,7 @@ test('a needs-you report shows the thread own line and answers the question thro
     {
       threads: [THREAD],
       messages: NEEDS_YOU_ROWS,
-      todos: [{ ...TASK, phase: 'building', awaitingReply: true }],
+      todos: [{ ...TASK, phase: 'needs_input' }],
     },
     (path, route, json) => {
       if (path !== `/api/todos/${TASK.id}/messages` || route.request().method() !== 'POST') return;
@@ -176,7 +176,7 @@ test('only the newest needs-you report of a thread offers a reply', async ({ pag
       asked('first-question', 'Which export format?', 20),
       asked('second-question', 'Which delimiter?', 30),
     ],
-    todos: [{ ...TASK, phase: 'building', awaitingReply: true }],
+    todos: [{ ...TASK, phase: 'needs_input' }],
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
@@ -301,7 +301,7 @@ test('a parked question keeps its reply after a later review report', async ({ p
       report('question', 'needs-you', 20),
       report('parked', 'review', 30),
     ],
-    todos: [{ ...TASK, phase: 'review', awaitingReply: true }],
+    todos: [{ ...TASK, phase: 'needs_input' }],
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');

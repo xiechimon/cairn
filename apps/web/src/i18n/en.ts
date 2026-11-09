@@ -198,8 +198,6 @@ export const EN: Record<string, string> = {
   连接一台机器: 'Connect a machine',
   运行: 'Run',
   连接这台机器: 'to connect this machine',
-  '设置 Coordinator': 'Set up the Coordinator',
-  '给 Coordinator 选一个 Agent，它才能回答': 'Pick an Agent for the Coordinator so it can answer',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
   '点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。':
     'Use the button below the box to connect a model source, a machine and the Coordinator, then send again.',
@@ -372,6 +370,10 @@ export const EN: Record<string, string> = {
   '你确认方案后，Agent 开始构建。': 'The agent starts building once you confirm the plan.',
   '构建完成后，Agent 会把它移到审核。': 'The agent moves it to Review when the build is done.',
   '审核无误后，你可以把它标记为已完成。': 'Mark it done once the review looks right.',
+  '它在等一个问题的回答，回答后会在同一个会话里继续。':
+    'It is waiting for an answer to its question; once answered it continues in the same session.',
+  待回答: 'Needs input',
+  '回答它的问题…': 'Answer its question…',
   '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
   '这次运行失败了，可以重跑，或移回待开始。':
     'This run failed. Rerun it, or move it back to To start.',
@@ -471,6 +473,7 @@ export const EN: Record<string, string> = {
     'API keys connect machines from the command line and let MCP clients reach your workbench.',
   新建密钥: 'New key',
   复制: 'Copy',
+  复制代码: 'Copy code',
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
@@ -579,14 +582,6 @@ export const EN: Record<string, string> = {
   // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
   // 步只等它上线不自动改派）。
   模型: 'Model',
-  // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
-  归属机: 'Home machine',
-  ' · 归属机 {machine}': ' · on {machine}',
-  模型与归属机: 'Model & home machine',
-  '跟随绑定 Agent：模型 {model} · 归属机 {machine}':
-    'Follows the bound Agent: model {model} · home {machine}',
-
-  未设归属机: 'no home machine',
   接入机器: 'Connect a machine',
   在线: 'Online',
   '迁移到…': 'Migrate to…',
@@ -729,7 +724,7 @@ export const EN: Record<string, string> = {
   主题: 'Thread',
   新主题: 'New thread',
   'Coordinator 设置': 'Coordinator settings',
-  '请先为 Coordinator 选择一个 Agent。': 'Choose an Agent for the Coordinator first.',
+  '请先在工作路由里配置 Coordinator。': 'Configure the Coordinator in work routing first.',
   '有什么可以帮你的？': 'How can I help?',
   章程: 'Charter',
   记忆: 'Memory',
@@ -740,8 +735,6 @@ export const EN: Record<string, string> = {
   '尚无章程。点击编辑，为 Coordinator 添加常设指示。':
     'No charter yet. Click edit to give the Coordinator standing instructions.',
   编辑: 'Edit',
-  '尚未选择 Agent。请先在「Agent」页选定 Agent，记忆将保存在该 Agent 上。':
-    'No Agent selected yet. Pick an Agent on the "Agent" tab first; memories are saved on that Agent.',
   '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。':
     'Nothing being watched yet. When the Coordinator watches a todo, or promises to check back at a set time, it is listed here by thread.',
   // #811 关注 tab：无备注 wake 行的回退文案（有备注显示备注原文）。
@@ -1167,8 +1160,9 @@ export const EN: Record<string, string> = {
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
-  '尚无记忆。Agent 会在工作中将值得沉淀的经验存入此处。':
-    'No memories yet. The Agent stores experience worth keeping here as it works.',
+  '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。':
+    'No memories yet. The Coordinator stores experience worth keeping here as it works.',
+  模型与机器: 'Model & machine',
 
   // —— #499 记忆 tab 的搜索与排序（配额头 + 搜索框 + 排序档）——
   // `记忆 · {n} / {max}`：{max} = shared MEMORY_QUOTA_PER_AGENT 插值，不写死
@@ -1439,6 +1433,12 @@ export const EN: Record<string, string> = {
   用途: 'Uses',
   连接: 'Connections',
   模型路由: 'Model routing',
+  用量与连接: 'Usage & connections',
+  正在加载用量与连接: 'Loading usage & connections',
+  用量与连接没能加载: 'Usage & connections did not load',
+  规则与策略: 'Rules & policies',
+  正在加载规则与策略: 'Loading rules & policies',
+  规则与策略没能加载: 'Rules & policies did not load',
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
@@ -1804,8 +1804,6 @@ export const EN: Record<string, string> = {
   机器没能加载: 'Machines did not load',
   正在加载模型服务: 'Loading providers',
   模型服务没能加载: 'Providers did not load',
-  正在加载工作路由: 'Loading work routing',
-  工作路由没能加载: 'Work routing did not load',
   正在加载命令记录: 'Loading command history',
   命令记录没能加载: 'Command history did not load',
   '正在加载 Coordinator 的电脑': "Loading the Coordinator's computer",

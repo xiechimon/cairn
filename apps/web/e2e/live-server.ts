@@ -106,7 +106,7 @@ export async function bootLiveServer(
   for (;;) {
     try {
       const res = await fetch(`${base}/api/teams`, { signal: AbortSignal.timeout(2_000) });
-      if (res.status === (token !== null ? 401 : 200)) break;
+      if (res.status === 200 || (token !== null && res.status === 401)) break;
     } catch {}
     const exited = child.exitCode ?? child.signalCode;
     if (exited !== null || Date.now() > deadline) {

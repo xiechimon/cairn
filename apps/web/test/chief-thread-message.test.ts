@@ -66,6 +66,7 @@ describe('how a home card reply reaches its thread', () => {
     ['review', 'revision'],
     ['failed', 'restart'],
     ['building', 'steer'],
+    ['needs_input', 'steer'],
     ['done', 'steer'],
     ['queued', null],
     ['todo', null],

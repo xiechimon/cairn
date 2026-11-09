@@ -9,6 +9,7 @@ import type {
   MachineCapabilities,
 } from '@cairn/shared';
 import {
+  appendAnswers,
   CLAIM_BACKOFF_CAP_MS,
   CLAIM_POLL_INTERVAL_MS,
   type ClaudeLogin,
@@ -616,8 +617,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
-      const content = await client.steer(stepId);
-      if (content === null) return;
+      const fetched = await client.steer(stepId);
+      const answers = fetched?.answers ?? [];
+      const content = appendAnswers(fetched?.content ?? '', answers);
+      if (content === '') return;
       let deliveryText = content;
       let images: DeliveredImage[] | undefined;
       try {
@@ -657,7 +660,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         return;
       }
       await live.steer(deliveryText, images);
-      await client.steerAck?.(stepId);
+      await client.steerAck?.(
+        stepId,
+        answers.length > 0
+          ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' }
+          : undefined,
+      );
       logger.step(`steer delivered step=${stepId}`);
     } catch (err) {
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);

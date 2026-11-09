@@ -21,6 +21,6 @@
   },
   {
     "file": "docs/verify/2136/review-check.test.mjs",
-    "reason": "Historical collector test reads the retired lessons event stream; keep the archive and run the current commit-author recovery safeguards instead."
+    "reason": "Historical collector test reads the retired lessons event stream; keep the archive and run the current commit identity check instead."
   }
 ]

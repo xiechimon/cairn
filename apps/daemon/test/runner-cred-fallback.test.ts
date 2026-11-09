@@ -190,7 +190,7 @@ function fakeWorkspace(opts: {
     },
     async commitAll() {
       calls.push('commitAll');
-      return { committed: true, head: 'abc123' };
+      return { committed: true, head: 'abc123', setupDrift: [] };
     },
     async push(_cwd, branch, cred) {
       calls.push(`push:${branch}`);
@@ -333,7 +333,12 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
       });
       const workspace = fakeWorkspace({});
       const manager = new WorkspaceManager({ logger: captureLogger().logger });
-      workspace.ws.push = manager.push.bind(manager);
+      workspace.ws.push = (cwd, branch, cred) =>
+        manager.push(cwd, branch, cred, {
+          base: null,
+          identity: null,
+          coAuthor: null,
+        });
       const pending = setup(
         claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
         { git: GITHUB_TOKEN, workspace },

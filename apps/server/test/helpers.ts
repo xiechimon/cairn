@@ -19,6 +19,7 @@ import type { AppContext } from '../src/context.js';
 import { type Db, openMemoryDb } from '../src/db/client.js';
 import {
   apiKey,
+  autonomyPause,
   build as buildTable,
   machine as machineTable,
   routingRule,
@@ -32,6 +33,7 @@ import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { enqueueStep } from '../src/services/builds.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
+import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
 import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { VapidKeys } from '../src/services/push.js';
@@ -69,11 +71,13 @@ export function bootServer(
     skillImportTimeoutMs?: number;
     webDir?: string | null;
     githubFetch?: AppContext['githubFetch'];
+    githubAppIdentity?: AppContext['githubAppIdentity'];
     logger?: AppContext['logger'];
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
     providerTestTimeoutMs?: number;
     authToken?: string | null;
+    loopbackOwner?: AppContext['loopbackOwner'];
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
@@ -147,6 +151,9 @@ export function bootServer(
         ? {}
         : { providerTestTimeoutMs: opts.providerTestTimeoutMs }),
       githubFetch: opts.githubFetch ?? rejectingGithubFetch,
+      ...(opts.githubAppIdentity !== undefined
+        ? { githubAppIdentity: opts.githubAppIdentity }
+        : {}),
       ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
       ...(opts.skillImportFetch !== undefined ? { skillImportFetch: opts.skillImportFetch } : {}),
       ...(opts.skillImportTimeoutMs !== undefined
@@ -160,6 +167,7 @@ export function bootServer(
       skillSourcesPath,
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
       authToken: opts.authToken ?? null,
+      loopbackOwner: opts.loopbackOwner ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
     };
     const app = createApp(appContext, opts.logger);
@@ -492,4 +500,22 @@ export function machineIdByName(s: TestServer, name: string): string {
 
 export function withVerification(plan: string): string {
   return `Kind: fix\n${plan}\n\n## Verification\n- \`pnpm test\` 通过\n`;
+}
+
+export function pauseTeamForTest(db: Db, teamId: string): void {
+  db.insert(autonomyPause)
+    .values({
+      id: newRecordId(),
+      teamId,
+      source: 'settings',
+      reason: 'Paused in a test.',
+      markers: [],
+      publishError: 'test pause publishes no marker',
+      openedAt: Date.now(),
+    })
+    .run();
+}
+
+export function teamPausedForTest(db: Db, teamId: string): boolean {
+  return teamAutonomyPaused(db, teamId);
 }

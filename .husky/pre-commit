@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 set -e
 
+node scripts/commit-identity.mjs pre-commit
+
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$STAGED" ] && exit 0
 

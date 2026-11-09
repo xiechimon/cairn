@@ -127,7 +127,7 @@ function RoutingContent() {
   return (
     <PageShell
       route={MODEL_ROUTING_HREF}
-      title={t('模型路由')}
+      title={t('用量与连接')}
       selected={MODEL_ROUTING_HREF}
       fixture={fixture}
     >
@@ -143,8 +143,8 @@ function RoutingContent() {
             <QueryBoundary
               query={live ? routingQ : undefined}
               isEmpty={live && routingQ.data === undefined}
-              loadingLabel={t('正在加载工作路由')}
-              errorTitle={t('工作路由没能加载')}
+              loadingLabel={t('正在加载用量与连接')}
+              errorTitle={t('用量与连接没能加载')}
               empty={null}
             >
               <div className="flex flex-col gap-8 pb-16">

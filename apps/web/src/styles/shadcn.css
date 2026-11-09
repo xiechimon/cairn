@@ -151,11 +151,29 @@
   --selection-bar-ink: rgb(255 255 255);
   --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(0 0 0 / 0.24);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
-  --shadow-composer:
-    0 4px 20px rgb(0 0 0 / 0.075), inset 0 0 0 var(--hairline) rgb(255 255 255 / 0.08);
+  --composer-ring: rgb(255 255 255 / 0.08);
+  --composer-ring-focus: rgb(255 255 255 / 0.16);
+  --composer-drop: 0 4px 20px rgb(0 0 0 / 0.075);
+  --shadow-composer: var(--composer-drop), inset 0 0 0 var(--hairline) var(--composer-ring);
   --shadow-composer-hover: var(--shadow-composer);
   --shadow-composer-focus:
-    0 4px 20px rgb(0 0 0 / 0.075), inset 0 0 0 var(--hairline) rgb(255 255 255 / 0.16);
+    var(--composer-drop), inset 0 0 0 var(--hairline) var(--composer-ring-focus);
+  --shadow-composer-attached:
+    var(--composer-drop), inset var(--hairline) 0 0 0 var(--composer-ring),
+    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring),
+    inset 0 calc(var(--hairline) * -1) 0 0 var(--composer-ring);
+  --shadow-composer-attached-focus:
+    var(--composer-drop), inset var(--hairline) 0 0 0 var(--composer-ring-focus),
+    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring-focus),
+    inset 0 calc(var(--hairline) * -1) 0 0 var(--composer-ring-focus);
+  --shadow-composer-cap:
+    inset var(--hairline) 0 0 0 var(--composer-ring),
+    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring),
+    inset 0 var(--hairline) 0 0 var(--composer-ring);
+  --shadow-composer-cap-focus:
+    inset var(--hairline) 0 0 0 var(--composer-ring-focus),
+    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring-focus),
+    inset 0 var(--hairline) 0 0 var(--composer-ring-focus);
   --canvas: #1f1f1f;
   --background: #191919;
   --foreground: #efefef;
@@ -212,6 +230,18 @@
   --switch-on: var(--card-button);
   --tag-tint: 22%;
   --code-pill-bg: #2a2a2a;
+  --prose-code-surface: rgb(32 32 32 / 0.5);
+  --prose-code-line: rgb(255 255 255 / 0.04);
+  --prose-code-fill: rgb(255 255 255 / 0.075);
+  --code-token-plain: currentColor;
+  --code-token-keyword: #cc7bf4;
+  --code-token-function: #70b8ff;
+  --code-token-string: #9be963;
+  --code-token-constant: #5eeded;
+  --code-token-parameter: #f7ab5f;
+  --code-token-type: #fbad60;
+  --code-token-punctuation: #d3d7de;
+  --code-token-comment: #818898;
   --bubble-base: #262626;
   --bubble-wash-a: rgb(130 180 111 / 0.16);
   --bubble-wash-b: rgb(111 147 187 / 0.14);
@@ -266,10 +296,20 @@
   --selection-bar-ink: rgb(255 255 255);
   --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(11 11 11 / 0.08);
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
-  --shadow-composer: 0 4px 20px rgb(0 0 0 / 0.035), inset 0 0 0 var(--hairline) rgb(0 0 0 / 0.1);
-  --shadow-composer-hover: var(--shadow-composer);
-  --shadow-composer-focus:
-    0 4px 20px rgb(0 0 0 / 0.035), inset 0 0 0 var(--hairline) rgb(0 0 0 / 0.2);
+  --composer-ring: rgb(0 0 0 / 0.1);
+  --composer-ring-focus: rgb(0 0 0 / 0.2);
+  --composer-drop: 0 4px 20px rgb(0 0 0 / 0.035);
+  --prose-code-surface: rgb(255 255 255 / 0.5);
+  --prose-code-line: rgb(0 0 0 / 0.08);
+  --prose-code-fill: rgb(0 0 0 / 0.05);
+  --code-token-keyword: #8100c2;
+  --code-token-function: #0051c2;
+  --code-token-string: #008000;
+  --code-token-constant: #008080;
+  --code-token-parameter: #b84f05;
+  --code-token-type: #b34a00;
+  --code-token-punctuation: #2b303b;
+  --code-token-comment: #6e7687;
   --canvas: #fafafa;
   --background: #ffffff;
   --foreground: #1a1a1a;

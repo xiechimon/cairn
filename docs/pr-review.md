@@ -54,13 +54,9 @@ Three hard rules:
 
 The review verdict lands as a **PR comment** (`gh pr comment`; write long content to a one-off file and use `--body-file`), not by editing the PR body — the body is the author's evidence surface, and the review does not change it.
 
-## Merge method by commit author
+## Merge method and commit identity
 
-Read the PR opener and every commit author (`gh pr view <n> --json author,commits`) before choosing the merge method. A bot-opened PR merges by rebase from exactly one commit whose author is one of the accepted bot authors; a human-opened PR merges by squash.
-
-Accepted bot commit authors: `Cairnwright`, `cairnwright[bot]`.
-
-Both are treated the same by the merge helper `merge-pr.sh`. A `cairnwright[bot]` commit must also carry a `Cairn-Thread:` trailer and a `Co-authored-by: xiechimon` trailer. Any other bot author is foreign and the PR goes back to the dispatcher. The `commit-author` workflow still rejects `cairnwright[bot]` until the identity switch (#2289) lands, so a `cairnwright[bot]` commit that reaches main fails that check until then.
+Every PR merges by squash, whoever opened it. A squash commit is authored by the PR opener, so an App-opened PR lands on main as `cairnwright[bot]` and an ian-opened PR as ian. Inside the PR, every commit on a branch of this repository is authored by `cairnwright[bot]` or by ian, and a fork PR carries neither identity; the `commit-author` check enforces this from `packages/shared/commit-identity.json`, and `docs/ops/agent-bot-identity.md` explains the identity.
 
 ## Mechanical checks are not the reviewer's job (do not be a CI parrot)
 

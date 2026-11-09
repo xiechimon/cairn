@@ -28,6 +28,7 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
     action: null,
     placeholder: '向 Agent 补充说明，执行过程中即可送达',
   },
+  needs_input: { chip: '待回答', tone: 'confirm', action: '回答', placeholder: '回答它的问题…' },
   review: { chip: '审核', tone: 'confirm', action: '完成', placeholder: '请求修改…' },
   done: {
     chip: '已完成',
@@ -56,6 +57,7 @@ export const PHASE_STATUS: Record<Phase, { glyph: GlyphKind; ink: string }> = {
   planning: { glyph: 'quarter', ink: PLAN_INK },
   confirm: { glyph: 'half', ink: ACCENT_INK },
   building: { glyph: 'three-quarter', ink: RUNNING_INK },
+  needs_input: { glyph: 'half', ink: ACCENT_INK },
   review: { glyph: 'three-quarter', ink: ACCENT_INK },
   failed: { glyph: 'failed', ink: 'text-destructive' },
   done: { glyph: 'done', ink: RUNNING_INK },

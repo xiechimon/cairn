@@ -32,8 +32,9 @@ who did not watch the work. Use this order:
 
 For code changes, the Codex cloud review on the PR head is the required
 review. Protected paths, documentation included, need it too; other
-docs-only changes need no code review. After three rounds, rethink or hand
-the PR to ian.
+docs-only changes need no code review. Review convergence (whole bug class
+per push, one push per round, P2/P3 deferral to a real issue, the round-3
+stop) follows `AGENTS.md`, "How to work".
 Review links the Codex cloud review on the head SHA, states its verdict and
 lists unfixed findings with reasons. Risk states one-way or two-way
 door, blast radius and whether the owner must merge. Put longer overlap
@@ -49,10 +50,14 @@ lines do not count. Over the limit, it reports
 `too-long: <n> characters of prose outside tables, images, code and details (limit 600)`.
 Keep Proof and What short; put supporting output in tables or code blocks.
 
-Size is not a gate (D68). The `pr-size` workflow labels each PR `size:XS` to
-`size:XXL` from changed lines, leaving out tests, snapshots, `docs/verify/**`,
-generated drizzle meta and the lockfile. The rule is one underlying problem
-per PR, and the review judges it; a large diff alone is not a finding.
+The `pr-size` check fails a PR above 3000 changed lines outside the generated
+paths in `GENERATED_PATHS` of `scripts/pr-size.mjs` (feature maps,
+`.mergify.yml`, lockfiles, snapshots, drizzle meta, `docs/verify/**`), and
+lists the largest files. Split such a PR into independent PRs off `main`.
+To re-report a head without pushing, run
+`gh workflow run pr-size.yml -f pr=<n>` (no input re-reports every open PR).
+The same workflow labels each PR `size:XS` to `size:XXL`, also leaving out
+tests, for context only.
 A section containing only fenced code or HTML comments is unanswered.
 
 A legacy `## Verified` aliases Proof. The complete legacy six-section shape
@@ -139,8 +144,8 @@ git switch -c pr-assets/123 origin/main
 mkdir -p docs/verify/2206
 cp /tmp/before.png /tmp/after.png /tmp/unchanged.png docs/verify/2206/
 git add docs/verify/2206/before.png docs/verify/2206/after.png docs/verify/2206/unchanged.png
-git commit -m "docs(2206): add PR screenshots (#123)"
-git push origin HEAD
+~/.cairn/tools/app-token/as-bot.sh git commit -m "docs(2206): add PR screenshots (#123)"
+~/.cairn/tools/app-token/as-bot.sh git push origin HEAD:pr-assets/123
 git rev-parse HEAD
 ```
 
@@ -221,12 +226,9 @@ Do not run a local `codex exec` or `claude -p` review before pushing. Codex clou
 - `coordinator-hold` means the coordinator asked for changes or a person's decision is pending: `.mergify.yml`, `coordinator-merge.mjs` and `merge-pr.sh` all refuse the PR while it is on. Keep it on until you have pushed the requested work or ian gave the decision, then ask the coordinator to remove it.
 - Agents decide by their own recommendation, say what they chose and why in chat, and continue; decisions routed to ian follow `AGENTS.md`, "Merge routes". Before asking ian about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`.
 - Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs enter the merge queue with every other green PR), with no unchecked tasks anywhere in the body. ian may admin-merge; an agent uses `--admin` only on a PR ian named in chat, after every required check passes on its head (`AGENTS.md`, "Merge routes").
-- Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
-- Bot-opened PRs require exactly one commit authored by `Cairnwright` (`merge-pr.sh` also accepts `cairnwright[bot]` with `Cairn-Thread:` and `Co-authored-by: xiechimon` trailers; see `docs/pr-review.md`, "Merge method by commit author") before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
-- PRs that `.mergify.yml` admits (a green `review-gate` check from GitHub Actions and a green `merge-route` check, with no `coordinator-hold`) enter the Mergify merge queue automatically: never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Path class does not keep a PR on the human route.
-- Human-opened PRs that Mergify does not admit use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author, on the route `AGENTS.md` gives them. After a merge, read the main commit author and the `commit-author` Actions result.
-- Prepare commits outside the App token wrapper, following `docs/ops/agent-bot-identity.md`. Verify that neither the author name nor email of any prepared commit contains `cairnwright[bot]` before pushing.
-- If main's author check fails, follow the recovery procedure in `docs/ops/agent-bot-identity.md`. Preserve main history. A subsequent compliant push checks its own `BEFORE_SHA..HEAD` range; verify the actual main commit author and Actions result after merging.
+- Agent sessions commit, push and open PRs as the App: `~/.cairn/tools/app-token/as-bot.sh git commit ...`, `as-bot.sh git push origin HEAD:<branch>` and `as-bot.sh gh pr create ...`. The commit is authored and committed by `cairnwright[bot]` with `Co-authored-by: xiechimon`, and the push is a plain push with the usual hooks. The pre-commit and pre-push hooks and the `commit-author` check reject any other identity; `docs/ops/agent-bot-identity.md` has the rule.
+- PRs that `.mergify.yml` admits (green `review-gate` from GitHub Actions, `merge-route` and `pr-size` checks, with no `coordinator-hold`) enter the Mergify merge queue automatically: never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Path class does not keep a PR on the human route.
+- PRs that Mergify does not admit merge by squash on the route `AGENTS.md` gives them (`~/.cairn/tools/merge-pr.sh` on the dispatch host). After a merge, read the main commit author and the `commit-author` Actions result.
 
 ## Gate facts — what is actually enforced
 

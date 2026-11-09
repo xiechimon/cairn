@@ -174,7 +174,7 @@ function fakeWorkspace(cwd: string, diff: string | null) {
     },
     async commitAll() {
       calls.push('commitAll');
-      return { committed: true, head: 'def456' };
+      return { committed: true, head: 'def456', setupDrift: [] };
     },
     async push() {
       calls.push('push');

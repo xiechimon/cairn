@@ -1,22 +1,25 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { type GitIdentity, localCommitIdentity } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
-import { autonomousMergeAdmission, build, project, team, todo } from '../db/schema.js';
+import { autonomousMergeAdmission, build, project, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
 import { type FetchLike, githubPull, isFullSha } from '../lib/github.js';
 import type { AutonomousToken } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
-import { autonomousToken } from './github-autonomous-token.js';
-import { brakeRequest, pauseGithubRepo } from './github-autonomy-brake.js';
+import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
+import { brakeRequest, pauseTeamAutonomy } from './github-autonomy-brake.js';
 
-export async function prepareRecoveryBranch(
-  url: string,
-  base: string,
-  reverted: string,
-  token: AutonomousToken,
-): Promise<string> {
+export async function prepareRecoveryBranch(input: {
+  url: string;
+  base: string;
+  reverted: string;
+  token: AutonomousToken;
+  identity: GitIdentity;
+}): Promise<string> {
+  const { url, base, reverted, token, identity } = input;
   if (!isFullSha(base) || !isFullSha(reverted)) throw new Error('Recovery requires full SHAs');
   const dir = await mkdtemp(join(tmpdir(), 'cairn-recovery-'));
   const branch = `cairn-recovery/${reverted.slice(0, 8)}`;
@@ -25,10 +28,10 @@ export async function prepareRecoveryBranch(
     GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
     GIT_CONFIG_VALUE_0: `Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
     GIT_TERMINAL_PROMPT: '0',
-    GIT_AUTHOR_NAME: 'Cairn',
-    GIT_AUTHOR_EMAIL: 'cairn@users.noreply.github.com',
-    GIT_COMMITTER_NAME: 'Cairn',
-    GIT_COMMITTER_EMAIL: 'cairn@users.noreply.github.com',
+    GIT_AUTHOR_NAME: identity.name,
+    GIT_AUTHOR_EMAIL: identity.email,
+    GIT_COMMITTER_NAME: identity.name,
+    GIT_COMMITTER_EMAIL: identity.email,
   };
   const git = async (...args: string[]): Promise<string> => {
     const result = await runGit(args, { cwd: dir, env, timeoutMs: 60_000 });
@@ -37,12 +40,13 @@ export async function prepareRecoveryBranch(
   };
   try {
     await git('init');
-    await git('fetch', '--no-tags', url, base, reverted);
+    await git('remote', 'add', 'origin', url);
+    await git('fetch', '--no-tags', 'origin', base, reverted);
     await git('checkout', '--detach', base);
     const parents = (await git('show', '-s', '--format=%P', reverted)).split(' ');
     await git('revert', '--no-commit', ...(parents.length > 1 ? ['-m', '1'] : []), reverted);
     const tree = await git('write-tree');
-    const sha = await git(
+    const local = await git(
       'commit-tree',
       tree,
       '-p',
@@ -50,7 +54,7 @@ export async function prepareRecoveryBranch(
       '-m',
       `Revert autonomous merge ${reverted.slice(0, 8)}\n\nThis reverts commit ${reverted}.`,
     );
-    await git('push', url, `${sha}:refs/heads/${branch}`);
+    await git('push', 'origin', `${local}:refs/heads/${branch}`);
     return branch;
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -149,12 +153,11 @@ export async function recoverRedAutonomousMain(
       .filter((check) => check.name === 'check' && check.app?.slug === 'github-actions')
       .sort((a, b) => b.id - a.id)[0];
     if (latest?.status !== 'completed' || latest.conclusion !== 'failure') continue;
-    deps.db
-      .update(team)
-      .set({ autonomyPaused: true })
-      .where(eq(team.id, row.admission.teamId))
-      .run();
-    await pauseGithubRepo(fetchImpl, token, repo, `Main check failed at ${main}.`);
+    await pauseTeamAutonomy({ ...deps, githubFetch: fetchImpl }, row.admission.teamId, {
+      source: 'main-red',
+      reason: `Main check failed at ${main} in ${repo}.`,
+      requestKey: `main-red:${repo}:${main}`,
+    }).catch(() => undefined);
     const pull = await githubPull(fetchImpl, token, target.owner, target.repo, row.build.prNumber);
     const reverted = pull?.pull?.mergeCommitSha;
     if (!reverted || !isFullSha(reverted)) continue;
@@ -197,7 +200,13 @@ export async function recoverRedAutonomousMain(
     } else if (!label.ok) continue;
     const ref = await brakeRequest(fetchImpl, token, repo, `git/ref/heads/${branch}`);
     if (ref.status === 404)
-      await prepareRecoveryBranch(`https://github.com/${repo}.git`, main, reverted, token);
+      await prepareRecoveryBranch({
+        url: `https://github.com/${repo}.git`,
+        base: main,
+        reverted,
+        token,
+        identity: softwareCommitIdentity(deps) ?? localCommitIdentity('Cairn'),
+      });
     else if (!ref.ok) continue;
     const opened = await brakeRequest(fetchImpl, token, repo, 'pulls', {
       title: `Revert autonomous merge ${reverted.slice(0, 8)}`,

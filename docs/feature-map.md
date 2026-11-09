@@ -15,14 +15,14 @@
 
 | Item | Count |
 |---|---|
-| Features | 57 |
+| Features | 56 |
 | status shipped | 46 |
 | status partial | 7 |
-| status planned | 4 |
+| status planned | 3 |
 | research, frontend design and backend design all present or not applicable | 18 |
 | Research gaps | 20 |
-| Frontend design gaps | 26 |
-| Backend design gaps | 26 |
+| Frontend design gaps | 25 |
+| Backend design gaps | 25 |
 | notes cited but not on main | 23 |
 
 ## Coverage
@@ -84,7 +84,6 @@
 | [Feature flags and releases](#feature-releases) | 4 | shipped | gap | gap | gap | B11 |
 | [Feishu integration](#feishu) | 4 | shipped | gap | gap | gap | B11 |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
-| [Relay service](#relay-service) | 4 | planned | yes | gap | gap | B12 |
 | [Thread tags](#thread-tags) | 4 | shipped | gap | yes | yes | B11 |
 
 ## Gaps by batch
@@ -205,14 +204,13 @@ Small surfaces that work today without research or design: the Coordinator MCP f
 | [Feishu integration](#feishu) | 4 | Research: no note on why Feishu and what it delivers<br>Frontend design: the Feishu settings have no design<br>Backend design: no design for the Feishu delivery path |
 | [Thread tags](#thread-tags) | 4 | Research: no note on whether tags still earn their place after D58 |
 
-### B12 · Phase 3: relay service and iOS app
+### B12 · Phase 3: iOS app
 
-Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the native iOS app of D22. Research and design only when phase 2 is close.
+Work for after phase 2 graduates: the native iOS app of D22. Research and design only when phase 2 is close.
 
 | Feature | Centrality | Missing |
 |---|---|---|
 | [iOS app](#ios-app) | 4 | Research: the Optio and t3code comparison of D22 has not been done<br>Frontend design: not designed<br>Backend design: not designed |
-| [Relay service](#relay-service) | 4 | Frontend design: not designed<br>Backend design: not designed; T3 Connect is the named reference |
 
 ## Research and design links
 
@@ -380,9 +378,9 @@ Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the 
 
 **Threads** (shipped). A thread is one piece of work with its own session: created, continued, snoozed, archived, reset and counted by phase.
 
-- Research: [docs/research/r12-save-and-start-behavior.md](research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main)
+- Research: [docs/research/r12-save-and-start-behavior.md](research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
-- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main)
+- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 
 ### android-installed-web-app-intake
 
@@ -655,14 +653,6 @@ Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the 
 - Research: **gap**: the Optio and t3code comparison of D22 has not been done
 - Frontend design: **gap**: not designed
 - Backend design: **gap**: not designed
-
-### relay-service
-
-**Relay service** (planned). D104: an optional Cloudflare relay for users who will not sign up for Tailscale, after phase 2.
-
-- Research: [docs/research/cloudflare-control-plane-inventory.md](research/cloudflare-control-plane-inventory.md)
-- Frontend design: **gap**: not designed
-- Backend design: **gap**: not designed; T3 Connect is the named reference
 
 ### thread-tags
 

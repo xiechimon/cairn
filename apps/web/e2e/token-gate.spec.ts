@@ -33,7 +33,7 @@ let authed: LiveServer;
 let openServer: LiveServer;
 
 test.beforeAll(async () => {
-  authed = await bootLiveServer(GATE_TOKEN);
+  authed = await bootLiveServer(GATE_TOKEN, { [ENV_VARS.requireToken]: '1' });
   openServer = await bootLiveServer(null);
 });
 

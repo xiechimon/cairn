@@ -83,8 +83,8 @@
     },
     {
       "id": "B12",
-      "title": "Phase 3: relay service and iOS app",
-      "scope": "Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the native iOS app of D22. Research and design only when phase 2 is close."
+      "title": "Phase 3: iOS app",
+      "scope": "Work for after phase 2 graduates: the native iOS app of D22. Research and design only when phase 2 is close."
     }
   ],
   "features": [
@@ -491,7 +491,7 @@
           "apps/server/src/routes-push.ts",
           "apps/server/src/services/push.ts",
           "apps/server/src/services/push-alerts.ts",
-          "apps/server/src/services/thread-push.ts"
+          "apps/server/src/services/owner.ts"
         ]
       },
       "routes": {
@@ -524,7 +524,7 @@
       "id": "threads",
       "name": "Threads",
       "summary": "A thread is one piece of work with its own session: created, continued, snoozed, archived, reset and counted by phase.",
-      "states": "Running, waiting on the user, done, snoozed or archived; the thread opens in the side panel with its actions menu.",
+      "states": "Running, waiting on the user, done, snoozed or archived; the thread opens in the side panel with its actions menu. Tasks reads include recent archives and pending standalone Coordinator questions; section is derived on every read.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -537,7 +537,8 @@
           "apps/server/src/routes-todos.ts",
           "apps/server/src/services/todos.ts",
           "apps/server/src/services/snooze.ts",
-          "apps/server/src/services/phase.ts"
+          "apps/server/src/services/phase.ts",
+          "apps/server/src/services/tasks.ts"
         ]
       },
       "routes": {
@@ -553,7 +554,8 @@
           "/api/todos/:id/unsnooze",
           "/api/todos/:id/reset",
           "/api/projects/:id/todos",
-          "/api/teams/:id/progress"
+          "/api/teams/:id/progress",
+          "/api/tasks"
         ]
       },
       "reach": [
@@ -568,7 +570,8 @@
       "research": [
         "docs/research/r12-save-and-start-behavior.md",
         "docs/research/r14-orchestration-parent-card.md",
-        "docs/research/branch-model-2026-11-08.md"
+        "docs/research/branch-model-2026-11-08.md",
+        "docs/research/duet-proactive-coordinator.md"
       ],
       "frontendDesign": [
         "docs/design/references/thread-review",
@@ -577,13 +580,15 @@
       "backendDesign": [
         "docs/spec/23-rework-to-original-branch-and-pr-convergence.md",
         "docs/spec/24-run-brief-written-to-worktree-file.md",
-        "docs/research/branch-model-2026-11-08.md"
+        "docs/research/branch-model-2026-11-08.md",
+        "docs/design/duet-shaped-clients.md"
       ],
       "evidence": [
         "apps/web/e2e/detail-continue-thread.spec.ts",
         "apps/web/e2e/detail-archive.spec.ts",
         "apps/server/test/snooze.test.ts",
-        "apps/server/test/archive.test.ts"
+        "apps/server/test/archive.test.ts",
+        "apps/server/test/tasks.test.ts"
       ]
     },
     {
@@ -2577,24 +2582,6 @@
         "apps/daemon/test/runner-create-tag.test.ts"
       ],
       "batch": "B11"
-    },
-    {
-      "id": "relay-service",
-      "name": "Relay service",
-      "summary": "D104: an optional Cloudflare relay for users who will not sign up for Tailscale, after phase 2.",
-      "centrality": 4,
-      "status": "planned",
-      "research": [
-        "docs/research/cloudflare-control-plane-inventory.md"
-      ],
-      "frontendDesign": {
-        "gap": "not designed"
-      },
-      "backendDesign": {
-        "gap": "not designed; T3 Connect is the named reference"
-      },
-      "evidence": [],
-      "batch": "B12"
     },
     {
       "id": "ios-app",

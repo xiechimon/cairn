@@ -5,7 +5,7 @@ import { threadStatus } from './thread-copy.js';
 export const ACT_ORDER = ['needs-you', 'failed', 'review'] as const;
 
 export function actRank(todo: TodoRecord): number {
-  if (todo.awaitingReply === true || todo.phase === 'confirm') return 0;
+  if (todo.phase === 'needs_input' || todo.phase === 'confirm') return 0;
   if (todo.phase === 'failed') return 1;
   return 2;
 }

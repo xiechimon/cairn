@@ -138,6 +138,8 @@ test.each([autonomousToken, githubReadToken])(
   async (resolve) => {
     const db = openMemoryDb();
     vi.stubEnv('CAIRN_APP_TOKEN_SOCKET', '/environment.sock');
+    vi.stubEnv('CAIRN_GITHUB_APP_SLUG', 'cairnwright');
+    vi.stubEnv('CAIRN_GITHUB_APP_BOT_ID', '347615582');
     const provider = vi.spyOn(app, 'appTokenOrNull').mockResolvedValue('fake-app' as AppToken);
     try {
       const config = loadConfig({ authToken: null, githubAppTokenSocket: '/config.sock' });

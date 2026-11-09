@@ -16,6 +16,7 @@ export function replyDeliveryOf(phase: Phase): ThreadReplyDelivery | null {
     case 'failed':
       return 'restart';
     case 'building':
+    case 'needs_input':
     case 'done':
       return 'steer';
     default:

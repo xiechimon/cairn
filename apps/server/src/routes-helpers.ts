@@ -117,8 +117,16 @@ export function verifyGitBasicAuth(ctx: AppContext, header: string): string | un
   )?.id;
 }
 
+export function githubAppOf(ctx: AppContext) {
+  return {
+    githubAppTokenSocket: ctx.githubAppTokenSocket ?? null,
+    githubAppIdentity: ctx.githubAppIdentity ?? null,
+  };
+}
+
 export function svcOf(ctx: AppContext) {
   return {
+    ...githubAppOf(ctx),
     db: ctx.db,
     hub: ctx.hub,
     machineHub: ctx.machineHub,
@@ -136,6 +144,7 @@ export function svcOf(ctx: AppContext) {
 
 export function githubIssueDepsOf(ctx: AppContext): GithubIssueFaceDeps {
   return {
+    ...githubAppOf(ctx),
     db: ctx.db,
     box: ctx.secretBox,
     oauthClient: ctx.oauthClient,

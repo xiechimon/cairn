@@ -517,7 +517,6 @@ const legacyNow: TodoRecord = {
   lastRunAt: at('2026-09-22', 18, 30),
   hasChanges: true,
   hasPlan: true,
-  awaitingReply: false,
   buildHistory: [
     { buildId: 'r3-conv-legacy-1', createdAt: at(R3_DAY, 13, 5) },
     { buildId: 'r3-conv-legacy-1b', createdAt: at('2026-09-22', 18, 30) },
