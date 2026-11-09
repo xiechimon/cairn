@@ -73,7 +73,7 @@ describe('parseSkillFrontmatter', () => {
   it('no frontmatter block -> empty object', () => {
     expect(parseSkillFrontmatter('no frontmatter')).toEqual({});
   });
-  it('quoted values stripped of quotes; folded block scalars not accepted', () => {
+  it('unquotes string scalars and omits empty folded scalars', () => {
     expect(parseSkillFrontmatter('---\nname: "quoted"\n---\n')).toEqual({ name: 'quoted' });
     expect(parseSkillFrontmatter('---\ndescription: >\n---\n')).toEqual({});
   });
