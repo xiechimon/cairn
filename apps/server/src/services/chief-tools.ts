@@ -540,8 +540,16 @@ export async function executeChiefTool(
       return json({ deleted });
     }
     case 'close_todos': {
+      const supersededBy = optStr(params, 'supersededBy');
       return json(
-        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'closed', chiefActor),
+        transitionTodos(
+          deps,
+          ctx.teamId,
+          strArr(params, 'todoIds'),
+          'closed',
+          chiefActor,
+          supersededBy !== undefined ? { supersededBy } : {},
+        ),
       );
     }
     case 'reopen_todos':
@@ -920,6 +928,7 @@ export function transitionTodos(
   todoIds: string[],
   to: 'closed' | 'todo' | 'done',
   actor: TransitionActor,
+  opts: { supersededBy?: string } = {},
 ): { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> } {
   const svc = {
     db: deps.db,
@@ -929,6 +938,12 @@ export function transitionTodos(
     vapidKeys: deps.vapidKeys,
     convHub: deps.convHub,
   };
+  if (opts.supersededBy !== undefined) {
+    requireTeamTodo(deps.db, opts.supersededBy, teamId);
+    if (todoIds.includes(opts.supersededBy)) {
+      throw new HttpError(400, 'supersededBy must name a todo that is not being closed');
+    }
+  }
   const transitioned: string[] = [];
   const skipped: string[] = [];
   const reasons: Record<string, string> = {};
@@ -950,6 +965,13 @@ export function transitionTodos(
     }
     try {
       const record = setTodoPhase(svc, id, to);
+      if (record && to === 'closed') {
+        deps.db
+          .update(todo)
+          .set({ supersededBy: opts.supersededBy ?? null })
+          .where(eq(todo.id, id))
+          .run();
+      }
       if (record) {
         transitioned.push(id);
         const doneFromInProgress =

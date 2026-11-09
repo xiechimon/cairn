@@ -75,6 +75,7 @@ import {
 } from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 import { sweepSnoozeExpiry } from './snooze.js';
+import { createTaskIssueSync } from './task-issue-sync.js';
 import { insertMessageRow } from './transcript.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 
@@ -231,6 +232,7 @@ export function createScheduler(
         })
       : null;
   const prWatch = ci ? createPrWatch(deps, ci) : null;
+  const taskIssueSync = ci ? createTaskIssueSync(deps, ci) : null;
   const correctionIntake = intake
     ? createIssueIntake(deps, { ...intake, label: 'correction' })
     : null;
@@ -692,6 +694,7 @@ export function createScheduler(
       },
       'pr-watch': async () => {
         await watchPrs();
+        await taskIssueSync?.sweep();
       },
       intake: async () => {
         await issueIntake?.sweep();

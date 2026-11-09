@@ -165,6 +165,8 @@ export const todo = sqliteTable(
     sourceBuildId: text('sourceBuildId'),
     sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
     sourceRef: text('sourceRef'),
+    issueState: text('issueState').$type<'open' | 'closed' | null>(),
+    supersededBy: text('supersededBy'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
     decisions: json<TaskDecision[]>('decisions').notNull().default(sql`'[]'`),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
@@ -174,6 +176,16 @@ export const todo = sqliteTable(
   },
   (t) => [index('todo_phase_idx').on(t.phase)],
 );
+
+export const taskIssueClose = sqliteTable('task_issue_close', {
+  id: text('id').primaryKey(),
+  teamId: text('teamId')
+    .notNull()
+    .references(() => team.id),
+  sourceRef: text('sourceRef').notNull(),
+  comment: text('comment').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
+});
 
 export const tag = sqliteTable('tag', {
   id: text('id').primaryKey(),
