@@ -1,0 +1,20 @@
+Base: db603dbbf
+Command: node node_modules/vitest/vitest.mjs run apps/server/test/memory-document-injection.test.ts --maxWorkers=4
+
+   × section 4: Coordinator system prompt loads the index prefix, not files or recency-ranked facts 207ms
+   × section 4: Coordinator step claim uses the same bounded index 199ms
+   × section 4: routed project context uses its index and excludes the team index 166ms
+   × section 4: worker injection bounds each team and project index independently 198ms
+   × empty injection ensures one persisted index 110ms
+   × system injection stops at the byte bound without splitting UTF-8 or rejecting stored text 101ms
+   × step injection stops at the byte bound without splitting UTF-8 or rejecting stored text 85ms
+   × project injection stops at the byte bound without splitting UTF-8 or rejecting stored text 85ms
+   × worker injection stops at the byte bound without splitting UTF-8 or rejecting stored text 104ms
+   × empty project and independent scopes get distinct persisted revisions without leaking author memory 94ms
+   × initialization failure propagates and rolls back instead of returning synthetic memory 93ms
+   × digest loads index and file count without stamping use or including another thread scratchpad 87ms
+   × machine HTTP claim delivers bounded Coordinator system and step prompts 169ms
+   × machine HTTP worker claim delivers separate bounded indexes and matching todo scratchpad 221ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  14 failed (14)

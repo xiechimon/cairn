@@ -1,0 +1,36 @@
+{
+  "request": "POST /api/machine/tasks/claim {}",
+  "status": 200,
+  "providerMode": "fake machine; no model/provider invoked",
+  "memoryObjects": 410,
+  "indexes": 0,
+  "fileBodiesLeaked": true,
+  "summary": [
+    {
+      "title": "line-0",
+      "lines": 2,
+      "hasFileBody": true,
+      "start": [
+        "first-0",
+        "FILE-BODY-0"
+      ],
+      "end": [
+        "first-0",
+        "FILE-BODY-0"
+      ]
+    },
+    {
+      "title": "line-204",
+      "lines": 2,
+      "hasFileBody": true,
+      "start": [
+        "first-204",
+        "FILE-BODY-204"
+      ],
+      "end": [
+        "first-204",
+        "FILE-BODY-204"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "request": "POST /api/machine/tasks/claim {}",
+  "status": 200,
+  "providerMode": "fake machine; no model/provider invoked",
+  "memoryObjects": 2,
+  "indexes": 2,
+  "fileBodiesLeaked": false,
+  "summary": [
+    {
+      "title": "MEMORY.md",
+      "lines": 201,
+      "hasFileBody": false,
+      "start": [
+        "- line-0：first-0（记忆文件：line-0）",
+        "- line-1：first-1（记忆文件：line-1）"
+      ],
+      "end": [
+        "- line-199：first-199（记忆文件：line-199）",
+        "（MEMORY.md 后面还有 5 行没有加载；用 memories 读全文，并把细节移到记忆文件）"
+      ]
+    },
+    {
+      "title": "MEMORY.md",
+      "lines": 201,
+      "hasFileBody": false,
+      "start": [
+        "- line-0：first-0（记忆文件：line-0）",
+        "- line-1：first-1（记忆文件：line-1）"
+      ],
+      "end": [
+        "- line-199：first-199（记忆文件：line-199）",
+        "（MEMORY.md 后面还有 5 行没有加载；用 memories 读全文，并把细节移到记忆文件）"
+      ]
+    }
+  ]
+}

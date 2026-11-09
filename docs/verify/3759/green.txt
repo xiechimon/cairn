@@ -1,0 +1,14 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 REPO
+
+
+ Test Files  11 passed (11)
+      Tests  92 passed (92)
+   Start at  12:29:15
+   Duration  7.60s (tests 44%, import 32%, transform 23%, setup 1%)
+
+     Import  |@xiechimon/cairn| 385 modules were evaluated 3420 times · 8.96s total, 32% of tracked time
+             ~1.25s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+
