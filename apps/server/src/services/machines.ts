@@ -100,9 +100,9 @@ export function ackSteer(
   body: MachineSteerAckBody = {},
 ): { ok: true } {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (stepRow?.machineId !== machine.id || stepRow.status !== 'claimed') return { ok: true };
+  if (stepRow === undefined || stepRow.machineId !== machine.id) return { ok: true };
   if (isChiefConversation(stepRow.buildId)) {
-    ackChiefSteer(deps, machine.teamId, stepRow);
+    if (stepRow.status === 'claimed') ackChiefSteer(deps, machine.teamId, stepRow);
   } else if (body.answerIds !== undefined && body.answerIds.length > 0) {
     markDelivered(deps, stepRow.buildId, body.answerIds, body.via ?? 'steer', stepId);
   }

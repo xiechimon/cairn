@@ -19,7 +19,8 @@ function decision(requestId: string, answer: string) {
 
 function scriptedBackend(script: {
   steer?: (text: string) => Promise<void>;
-  onOpen?: (opts: SessionOpts) => Promise<void>;
+  onOpen?: (opts: SessionOpts) => Promise<StepEvent[] | undefined>;
+  held?: boolean;
 }) {
   const prompts: string[] = [];
   let release: () => void = () => {};
@@ -32,8 +33,8 @@ function scriptedBackend(script: {
       sessionId: 'sess-answers',
       events: (async function* () {
         yield { type: 'text_delta', text: 'working' } as StepEvent;
-        await script.onOpen?.(opts);
-        await gate;
+        for (const event of (await script.onOpen?.(opts)) ?? []) yield event;
+        if (script.held !== false) await gate;
         yield { type: 'done', usage: [] } as StepEvent;
       })(),
       steer: script.steer ?? (async () => {}),
@@ -133,8 +134,7 @@ describe('the daemon acks an answer only after it reached the agent', () => {
     await handle.done;
   });
 
-  test('an answered ask_user poll is acked by its request id via poll before the tool result returns', async () => {
-    const api = new FakeMachineApi();
+  async function askOnce(api: FakeMachineApi, resultReachesAgent: boolean) {
     const asked: string[] = [];
     Object.assign(api, {
       askUser: async (_stepId: string, body: MachineAskBody): Promise<MachineAskResponse> => {
@@ -148,11 +148,19 @@ describe('the daemon acks an answer only after it reached the agent', () => {
       },
     });
     let toolResult = '';
-    const { backend, release } = scriptedBackend({
+    const { backend } = scriptedBackend({
+      held: false,
       onOpen: async (opts) => {
         toolResult = (await opts.executeRemoteTool?.('ask_user', {
           questions: [{ header: 'Conflict', question: 'Which wins?', options: [] }],
         })) as string;
+        if (!resultReachesAgent) return [];
+        return [
+          {
+            type: 'toolcall_end',
+            call: { id: 'call-1', name: 'ask_user', arguments: {}, result: toolResult },
+          } as StepEvent,
+        ];
       },
     });
     const claimed: ClaimedStep = {
@@ -160,11 +168,45 @@ describe('the daemon acks an answer only after it reached the agent', () => {
       remoteTools: [{ name: 'ask_user', description: 'Ask the person' }],
     };
     const { handle } = await run(api, backend, claimed);
-    await waitFor(() => toolResult !== '');
+    await waitFor(() => api.doneBodies.length === 1);
     expect(JSON.parse(toolResult)).toMatchObject({ status: 'answered' });
     expect(asked).toHaveLength(1);
+    await handle.stop();
+    await handle.done;
+    return asked;
+  }
+
+  test('an answered ask_user poll is acked via poll once its tool result reached the agent', async () => {
+    const api = new FakeMachineApi();
+    const asked = await askOnce(api, true);
     expect(api.steerAckBodies).toEqual([{ answerIds: asked, via: 'poll' }]);
-    release();
+  });
+
+  test('an answered ask_user poll whose tool result never reached the agent is not acked', async () => {
+    const api = new FakeMachineApi();
+    await askOnce(api, false);
+    expect(api.steerAckBodies).toEqual([]);
+  });
+
+  test('the session-start ack completes before the step reports done', async () => {
+    const api = new FakeMachineApi();
+    const ack = api.steerAck.bind(api);
+    api.steerAck = async (stepId, body) => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await ack(stepId, body);
+      api.calls.push('ack-finished');
+    };
+    const { backend } = scriptedBackend({ held: false });
+    const claimed: ClaimedStep = {
+      ...CLAIMED,
+      answerIds: [REQUEST_A],
+      todo: { ...CLAIMED.todo!, decisions: [decision(REQUEST_A, 'Answer for A.')] },
+    };
+    const { handle } = await run(api, backend, claimed);
+    await waitFor(() => api.doneBodies.length === 1);
+    const done = api.calls.findIndex((call) => call.startsWith('done:s1'));
+    expect(api.calls.indexOf('ack-finished')).toBeGreaterThanOrEqual(0);
+    expect(api.calls.indexOf('ack-finished')).toBeLessThan(done);
     await handle.stop();
     await handle.done;
   });

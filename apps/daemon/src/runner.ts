@@ -7,6 +7,7 @@ import type {
   AgentSessionHandle,
   AgentTodoItem,
   AgentTokenUsage,
+  AnswerDeliveryVia,
   BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
@@ -934,6 +935,13 @@ async function runClaimedStep(
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
   let askKeepAlive: (() => void) | null = null;
+  const answeredPolls = new Set<string>();
+  const ackAnswers = async (answerIds: readonly string[], via: AnswerDeliveryVia) => {
+    if (answerIds.length === 0) return;
+    await client.steerAck?.(stepId, { answerIds: [...answerIds], via }).catch((err: unknown) => {
+      logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  };
   const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
     if (client.askUser === undefined) throw new Error('ask channel unavailable');
     const requestId = `ask-${randomUUID()}`;
@@ -950,11 +958,7 @@ async function runClaimedStep(
         { signal: askAbort.signal },
       );
       if (response.status === 'answered' && !askAbort.signal.aborted) {
-        await client
-          .steerAck?.(stepId, { answerIds: [requestId], via: 'poll' })
-          .catch((err: unknown) => {
-            logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
-          });
+        answeredPolls.add(requestId);
       }
       return JSON.stringify(response);
     } catch (err) {
@@ -1594,13 +1598,7 @@ async function runClaimedStep(
     }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     deps.sessionHandles?.set(stepId, handle);
-    if (claimed.answerIds !== undefined && claimed.answerIds.length > 0) {
-      client
-        .steerAck?.(stepId, { answerIds: claimed.answerIds, via: 'session-start' })
-        .catch((err: unknown) => {
-          logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
-        });
-    }
+    await ackAnswers(claimed.answerIds ?? [], 'session-start');
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
@@ -1613,6 +1611,12 @@ async function runClaimedStep(
         if (ev.type === 'toolcall_end') {
           if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
           else runningToolCalls.delete(ev.call.id);
+          if (ev.call.result !== undefined && answeredPolls.size > 0) {
+            const result = JSON.stringify(ev.call.result);
+            const reached = [...answeredPolls].filter((id) => result.includes(id));
+            for (const id of reached) answeredPolls.delete(id);
+            await ackAnswers(reached, 'poll');
+          }
         }
         armWatchdog(streamTimeouts.idle, 'idle');
         armBodyTimeout();

@@ -240,6 +240,24 @@ describe('an answer is delivered only when the daemon acks it', () => {
     });
   });
 
+  test('an ack that arrives after its step finished still marks the answer; an ack from another machine marks nothing', async () => {
+    const world = startSession();
+    await ask(world, REQUEST_A, true);
+    await answer(world, REQUEST_A, 'Repo rule wins.');
+    finish(world.stepRow.id);
+    const stranger = insertMachine(H.s);
+    ackSteer(deps(), { id: stranger, teamId: H.teamId }, world.stepRow.id, {
+      answerIds: [REQUEST_A],
+      via: 'steer',
+    });
+    expect(recordOf(world, REQUEST_A)?.deliveredAt).toBeNull();
+    ack(world, world.stepRow.id, [REQUEST_A], 'steer');
+    expect(recordOf(world, REQUEST_A)).toMatchObject({
+      deliveredVia: 'steer',
+      deliveredStepId: world.stepRow.id,
+    });
+  });
+
   test('a double ack and an ack for an unknown id change nothing', async () => {
     const world = startSession();
     await ask(world, REQUEST_A, true);
