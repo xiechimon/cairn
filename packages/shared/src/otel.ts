@@ -431,17 +431,14 @@ export function createCairnTracing(
     exportTimeoutMillis: timeoutMs,
   });
   const recorder = spanRecorder(resource, scope, processor);
-  const inFlight = new Set<Promise<void>>();
+  let tail: Promise<void> = Promise.resolve();
   const flush = () => {
-    const sent = processor.forceFlush().catch((error: unknown) => {
-      onError(error instanceof Error ? error : new Error(String(error)));
-    });
-    inFlight.add(sent);
-    void sent.finally(() => inFlight.delete(sent));
-    return sent;
-  };
-  const settle = async () => {
-    await Promise.all([...inFlight, flush()]);
+    tail = tail
+      .then(() => processor.forceFlush())
+      .catch((error: unknown) => {
+        onError(error instanceof Error ? error : new Error(String(error)));
+      });
+    return tail;
   };
   return {
     record(spans) {
@@ -449,9 +446,9 @@ export function createCairnTracing(
       recorder.record(spans);
       void flush();
     },
-    forceFlush: settle,
+    forceFlush: flush,
     async shutdown() {
-      await settle();
+      await flush();
       await recorder.provider.shutdown();
     },
   };
