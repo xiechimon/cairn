@@ -33,6 +33,7 @@ import {
   todo,
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
@@ -569,6 +570,12 @@ async function tryClaim(
               prUrl: guardPr.prUrl,
             })
           : buildMergedPrGuardInstruction({ prNumber: guardPr.prNumber, prUrl: guardPr.prUrl });
+    const decided = new Set(cand.todoRow.decisions.map((decision) => decision.requestId));
+    const answerIds = receivesAnswers(cand.stepRow.kind)
+      ? undeliveredAnswers(db, cand.stepRow.buildId)
+          .map((answer) => answer.requestId)
+          .filter((requestId) => decided.has(requestId))
+      : [];
     return {
       step: {
         id: cand.stepRow.id,
@@ -581,6 +588,7 @@ async function tryClaim(
       ...(localMerge !== null ? { localMerge } : {}),
       session,
       ...(instruction !== null ? { instruction } : {}),
+      ...(answerIds.length > 0 ? { answerIds } : {}),
       todo: {
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,

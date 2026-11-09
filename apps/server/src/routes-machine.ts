@@ -16,6 +16,7 @@ import {
   machineEnrollStartBodySchema,
   machineHeartbeatBodySchema,
   machinePresenceBodySchema,
+  machineSteerAckBodySchema,
   machineSyncResultBodySchema,
   machineThinkingDeltaBodySchema,
   machineToolBodySchema,
@@ -433,12 +434,13 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     return c.json(fetchSteer({ db: ctx.db }, row, stepId));
   });
 
-  app.post('/api/machine/steer/ack', (c) => {
+  app.post('/api/machine/steer/ack', async (c) => {
     const row = me(c);
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
+    const body = parseWith(machineSteerAckBodySchema, (await jsonBody(c)) ?? {}, 'body');
     return c.json(
-      ackSteer({ db: ctx.db, convHub: ctx.convHub, machineHub: ctx.machineHub }, row, stepId),
+      ackSteer({ db: ctx.db, convHub: ctx.convHub, machineHub: ctx.machineHub }, row, stepId, body),
     );
   });
 

@@ -305,6 +305,10 @@ export const askUserAnswerSchema = z
   });
 export type AskUserAnswer = z.infer<typeof askUserAnswerSchema>;
 
+export const ANSWER_DELIVERY_VIAS = ['poll', 'steer', 'session-start'] as const;
+export const answerDeliveryViaSchema = z.enum(ANSWER_DELIVERY_VIAS);
+export type AnswerDeliveryVia = z.infer<typeof answerDeliveryViaSchema>;
+
 export const askUserQuestionContentSchema = z.object({
   kind: z.literal(ASK_USER_QUESTION_KIND),
   requestId: z.string().min(1),
@@ -314,6 +318,11 @@ export const askUserQuestionContentSchema = z.object({
   cancelReason: z.string().optional(),
   parkedAt: z.number().int().optional(),
   provenance: provenanceSchema.optional(),
+  answeredAt: z.number().int().optional(),
+  answeredBy: z.enum(['person', 'coordinator']).optional(),
+  deliveredAt: z.number().int().nullable().optional(),
+  deliveredVia: answerDeliveryViaSchema.optional(),
+  deliveredStepId: z.string().optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;
 

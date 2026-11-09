@@ -8,10 +8,10 @@ A worker question (`ask_user`, or the synthetic zero-change question) gets an an
 
 ## Invariants
 
-1. Every answer has one delivery record, keyed by `(buildId, requestId)`. Fields: `answeredAt`, `answeredBy` (`person` | `coordinator` | `default`), `text`, `deliveredAt` (null until delivered), `deliveredVia` (`ask-poll` | `steer` | `session-start`), `deliveredStepId`.
+1. Every answer has one delivery record, keyed by `(buildId, requestId)`. Fields: `answeredAt`, `answeredBy` (`person` | `coordinator` | `default`), `text`, `deliveredAt` (null until delivered), `deliveredVia` (`poll` | `steer` | `session-start`), `deliveredStepId`.
 2. Exactly two functions touch delivery: `recordAnswer(buildId, requestId, answer)` creates or refuses the record, and `markDelivered(buildId, requestIds, via, stepId)` sets `deliveredAt` if it is null. Nothing else writes `deliveredAt`. `markDelivered` is idempotent: a second call for the same id is a no-op.
 3. Exactly one function reads what still has to be delivered: `undeliveredAnswers(buildId)`. Every path that can hand text to the agent asks it, and only it.
-4. An answer is delivered only when the daemon acks it. All three paths end in the same receiver ack by request id: the daemon acks an answer the ask poll returned once the tool result reached the agent, acks after a successful `live.steer`, and acks once a session started on a prompt that contained it. Handing it out, including in a poll response, is not delivery.
+4. An answer is delivered only when the daemon acks it. All three paths end in the same receiver ack by request id: the daemon acks an answer the ask poll returned once the tool result reached the agent, acks after a successful `live.steer`, and acks once a session started on a prompt that contained it. A session counts as started on its prompt at its first event, observed in the shared runner where the daemon iterates the session handle, so every backend uses the same rule; a session that ends without any event never acks, and its answers are re-sent. Handing it out, including in a poll response, is not delivery.
 5. An answer is only handed to a daemon that declared `answersAck` (the capability gate from #3467). With no capable receiver the question stays pending and the task shows `machine-update`.
 6. The daemon applies an answer at most once per conversation: its applied set is seeded at claim from `answerIds`, gains every answer it acks (poll, steer or session start), and is the only dedupe source.
 
@@ -23,13 +23,14 @@ Every path that writes or reads delivery state, including each one that leaked i
 
 | # | Entry point (current code) | Reads | Writes | Failure seen in #3467 | Under the record |
 |---|---|---|---|---|---|
-| 1 | `askWorkerQuestion` poll returns an answered question (`worker-questions.ts`), and the daemon's `ask_user` tool result | record | `markDelivered(…, 'ask-poll')` only through the daemon ack | human answer through a message while the poll held it was replayed later | the daemon acks after the tool result reached the agent; an interrupted poll stays unacked and is re-sent |
+| 1 | `askWorkerQuestion` poll returns an answered question (`worker-questions.ts`), and the daemon's `ask_user` tool result | record | `markDelivered(…, 'poll')` only through the daemon ack | human answer through a message while the poll held it was replayed later | the daemon acks after the tool result reached the agent; an interrupted poll stays unacked and is re-sent |
 | 2 | `answerTaskQuestion` held branch (`thread-message.ts`) | — | `recordAnswer` only | marked delivered at settle time | the ack in row 1 marks it |
 | 3 | `answerTaskQuestion` waiting-other-questions branch | — | `recordAnswer` | answer A lost when B resumed | carried by row 6 |
 | 4 | `sendBuildSteer` running step, `answer` option or human text answering a pending question (`builds.ts`) | — | `recordAnswer`, steer slot | single steer slot overwrote A with B | answers never ride in the slot; row 7 carries them |
 | 5 | `settleWorkerReply` (person free text, queued message) | — | `recordAnswer` | stored with no delivery path when the poll consumed it | same as row 1 or row 7 |
 | 6 | `enqueueStep` for session and plan steps (`withUndeliveredAnswers`), covering continuation, rework, replan, PR wakes, schedules | `undeliveredAnswers` | — | earlier: marked at enqueue, lost when the session never started | prompt carries them; row 8 marks |
 | 7 | `fetchSteer` (`machines.ts`) | `undeliveredAnswers` | — | earlier: marked at pickup, lost when `live.steer` failed | hands them out, marks nothing |
+| 7a | `completeStep` for plan, build and session steps | `undeliveredAnswers` | — | an answer steered into a step that ended before pickup was lost and the task went to review | with no pending question, the step end enqueues the continuation that carries them instead of moving the task on |
 | 8 | Claim (`machine-claim.ts`, `answerIds`) and daemon `onSessionLive` (host runner, orb ready frame, journal recovery via `runTrackedStep`) | record | `markDelivered(…, 'session-start')` through the ack route | orb and recovery runs never acked; startup steer re-sent | one ack route for all three |
 | 9 | Ack route (`POST /api/machine/steer/ack`, `answerIds` and `via`), used for poll, steer and session-start acks | — | `markDelivered(…, via)` | double ack | idempotent |
 | 10 | Daemon `deliverSteer` (`machine-loop.ts`), serialized per step | applied set | — | concurrent events steered twice | unchanged |
@@ -40,7 +41,7 @@ Every path that writes or reads delivery state, including each one that leaked i
 ## Migration
 
 - The record lives in the existing question message content (`answers`, plus new `deliveredAt`, `deliveredVia`, `deliveredStepId`), so no table migration. `markDelivered` is the only writer of those fields; a lint-level test greps for other writers.
-- Existing answered questions with no `deliveredAt` are treated as delivered on the first boot after the change (one data migration), so no old answer is replayed.
+- Existing answered questions have no `deliveredAt` field and count as delivered; new records write `deliveredAt: null` when answered. No data migration, and no old answer is replayed.
 
 ## Tests
 

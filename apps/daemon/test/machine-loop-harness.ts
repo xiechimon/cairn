@@ -5,7 +5,9 @@ import type {
   MachineAttachmentResponse,
   MachineCapabilities,
   MachineDoneBody,
+  MachineSteerAckBody,
   MachineStreamEvent,
+  SteerAnswer,
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
@@ -75,6 +77,8 @@ export class FakeMachineApi implements MachineApi {
   }[] = [];
   failClaims = 0;
   steerResponse: string | null = null;
+  steerAnswers: SteerAnswer[] = [];
+  steerAckBodies: (MachineSteerAckBody | undefined)[] = [];
   attachments: Record<string, MachineAttachmentResponse | Error> = {};
   attachmentCalls: string[] = [];
   stopResponse: boolean | null = null;
@@ -196,10 +200,13 @@ export class FakeMachineApi implements MachineApi {
   }
   async steer(stepId: string) {
     this.calls.push(`steer:${stepId}`);
-    return this.steerResponse;
+    return this.steerAnswers.length > 0
+      ? { content: this.steerResponse, answers: this.steerAnswers }
+      : { content: this.steerResponse };
   }
-  async steerAck(stepId: string) {
+  async steerAck(stepId: string, body?: MachineSteerAckBody) {
     this.calls.push(`steer-ack:${stepId}`);
+    this.steerAckBodies.push(body);
   }
   async attachment(stepId: string, attachmentId: string): Promise<MachineAttachmentResponse> {
     this.attachmentCalls.push(`${stepId}:${attachmentId}`);
