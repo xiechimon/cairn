@@ -154,23 +154,10 @@ export function pauseTeamGithubRepos(deps: GithubTokenDeps, teamId: string): Pro
 export async function pauseTeamAutonomy(
   deps: PauseDeps,
   teamId: string,
-  request: { source: AutonomyPauseSource; reason: string },
+  request: { source: AutonomyPauseSource; reason: string; requestKey?: string },
 ): Promise<void> {
-  const duplicate = deps.db
-    .select({ id: autonomyPause.id })
-    .from(autonomyPause)
-    .where(
-      and(
-        eq(autonomyPause.teamId, teamId),
-        eq(autonomyPause.source, request.source),
-        eq(autonomyPause.reason, request.reason),
-        isNull(autonomyPause.resolvedAt),
-      ),
-    )
-    .get();
-  if (duplicate !== undefined) return;
   const id = newRecordId();
-  deps.db
+  const inserted = deps.db
     .insert(autonomyPause)
     .values({
       id,
@@ -179,8 +166,11 @@ export async function pauseTeamAutonomy(
       reason: request.reason,
       markers: [],
       openedAt: Date.now(),
+      requestKey: request.requestKey ?? null,
     })
+    .onConflictDoNothing()
     .run();
+  if (inserted.changes === 0) return;
   const repos = teamGithubRepos(deps.db, teamId);
   const results = await Promise.allSettled(
     repos.map(async (ref): Promise<AutonomyPauseMarker> => {

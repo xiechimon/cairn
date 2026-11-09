@@ -100,8 +100,12 @@ export const autonomyPause = sqliteTable(
     openedAt: epochMs('openedAt').notNull(),
     resolvedAt: epochMs('resolvedAt'),
     resolvedBy: text('resolvedBy').$type<'markers' | 'owner'>(),
+    requestKey: text('requestKey'),
   },
-  (t) => [index('autonomy_pause_team_resolved_idx').on(t.teamId, t.resolvedAt)],
+  (t) => [
+    index('autonomy_pause_team_resolved_idx').on(t.teamId, t.resolvedAt),
+    uniqueIndex('autonomy_pause_team_request_key_idx').on(t.teamId, t.requestKey),
+  ],
 );
 
 export const project = sqliteTable('project', {

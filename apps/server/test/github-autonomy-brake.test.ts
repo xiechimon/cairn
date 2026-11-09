@@ -204,6 +204,38 @@ test('after the owner resumes a failed pause, a new settings pause resumes once 
   }
 });
 
+test('a settings pause sent again after its markers closed stays paused on its own new markers', async () => {
+  const w = teamMarkersWorld();
+  try {
+    const pause = () =>
+      req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, { autonomyPaused: true });
+    expect((await pause()).status).toBe(200);
+    w.closeAll();
+    expect((await pause()).status).toBe(200);
+    await syncAutonomyPauses(w.deps);
+    expect(w.paused()).toBe(true);
+    expect([...w.issues.values()].filter((issue) => issue.open)).toHaveLength(2);
+  } finally {
+    w.s.dispose();
+  }
+});
+
+test('a repeated request key opens one entry, and an acknowledged key does not reopen', async () => {
+  const w = teamMarkersWorld();
+  try {
+    const request = { source: 'main-red' as const, reason: 'Main red.', requestKey: 'main-red:a' };
+    await pauseTeamAutonomy(w.deps, w.s.team.id, request);
+    await pauseTeamAutonomy(w.deps, w.s.team.id, request);
+    expect(w.issues.size).toBe(2);
+    w.closeAll();
+    await syncAutonomyPauses(w.deps);
+    await pauseTeamAutonomy(w.deps, w.s.team.id, request);
+    expect(w.paused()).toBe(false);
+  } finally {
+    w.s.dispose();
+  }
+});
+
 test('an unreadable published marker keeps the pause', async () => {
   const w = teamMarkersWorld();
   try {

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5589dc45-8664-4343-9192-4d8a87496bf0",
+  "id": "08334922-46b9-43ac-845b-22d73f93a7c5",
   "prevId": "e0041d67-d2f8-4b7a-b89e-62605646e562",
   "tables": {
     "agent_memory": {
@@ -491,6 +491,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "requestKey": {
+          "name": "requestKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -501,6 +508,14 @@
             "resolvedAt"
           ],
           "isUnique": false
+        },
+        "autonomy_pause_team_request_key_idx": {
+          "name": "autonomy_pause_team_request_key_idx",
+          "columns": [
+            "teamId",
+            "requestKey"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {

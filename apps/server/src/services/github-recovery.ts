@@ -163,6 +163,7 @@ export async function recoverRedAutonomousMain(
     await pauseTeamAutonomy({ ...deps, githubFetch: fetchImpl }, row.admission.teamId, {
       source: 'main-red',
       reason: `Main check failed at ${main} in ${repo}.`,
+      requestKey: `main-red:${repo}:${main}`,
     }).catch(() => undefined);
     const pull = await githubPull(fetchImpl, token, target.owner, target.repo, row.build.prNumber);
     const reverted = pull?.pull?.mergeCommitSha;

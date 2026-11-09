@@ -142,6 +142,7 @@ async function raiseUnjudgedLanding(
   await pauseTeamAutonomy(deps, teamId, {
     source: 'unjudged-landing',
     reason: `Unjudged landing: ${reason}`,
+    requestKey: `unjudged-landing:${stepRow.id}`,
   }).catch(() => undefined);
   upsertMessage(deps, {
     id: `ship-unjudged-${stepRow.id}`,
