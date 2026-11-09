@@ -49,7 +49,7 @@ Delete `integration/eval/chief-dispatch`, `integration/eval/project-routing`, th
 
 ## 6. Delivery and review record
 
-Design PR: pending creation; record its number here before handoff. This PR closes only design issue #3700, not the migration.
+Design PR: [#3701](https://github.com/xiechimon/cairn/pull/3701). This PR closes only design issue #3700, not the migration.
 
 | Ordered PR | Complete boundary and proof |
 |---|---|
