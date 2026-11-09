@@ -17,6 +17,7 @@ import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
+import { shouldExpandLastWork } from './work-expansion.js';
 import { InjectedSkills, WorkTrace } from './work-trace.js';
 
 export interface LiveStep {
@@ -584,18 +585,35 @@ function FailRow({
   t: TFunc;
 }) {
   const [rawOpen, setRawOpen] = useState(false);
+  const title =
+    item.facts === undefined ? item.title : t('本步异常结束：{reason}', { reason: item.title });
+  const facts =
+    item.facts === undefined
+      ? ''
+      : [
+          item.facts.files !== null ? t('改动 {n} 个文件', { n: item.facts.files }) : null,
+          item.facts.commits.length > 0
+            ? t('提交 {shas}', { shas: item.facts.commits.join(', ') })
+            : null,
+          item.facts.pr !== null ? t('PR #{n}', { n: item.facts.pr }) : t('未开 PR'),
+        ]
+          .filter((part): part is string => part !== null)
+          .join(' · ');
   return (
     <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
       <span
         className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
         data-testid="agent-text"
       >
-        <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
+        <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{title}</p>
         {item.body !== '' && (
           <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
         )}
         {item.title !== '' && (
-          <p className={`${PARA} ${PARA_GAP} flex gap-3 text-meta text-(--text-tertiary)`}>
+          <p
+            className={`${PARA} ${PARA_GAP} flex flex-wrap gap-3 text-meta text-(--text-tertiary)`}
+          >
+            {facts !== '' && <span>{facts}</span>}
             <Button
               variant="ghost"
               className="h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary)"
@@ -606,13 +624,18 @@ function FailRow({
           </p>
         )}
       </span>
-      <ActionRow copy={[item.title, item.body].filter((part) => part !== '').join('\n')} t={t} />
+      <ActionRow
+        copy={[title, item.body === '' ? '' : t(item.body), facts]
+          .filter((part) => part !== '')
+          .join('\n')}
+        t={t}
+      />
       <DialogShell title={t('原始错误')} open={rawOpen} onClose={() => setRawOpen(false)} size="l">
         <pre
           className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
           data-testid="fail-raw-error"
         >
-          {item.title}
+          {item.raw ?? item.title}
         </pre>
       </DialogShell>
     </div>
@@ -667,7 +690,7 @@ export function Transcript({
   useEffect(() => {
     previous.current = { live, ids };
   });
-  const lastWork = workItems.at(-1);
+  const lastWork = shouldExpandLastWork(workItems) ? workItems.at(-1) : undefined;
 
   return (
     <>
