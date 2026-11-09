@@ -7903,6 +7903,13 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "path": "/api/tasks",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "GET",
     "path": "/api/todos/{id}",
   },
   {
