@@ -49,6 +49,42 @@ function previousDatabase(): string {
   return path;
 }
 
+async function createProjectTag(
+  s: ReturnType<typeof bootServer>,
+  projectId: string,
+  name: string,
+): Promise<string> {
+  const response = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+    name,
+    color: '#000000',
+  });
+  expect(response.status).toBe(201);
+  return ((await response.json()) as { id: string }).id;
+}
+
+async function correctionWorld(classified = false) {
+  const s = bootServer();
+  const projectId = await postProject(s.app);
+  const regularId = await createProjectTag(s, projectId, 'regular');
+  const correctionId = await createProjectTag(s, projectId, 'correction');
+  const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+    title: 'Original task',
+    spec: 'Original body.',
+    tagIds: [classified ? correctionId : regularId],
+  });
+  expect(created.status).toBe(201);
+  const taskId = ((await created.json()) as { id: string }).id;
+  return { s, projectId, correctionId, taskId };
+}
+
+function classificationState(s: ReturnType<typeof bootServer>, taskId: string) {
+  return {
+    task: s.db.get(sql`SELECT * FROM todo WHERE id = ${taskId}`),
+    links: s.db.all(sql`SELECT * FROM todo_tag WHERE todoId = ${taskId} ORDER BY tagId`),
+    schedules: s.db.all(sql`SELECT * FROM schedule WHERE todoId = ${taskId} ORDER BY id`),
+  };
+}
+
 describe('internal correction classification', () => {
   test('the correction migration immediately follows prior migrations with a newer timestamp', () => {
     const journal = JSON.parse(
@@ -119,6 +155,80 @@ describe('internal correction classification', () => {
       200,
     );
     expect(isCorrectionTask(s.db, task.id)).toBe(false);
+  });
+
+  test.each(
+    ['missing-first', 'missing-last', 'missing-only', 'foreign'].flatMap((kind) =>
+      [false, true].map((classified) => ({ kind, classified })),
+    ),
+  )(
+    '$kind replacement preserves the complete task when correction starts $classified',
+    async ({ kind, classified }) => {
+      const { s, correctionId, taskId } = await correctionWorld(classified);
+      const foreignId =
+        kind === 'foreign'
+          ? await createProjectTag(s, await postProject(s.app, 'Other'), 'correction')
+          : '';
+      const tagIds =
+        kind === 'foreign'
+          ? [foreignId]
+          : kind === 'missing-only'
+            ? ['missing-id']
+            : kind === 'missing-first'
+              ? ['missing-id', correctionId]
+              : [correctionId, 'missing-id'];
+      const before = classificationState(s, taskId);
+      const response = await req(s.app, 'PATCH', `/api/todos/${taskId}`, {
+        title: 'Must not be saved',
+        tagIds,
+      });
+      expect.soft(response.status).toBe(400);
+      expect(classificationState(s, taskId)).toEqual(before);
+    },
+  );
+
+  test('duplicate replacement ids are applied once with matching correction state', async () => {
+    const { s, correctionId, taskId } = await correctionWorld();
+    const response = await req(s.app, 'PATCH', `/api/todos/${taskId}`, {
+      tagIds: [correctionId, correctionId],
+    });
+    expect(response.status).toBe(200);
+    expect(classificationState(s, taskId)).toMatchObject({
+      task: { correctionRequired: 1 },
+      links: [{ todoId: taskId, tagId: correctionId }],
+    });
+  });
+
+  test.each([false, true])('rolls back tag failures (move: %s)', async (moving) => {
+    const { s, projectId, taskId, correctionId: originalId } = await correctionWorld();
+    const target = moving ? await postProject(s.app, 'Target') : projectId;
+    const correctionId = moving ? await createProjectTag(s, target, 'correction') : originalId;
+    s.db.run(sql`INSERT INTO schedule (id, teamId, projectId, todoId, kind, tz, createdBy)
+      VALUES ('correction-schedule', ${s.team.id}, ${projectId}, ${taskId}, 'daily', 'UTC', ${s.user.id})`);
+    const before = classificationState(s, taskId);
+    s.db.run(sql`CREATE TRIGGER reject_tag_link BEFORE INSERT ON todo_tag
+      BEGIN SELECT RAISE(ABORT, 'tag write blocked'); END`);
+    const response = await req(s.app, 'PATCH', `/api/todos/${taskId}`, {
+      title: 'Must not be saved',
+      projectId: target,
+      tagIds: [correctionId],
+    });
+    expect(response.status).toBe(500);
+    expect(classificationState(s, taskId)).toEqual(before);
+  });
+
+  test('a failed creation association write leaves no hidden correction task', async () => {
+    const { s, projectId, correctionId } = await correctionWorld();
+    const before = s.db.all('SELECT * FROM todo ORDER BY id');
+    s.db.run(sql`CREATE TRIGGER reject_tag_link BEFORE INSERT ON todo_tag
+      BEGIN SELECT RAISE(ABORT, 'tag write blocked'); END`);
+    const response = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+      title: 'Must not exist',
+      spec: 'Reject the category association.',
+      tagIds: [correctionId],
+    });
+    expect(response.status).toBe(500);
+    expect(s.db.all('SELECT * FROM todo ORDER BY id')).toEqual(before);
   });
 
   test('upgrade snapshots local and GitHub correction membership without changing thread data', () => {

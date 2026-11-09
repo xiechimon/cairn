@@ -20,7 +20,7 @@ The runtime probe starts and stops its server through `scripts/owned-process.mjs
 
 Before production edits, the three tests in `apps/server/test/correction-classification.test.ts` failed: two because the flag column did not exist, and one because no snapshot migration ran and the injected update failure never occurred.
 
-The final targeted run passed 122 tests across six files:
+The original targeted run passed 122 tests across six files:
 
 ```sh
 pnpm exec vitest run apps/server/test/correction-classification.test.ts apps/server/test/correction-gate-binding.test.ts apps/server/test/loop-feedback.test.ts apps/server/test/github-issues.test.ts apps/server/test/orchestration-source.test.ts apps/server/test/wire.test.ts --maxWorkers=4 --no-file-parallelism
@@ -30,9 +30,26 @@ The regression covers fresh defaults, API invisibility, local and GitHub upgrade
 
 `pnpm lint`, `pnpm typecheck`, `pnpm spec:parse` and `pnpm prepush` passed.
 
-## Limits
+## Review fix: partial writes
 
-The affected local e2e selection ran six specs / 21 tests twice. Each attempt passed 20 tests, but the browser exited or crashed at different points: first the feature-release retry test, then the already-authenticated login test. These runs do not establish an e2e pass; CI must report on the pushed head. The initial parallel Vitest attempt also lost a worker; serial file execution passed the entire targeted selection.
+Cloud review identified a partial-write bug: an invalid same-project replacement changed the internal correction flag and deleted associations before the request failed. The whole writer inventory was checked: creation (including GitHub import), same-project replacement and project moves. Validation and deduplication now happen before replacement writes, and Drizzle transactions keep the task, flag, associations and moved schedules atomic.
+
+Eleven new regression cases failed before the production fix. The final regression set adds twelve cases, including a same-project fault-injection control:
+
+| Entry path | Failure or control | Required result |
+| --- | --- | --- |
+| Same-project replacement | Missing ids in either order, missing-only and foreign-project ids; flag initially off and on | HTTP 400; complete task and associations unchanged |
+| Replacement | Duplicate correction ids | HTTP 200; one association and classification on |
+| Same-project replacement and project move | Injected association-insert failure | HTTP 500; complete task, version, flag, associations and schedule unchanged |
+| Creation, shared by GitHub import | Injected association-insert failure | HTTP 500; no orphan task |
+
+The current targeted run passes 178 tests across fourteen files with `--maxWorkers=4 --no-file-parallelism --testTimeout=120000`. It includes the previous eleven-file selection plus task metadata, archived-project writes and chief project selection. The affected Playwright selection now passes all 21 tests across six specs. Lint, typecheck and spec:parse pass.
+
+A fresh isolated production-entry-point server also verifies all eight invalid replacement combinations, duplicate normalization, correction completion 409, ordinary completion 200 and a clean read-only SQLite foreign-key check. [Identifier-free runtime observations](atomic-correction/result.json) preserve these results without any instance ids. Database-write fault injection is covered by the API/SQLite regressions, not this live probe; no provider or real GitHub request is exercised.
+
+## Earlier local limits
+
+Before the review fix, the affected local e2e selection ran six specs / 21 tests twice. Each attempt passed 20 tests, but the browser exited or crashed at different points: first the feature-release retry test, then the already-authenticated login test. Those earlier attempts did not establish a pass; the review-fix rerun above does. CI must still report on the pushed head. The initial parallel Vitest attempt also lost a worker; serial file execution passed the entire targeted selection.
 
 ## Upgrade after the evidence-store migration
 
