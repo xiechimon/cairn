@@ -1,7 +1,7 @@
 import { chiefGetResponseSchema } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 
-async function runningTask(page: Page) {
+async function runningTask(page: Page, readDelay = 0) {
   const chief = chiefGetResponseSchema.parse({
     chief: {
       id: 'chief-user-1-team-1',
@@ -87,13 +87,22 @@ async function runningTask(page: Page) {
     }
   };
   await page.addInitScript(() => {
+    const streams: FakeEventSource[] = [];
     class FakeEventSource extends EventTarget {
+      readonly url: string;
       readyState = 1;
-      close() {}
+      onmessage: ((event: { data: string }) => void) | null = null;
+      constructor(url: string) {
+        super();
+        this.url = url;
+        streams.push(this);
+      }
+      close() { this.readyState = 2; }
     }
+    Object.defineProperty(window, '__streams', { value: streams });
     Object.defineProperty(window, 'EventSource', { value: FakeEventSource });
   });
-  await page.route('**/api/**', (route) => {
+  await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === '/api/teams') return route.fulfill({ json: [{ id: 'team-1', name: 'Team' }] });
@@ -130,7 +139,7 @@ async function runningTask(page: Page) {
       if (request.method() === 'POST') {
         const input = request.postDataJSON() as { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean; editQueued?: boolean };
         sent.push(input);
-        const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), deliverAfterStop: input.deliverAfterStop };
+        const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), ...(input.mode === 'queue' ? { deliverAfterStop: input.deliverAfterStop ?? false } : {}) };
         if (input.editQueued) {
           const row = queuedMessages.find((item) => item.id === input.queuedMessageId);
           if (!row) return route.fulfill({ status: 409, json: { error: 'Queued message was already delivered' } });
@@ -151,6 +160,7 @@ async function runningTask(page: Page) {
         task.v += 1;
         return route.fulfill({ status: 201, json: { message } });
       }
+      if (sent.length > 0 && readDelay > 0) await new Promise((resolve) => setTimeout(resolve, readDelay));
       return route.fulfill({
         json: {
           messages,
@@ -182,8 +192,35 @@ async function runningTask(page: Page) {
   await page.goto(`/app/todo/${task.id}`);
   const input = page.getByTestId('composer-card').getByRole('textbox');
   await expect(input).toBeEnabled();
-  return { input, sent, stops, steerPending, queuedMessages, finish, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
+  const rollover = async () => {
+    const source = build.id;
+    const queued = queuedMessages.shift()!;
+    const message = { id: 'rollover-delivered', role: 'user', content: queued.content, createdAt: Date.now() };
+    build.id = 'replacement-build';
+    task.latestBuildId = build.id;
+    task.v += 1;
+    messages.push(message);
+    steps[0]!.buildId = build.id;
+    await page.evaluate((event) => {
+      const streams = (window as unknown as { __streams: { url: string; readyState: number; onmessage: ((event: { data: string }) => void) | null }[] }).__streams;
+      const active = streams.find((stream) => stream.url.includes(`/conversations/${event.deliveredQueue.conversationId}/stream`) && stream.readyState === 1);
+      if (!active) throw new Error('Source conversation is not subscribed');
+      if (streams.some((stream) => stream.url.includes(`/conversations/${event.conversationId}/stream`))) throw new Error('Target subscribed before rollover');
+      active.onmessage?.({ data: JSON.stringify(event) });
+    }, { type: 'message', conversationId: build.id, message, deliveredQueue: { conversationId: source, messageId: queued.id } });
+  };
+  return { input, sent, stops, steerPending, queuedMessages, finish, rollover, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
 }
+
+test('a confirmed queue capsule is visible before a slow transcript read without becoming a delivered bubble', async ({ page }) => {
+  const task = await runningTask(page, 3000);
+  await task.input.fill('Wait for the current turn');
+  await task.input.press('Control+Enter');
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toContainText('Wait for the current turn', { timeout: 700 });
+  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Wait for the current turn' })).toHaveCount(0);
+  await expect(task.input).toHaveValue('');
+  expect(task.steerPending).toEqual([]);
+});
 
 for (const chord of ['Meta+Enter', 'Control+Enter']) {
   test(`${chord} queues without steering and survives reload until completion`, async ({ page }) => {
@@ -205,6 +242,28 @@ for (const chord of ['Meta+Enter', 'Control+Enter']) {
     expect(task.turns()).toBe(1);
   });
 }
+
+test('rollover confirms the bubble through the source stream before the target GET finishes', async ({ page }) => {
+  const task = await runningTask(page, 3000);
+  await task.input.fill('Continue on the replacement build');
+  await task.input.press('Control+Enter');
+  await expect(page.getByTestId('queued-message')).toBeVisible();
+  await task.rollover();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __streams: { url: string; readyState: number }[] }).__streams.some((stream) => stream.url.includes('/conversations/replacement-build/stream') && stream.readyState === 1)), { timeout: 700 }).toBe(true);
+  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Continue on the replacement build' })).toHaveCount(1, { timeout: 700 });
+  await expect(page.getByTestId('queued-message')).toHaveCount(0, { timeout: 700 });
+});
+
+test('send now removes the capsule as soon as delivery is confirmed despite a slow read', async ({ page }) => {
+  const task = await runningTask(page, 3000);
+  await task.input.fill('Deliver exactly once');
+  await task.input.press('Control+Enter');
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
+  await page.getByTestId('steer-queued-message').click();
+  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Deliver exactly once' })).toBeVisible({ timeout: 700 });
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(0, { timeout: 700 });
+  expect(task.steerPending).toEqual(['Deliver exactly once']);
+});
 
 test('send now delivers the queued capsule immediately and plain Enter still steers', async ({ page }) => {
   const task = await runningTask(page);
