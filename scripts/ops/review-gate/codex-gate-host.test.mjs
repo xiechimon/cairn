@@ -23,7 +23,13 @@ fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, input }) + '\\n')
 const world = JSON.parse(fs.readFileSync(process.env.FAKE_WORLD, 'utf8'));
 const joined = args.join(' ');
 const out = (value) => process.stdout.write(JSON.stringify(value));
-if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
+const issue = /api -i repos\\/o\\/r\\/issues\\/(\\d+)$/.exec(joined);
+if (issue) {
+  const found = (world.issues ?? {})[issue[1]];
+  if (found === 'error') process.exit(2);
+  process.stdout.write((found ? 'HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n' : 'HTTP/2.0 404 Not Found\\r\\n\\r\\n') + JSON.stringify(found ?? { message: 'Not Found' }));
+  if (!found) process.exit(1);
+} else if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
 else if (joined.includes('--slurp') && joined.includes('/pulls/7/files')) out(world.filePages ?? [world.files ?? []]);
 else if (joined.includes('--slurp') && joined.includes('repos/o/r/pulls?')) out([world.pulls]);
 else if (joined.includes('--slurp') && joined.includes('/git/matching-refs/')) out([world.matchingRefs ?? []]);
@@ -598,4 +604,133 @@ test('incomplete PR file pagination cannot preserve a previous successful check'
   });
   assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
   assert.match(out.body(out.checkWrites[0]).output.summary, /file list/i);
+});
+
+const reply = (
+  body,
+  author = { login: 'dev', __typename: 'User' },
+  authorAssociation = 'OWNER',
+) => ({
+  author,
+  authorAssociation,
+  body,
+});
+const withReplies = (level, replies, over = {}) => {
+  const root = thread(level);
+  return {
+    ...root,
+    isResolved: true,
+    comments: {
+      totalCount: replies.length + 1,
+      nodes: [...root.comments.nodes, ...replies],
+    },
+    ...over,
+  };
+};
+const deferred = (level, issue, over = {}) =>
+  withReplies(
+    level,
+    [
+      reply('Looking at this now.'),
+      reply(`Valid, out of scope for this PR, tracked in #${issue}.`),
+    ],
+    over,
+  );
+const realIssue = { number: 12, state: 'open', title: 'follow-up' };
+const deferralWorld = (threads, issues = { 12: realIssue }) => ({
+  comments: [stateComment(SHA, 'completed')],
+  threads,
+  issues,
+  files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+  checkRuns: [ownRun()],
+});
+
+test('a P2 or P3 finding answered as out of scope with a real issue passes', () => {
+  for (const level of ['P2', 'P3']) {
+    const body = (out) => out.body(out.checkWrites[0]);
+    const out = run(deferralWorld([deferred(level, 12)]));
+    assert.equal(body(out).conclusion, 'success', level);
+  }
+});
+
+test('a P0 or P1 finding on a changed line cannot be deferred; it must be fixed', () => {
+  for (const level of ['P0', 'P1']) {
+    const out = run(deferralWorld([deferred(level, 12)]));
+    const body = out.body(out.checkWrites[0]);
+    assert.equal(body.conclusion, 'failure', level);
+    assert.match(body.output.summary, /must be fixed/, level);
+    assert.match(body.output.summary, new RegExp(`discussion_r${level}`), level);
+  }
+});
+
+test('a deferral to a number that is not an issue in this repository blocks', () => {
+  const missing = run(deferralWorld([deferred('P2', 99)]));
+  const pull = run(
+    deferralWorld([deferred('P2', 13)], {
+      13: { number: 13, pull_request: { url: 'https://api.github.com/repos/o/r/pulls/13' } },
+    }),
+  );
+  for (const out of [missing, pull]) {
+    const body = out.body(out.checkWrites[0]);
+    assert.equal(body.conclusion, 'failure');
+    assert.match(body.output.summary, /not an issue/);
+  }
+});
+
+test('an issue lookup that fails for another reason cannot pass the gate', () => {
+  const out = run(deferralWorld([deferred('P2', 12)], { 12: 'error' }));
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'failure');
+  assert.equal(body.output.title, 'Cannot determine the review inputs');
+});
+
+test('a deferred P1 on lines that predate the PR passes, and threads without a deferral read no issue', () => {
+  const carried = run({
+    ...deferralWorld([deferred('P1', 12)]),
+    files: [{ filename: 'src/a.ts', patch: '@@ -40,1 +40,2 @@\n ctx\n+added' }],
+  });
+  assert.equal(carried.body(carried.checkWrites[0]).conclusion, 'success');
+  const plain = run(deferralWorld([thread('P2', { isResolved: true })]));
+  assert.equal(plain.body(plain.checkWrites[0]).conclusion, 'success');
+  assert.ok(!plain.calls.some((call) => call.args.join(' ').includes('/issues/12')));
+});
+
+test('only replies from writers or the cairn App count as deferrals; the Codex finding itself never does', () => {
+  const stranger = run(
+    deferralWorld([
+      withReplies('P2', [
+        reply(
+          'valid, out of scope for this PR, tracked in #99',
+          { login: 'drive-by', __typename: 'User' },
+          'NONE',
+        ),
+      ]),
+    ]),
+  );
+  assert.equal(stranger.body(stranger.checkWrites[0]).conclusion, 'success');
+  const quoting = thread('P2', { isResolved: true });
+  quoting.comments.nodes[0].body +=
+    '\n\nReply valid, out of scope for this PR, tracked in #99 to defer.';
+  const self = run(deferralWorld([quoting]));
+  assert.equal(self.body(self.checkWrites[0]).conclusion, 'success');
+  const app = run(
+    deferralWorld([
+      withReplies('P2', [
+        reply(
+          'valid, out of scope for this PR, tracked in #99',
+          { login: 'cairnwright', __typename: 'Bot' },
+          'NONE',
+        ),
+      ]),
+    ]),
+  );
+  assert.match(app.body(app.checkWrites[0]).output.summary, /not an issue/);
+});
+
+test('a thread with more comments than one page cannot be judged and fails as unreadable input', () => {
+  const long = withReplies('P1', [reply('ok')], {
+    comments: { totalCount: 150, nodes: thread('P1').comments.nodes },
+  });
+  const out = run(deferralWorld([long]));
+  assert.equal(out.body(out.checkWrites[0]).output.title, 'Cannot determine the review inputs');
 });
