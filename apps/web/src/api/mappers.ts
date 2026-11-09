@@ -1452,6 +1452,23 @@ function handoffTodoOf(call: ToolCallRecord): string | null {
   return typeof todoId === 'string' && todoId !== '' ? todoId : null;
 }
 
+function createdTodoOf(call: ToolCallRecord): { todoId: string; projectId: string | null } | null {
+  if (call.name !== 'create_todo' || call.result === undefined || call.isError === true)
+    return null;
+  let result: unknown = call.result;
+  if (typeof result === 'string') {
+    try {
+      result = JSON.parse(result);
+    } catch {
+      return null;
+    }
+  }
+  const todoId = (result as { id?: unknown } | null)?.id;
+  if (typeof todoId !== 'string' || todoId === '') return null;
+  const projectId = (call.arguments as { projectId?: unknown } | null)?.projectId;
+  return { todoId, projectId: typeof projectId === 'string' ? projectId : null };
+}
+
 export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
   return collectChiefStream(messages).items;
 }
@@ -1477,6 +1494,11 @@ function collectChiefStream(
       .map((m) => chiefUserText(textOfContent(m.content).trim())),
   );
   let pendingTools: ChiefToolRow[] = [];
+  let pendingCards: ChiefStreamItem[] = [];
+  const flushCards = () => {
+    items.push(...pendingCards);
+    pendingCards = [];
+  };
   let eventTurn = false;
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
@@ -1584,6 +1606,9 @@ function collectChiefStream(
       const handoffTodoId = handoffTodoOf(call);
       if (handoffTodoId !== null)
         items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
+      const created = createdTodoOf(call);
+      if (created !== null)
+        pendingCards.push({ kind: 'task-card', id: `${m.id}:task-card`, ...created });
       continue;
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
@@ -1610,6 +1635,7 @@ function collectChiefStream(
       if (text === '') continue;
       if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
+      flushCards();
       const head = orchestratePromptHeadOf(text);
       items.push(
         head === null
@@ -1647,7 +1673,9 @@ function collectChiefStream(
       ...rowProject(m),
     });
     pendingTools = [];
+    flushCards();
   }
+  flushCards();
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
   items.forEach((item, index) => {
     if (

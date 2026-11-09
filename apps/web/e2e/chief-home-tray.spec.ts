@@ -5,24 +5,6 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-const todoIn = (n: number, phase: string, title: string) => ({
-  ...TASK,
-  id: `todo-${n}`,
-  seqNum: n,
-  title,
-  phase,
-  phaseAt: Date.now(),
-  latestBuildId: `build-${n}`,
-});
-
-const FIVE = [
-  todoIn(1, 'confirm', 'Plan the routing split'),
-  todoIn(2, 'failed', 'Fix the orb permission'),
-  todoIn(3, 'review', 'Fold finished turns'),
-  todoIn(4, 'confirm', 'Rename the sidebar groups'),
-  todoIn(5, 'failed', 'Rerun the relay probe'),
-];
-
 const QUESTION = {
   id: 'row-ask-1',
   role: 'assistant',
@@ -82,38 +64,10 @@ async function openWithQuestion(page: Page, todos: unknown[] = []) {
   return { state, answered };
 }
 
-test('needs-you threads sit in a tray above the composer, three at most, with the rest counted', async ({ page }) => {
-  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: FIVE });
-  await page.goto('/app');
-  const tray = page.getByTestId('chief-composer-block').getByTestId('needs-you');
-  await expect(tray.locator('[data-slot="needs-you-item"]')).toHaveCount(3);
-  await expect(tray.getByTestId('needs-you-count')).toHaveText('5');
-  await expect(page.getByTestId('chief-stream').getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('home-c-lead').getByTestId('needs-you')).toHaveCount(0);
-  const trayBox = await tray.boundingBox();
-  const composerBox = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
-  expect(trayBox!.y + trayBox!.height).toBeLessThanOrEqual(composerBox!.y + 1);
-  await tray.getByRole('button', { name: '2 more' }).click();
-  await expect(tray.locator('[data-slot="needs-you-item"]')).toHaveCount(5);
-  await tray.getByRole('button', { name: 'Show less' }).click();
-  await expect(tray.locator('[data-slot="needs-you-item"]')).toHaveCount(3);
-});
-
-test('the tray stays in view after the history scrolls', async ({ page }) => {
-  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: FIVE.slice(0, 2) });
-  await page.goto('/app');
-  await page.getByTestId('home-c').getByTestId('chief-body').evaluate((node) => {
-    node.scrollTop = 0;
-  });
-  await expect(page.getByTestId('needs-you')).toBeInViewport();
-  await expect(page.getByTestId('needs-you')).toHaveCount(1);
-});
-
-test('no needs-you thread and no question means no tray and a plain tab title', async ({ page }) => {
+test('no needs-you thread and no question means a plain tab title', async ({ page }) => {
   await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: [TASK] });
   await page.goto('/app');
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
-  await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page).toHaveTitle('Cairn');
 });
 
@@ -209,16 +163,4 @@ test('an answered card fades out over 200ms and leaves a one-line summary in the
   );
   expect(seen).toEqual([{ animation: 'question-fade-out', duration: '0.2s' }]);
   await expect(page).toHaveTitle('Cairn');
-});
-
-test('on a phone every tray row still has a button that opens its thread', async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
-  await mockLive(page, { threads: [THREAD], messages: HISTORY, todos: FIVE });
-  await page.goto('/app');
-  const tray = page.getByTestId('chief-composer-block').getByTestId('needs-you');
-  const rows = tray.locator('[data-slot="needs-you-item"]');
-  await expect(rows).toHaveCount(3);
-  for (let i = 0; i < 3; i++) {
-    await expect(rows.nth(i).getByRole('button', { name: 'View thread' })).toBeVisible();
-  }
 });

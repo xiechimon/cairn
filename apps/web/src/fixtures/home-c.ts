@@ -60,6 +60,12 @@ const conversation: ChiefContent = {
       paragraphs: [[{ text: 'Round 6 found no /work in the orb; fixed, round 7 is running.' }]],
     },
     {
+      kind: 'task-card',
+      id: 'home-c-card-orb',
+      todoId: 'home-c-working-c',
+      projectId: HOME_C_CRED,
+    },
+    {
       kind: 'question',
       id: 'home-c-question',
       requestId: 'home-c-q1',
@@ -95,8 +101,14 @@ const conversation: ChiefContent = {
       createdAt: r7(20, 5) + 4 * 60_000,
       paragraphs: [[{ text: 'Started it; the PR is up for your review.' }]],
     },
+    {
+      kind: 'task-card',
+      id: 'home-c-card-fold',
+      todoId: 'home-c-review',
+      projectId: PROJECT_ID,
+    },
   ],
-  streamAt: [r7(20, 0), r7(20, 1), r7(20, 1), r7(20, 5), r7(20, 6)],
+  streamAt: [r7(20, 0), r7(20, 1), r7(20, 1), r7(20, 1), r7(20, 5), r7(20, 6), r7(20, 6)],
 };
 
 export const homeC: FixtureSet = {

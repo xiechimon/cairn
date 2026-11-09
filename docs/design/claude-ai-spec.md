@@ -41,7 +41,7 @@ Not captured: toasts and a failed send (no reliable trigger without breaking the
 | Menus (`board/sidebar-project-menu.tsx`, `board/thread-actions.tsx`, `chief/project-menu.tsx`, model pickers) | Composer `+` menu, model menu; a bottom sheet at 375 | `shell` |
 | Dialogs (`DialogShell`, `chief/edit-charter-dialog.tsx`, `board/reset-confirm-dialog.tsx`) | Settings dialog chrome | `shell`, `settings` |
 | Tooltips (rule C4) | Composer and action-row tooltips | `shell`, `chat-long`, `focus` |
-| No counterpart: needs-you tray and question card, board and activity, machines and computer feed, diff and review | Apply the component rules in section 8; keep the t3code and Amp references in `docs/design/references/` for structure | none |
+| No counterpart: task cards and question card, board and activity, machines and computer feed, diff and review | Apply the component rules in section 8; keep the t3code and Amp references in `docs/design/references/` for structure | none |
 
 ## 2. Typesetting (checklist 1)
 
