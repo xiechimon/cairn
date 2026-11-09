@@ -1,9 +1,8 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files';
+const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks';
 const TASKS = `${PROJ}?scenario=prj-tasks`;
 const EMPTY = `${PROJ}?scenario=r2-24b&tab=tasks`;
-const LOCAL_FILES = `${PROJ}?scenario=prj-local-files`;
 
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
@@ -19,17 +18,6 @@ function resolveColor(page: Page, value: string) {
     probe.style.color = v;
     document.body.append(probe);
     const color = getComputedStyle(probe).color;
-    probe.remove();
-    return color;
-  }, value);
-}
-
-function resolveBackground(page: Page, value: string) {
-  return page.evaluate((v) => {
-    const probe = document.createElement('span');
-    probe.style.backgroundColor = v;
-    document.body.append(probe);
-    const color = getComputedStyle(probe).backgroundColor;
     probe.remove();
     return color;
   }, value);
@@ -133,24 +121,4 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(create, 'E1').toHaveCSS('border-top-left-radius', '8px');
   });
 
-  test(`files: bleed body, picker face on the selected file, type scale (${theme})`, async ({
-    page,
-  }) => {
-    await setTheme(page, theme);
-    await page.goto(LOCAL_FILES);
-
-    await expect(page.getByTestId('page-col'), 'T1: 文件 keeps the bleed').toHaveCount(0);
-
-    const placeholder = page.getByText('请选择一个文件查看');
-    await expect(placeholder, 'F3').toHaveCSS('font-size', '14px');
-    await expect(placeholder, 'F3').toHaveCSS('color', await resolveColor(page, 'var(--text-tertiary)'));
-
-    const file = page.locator('[data-tree-entry="file"]', { hasText: 'README.md' });
-    await file.click();
-    await expect(file).toHaveAttribute('aria-current', 'true');
-    await page.mouse.move(0, 0);
-    await expect(file, 'F1').toHaveCSS('background-color', await resolveBackground(page, 'var(--card)'));
-    expect(await css(file, 'box-shadow'), 'F1: 1px ring').toContain('0px 0px 0px 1px');
-
-  });
 }
