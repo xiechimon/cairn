@@ -475,7 +475,15 @@ export async function sendBuildSteer(
           createdAt: now,
         });
       }
-      if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
+      if (!continuationOptions.schedule)
+        insertMessageRow(
+          deps,
+          targetBuildId,
+          messageRow,
+          body.queuedMessageId === undefined
+            ? undefined
+            : { conversationId, messageId: body.queuedMessageId },
+        );
       if (running && !answered) {
         db.insert(steerPending)
           .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })

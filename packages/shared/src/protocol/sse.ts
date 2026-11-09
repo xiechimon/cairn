@@ -98,7 +98,9 @@ export const MACHINE_STREAM_EVENT_TYPES = ['wake', 'shutdown'] as const;
 export const conversationMessageEventSchema = z.object({
   type: z.literal('message'),
   message: transcriptRowSchema,
+  deliveredQueue: z.object({ conversationId: recordId, messageId: recordId }).optional(),
 });
+export type ConversationMessageEvent = z.infer<typeof conversationMessageEventSchema>;
 
 export const conversationTextDeltaEventSchema = z.object({
   type: z.literal('text_delta'),

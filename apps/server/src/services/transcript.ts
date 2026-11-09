@@ -1,3 +1,4 @@
+import type { ConversationMessageEvent } from '@cairn/shared';
 import type { Db } from '../db/client.js';
 import { message } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -13,12 +14,15 @@ export function insertMessageRow(
     createdAt: number;
     actor?: string | null;
   },
+  deliveredQueue?: ConversationMessageEvent['deliveredQueue'],
 ): void {
   deps.db
     .insert(message)
     .values({ ...row, actor: row.actor ?? null, conversationId })
     .run();
-  deps.convHub?.publishMessage(conversationId, { ...row, actor: row.actor ?? null });
+  const published = { ...row, actor: row.actor ?? null };
+  if (deliveredQueue === undefined) deps.convHub?.publishMessage(conversationId, published);
+  else deps.convHub?.publishMessage(conversationId, published, deliveredQueue);
 }
 
 export function insertGateAnnouncement(

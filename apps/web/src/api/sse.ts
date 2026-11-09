@@ -5,7 +5,11 @@ import type {
   NotificationRecord,
   TranscriptRow,
 } from '@cairn/shared';
-import { isChiefConversationId, SILENT_NOTIFICATION_TYPES } from '@cairn/shared';
+import {
+  conversationMessageEventSchema,
+  isChiefConversationId,
+  SILENT_NOTIFICATION_TYPES,
+} from '@cairn/shared';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
@@ -223,7 +227,12 @@ export function startConversationStream(
         }
         case 'message': {
           const row = ev.message as TranscriptRow;
-          cacheUserMessage(qc, conversationId, row);
+          cacheUserMessage(
+            qc,
+            conversationId,
+            row,
+            conversationMessageEventSchema.shape.deliveredQueue.safeParse(ev.deliveredQueue).data,
+          );
           if (row.role === 'assistant' && textOfContent(row.content).trim() !== '') {
             liveTextStore.noteSettled(conversationId, row.id);
           }

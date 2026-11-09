@@ -66,6 +66,24 @@ afterEach(() => {
 });
 
 describe('confirmed user message visibility', () => {
+  it.each([CONV, 'replacement-build'])('correlates automatic queue delivery into %s by identity, not equal content', (target) => {
+    const qc = freshClient();
+    const delivered = { id: 'delivered', role: 'user', content: 'Identical words', createdAt: 5 };
+    const keep = { id: 'keep-queued', content: delivered.content, createdAt: 2 };
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null, queuedMessages: [{ ...keep, id: 'source-queued' }, keep] };
+    qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
+    const stop = startConversationStream(target, qc, {});
+    const es = FakeEventSource.instances.at(-1) as FakeEventSource;
+    es.fireOpen();
+    const event = { type: 'message', message: delivered, deliveredQueue: { conversationId: CONV, messageId: 'source-queued' } };
+    es.push(event);
+    es.push(event);
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toMatchObject({ pages: [{ queuedMessages: [keep] }] });
+    expect(qc.getQueryData(['messages', target, 'pages'])).toMatchObject({ pages: [{ messages: [delivered] }] });
+    stop();
+    qc.clear();
+  });
+
   it('keeps queued messages out of the delivered transcript and updates the capsule once', () => {
     const qc = freshClient();
     const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };

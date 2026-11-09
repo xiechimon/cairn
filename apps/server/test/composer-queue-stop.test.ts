@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import {
   build,
   machine as machineTable,
@@ -76,6 +76,42 @@ async function runningTask(opts: { githubFetch?: FetchLike } = {}) {
     });
   return { s, send, face, finish };
 }
+
+test.each(['success', 'stopped', 'manual'] as const)(
+  'correlates %s queue delivery with its source capsule without consuming equal text',
+  async (kind) => {
+    const w = await runningTask();
+    const frames: object[] = [];
+    const stop = w.s.convHub.subscribe('build', {
+      nextSeq: () => 1,
+      send: async (payload) => {
+        frames.push(payload);
+      },
+    });
+    await w.send({ content: 'Identical words', mode: 'queue', deliverAfterStop: true });
+    await w.send({ content: 'Identical words', mode: 'queue' });
+    const [first, keep] = (await w.face()).queuedMessages!;
+    if (kind === 'manual')
+      expect(
+        (await w.send({ content: 'Identical words', queuedMessageId: first!.id })).status,
+      ).toBe(201);
+    else expect((await w.finish(kind)).status).toBe(200);
+    expect(frames).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'message',
+          message: expect.objectContaining({ role: 'user', content: 'Identical words' }),
+          deliveredQueue: { conversationId: 'build', messageId: first!.id },
+        }),
+      ]),
+    );
+    expect((await w.face()).queuedMessages).toEqual([keep]);
+    expect(
+      (await w.face()).messages.filter((row) => row.content === 'Identical words'),
+    ).toHaveLength(1);
+    stop();
+  },
+);
 
 test('queued text persists without steering and completion starts exactly one continuation', async () => {
   const w = await runningTask();
@@ -328,11 +364,17 @@ test('a closed PR continuation carries the remaining queue into the new build', 
     .run();
   expect((await w.send({ content: 'A', mode: 'queue' })).status).toBe(201);
   expect((await w.send({ content: 'B', mode: 'queue' })).status).toBe(201);
-  const queuedB = (await w.face()).queuedMessages![1]!;
+  const [queuedA, queuedB] = (await w.face()).queuedMessages!;
+  const published = vi.spyOn(w.s.convHub, 'publishMessage');
   pullState = 'closed';
   expect((await w.finish('success')).status).toBe(200);
   const newBuildId = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!.latestBuildId!;
   expect(newBuildId).not.toBe('build');
+  expect(published).toHaveBeenCalledWith(
+    newBuildId,
+    expect.objectContaining({ role: 'user', content: 'A' }),
+    { conversationId: 'build', messageId: queuedA!.id },
+  );
   const response = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({
