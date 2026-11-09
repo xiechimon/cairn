@@ -57,7 +57,14 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
    - segments are separated by a blank line.
 
    `todo.spec` holds `renderTaskText(request)`, and it is written only by the request service (`coordinator-request.ts`), at creation and on append. Readers that only display or search text (the board, search, the Coordinator `todos` summary, MCP `todos`, trajectory export) keep reading `spec`. Every reader that decides authority or builds a model prompt reads `request.segments`; the table under Entry points lists them.
-3. The title is fenced by the author of the segment it is cut from (`titleAuthor(todo)` = `segments[0].author` for a task with `request`, `isIssueSourcedTask` for the others). It is not decided by `sourceKind`. That rule holds in the task prompt, the orchestration prompt, `wakeFacts` and the other wake prompts.
+3. The title has its own author, `titleAuthor(todo)`:
+   - `worker` when `request.titleSource` is `worker`. The title is printed with a `named by the worker` label and no fence.
+   - `segments[0].author` when the title was cut from the first segment.
+   - `isIssueSourcedTask(todo)` for tasks without `request`.
+
+   It is never decided by `sourceKind` for a task with `request`. That rule holds in the task prompt, the orchestration prompt, `wakeFacts` and the other wake prompts.
+
+   Old daemons ignore `request`, and an issue-split child has no `sourceKind`. The claim is therefore gated on the daemon's CLI version, the way the MCP gate uses `MCP_MIN_CLI_VERSION` (`cliVersionAtLeast` in `machine-claim.ts`), with a new `TASK_SEGMENTS_MIN_CLI_VERSION`. An older daemon receives a title the server has already fenced (`fenceIssueText(sourceRef, title)`) whenever `titleAuthor` is `third-party`, and a `spec` from `renderTaskText`, whose third-party segments are fenced. An old daemon therefore never shows third-party text unfenced.
 4. A split of an issue does not inherit the issue's `sourceKind` or `sourceRef`. The task-issue sync (#3526) reconciles a task's own issue from its row, so two tasks pointing at one issue would fight over its state. A split child is an ordinary Coordinator task: on a GitHub-backed project it gets its own issue, whose body is `renderTaskText` (the issue quote stays fenced) plus the footer below. It names its parent by todo id in `request.segments[*].source`.
 5. Every Coordinator step records `step.ownerMessageIds` (JSON, nullable, `[]` when absent), written explicitly by the code path that enqueues or extends the turn. `create_todo` without `messageIds` cites exactly this list. The id-prefix, rewind-text and answer-timestamp inference is deleted.
 6. `create_todo` (Coordinator surface) has a strict schema. Unknown keys return 400. Its fields:
@@ -83,12 +90,14 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
 | T3 | queued owner message that becomes its own turn | `submitChiefMessage` (queued) | `[message.id]` |
 | T4 | rewind | `rewindChiefThread` | `[anchor.id]` |
 | T5 | owner answers `ask_user` while the asking turn runs | `answerQuestion` | appends `requestId` to the running step |
-| T6 | owner answers a parked question; a new turn resumes | `enqueueResumedTurn` | the asking step's `ownerMessageIds`, then `requestId` |
+| T6 | owner answers a parked question; a new turn resumes | `enqueueResumedTurn` | the question's `askedFor`, then `requestId` |
 | T7 | Coordinator answers its own question (`answeredBy: coordinator`) | none | not appended |
 | T8 | orchestration request (`POST /api/todos/:id/orchestrate`) | `orchestrateTodo` | `[]`; the Coordinator splits with `sourceTodoId` |
 | T9 | wake turns (gate, settle, failed, scheduled wake, digest) | `enqueueChiefStep` | `[]` |
 
 `enqueueChiefStep` requires the value (`ownerMessageIds: string[]`), so a new turn kind cannot be added without choosing it. Steps created before the migration read as `[]`; they have all finished.
+
+A question records whose request it asks about when it is created. `createOrGetQuestion` copies the running step's `ownerMessageIds` into the question content as `askedFor: string[]`, so T6 needs no lookup of the asking step after it has finished. A question parked before the migration has no `askedFor`: its resumed turn cites only the answer, and the Coordinator cites the original request explicitly (found with `search_history`).
 
 ## Title: truncated owner words
 
@@ -97,7 +106,7 @@ The title is `derivePlaceholderTitle` applied to the text of `segments[0]`: the 
 - it becomes the GitHub issue title;
 - truncation is deterministic.
 
-The existing first-step rename (`set_task_meta` on GitHub projects) sets `request.titleSource: 'worker'`. The board, the side chat and the issue then show a `named by the worker` mark.
+The existing first-step rename (`set_task_meta` on GitHub projects) is off for tasks with `request` (`titleFinal: true`) until rollout step 3. Step 3 lets it set `request.titleSource: 'worker'` and ships, in the same PR, the `named by the worker` mark on the board, the side chat and the issue. `titleSource` thus becomes writable only together with its mark.
 
 ## What the worker sees: the segments inline, the rest of the thread by link
 
@@ -154,8 +163,8 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 | W8 | GitHub issue import (`github-issues.ts`) | issue body, `sourceKind` | unchanged; `request` stays null and the task-wide fence remains |
 | W9 | MCP face `create_todo`, `update_todo` | caller's own text | unchanged |
 | W10 | research threads, citation checks, retro proposals | server templates | unchanged |
-| W11 | worker `set_task_meta` | title | sets `titleSource: 'worker'` |
-| R1 | claim payload, daemon `buildTaskPrompt` (`machine-claim.ts`, `runner.ts`) | segments | the claim carries `request`; the prompt fences exactly the third-party segments and a third-party title; `classifyUserText` still reads it as `task-prompt` |
+| W11 | worker `set_task_meta` | title | step 1: refused for a task with `request` (`titleFinal`); step 3: sets `titleSource: 'worker'`, after which every prompt labels the title as the worker's and does not fence it as the issue author's |
+| R1 | claim payload, daemon `buildTaskPrompt` (`machine-claim.ts`, `runner.ts`) | segments | the claim carries `request` to a daemon at or above `TASK_SEGMENTS_MIN_CLI_VERSION`; the prompt fences exactly the third-party segments and a third-party title; `classifyUserText` still reads it as `task-prompt`; an older daemon receives the server-fenced title and the rendered spec, and its prompt shows no third-party text unfenced |
 | R2 | verify step prompt (`builds.ts`) | segments | same rendering as R1 |
 | R3 | orchestration prompt (`orchestrate.ts`, `buildOrchestratePrompt`) | segments | `POST /api/todos/:id/orchestrate` on an issue child with an owner correction: one fence around the issue quote only, the correction unfenced (red on revision 1) |
 | R4 | wake prompts (`wakeFacts`) | title author | an issue-quoted title is fenced; an owner title is not |
@@ -163,7 +172,7 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 | R6 | `classifyDifficulty`, research-before-plan tier | `request.difficulty` | the stored difficulty wins over length |
 | R7 | `todos` summary, search, board `SpecBlock`, trajectory export | `spec` | unchanged; a test asserts `spec === renderTaskText(request)` after create and after append |
 | R8 | `request_context` worker tool | thread messages | filters other projects; answers `removed` after a rewind |
-| T1–T9 | turn attribution | `step.ownerMessageIds` | one test per row of the turn table, through the real entry point (send, steer, queue, rewind, in-turn answer, parked answer, Coordinator answer, orchestrate, wake); plus a static test that `enqueueChiefStep` requires `ownerMessageIds` and that no code reads the `resume-` prefix or compares `answeredAt` to a claim time |
+| T1–T9 | turn attribution | `step.ownerMessageIds`, `askedFor` | one test per row of the turn table, through the real entry point (send, steer, queue, rewind, in-turn answer, parked answer, Coordinator answer, orchestrate, wake); the parked-answer test finishes the asking step before answering, and a pre-migration question without `askedFor` resumes citing only the answer; plus a static test that `enqueueChiefStep` requires `ownerMessageIds` and that no code reads the `resume-` prefix or compares `answeredAt` to a claim time |
 | M1 | `message_thread` | `messageIds`, `note` | parameter allowlist; a 281-character note returns 400; owner messages are delivered byte for byte under the owner's mark, a note under `Coordinator note` |
 | P1 | Coordinator prompt | system prompt | no `措辞→spec` or `要求：`; the overlap rule no longer mentions the spec |
 
@@ -181,6 +190,7 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 
 - `todo.request` changes shape from revision 1's `sources` and `quotes` to `segments`. Revision 1 never reached `main` (#3558 is open), so no stored rows need converting.
 - `step.ownerMessageIds` is a new nullable JSON column. Old steps read as `[]`.
+- `askedFor` is a new optional field of the question content. Old questions have none (see T6).
 - Existing tasks keep their `spec` and a null `request`.
 
 ## Follow-ups
@@ -192,8 +202,8 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 ## Rollout
 
 Each step is one PR off `main`:
-1. #3558 reworked onto this revision. It covers the segments, `renderTaskText`, the request service, `step.ownerMessageIds` with T1–T9, the strict schemas, the prompt change, the claim carrying `request`, and the R1–R7 reader changes. It keeps the strict schema, prompt and tests of revision 1 that still apply. Tests: W1–W11, R1–R7, T1–T9, P1.
+1. #3558 reworked onto this revision. It covers the segments, `renderTaskText`, the request service, `step.ownerMessageIds` with T1–T9, the strict schemas, the prompt change, the claim carrying `request` behind `TASK_SEGMENTS_MIN_CLI_VERSION`, `askedFor`, and the R1–R7 reader changes. Request tasks keep their titles (`titleFinal`). It keeps the strict schema, prompt and tests of revision 1 that still apply. Tests: W1–W10, W11 (step-1 row), R1–R7, T1–T9, P1.
 2. The daemon source block and `request_context` (R8).
-3. The GitHub footer and the `named by the worker` mark, plus the `message_thread` change (M1).
+3. The GitHub footer; worker renames of request tasks together with the `named by the worker` mark (W11); the `message_thread` change (M1).
 
 Protected paths: step 1 adds migrations under `**/drizzle/**` and touches `services/machine-claim.ts` and `machine-relay.ts`; step 2 touches `machine-relay.ts`. Each step needs the Codex review on its head.
