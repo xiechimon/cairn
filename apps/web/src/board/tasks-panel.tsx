@@ -184,10 +184,12 @@ export function TasksPanel({
   const prOf = prByThread(prs);
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
   const row = (entry: TaskEntry) => {
-    const copy: TaskRowCopy = taskRowCopy(entry, prOf.get(entry.todo.id));
+    const pr = prOf.get(entry.todo.id);
+    const copy: TaskRowCopy = taskRowCopy(entry, pr);
     return (
       <TaskRow
         key={entry.todo.id}
+        {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
         title={entry.todo.title}
         glyph={glyphOf(entry)}
         word={t(copy.word)}

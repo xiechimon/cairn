@@ -4,6 +4,7 @@ import { ACCENT_INK } from '../../phase.js';
 import { BrandGlyph } from '../brand-glyph.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { Button } from '../ui/button.js';
+import { PrLink } from './pr-link.js';
 
 export type TaskRowGlyph = GlyphKind | 'question';
 
@@ -17,6 +18,7 @@ export interface TaskRowProps {
   waiting: boolean;
   running: boolean;
   muted?: boolean;
+  prLink?: { number: number; url: string };
   onOpen?: () => void;
 }
 
@@ -36,9 +38,11 @@ export function TaskRow({
   waiting,
   running,
   muted = false,
+  prLink,
   onOpen,
 }: TaskRowProps) {
-  return (
+  const linkRoom = prLink != null ? 'pr-16' : undefined;
+  const row = (
     <Button
       variant="ghost"
       data-slot="task-row"
@@ -71,7 +75,10 @@ export function TaskRow({
             {age}
           </span>
         </span>
-        <span data-slot="task-row-what" className="text-meta leading-5 text-content-secondary">
+        <span
+          data-slot="task-row-what"
+          className={cn('text-meta leading-5 text-content-secondary', where === null && linkRoom)}
+        >
           <span className={waiting ? `${ACCENT_INK} font-medium` : 'text-content-tertiary'}>
             {word}
           </span>
@@ -81,7 +88,10 @@ export function TaskRow({
         {where !== null && (
           <span
             data-slot="task-row-where"
-            className="flex items-center gap-1 text-meta leading-5 font-medium text-foreground"
+            className={cn(
+              'flex items-center gap-1 text-meta leading-5 font-medium text-foreground',
+              linkRoom,
+            )}
           >
             <ArrowRight aria-hidden className="size-3.5 text-content-tertiary" strokeWidth={1.75} />
             {where}
@@ -89,5 +99,16 @@ export function TaskRow({
         )}
       </span>
     </Button>
+  );
+  if (prLink == null) return row;
+  return (
+    <div data-slot="task-row-frame" className="relative">
+      {row}
+      <PrLink
+        number={prLink.number}
+        url={prLink.url}
+        className="absolute right-2.5 bottom-2 text-meta leading-5"
+      />
+    </div>
   );
 }
