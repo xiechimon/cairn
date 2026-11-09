@@ -196,7 +196,7 @@ def resolve_node():
 
 
 def decrypt(db, key, env, report, node):
-    candidates = [('secret', 'valueCipher'), ('provider', 'apiKeyCipher'), ('github_connection', 'accessTokenCipher'), ('feishu_binding', 'appSecretCipher')]
+    candidates = [('secret', 'valueCipher'), ('provider', 'apiKeyCipher'), ('github_connection', 'accessTokenCipher')]
     envelope = None
     for table, column in candidates:
         if table in tables(db):
