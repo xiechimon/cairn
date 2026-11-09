@@ -43,7 +43,7 @@ export function McpServersPage() {
             testId="resource-empty"
             className="mt-6"
             icon={Network}
-            title={t('尚无 MCP 服务器。')}
+            title={t('尚无 MCP 服务器')}
             description={t(
               '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。',
             )}
