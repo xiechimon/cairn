@@ -78,7 +78,7 @@ export function ArchivedProjectsSection() {
                   disabled={!live || inFlight.has(project.id)}
                   onClick={() => unarchive(project.id)}
                 >
-                  {t('取消归档')}
+                  {inFlight.has(project.id) ? t('取消归档中…') : t('取消归档')}
                 </Button>
               </div>
             ))}

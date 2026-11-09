@@ -7,7 +7,7 @@ const HOUR = 60 * 60 * 1000;
 const OLDER = { ...PROJECT, id: 'proj-old', name: 'probe-older', archivedAt: Date.now() - 48 * HOUR };
 const NEWER = { ...PROJECT, id: 'proj-new', name: 'probe-newer', archivedAt: Date.now() - 2 * HOUR };
 
-async function open(page: Page, opts: { archived?: (typeof OLDER)[]; failUnarchive?: boolean } = {}) {
+async function open(page: Page, opts: { archived?: (typeof OLDER)[]; failUnarchive?: boolean; hold?: Promise<void> } = {}) {
   const projects = [PROJECT, ...(opts.archived ?? [OLDER, NEWER])].map((p) => ({ ...p }));
   const calls: string[] = [];
   await mockLive(page, { threads: [THREAD], messages: [], projects }, (path, route, json) => {
@@ -17,8 +17,10 @@ async function open(page: Page, opts: { archived?: (typeof OLDER)[]; failUnarchi
     if (opts.failUnarchive === true) return json({ error: 'boom' }, 500);
     const target = projects.find((p) => p.id === m[1]);
     if (target === undefined) return json({ error: 'nope' }, 404);
-    (target as { archivedAt: number | null }).archivedAt = null;
-    return json(target);
+    return (opts.hold ?? Promise.resolve()).then(() => {
+      (target as { archivedAt: number | null }).archivedAt = null;
+      return json(target);
+    });
   });
   await page.goto('/app/settings/projects');
   return calls;
@@ -49,6 +51,25 @@ test('with nothing archived the section says so', async ({ page }) => {
   await expect(rows(page)).toHaveCount(0);
   await expect(page.getByText('没有已归档的项目')).toBeVisible();
   await evidenceShot(page, 'archived-projects-empty.png');
+});
+
+test('the row being unarchived says so on its button until the request settles', async ({ page }) => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await open(page, { hold });
+  const older = rows(page).filter({ hasText: 'probe-older' }).getByTestId('archived-project-unarchive');
+  const newer = rows(page).filter({ hasText: 'probe-newer' }).getByTestId('archived-project-unarchive');
+  await older.click();
+  await expect(older).toHaveText('取消归档中…');
+  await expect(older).toBeDisabled();
+  await expect(newer).toHaveText('取消归档');
+  await expect(newer).toBeEnabled();
+  await evidenceShot(page, 'archived-projects-unarchiving.png');
+  release();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(newer).toHaveText('取消归档');
 });
 
 test('a failed unarchive keeps the row and says why', async ({ page }) => {

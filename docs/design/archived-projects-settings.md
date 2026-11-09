@@ -21,7 +21,7 @@ One `SettingsCard` titled `已归档项目`. Each row is a `SettingsRow`:
 | Load error | The `QueryBoundary` error card `项目没能加载` with retry. |
 | Empty | `EmptyState`: `没有已归档的项目`, hint `在侧栏项目菜单里归档的项目会出现在这里。` |
 | Rows | One row per archived project. Active projects are not listed; they are managed from the sidebar and project settings. |
-| Unarchiving | That row's button is disabled while the request runs. |
+| Unarchiving | That row's button is disabled and reads `取消归档中…` while the request runs. |
 | Unarchived | The row leaves the list and the project reappears in the sidebar (the mutation invalidates the shared queries). |
 | Unarchive failed | The row stays; a toast titled `取消归档失败，请重试。` with no server detail (UI rule C5). |
 | Phone width | Settings collapses to its list; the section is one more entry, and its rows follow the shared `SettingsRow` narrow layout. |
