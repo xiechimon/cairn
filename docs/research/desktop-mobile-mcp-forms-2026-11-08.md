@@ -2,7 +2,7 @@
 
 Publication note: restored historical research, with private details redacted. Evidence labels describe the original research session; recommendations are not implementation approval or current policy.
 
-> **Question.** The owner keeps three surfaces: a desktop app he uses himself, the mobile web/PWA on Android (iOS native paused), and an MCP view that shows which servers each machine has (a marketplace maybe later). For each: what form, what it can do, how to build it, and what to leave out. The product stays lean: the smallest form that serves the owner's own daily use.
+> **Question.** This research considers three product surfaces: a desktop client, an Android web/PWA client (native iOS deferred), and an MCP view that shows which servers each machine has (a marketplace maybe later). For each: what form, what it can do, how to build it, and what to leave out. The product stays lean: the smallest form that supports daily use.
 >
 > **Marks.** **measured**: read or run first-hand in this session (doc page, source at a pinned ref, live API response, command output, page operated in Chrome). **inferred**: derived from measured and checkable. **unverified**: everything else.
 >
@@ -10,7 +10,7 @@ Publication note: restored historical research, with private details redacted. E
 >
 > **Builds on.** `docs/research/desktop-app-stack-2026-11-08.md` (Electron chosen for the shell; not reopened here). Spec 30 (`docs/spec/30-harness-profile-opt-in.md`) for MCP definitions across machines.
 >
-> **Blocked sources.** claude.ai connector directory page (`claude.ai/directory`): Cloudflare "verify you are human" checkbox in the owner's Chrome; agents do not solve CAPTCHAs. Covered instead by the Claude Code docs and by the connector registry the Claude session itself queries (measured, section 3.1). The Claude desktop app, Codex app, Cursor app and Linear app were not operated (no desktop-control session on the Mac); their rows rest on first-party docs and, for the desktop shells, on the bundle analysis in the stack note. Smithery's connection product shut down on 2026-10-31, so only its shutdown notice is read.
+> **Blocked sources.** claude.ai connector directory page (`claude.ai/directory`): Cloudflare "verify you are human" checkbox in the research browser; agents do not solve CAPTCHAs. Covered instead by the Claude Code docs and by the connector registry the Claude session itself queries (measured, section 3.1). The Claude desktop app, Codex app, Cursor app and Linear app were not operated (no desktop-control session was available); their rows rest on first-party docs and, for the desktop shells, on the bundle analysis in the stack note. Smithery's connection product shut down on 2026-10-31, so only its shutdown notice is read.
 
 ## 0. What cairn has today (measured)
 
@@ -18,7 +18,7 @@ Publication note: restored historical research, with private details redacted. E
 |---|---|---|
 | Desktop app | `planned`. Feature map: "a web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor"; gaps: no design for tray, window, install, packaging, updates, data location | `.claude/skills/verify-cairn/feature-map.json` id `desktop-app`; stack note |
 | Mobile web / PWA | `shipped`. `manifest.webmanifest` (standalone, `launch_handler: navigate-existing`, maskable icons, screenshots). `sw.js` has **no fetch handler** by design, handles `push` (title/body/tag, posts a delivery receipt to `/api/teams/:id/push/receipts`) and `notificationclick` (persists the href to CacheStorage, then focuses or opens a window). `push-device.ts` does VAPID subscribe/unsubscribe per device. Server side: `services/push.ts`, `push-alerts.ts` (delivery rows plus an SMTP fallback when push is not confirmed), `thread-push.ts`, and `pwa/thread-presence.ts` (a visible tab heartbeats presence, so the thread being viewed is not pushed) | `apps/web/public/sw.js`, `apps/web/src/pwa/*`, `apps/server/src/services/push*.ts` |
-| iOS app | `planned`, paused by the owner | feature map id `ios-app` |
+| iOS app | `planned`, deferred in the roadmap | feature map id `ios-app` |
 | MCP servers page | `shipped`, read-only. Reads **the server machine's** `~/.claude.json` top-level `mcpServers` only (`parseClaudeMcpEntries` ignores `projects[path].mcpServers`, `.mcp.json`, plugins, Codex `config.toml` and pi). Rows: name, transport, command or URL, env/header **key names** only. Write verbs 404 | `apps/server/src/services/mcp-servers.ts`, `packages/shared/src/protocol/mcp.ts:89`, `.claude/skills/verify-cairn/features/mcp-servers.md` |
 | Per-machine MCP facts | The daemon **already reports** each machine's MCP slugs and skill names in `capabilities` (`apps/daemon/src/machine-capabilities.ts`, mtime-cached). The server uses them for dispatch eligibility (`services/dispatch-eligibility.ts:38-80`). The machine detail pane shows only a count, `MCP {n} · 本机技能 {m}` (`apps/web/src/resources/machine-detail-pane.tsx:310`) | as cited |
 | Coordinator over MCP | `shipped`: `/api/mcp` lets outside harnesses talk to the Coordinator with an API key | feature map id `coordinator-mcp` |
@@ -56,13 +56,13 @@ Offline is not a feature anyone builds for an agent product beyond queued writes
 
 ### 1.3 Recommendation for cairn
 
-The owner's real topology: an always-on Linux box runs the cairn server and the main daemon; he sits at a Mac or the Linux desktop. So his desktop app is a **client of the always-on server** that can optionally make the current computer a second worker. Bundling a server is the stranger-onboarding story (D100/D105) and is a later phase, not the owner's daily need.
+For an existing self-hosted deployment, the desktop app can be a **client of a configured server** that optionally makes the current computer another worker. This is a generic deployment scenario, not a description of a personal installation. Bundling a server belongs to the new-installation flow (D100/D105) and is deferred in this historical proposal.
 
 Should do (3-5), one measured example each:
 
 | # | Capability | Example measured | cairn form |
 |---|---|---|---|
-| D1 | Window on the always-on server's origin, remembered per install; single instance | Orca pairs a client to a Remote Orca Server with a link (measured) | Electron `BrowserWindow.loadURL(<server origin over tailnet>)`, the same SPA; first run asks for the server URL or a pairing link |
+| D1 | Window on a configured server origin, remembered per install; single instance | Orca pairs a client to a Remote Orca Server with a link (measured) | Electron `BrowserWindow.loadURL(<server origin over tailnet>)`, the same SPA; first run asks for the server URL or a pairing link |
 | D2 | Tray / menu-bar with "needs you" count, and OS notifications only for needs-input / failed / PR ready, suppressed for the visible thread | Codex: completion alerts "only in background" plus separate permission toggles; Amp: never for the thread on screen (measured) | Reuse the existing push events and the `thread-presence` heartbeat; the desktop subscribes like a device and shows `Notification` + `Tray` badge; zero the badge on focus as t3code does |
 | D3 | `cairn://` deep links that open a prefilled draft in the Coordinator or a thread, never auto-run | `claude://code/new?...&q=` asks to confirm; t3code prompt links never run anything (measured) | Register the scheme; map `cairn://thread/<id>` and `cairn://new?q=` onto existing web routes |
 | D4 | "Use this computer as a worker" switch | Amp runner: uses the installed CLI, folder allowlist, restart on exit, stop on quit, keep-awake while plugged in, explicit Missing / Not signed in / Too old states (measured) | Spawn the existing `apps/daemon` with this machine's registration, an explicit allowed-folders list, `powerSaveBlocker` while on AC; diagnose `claude` / `codex` / `pi` presence and sign-in, never bundle them |
@@ -72,11 +72,11 @@ Leave out:
 
 - A second UI or native panes: the SPA is the UI (D45).
 - Bundling Claude Code / Codex binaries (Conductor does it and must then pin them; Amp and Claude-SSH use what is installed) (measured).
-- Bundling the server, Coordinator and tsnet in the owner's first slice: his server already runs on the always-on box. Keep D100's bundled mode for the stranger install phase.
+- Bundling the server, Coordinator and tsnet in the existing-deployment slice. Keep D100's bundled mode for the new-installation phase.
 - Offline mode, an in-app terminal, an in-app browser, computer use, SSH session management (the daemon already runs where the code is).
 - Windows build until someone needs it.
 
-**First slice.** `apps/desktop`: Electron window on a configured server origin + tray with the needs-you count + OS notifications from the existing push stream with presence suppression + `cairn://` drafts + electron-updater, AppImage and unsigned DMG. Acceptance: on the Linux desktop and the Mac, a task that asks a question raises one notification, clicking it lands in the thread, the badge clears, nothing fires for the thread on screen. D4 (worker switch) is slice two, because it touches daemon registration (`apps/daemon/src/credentials.ts`, `apps/server/src/routes-machine.ts`, both owner-routed security surfaces).
+**First slice.** `apps/desktop`: Electron window on a configured server origin + tray with the needs-you count + OS notifications from the existing push stream with presence suppression + `cairn://` drafts + electron-updater, AppImage and unsigned DMG. Acceptance: on supported desktop platforms, a task that asks a question raises one notification, clicking it lands in the thread, the badge clears, nothing fires for the thread on screen. D4 (worker switch) is slice two, because it touches daemon registration (`apps/daemon/src/credentials.ts`, `apps/server/src/routes-machine.ts`, both owner-routed security surfaces).
 
 ---
 
@@ -132,7 +132,7 @@ Should do:
 
 Leave out: native iOS and Android apps, Live Activities / ongoing notifications (need native, measured above), a terminal or file editor on the phone, in-page voice dictation (Gboard voice typing already works in any text field, inferred), offline write queue, approving commands straight from the lock screen.
 
-**First slice.** M1 + M4 + M3: notification classes with per-device toggles, manifest `shortcuts`, `share_target` into a Coordinator draft. All are manifest and service-worker changes plus one server tag. Acceptance on the owner's Android phone: install from Chrome, long-press shows two shortcuts, sharing a URL from another app opens a Coordinator draft, a question push arrives with the screen locked and opens the thread, a done push can be muted without muting questions.
+**First slice.** M1 + M4 + M3: notification classes with per-device toggles, manifest `shortcuts`, `share_target` into a Coordinator draft. All are manifest and service-worker changes plus one server tag. Acceptance on an Android test device: install from Chrome, long-press shows two shortcuts, sharing a URL from another app opens a Coordinator draft, a question push arrives with the screen locked and opens the thread, a done push can be muted without muting questions.
 
 ---
 
@@ -183,11 +183,11 @@ Leave out: a hosted MCP proxy or gateway (Smithery folded theirs; Aperture alrea
 
 ## 4. Open items
 
-- Operate the claude.ai connector directory once the owner clears the Cloudflare check in his Chrome.
-- On the Android phone: confirm WebAPK minting for the tailnet-only origin and that Web Push arrives with Chrome closed.
-- The Claude desktop, Codex and Cursor desktop apps were read through docs only; a hands-on pass on the Mac would confirm notification and badge behavior screen by screen.
+- Operate the claude.ai connector directory once an authorized tester clears the Cloudflare check in the research browser.
+- On an Android test device: confirm WebAPK minting for the tailnet-only origin and that Web Push arrives with Chrome closed.
+- The Claude desktop, Codex and Cursor desktop apps were read through docs only; a hands-on pass on a supported desktop platform would confirm notification and badge behavior screen by screen.
 
-## Addendum: claude.ai Directory, operated 2026-11-08 (measured, signed-in Mac Chrome)
+## Addendum: claude.ai Directory, operated 2026-11-08 (measured, signed-in research browser)
 
 - `https://claude.ai/directory` loaded with no challenge on this pass. The page has one search box ("Search plugins & connectors"), a Filter menu, "Add custom" and "Submissions".
 - The Filter menu offers categories (Topic, Department, Industry, Everyday life) and types with counts: Trending 9, New 10,306, Verified 1,512, Community 8,794, Custom 1, In-chat UI 752, Desktop extensions 132.

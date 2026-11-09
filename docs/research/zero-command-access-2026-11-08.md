@@ -1,4 +1,4 @@
-# Zero-command access from all of the owner's devices (2026-11-08)
+# Zero-command access across devices (2026-11-08)
 
 Publication note: restored historical research, with private details redacted. Evidence labels describe the original research session; recommendations are not implementation approval or current policy.
 
@@ -6,21 +6,21 @@ Publication note: restored historical research, with private details redacted. E
 >
 > **Marks.** **`measured`**: read first-hand this session (official doc page, source at a named ref, command output, or the running product). **`inferred`**: derived from `measured` and checkable. **`unverified`**: everything else.
 >
-> **Refs.** cairn at `origin/main` `2ff7e8761`. Tailscale source at `v1.104.5` (Go module cache, the version `apps/tsnet-sidecar` pins). t3code `main` `ade473018`, `docs/user/remote-access.md` last changed in `d520d5bb8`. openai/codex `main` `9ba7a3df5`. The server host runs tailscaled 1.104.2.
+> **Refs.** cairn at `origin/main` `2ff7e8761`. Tailscale source at `v1.104.5` (Go module cache, the version `apps/tsnet-sidecar` pins). t3code `main` `ade473018`, `docs/user/remote-access.md` last changed in `d520d5bb8`. openai/codex `main` `9ba7a3df5`.
 >
 > **Builds on.** [`remote-access-tsnet.md`](remote-access-tsnet.md) (D103: the user's own Tailscale account, no cairn-run server), [`seamless-device-auth-2026-11-08.md`](seamless-device-auth-2026-11-08.md) (tailnet owner identity, shipped in #3440) and [`docs/deploy/tailscale-mobile.md`](../deploy/tailscale-mobile.md).
 >
-> **Method note.** The `agent-reach web` channel hit a one-hour rate limit (`RATE_LIMITED`, "retry later"). Pages were then fetched with `curl` and stripped to text. Nabu Casa's support site sits behind a Cloudflare JavaScript challenge, so it was read in the owner's Chrome. GitHub sources were read with `gh api`.
+> **Method note.** The `agent-reach web` channel hit a one-hour rate limit (`RATE_LIMITED`, "retry later"). Pages were then fetched with `curl` and stripped to text. Nabu Casa's support site sits behind a Cloudflare JavaScript challenge, so it was read in the research browser. GitHub sources were read with `gh api`.
 
 ## 1. What cairn needs today, measured
 
 | Fact | Mark | Source |
 |---|---|---|
-| the owner's box needs two manual steps: `CAIRN_TSNET=socket` in the service env, and `tailscale serve --bg unix:…/tailnet.sock` (root or operator). Serve on the host now points at `unix:<HOME>/.cairn/tsnet/tailnet.sock`. | `measured` | `docs/deploy/tailscale-mobile.md` §1-2; `tailscale serve status` |
+| Socket-mode setup requires two manual steps: `CAIRN_TSNET=socket` in the service env, and `tailscale serve --bg unix:…/tailnet.sock` (root or operator). Socket-mode deployments use a Unix socket upstream. | `measured` | `docs/deploy/tailscale-mobile.md` §1-2 |
 | `CAIRN_TSNET=1` already spawns the Go sidecar, which emits `authUrl`, reports `ownerLogin`/`selfTagged`, opens `ListenTLS(":443")` and rejects tagged and sharee peers. | `measured` | `apps/tsnet-sidecar/internal/sidecar/node.go`, `run.go:153-175` |
 | The Remote access page already shows `请先登录 Tailscale：{url}` when the sidecar is in `needs-login`. It is shown as text, not a button, and the sidecar only starts when an env var is set. | `measured` | `apps/web/src/routes/remote-access-page.tsx:121-180`; `apps/server/src/config.ts:206` |
 | The sidecar binary built from `origin/main` for linux/amd64 is 32,691,423 bytes. | `measured` | `go build` in a scratch directory |
-| Run with a fresh state dir, the sidecar printed `LocalBackend state is NeedsLogin; running StartLoginInteractive...` and emitted `{"type":"authUrl"}` with a `login.tailscale.com/a/…` URL. It exits as soon as its stdin closes. | `measured` | scratch run; process stopped before sign-in, no node was added (`tailscale status` has no such node) |
+| Run with a fresh state dir, the sidecar printed `LocalBackend state is NeedsLogin; running StartLoginInteractive...` and emitted `{"type":"authUrl"}` with a `login.tailscale.com/a/…` URL. It exits as soon as its stdin closes. | `measured` | scratch run; process stopped before sign-in |
 | Opening that URL shows "Log in to connect a device to your tailnet": email, Google, Microsoft, GitHub, Apple, passkey, plus "Alternatively, use a QR code". The sign-in was not completed, because passwords and 2FA are the owner's to enter. | `measured` | [screenshot](zero-command-access-2026-11-08/tsnet-authurl-login.jpg) |
 [Redacted: private measurements.]
 
@@ -73,7 +73,7 @@ Click counts below assume the user is already signed in to their identity provid
 
 | Claim inside the proposal | Verdict | Evidence |
 |---|---|---|
-| No sudo, no system Tailscale needed on the server | **Holds.** tsnet is userspace in the user's own process; the sidecar ran as `the owner` with a private state dir. | `measured` scratch run |
+| No sudo, no system Tailscale needed on the server | **Holds.** tsnet is userspace in the user's own process; the sidecar ran as an unprivileged user with a private state dir. | `measured` scratch run |
 | One click | **No: 1 click in cairn plus 2-4 at Tailscale**, and one more consent step on tailnets without HTTPS. | `measured` login page; `tsnet.go:1467-1471`; KB 1153 |
 | The owner is recognised with no allowlist | **Holds for interactive login only.** An interactive node is untagged and owned by the user, so the sidecar's `ownerLogin` matches. An auth-key or tagged node loses that (`selfTagged` means allowlist only). | `measured` `node.go:57-72`; `docs/deploy/tailscale-mobile.md` §1 |
 | It keeps working | **Breaks after 180 days** unless the user re-authenticates or disables key expiry for the node. HA's add-on documents the same chore. | `measured` KB 1028, HA DOCS.md |
@@ -106,7 +106,7 @@ Click counts below assume the user is already signed in to their identity provid
 | First phone without Tailscale: install the app, Get Started, allow VPN, sign in with the same IdP | about 5 taps plus the store install | 0 | 0 | `measured` KB 1020/1079 |
 | Then scan the **Open on phone** QR in cairn, which opens `https://<node>.<tailnet>.ts.net/app` and is admitted as the owner | 1 scan | 0 | 0 | `inferred` (owner admit is `measured` in #3440 e2e) |
 | Optional: Add to Home Screen for the PWA and push | 3 | 0 | 0 | `measured` deploy doc |
-| **Each additional device already on the tailnet** (the owner's iPhone today) | **1 scan or 1 bookmark** | **0** | **0** | `inferred` |
+| **Each additional device already on the tailnet** | **1 scan or 1 bookmark** | **0** | **0** | `inferred` |
 
 [Redacted: private measurements.]
 
@@ -118,7 +118,7 @@ Click counts below assume the user is already signed in to their identity provid
 - Trusted parties: the Tailscale control plane, which asserts who the user is (`inferred`: a control-plane compromise could forge identity); the user's IdP; and same-uid local processes (already trusted, `measured` prior research §4).
 - New exposures: the node name goes into CT logs when HTTPS is enabled (`measured` KB 1153), and the node state dir holds the node key (`inferred`: keep `<CAIRN_HOME>/tsnet/state` at 0700, as `ensurePrivateDir` does, `measured`).
 - Funnel stays off by default, token or pairing only, no identity, no screen (D103 §4).
-- Starting the sidecar unauthenticated joins nothing: the node exists in the tailnet only after the user completes the login (`measured`: no `zca-walk` node after the scratch run).
+- Starting the sidecar unauthenticated joins nothing: the node exists in the tailnet only after the user completes the login (`measured`: the scratch run ended before enrollment).
 
 ### 5.4 Failure modes the implementation must cover (tests first)
 
