@@ -458,9 +458,7 @@ export function HomeC({
                   composerRef={composerRef}
                   onPick={thread.pick}
                 />
-                <ComposerSetupHint
-                  onOpenCoordinatorSettings={() => surface.setChiefView('settings')}
-                />
+                <ComposerSetupHint />
               </>
             }
             composerRef={(node) => {

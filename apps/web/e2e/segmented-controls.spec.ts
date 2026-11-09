@@ -175,7 +175,7 @@ test('chief tabs: indicator pill slides between chips — 150ms ease on left/top
 }) => {
   await themed(page, 'light', '/app?scenario=101');
   const pill = page.locator('[data-segmented="indicator"]');
-  const agent = page.getByRole('tab', { name: 'Agent' });
+  const routing = page.getByRole('tab', { name: '模型与机器' });
   const charter = page.getByRole('tab', { name: '章程' });
 
   const box = (loc: Locator) =>
@@ -191,8 +191,8 @@ test('chief tabs: indicator pill slides between chips — 150ms ease on left/top
     expect(Math.abs(p.h - c.h)).toBeLessThanOrEqual(1);
   };
 
-  await aligned(agent);
-  expect(await bg(agent)).toBe('rgba(0, 0, 0, 0)');
+  await aligned(routing);
+  expect(await bg(routing)).toBe('rgba(0, 0, 0, 0)');
   const layering = await pill.evaluate((el) => {
     const cs = getComputedStyle(el);
     const tabCs = getComputedStyle(document.querySelector('[role="tab"]')!);
