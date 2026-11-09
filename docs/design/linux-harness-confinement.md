@@ -1,7 +1,7 @@
 # Linux harness confinement
 
 Date: 2026-11-09
-Status: proposed; awaiting ian's design review; no implementation authorized
+Status: approved by ian on 2026-11-09; startup-availability addition and review correction below; implementation follows in ordered PRs
 
 ## Decision and boundary
 
@@ -10,6 +10,7 @@ Status: proposed; awaiting ian's design review; no implementation authorized
 | Linux only; one mandatory bwrap launcher for dispatched harnesses on omarchy | ian and orchestrator, 2026-11-09; supersedes the platform scope in [research §4.2](../research/user-computer-model-2026-11-08.md#42-mode-b-one-cairn-owned-sandbox-around-every-harness) |
 | No Seatbelt implementation | Known gap: its proposed file policy cannot meet daemon-PID isolation; non-Linux task launches must refuse, never run unconfined |
 | Computer-driver tasks #140/#141 paused; neither driver qualified | ian, 2026-11-09; no driver choice, orb/noVNC deletion, dependency or lockfile change here |
+| Startup isolation failure is machine unavailability, not repeated task failure | [ian's approval and addition](https://github.com/xiechimon/cairn/pull/3656#issuecomment-6742184723), 2026-11-09; machines-page reason and one notification per outage |
 
 Reuse the research's whole-process precedent, not Bash-only or in-process isolation. Launch observations were inspected at `b46a16893`; proposals are not measured guarantees. Scope: daemon-dispatched harnesses and descendants, including retained orb workers, not the in-server pi-durable Coordinator or external MCP services.
 
@@ -25,7 +26,7 @@ Only `apps/daemon/src/backend/confine.ts` launches harnesses: bwrap with `--die-
 
 ## Launch inventory and failure behavior
 
-Paths are relative to `apps/daemon/src/`; write failing launch tests per row, including create/resume.
+Paths are relative to `apps/daemon/src/`; write failing launch tests per row, including create/resume. Invalid task input or model/adapter configuration remains session-local; isolation infrastructure failure follows the machine-unavailable transition below at every entry.
 
 | Existing entry | Replacement and failure behavior |
 | --- | --- |
@@ -37,6 +38,21 @@ Paths are relative to `apps/daemon/src/`; write failing launch tests per row, in
 
 Git/workspace management, daemon supervisors and computer-driver helpers are not harness launches. Structural coverage must nevertheless reject new direct harness launches outside the inventoried seams, including SDK defaults; no backend file except `confine.ts` may import `node:child_process`.
 
+## Startup ownership and machine availability
+
+[Primary-source research](../research/confine-process-ownership-2026-11-09.md) identifies the parent-already-dead race in bwrap's `--die-with-parent`; retain the flag only as cleanup assistance. One systemd-owned transient task service/cgroup, established before bwrap starts, uses `BindsTo=` plus `After=` on the owning daemon unit, `Restart=no`, `KillMode=control-group` and final SIGKILL. bwrap remains the single sandbox. No cgroup delegation, writable cgroup controls or manager-control sockets/FDs reach the child. Missing manager/owner-unit/cgroup support fails preflight; no alternative launch mode.
+
+A trusted confine init gate inside bwrap starts no harness until it validates an explicit current-invocation acknowledgement after manager ownership and sandbox readiness. EOF, cancellation or stale/malformed acknowledgement aborts; bwrap's `--block-fd` alone is insufficient because EOF releases it. Parent loss stops the bound task unit even before acknowledgement. Cancel/start races reconcile the unique launch unit; release paths only after terminal manager state **and** `cgroup.events populated=0`, not a PID exit or successful stop request. Unverifiable cleanup reserves paths and marks the machine unavailable.
+
+| Availability reader/writer | Transition, failure behavior and required test |
+| --- | --- |
+| Daemon startup/preflight and recovery | `checking → ready/unavailable`; run the same policy, startup gate and cleanup checks before any claim or harness probe. Missing bwrap, denied namespaces/mounts or failed ownership/cleanup makes all task runtimes unavailable. No raw fallback or automatic recheck loop; explicit recheck after repair must pass before readiness. |
+| Enrollment/presence; shared capability parser; server machine service | Carry validated confinement state, scrubbed reason code and fenced daemon-invocation identity. Persist the current state; missing/invalid/stale readiness cannot enable dispatch. Keep presence online to expose the fault, without overwriting the owner's enabled-runtime settings. Test restart and reordered reports. |
+| Scheduler/routing, server claim eligibility and daemon launch gate | Require current acknowledged readiness at every entry; otherwise leave tasks pending without failed builds. If infrastructure fails after claim but before launch, release the unstarted claim as machine-blocked and stop further claims; test concurrent claims and zero repeated task failures. |
+| Machines page; notification writer | Show unavailable with the repair reason. Server persists one outage identity until confirmed recovery; deduplicate notification by machine/outage across heartbeats and restarts. Test one notification for repeated failure, visible reason, recovery and one new notice for a later outage. |
+
+Implementation touches `machine-loop.ts`, shared machine capabilities, server presence/eligibility/routing/claim/notification paths and the existing machines surface together; do not ship readiness reporting without enforcement or UI visibility.
+
 ## Pi protocol and state ownership
 
 One child per live session; no persisted protocol state or daemon-wide environment mutation. Existing SDK plus versioned, Zod-validated JSONL on private pipes: bounded frames/queues, correlation IDs, backpressure; scrubbed stderr diagnostics. This thin bridge preserves Cairn's custom tools/gates, unlike stock pi RPC.
@@ -47,8 +63,8 @@ One child per live session; no persisted protocol state or daemon-wide environme
 | Parent prompt; child ready → running; child events/usage | Stream ordered StepEvents, final usage and durable transcript updates; parent owns indexing and validates session paths. EOF, invalid/oversized frames or persistence failure fail pending work, never synthesize success. |
 | Parent steer/image input; child live session | Preserve ordering, image checks, gates, skills, telemetry and compaction behavior. Reject steering after stopping and unsupported input without another child. |
 | Child tool request; parent registered callback; child reply | Bridge only declared local/remote tools and approval callbacks with correlated IDs; reject unknown methods/IDs. Built-in file/Bash tools stay in the child. Do not expose a generic parent filesystem/command executor. External services retain their own authorization. |
-| Parent stop/abort; completion, child error/exit, or parent loss → stopping → closed/failed | Settle outstanding requests once, cancel callbacks, close pipes and terminate the entire confined tree. Await cleanup before releasing task paths; descendants cannot survive parent loss. No respawn or blind retry. |
+| Parent stop/abort; completion, child error/exit, or parent loss → stopping → closed/failed | Settle requests once, cancel callbacks and close pipes; stop the manager-owned task cgroup and verify emptiness before releasing paths. Test owner death/cancel before startup acknowledgement, immediately after it, and with double-fork/session-changing descendants. Uncertain cleanup marks the machine unavailable; no respawn or blind retry. |
 
 ## Acceptance before implementation is called complete
 
-Red-first: argv snapshots; launch/state tests per table row; structural tests; per-profile Linux probes for worktree writes, denied home writes/secret reads, hidden daemon PID, HTTP and GPU. Cover nested daemon-home paths, protected git metadata, absent targets and namespace/mount failure. Real Claude/Codex/pi fake-model E2Es request sentinel reads/home writes and prove denial; record omarchy install (`pnpm install --ignore-scripts`) and tests inside confine. Use targeted Vitest `--maxWorkers=4`, lint, typecheck, spec:parse and prepush. No fresh runtime pass or macOS evidence is claimed. Hold this docs PR with `coordinator-hold`; ian reviews before code.
+Red-first: argv snapshots; launch/state tests per table row; structural tests; per-profile Linux probes for worktree writes, denied home writes/secret reads, hidden daemon PID, HTTP and GPU. Cover nested daemon-home paths, protected git metadata, absent targets, startup/cancel/parent-death races, independently verified cgroup cleanup and machine-unavailable behavior for namespace/mount failure, including the visible reason and exactly one outage notification. Real Claude/Codex/pi fake-model E2Es request sentinel reads/home writes and prove denial; record omarchy install (`pnpm install --ignore-scripts`) and tests inside confine. Use targeted Vitest `--maxWorkers=4`, lint, typecheck, spec:parse and prepush. No fresh runtime pass or macOS evidence is claimed. Design approval is recorded above; implementation starts only after this docs PR merges, in ordered red-first PRs.
