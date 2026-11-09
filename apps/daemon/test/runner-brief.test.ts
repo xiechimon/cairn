@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -21,6 +22,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
@@ -270,149 +272,55 @@ async function run(opts: {
   return { client, lines, cwd };
 }
 
-describe('brief wiring: write inventory and channel clearing', () => {
-  test.each(['AGENTS.md', 'CLAUDE.md'] as const)(
-    'claude-code loads repository guidance once when only %s exists',
-    async (file) => {
-      const sentinel = 'repository-guidance-sentinel';
-      let atOpen = '';
-      const { backend, seen } = stubBackend({
-        onSessionStart: (cwd) => {
-          atOpen = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
-        },
-      });
-      const claude = createClaudeCodeBackend({});
-      const claimed = claimedStep({ repoBound: false, provider: 'claude-code' });
-      const { cwd, client } = await run({
-        claimed,
-        backend: { ...backend, capabilities: claude.capabilities, brief: claude.brief },
-        seed: (cwd) => writeFileSync(join(cwd, file), `${sentinel}\n`),
-      });
+describe('brief delivery through the session prompt', () => {
+  test.each([undefined, 'pi', null] as const)(
+    'delivers runtime guidance for channel %s without writing files',
+    async (briefBackendId) => {
+      const { backend, seen } = stubBackend({ briefBackendId });
+      const { cwd, client } = await run({ claimed: claimedStep({ repoBound: false }), backend });
       expect(client.doneBodies[0]?.body.status).toBe('success');
-      expect(atOpen.split(sentinel)).toHaveLength(2);
-      expect(seen[0]?.systemPrompt).toBeUndefined();
-      expect(readFileSync(join(cwd, file), 'utf8')).toBe(`${sentinel}\n`);
-      if (file === 'AGENTS.md') expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(false);
+      expect(seen[0]?.systemPrompt).toContain('负责构建');
+      if (briefBackendId !== null) expect(seen[0]?.systemPrompt).toContain('stub-catalog');
+      expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
+      expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(false);
     },
   );
 
-  test('claude-code prefers CLAUDE.md without duplicating AGENTS.md guidance', async () => {
-    const sentinel = 'shared-repository-guidance-sentinel';
-    const claudeText = `${sentinel}\nclaude-specific-guidance\n`;
-    const agentsText = `${sentinel}\nagents-specific-guidance\n`;
-    let atOpen = '';
-    const { backend } = stubBackend({
-      onSessionStart: (cwd) => {
-        atOpen = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
-      },
-    });
-    const claude = createClaudeCodeBackend({});
-    const claimed = claimedStep({ repoBound: false, provider: 'claude-code' });
-    const { cwd, client } = await run({
-      claimed,
-      backend: { ...backend, capabilities: claude.capabilities, brief: claude.brief },
-      seed: (cwd) => {
-        writeFileSync(join(cwd, 'CLAUDE.md'), claudeText);
-        writeFileSync(join(cwd, 'AGENTS.md'), agentsText);
-      },
-    });
-    expect(client.doneBodies[0]?.body.status).toBe('success');
-    expect(atOpen.split(sentinel)).toHaveLength(2);
-    expect(atOpen).toContain('claude-specific-guidance');
-    expect(atOpen).not.toContain('agents-specific-guidance');
-    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(claudeText);
-    expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf8')).toBe(agentsText);
+  test('Claude receives AGENTS.md guidance through the prompt while native CLAUDE.md stays untouched', async () => {
+    for (const file of ['AGENTS.md', 'CLAUDE.md']) {
+      const { backend, seen } = stubBackend({});
+      const claude = createClaudeCodeBackend({});
+      const { cwd, client } = await run({
+        claimed: claimedStep({ repoBound: false }),
+        backend: { ...backend, capabilities: claude.capabilities, brief: claude.brief },
+        seed: (cwd) => writeFileSync(join(cwd, file), 'repository-guidance-sentinel\n'),
+      });
+      expect(client.doneBodies[0]?.body.status).toBe('success');
+      expect(seen[0]?.systemPrompt).toContain('负责构建');
+      if (file === 'AGENTS.md')
+        expect(seen[0]?.systemPrompt).toContain('repository-guidance-sentinel');
+      else expect(seen[0]?.systemPrompt).not.toContain('repository-guidance-sentinel');
+      expect(readFileSync(join(cwd, file), 'utf8')).toBe('repository-guidance-sentinel\n');
+    }
   });
 
-  test('pi keeps repository guidance when only CLAUDE.md exists', async () => {
-    const sentinel = 'pi-claude-fallback-sentinel';
-    let atOpen = '';
-    const { backend } = stubBackend({
-      onSessionStart: (cwd) => {
-        atOpen = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
-        expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
-      },
-    });
-    const { cwd, client } = await run({
-      claimed: claimedStep({ repoBound: false }),
-      backend,
-      seed: (cwd) => writeFileSync(join(cwd, 'CLAUDE.md'), `${sentinel}\n`),
-    });
-    expect(client.doneBodies[0]?.body.status).toBe('success');
-    expect(atOpen.split(sentinel)).toHaveLength(2);
-    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(`${sentinel}\n`);
-  });
-
-  test('file already on disk at createSession, content = systemPrompt body + backend contributions (failure mode 2)', async () => {
-    let atOpen: string | null = null;
-    const { backend, seen } = stubBackend({
-      onSessionStart: (cwd) => {
-        atOpen = readFileSync(join(cwd, 'AGENTS.md'), 'utf8');
-      },
-    });
-    await run({ claimed: claimedStep({ repoBound: false }), backend });
-    expect(seen.length).toBeGreaterThan(0);
-    expect(atOpen).not.toBeNull();
-    expect(atOpen as unknown as string).toContain('负责构建');
-    expect(atOpen as unknown as string).toContain('<skills>stub-catalog</skills>');
-  });
-
-  test('with a brief channel → SessionOpts.systemPrompt absent (failure mode 1: channel not opened twice)', async () => {
-    const { backend, seen } = stubBackend({});
-    await run({ claimed: claimedStep({ repoBound: false }), backend });
-    for (const s of seen) expect(s.systemPrompt).toBeUndefined();
-  });
-
-  test('backend without a brief channel → keeps inline systemPrompt and writes no file (failure mode 6)', async () => {
-    const { backend, seen } = stubBackend({ briefBackendId: null });
-    const { cwd } = await run({ claimed: claimedStep({ repoBound: false }), backend });
-    expect(seen[0]?.systemPrompt).toContain('负责构建');
-    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
-  });
-});
-
-describe('brief wiring: erase covers every exit', () => {
-  test('successful close → created-state file deleted (positive case of failure mode 3)', async () => {
-    const { backend } = stubBackend({});
-    const { cwd, lines } = await run({ claimed: claimedStep({ repoBound: false }), backend });
-    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
-    expect(lines.some((l) => l.includes('brief removed'))).toBe(true);
-  });
-
-  test("appended state → user's existing file restored byte for byte", async () => {
-    const { backend } = stubBackend({});
-    const userText = '# 仓库约定\n\n- 用 pnpm\n';
-    const { cwd } = await run({
-      claimed: claimedStep({ repoBound: false }),
-      backend,
-      seed: (d) => writeFileSync(join(d, 'CLAUDE.md'), userText),
-    });
-    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(userText);
-  });
-
-  test('openSession throw exit is also erased (key gap of failure mode 3)', async () => {
-    const { backend } = stubBackend({ throwOnOpen: true });
-    const { cwd, client, lines } = await run({
-      claimed: claimedStep({ repoBound: false }),
-      backend,
-    });
-    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
-    expect(lines.some((l) => l.includes('brief removed') || l.includes('brief noop'))).toBe(true);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-  });
-
-  test('stream-error exit is also erased (key gap of failure mode 3)', async () => {
-    const { backend } = stubBackend({
-      events: [
-        {
-          type: 'error',
-          error: { message: 'stream blew up', retryable: false },
-        } as StepEvent,
-      ],
-    });
-    const { cwd } = await run({ claimed: claimedStep({ repoBound: false }), backend });
-    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
-  });
+  test.each(['open', 'stream'] as const)(
+    '%s failure leaves repository guidance unchanged',
+    async (failure) => {
+      const { backend } = stubBackend({
+        throwOnOpen: failure === 'open',
+        events: [{ type: 'error', error: { message: 'stream failed', retryable: false } }],
+      });
+      const { cwd, client } = await run({
+        claimed: claimedStep({ repoBound: false }),
+        backend,
+        seed: (cwd) => writeFileSync(join(cwd, 'AGENTS.md'), 'repository guidance\n'),
+      });
+      expect(client.doneBodies[0]?.body.status).toBe('failed');
+      expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf8')).toBe('repository guidance\n');
+      expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(false);
+    },
+  );
 });
 
 describe('brief wiring: post-push marker detection (#958 gate 4)', () => {
@@ -448,43 +356,11 @@ describe('brief wiring: post-push marker detection (#958 gate 4)', () => {
   });
 });
 
-describe('brief wiring: failure gate', () => {
-  test('erase failure → no commitAll, closes as failed, transcript lands a line (failure mode 4)', async () => {
-    const claimed = claimedStep({ repoBound: true });
-    const cwdForWs = testTempDir('cairn-brief-wt-');
-    const { ws, calls } = fakeWorkspace(cwdForWs);
-    mkdirSync(cwdForWs, { recursive: true });
-    const { backend } = stubBackend({
-      onSessionStart: (cwd) => {
-        rmSync(join(cwd, 'AGENTS.md'), { force: true });
-        mkdirSync(join(cwd, 'AGENTS.md'));
-      },
-    });
-    const { client } = await run({ claimed, backend, workspace: ws });
-    expect(calls).not.toContain('commitAll');
-    expect(calls).not.toContain('push');
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-    expect(JSON.stringify(client.uploads)).toContain('运行简报未能从工作区擦除');
-  });
-
-  test('write failure is fail-closed: no session opened (failure mode 5)', async () => {
-    const { backend, seen } = stubBackend({});
-    const { client, cwd } = await run({
-      claimed: claimedStep({ repoBound: false }),
-      backend,
-      seed: (d) => mkdirSync(join(d, 'AGENTS.md')),
-    });
-    expect(seen.length).toBe(0);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(true);
-  });
-});
-
 test('generated worker brief requests light and dark screenshots through attach_file', async () => {
   let brief = '';
   const { backend } = stubBackend({
-    onSessionStart: (cwd) => {
-      brief = readFileSync(join(cwd, 'AGENTS.md'), 'utf8');
+    onSessionStart: (_cwd, session) => {
+      brief = session.systemPrompt ?? '';
     },
   });
   await run({ claimed: claimedStep({ repoBound: false }), backend });
@@ -524,4 +400,67 @@ test('runner prepares attach_file locally and relays only workspace bytes', asyn
       },
     },
   ]);
+});
+
+test('runtime guidance reaches the session while tracked workspace status stays empty', async () => {
+  const { backend } = stubBackend({
+    onSessionStart: (cwd, session) => {
+      expect(execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf8' })).toBe('');
+      expect(session.systemPrompt).toContain('memory-sentinel');
+      expect(session.systemPrompt).toContain('<skills>stub-catalog</skills>');
+    },
+  });
+  const claimed = claimedStep({ repoBound: false });
+  if (claimed.agent)
+    claimed.agent.memories = [{ title: 'Test memory', content: 'memory-sentinel' }];
+  const { client } = await run({
+    claimed,
+    backend,
+    seed: (cwd) => {
+      execFileSync('git', ['init', '-b', 'main'], { cwd });
+      writeFileSync(join(cwd, 'AGENTS.md'), 'Repository guidance\n');
+      execFileSync('git', ['add', 'AGENTS.md'], { cwd });
+      execFileSync(
+        'git',
+        ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'],
+        { cwd },
+      );
+    },
+  });
+  expect(client.doneBodies[0]?.body.status).toBe('success');
+});
+
+test('an intentional no-op worker completes successfully through the real workspace manager', async () => {
+  const repo = testTempDir('cairn-noop-repo-');
+  execFileSync('git', ['init', '-b', 'main'], { cwd: repo });
+  writeFileSync(join(repo, 'AGENTS.md'), 'Repository guidance\n');
+  mkdirSync(join(repo, '.agents'));
+  writeFileSync(join(repo, '.agents/setup'), '#!/bin/sh\necho setup > setup-output\n', {
+    mode: 0o755,
+  });
+  execFileSync('git', ['add', 'AGENTS.md', '.agents/setup'], { cwd: repo });
+  execFileSync(
+    'git',
+    ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'],
+    { cwd: repo },
+  );
+  const claimed = claimedStep({ repoBound: true });
+  if (claimed.project?.repo) claimed.project.repo.cloneUrl = repo;
+  const { logger } = captureLogger();
+  const { backend } = stubBackend({
+    events: [
+      { type: 'text_delta', text: 'No changes; waiting for the requested decision.' },
+      { type: 'done', usage: [] },
+    ],
+    onSessionStart: (cwd) => {
+      const gitFile = readFileSync(join(cwd, '.git'), 'utf8').trim().slice('gitdir: '.length);
+      const hook = join(gitFile, 'hooks/pre-commit');
+      mkdirSync(join(hook, '..'), { recursive: true });
+      writeFileSync(hook, '#!/bin/sh\necho empty-step-hook-ran >&2\nexit 1\n', { mode: 0o755 });
+      execFileSync('git', ['config', 'core.hooksPath', join(gitFile, 'hooks')], { cwd });
+    },
+  });
+  const { client } = await run({ claimed, backend, workspace: new WorkspaceManager({ logger }) });
+  expect(client.doneBodies[0]?.body).toMatchObject({ status: 'success', hasChanges: false });
+  expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
 });

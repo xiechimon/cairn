@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -36,6 +36,7 @@ async function seedHijackRepo(): Promise<string> {
   const dir = join(makeTestTempDir('cairn-policy-user-'), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# policy repo\n');
+  writeFileSync(join(dir, 'AGENTS.md'), 'repository-policy-guidance-sentinel\n');
   mkdirSync(join(dir, '.pi'));
   writeFileSync(join(dir, '.pi', 'SYSTEM.md'), `${HIJACK_MARKER}\n`);
   await runGit(['add', '-A'], { cwd: dir });
@@ -56,7 +57,7 @@ beforeAll(async () => {
       toolCall: {
         name: 'bash',
         arguments: {
-          command: 'printf "policy probe\\n" >> README.md',
+          command: 'test -z "$(git status --porcelain)" && printf "policy probe\\n" >> README.md',
         },
       },
     },
@@ -142,6 +143,14 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     expect(flat).not.toContain('PI-TRUST-HIJACK-MARKER');
 
     expect(flat).toContain(TASK_SPEC);
+    expect(flat).toContain('repository-policy-guidance-sentinel');
+    expect(flat).toContain('For UI tasks, attach light and dark screenshots');
+    const workspace = join(paths.workspacesDir, buildId);
+    expect(readFileSync(join(workspace, 'AGENTS.md'), 'utf8')).toBe(
+      'repository-policy-guidance-sentinel\n',
+    );
+    expect(readFileSync(join(workspace, 'README.md'), 'utf8')).toContain('policy probe');
+    expect((await runGit(['status', '--porcelain'], { cwd: workspace })).stdout).toBe('');
 
     expect((stub.requests[0] as unknown as Record<string, unknown>).prompt_cache_retention).toBe(
       '24h',

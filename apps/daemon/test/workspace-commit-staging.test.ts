@@ -295,3 +295,18 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
     );
   }, 60_000);
 });
+
+test('a step with only setup drift skips commit hooks and finishes with no changes', async () => {
+  await seedRepo(userRepo);
+  const ws = new WorkspaceManager({ logger: quietLogger() });
+  const prepared = await ws.prepare(prepareInput());
+  const head = await ws.headCommit(prepared.cwd);
+  const hook = await gitPrim.gitPath(prepared.cwd, 'hooks/pre-commit');
+  mkdirSync(join(hook, '..'), { recursive: true });
+  writeFileSync(hook, '#!/bin/sh\necho empty-step-hook-ran >&2\nexit 1\n', { mode: 0o755 });
+  await expect(ws.commitAll(prepared.cwd, 'build: deliberate pause', IDENTITY)).resolves.toEqual({
+    committed: false,
+    head,
+    setupDrift: expect.arrayContaining(['.setup-cache/state', 'pnpm-lock.yaml']),
+  });
+});
