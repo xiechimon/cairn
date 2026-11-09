@@ -141,7 +141,6 @@ function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
   const workKey = ownership?.workKey ?? '';
   if (row.lastNotifiedOwner === owner && row.lastNotifiedWork === workKey) return;
   if (!claimCheckpoint(deps.db, row, owner, workKey)) return;
-  if (row.lastNotifiedOwner === null) return;
   if (row.lastNotifiedOwner !== owner) {
     const record = getTodo(deps, row.id);
     if (record !== null) deps.hub.publishTodoDoc(record.teamId, record);
@@ -149,6 +148,21 @@ function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
   if (ownership === null) return;
   if (ownership.owner === 'owner') notifyOwner(deps, row, ownership.reason);
   else enqueueOwnershipWake(deps, row, ownership.reason);
+}
+
+export function seedOwnerCheckpoints(db: Db): number {
+  const rows = db.select().from(todo).where(isNull(todo.lastNotifiedOwner)).all();
+  for (const row of rows) {
+    const ownership = ownershipOf(db, row);
+    db.update(todo)
+      .set({
+        lastNotifiedOwner: ownership?.owner ?? NOBODY,
+        lastNotifiedWork: ownership?.workKey ?? '',
+      })
+      .where(and(eq(todo.id, row.id), isNull(todo.lastNotifiedOwner)))
+      .run();
+  }
+  return rows.length;
 }
 
 export function reconcileOwners(deps: OwnerDeps, todoIds?: readonly string[]): void {

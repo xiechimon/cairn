@@ -13,7 +13,7 @@ import {
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import type { BuildDeps } from '../src/services/builds.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
-import { reconcileOwners } from '../src/services/owner.js';
+import { reconcileOwners, seedOwnerCheckpoints } from '../src/services/owner.js';
 import { parkFailedBuild } from '../src/services/retry-parking.js';
 import { getTodo, setTodoArchived, setTodoPhase } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -370,6 +370,20 @@ describe('reconcileOwners (#3512)', () => {
     expect(w.notified() - before).toBe(1);
   });
 
+  test('a migrated task that fails right after boot still wakes the Coordinator once', () => {
+    const w = openWorld({ phase: 'building', failure: 'repeated' });
+    w.s.db.update(todoTable).set({ lastNotifiedOwner: null, lastNotifiedWork: null }).run();
+    seedOwnerCheckpoints(w.s.db);
+    w.s.db
+      .update(buildTable)
+      .set({ errorMessage: 'boom' })
+      .where(eq(buildTable.id, w.buildId))
+      .run();
+    setTodoPhase(w.deps, w.todoId, 'failed');
+    reconcileOwners(w.deps);
+    expect(wakes(w).filter((prompt) => prompt.startsWith('[wake:failed]'))).toHaveLength(1);
+  });
+
   test('the first sweep after the migration seeds checkpoints without waking anyone', () => {
     const w = openWorld({ phase: 'failed', failure: 'parked' });
     const other = newRecordId(8);
@@ -387,6 +401,7 @@ describe('reconcileOwners (#3512)', () => {
       .run();
     w.s.db.update(todoTable).set({ lastNotifiedOwner: null, lastNotifiedWork: null }).run();
     const before = w.notified();
+    seedOwnerCheckpoints(w.s.db);
     reconcileOwners(w.deps);
     reconcileOwners(w.deps);
     expect(wakes(w)).toHaveLength(0);
