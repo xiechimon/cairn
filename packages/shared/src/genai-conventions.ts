@@ -1,31 +1,51 @@
+import { LangfuseOtelSpanAttributes } from '@langfuse/core';
+import type { Attributes, AttributeValue } from '@opentelemetry/api';
+import {
+  ATTR_GEN_AI_AGENT_ID,
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+  ATTR_GEN_AI_RESPONSE_MODEL,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  GEN_AI_OPERATION_NAME_VALUE_CHAT,
+  GEN_AI_OPERATION_NAME_VALUE_EXECUTE_TOOL,
+  GEN_AI_OPERATION_NAME_VALUE_INVOKE_AGENT,
+} from '@opentelemetry/semantic-conventions/incubating';
 import { redactSecrets } from './secret-redaction.js';
 
-export type AttributeValue = string | number | boolean | readonly string[] | { double: number };
-export type Attributes = Record<string, AttributeValue>;
+export type { Attributes, AttributeValue };
 
 export const GENAI_OPERATION = {
-  invokeAgent: 'invoke_agent',
-  chat: 'chat',
-  executeTool: 'execute_tool',
+  invokeAgent: GEN_AI_OPERATION_NAME_VALUE_INVOKE_AGENT,
+  chat: GEN_AI_OPERATION_NAME_VALUE_CHAT,
+  executeTool: GEN_AI_OPERATION_NAME_VALUE_EXECUTE_TOOL,
 } as const;
 
 export const GENAI_ATTR = {
-  operationName: 'gen_ai.operation.name',
-  providerName: 'gen_ai.provider.name',
-  requestModel: 'gen_ai.request.model',
-  responseModel: 'gen_ai.response.model',
-  responseFinishReasons: 'gen_ai.response.finish_reasons',
-  agentId: 'gen_ai.agent.id',
-  agentName: 'gen_ai.agent.name',
-  usageInputTokens: 'gen_ai.usage.input_tokens',
-  usageOutputTokens: 'gen_ai.usage.output_tokens',
-  usageCacheReadInputTokens: 'gen_ai.usage.cache_read.input_tokens',
-  usageCacheCreationInputTokens: 'gen_ai.usage.cache_creation.input_tokens',
-  usageCost: 'gen_ai.usage.cost',
-  toolName: 'gen_ai.tool.name',
-  toolCallId: 'gen_ai.tool.call.id',
-  toolCallArguments: 'gen_ai.tool.call.arguments',
-  toolCallResult: 'gen_ai.tool.call.result',
+  operationName: ATTR_GEN_AI_OPERATION_NAME,
+  providerName: ATTR_GEN_AI_PROVIDER_NAME,
+  requestModel: ATTR_GEN_AI_REQUEST_MODEL,
+  responseModel: ATTR_GEN_AI_RESPONSE_MODEL,
+  responseFinishReasons: ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+  agentId: ATTR_GEN_AI_AGENT_ID,
+  agentName: ATTR_GEN_AI_AGENT_NAME,
+  usageInputTokens: ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  usageOutputTokens: ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  usageCacheReadInputTokens: ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+  usageCacheCreationInputTokens: ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  toolName: ATTR_GEN_AI_TOOL_NAME,
+  toolCallId: ATTR_GEN_AI_TOOL_CALL_ID,
+  toolCallArguments: ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  toolCallResult: ATTR_GEN_AI_TOOL_CALL_RESULT,
 } as const;
 
 export const CAIRN_ATTR = {
@@ -78,11 +98,11 @@ export function otelErrorMessage(reason: string | null | undefined): string | un
 }
 
 export const LANGFUSE_ATTR = {
-  traceName: 'langfuse.trace.name',
-  traceTags: 'langfuse.trace.tags',
-  sessionId: 'langfuse.session.id',
-  genericSessionId: 'session.id',
-  environment: 'langfuse.environment',
+  traceName: LangfuseOtelSpanAttributes.TRACE_NAME,
+  traceTags: LangfuseOtelSpanAttributes.TRACE_TAGS,
+  sessionId: LangfuseOtelSpanAttributes.TRACE_SESSION_ID,
+  environment: LangfuseOtelSpanAttributes.ENVIRONMENT,
+  costDetails: LangfuseOtelSpanAttributes.OBSERVATION_COST_DETAILS,
   deploymentEnvironment: 'deployment.environment',
 } as const;
 
@@ -118,7 +138,6 @@ export function langfuseTraceAttributes(trace: {
     [LANGFUSE_ATTR.traceName]: trace.name,
     [LANGFUSE_ATTR.traceTags]: trace.tags,
     [LANGFUSE_ATTR.sessionId]: trace.sessionId,
-    [LANGFUSE_ATTR.genericSessionId]: trace.sessionId,
     ...langfuseEnvironmentAttributes(trace.environment),
   });
 }
@@ -196,8 +215,7 @@ export function invokeAgentAttributes(build: {
     [CAIRN_ATTR.outcomeMerged]: build.outcome?.merged,
     [CAIRN_ATTR.outcomeRevertedWithin7d]: build.outcome?.revertedWithin7d,
     [CAIRN_ATTR.outcomeFixedByLaterPr]: build.outcome?.fixedByLaterPr,
-    [CAIRN_ATTR.costUsd]:
-      build.outcome?.costTotal == null ? null : { double: build.outcome.costTotal },
+    [CAIRN_ATTR.costUsd]: build.outcome?.costTotal,
     [CAIRN_ATTR.attributionWhere]: build.attribution?.where,
     [CAIRN_ATTR.attributionWhy]: build.attribution?.why,
   });
@@ -296,8 +314,10 @@ export function chatAttributes(
     [GENAI_ATTR.usageCacheReadInputTokens]: usage?.cacheRead,
     [GENAI_ATTR.usageCacheCreationInputTokens]: usage?.cacheWrite,
     [CAIRN_ATTR.rawStopReason]: turn.rawFinishReason,
-    [GENAI_ATTR.usageCost]:
-      turn.costUsd === undefined || turn.costUsd <= 0 ? null : { double: turn.costUsd },
+    [LANGFUSE_ATTR.costDetails]:
+      turn.costUsd === undefined || turn.costUsd <= 0
+        ? null
+        : JSON.stringify({ total: turn.costUsd }),
   });
 }
 

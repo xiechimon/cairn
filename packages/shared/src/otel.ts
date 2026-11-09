@@ -1,5 +1,24 @@
 import { createHash } from 'node:crypto';
-import type { Attributes } from './genai-conventions.js';
+import {
+  type Attributes,
+  ROOT_CONTEXT,
+  SpanKind,
+  SpanStatusCode,
+  TraceFlags,
+  type Tracer,
+  trace,
+} from '@opentelemetry/api';
+import { ExportResultCode } from '@opentelemetry/core';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import {
+  BatchSpanProcessor,
+  type IdGenerator,
+  RandomIdGenerator,
+  type ReadableSpan,
+  type SpanProcessor,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace';
 
 export class OtlpTargetConfigError extends Error {
   constructor(message: string) {
@@ -23,6 +42,14 @@ export function otlpRootSpanIdOfBuild(buildId: string): string {
 
 export function otlpStepSpanIdOfBuild(buildId: string, stepId: string): string {
   return deriveOtelId(8, 'span', buildId, 'step', stepId);
+}
+
+export function otlpChildSpanIdOfBuild(
+  buildId: string,
+  stepId: string,
+  ...path: (string | number)[]
+): string {
+  return deriveOtelId(8, 'span', buildId, 'step', stepId, ...path);
 }
 
 export function otlpTraceIdOfTurn(stepId: string): string {
@@ -144,16 +171,28 @@ function deriveOtelId(bytes: number, ...parts: (string | number)[]): string {
 }
 
 export function otlpAttributes(attributes: Attributes): OtlpAttribute[] {
-  return Object.entries(attributes).map(([key, value]): OtlpAttribute => {
-    if (typeof value === 'string') return { key, value: { stringValue: value } };
-    if (typeof value === 'boolean') return { key, value: { boolValue: value } };
+  return Object.entries(attributes).flatMap(([key, value]): OtlpAttribute[] => {
+    if (value == null) return [];
+    if (typeof value === 'string') return [{ key, value: { stringValue: value } }];
+    if (typeof value === 'boolean') return [{ key, value: { boolValue: value } }];
     if (typeof value === 'number')
-      return {
+      return [
+        {
+          key,
+          value: Number.isInteger(value) ? { intValue: String(value) } : { doubleValue: value },
+        },
+      ];
+    if (!Array.isArray(value)) return [];
+    return [
+      {
         key,
-        value: Number.isInteger(value) ? { intValue: String(value) } : { doubleValue: value },
-      };
-    if ('double' in value) return { key, value: { doubleValue: value.double } };
-    return { key, value: { arrayValue: { values: value.map((item) => ({ stringValue: item })) } } };
+        value: {
+          arrayValue: {
+            values: value.map((item: unknown) => ({ stringValue: String(item ?? '') })),
+          },
+        },
+      },
+    ];
   });
 }
 
@@ -248,5 +287,172 @@ export function createOtlpSender(
       return true;
     },
     dropped: () => dropped,
+  };
+}
+
+export interface CairnSpan {
+  name: string;
+  kind: 'internal' | 'client';
+  traceId?: string;
+  spanId?: string;
+  parent?: { traceId: string; spanId: string };
+  startMs: number;
+  endMs: number;
+  attributes: Attributes;
+  error?: string;
+}
+
+class DerivedIdGenerator implements IdGenerator {
+  private readonly random = new RandomIdGenerator();
+  private nextTraceId: string | undefined;
+  private nextSpanId: string | undefined;
+
+  queue(traceId: string | undefined, spanId: string | undefined): void {
+    this.nextTraceId = traceId;
+    this.nextSpanId = spanId;
+  }
+
+  generateTraceId(): string {
+    const id = this.nextTraceId ?? this.random.generateTraceId();
+    this.nextTraceId = undefined;
+    return id;
+  }
+
+  generateSpanId(): string {
+    const id = this.nextSpanId ?? this.random.generateSpanId();
+    this.nextSpanId = undefined;
+    return id;
+  }
+}
+
+interface SpanRecorder {
+  provider: TracerProvider;
+  record(spans: readonly CairnSpan[]): void;
+}
+
+function spanRecorder(resource: Attributes, scope: string, processor: SpanProcessor): SpanRecorder {
+  const ids = new DerivedIdGenerator();
+  const provider = new TracerProvider({
+    idGenerator: ids,
+    resource: resourceFromAttributes(resource),
+    spanProcessors: [processor],
+  });
+  const tracer: Tracer = provider.getTracer(scope);
+  const epoch = (ms: number) => new Date(Math.trunc(ms));
+  return {
+    provider,
+    record(spans) {
+      for (const span of spans) {
+        const parent =
+          span.parent === undefined
+            ? ROOT_CONTEXT
+            : trace.setSpanContext(ROOT_CONTEXT, {
+                traceId: span.parent.traceId,
+                spanId: span.parent.spanId,
+                traceFlags: TraceFlags.SAMPLED,
+                isRemote: true,
+              });
+        ids.queue(span.traceId, span.spanId);
+        try {
+          const started = tracer.startSpan(
+            span.name,
+            {
+              kind: span.kind === 'client' ? SpanKind.CLIENT : SpanKind.INTERNAL,
+              startTime: epoch(span.startMs),
+              attributes: span.attributes,
+            },
+            parent,
+          );
+          if (span.error !== undefined)
+            started.setStatus({ code: SpanStatusCode.ERROR, message: span.error });
+          started.end(epoch(Math.max(span.startMs, span.endMs)));
+        } finally {
+          ids.queue(undefined, undefined);
+        }
+      }
+    },
+  };
+}
+
+function otlpExporter(target: OtlpTarget, timeoutMs: number): OTLPTraceExporter {
+  return new OTLPTraceExporter({
+    url: target.url.href,
+    headers: target.headers,
+    timeoutMillis: timeoutMs,
+  });
+}
+
+export async function exportCairnSpans(
+  target: OtlpTarget,
+  resource: Attributes,
+  scope: string,
+  spans: readonly CairnSpan[],
+  timeoutMs = OTLP_SEND_TIMEOUT_MS,
+): Promise<void> {
+  const ended: ReadableSpan[] = [];
+  const recorder = spanRecorder(resource, scope, {
+    onStart: () => {},
+    onEnd: (span) => {
+      ended.push(span);
+    },
+    forceFlush: async () => {},
+    shutdown: async () => {},
+  });
+  recorder.record(spans);
+  await recorder.provider.shutdown();
+  const exporter = otlpExporter(target, timeoutMs);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      exporter.export(ended, (result) => {
+        if (result.code === ExportResultCode.SUCCESS) resolve();
+        else reject(result.error ?? new Error('OTLP export failed'));
+      });
+    });
+  } finally {
+    await exporter.shutdown();
+  }
+}
+
+export interface CairnTracing {
+  record(spans: readonly CairnSpan[]): void;
+  forceFlush(): Promise<void>;
+  shutdown(): Promise<void>;
+}
+
+export function createCairnTracing(
+  target: OtlpTarget,
+  resource: Attributes,
+  scope: string,
+  onError: (error: Error) => void = () => {},
+  timeoutMs = OTLP_SEND_TIMEOUT_MS,
+): CairnTracing {
+  const processor = new BatchSpanProcessor({
+    exporter: otlpExporter(target, timeoutMs),
+    exportTimeoutMillis: timeoutMs,
+  });
+  const recorder = spanRecorder(resource, scope, processor);
+  const inFlight = new Set<Promise<void>>();
+  const flush = () => {
+    const sent = processor.forceFlush().catch((error: unknown) => {
+      onError(error instanceof Error ? error : new Error(String(error)));
+    });
+    inFlight.add(sent);
+    void sent.finally(() => inFlight.delete(sent));
+    return sent;
+  };
+  const settle = async () => {
+    await Promise.all([...inFlight, flush()]);
+  };
+  return {
+    record(spans) {
+      if (spans.length === 0) return;
+      recorder.record(spans);
+      void flush();
+    },
+    forceFlush: settle,
+    async shutdown() {
+      await settle();
+      await recorder.provider.shutdown();
+    },
   };
 }
