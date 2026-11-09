@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b2232e95-df50-4c40-b8c9-0b4476d55c87",
-  "prevId": "81a8be48-dab9-429a-935b-ff282906030c",
+  "id": "81a8be48-dab9-429a-935b-ff282906030c",
+  "prevId": "749d1454-31d5-4eb7-9b76-ab1220609c22",
   "tables": {
     "agent_memory": {
       "name": "agent_memory",
@@ -2492,83 +2492,6 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "feature_flag": {
-      "name": "feature_flag",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "userId": {
-          "name": "userId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "feature_flag_key_global_unique": {
-          "name": "feature_flag_key_global_unique",
-          "columns": [
-            "key"
-          ],
-          "isUnique": true,
-          "where": "\"feature_flag\".\"userId\" IS NULL"
-        },
-        "feature_flag_key_user_unique": {
-          "name": "feature_flag_key_user_unique",
-          "columns": [
-            "key",
-            "userId"
-          ],
-          "isUnique": true,
-          "where": "\"feature_flag\".\"userId\" IS NOT NULL"
-        }
-      },
-      "foreignKeys": {
-        "feature_flag_userId_user_id_fk": {
-          "name": "feature_flag_userId_user_id_fk",
-          "tableFrom": "feature_flag",
-          "tableTo": "user",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -5434,13 +5357,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "ownerMessageIds": {
-          "name": "ownerMessageIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         }
       },

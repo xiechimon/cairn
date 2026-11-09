@@ -148,7 +148,7 @@ export const SESSION_BRIEF = [
   '2. Write tests first: add or update tests that fail for the right reason before you change behavior.',
   '3. Implement: make the smallest change that passes the tests, commit on the work branch and push as your instructions say.',
   '4. Self-check with evidence: run the checks named in the task and the project instructions, run the new tests, and exercise the changed behavior the way a user would. Quote the commands and their results in your final message; do not claim a check you did not run.',
-  'Before you finish, ask a question, or give up, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
+  'Before you finish or ask a question, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
 ].join('\n');
 
 export const SESSION_REWORK_BRIEF =

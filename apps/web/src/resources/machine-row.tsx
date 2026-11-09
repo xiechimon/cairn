@@ -304,7 +304,7 @@ export function MachineRowView({
             <DropdownMenuItem
               data-testid="machine-menu-delete"
               disabled={deleting}
-              title={t('删除后，这台机器要重新注册才能再接任务。')}
+              title={t('删除后，这台机器要重新注册才能再接任务')}
               onClick={() => setConfirmOpen(true)}
             >
               {t('删除机器')}

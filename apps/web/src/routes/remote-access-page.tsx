@@ -173,7 +173,7 @@ export function RemoteAccessPage() {
           testId="remote-routes-empty"
           className="mt-6"
           icon={Smartphone}
-          title={t('这台电脑暂时没有手机可用的线路。')}
+          title={t('这台电脑暂时没有手机可用的线路')}
           description={
             awaitingTailnetLogin && tailnet?.authUrl
               ? t('请先登录 Tailscale：{url}', { url: tailnet.authUrl })

@@ -536,7 +536,7 @@ class AcpBackend implements AgentBackend {
       session = new AcpSession(
         sessionId,
         connection,
-        adapter && opts.systemPrompt && validated.prompt !== undefined
+        opts.systemPrompt && validated.prompt !== undefined
           ? `${opts.systemPrompt}\n\n${validated.prompt}`
           : validated.prompt,
         (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),

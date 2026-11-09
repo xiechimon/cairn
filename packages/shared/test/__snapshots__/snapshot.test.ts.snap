@@ -8295,7 +8295,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "computer",
   "computer_call",
   "due_event",
-  "feature_flag",
   "client_message",
   "harness_profile",
   "composer_draft",
@@ -8398,16 +8397,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "deploy.json next to server.db, written by deploy-self.sh (#2427)",
     "path": "/api/server/deploy",
-  },
-  {
-    "method": "GET",
-    "note": "owner lists registered flags and their global release state (#2427)",
-    "path": "/api/flags",
-  },
-  {
-    "method": "POST",
-    "note": "owner releases a feature flag to every user (#2427)",
-    "path": "/api/flags/{key}/release",
   },
   {
     "method": "GET",

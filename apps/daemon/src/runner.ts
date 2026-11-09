@@ -71,6 +71,7 @@ import {
   transcriptPromptRowId,
   withCoAuthor,
 } from '@cairn/shared';
+import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
 import { prepareFileAttachment } from './attach-file.js';
@@ -85,7 +86,7 @@ import {
   type SkillsCatalogOpts,
 } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
-import { type BriefHandle, caseInsensitiveFsFor, cleanupBrief, writeBrief } from './brief-file.js';
+import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
   type ClaudeCodeAuthProbe,
   claudeCodeAuthFailureMessage,
@@ -392,17 +393,35 @@ export async function runStep(
   if (heartbeat.unref) heartbeat.unref();
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
   const credentialCleanups: (() => void)[] = [];
+  const errors: unknown[] = [];
   try {
     await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, credentialCleanups);
-  } finally {
-    for (const cleanup of credentialCleanups.reverse()) cleanup();
-    deps.sessionHandles?.delete(stepId);
-    clearInterval(heartbeat);
-    deps.stepImageSupport?.delete(stepId);
-    deps.stepSteeringSupport?.delete(stepId);
-    deps.stepTranscripts?.delete(stepId);
-    stop.settle();
+  } catch (error) {
+    errors.push(error);
   }
+  for (const cleanup of [
+    ...credentialCleanups.reverse(),
+    () => deps.sessionHandles?.delete(stepId),
+    () => clearInterval(heartbeat),
+    () => deps.stepImageSupport?.delete(stepId),
+    () => deps.stepSteeringSupport?.delete(stepId),
+    () => deps.stepTranscripts?.delete(stepId),
+    () => stop.settle(),
+  ]) {
+    try {
+      cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1)
+    throw new AggregateError(
+      errors,
+      `Step execution or cleanup failed: ${errors
+        .map((error) => (error instanceof Error ? error.message : String(error)))
+        .join('; ')}`,
+    );
 }
 
 async function runClaimedStep(
@@ -986,8 +1005,22 @@ async function runClaimedStep(
           GITHUB_TOKEN: creds.git.password,
         })
       : {};
+  let temporary: ReturnType<typeof createTempEnvironment>;
+  try {
+    temporary = createTempEnvironment({ ...process.env, ...opts.env });
+  } catch (error) {
+    await failStep(
+      deps,
+      heartbeat,
+      stepId,
+      `Temporary directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return;
+  }
+  credentialCleanups.push(temporary.cleanup);
   const stepEnv: Record<string, string> = {
     ...opts.env,
+    ...temporary.env,
     ...stepGitEnv,
     ...(readonlyWorkspace ? READONLY_GIT_ENV : {}),
   };
@@ -1011,7 +1044,7 @@ async function runClaimedStep(
     provider,
     modelId: agent.modelId,
     ...(agent.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}),
-    ...(systemPrompt && backend.brief === undefined ? { systemPrompt } : {}),
+    ...(systemPrompt ? { systemPrompt } : {}),
     cwd,
     ...(deliveryPrompt !== null ? { prompt: deliveryPrompt } : {}),
     ...(promptImages !== undefined ? { promptImages } : {}),
@@ -1132,43 +1165,20 @@ async function runClaimedStep(
     }
   }
 
-  let briefHandle: BriefHandle | null = null;
-  let briefCleanupFailed = false;
-  const cleanupBriefOnce = (): void => {
-    if (briefHandle === null) return;
-    const h = briefHandle;
-    briefHandle = null;
-    try {
-      logger.step(`brief ${cleanupBrief(h)} (${h.file})`);
-    } catch (err) {
-      briefCleanupFailed = true;
-      const reason = err instanceof Error ? err.message : String(err);
-      logger.step(`brief cleanup failed: ${reason}`);
-      transcript.upsert({
-        id: `brief-cleanup-${stepId}`,
-        role: 'system',
-        content: `运行简报未能从工作区擦除（${reason}，文件 ${h.file}）——本轮不提交不推送，以免它被当作改动带进分支`,
-        createdAt: now(),
-      });
-    }
-  };
-  if (backend.brief !== undefined) {
-    try {
-      briefHandle = writeBrief({
+  try {
+    assertNoLegacyBrief(cwd);
+    if (backend.brief !== undefined) {
+      sessionOpts.systemPrompt = composeBrief({
         cwd,
         backendId: backend.brief.backendId,
         content: backend.brief.composeBody(sessionOpts, systemPrompt),
-        caseInsensitiveFs: caseInsensitiveFsFor(process.platform),
       });
-      logger.step(`brief written: ${briefHandle.file} (${briefHandle.mode})`);
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      logger.step(`brief write failed: ${reason}`);
-      cleanupBriefOnce();
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, `运行简报写入失败（${reason}）`);
-      return;
     }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    clearCredentials(creds);
+    await failStep(deps, heartbeat, stepId, `Runtime guidance could not be composed: ${reason}`);
+    return;
   }
 
   if (!isChief) {
@@ -1579,7 +1589,6 @@ async function runClaimedStep(
       if (await retryWithoutImages(message)) continue;
       flushDeltas();
       flushThinking();
-      cleanupBriefOnce();
       clearCredentials(creds);
       await failStep(deps, heartbeat, stepId, message);
       return;
@@ -1933,8 +1942,6 @@ async function runClaimedStep(
   }
   if (!sawDone && handle !== null) usage = handle.usage();
 
-  cleanupBriefOnce();
-
   const rewindToStepStart = async (): Promise<string | null> => {
     if (ws?.readonly === true) return null;
     if (ws === null || !deps.workspace || headAtStart === null) return '步起点 commit 不可得';
@@ -1986,8 +1993,7 @@ async function runClaimedStep(
     deps.workspace &&
     lastError === null &&
     !stopped &&
-    !isReview &&
-    !briefCleanupFailed
+    !isReview
   ) {
     const git = deps.workspace;
     try {
@@ -2104,8 +2110,7 @@ async function runClaimedStep(
     !stopped &&
     ws !== null &&
     ws.readonly !== true &&
-    deps.workspace &&
-    !briefCleanupFailed
+    deps.workspace
   ) {
     const git = deps.workspace;
     try {
@@ -2130,10 +2135,6 @@ async function runClaimedStep(
         `failed build preservation failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-  }
-
-  if (briefCleanupFailed && lastError === null) {
-    lastError = '运行简报未能从工作区擦除——本轮未提交未推送（详见 transcript 的简报行）';
   }
 
   let report: string | null = null;

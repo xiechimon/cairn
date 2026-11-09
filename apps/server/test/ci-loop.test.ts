@@ -1146,7 +1146,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(checksReads()).toBe(before);
   });
 
-  test('completeStep: execution step done + PR delivered (prNumber present) -> stays building; no PR -> review (existing behavior)', () => {
+  test('completeStep: execution step done + PR delivered (prNumber present) -> stays building; no PR -> needs_input with the not-delivered question (task stall class 2)', () => {
     const withPr = makePrWorld({ checks: [] });
     const stepId = `step-run-${Math.random().toString(36).slice(2, 8)}`;
     withPr.s.db
@@ -1183,7 +1183,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       })
       .run();
     completeStep(noPr.s.svc, stepId2, { hasChanges: true });
-    expect(noPr.todoRow().phase).toBe('review');
+    expect(noPr.todoRow().phase).toBe('needs_input');
 
     const hosted = makePrWorld({ checks: [] });
     hosted.s.db
@@ -1476,7 +1476,7 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
       );
       if (state !== 'open') {
         expect(w.buildRow().prNumber).toBeNull();
-        expect(w.todoRow().phase).toBe('review');
+        expect(w.todoRow().phase).toBe('needs_input');
         return;
       }
       expect(w.buildRow().prNumber).toBe(w.prNumber);

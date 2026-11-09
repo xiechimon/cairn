@@ -368,7 +368,7 @@ function docBlockClass(kind: string, first: boolean): string {
   const base = 'text-card-title break-words text-(--foreground)';
   if (kind === 'para') return `${base}${first ? '' : ' mt-2'}`;
   if (kind === 'bullet') return `${base} relative mt-1 pl-4`;
-  return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium tracking-[0.02em] text-(--text-tertiary)`;
+  return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium text-(--text-tertiary)`;
 }
 
 export function DocPane({
