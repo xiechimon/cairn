@@ -4,7 +4,9 @@ import {
   COLD_CACHE_MISS_MIN_TOKENS,
   COLD_RECENT_EXCHANGES,
   coldWindowStartFromRows,
+  imageOmissionNote,
   isColdResume,
+  isPureToolCallAssistant,
   projectColdMessages,
   retentionMsFor,
   SHORT_RETENTION_MS,
@@ -149,7 +151,32 @@ describe('truncateOldToolResults', () => {
 });
 
 describe('stripConsumedImages', () => {
-  it('replaces older image blocks with a pointer note', () => {
+  it('replaces older image blocks with a real attachmentId pointer', () => {
+    const token = '![shot.png](attachment:team1/att-abc.png)';
+    const messages: Message[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: `see\n\n${token}` },
+          { type: 'image', data: 'aaa', mimeType: 'image/png' },
+        ],
+        timestamp: 1,
+      },
+      user('latest'),
+    ];
+    const out = stripConsumedImages(messages, { keepRecentMessages: 1 });
+    expect(out[0]?.role).toBe('user');
+    if (out[0]?.role !== 'user' || typeof out[0].content === 'string') throw new Error('shape');
+    expect(out[0].content.some((block) => block.type === 'image')).toBe(false);
+    const note = out[0].content.find(
+      (block) => block.type === 'text' && block.text.includes('omitted'),
+    );
+    expect(note?.type === 'text' ? note.text : '').toBe(
+      imageOmissionNote('att-abc', 'team1/att-abc.png'),
+    );
+  });
+
+  it('falls back when no attachment token is present', () => {
     const messages: Message[] = [
       {
         role: 'user',
@@ -162,17 +189,17 @@ describe('stripConsumedImages', () => {
       user('latest'),
     ];
     const out = stripConsumedImages(messages, { keepRecentMessages: 1 });
-    expect(out[0]?.role).toBe('user');
     if (out[0]?.role !== 'user' || typeof out[0].content === 'string') throw new Error('shape');
-    expect(out[0].content.some((block) => block.type === 'image')).toBe(false);
     expect(
-      out[0].content.some((block) => block.type === 'text' && block.text.includes('omitted')),
+      out[0].content.some(
+        (block) => block.type === 'text' && block.text.includes('no attachmentId'),
+      ),
     ).toBe(true);
   });
 });
 
 describe('selectColdMessageWindow', () => {
-  it('keeps the last N conversational exchanges and drops wake rows', () => {
+  it('keeps the last N conversational exchanges and drops earlier wake rows', () => {
     const messages: Message[] = [user('[wake:timer] noise')];
     for (let i = 0; i < COLD_RECENT_EXCHANGES + 4; i++) {
       messages.push(user(`u${i}`), assistant(`a${i}`));
@@ -184,6 +211,53 @@ describe('selectColdMessageWindow', () => {
     expect(users[0]).toBe('u5');
     expect(users.at(-1)).toBe('current');
     expect(users).toHaveLength(COLD_RECENT_EXCHANGES);
+  });
+
+  it('keeps a current wake prompt while dropping earlier wakes', () => {
+    const messages: Message[] = [
+      user('[wake:old] stale'),
+      assistant('a0'),
+      user('[wake:task] Task #3 finished\n[history id: user-abc]'),
+    ];
+    const out = selectColdMessageWindow(messages);
+    const users = out.filter((message) => message.role === 'user').map(userText);
+    expect(users.some((text) => text.includes('[wake:old]'))).toBe(false);
+    expect(users.at(-1)).toContain('[wake:task]');
+    expect(users.at(-1)).toContain('[history id: user-abc]');
+  });
+
+  it('drops pure tool-call assistants and their tool results from the cold window', () => {
+    const pureTool: Message = {
+      role: 'assistant',
+      content: [{ type: 'toolCall', id: 'c1', name: 'bash', arguments: { command: 'ls' } }],
+      api: 'anthropic-messages',
+      provider: 'anthropic',
+      model: 'm',
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'toolUse',
+      timestamp: 2,
+    };
+    expect(isPureToolCallAssistant(pureTool)).toBe(true);
+    const messages: Message[] = [
+      user('u0', 1),
+      pureTool,
+      tool('bash', 'noise', 3),
+      user('current', 4),
+    ];
+    const out = selectColdMessageWindow(messages, 8);
+    expect(out.some((message) => message.role === 'assistant')).toBe(false);
+    expect(out.some((message) => message.role === 'toolResult')).toBe(false);
+    expect(out.filter((message) => message.role === 'user').map(userText)).toEqual([
+      'u0',
+      'current',
+    ]);
   });
 });
 
