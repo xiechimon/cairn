@@ -1,24 +1,36 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
-import { afterEach, describe, expect, test, vi } from 'vitest';
-import { PiStepSpanSink } from '../src/backend/otel.js';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { flushDaemonOtel, PiStepSpanSink, shutdownDaemonOtel } from '../src/backend/otel.js';
 import { type AgentSessionEventLike, recordPiSpanEvent } from '../src/backend/pi.js';
 
-const env = { CAIRN_OTEL_ENDPOINT: 'http://127.0.0.1:3000/api/public/otel' };
+const captured: { body: { resourceSpans: { scopeSpans: { spans: unknown[] }[] }[] } }[] = [];
+let server: Server | undefined;
+let endpoint = '';
 
-afterEach(() => {
-  vi.unstubAllGlobals();
+beforeAll(async () => {
+  server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      captured.push({ body: JSON.parse(Buffer.concat(chunks).toString('utf8')) });
+      res.setHeader('content-type', 'application/json');
+      res.end('{}');
+    });
+  });
+  await new Promise<void>((done) => server?.listen(0, '127.0.0.1', done));
+  endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/public/otel`;
+});
+
+afterAll(async () => {
+  await shutdownDaemonOtel();
+  server?.close();
 });
 
 function harness() {
-  const captured: { body: { resourceSpans: { scopeSpans: { spans: unknown[] }[] }[] } }[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_url: string, init: RequestInit) => {
-      captured.push({ body: JSON.parse(String(init.body)) });
-      return new Response('{}', { status: 200 });
-    }),
-  );
-  const target = parseOtlpTarget(env)!;
+  captured.splice(0);
+  const target = parseOtlpTarget({ CAIRN_OTEL_ENDPOINT: endpoint })!;
   const ctx = stepOtelContext('build-abc', 'step-xyz', target);
   const sink = new PiStepSpanSink(ctx, { provider: 'stub-gw', model: 'stub-model' });
   return {
@@ -67,6 +79,7 @@ describe('recordPiSpanEvent', () => {
     recordPiSpanEvent(sink, toolEnd);
     recordPiSpanEvent(sink, messageEnd);
     await sink.flush();
+    await flushDaemonOtel();
     const sent = spans();
     expect(sent).toHaveLength(2);
     const tool = sent.find((s) => s.name.startsWith('execute_tool'))!;
@@ -76,8 +89,8 @@ describe('recordPiSpanEvent', () => {
     const chat = sent.find((s) => s.name.startsWith('chat'))!;
     const chatAttrs = Object.fromEntries(chat.attributes.map((a) => [a.key, a.value]));
     expect(chatAttrs['gen_ai.request.model']).toEqual({ stringValue: 'claude-sonnet' });
-    expect(chatAttrs['gen_ai.usage.input_tokens']).toEqual({ intValue: '7' });
-    expect(chatAttrs['gen_ai.usage.output_tokens']).toEqual({ intValue: '3' });
+    expect(chatAttrs['gen_ai.usage.input_tokens']).toEqual({ intValue: 7 });
+    expect(chatAttrs['gen_ai.usage.output_tokens']).toEqual({ intValue: 3 });
     expect(chatAttrs['cairn.raw_stop_reason']).toEqual({ stringValue: 'end_turn' });
   });
 
@@ -87,6 +100,7 @@ describe('recordPiSpanEvent', () => {
     recordPiSpanEvent(sink, { type: 'message_end', message: { role: 'user' } });
     recordPiSpanEvent(sink, { type: 'compaction_start' });
     await sink.flush();
+    await flushDaemonOtel();
     expect(spans()).toEqual([]);
   });
 
@@ -97,6 +111,7 @@ describe('recordPiSpanEvent', () => {
       message: { role: 'user', provider: 'anthropic', model: 'm', usage: { input: 1 } },
     });
     await sink.flush();
+    await flushDaemonOtel();
     expect(spans()).toEqual([]);
   });
 });

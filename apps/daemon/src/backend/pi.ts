@@ -17,6 +17,7 @@ import type {
   ToolCallRecord,
 } from '@cairn/shared';
 import { classifyStepFailure, ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
+import { getSystemMessageText } from '@earendil-works/pi-ai';
 import {
   type BuiltinProvider,
   getAllBuiltinModels,
@@ -505,6 +506,7 @@ export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEvent
           cacheWrite: msg.usage.cacheWrite,
         },
         costUsd: msg.usage.cost?.total,
+        output: { role: msg.role, content: msg.content },
       });
     }
     return;
@@ -930,9 +932,24 @@ export class PiBackend implements AgentBackend {
     const ceilingFetch = compactionCeilingFetch(diagnosedFetch, (line) => {
       this.opts.onCompactionLog?.(line);
     });
+    const spans =
+      opts.telemetry !== undefined
+        ? new PiStepSpanSink(
+            opts.telemetry,
+            { provider: opts.provider.providerId, model: opts.modelId },
+            this.opts.onOtelLog,
+          )
+        : undefined;
     const streamSimple = runtime.streamSimple.bind(runtime);
-    runtime.streamSimple = (requestModel, context, options) =>
-      streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+    runtime.streamSimple = (requestModel, context, options) => {
+      spans?.request(
+        context.messages.map((message) => ({
+          role: message.role,
+          content: message.role === 'system' ? getSystemMessageText(message) : message.content,
+        })),
+      );
+      return streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+    };
     const diagnose = (message: string): string =>
       enrichProviderError(message, providerResponses.current, {
         ...(this.opts.machineName !== undefined
@@ -1106,18 +1123,8 @@ export class PiBackend implements AgentBackend {
       mcpEndpoints.length > 0 || askRelay !== undefined ? { uiContext: mcpCaptureUi } : {},
     );
     this.opts.onSession?.(session.sessionId, session.sessionFile);
-    const handle = new PiSessionHandle(
-      session,
-      model,
-      diagnose,
-      opts.telemetry !== undefined
-        ? new PiStepSpanSink(
-            opts.telemetry,
-            { provider: opts.provider.providerId, model: opts.modelId },
-            this.opts.onOtelLog,
-          )
-        : undefined,
-      (line) => this.opts.onCompactionLog?.(line),
+    const handle = new PiSessionHandle(session, model, diagnose, spans, (line) =>
+      this.opts.onCompactionLog?.(line),
     );
     if (opts.prompt !== undefined) {
       const promptImages =
