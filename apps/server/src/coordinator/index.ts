@@ -22,7 +22,7 @@ import {
 import { nowMs } from '../lib/ids.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
-import { lastContextBearingTurnUsage } from '../services/coordinator-context.js';
+import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
@@ -355,7 +355,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       });
     }
     const volatileParts = context.sections;
-    const lastUsage = lastContextBearingTurnUsage(db, row.buildId);
+    const lastUsage = lastTurnUsageForColdResume(db, row.buildId);
     const routerModel = `${providers.router.provider}/${providers.router.modelId}`;
     const retentionMs = retentionMsFor(
       resolveCacheRetentionTier(),

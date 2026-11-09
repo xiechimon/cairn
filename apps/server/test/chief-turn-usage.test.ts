@@ -22,6 +22,7 @@ import { getChiefEnvelope } from '../src/services/chief.js';
 import {
   DEFAULT_CONTEXT_WINDOW,
   lastContextBearingTurnUsage,
+  lastTurnUsageForColdResume,
   setCoordinatorServerContextEnabled,
 } from '../src/services/coordinator-context.js';
 import { finishStep } from '../src/services/machines.js';
@@ -393,6 +394,40 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
   });
 
+  test('flag on: cold-resume still sees a context-less turn model for route mismatch', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-cc-cold');
+    await finishStep(deps(), machineId, 'turn-cc-cold', {
+      status: 'success',
+      usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
+    });
+    expect(lastContextBearingTurnUsage(H.s.db, H.threadId)).toBeNull();
+    const raw = lastTurnUsageForColdResume(H.s.db, H.threadId);
+    expect(raw).toMatchObject({
+      model: 'claude-code/claude-haiku-5-5',
+      contextTokens: null,
+      stepId: 'turn-cc-cold',
+    });
+    expect(
+      isColdResume({
+        now: Date.now(),
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'stub-gw/stub-model',
+        lastUsage:
+          raw === null
+            ? null
+            : {
+                createdAt: raw.createdAt,
+                cacheRead: raw.cacheRead,
+                input: raw.input,
+                contextTokens: raw.contextTokens,
+                model: raw.model,
+              },
+      }),
+    ).toBe(true);
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
+  });
+
   test('flag on: a multi-model turn keeps the context-bearing model for the meter', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-multi');
@@ -442,7 +477,12 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       .orderBy(desc(chiefTurnUsage.createdAt))
       .get();
     expect(newestByCreatedAt?.model).toBe(modelB);
-    const shared = lastContextBearingTurnUsage(H.s.db, H.threadId);
+    expect(lastContextBearingTurnUsage(H.s.db, H.threadId)).toMatchObject({
+      model: modelA,
+      contextTokens: 5_000,
+      stepId: 'turn-aba',
+    });
+    const shared = lastTurnUsageForColdResume(H.s.db, H.threadId);
     expect(shared).toMatchObject({
       model: modelA,
       contextTokens: 5_000,

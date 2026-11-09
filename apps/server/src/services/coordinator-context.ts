@@ -76,14 +76,30 @@ export type ContextBearingTurnUsage = {
   contextTokens: number;
 };
 
+export type TurnUsageForColdResume = {
+  stepId: string;
+  threadId: string;
+  model: string;
+  createdAt: number;
+  cacheRead: number;
+  input: number;
+  contextTokens: number | null;
+};
+
+function latestTurnUsageStepId(db: Db, scope: SQL): string | null {
+  return (
+    db
+      .select({ stepId: chiefTurnUsage.stepId })
+      .from(chiefTurnUsage)
+      .where(scope)
+      .orderBy(desc(chiefTurnUsage.createdAt))
+      .get()?.stepId ?? null
+  );
+}
+
 function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTurnUsage | null {
-  const latest = db
-    .select({ stepId: chiefTurnUsage.stepId })
-    .from(chiefTurnUsage)
-    .where(scope)
-    .orderBy(desc(chiefTurnUsage.createdAt))
-    .get();
-  if (latest == null) return null;
+  const stepId = latestTurnUsageStepId(db, scope);
+  if (stepId == null) return null;
   const last = db
     .select({
       contextTokens: chiefTurnUsage.contextTokens,
@@ -95,7 +111,7 @@ function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTur
       stepId: chiefTurnUsage.stepId,
     })
     .from(chiefTurnUsage)
-    .where(and(eq(chiefTurnUsage.stepId, latest.stepId), isNotNull(chiefTurnUsage.contextTokens)))
+    .where(and(eq(chiefTurnUsage.stepId, stepId), isNotNull(chiefTurnUsage.contextTokens)))
     .orderBy(desc(chiefTurnUsage.createdAt))
     .get();
   if (last?.contextTokens == null) return null;
@@ -115,6 +131,41 @@ export function lastContextBearingTurnUsage(
   threadId: string,
 ): ContextBearingTurnUsage | null {
   return lastContextBearingTurnUsageWhere(db, eq(chiefTurnUsage.threadId, threadId));
+}
+
+export function lastTurnUsageForColdResume(
+  db: Db,
+  threadId: string,
+): TurnUsageForColdResume | null {
+  const scope = eq(chiefTurnUsage.threadId, threadId);
+  const bearing = lastContextBearingTurnUsageWhere(db, scope);
+  if (bearing !== null) return bearing;
+  const stepId = latestTurnUsageStepId(db, scope);
+  if (stepId == null) return null;
+  const raw = db
+    .select({
+      contextTokens: chiefTurnUsage.contextTokens,
+      model: chiefTurnUsage.model,
+      createdAt: chiefTurnUsage.createdAt,
+      cacheRead: chiefTurnUsage.cacheRead,
+      input: chiefTurnUsage.input,
+      threadId: chiefTurnUsage.threadId,
+      stepId: chiefTurnUsage.stepId,
+    })
+    .from(chiefTurnUsage)
+    .where(eq(chiefTurnUsage.stepId, stepId))
+    .orderBy(desc(chiefTurnUsage.createdAt))
+    .get();
+  if (raw === undefined) return null;
+  return {
+    stepId: raw.stepId,
+    threadId: raw.threadId,
+    model: raw.model,
+    createdAt: raw.createdAt,
+    cacheRead: raw.cacheRead,
+    input: raw.input,
+    contextTokens: raw.contextTokens ?? null,
+  };
 }
 
 export function lastTurnContext(
