@@ -1,5 +1,5 @@
 import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
@@ -660,26 +660,61 @@ describe('Coordinator repository reads', () => {
   });
 
   test('reads the actual owned-process source through the Coordinator cache executor', async () => {
+    const source = await bindRepo('github');
+    writeFileSync(
+      join(source, 'scripts/owned-process.mjs'),
+      readFileSync('scripts/owned-process.mjs'),
+    );
+    for (const args of [
+      ['add', 'scripts/owned-process.mjs'],
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.test',
+        'commit',
+        '-m',
+        'actual source',
+      ],
+      ['checkout', '--detach'],
+      ['update-ref', '-d', 'refs/heads/main'],
+    ]) {
+      const result = await runGit(args, { cwd: source });
+      expect(result.code, result.stderr).toBe(0);
+    }
+    const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: source })).stdout.toString().trim();
+    const refs = await runGit(['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/tags'], {
+      cwd: source,
+    });
+    expect(refs.stdout.toString().trim()).toBe('');
     const workspacesDir = join(H.s.reposDir, 'actual-source-workspaces');
     const cache = join(workspacesDir, H.projectId, 'repo');
     mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
-    expect((await runGit(['clone', '--no-checkout', resolve('.'), cache])).code).toBe(0);
-    await fetchFixture(cache, resolve('.'), 'xiechimon/cairn');
+    expect((await runGit(['clone', '--no-checkout', source, cache])).code).toBe(0);
+    await fetchFixture(cache, source, 'xiechimon/cairn');
     H.s.db
       .update(project)
       .set({ repoKind: 'github', githubRepo: 'xiechimon/cairn', localPath: null })
       .where(eq(project.id, H.projectId))
       .run();
-    const result = JSON.parse(
-      await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
-        projectId: H.projectId,
-        paths: ['scripts/owned-process.mjs'],
-        ref: 'HEAD',
-      }),
-    ) as Docs;
+    const read = async () =>
+      JSON.parse(
+        await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+          projectId: H.projectId,
+          paths: ['scripts/owned-process.mjs'],
+          ref: 'HEAD',
+        }),
+      ) as Docs;
+    const unverified = await read();
+    expect(unverified.files[0]?.content).toBeUndefined();
+    expect(unverified.files[0]?.error).toMatch(/current repository|verified repository/);
+    expect(
+      (await runGit(['update-ref', 'refs/heads/cache-source', commit], { cwd: source })).code,
+    ).toBe(0);
+    writeFileSync(join(source, 'scripts/owned-process.mjs'), 'uncommitted fixture replacement\n');
+    await fetchFixture(cache, source, 'xiechimon/cairn');
+    const result = await read();
     expect(result.files[0]?.content).toBe(readFileSync('scripts/owned-process.mjs', 'utf8'));
-    expect(result.files[0]?.commit).toBe(
-      (await runGit(['rev-parse', 'HEAD'])).stdout.toString().trim(),
-    );
+    expect(result.files[0]?.commit).toBe(commit);
   });
 });
