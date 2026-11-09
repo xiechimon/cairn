@@ -48,7 +48,8 @@
     "apps/web/src/pages/project-concurrency-select.tsx"
   ],
   "team": [
-    "apps/web/src/routes/team-page.tsx"
+    "apps/web/src/settings/settings-redirect.tsx",
+    "apps/web/src/resources/routing-settings-page.tsx"
   ],
   "machines": [
     "apps/web/src/resources/machines-page.tsx",
