@@ -1066,6 +1066,8 @@
         "web": [
           "/app/resources/model-routing",
           "/app/resources/routing-settings",
+          "/app/team",
+          "/app/settings/team",
           "settings:routing",
           "settings:work-routing"
         ],
@@ -2176,14 +2178,13 @@
     {
       "id": "account-and-team",
       "name": "Account and team",
-      "summary": "The user's account, the team, its members and the PR attribution settings.",
-      "states": "Account details and language, the team with its members and the PR attribution settings.",
+      "summary": "The user's account, the team record and the PR attribution settings.",
+      "states": "Account details and language, and the PR attribution settings.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/routes/account-page.tsx",
-          "apps/web/src/routes/team-page.tsx"
+          "apps/web/src/routes/account-page.tsx"
         ],
         "server": [
           "apps/server/src/routes-core.ts",
@@ -2193,9 +2194,7 @@
       "routes": {
         "web": [
           "/app/account",
-          "/app/team",
-          "settings:account",
-          "settings:team"
+          "settings:account"
         ],
         "server": [
           "/api/user/me",
@@ -2205,8 +2204,7 @@
         ]
       },
       "reach": [
-        "settings account",
-        "settings team"
+        "settings account"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/avatars.md"

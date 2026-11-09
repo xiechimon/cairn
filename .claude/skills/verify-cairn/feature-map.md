@@ -19,7 +19,6 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
 | `secrets` | `设置` (Settings) › `执行环境` (Execution) › `密钥` (Secrets) | [Secrets](#secrets) |
-| `team` | `设置` (Settings) › `团队与访问` (Team & access) › `团队` (Team) | [Account and team](#account-and-team) |
 | `api-keys` | `设置` (Settings) › `团队与访问` (Team & access) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `团队与访问` (Team & access) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 
@@ -312,7 +311,7 @@ Reach:
 2. `click testid:routing-section`
 3. `settings work-routing`
 
-- Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`
+- Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
 - Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
@@ -615,19 +614,18 @@ Reach:
 
 ### account-and-team
 
-**Account and team** (shipped, centrality 3). The user's account, the team, its members and the PR attribution settings.
+**Account and team** (shipped, centrality 3). The user's account, the team record and the PR attribution settings.
 
-States: Account details and language, the team with its members and the PR attribution settings.
+States: Account details and language, and the PR attribution settings.
 
 Reach:
 
 1. `settings account`
-2. `settings team`
 
-- Web routes: `/app/account`, `/app/team`
-- Settings: `设置` (Settings) › `账号` (Account); `设置` (Settings) › `团队与访问` (Team & access) › `团队` (Team)
+- Web routes: `/app/account`
+- Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `team-agents-removed`
+- Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)

@@ -1439,6 +1439,7 @@ export const EN: Record<string, string> = {
   规则与策略: 'Rules & policies',
   正在加载规则与策略: 'Loading rules & policies',
   规则与策略没能加载: 'Rules & policies did not load',
+  打开工作路由: 'Open work routing',
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
@@ -1540,7 +1541,6 @@ export const EN: Record<string, string> = {
   没有匹配的设置: 'No matching settings',
   只影响这台设备: 'Applies to this device only',
   模型与账户: 'Models & accounts',
-  工作路由: 'Work routing',
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
   '还没有路由规则。': 'No routing rules yet.',
@@ -1556,10 +1556,6 @@ export const EN: Record<string, string> = {
   '把固定在这台机器上的路由规则一起迁到另一台机器。':
     'Move the routing rules pinned to this machine to another machine.',
   引文检查: 'Citation check',
-  'Agent 已由路由规则取代': 'Agents are replaced by routing rules',
-  '模型、机器和权限现在由工作路由规则与工作策略决定。':
-    'Models, machines and permissions are now set by work routing rules and work policies.',
-  打开工作路由: 'Open work routing',
   模型与首选机器: 'Model and preferred machine',
   首选机器: 'Preferred machine',
   不固定: 'Any machine',
