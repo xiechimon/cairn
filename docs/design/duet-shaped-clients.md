@@ -1,10 +1,10 @@
 # Duet-shaped clients: one layout for web, iOS and desktop
 
-Status: proposal, 2026-11-09. Waits on the owner and the coordinator (PR labelled `coordinator-hold`). No app code lands with this document.
+Status: accepted by the owner on 2026-11-09 (decisions in section 8). No app code lands with this document; implementation follows the PR order in section 6.
 
 The owner restarted the iOS app and the desktop app and wants both shaped like Anthropic's Claude Duet. This document maps Duet onto cairn once, so the web app, the iOS app and the Electron desktop shell share one information architecture. When it is accepted, it replaces the tab layout in `docs/design/mobile-information-architecture.md` (that file is updated in the first PR below, not here).
 
-Owner decisions of 2026-11-09, relayed by the coordinator on this PR:
+Owner decisions of 2026-11-09 that shaped this document (the full list is in section 8):
 
 1. The iOS app copies Duet's structure closely; the desktop app borrows from it. Where Duet's order or default differs from a cairn preference, Duet wins (the home tab and the Tasks section order).
 2. Duet's layout and interaction patterns, with cairn's own tokens and colors; never Duet's brand assets (logo, typeface, orange accent, illustrations).
@@ -16,6 +16,8 @@ Marks used on every claim that drives a decision:
 - **Seen**: visible in a reference image listed under Sources.
 - **Read**: read in a primary text source (Anthropic page, Apple page, a GitHub repository, or this repository's code and docs at `origin/main` `45f00e7f8`).
 - **Inferred**: derived from Seen or Read facts and checkable; anything predictive is also marked Inferred.
+
+The signing write-up in 4.4 uses the review convention's marks: `实测` (seen or read first-hand: Seen and Read above), `推断` (Inferred) and `猜测` (a guess, not checked).
 
 Duet is waitlisted, so nothing here comes from operating it. Every Duet row is Seen or Read from public material.
 
@@ -67,7 +69,7 @@ Duet is waitlisted, so nothing here comes from operating it. Every Duet row is S
 | Everything | The Coordinator conversation (one per team) | The only conversational entry. Unchanged rule: the Coordinator only routes (`coordinator-routes-verbatim.md`). |
 | Channel | A project | A lens on the one Coordinator, not a second chat (2.3). |
 | Channel group | A project group | New nullable `group` on the project (2.3). |
-| Sidebar dot | Ochre dot: a task in this project waits on the owner | Derived from `ownerOf`, no read state (2.3, question 4). |
+| Sidebar dot | Ochre dot: a task in this project waits on the owner | Derived from `ownerOf`, no read state (2.3, D8). |
 | Tasks: Needs input | `owner = 'owner'`, reason `question` or `confirm` | 2.4 |
 | Tasks: Ready for review | `owner = 'owner'`, reason `review` | 2.4 |
 | Tasks: Working | Every other open task: running, queued, or owned by the Coordinator | 2.4 |
@@ -90,7 +92,7 @@ Duet channels are separate chats that share one memory (Read). cairn should not 
 - The composer in a project view sends to the one Coordinator thread with that `projectId` preset. The Coordinator still routes; the preset is a routing fact, not a rewrite of the owner's words.
 - Everything shows all messages, including those tagged to projects. Inferred: this matches Duet's "All chat context across every channel" (Seen).
 - Groups: add `project.group` (nullable text). The sidebar renders projects without a group first, then each group as a collapsible header with its projects, in name order. Moving a project is a `Move to group` item in the existing project menu (`sidebar-project-menu.tsx`, Read), with drag as a later nicety. No group table: a group with no projects does not exist. Inferred: a name column covers Duet's folders (Seen) without a second entity.
-- Sidebar row: project icon and name, plus an ochre dot when at least one of its tasks has `owner = 'owner'`. No count, no task rows, no status line on web. `apps/web/DESIGN-RULES.md` V5 allows ochre only for "waiting on you" and has no blue (Read), so Duet's blue dot becomes ochre and means needs-you, not unread (question 4).
+- Sidebar row: project icon and name, plus an ochre dot when at least one of its tasks has `owner = 'owner'`. No count, no task rows, no status line on web. `apps/web/DESIGN-RULES.md` V5 allows ochre only for "waiting on you" and has no blue (Read), so Duet's blue dot becomes ochre and means needs-you, not unread (D8).
 - Phone drawer rows add one status line, as Duet does (Seen): the reason of the newest owner-owned task, else `N working`, else nothing.
 
 ### 2.4 Tasks from `ownerOf`
@@ -204,7 +206,7 @@ The owner chose free signing (4.4). The free Apple Developer tier has no Push no
 | B. Background refresh plus local notifications | Sometimes | Unbounded: "the system doesn't guarantee launching the task at the specified date, but only that it won't begin sooner"; the system weighs usage, power and a force-quit | A `BGAppRefreshTask` that fetches needs-you and posts `UNNotificationRequest`s, plus de-duplication against what the owner already saw | Read (Apple `earliestBeginDate`); usage and force-quit effects Inferred |
 | C. Poll or stream while the app is open | No | Instant, but only in the foreground | Exists: the app already follows the SSE stream | Read (`apps/ios/README.md`) |
 
-**Recommendation: A, and only A, as the alert path.** It is the one option that reaches a locked phone, and it costs no new code because the server, the service worker and presence suppression already exist. B would add a second, unreliable alert path that can fire hours late and duplicate A, so it is not built. C stays what it is: live data while the app is open, not an alert.
+**Decision D7: A, and only A, is the alert path.** It is the one option that reaches a locked phone, and it costs no new code because the server, the service worker and presence suppression already exist. B would add a second, unreliable alert path that can fire hours late and duplicate A, so it is not built. C stays what it is: live data while the app is open, not an alert.
 
 How A fits the native app:
 
@@ -233,7 +235,44 @@ How A fits the native app:
 
 All four share Apple's free-tier limits: 7-day profiles, at most 3 sideloaded apps per device, 10 App IDs per 7 days (Read, compare-memberships), and no APNs (4.3). Every signer holds a session of the Apple ID it signs with; both videos and the guide use a secondary Apple ID (Read), and so should the owner.
 
-**Recommendation: design cairn to be signer-agnostic, and run it under SideStore with a daily Shortcuts refresh.** SideStore is the route that meets "re-signed automatically on the phone"; Seal re-signs on the phone but needs a tap, and its distribution by direct message is weaker provenance. If the owner prefers Seal, nothing in cairn changes: both sign the same unsigned IPA. Inferred.
+#### The two signing videos, frame by frame
+
+Neither video has a subtitle track (`实测`: agent-reach `bilibili subtitle` and `youtube subtitle` return none, and the Bilibili view API lists no subtitles), and audio transcription is unavailable without a Whisper key. Both were therefore read frame by frame in a browser tab, plus titles, descriptions and pinned comments. Personal data visible in the frames (Apple ID emails, device names) is left out here.
+
+**Video 1: Seal, https://www.bilibili.com/video/BV1k5HS6aE5s/** (uploader `Sealsign`, 56 s, 2026-10-08, screen recording without narration)
+
+| Question | Answer | Mark |
+|---|---|---|
+| What the tool is | Seal, an on-phone IPA signer. Its own bundle ID is `com.mjorb.seal`, which matches the `MJorb` repository; signed apps get a `.seal` suffix | `实测` (frames 0:15, 0:22); same project `推断` |
+| Manual or automatic | Manual. Renewal is a `Renew all` button or a per-app `Renew now`; the batch sheet says to keep Seal open and not lock the screen or switch apps until it finishes. The only time-based feature is a reminder 24 hours before expiry | `实测` (frames 0:15, 0:29, 0:48) |
+| What it needs | An Apple ID added in Seal, a paired device (`Device: Paired`), and LocalDevVPN per the README; no computer after Seal itself is installed, but the first install of Seal needs another signer | `实测` (frame 0:48); README `实测`; first install `实测` from the README |
+| 7-day and 3-app limits | Badges show 5 and 6 days left, consistent with 7-day profiles; three apps are installed (Seal plus two), which is the free tier's cap | `实测` (frame 0:22); that a fourth app would fail `推断` from Apple's limit |
+| Failure modes | A renewal interrupted by locking or switching apps (the sheet warns against it); a missed reminder lets the profile lapse and the apps stop launching until re-signed; the README's own commits mention interactive two-factor failing in batch renewal | `实测` (sheet text, README commit `4c24fda2`); lapse behaviour `推断` |
+| Provenance | The IPA is handed out by direct message and a WeChat account; the repository has 1 star | `实测` (comments, GitHub API) |
+
+**Video 2: LiveContainer + SideStore, https://www.youtube.com/watch?v=UjS2oob2KUk** (CatCoder, 8:40, 2026-07-02, title "permanently free, unlimited re-signing, no computer needed")
+
+| Question | Answer | Mark |
+|---|---|---|
+| What the tools are | iloader on a Mac installs the combined LiveContainer + SideStore app; SideStore re-signs on the phone; LiveContainer runs further IPAs inside itself, so they do not use app slots | `实测` (frames 2:10, 3:10, 7:25; the presenter's notes) |
+| Manual or automatic | A Shortcut named for auto re-signing runs: turn Wi-Fi on, `Start LocalDevVPN`, SideStore `Refresh All Apps`, `Stop LocalDevVPN`, then restart the presenter's proxy app. After it runs, SideStore shows both apps at `7 DAYS`. The frames sampled show the Shortcut being run by hand; the notes say "shortcut sets up automatic refresh". A daily trigger needs a personal automation in the Shortcuts `Automation` tab, which the sampled frames do not show being set up | `实测` (frames 1:10, 7:25, 8:25); automation `推断` |
+| What it needs | A computer once (iloader on a Mac, iPhone paired over USB or Wi-Fi); a secondary Apple ID signed in to iloader and to SideStore; an anisette server (iloader's setting shows the `SideStore (.io)` one); a pairing file placed on the phone; LocalDevVPN running during each refresh; Wi-Fi on | `实测` (frames 2:10, 3:10, 7:25) |
+| 7-day and 3-app limits | SideStore's `My Apps` shows two active apps at 7 days, a third app parked as `Inactive` with `ACTIVATE`, and "6 App IDs Remaining". The presenter's notes: AltStore and SideStore each take one of the phone's app slots; LiveContainer runs unlimited IPAs inside one slot, one at a time | `实测` (frames 0:20, 8:25) |
+| Failure modes | The refresh depends on LocalDevVPN, Wi-Fi and the third-party anisette server all working at run time; the Shortcut must stop the VPN afterwards or it stays on (the presenter's proxy has to be restarted); community reports add "took too long" errors on `Refresh All Apps` | `实测` (Shortcut steps); anisette dependency `推断`; community reports `实测` (guide), anecdotal |
+| Device | The phone in the video runs iOS 26.3 | `实测` (frame 4:10) |
+
+**Check of the decision against the videos: confirmed, with one correction.** SideStore with a Shortcut is still the only route that re-signs without a tap: Seal's video shows a manual, foreground renewal with a reminder (`实测`), while the SideStore Shortcut chains the VPN and the refresh in one action (`实测`). The correction is that "automatic" needs two things the video does not show: a personal automation in the Shortcuts app with a daily time trigger and "Run Immediately", and the VPN stopped at the end of the Shortcut. Both go into the setup steps below (`推断`).
+
+Setup the owner follows once (iOS 17 or later for "Run Immediately" automations, `猜测` on the exact version):
+
+1. On the Mac, install iloader, sign in with the secondary Apple ID, pair the iPhone, install SideStore (the combined LiveContainer build is optional), and place the pairing file.
+2. On the phone, sign in to SideStore with the same Apple ID, then install the cairn IPA as its own app (not inside LiveContainer).
+3. Build the Shortcut: `Start LocalDevVPN`, `Refresh All Apps`, `Stop LocalDevVPN`.
+4. Add a personal automation: time of day, daily, `Run Immediately`, running that Shortcut. Check SideStore's `My Apps` after the first run shows `7 DAYS`.
+
+Free-tier budget on the phone: SideStore and cairn use two of the three app slots and two App IDs per week, leaving one slot (`推断` from the frames and Apple's limits).
+
+**Decision (owner, 2026-11-09): cairn is signer-agnostic and runs under SideStore with a daily Shortcuts refresh, signed with a secondary Apple ID.** SideStore is the route that meets "re-signed automatically on the phone"; Seal re-signs on the phone but needs a tap, and its distribution by direct message is weaker provenance. If the owner prefers Seal, nothing in cairn changes: both sign the same unsigned IPA. Inferred.
 
 What this means for the cairn app and build:
 
@@ -259,7 +298,7 @@ The desktop borrows from Duet rather than copying it: it keeps the wide web layo
 - **Tray badge**: the needs-you count from 2.4, the same number as the iOS tab badge. Linux shows it in the tray icon (StatusNotifierItem on waybar, unverified on Wayland, Inferred), macOS on the dock and menu bar. Cleared when the window is focused, as t3code does (Read, mcp-forms note).
 - **Notifications**: the main process subscribes to the team stream (`GET /api/teams/:id/stream`, Read, `routes-core.ts`) and raises an OS notification for each ownership notification the reconciler writes (`notifyOwnership`, Read, `notifications.ts`). It does not use Web Push inside Electron (Inferred: the desktop is online whenever it can notify, and the stream already carries the events). Suppressed when the thread is on screen, through the same presence heartbeat. Clicking opens `/app?thread=<todoId>`.
 - **Deep links**: register `cairn://` with `setAsDefaultProtocolClient`, handle `open-url` on macOS and `second-instance` on Linux and Windows (Read, stack note), and map each link to the web route in section 3, step 7. `cairn://new?q=` opens a draft and never runs.
-- **Update and packaging**: electron-builder and electron-updater; AppImage for the Linux desktop, an unsigned DMG for the Mac. Signing and notarization cost money (question 5).
+- **Update and packaging**: electron-builder and electron-updater; AppImage for the Linux desktop, an unsigned DMG for the Mac. Signing and notarization cost money (D9).
 - Later slices, not here: "use this computer as a worker" (it touches `apps/daemon/src/credentials.ts` and `apps/server/src/routes-machine.ts`, owner-routed security surfaces), and the bundled server for stranger installs.
 
 ## 6. Order of small PRs
@@ -295,15 +334,19 @@ Each PR is independent off `main` unless it says otherwise, and each ends with s
 | Proactive checks of outside accounts every few hours | Not part of this client work; quota cost is the reason Duet limits it | Read (launch article) |
 | A Tasks `+` button that creates a task directly | The `+` opens the Chat composer instead, so tasks still enter through the Coordinator and the verbatim request stays in one path | Inferred |
 
-## 8. Open questions for the owner
+## 8. Decisions
 
-Each has a recommended answer; the recommendation applies if the owner does not answer.
+Owner decisions of 2026-11-09 on this PR, each taking the recommendation that was offered. They replace the open questions.
 
-Decided by the owner on 2026-11-09 and folded in above: iOS copies Duet closely and the desktop borrows (4.2, 5); the home tab and the section order follow Duet (4.2, 2.4); no Make tab unless something maps (2.7); free signing instead of the paid program (4.4).
-
-1. **Which signer.** Recommended: SideStore with a daily Shortcuts `Refresh All Apps` automation, because it is the only free route that re-signs without a tap; Seal works with the same IPA if the owner prefers one tap after its 24-hour reminder.
-2. **Apple ID for signing.** Recommended: a secondary Apple ID, as both videos and the community guide use; the signer holds that account's session on the phone.
-3. **Needs-you alerts while signing is free.** Recommended: install the cairn PWA on the home screen and allow notifications; it is the only alert path (4.3). No background-refresh notifications.
-4. **What the project dot means.** Recommended: ochre, "a task here waits on you", from `ownerOf`. The alternative, an unread dot, needs per-project read state and a second meaning for the one accent.
-5. **Desktop signing (Apple Developer ID and notarization; Windows signing).** Recommended: unsigned AppImage and DMG for the owner's own machines now; decide signing with the stranger-install phase.
-6. **Label of the top row.** Recommended: keep `Coordinator`, not `Everything`, since the name is already in the product and the MCP face.
+| # | Decision | Where it applies |
+|---|---|---|
+| D1 | iOS copies Duet's structure closely; the desktop borrows from it | 4.2, 5 |
+| D2 | Duet's layout and interaction patterns with cairn's own tokens and colors; no Duet brand assets | 2.6, 4.2, 7 |
+| D3 | iOS opens on `Chat`; Tasks sections in Duet's order: Ready for review, Needs input, Working, Resolved | 2.4, 4.2 |
+| D4 | No third tab: nothing in cairn maps to `Make` | 2.7 |
+| D5 | Free signing: SideStore re-signs on the phone through a daily Shortcuts automation | 4.4 |
+| D6 | Sign with a secondary Apple ID, not the owner's main account | 4.4 |
+| D7 | The installed PWA's Web Push is the only needs-you alert channel; no background-refresh notifications | 4.3 |
+| D8 | An ochre project dot means "a task in this project is waiting on you", derived from `ownerOf` | 2.3 |
+| D9 | The desktop build stays unsigned for now (AppImage and DMG); signing is decided with the stranger-install phase | 5 |
+| D10 | The top row keeps the name `Coordinator` | 2.2 |
