@@ -540,6 +540,91 @@ for (const size of [
   });
 }
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`the card and composer read as one surface: one hairline per outer edge, none at the seam (${theme})`, async ({
+    page,
+  }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await mockLive(page, structuredClone(ONE));
+    await page.goto('/app');
+    const scope = page.getByTestId('home-c');
+    const card = scope.getByTestId('chief-question-card');
+    const composer = scope.locator('.chief-composer');
+    await expect(card).toBeVisible();
+    const edges = async () =>
+      page.evaluate(() => {
+        const read = (el: Element) => {
+          const style = getComputedStyle(el);
+          const layers = style.boxShadow.split(/,(?![^(]*\))/).map((layer) => layer.trim());
+          const rings: Record<string, string> = {};
+          let outerRing = false;
+          for (const layer of layers) {
+            const color = /^(rgba?\([^)]*\)|oklab\([^)]*\)|color\([^)]*\))/.exec(layer)?.[1] ?? '';
+            const [x, y, blur, spread] = layer
+              .slice(color.length)
+              .trim()
+              .split(/\s+/)
+              .map((part) => Number.parseFloat(part));
+            if (!layer.endsWith('inset')) {
+              if (blur === 0 && (spread ?? 0) > 0) outerRing = true;
+              continue;
+            }
+            if ((spread ?? 0) > 0) rings.all = color;
+            else if ((x ?? 0) > 0) rings.left = color;
+            else if ((x ?? 0) < 0) rings.right = color;
+            else if ((y ?? 0) > 0) rings.top = color;
+            else if ((y ?? 0) < 0) rings.bottom = color;
+          }
+          const borders = ['Top', 'Right', 'Bottom', 'Left'].map(
+            (side) => style.getPropertyValue(`border-${side.toLowerCase()}-width`),
+          );
+          return { rings, outerRing, borders };
+        };
+        return {
+          card: read(document.querySelector('[data-testid="home-c"] [data-testid="chief-question-card"]')!),
+          composer: read(document.querySelector('[data-testid="home-c"] .chief-composer')!),
+        };
+      });
+    const assertOneSurface = async () => {
+      const { card: top, composer: bottom } = await edges();
+      expect(top.borders).toEqual(['0px', '0px', '0px', '0px']);
+      expect(bottom.borders).toEqual(['0px', '0px', '0px', '0px']);
+      expect(top.outerRing).toBe(false);
+      expect(bottom.outerRing).toBe(false);
+      expect(Object.keys(top.rings).sort()).toEqual(['left', 'right', 'top']);
+      expect(Object.keys(bottom.rings).sort()).toEqual(['bottom', 'left', 'right']);
+      expect(top.rings.left).toBe(bottom.rings.left);
+      expect(top.rings.right).toBe(bottom.rings.right);
+      expect(top.rings.top).toBe(bottom.rings.bottom);
+      return top.rings.left;
+    };
+    const resting = await assertOneSurface();
+    await page.mouse.move(0, 0);
+    const seam = (await composer.boundingBox())!;
+    const strip = await page.screenshot({
+      clip: { x: Math.round(seam.x + seam.width / 2), y: Math.round(seam.y) - 16, width: 1, height: 32 },
+    });
+    const colors = await page.evaluate(async (png) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${png}`;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(image, 0, 0);
+      const data = context.getImageData(0, 0, image.width, image.height).data;
+      const seen = new Set<string>();
+      for (let i = 0; i < data.length; i += 4) seen.add(`${data[i]},${data[i + 1]},${data[i + 2]}`);
+      return [...seen];
+    }, strip.toString('base64'));
+    expect(colors, 'the 32px across the seam is one flat fill').toHaveLength(1);
+    await composer.locator('textarea').focus();
+    await expect.poll(async () => (await edges()).card.rings.left).not.toBe(resting);
+    await assertOneSurface();
+  });
+}
+
 test('the card collapses to a one-line bar, stays collapsed per question, and expands again', async ({
   page,
 }) => {

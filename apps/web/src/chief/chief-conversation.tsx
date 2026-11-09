@@ -521,7 +521,7 @@ export function ChiefConversation({
       )}
       <div
         data-testid="chief-composer-block"
-        className="flex max-h-[65%] min-h-0 flex-none flex-col"
+        className="group/composer flex max-h-[65%] min-h-0 flex-none flex-col"
       >
         {tray}
         <ChiefQuestionDock bound={answerHere} ownFooter={mode === 'thread'} />

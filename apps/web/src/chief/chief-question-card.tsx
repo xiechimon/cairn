@@ -75,7 +75,7 @@ const NUM_CLS =
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
 const ATTACHED_CARD_CLS =
-  '@container relative flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) border border-b-0 border-border bg-card shadow-(--e1)';
+  '@container relative z-1 flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) bg-card shadow-(--shadow-composer-cap) group-has-[.chief-composer:focus-within]/composer:shadow-(--shadow-composer-cap-focus)';
 const OPTION_ROW_CLS =
   'h-auto w-full items-start justify-start gap-2.5 whitespace-normal rounded-md px-2 py-1.5 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
