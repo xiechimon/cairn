@@ -475,7 +475,12 @@ export async function executeThreadMcpTool(
         return { threadId, ...stopChiefTurn(deps, teamId, threadId) };
       const conversationId = requireWorkConversation(db, teamId, thread.row);
       if (conversationId === null) throw new HttpError(409, 'Thread has no run to interrupt');
-      const result = requestStop(deps, conversationId, { discard: false });
+      const result = requestStop(
+        deps,
+        conversationId,
+        { discard: false },
+        { actor: 'mcp', reason: 'interrupt_thread over MCP' },
+      );
       if (!result.delegated) await drainTaskMessageQueue(deps, conversationId);
       return { threadId, ...result };
     }

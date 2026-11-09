@@ -6,7 +6,7 @@ import {
   redactSecrets,
   threadMessageBodySchema,
 } from '@cairn/shared';
-import { and, desc, eq, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
@@ -116,13 +116,17 @@ async function messageThread(
 
 function stopThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
   const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
+  str(params, 'reason');
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }
   return json({
     todoId: row.id,
     seqNum: row.seqNum,
-    stopped: cancelBuild(deps, row.latestBuildId),
+    stopped: cancelBuild(deps, row.latestBuildId, {
+      actor: 'coordinator',
+      reason: tidy(str(params, 'reason'), LINE_MAX),
+    }),
   });
 }
 
@@ -132,10 +136,9 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
     throw new HttpError(400, 'invalid params.offset: expected non-negative safe integer');
   }
   const projectId = optStr(params, 'projectId');
-  const hidden: Phase[] =
-    params.includeDone === true ? ['closed', 'todo'] : ['closed', 'todo', 'done'];
+  const hidden: Phase[] = params.includeDone === true ? ['closed'] : ['closed', 'done'];
   const rows = db
-    .select({ row: todo, line: build.reportLine })
+    .select({ row: todo, line: build.reportLine, stop: build.stop })
     .from(todo)
     .leftJoin(build, eq(build.id, todo.latestBuildId))
     .where(
@@ -144,6 +147,7 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
         isNull(todo.archivedAt),
         isNotNull(todo.latestBuildId),
         notInArray(todo.phase, hidden),
+        or(ne(todo.phase, 'todo'), isNotNull(build.stop)),
         projectId !== undefined ? eq(todo.projectId, projectId) : undefined,
       ),
     )
@@ -151,7 +155,7 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
     .all();
   const page = rows.slice(offset, offset + CHIEF_ROUTER_THREADS_PAGE);
   return json({
-    threads: page.map(({ row, line }) => ({
+    threads: page.map(({ row, line, stop }) => ({
       id: row.id,
       seqNum: row.seqNum,
       title: tidy(row.title, TITLE_MAX),
@@ -159,6 +163,8 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
       phase: row.phase,
       awaitingReply: row.awaitingReply,
       line: line === null || line === undefined ? null : tidy(line, LINE_MAX),
+      stopped:
+        stop === null || stop === undefined ? null : { actor: stop.actor, reason: stop.reason },
     })),
     total: rows.length,
     nextOffset: offset + page.length < rows.length ? offset + page.length : null,

@@ -178,7 +178,7 @@ function fakeWorkspace(opts: { prepareError?: Error } = {}) {
     },
     async commitAll() {
       calls.push('commitAll');
-      return { committed: true, head: 'abc123' };
+      return { committed: true, head: 'abc123', setupDrift: [] };
     },
     async push(_cwd, branch, cred) {
       calls.push(`push:${branch}`);
@@ -533,7 +533,7 @@ describe('runner plan step handoff location (#1203: plan.md moved out of the rep
         };
       },
       async commitAll() {
-        return { committed: true, head: 'abc123' };
+        return { committed: true, head: 'abc123', setupDrift: [] };
       },
       async push() {},
       async mergeDefaultBranch() {
@@ -598,7 +598,7 @@ describe('runner plan step handoff location (#1203: plan.md moved out of the rep
         };
       },
       async commitAll() {
-        return { committed: true, head: 'abc123' };
+        return { committed: true, head: 'abc123', setupDrift: [] };
       },
       async push() {},
       async mergeDefaultBranch() {

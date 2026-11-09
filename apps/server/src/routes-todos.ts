@@ -143,7 +143,12 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       prior != null &&
       (IN_PROGRESS_PHASES as readonly string[]).includes(prior.phase) &&
       record.phase === 'done';
-    if (closing || exited) stopActiveStepsAfterExit(svc, id);
+    if (closing || exited) {
+      stopActiveStepsAfterExit(svc, id, {
+        actor: 'person',
+        reason: `${closing ? 'closed' : 'marked done'} by ${svc.user.displayName}`,
+      });
+    }
     return c.json(record);
   });
 
@@ -151,7 +156,10 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     const record = setTodoArchived(svc, id, true);
     if (!record) throw notFound(`todo ${id}`);
-    stopActiveStepsForArchive(svc, id);
+    stopActiveStepsForArchive(svc, id, {
+      actor: 'person',
+      reason: `archived by ${svc.user.displayName}`,
+    });
     return c.json(getTodo(svc, id) ?? record);
   });
 
@@ -183,7 +191,10 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     if (!prior) throw notFound(`todo ${id}`);
     let prep: ReturnType<typeof prepareStopForDone>;
     try {
-      prep = prepareStopForDone(svc, id);
+      prep = prepareStopForDone(svc, id, {
+        actor: 'person',
+        reason: `stop and mark done by ${svc.user.displayName}`,
+      });
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;
