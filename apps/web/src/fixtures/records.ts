@@ -17,6 +17,7 @@ import {
   type QuotaWait,
   type SecretRecord,
   type SkillFact,
+  type StepPromptOrigin,
   type TagRecord,
   type ThreadMessageContent,
   type ThreadReportContent,
@@ -389,6 +390,7 @@ export type TranscriptItem =
   | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
   | { kind: 'automation-completed'; id: string }
   | { kind: 'chief' }
+  | { kind: 'step-prompt'; id: string; origin: StepPromptOrigin; raw: string }
   | {
       kind: 'fail';
       title: string;

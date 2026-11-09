@@ -2,7 +2,6 @@ import type { ProjectColor, ProjectIcon } from '@cairn/shared';
 import {
   BookText,
   Brain,
-  FolderOpen,
   Gauge,
   KeyRound,
   Layers,
@@ -118,10 +117,10 @@ export function ProjectHome({
               variant="ghost"
               size="sm"
               className="text-meta text-content-secondary"
-              render={<Link to={`/app/project/${project.id}/files`} />}
+              render={<Link to={`/app/project/${project.id}/tasks`} />}
             >
-              <FolderOpen aria-hidden="true" className="size-3.5" />
-              {t('文件')}
+              <ListTodo aria-hidden="true" className="size-3.5" />
+              {t('任务')}
             </Button>
             <Button
               variant="ghost"

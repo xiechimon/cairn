@@ -1,11 +1,4 @@
-import {
-  FolderOpen,
-  House,
-  ListChecks,
-  MessageSquareWarning,
-  PackageCheck,
-  Settings2,
-} from 'lucide-react';
+import { House, ListChecks, MessageSquareWarning, PackageCheck, Settings2 } from 'lucide-react';
 import {
   type ReactNode,
   useCallback,
@@ -287,10 +280,10 @@ export function HomeC({
         variant="ghost"
         size="sm"
         className="text-meta text-content-secondary"
-        render={<Link to={`/app/project/${projectId}/files`} />}
+        render={<Link to={`/app/project/${projectId}/tasks`} />}
       >
-        <FolderOpen aria-hidden="true" className="size-3.5" />
-        {t('文件')}
+        <ListChecks aria-hidden="true" className="size-3.5" />
+        {t('任务')}
       </Button>
       <Button
         variant="ghost"

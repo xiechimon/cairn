@@ -566,11 +566,7 @@ export const EN: Record<string, string> = {
   历史: 'History',
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
-  // #1097 files-pane folder drill-down
-  目录导航: 'Directory navigation',
   根目录: 'Root',
-  '此目录为空。': 'This folder is empty.',
-  '文件树读取失败。': 'Failed to read the file tree.',
   '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
@@ -633,7 +629,6 @@ export const EN: Record<string, string> = {
   // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
   额度空: 'out of quota',
   限流: 'rate limited',
-  请选择一个文件查看: 'Select a file to view',
   // #202 文件查看器三态（loading / error / 不可预览）
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
@@ -943,6 +938,16 @@ export const EN: Record<string, string> = {
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
+  'CI 修复第 {round}/{max} 轮：推送前检查未通过':
+    'CI fix round {round}/{max}: pre-push checks failed',
+  'CI 修复第 {round}/{max} 轮：CI 检查未通过': 'CI fix round {round}/{max}: CI checks failed',
+  '解冲突第 {round}/{max} 轮：PR 与默认分支冲突':
+    'Conflict fix round {round}/{max}: the PR conflicts with the default branch',
+  '按反馈返工，继续本会话': 'Reworking from feedback in this session',
+  查看原始日志: 'View raw log',
+  原始日志: 'Raw log',
+  查看完整指令: 'View full instruction',
+  完整指令: 'Full instruction',
   // #1285 失败行指引按分类分族
   '请将其重新上线，或重新运行任务以改派其他机器。':
     'Reconnect the machine, or rerun the task to assign another machine.',
@@ -1080,13 +1085,6 @@ export const EN: Record<string, string> = {
 
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
-
-  // —— local 项目 Files tab 读面（#1030 开闸；不可达降级文案）——
-  '本地仓库当前无法读取。': 'The local repository cannot be read right now.',
-
-  // —— github 项目 Files tab 诚实降级面（#704 / B-C1：文件在 GitHub，外链承接）——
-  'GitHub 仓库项目的文件在 GitHub 上查看': 'Files for GitHub repository projects live on GitHub',
-  '打开 GitHub 仓库': 'Open the GitHub repository',
 
   // —— #403/#445 看板筛选面（仓库 chip 组 + 类型 popover + 空结果态）——
   类型: 'Type',
