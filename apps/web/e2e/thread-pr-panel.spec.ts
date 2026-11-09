@@ -266,13 +266,13 @@ test('the PR list says what is missing when no thread has a PR', async ({ page }
   await expect(page.getByTestId('work-prs')).toContainText('PRs opened by threads are listed here.');
 });
 
-test('the same PR link reaches the needs-you card, the outputs panel and the finish dialog', async ({ page }) => {
+test('the same PR reaches the needs-you card, the Tasks row and the finish dialog', async ({ page }) => {
   await setup(page, { rows: [prRow()] });
   await page.goto('/app');
   const card = page.locator('[data-slot="thread-card"]').first();
   await expect(card.getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
   await page.goto('/app?pane=tasks');
-  await expect(page.locator('[data-slot="thread-row"]').first().getByRole('link', { name: /PR #42/ })).toBeVisible();
+  await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toContainText('#42');
   await page.goto('/app?thread=todo-1');
   await page.getByRole('button', { name: 'Finish…' }).click();
   await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);

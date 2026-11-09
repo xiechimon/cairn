@@ -62,7 +62,6 @@ import type {
   SkillRecord,
   StepJournalRow,
   TagRecord,
-  TasksQuery,
   TeamMember,
   TeamRecord,
   ThreadMessageResult,
@@ -71,7 +70,12 @@ import type {
   UpdateSkillBody,
   UserRecord,
 } from '@cairn/shared';
-import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
+import {
+  backupHealthSchema,
+  backupNotice,
+  SKILL_ENTRY_FILE,
+  tasksQuerySchema,
+} from '@cairn/shared';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -189,7 +193,7 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
 export const useTasks = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['tasks', teamId],
-    queryFn: () => api.get<TasksQuery>(`/api/tasks?teamId=${teamId}`),
+    queryFn: async () => tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}`)),
     enabled: enabled && teamId !== undefined,
   });
 

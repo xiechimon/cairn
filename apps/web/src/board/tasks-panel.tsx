@@ -224,11 +224,12 @@ export function TasksPanel({
         title={t('现在没有任务')}
         description={t('跟 Coordinator 说一件事，它会在这里出现。')}
         action={{ label: t('给 Coordinator 发消息'), onClick: onNewTask }}
-        className="mt-[10vh]"
+        className="mt-6"
       />
     ) : null;
   const active = (
     <div className="flex flex-col gap-2">
+      {empty}
       {ACTIVE_SECTIONS.map((section) => {
         const n = count(section);
         if (n === 0) return null;
@@ -282,6 +283,7 @@ export function TasksPanel({
         {groups.up_next.map(row)}
       </section>
     );
+  const body = tab === 'active' ? active : next;
   return (
     <SidePanel label={t('任务')} onDismiss={onClose}>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
@@ -319,9 +321,9 @@ export function TasksPanel({
           isEmpty={empty !== null}
           loadingLabel={t('正在加载任务')}
           errorTitle={t('任务没能加载')}
-          empty={empty}
+          empty={body}
         >
-          {empty ?? (tab === 'active' ? active : next)}
+          {body}
         </QueryBoundary>
       </div>
     </SidePanel>
