@@ -257,11 +257,23 @@ All of this lands **in the same change as `confine` and the Cua host driver**. T
 
 ### 4.4 Spikes before the change (feasibility)
 
-1. **Cua Driver on omarchy**, run from the daemon's environment:
-   - `get_window_state` and an element click on a GTK app with no focus change.
-   - CDP attach to the running `google-chrome` 157 profile.
-   - Per-window capture without a portal prompt on each call.
-   - Pass: all three, with the user typing in another window throughout.
+1. **Host driver comparison, measured 2026-11-09: blocked; no driver selected.** The provisional Cua choice in §4.1 is not an implementation approval. Neither candidate completed the required script. See [method, primary sources, evidence and limits](host-computer-driver-spike-2026-11-09.md). These observations come from the interactive desktop session, not the daemon's environment.
+
+   | Check | agent-desktop 1.1.0 | Cua Driver 0.38.0 |
+   | --- | --- | --- |
+   | GTK 3 semantic clicks | 3/3 counter increments; batch 1,522 ms | 3/3 counter increments; batch 3,420 ms |
+   | Qt Widgets 6.12.0 semantic clicks | 3/3 counter increments; batch 1,583 ms | 0/3 requested; zero dispatched; first read 489 ms; `accessibility_window_identity_unproven` withheld action handles |
+   | GTK single-window capture | Refused: `PLATFORM_NOT_SUPPORTED`, 64 ms | Correct 420 × 200 PNG, 25 ms |
+   | Qt single-window capture | Refused: `PLATFORM_NOT_SUPPORTED`, 55 ms | Correct 420 × 200 PNG, 42 ms |
+   | Background raw `F24`, same unfocused fixtures | 2/2 refused: `STALE_REF`, exact focus unproven; no key sent | 2/2 refused: `background_unavailable`; no foreground retry |
+   | Existing-profile Chrome CDP | No CDP command advertised; not verified | Read-only classification returned `browser_consent_required`; setup not invoked; not verified |
+   | Mac desktop checks | 0 executed, 0 passes | 0 executed, 0 passes |
+
+   Shared observation interval: **10,993 ms, 967 samples, zero focus events, zero changed focus/pointer samples, zero observer errors**. Maximum sampling gap: **21.65 ms**. No movement was observed; pointer excursions between samples cannot be excluded. Continuous user typing was not instrumented. No complete acceptance pass is claimed. Times are single-run observations, not performance percentiles; click batches include snapshots, counter readback and settling.
+
+   Mac SSH initially worked; Cua 0.38.0 was installed, but its daemon was not running and permissions were unknown. agent-desktop was absent from the checked locations. A later five-second SSH probe timed out. Mac availability is not a background-operation pass.
+
+   No foreground fallback, desktop capture, Chrome setup UI, profile edit, driver dependency, or experimental Hyprland seat plugin was used. Segment 3 is blocked pending a qualifying measured choice. Segment 2's PR must also wait for segment 1's first program PR, which did not exist at measurement time; the unchanged original remains available through research-only PR #3449 and the untouched authoritative local source.
 2. **Fake model endpoints** for Claude Code, Codex and pi that script one shell tool call (for test 5).
 3. **macOS Seatbelt**:
    - Claude Code and `codex-acp` run inside `sandbox-exec` with their inner sandboxes off.
