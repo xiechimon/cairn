@@ -1,8 +1,13 @@
 import type { MachineDoneBody } from '@cairn/shared';
 import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { SHORT_RETENTION_MS } from '../src/coordinator/runtime/cold-slim.js';
+import {
+  isColdResume,
+  resolveCacheRetentionTier,
+  retentionMsFor,
+  SHORT_RETENTION_MS,
+} from '../src/coordinator/runtime/cold-slim.js';
 import {
   build,
   chiefThread,
@@ -405,43 +410,88 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     });
   });
 
-  test('flag on: cold-resume and the meter share the context-bearing model after a multi-model turn', async () => {
+  test('flag on: A→B→A keeps meter and cold-resume send path on the final model (Warm)', async () => {
     const machineId = insertMachine(H.s);
-    claimedStep(machineId, 'turn-multi-cold');
-    await finishStep(deps(), machineId, 'turn-multi-cold', {
+    const modelA = 'stub-gw/stub-model';
+    const modelB = 'stub-gw/other-model';
+    claimedStep(machineId, 'turn-aba');
+    await finishStep(deps(), machineId, 'turn-aba', {
       status: 'success',
       usage: [
-        usage('stub-gw/stub-model', 1000, 800, { contextTokens: 5_000 }),
-        usage('stub-gw/other-model', 50, 0),
+        usage(modelA, 100, 0, { contextTokens: 1_000 }),
+        usage(modelB, 50, 0),
+        usage(modelA, 200, 800, { contextTokens: 5_000 }),
       ],
     });
-    const stubRow = turnRows().find(
-      (r) => r.stepId === 'turn-multi-cold' && r.model === 'stub-gw/stub-model',
-    );
-    expect(stubRow).toBeDefined();
+    const rows = turnRows().filter((r) => r.stepId === 'turn-aba');
+    expect(Object.fromEntries(rows.map((r) => [r.model, r.contextTokens]))).toEqual({
+      [modelA]: 5_000,
+      [modelB]: null,
+    });
+    const modelARow = rows.find((r) => r.model === modelA);
+    expect(modelARow).toBeDefined();
     H.s.db
       .update(chiefTurnUsage)
-      .set({ createdAt: (stubRow?.createdAt ?? 0) + 10 })
-      .where(
-        and(
-          eq(chiefTurnUsage.stepId, 'turn-multi-cold'),
-          eq(chiefTurnUsage.model, 'stub-gw/other-model'),
-        ),
-      )
+      .set({ createdAt: (modelARow?.createdAt ?? 0) + 10 })
+      .where(and(eq(chiefTurnUsage.stepId, 'turn-aba'), eq(chiefTurnUsage.model, modelB)))
       .run();
-    const rows = turnRows().filter((r) => r.stepId === 'turn-multi-cold');
-    const newestByCreatedAt = [...rows].sort((a, b) => b.createdAt - a.createdAt)[0];
-    expect(newestByCreatedAt?.model).toBe('stub-gw/other-model');
+    const newestByCreatedAt = H.s.db
+      .select()
+      .from(chiefTurnUsage)
+      .where(eq(chiefTurnUsage.threadId, H.threadId))
+      .orderBy(desc(chiefTurnUsage.createdAt))
+      .get();
+    expect(newestByCreatedAt?.model).toBe(modelB);
     const shared = lastContextBearingTurnUsage(H.s.db, H.threadId);
     expect(shared).toMatchObject({
-      model: 'stub-gw/stub-model',
+      model: modelA,
       contextTokens: 5_000,
-      stepId: 'turn-multi-cold',
+      stepId: 'turn-aba',
     });
-    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+    const meter = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(meter).toMatchObject({
       tokens: 5_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
+    const retentionMs = retentionMsFor(resolveCacheRetentionTier(), shared?.model ?? modelA);
+    const sendCold = isColdResume({
+      now: Date.now(),
+      lastUsage:
+        shared === null
+          ? null
+          : {
+              createdAt: shared.createdAt,
+              cacheRead: shared.cacheRead,
+              input: shared.input,
+              contextTokens: shared.contextTokens,
+              model: shared.model,
+            },
+      retentionMs,
+      activeModel: modelA,
+    });
+    expect(sendCold).toBe(false);
+    expect(meter?.resume === 'warm').toBe(!sendCold);
+    expect(
+      isColdResume({
+        now: Date.now(),
+        lastUsage:
+          newestByCreatedAt === undefined
+            ? null
+            : {
+                createdAt: newestByCreatedAt.createdAt,
+                cacheRead: newestByCreatedAt.cacheRead,
+                input: newestByCreatedAt.input,
+                contextTokens: newestByCreatedAt.contextTokens,
+                model: newestByCreatedAt.model,
+              },
+        retentionMs: retentionMsFor(
+          resolveCacheRetentionTier(),
+          newestByCreatedAt?.model ?? modelA,
+        ),
+        activeModel: modelA,
+      }),
+    ).toBe(true);
   });
 
   test('flag on: a later turn without contextTokens hides the meter instead of keeping the prior percent', async () => {
