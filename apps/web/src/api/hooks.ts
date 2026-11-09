@@ -62,6 +62,7 @@ import type {
   SkillRecord,
   StepJournalRow,
   TagRecord,
+  TasksQuery,
   TeamMember,
   TeamRecord,
   ThreadMessageResult,
@@ -182,6 +183,13 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useTasks = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['tasks', teamId],
+    queryFn: () => api.get<TasksQuery>(`/api/tasks?teamId=${teamId}`),
     enabled: enabled && teamId !== undefined,
   });
 

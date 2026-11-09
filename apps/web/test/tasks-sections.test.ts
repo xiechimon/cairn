@@ -1,0 +1,216 @@
+import type { PrPanelRow } from '@cairn/shared';
+import { describe, expect, test } from 'vitest';
+import {
+  bySection,
+  needsYouBadge,
+  questionRowCopy,
+  scopeTasks,
+  tasksFromQuery,
+  type TaskEntry,
+  type TaskSection,
+  taskRowCopy,
+} from '../src/board/tasks-sections.js';
+import type { TodoRecord } from '../src/fixtures/records.js';
+import { todo } from './helpers.js';
+
+const entry = (
+  seq: number,
+  phase: TodoRecord['phase'],
+  section: TaskSection,
+  extra: Partial<TodoRecord> = {},
+): TaskEntry => ({ todo: { ...todo(seq, phase), ...extra }, section });
+
+const pr = (
+  over: Omit<Partial<PrPanelRow>, 'checks'> & { checks?: Partial<PrPanelRow['checks']> },
+): PrPanelRow => ({
+  buildId: 'b1',
+  threadId: 't1',
+  projectId: null,
+  repo: 'xiechimon/cairn',
+  number: 3558,
+  title: 'PR',
+  url: 'https://github.com/xiechimon/cairn/pull/3558',
+  state: 'open',
+  mergeState: 'clean',
+  additions: 1,
+  deletions: 1,
+  branch: 'b',
+  base: 'main',
+  head: 'abc',
+  checksReadFor: 'abc',
+  verdict: null,
+  autoFix: true,
+  mergeWhenReady: false,
+  autoArchive: true,
+  dismissed: false,
+  blockedSince: null,
+  wakeRounds: 0,
+  lastReadAt: 0,
+  ...over,
+  checks: { passed: 41, failed: 0, running: 0, total: 41, failedNames: [], ...over.checks },
+});
+
+describe('a needs-you row says what is waiting and where to act', () => {
+  test('a review with a green PR names the PR, its checks and the PR card', () => {
+    const copy = taskRowCopy(entry(1, 'review', 'ready_for_review'), pr({}));
+    expect(copy).toMatchObject({
+      word: '待审阅',
+      what: { key: 'PR #{n} 检查 {p}/{t} 通过', params: { n: 3558, p: 41, t: 41 } },
+      where: '到 PR 卡合并',
+      waiting: true,
+    });
+  });
+
+  test('a review whose PR has failing checks says how many failed', () => {
+    const copy = taskRowCopy(
+      entry(1, 'review', 'ready_for_review'),
+      pr({ checks: { passed: 37, failed: 1, total: 38 } }),
+    );
+    expect(copy.what).toEqual({ key: 'PR #{n} 有 {f} 项检查没过', params: { n: 3558, f: 1 } });
+  });
+
+
+  test('a review without a PR points at the changes in the task', () => {
+    expect(taskRowCopy(entry(1, 'review', 'ready_for_review')).where).toBe('到任务里看改动');
+  });
+
+  test('a plan waiting for approval says so and where to approve it', () => {
+    expect(taskRowCopy(entry(1, 'confirm', 'needs_input'))).toMatchObject({
+      word: '待回答',
+      what: { key: '计划写好了' },
+      where: '到任务里批准计划',
+    });
+  });
+
+  test('a question from the task points at the task', () => {
+    expect(taskRowCopy(entry(1, 'needs_input', 'needs_input')).where).toBe('到任务里回答');
+  });
+
+  test('a standalone Coordinator question points at the question card', () => {
+    expect(questionRowCopy()).toMatchObject({ waiting: true, where: '在问题卡里选' });
+  });
+
+  test('no row says the old "ready, waiting for your review" line', () => {
+    const copies = [
+      taskRowCopy(entry(1, 'review', 'ready_for_review')),
+      taskRowCopy(entry(2, 'confirm', 'needs_input')),
+      taskRowCopy(entry(3, 'needs_input', 'needs_input')),
+    ];
+    for (const copy of copies) {
+      expect(copy.what.key).not.toContain('等你审阅');
+      expect(copy.where).not.toBeNull();
+    }
+  });
+});
+
+describe('rows that do not wait on the owner', () => {
+  test('working rows have no action and carry the running dot only while a run is active', () => {
+    expect(taskRowCopy(entry(1, 'building', 'working'))).toMatchObject({
+      waiting: false,
+      running: true,
+      where: null,
+      what: { key: '正在动手。' },
+    });
+    expect(taskRowCopy(entry(2, 'queued', 'working')).running).toBe(false);
+  });
+
+  test('a task the Coordinator owns says the Coordinator is on it', () => {
+    const copy = taskRowCopy(entry(1, 'failed', 'working', { owner: 'coordinator' }));
+    expect(copy.what.key).toBe('Coordinator 在跟进');
+    expect(copy.waiting).toBe(false);
+  });
+
+  test('a failed task nobody owns yet waits for its automatic retry, not for the owner', () => {
+    const copy = taskRowCopy(entry(1, 'failed', 'working'));
+    expect(copy.what.key).toBe('失败了，等自动重试');
+    expect(copy.where).toBeNull();
+  });
+
+  test('resolved rows name the phase and a merged PR', () => {
+    expect(taskRowCopy(entry(1, 'done', 'resolved'), pr({ state: 'merged' }))).toMatchObject({
+      word: '已完成',
+      what: { key: 'PR #{n} 已合并', params: { n: 3558 } },
+    });
+    expect(taskRowCopy(entry(2, 'closed', 'resolved')).word).toBe('已关闭');
+  });
+});
+
+describe('sections and the badge come from the server section, not the phase', () => {
+  test('rows group by their section, newest first, whatever their phase says', () => {
+    const groups = bySection([
+      { ...entry(1, 'review', 'working'), todo: { ...todo(1, 'review'), phaseAt: 1 } },
+      { ...entry(2, 'building', 'working'), todo: { ...todo(2, 'building'), phaseAt: 2 } },
+      entry(3, 'confirm', 'needs_input'),
+      entry(4, 'todo', 'up_next'),
+    ]);
+    expect(groups.working.map((row) => row.todo.seqNum)).toEqual([2, 1]);
+    expect(groups.needs_input).toHaveLength(1);
+    expect(groups.up_next).toHaveLength(1);
+    expect(groups.ready_for_review).toHaveLength(0);
+  });
+
+  test('the badge counts needs-input and ready-for-review rows plus standalone questions', () => {
+    const entries = [
+      entry(1, 'review', 'ready_for_review'),
+      entry(2, 'confirm', 'needs_input'),
+      entry(3, 'review', 'working'),
+      entry(4, 'done', 'resolved'),
+    ];
+    expect(needsYouBadge(entries, [{ requestId: 'q', header: 'h', createdAt: 0, projectId: null }])).toBe(3);
+  });
+});
+
+describe('the panel reads the one Tasks query as the server sent it', () => {
+  test('rows with a null section are dropped and questions keep their own list', () => {
+    const wire = (seq: number, section: TaskSection | null) => ({
+      ...todo(seq, 'review'),
+      ownerId: null,
+      createdBy: null,
+      sourceBuildId: null,
+      sourceKind: null,
+      sourceRef: null,
+      output: 'code' as const,
+      owner: 'owner' as const,
+      kind: 'todo' as const,
+      section,
+    });
+    const view = tasksFromQuery({
+      entries: [
+        wire(1, 'ready_for_review'),
+        wire(2, null),
+        {
+          kind: 'question',
+          requestId: 'r1',
+          threadId: 'th',
+          projectId: 'p1',
+          title: 'Remove Feishu entirely?',
+          section: 'needs_input',
+          createdAt: 5,
+          content: { kind: 'ask_user_question', requestId: 'r1', status: 'pending', questions: [] },
+        },
+      ],
+    } as unknown as Parameters<typeof tasksFromQuery>[0]);
+    expect(view.entries.map((row) => [row.todo.seqNum, row.section])).toEqual([[1, 'ready_for_review']]);
+    expect(view.questions).toEqual([
+      { requestId: 'r1', header: 'Remove Feishu entirely?', createdAt: 5, projectId: 'p1' },
+    ]);
+  });
+
+  test('a project lens keeps only that project, questions included', () => {
+    const view = scopeTasks(
+      {
+        entries: [
+          { ...entry(1, 'review', 'ready_for_review'), todo: { ...todo(1, 'review'), projectId: 'a' } },
+          { ...entry(2, 'review', 'ready_for_review'), todo: { ...todo(2, 'review'), projectId: 'b' } },
+        ],
+        questions: [
+          { requestId: 'x', header: 'h', createdAt: 0, projectId: 'a' },
+          { requestId: 'y', header: 'h', createdAt: 0, projectId: null },
+        ],
+      },
+      'a',
+    );
+    expect(view.entries.map((row) => row.todo.seqNum)).toEqual([1]);
+    expect(view.questions.map((q) => q.requestId)).toEqual(['x']);
+  });
+});

@@ -21,6 +21,9 @@ import {
   type TagRecord,
   type ThreadMessageContent,
   type ThreadReportContent,
+  type TodoOutputKind,
+  type TodoOwner,
+  type TodoSection,
   type UsageCost,
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
@@ -73,6 +76,9 @@ export interface TodoRecord {
   sourceRef?: string | null;
   usageCost?: UsageCost;
   verified?: boolean;
+  owner?: TodoOwner;
+  output?: TodoOutputKind;
+  section?: TodoSection | null;
   routeOverride?: {
     machineId?: string;
     requiredCapabilities?: {
