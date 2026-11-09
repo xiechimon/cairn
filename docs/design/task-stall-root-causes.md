@@ -1,6 +1,6 @@
 # Task stall root causes
 
-Status: proposed, awaiting coordinator review. Builds on `answer-delivery-record.md` and `thread-owner-field.md`, both landed (#3545, #3527). Prior art: `docs/research/task-stall-root-causes-2026-11-09.md` (Linear, GitHub Actions, Temporal, Airflow, Buildkite) and `docs/research/orca-execution-model-2026-11-09.md` (Orca, Codex CLI, Claude Code, t3code; its section 5 recommendations R1 to R3 are the input for classes 3, 1 and 4, and 2, and each section below says where it follows or departs from them). Out of scope, fixed elsewhere: the dirty `AGENTS.md` zero-change commit failure (#3615) and deploy starvation (#3624). Also out of scope: Orca R4 (long-lane hosting) and R6 (park a failure that repeats the same cause), which are separate changes.
+Status: accepted (coordinator review on #3635, 2026-11-09; class 3 auto-start decided by the owner the same day). Builds on `answer-delivery-record.md` and `thread-owner-field.md`, both landed (#3545, #3527). Prior art: `docs/research/task-stall-root-causes-2026-11-09.md` (Linear, GitHub Actions, Temporal, Airflow, Buildkite) and `docs/research/orca-execution-model-2026-11-09.md` (Orca, Codex CLI, Claude Code, t3code; its section 5 recommendations R1 to R3 are the input for classes 3, 1 and 4, and 2, and each section below says where it follows or departs from them). Out of scope, fixed elsewhere: the dirty `AGENTS.md` zero-change commit failure (#3615) and deploy starvation (#3624). Also out of scope: Orca R4 (long-lane hosting) and R6 (park a failure that repeats the same cause), which are separate changes.
 
 Evidence is the 2026-11-09 stuck sweep of the live `server.db`, read-only. Every open task has since been archived by the owner, so the cases below are history (`todo`, `build`, `step`, `message` and `chief_message` rows).
 
@@ -28,7 +28,7 @@ Prior art: GitHub `needs`, Airflow trigger rules and Buildkite `depends_on` all 
 5. When a blocker reaches `failed` or `closed`, the dependent's step stays held, and `ownerOf` returns `coordinator` with the new reason `blocked` and work key `blocked:<blockerId>:<phase>`. The Coordinator wakes once and can retry the blocker, drop the edge with `update_todo`, or close the dependent. This is the counterpart of Airflow's `upstream_failed`, routed to the Coordinator instead of failing the task.
 6. Parallelism is `project.maxConcurrent` only. The Coordinator prompt's dispatch guidance says to start everything and express order with `blockedBy`.
 
-Rule 1 is awaiting the owner's decision on whether Coordinator-created todos may start without his confirmation. This design assumes yes.
+The owner decided rule 1 on 2026-11-09: Coordinator-created todos start automatically, without his confirmation.
 
 This follows Orca R1's root fix, which folds create and open into one call. It does not add R1's level-triggered `runTick` sweep over unstarted todos, for two reasons. First, the sweep cannot tell a todo the Coordinator forgot from one that was deliberately stopped back to `todo`: #139's first build was cancelled during the 11-08 freeze, and a sweep would have restarted it. Second, with create and reopen starting the build themselves, the forgotten case no longer exists, so the sweep would be a second starter for a state that cannot be reached. The level re-check Orca relies on lives in rule 4, which re-evaluates every held task on every tick.
 
@@ -41,7 +41,7 @@ This follows Orca R1's root fix, which folds create and open into one call. It d
 
 | # | Path | Today | After |
 |---|---|---|---|
-| 1 | `create_todo` (Coordinator) | `todo`; needs `open_thread` | `queued`; held if blocked (awaiting owner decision on auto-start) |
+| 1 | `create_todo` (Coordinator) | `todo`; needs `open_thread` | `queued`; held if blocked (auto-start, owner decision 2026-11-09) |
 | 2 | `reopen_todos` | back to `todo` | new build, `queued` |
 | 3 | `update_todo` with `blockedBy` | n/a | writes the edge; next release pass re-evaluates |
 | 4 | `startBuilds` / `enqueueStep` for a blocked task (continuation, rework, wakes) | not held | held at insert |
@@ -159,6 +159,11 @@ Orca R2(b) re-fires the wake once, with the previous turn's last message, before
 Migration: add a nullable `coordinatorTurn` JSON column. Existing rows read as no turn and keep today's behavior until their next wake.
 
 ## Decisions taken here (revertible)
+
+| Decision | By | Date |
+|---|---|---|
+| Coordinator-created todos start automatically, without owner confirmation (class 3 rule 1) | owner | 2026-11-09 |
+| The design as a whole, including the departures from Orca R1 to R3 | coordinator | 2026-11-09 |
 
 - Coordinator-created todos always start. There is no draft switch, because no recorded case needed a Coordinator-created backlog item. Revert: add the switch back on `create_todo`.
 - A failed or closed blocker routes to the Coordinator instead of failing the dependent. Research-before-plan no longer proceeds silently when its research fails.
