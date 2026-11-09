@@ -1,0 +1,58 @@
+$ curl -s -X GET 'http://127.0.0.1:18881/api/projects/oYAVZeD5PJnX_v7GyHNUK/tree'
+HTTP 200
+{"ref":"HEAD","commit":"ed60ead30b6737065d9a21bee3379438d23a7ae8","path":"","entries":[{"name":"README.md","path":"README.md","type":"blob","size":30}]}
+
+$ curl -s -X GET 'http://127.0.0.1:18881/api/projects/oYAVZeD5PJnX_v7GyHNUK/file?path=README.md'
+HTTP 200
+{"ref":"HEAD","commit":"ed60ead30b6737065d9a21bee3379438d23a7ae8","path":"README.md","size":30,"encoding":"utf-8","content":"# Retained thread file access\n"}
+
+$ curl -s -X GET 'http://127.0.0.1:18881/api/projects/oYAVZeD5PJnX_v7GyHNUK/commits'
+HTTP 200
+{"ref":"trunk","commits":[{"sha":"ed60ead30b6737065d9a21bee3379438d23a7ae8","shortSha":"ed60ead","message":"Seed verification repository","authorName":"Verification","at":1794255044000}]}
+
+$ curl -s -X GET 'http://127.0.0.1:18881/api/projects/oYAVZeD5PJnX_v7GyHNUK/commits/HEAD'
+HTTP 200
+{"sha":"ed60ead30b6737065d9a21bee3379438d23a7ae8","shortSha":"ed60ead","message":"Seed verification repository","authorName":"Verification","at":1794255044000,"files":[{"path":"README.md","additions":1,"deletions":0,"hunks":[{"header":"@@ -0,0 +1 @@","lines":["+# Retained thread file access"]}]}]}
+
+$ curl -s -X GET 'http://127.0.0.1:18883/api/projects/AWCBxWW6mtirGuVUWtiZ6/tree'
+HTTP 404
+{"error":"Not found"}
+rows before: [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+rows after:  [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+
+$ curl -s -X GET 'http://127.0.0.1:18883/api/projects/AWCBxWW6mtirGuVUWtiZ6/file?path=README.md'
+HTTP 404
+{"error":"Not found"}
+rows before: [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+rows after:  [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+
+$ curl -s -X GET 'http://127.0.0.1:18883/api/projects/AWCBxWW6mtirGuVUWtiZ6/commits'
+HTTP 404
+{"error":"Not found"}
+rows before: [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+rows after:  [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+
+$ curl -s -X GET 'http://127.0.0.1:18883/api/projects/AWCBxWW6mtirGuVUWtiZ6/commits/HEAD'
+HTTP 404
+{"error":"Not found"}
+rows before: [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+rows after:  [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+
+$ curl -s -X GET 'http://127.0.0.1:18883/api/projects/AWCBxWW6mtirGuVUWtiZ6/files'
+HTTP 200
+{"ref":"HEAD","commit":"ed60ead30b6737065d9a21bee3379438d23a7ae8","truncated":false,"files":[{"path":"README.md","type":"blob","size":30}]}
+rows before: [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+rows after:  [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+
+$ curl -s -X GET 'http://127.0.0.1:18883/api/projects/AWCBxWW6mtirGuVUWtiZ6/branches'
+HTTP 200
+{"defaultBranch":"trunk","branches":[{"name":"trunk","isDefault":true}]}
+rows before: [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+rows after:  [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+
+$ curl -s -X GET 'http://127.0.0.1:18883/api/projects/AWCBxWW6mtirGuVUWtiZ6/todos'
+HTTP 200
+[{"id":"KkPF7kNiMJJtMYg2jcezB","teamId":"KPp4XsrWb8DIvxWsOyAiH","projectId":"AWCBxWW6mtirGuVUWtiZ6","title":"Preserve core project work","spec":"Keep this task and its file capabilities.","phase":"todo","phaseAt":1794255044478,"archivedAt":null,"snoozedUntil":null,"snoozeMode":null,"seqNum":1,"orderIndex":0,"tagIds":[],"latestBuildId":null,"lastRunAt":null,"hasChanges":false,"hasPlan":false,"buildHistory":[],"sourceTodo":null,"blockedBy":null,"v":1,"createdBy":"kpY9tzf6FFb5LGVs9mhPY","ownerId":"kpY9tzf6FFb5LGVs9mhPY","sourceBuildId":null,"sourceKind":null,"sourceRef":null,"output":"code","owner":null,"section":"up_next","quotaWait":null}]
+rows before: [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+rows after:  [{"id":"KkPF7kNiMJJtMYg2jcezB","title":"Preserve core project work","projectId":"AWCBxWW6mtirGuVUWtiZ6"}]
+

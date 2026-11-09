@@ -1,0 +1,15 @@
+{
+  "before": "c11c8ca09081ae65fdd1080dd39b0efe25737b24",
+  "testedTree": "d47bd640b1bba4ebb3c8eff0596be1eb83ee8943",
+  "retiredEndpoints": 4,
+  "liveCallsPassed": 11,
+  "mentionsListHasReadme": true,
+  "stored": {
+    "id": "KkPF7kNiMJJtMYg2jcezB",
+    "title": "Preserve core project work",
+    "projectId": "AWCBxWW6mtirGuVUWtiZ6"
+  },
+  "provider": "not exercised",
+  "auth": "off",
+  "surface": "two isolated live stacks"
+}
