@@ -1,4 +1,10 @@
-import type { ChiefNoticeContent, SecretBox, StopActor, UserRecord } from '@cairn/shared';
+import type {
+  ChiefNoticeContent,
+  GitIdentity,
+  SecretBox,
+  StopActor,
+  UserRecord,
+} from '@cairn/shared';
 import {
   CHIEF_NOTICE_KIND,
   createSkillBodySchema,
@@ -81,6 +87,7 @@ import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -295,6 +302,7 @@ export async function executeChiefTool(
     vapidKeys: deps.vapidKeys,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
   const chiefActor: TransitionActor = {
@@ -990,6 +998,7 @@ function buildDeps(deps: ChiefToolDeps) {
     reposDir: deps.reposDir,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     githubFetch: deps.githubFetch,
     oauthClient: deps.oauthClient,
   };

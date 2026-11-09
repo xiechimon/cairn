@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ACCESS_TOKEN_FILE_NAME,
+  appBotIdentity,
   BRAND,
   CLAIM_POLL_INTERVAL_MS,
   CLAUDE_CONFIG_FILE_NAME,
@@ -65,6 +66,7 @@ export const serverConfigSchema = z.object({
   schedulerTickMs: z.number().int().positive(),
   webDir: z.string().nullable(),
   githubAppTokenSocket: z.string().min(1).nullable().default(null),
+  githubAppIdentity: z.object({ name: z.string(), email: z.string() }).nullable().default(null),
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
   requireToken: z.boolean(),
@@ -150,6 +152,23 @@ function expandHome(path: string): string {
   return path === '~' ? homedir() : path.startsWith('~/') ? join(homedir(), path.slice(2)) : path;
 }
 
+function envGithubAppIdentity(tokenSocket: string | null) {
+  const slug = envStr('CAIRN_GITHUB_APP_SLUG');
+  const botId = envStr('CAIRN_GITHUB_APP_BOT_ID');
+  if (slug === null && botId === null) {
+    if (tokenSocket !== null)
+      throw new Error(
+        'CAIRN_APP_TOKEN_SOCKET requires the App commit identity: set CAIRN_GITHUB_APP_SLUG and CAIRN_GITHUB_APP_BOT_ID',
+      );
+    return null;
+  }
+  if (slug === null || botId === null || !/^[1-9]\d*$/.test(botId))
+    throw new Error(
+      'App commit identity half-configured: set CAIRN_GITHUB_APP_SLUG and a numeric CAIRN_GITHUB_APP_BOT_ID, or neither',
+    );
+  return appBotIdentity(slug, Number(botId));
+}
+
 export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
   const home = process.env[ENV_VARS.home] ?? join(homedir(), BRAND.homeDirName);
   const joinedDataDir = join(home, 'server');
@@ -179,6 +198,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       fileToken = parsed;
     }
   }
+  const githubAppTokenSocket = envStr('CAIRN_APP_TOKEN_SOCKET');
   return serverConfigSchema.parse({
     port: envPort() ?? 8787,
     homeDir: home,
@@ -193,7 +213,8 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     claimHoldMs: CLAIM_POLL_INTERVAL_MS,
     schedulerTickMs: 15_000,
     webDir: webDirEnv !== undefined && webDirEnv !== '' ? resolve(webDirEnv) : defaultWebDir(),
-    githubAppTokenSocket: envStr('CAIRN_APP_TOKEN_SOCKET'),
+    githubAppTokenSocket,
+    githubAppIdentity: envGithubAppIdentity(githubAppTokenSocket),
     githubOauth:
       oauthId !== undefined && oauthSecret !== undefined
         ? { clientId: oauthId, clientSecret: oauthSecret }

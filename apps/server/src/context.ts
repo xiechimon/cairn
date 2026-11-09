@@ -1,5 +1,5 @@
 import type { NetworkInterfaceInfo } from 'node:os';
-import type { TeamRecord, UserRecord } from '@cairn/shared';
+import type { GitIdentity, TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { FetchLike } from './lib/github.js';
@@ -22,6 +22,7 @@ export interface RemoteAccessContext {
 
 export interface AppContext {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   remote?: RemoteAccessContext;
   db: Db;
   hub: TeamStreamHub;

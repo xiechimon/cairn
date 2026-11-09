@@ -138,6 +138,7 @@ export async function executeMcpTool(
     vapidKeys: deps.vapidKeys,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     oauthClient: deps.oauthClient,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };

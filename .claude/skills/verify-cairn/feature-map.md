@@ -1084,19 +1084,6 @@ Reach:
 - Backend design: **gap**: not designed
 - Evidence: none
 
-### relay-service
-
-**Relay service** (planned, centrality 4). D104: an optional Cloudflare relay for users who will not sign up for Tailscale, after phase 2.
-
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: [docs/research/cloudflare-control-plane-inventory.md](../../../docs/research/cloudflare-control-plane-inventory.md)
-- Frontend design: **gap**: not designed
-- Backend design: **gap**: not designed; T3 Connect is the named reference
-- Evidence: none
-
 ### thread-tags
 
 **Thread tags** (shipped, centrality 4). The fixed tag vocabulary on threads, set by agents and users.

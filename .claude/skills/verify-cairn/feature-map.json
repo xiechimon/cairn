@@ -80,8 +80,8 @@
     },
     {
       "id": "B12",
-      "title": "Phase 3: relay service and iOS app",
-      "scope": "Work for after phase 2 graduates: the optional Cloudflare relay of D104 and the native iOS app of D22. Research and design only when phase 2 is close."
+      "title": "Phase 3: iOS app",
+      "scope": "Work for after phase 2 graduates: the native iOS app of D22. Research and design only when phase 2 is close."
     }
   ],
   "features": [
@@ -2550,24 +2550,6 @@
         "apps/daemon/test/runner-create-tag.test.ts"
       ],
       "batch": "B11"
-    },
-    {
-      "id": "relay-service",
-      "name": "Relay service",
-      "summary": "D104: an optional Cloudflare relay for users who will not sign up for Tailscale, after phase 2.",
-      "centrality": 4,
-      "status": "planned",
-      "research": [
-        "docs/research/cloudflare-control-plane-inventory.md"
-      ],
-      "frontendDesign": {
-        "gap": "not designed"
-      },
-      "backendDesign": {
-        "gap": "not designed; T3 Connect is the named reference"
-      },
-      "evidence": [],
-      "batch": "B12"
     },
     {
       "id": "ios-app",

@@ -1,6 +1,7 @@
 import {
   GITHUB_CONNECTION_OAUTH,
   type GithubConnectionStatus,
+  type GitIdentity,
   type SecretBox,
 } from '@cairn/shared';
 import { eq, isNull } from 'drizzle-orm';
@@ -22,6 +23,7 @@ export interface GithubConnectionDeps {
 export interface GithubTokenDeps {
   db: Db;
   githubAppTokenSocket?: string | null;
+  githubAppIdentity?: GitIdentity | null | undefined;
   box?: SecretBox | undefined;
   githubFetch?: FetchLike | undefined;
   oauthClient?: OAuthClientConfig | null | undefined;

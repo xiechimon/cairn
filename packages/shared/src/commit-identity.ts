@@ -24,6 +24,7 @@ export interface CommitFacts {
 }
 
 const COMMIT_HELPER = '~/.cairn/tools/app-token/as-bot.sh git commit';
+const LOCAL_COMMIT_EMAIL = 'cairn@localhost';
 
 export function githubNoreplyEmail(account: GithubAccount): string {
   return `${account.id}+${account.login}@users.noreply.github.com`;
@@ -37,7 +38,7 @@ export function appBotIdentity(appSlug: string, botUserId: number): GitIdentity 
 }
 
 export function localCommitIdentity(name: string): GitIdentity {
-  return { name, email: 'cairn@localhost' };
+  return { name, email: LOCAL_COMMIT_EMAIL };
 }
 
 export function policyBotIdentity(policy: CommitIdentityPolicy): GitIdentity {
@@ -113,6 +114,11 @@ export function localCommitViolation(
   env: Record<string, string | undefined>,
 ): string | null {
   const bot = policyBotIdentity(policy);
+  const local = [author, committer].find(
+    (identity) => identity.email.toLowerCase() === LOCAL_COMMIT_EMAIL,
+  );
+  if (local)
+    return `${describe(local)} is the identity of a cairn server without a GitHub App identity: set CAIRN_GITHUB_APP_SLUG and CAIRN_GITHUB_APP_BOT_ID on the server, or commit as ${bot.name} with ${COMMIT_HELPER}`;
   if (isAgentEnvironment(policy, env)) {
     if (sameIdentity(author, bot) && sameIdentity(committer, bot)) return null;
     return `agent sessions commit as ${bot.name}, not ${describe(author)}: run ${COMMIT_HELPER} ...`;
