@@ -1,0 +1,354 @@
+[
+  {
+    "state": "input",
+    "theme": "light",
+    "width": 1440,
+    "image": "input-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "working",
+    "theme": "light",
+    "width": 1440,
+    "image": "working-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "clarify",
+    "theme": "light",
+    "width": 1440,
+    "image": "clarify-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "proposed",
+    "theme": "light",
+    "width": 1440,
+    "image": "proposed-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "applied",
+    "theme": "light",
+    "width": 1440,
+    "image": "applied-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "undone",
+    "theme": "light",
+    "width": 1440,
+    "image": "undone-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-run",
+    "theme": "light",
+    "width": 1440,
+    "image": "error-run-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-conflict",
+    "theme": "light",
+    "width": 1440,
+    "image": "error-conflict-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "offline",
+    "theme": "light",
+    "width": 1440,
+    "image": "offline-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-input",
+    "theme": "light",
+    "width": 1440,
+    "image": "detail-input-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-proposed",
+    "theme": "light",
+    "width": 1440,
+    "image": "detail-proposed-light-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "input",
+    "theme": "dark",
+    "width": 1440,
+    "image": "input-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "working",
+    "theme": "dark",
+    "width": 1440,
+    "image": "working-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "clarify",
+    "theme": "dark",
+    "width": 1440,
+    "image": "clarify-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "proposed",
+    "theme": "dark",
+    "width": 1440,
+    "image": "proposed-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "applied",
+    "theme": "dark",
+    "width": 1440,
+    "image": "applied-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "undone",
+    "theme": "dark",
+    "width": 1440,
+    "image": "undone-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-run",
+    "theme": "dark",
+    "width": 1440,
+    "image": "error-run-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-conflict",
+    "theme": "dark",
+    "width": 1440,
+    "image": "error-conflict-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "offline",
+    "theme": "dark",
+    "width": 1440,
+    "image": "offline-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-input",
+    "theme": "dark",
+    "width": 1440,
+    "image": "detail-input-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-proposed",
+    "theme": "dark",
+    "width": 1440,
+    "image": "detail-proposed-dark-1440.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "input",
+    "theme": "light",
+    "width": 390,
+    "image": "input-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "working",
+    "theme": "light",
+    "width": 390,
+    "image": "working-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "clarify",
+    "theme": "light",
+    "width": 390,
+    "image": "clarify-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "proposed",
+    "theme": "light",
+    "width": 390,
+    "image": "proposed-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "applied",
+    "theme": "light",
+    "width": 390,
+    "image": "applied-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "undone",
+    "theme": "light",
+    "width": 390,
+    "image": "undone-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-run",
+    "theme": "light",
+    "width": 390,
+    "image": "error-run-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-conflict",
+    "theme": "light",
+    "width": 390,
+    "image": "error-conflict-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "offline",
+    "theme": "light",
+    "width": 390,
+    "image": "offline-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-input",
+    "theme": "light",
+    "width": 390,
+    "image": "detail-input-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-proposed",
+    "theme": "light",
+    "width": 390,
+    "image": "detail-proposed-light-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "input",
+    "theme": "dark",
+    "width": 390,
+    "image": "input-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "working",
+    "theme": "dark",
+    "width": 390,
+    "image": "working-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "clarify",
+    "theme": "dark",
+    "width": 390,
+    "image": "clarify-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "proposed",
+    "theme": "dark",
+    "width": 390,
+    "image": "proposed-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "applied",
+    "theme": "dark",
+    "width": 390,
+    "image": "applied-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "undone",
+    "theme": "dark",
+    "width": 390,
+    "image": "undone-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-run",
+    "theme": "dark",
+    "width": 390,
+    "image": "error-run-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "error-conflict",
+    "theme": "dark",
+    "width": 390,
+    "image": "error-conflict-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "offline",
+    "theme": "dark",
+    "width": 390,
+    "image": "offline-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-input",
+    "theme": "dark",
+    "width": 390,
+    "image": "detail-input-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  },
+  {
+    "state": "detail-proposed",
+    "theme": "dark",
+    "width": 390,
+    "image": "detail-proposed-dark-390.png",
+    "axeViolations": 0,
+    "overflow": false
+  }
+]
