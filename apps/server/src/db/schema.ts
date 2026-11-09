@@ -146,6 +146,7 @@ export const todo = sqliteTable(
       .references(() => project.id),
     title: text('title').notNull(),
     spec: text('spec').notNull().default(''),
+    correctionRequired: bool('correctionRequired').notNull().default(false),
     phase: text('phase').$type<Phase>().notNull().default('todo'),
     phaseAt: epochMs('phaseAt').notNull(),
     archivedAt: epochMs('archivedAt'),

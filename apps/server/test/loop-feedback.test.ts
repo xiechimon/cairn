@@ -487,12 +487,8 @@ describe('correction loop', () => {
   test.each(['building', 'queued'] as const)(
     'Coordinator cannot complete an unguarded correction from %s',
     async (phase) => {
-      const { s, deps, task, projectId } = await world();
-      const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-        name: 'correction',
-        color: '#000000',
-      });
-      updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+      const { s, deps, task } = await world();
+      s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
       s.db.update(todo).set({ phase }).where(eq(todo.id, task.id)).run();
       const result = transitionTodos(deps, s.team.id, [task.id], 'done', {
         kind: 'agent',
@@ -515,13 +511,8 @@ describe('correction loop', () => {
   test.each(['internal', 'manual'] as const)(
     'a correction can be abandoned through the %s phase path without a guard',
     async (path) => {
-      const { s, deps, task, projectId } = await world();
-      const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-        name: 'correction',
-        color: '#000000',
-      });
-      const label = (await res.json()) as { id: string };
-      updateTodo(deps, task.id, { tagIds: [label.id] });
+      const { s, deps, task } = await world();
+      s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
       const closed =
         path === 'manual'
           ? updateTodo(deps, task.id, { phase: 'closed' }, { manualPhase: true })
@@ -531,12 +522,8 @@ describe('correction loop', () => {
   );
 
   test('merged correction reconciliation settles once with one merge row and one completion row without a guard', async () => {
-    const { s, deps, task, projectId } = await world();
-    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      name: 'correction',
-      color: '#000000',
-    });
-    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    const { s, deps, task } = await world();
+    s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
     const gh = mergeGithubFake({ 42: { state: 'closed', merged: true } }, () =>
       conversationBranch('build-feedback'),
     );
@@ -552,12 +539,8 @@ describe('correction loop', () => {
   });
 
   test('the API merge gate rejects an unguarded correction before any GitHub merge request', async () => {
-    const { s, deps, task, projectId } = await world();
-    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      name: 'correction',
-      color: '#000000',
-    });
-    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    const { s, deps, task } = await world();
+    s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
     const gh = mergeGithubFake({ 42: { state: 'open', merged: false } }, () =>
       conversationBranch('build-feedback'),
     );
@@ -580,12 +563,8 @@ describe('correction loop', () => {
   });
 
   test('the API correction merge completes after GitHub merges even if guard proof disappears during settlement', async () => {
-    const { s, deps, task, projectId } = await world();
-    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      name: 'correction',
-      color: '#000000',
-    });
-    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    const { s, deps, task } = await world();
+    s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
     const checkpoint = '1a2b3c4d'.repeat(5);
     s.db
       .insert(step)
@@ -617,12 +596,8 @@ describe('correction loop', () => {
   });
 
   test('post-merge completion does not reapply the correction guard', async () => {
-    const { s, deps, task, projectId } = await world();
-    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      name: 'correction',
-      color: '#000000',
-    });
-    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    const { s, deps, task } = await world();
+    s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
     expect(() => finishTodoDone(deps, task.id, 'build-feedback')).not.toThrow();
     expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe('done');
   });
@@ -683,13 +658,8 @@ describe('correction loop', () => {
   test.each(['checkpoint', 'ahead'] as const)(
     'a passing gate at the %s head permits completion when the daemon diff is unavailable',
     async (position) => {
-      const { s, deps, task, projectId } = await world();
-      const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-        name: 'correction',
-        color: '#000000',
-      });
-      const label = (await res.json()) as { id: string };
-      updateTodo(deps, task.id, { tagIds: [label.id] });
+      const { s, deps, task } = await world();
+      s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
       const checkpoint = 'a'.repeat(40);
       const head = position === 'ahead' ? 'b'.repeat(40) : checkpoint;
       s.db
@@ -736,14 +706,8 @@ describe('correction loop', () => {
   );
 
   test('manual done requires gate proof even when a delivered diff contains a test or legacy added status', async () => {
-    const { s, deps, task, projectId } = await world();
-    const imported = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      name: 'correction',
-      color: '#000000',
-    });
-    expect(imported.status).toBe(201);
-    const correctionTag = (await imported.json()) as { id: string };
-    updateTodo(deps, task.id, { tagIds: [correctionTag.id] });
+    const { s, deps, task } = await world();
+    s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
     expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
       /test or gate/,
     );

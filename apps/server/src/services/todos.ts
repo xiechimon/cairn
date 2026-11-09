@@ -279,6 +279,17 @@ export function getTodo<D extends Pick<TodoDeps, 'db'>>(deps: D, id: string): To
   return row ? toTodoRecord(deps, row) : null;
 }
 
+function correctionFromTags(db: Db, tagIds: string[]): boolean {
+  if (tagIds.length === 0) return false;
+  return (
+    db
+      .select({ id: tag.id })
+      .from(tag)
+      .where(and(inArray(tag.id, tagIds), eq(sql`lower(${tag.name})`, 'correction')))
+      .get() !== undefined
+  );
+}
+
 function assertTagsInProject(db: Db, projectId: string, tagIds: readonly string[]): void {
   if (tagIds.length === 0) return;
   const owned = new Set(
@@ -312,6 +323,7 @@ export function createAutonomousTodo(
     title: string;
     spec: string;
     tagIds?: string[];
+    correctionRequired?: boolean;
     createdBy: string | null;
     ownerId: string | null;
     sourceKind?: TodoSourceKind;
@@ -348,6 +360,7 @@ export function createAutonomousTodo(
       projectId: input.projectId,
       title,
       spec: input.spec,
+      correctionRequired: input.correctionRequired ?? correctionFromTags(db, tagIds),
       phase: 'todo',
       phaseAt: now,
       seqNum,
@@ -427,6 +440,8 @@ export function updateAutonomousTodo(
       ? planProjectMove(deps, row, patch.projectId, patch.tagIds ?? [])
       : null;
   if (move !== null) Object.assign(sets, move.sets);
+  if (patch.tagIds !== undefined) sets.correctionRequired = correctionFromTags(db, patch.tagIds);
+  else if (move !== null) sets.correctionRequired = false;
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
