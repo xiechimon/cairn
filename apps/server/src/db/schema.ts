@@ -113,6 +113,7 @@ export const autonomyPause = sqliteTable(
 export const project = sqliteTable('project', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  group: text('group'),
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
