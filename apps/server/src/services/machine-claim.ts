@@ -586,6 +586,7 @@ async function tryClaim(
         seqNum: cand.todoRow.seqNum,
         title: cand.todoRow.title,
         spec: cand.todoRow.spec,
+        ...(cand.todoRow.decisions.length > 0 ? { decisions: cand.todoRow.decisions } : {}),
         ...(taskMeta !== undefined ? { meta: taskMeta } : {}),
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,

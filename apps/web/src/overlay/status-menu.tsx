@@ -21,6 +21,7 @@ const NEXT_NOTE: Record<Phase, string> = {
   planning: '方案写好后，Agent 会把它移到确认方案。',
   confirm: '你确认方案后，Agent 开始构建。',
   building: '构建完成后，Agent 会把它移到审核。',
+  needs_input: '它在等一个问题的回答，回答后会在同一个会话里继续。',
   review: '审核无误后，你可以把它标记为已完成。',
   done: '任务已完成，发送消息即可继续。',
   failed: '这次运行失败了，可以重跑，或移回待开始。',

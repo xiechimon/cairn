@@ -372,6 +372,10 @@ export const EN: Record<string, string> = {
   '你确认方案后，Agent 开始构建。': 'The agent starts building once you confirm the plan.',
   '构建完成后，Agent 会把它移到审核。': 'The agent moves it to Review when the build is done.',
   '审核无误后，你可以把它标记为已完成。': 'Mark it done once the review looks right.',
+  '它在等一个问题的回答，回答后会在同一个会话里继续。':
+    'It is waiting for an answer to its question; once answered it continues in the same session.',
+  待回答: 'Needs input',
+  '回答它的问题…': 'Answer its question…',
   '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
   '这次运行失败了，可以重跑，或移回待开始。':
     'This run failed. Rerun it, or move it back to To start.',
