@@ -78,7 +78,11 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
   };
 
   const body = (() => {
-    if (live && memoriesQ.data === undefined && memoriesQ.isError) {
+    if (
+      live &&
+      ((memoriesQ.data === undefined && memoriesQ.isError) ||
+        (projectsQ.data === undefined && projectsQ.isError))
+    ) {
       return (
         <div role="alert" className="mt-2 flex items-center gap-3 border-y border-border py-3">
           <p className="min-w-0 flex-1 text-ui text-foreground">
@@ -86,15 +90,15 @@ export function MemoryTab({ live, teamId }: { live: boolean; teamId: string | un
           </p>
           <Button
             variant="outline"
-            disabled={memoriesQ.isFetching}
-            onClick={() => void memoriesQ.refetch()}
+            disabled={memoriesQ.isFetching || projectsQ.isFetching}
+            onClick={() => void Promise.all([memoriesQ.refetch(), projectsQ.refetch()])}
           >
             {t('重试')}
           </Button>
         </div>
       );
     }
-    if (live && memoriesQ.data === undefined) {
+    if (live && (memoriesQ.data === undefined || projectsQ.data === undefined)) {
       return (
         <div role="status" aria-label={t('正在加载记忆')} className="mt-2">
           <Skeleton className="mx-3 mt-4 mb-2 h-4 w-12" />

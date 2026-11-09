@@ -23,8 +23,6 @@ async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Loc
 
   const box = await probe.boundingBox();
   if (box == null) throw new Error('probe element has no box (not rendered?)');
-  // Aim near the probe's top: a tall probe (the 60-line charter) centers
-  // below the viewport, in the 10px canvas gap under the sheet.
   await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 10));
   await page.mouse.wheel(0, 240);
   await expect
@@ -147,10 +145,11 @@ test('all three long-content tabs of chief settings scroll to the bottom (#1032)
   await page.route('**/api/teams/team-1/memories', (route) =>
     route.fulfill({ json: MEMORIES }),
   );
+  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await openChiefSettings(page);
 
   await page.getByRole('tab', { name: '记忆' }).click();
-  const quota = page.getByText('记忆 · 40 / 100');
+  const quota = page.getByText('已存 40 条，上限 100 条 · 不是每条都会自动注入');
   await expect(quota).toBeVisible();
   await expectScrollerReachesBottom(page, quota, page.getByText('记忆条目 39'));
 

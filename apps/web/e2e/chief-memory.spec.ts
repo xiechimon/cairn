@@ -41,11 +41,17 @@ const MEMORIES = [
 
 type ListReply = 'ok' | 'fail' | 'hang';
 
-async function openMemory(page: Page, options: { list?: ListReply; deleteFails?: boolean; memories?: typeof MEMORIES } = {}) {
+async function openMemory(page: Page, options: { list?: ListReply; projects?: ListReply; deleteFails?: boolean; memories?: typeof MEMORIES } = {}) {
   const memories = structuredClone(options.memories ?? MEMORIES);
   const deleted: string[] = [];
   let listReply = options.list ?? 'ok';
+  let projectsReply = options.projects ?? 'ok';
   await mockLive(page, { threads: [THREAD], messages: [], projects: PROJECTS }, (p, route: Route, json) => {
+    if (p === '/api/projects') {
+      if (projectsReply === 'hang') return new Promise<void>(() => {});
+      if (projectsReply === 'fail') return json({ error: 'boom' }, 500);
+      return json(PROJECTS);
+    }
     if (p === '/api/teams/t1/memories') {
       if (listReply === 'hang') return new Promise<void>(() => {});
       if (listReply === 'fail') return json({ error: 'boom' }, 500);
@@ -69,6 +75,7 @@ async function openMemory(page: Page, options: { list?: ListReply; deleteFails?:
     deleted,
     recover: () => {
       listReply = 'ok';
+      projectsReply = 'ok';
     },
   };
 }
@@ -224,4 +231,32 @@ test('on a phone each row is two lines and nothing scrolls sideways', async ({ p
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await settled(page);
   await evidenceShot(page, 'memory-list-phone.png');
+});
+
+test('project loading keeps memories in the loading state without claiming projects were removed', async ({ page }) => {
+  await openMemory(page, { projects: 'hang' });
+  await expect(page.getByText('已存 5 条，上限 100 条 · 不是每条都会自动注入')).toBeVisible();
+  await expect(page.getByRole('status', { name: '正在加载记忆' })).toBeVisible();
+  await expect(page.getByTestId('memory-list')).toHaveCount(0);
+  await expect(page.getByText('已移除的项目')).toHaveCount(0);
+  await evidenceShot(page, 'memory-project-loading.png');
+});
+
+test('project lookup failure offers retry and recovers the list with real project names', async ({ page }) => {
+  const control = await openMemory(page, { projects: 'fail' });
+  const alert = page.getByRole('alert').filter({ hasText: '记忆没有加载出来，请重试。' });
+  await expect(alert).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('memory-list')).toHaveCount(0);
+  await expect(page.getByText('已移除的项目')).toHaveCount(0);
+  await evidenceShot(page, 'memory-project-error.png');
+  control.recover();
+  await alert.getByRole('button', { name: '重试' }).click();
+  await expect(page.getByTestId('memory-list').getByRole('heading', { name: /Field Notes/ })).toBeVisible();
+  await memoryRow(page, '无障碍检查').click();
+  await expect(page.getByRole('dialog').getByText('Field Notes · 核心')).toBeVisible();
+});
+
+test('a project absent from a successful lookup is still shown as removed', async ({ page }) => {
+  await openMemory(page, { memories: [row('m-gone', '保留的记忆', '仍可查看。', 'removed', NOV_8)] });
+  await expect(page.getByTestId('memory-list').getByRole('heading', { name: /已移除的项目/ })).toBeVisible();
 });
