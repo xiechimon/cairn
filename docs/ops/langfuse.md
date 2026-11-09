@@ -191,6 +191,8 @@ pnpm traj:shadow --since-hours 2 --settle-minutes 30
 
 It looks at units that ended between `since-hours + settle-minutes` and `settle-minutes` ago, skips units that already have a digest, and prints `units= digests= skipped_already_digested= cost_scores= question_units=`. `--dry-run` writes nothing. Run it at least as often as `--since-hours`; overlapping windows are safe.
 
+On omarchy the systemd user timer `cairn-langfuse-shadow.timer` runs it hourly from the deployed checkout `~/Code/AgentProjects/cairn-exec` with `--since-hours 2 --settle-minutes 30`. The service reads its variables from `~/.config/cairn/langfuse-shadow.env` (mode 600) and appends to `~/.local/state/cairn-langfuse/shadow.log`.
+
 The digest is the input of the `step digest` observation, at most 6,000 characters (about 1.5k tokens; generation inputs average 119k tokens, so the judges never see a raw trace). It holds the task title, the outcome and error, the last 12 phase transitions of the trace, idle minutes after the unit or the gap to the next one, counts computed in code (tool calls, tool errors, edits, the largest number of identical calls and identical failures, cost), the last 15 tool calls with errors, and the text of `ask_user` questions. It passes through `redactSecrets`. Its metadata carries `unit` and `has_owner_question`.
 
 Scores written by the job (source `API`, attached to the unit's span):
@@ -223,7 +225,7 @@ COMPOSE_PROFILES=egress-relay
 LANGFUSE_LLM_HTTPS_PROXY=http://egress-relay:3128
 ```
 
-Hosts with direct access leave both empty. `EGRESS_UPSTREAM` (default `127.0.0.1:7890`) and `EGRESS_ALLOW` (default `api.anthropic.com:443`) adjust the relay. A refused target appears in `docker compose logs egress-relay` as `egress relay refused: <host:port>`.
+Hosts with direct access leave both empty. `EGRESS_UPSTREAM` (default `127.0.0.1:7890`) and `EGRESS_ALLOW` (default `api.anthropic.com:443`) adjust the relay. A refused target appears in `docker compose logs egress-relay` as `egress relay refused: <host:port>`. The relays run as root with every capability dropped except `DAC_READ_SEARCH`, so they can read the mounted script even when the checkout was written with umask 077, as the deployed checkout is. Bring the stack up from the deployed checkout so the mount survives worktree cleanup: `docker compose -f ~/Code/AgentProjects/cairn-exec/ops/langfuse/docker-compose.yml --env-file ~/Code/AgentProjects/cairn/ops/langfuse/.env up -d`.
 
 ## Claude Code runtime tool traces (#2269)
 

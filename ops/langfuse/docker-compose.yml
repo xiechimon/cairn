@@ -46,6 +46,7 @@ x-egress-relay: &egress-relay
   user: "0:0"
   read_only: true
   cap_drop: [ALL]
+  cap_add: [DAC_READ_SEARCH]
   security_opt: [no-new-privileges:true]
   logging: *default-logging
 
