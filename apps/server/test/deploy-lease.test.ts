@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { machine, step } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import {
@@ -114,4 +114,20 @@ test('a pending long poll rechecks the drain lease after waking', async () => {
   expect(await pending).toBeNull();
   await req(s.app, 'DELETE', path, { owner: lease.owner });
   expect(await claim()).not.toBeNull();
+});
+
+test('lease release wakes a pending claim poll immediately for queued work', async () => {
+  const { s, enqueue, claim } = await claimWorld();
+  const waiting = vi.spyOn(s.machineHub, 'waitWake');
+  const pending = claim(75_000);
+  await vi.waitFor(() => expect(waiting).toHaveBeenCalled());
+  await req(s.app, 'PUT', path, lease);
+  const wake = vi.spyOn(s.machineHub, 'wake').mockImplementation(() => {});
+  try {
+    await enqueue();
+  } finally {
+    wake.mockRestore();
+  }
+  expect((await req(s.app, 'DELETE', path, { owner: lease.owner })).status).toBe(200);
+  expect(await pending).not.toBeNull();
 });

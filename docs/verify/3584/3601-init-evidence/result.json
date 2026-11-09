@@ -1,0 +1,9 @@
+{
+  "finding": "Inherited-lease deadlock: PID 1 omitted from ancestor traversal",
+  "review": "https://github.com/xiechimon/cairn/pull/3601#discussion_r4511373608",
+  "red": "2 failed on bc52c7597227bd81f330242bcd627e70e3ab41f9",
+  "green": "2 passed; related run 61 passed, 2 unavailable systemd-scope cases skipped",
+  "live": "Real admission, private slot directory and live Unix socket",
+  "mocked": "Linux parent field rewritten to PID 1; unit process table",
+  "notCovered": "Native PID-namespace init execution"
+}

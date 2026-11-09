@@ -233,7 +233,12 @@ const sql = (query) => execFileSync('sqlite3', ['${db}', query], { encoding: 'ut
 let status = 200;
 let row = JSON.parse(sql("select json_object('owner',owner,'status',status,'expiresAt',expiresAt) from deploy_lease where id='server'") || '{"owner":null,"status":"accepting","expiresAt":0}');
 if (existsSync('${fake}/lease-unsupported')) status = 404;
-else if (method === 'PUT') {
+else if (method === 'DELETE' && existsSync('${fake}/lease-delete-fail')) status = 503;
+else if (method === 'DELETE' && row.owner === JSON.parse(value('--data-binary')).owner) {
+  row = { ...row, status: 'accepting', expiresAt: 0 };
+  sql("update deploy_lease set status='accepting',expiresAt=0 where id='server'");
+  writeFileSync('${fake}/claims-woken', '');
+} else if (method === 'PUT') {
   const body = JSON.parse(value('--data-binary'));
   row = { owner: body.owner, status: 'draining', expiresAt: Date.now() + body.ttlMs };
   sql("insert or replace into deploy_lease values ('server','" + row.owner + "','draining'," + row.expiresAt + ")");
@@ -987,6 +992,7 @@ test('server-only deploys under continuous active work without stopping either d
       'apps/server/src/probe.ts': 'export {};\n',
       '.claude/skills/verify-cairn/feature-map.json': '{}\n',
       'packages/shared/src/tables.ts': 'export const DB_TABLES = ["deploy_lease"];\n',
+      'packages/shared/test/__snapshots__/snapshot.test.ts.snap': 'table registry snapshot\n',
       'marker.txt': 'previous\n',
     },
   });
@@ -1152,3 +1158,16 @@ test('bounded drain timeout resumes claims without stopping services and names s
   assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
   assert.equal(f.log('systemctl.log'), '');
 });
+
+for (const unavailable of [false, true]) {
+  test(`failed drain releases claims and wakes pending polls when HTTP is available=${!unavailable}`, () => {
+    const f = fixture({ claimed: 1 });
+    if (unavailable) writeFileSync(join(f.fake, 'lease-delete-fail'), '');
+    const result = f.run(DEPLOY, [pushTarget(f)]);
+    assert.equal(result.status, 75, result.stderr);
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+    assert.equal(existsSync(join(f.fake, 'claims-woken')), !unavailable);
+    assert.equal(existsSync(join(f.state, 'lease-owner')), false);
+    assert.equal(f.log('systemctl.log'), '');
+  });
+}

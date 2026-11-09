@@ -118,9 +118,15 @@ echo $$ >"$LOCK/pid"
 RUNTIME=daemon
 LEASE_OWNER=""
 
+lease_request() {
+  curl -sS --noproxy '*' --max-time 10 -o "$STATE/lease-response" -w '%{http_code}' \
+    -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
+}
+
 resume_claims() {
   [ -n "$LEASE_OWNER" ] || return 0
   [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || return 1
+  lease_request -X DELETE --data-binary "{\"owner\":\"$LEASE_OWNER\"}" >/dev/null 2>&1 || true
   local tables
   tables="$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" || return 1
   if [ "$tables" = 1 ]; then
@@ -276,16 +282,12 @@ classify_runtime() {
   while IFS= read -r path; do
     case "$path" in
       *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
-      apps/server/* | apps/web/* | integration/test/* | docs/* | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
+      apps/server/* | apps/web/* | integration/test/* | docs/* | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
       *) RUNTIME=daemon ;;
     esac
   done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")
 }
 
-lease_request() {
-  curl -sS --noproxy '*' --max-time 10 -o "$STATE/lease-response" -w '%{http_code}' \
-    -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
-}
 
 assert_lease() {
   python3 - "$STATE/lease-response" "$LEASE_OWNER" <<'PYLEASE'

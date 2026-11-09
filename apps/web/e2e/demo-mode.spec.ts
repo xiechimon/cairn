@@ -89,8 +89,8 @@ test('banner: 演示数据 + site and showcase links, bilingual, survives naviga
   );
 
   await page.getByTestId('sidebar-settings').click();
-  await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '团队' }).click();
-  await expect(page).toHaveURL(/\/app\/settings\/team$/);
+  await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '规则与策略' }).click();
+  await expect(page).toHaveURL(/\/app\/settings\/work-routing$/);
   await expect(banner).toBeVisible();
   await expect(banner).toBeInViewport();
 

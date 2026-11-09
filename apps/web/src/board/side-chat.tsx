@@ -230,7 +230,9 @@ function ThreadBody({
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}
-          spec={todo.spec.trim() !== '' ? todo.spec : undefined}
+          spec={todo.spec.trim() !== '' && !chat.hasEarlier ? todo.spec : undefined}
+          hasEarlier={chat.hasEarlier}
+          {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
           autoScroll={chat.transcript.length > 0}
           running={threadStatus(todo) === 'running'}
           settled={chat.transcriptSettled}

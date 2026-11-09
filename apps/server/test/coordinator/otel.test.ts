@@ -61,7 +61,7 @@ describe('in-server Coordinator telemetry', () => {
     const turn = spans.find((s) => s.name === 'coordinator turn');
     const chats = spans.filter((s) => s.name === 'chat m');
     const tools = spans.filter((s) => s.name === 'execute_tool todos');
-    expect(attr(turn as Span, 'langfuse.session.id')).toBe(w.threadId);
+    expect(attr(turn as Span, 'session.id')).toBe(w.threadId);
     expect(chats).toHaveLength(2);
     expect(tools).toHaveLength(1);
     for (const child of [...chats, ...tools]) {

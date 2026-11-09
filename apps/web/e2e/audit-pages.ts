@@ -77,7 +77,6 @@ export const PAGES: AuditPage[] = [
     url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
     ready: (p) => p.locator('.prj-set-avatar'),
   },
-  { name: 'team', url: '/app/team?scenario=12', ready: (p) => p.getByTestId('team-agents-removed') },
   {
     name: 'machines',
     url: '/app/settings/machines?scenario=06',
