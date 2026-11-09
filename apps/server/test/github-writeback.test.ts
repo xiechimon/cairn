@@ -949,6 +949,42 @@ describe('a self-created issue follows its task when the task stops (#3418 lifec
     s.dispose();
   });
 
+  test('a creation retry that succeeds after the task was cancelled closes the new issue', async () => {
+    const mock = lifecycleMock();
+    mock.set(`POST ${ISSUES_PATH}`, { status: 404, body: { message: 'no' } });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await flushSelfIssueWrites();
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { phase: 'closed' } });
+    await flushSelfIssueWrites();
+    mock.set(`POST ${ISSUES_PATH}`, { status: 201, body: CREATED_ISSUE });
+    const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
+    expect(retry.status).toBe(200);
+    await flushSelfIssueWrites();
+    expect(closes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
+    expect(comments(mock)).toEqual(['Cairn：这个任务已取消，这里的 issue 关闭（未计划）。']);
+    s.dispose();
+  });
+
+  test('resetting a cancelled started task reopens its issue', async () => {
+    const mock = lifecycleMock();
+    const { s, id } = await startedTask(mock);
+    s.db.update(todoTable).set({ lastRunAt: 5 }).where(eq(todoTable.id, id)).run();
+    await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'closed' } });
+    await flushSelfIssueWrites();
+    mock.set(`GET ${issuePath(101)}`, { status: 200, body: { ...CREATED_ISSUE, state: 'closed' } });
+    const reset = await call(s.app, 'POST', `/api/todos/${id}/reset`, { body: {} });
+    expect(reset.status).toBeLessThan(300);
+    await flushSelfIssueWrites();
+    expect(closes(mock)).toEqual([
+      { state: 'closed', state_reason: 'not_planned' },
+      { state: 'open', state_reason: 'reopened' },
+    ]);
+    s.dispose();
+  });
+
   test('an imported issue is never closed when its task is cancelled', async () => {
     const mock = lifecycleMock();
     const { s, id } = await startedTask(mock);

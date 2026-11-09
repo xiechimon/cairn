@@ -720,6 +720,7 @@ export function resetTodo(
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
+  scheduleSelfIssueSettle(deps, row, getRow(deps, id) ?? null);
   return { stale: false, record };
 }
 
@@ -952,6 +953,16 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     .run();
   const record = getTodo(deps, todoId);
   if (record) hub.publishTodoDoc(record.teamId, record);
+  const linked = getRow(deps, todoId);
+  if (linked !== undefined && isShelved(linked) && !issueSettleChains.has(todoId)) {
+    const close = selfIssueSettleOf(
+      deps,
+      { ...linked, phase: 'todo', archivedAt: null },
+      linked,
+      undefined,
+    );
+    if (close !== null && close !== 'reopen') await settleIssue(deps, linked.teamId, ref, close);
+  }
   if (replaced !== null && row.sourceRef !== null) {
     await settleIssue(deps, row.teamId, row.sourceRef, {
       stateReason: 'not_planned',
