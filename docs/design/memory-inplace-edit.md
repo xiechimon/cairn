@@ -31,10 +31,10 @@ Reverting (`把刚才的改回去`), moving a fact between team and project, and
 | `searchable`, `log` rows | Memory files `<name>.md` in their scope | Never; read through `memories` |
 | `scratchpad` rows | Unchanged | With the matching thread |
 
-The table stays `agent_memory`, with layers `index`, `file` and `scratchpad`:
+The table stays `agent_memory`. The existing layer names are kept to avoid a schema change (#3695): `core` holds `MEMORY.md`, `searchable` holds memory files, `scratchpad` is unchanged, and `log` is retired into files.
 
-- One valid `index` row per (team, project), titled `MEMORY.md`.
-- A `file` row's title is its file name, unique among valid files in its scope.
+- One valid `core` row per (team, project, independent owner), titled `MEMORY.md`.
+- A `searchable` row's title is its file name, unique among valid files in its scope.
 - Every content change keeps the versioning that exists today: a successor row plus `history`, with the predecessor invalidated in one transaction. A stale base returns 409.
 
 **No size limit for the owner.** There is no cap, counter or save rejection anywhere in the product, and no limit text on the page. Keeping `MEMORY.md` short is the model's job, as in Claude Code.
@@ -94,7 +94,7 @@ Ours mirrors that, model-facing only:
 | Settings `GET …/memories` | Valid team rows | `MEMORY.md` per scope, plus files with name, first line and `updatedAt`. |
 | Settings Delete | Hard delete of a row | Hard delete of a file and its versions (explicit erasure), with a confirmation. |
 | Settings Promote | In-place `projectId` change | Deleted; `update_memory` `moveTo`. |
-| Project deletion | Rows remain orphaned | The project's `MEMORY.md` and files are deleted with the project. |
+| Project deletion | Project rows move to the team | Kept as today: files move to the team, and the project `MEMORY.md` merges into the team one (#3695). |
 
 ## 5. Migration (one transaction per team, idempotent)
 
