@@ -5,6 +5,7 @@ import { and, eq, like } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
+  chiefThread,
   gateState,
   notification,
   plan as planTable,
@@ -14,7 +15,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import type { BuildDeps } from '../src/services/builds.js';
-import { transitionTodos } from '../src/services/chief-tools.js';
+import { executeChiefTool, transitionTodos } from '../src/services/chief-tools.js';
 import { listNeedsYou } from '../src/services/needs-you.js';
 import { reconcileOwners, seedOwnerCheckpoints } from '../src/services/owner.js';
 import { parkFailedBuild } from '../src/services/retry-parking.js';
@@ -557,6 +558,108 @@ describe('a Coordinator turn that changes nothing hands the task to the owner (t
     expect(ownerNow(w)).toBe('owner');
     expect(wakeStep(w).map((row) => row.status)).toEqual(['stopped']);
   });
+
+  test.each(['pending', 'waiting_quota'] as const)(
+    'cancelling the last %s wake clears busy state and publishes the stopped step',
+    (status) => {
+      const w = failedWorld();
+      const wake = wakeStep(w)[0]!;
+      w.s.db
+        .update(stepTable)
+        .set({ status, createdAt: nowMs() - 31 * 60_000 })
+        .where(eq(stepTable.id, wake.id))
+        .run();
+      const publish = vi.spyOn(w.s.convHub, 'publishStep');
+      reconcileOwners(w.deps);
+      expect(
+        w.s.db.select().from(chiefThread).where(eq(chiefThread.id, wake.buildId)).get()?.activeRun,
+      ).toBeNull();
+      expect(publish).toHaveBeenCalledWith(
+        wake.buildId,
+        expect.objectContaining({ id: wake.id, status: 'stopped' }),
+      );
+    },
+  );
+
+  test('cancelling a stale wake keeps an active sibling busy', () => {
+    const w = failedWorld();
+    const wake = wakeStep(w)[0]!;
+    w.s.db
+      .update(stepTable)
+      .set({ createdAt: nowMs() - 31 * 60_000 })
+      .where(eq(stepTable.id, wake.id))
+      .run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: newRecordId(),
+        buildId: wake.buildId,
+        kind: 'chief',
+        status: 'claimed',
+        createdAt: nowMs(),
+        claimedAt: nowMs(),
+      })
+      .run();
+    reconcileOwners(w.deps);
+    expect(
+      w.s.db.select().from(chiefThread).where(eq(chiefThread.id, wake.buildId)).get()?.activeRun,
+    ).not.toBeNull();
+    expect(wakeStep(w)[0]?.status).toBe('stopped');
+  });
+
+  test.each(['done', 'failed', 'stopped'] as const)(
+    'needs_you preserves answer arguments after a question turn ends %s',
+    async (status) => {
+      const w = openWorld({ phase: 'building' });
+      const requestId = 'ask-handoff-answer';
+      await ask(w, requestId);
+      endTurn(w, status);
+      reconcileOwners(w.deps);
+      const wake = wakeStep(w)[0]!;
+      const thread = w.s.db
+        .select()
+        .from(chiefThread)
+        .where(eq(chiefThread.id, wake.buildId))
+        .get()!;
+      const deps = {
+        ...w.deps,
+        box: w.s.secretBox,
+        reposDir: w.s.reposDir,
+        attachmentsDir: w.s.attachmentsDir,
+        skillsDir: w.s.skillsDir,
+      };
+      const ctx = {
+        teamId: w.s.team.id,
+        userId: w.s.user.id,
+        chiefId: thread.chiefId,
+        threadId: thread.id,
+        chiefAgentId: null,
+        conversationId: thread.id,
+      };
+      const out = JSON.parse(await executeChiefTool(deps, ctx, 'needs_you', {}));
+      expect(out.items).toEqual([
+        expect.objectContaining({
+          todoId: w.todoId,
+          owner: 'owner',
+          kind: 'handoff',
+          questions: [
+            expect.objectContaining({
+              requestId,
+              items: [expect.objectContaining({ question: `Which scope for ${requestId}?` })],
+            }),
+          ],
+        }),
+      ]);
+      const answered = JSON.parse(
+        await executeChiefTool(deps, ctx, 'answer_question', {
+          todoId: w.todoId,
+          requestId,
+          answer: 'Small',
+        }),
+      );
+      expect(answered).toMatchObject({ todoId: w.todoId, requestId });
+    },
+  );
 
   test('a wake the Coordinator is still running keeps the task, however long it runs', () => {
     const w = failedWorld();

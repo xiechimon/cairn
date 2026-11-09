@@ -34,7 +34,9 @@ test('routing carries the same sentence and says routing applies to all machines
   await expect(settings(page).getByTestId('settings-scope-note')).toContainText('对所有机器生效');
 });
 
-test('English scope copy names all machines and preserves the team members page', async ({ page }) => {
+test('English scope copy names all machines and keeps rules and policies in the nav', async ({
+  page,
+}) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   const selector = page.getByRole('combobox', { name: 'Settings apply to' });
@@ -42,7 +44,7 @@ test('English scope copy names all machines and preserves the team members page'
   await selector.click();
   await expect(page.getByRole('option', { name: 'All machines', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('link', { name: 'Team', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Rules & policies', exact: true })).toBeVisible();
 });
 
 test('gallery scope preserves duplicate suffixes and offline markers with icons', async ({ page }) => {

@@ -10,10 +10,12 @@ import { build, gateState, message, project, step, todo } from '../db/schema.js'
 import { nowMs } from '../lib/ids.js';
 import { planAwaitsAutoConfirm } from './builds.js';
 import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
+import { settleChiefActiveRun } from './chief-turns.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
 import { projectMergeConfigOf } from './projects.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
+import { publishStepRow } from './quota-wait.js';
 import { endSnoozeOn } from './snooze.js';
 import { getTodo } from './todos.js';
 
@@ -209,12 +211,17 @@ function claimCheckpoint(db: Db, row: TodoRow, owner: string, workKey: string): 
   );
 }
 
-function cancelUnstartedWake(db: Db, row: TodoRow): void {
+function cancelUnstartedWake(deps: OwnerDeps, row: TodoRow): void {
   if (row.coordinatorTurn === null) return;
-  db.update(step)
+  const [stopped] = deps.db
+    .update(step)
     .set({ status: 'stopped', finishedAt: nowMs() })
     .where(and(eq(step.id, row.coordinatorTurn.stepId), inArray(step.status, [...UNSTARTED_STEP])))
-    .run();
+    .returning()
+    .all();
+  if (stopped === undefined) return;
+  settleChiefActiveRun(deps.db, stopped.buildId);
+  publishStepRow(deps, stopped);
 }
 
 function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
@@ -229,7 +236,7 @@ function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
   }
   if (ownership === null) return;
   if (ownership.owner === 'owner') {
-    if (ownership.reason === 'handoff') cancelUnstartedWake(deps.db, row);
+    if (ownership.reason === 'handoff') cancelUnstartedWake(deps, row);
     notifyOwner(deps, row, ownership.reason);
     return;
   }

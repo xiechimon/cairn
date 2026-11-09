@@ -64,7 +64,7 @@ async function setup(
   page: Page,
   prs: PrsMode,
   theme: 'light' | 'dark' = 'light',
-  more: { todos?: unknown[]; projects?: unknown[] } = {},
+  more: { todos?: unknown[]; projects?: unknown[]; tasks?: unknown[] } = {},
 ) {
   await page.addInitScript((value) => {
     localStorage.setItem('cairn.locale', 'en');
@@ -77,6 +77,7 @@ async function setup(
       messages: [],
       todos: [REVIEW_TASK, ...(more.todos ?? [])],
       ...(more.projects !== undefined ? { projects: more.projects } : {}),
+      ...(more.tasks !== undefined ? { tasks: more.tasks } : {}),
     }, (path, _route, json) => {
     if (path === '/api/prs') return prs === 'error' ? json({ error: 'boom' }, 500) : json(prs.rows);
     if (path === '/api/todos/todo-1') return json(REVIEW_TASK);
@@ -266,16 +267,50 @@ test('the PR list says what is missing when no thread has a PR', async ({ page }
   await expect(page.getByTestId('work-prs')).toContainText('PRs opened by threads are listed here.');
 });
 
-test('the same PR link reaches the needs-you card, the outputs panel and the finish dialog', async ({ page }) => {
+test('the same PR reaches the needs-you card, the Tasks row and the finish dialog', async ({ page }) => {
   await setup(page, { rows: [prRow()] });
   await page.goto('/app');
   const card = page.locator('[data-slot="thread-card"]').first();
   await expect(card.getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
   await page.goto('/app?pane=tasks');
-  await expect(page.locator('[data-slot="thread-row"]').first().getByRole('link', { name: /PR #42/ })).toBeVisible();
+  await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toContainText('#42');
   await page.goto('/app?thread=todo-1');
   await page.getByRole('button', { name: 'Finish…' }).click();
   await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
+});
+
+test('a task row in the Tasks panel links its PR beside the row', async ({ page }) => {
+  await setup(page, { rows: [prRow()] }, 'light', {
+    tasks: [
+      {
+        ...REVIEW_TASK,
+        ownerId: null,
+        createdBy: null,
+        sourceBuildId: null,
+        sourceKind: null,
+        sourceRef: null,
+        output: 'code',
+        owner: 'owner',
+        kind: 'todo',
+        section: 'ready_for_review',
+      },
+    ],
+  });
+  await page.goto('/app?pane=tasks');
+  const row = page.locator('[data-slot="task-row-frame"]').filter({ hasText: REVIEW_TASK.title });
+  await expect(row.getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
+  await evidencePanelShot(page, 'tasks-row-pr-link-light.png', page.locator('.side-panel'));
+  await row.getByRole('button').click();
+  await expect(page).toHaveURL(/[?&]thread=todo-1/);
+});
+
+test('a finished task in Made links its newest PR', async ({ page }) => {
+  const done = { ...TASK, id: 'todo-9', seqNum: 9, title: 'Finished with a PR', phase: 'done', phaseAt: Date.now() };
+  await setup(page, { rows: [prRow({ threadId: 'todo-9', number: 77, url: 'https://github.com/xiechimon/cairn/pull/77', state: 'merged' }), prRow({ threadId: 'todo-9', number: 70, url: 'https://github.com/xiechimon/cairn/pull/70', state: 'closed' })] }, 'light', { todos: [done] });
+  await page.goto('/app?pane=made');
+  const row = page.getByRole('complementary', { name: 'Made' }).getByRole('link', { name: /PR #77/ });
+  await expect(row).toHaveAttribute('href', /pull\/77$/);
+  await expect(page.getByRole('complementary', { name: 'Made' }).getByRole('link', { name: /PR #70/ })).toHaveCount(0);
 });
 
 test('the changes view does not leak into the next thread after closing', async ({ page }) => {

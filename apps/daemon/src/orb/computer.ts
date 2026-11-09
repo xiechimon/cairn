@@ -9,10 +9,50 @@ import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { type OrbCommandRunner, runOrbCommand } from './provider.js';
 
 export const COMPUTER_TEMPLATE = 'cairn-orb-computer';
+export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
 export const COMPUTER_IDLE_STOP_MS = 10 * 60_000;
 export const COMPUTER_TAKEOVER_GRACE_MS = 30 * 60_000;
 
 const computerNamePattern = /^cairn-orb-computer-[a-f0-9]{40}$/;
+
+export function computerMachinesDir(root = process.env.CAIRN_ORB_ROOT ?? ''): string {
+  return root === '' ? '/var/lib/machines' : join(root, 'var/lib/machines');
+}
+
+export function computerImageMarkerPath(
+  name: string,
+  root = process.env.CAIRN_ORB_ROOT ?? '',
+): string {
+  return join(computerMachinesDir(root), name, 'etc', 'cairn-orb-computer-image');
+}
+
+export function readComputerImageMarker(
+  name: string,
+  options: {
+    root?: string;
+    readFileSync?: (path: string, encoding: 'utf8') => string;
+  } = {},
+): string | null {
+  const root = options.root ?? process.env.CAIRN_ORB_ROOT ?? '';
+  try {
+    return (options.readFileSync ?? readFileSync)(computerImageMarkerPath(name, root), 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+export function computerImageOffersBrowser(
+  options: {
+    root?: string;
+    version?: string;
+    readFileSync?: (path: string, encoding: 'utf8') => string;
+  } = {},
+): boolean {
+  const version =
+    options.version ?? process.env.CAIRN_AGENT_BROWSER_VERSION ?? PINNED_AGENT_BROWSER_VERSION;
+  const text = readComputerImageMarker(COMPUTER_TEMPLATE, options);
+  return text?.split('\n').includes(`agent-browser=${version}`) === true;
+}
 
 const computerStateSchema = z.array(
   z.object({
@@ -32,6 +72,7 @@ export function computerMachineName(scopeKey: string): string {
 export class ComputerOrbs {
   private readonly runner: OrbCommandRunner;
   private readonly runtimeRoot: string;
+  private readonly machinesRoot: string;
   private readonly stateFile: string | undefined;
   private readonly runtimeDirectoryTimeoutMs: number;
   private readonly shutdownTimeoutMs: number;
@@ -47,6 +88,7 @@ export class ComputerOrbs {
     options: {
       runner?: OrbCommandRunner;
       runtimeRoot?: string;
+      machinesRoot?: string;
       stateFile?: string;
       runtimeDirectoryTimeoutMs?: number;
       shutdownTimeoutMs?: number;
@@ -56,6 +98,7 @@ export class ComputerOrbs {
   ) {
     this.runner = options.runner ?? runOrbCommand;
     this.runtimeRoot = options.runtimeRoot ?? '/run/cairn-orb';
+    this.machinesRoot = options.machinesRoot ?? computerMachinesDir();
     this.stateFile = options.stateFile;
     this.runtimeDirectoryTimeoutMs = options.runtimeDirectoryTimeoutMs ?? 60_000;
     this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 30_000;
@@ -164,7 +207,13 @@ export class ComputerOrbs {
 
   private async ensureRunning(scopeKey: string): Promise<string> {
     const name = computerMachineName(scopeKey);
-    if (!(await this.images()).has(name)) {
+    if ((await this.images()).has(name)) {
+      if (this.cloneNeedsRefresh(name)) {
+        if ((await this.runningMachines()).has(name)) await this.stop(name);
+        await this.command(['machinectl', 'remove', name]);
+        await this.command(['machinectl', 'clone', COMPUTER_TEMPLATE, name]);
+      }
+    } else {
       await this.command(['machinectl', 'clone', COMPUTER_TEMPLATE, name]);
     }
     const computer = this.computers.get(scopeKey) ?? {
@@ -186,6 +235,21 @@ export class ComputerOrbs {
       throw error;
     }
     return name;
+  }
+
+  private cloneNeedsRefresh(name: string): boolean {
+    const template = this.readMarker(COMPUTER_TEMPLATE);
+    if (template === null) return false;
+    const clone = this.readMarker(name);
+    return clone !== template;
+  }
+
+  private readMarker(name: string): string | null {
+    try {
+      return readFileSync(join(this.machinesRoot, name, 'etc', 'cairn-orb-computer-image'), 'utf8');
+    } catch {
+      return null;
+    }
   }
 
   private async waitForRuntime(name: string): Promise<void> {

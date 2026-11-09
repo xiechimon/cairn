@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "51f9f832-c8e9-4bf5-82e7-8ca5b71486f9",
+  "id": "0d6ee11a-ea02-427c-a7c2-70f02dcc23ca",
   "prevId": "b875be75-f86b-4e0e-b2df-e0f143bdbe4c",
   "tables": {
     "agent_memory": {
@@ -1941,6 +1941,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "browserEnabled": {
+          "name": "browserEnabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -6362,13 +6370,6 @@
           "notNull": false,
           "autoincrement": false,
           "default": "''"
-        },
-        "coordinatorTurn": {
-          "name": "coordinatorTurn",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

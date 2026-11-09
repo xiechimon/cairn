@@ -152,15 +152,5 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(file, 'F1').toHaveCSS('background-color', await resolveBackground(page, 'var(--card)'));
     expect(await css(file, 'box-shadow'), 'F1: 1px ring').toContain('0px 0px 0px 1px');
 
-    await page.locator('.prj-files-seg-tab', { hasText: '历史' }).click();
-    const commit = page.locator('[data-history-entry="commit"]').first();
-    await expect(commit.getByTestId('history-message'), 'F2').toHaveCSS('font-size', '14px');
-    await expect(commit.getByTestId('history-meta'), 'F2').toHaveCSS('font-size', '13px');
-    await commit.click();
-    await expect(page.locator('[data-commit-detail="message"]'), 'F2').toHaveCSS(
-      'font-size',
-      '14px',
-    );
-    await expect(page.locator('[data-commit-detail="meta"]'), 'F2').toHaveCSS('font-size', '13px');
   });
 }

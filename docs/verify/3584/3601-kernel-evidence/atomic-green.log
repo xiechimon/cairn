@@ -1,0 +1,10 @@
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (5221.786666ms)
+✔ stale owner metadata cannot grant a second lease while the first run is alive (131.116535ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5419.224781

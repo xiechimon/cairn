@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_ROUTER_TOOLS,
+  COMPUTER_REMOTE_TOOLS,
   type MachineAskBody,
   type RemoteToolDef,
 } from '@cairn/shared';
@@ -143,7 +144,13 @@ export function coordinatorTool(
         return { output: [{ type: 'text', text }] };
       }
       try {
-        const text = await channel.relayTool(stepId, def.name, params);
+        const text = await channel.relayTool(
+          stepId,
+          def.name,
+          params,
+          api.callId,
+          context.abortSignal,
+        );
         if (def.name === 'attachment') {
           const attachment = JSON.parse(text) as {
             mimeType: string;
@@ -173,8 +180,8 @@ export function coordinatorToolsExtension(
 ) {
   const defs =
     options.routerTools === false
-      ? CHIEF_REMOTE_TOOLS
-      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
+      ? [...CHIEF_REMOTE_TOOLS, ...COMPUTER_REMOTE_TOOLS]
+      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [

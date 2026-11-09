@@ -19,14 +19,3 @@ test('clicking a file row selects it and renders the file content', async ({ pag
   await expect(page.getByText('请选择一个文件查看')).toHaveCount(0);
 });
 
-test('selection survives a files/history seg round-trip', async ({ page }) => {
-  await page.goto(PROJ);
-  const row = page.getByRole('button', { name: 'README.md', exact: true });
-  await row.click();
-  await expect(page.getByText('托管演示仓')).toBeVisible();
-  await page.locator('.prj-files').getByRole('tab', { name: '历史', exact: true }).click();
-  await expect(page.getByRole('listitem').first()).toBeVisible();
-  await page.locator('.prj-files').getByRole('tab', { name: '文件', exact: true }).click();
-  await expect(row).toHaveAttribute('aria-current', 'true');
-  await expect(page.getByText('托管演示仓')).toBeVisible();
-});

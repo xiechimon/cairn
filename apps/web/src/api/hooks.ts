@@ -44,7 +44,6 @@ import type {
   PatchTeamBody,
   PatchUserBody,
   PlanResponse as PlanRow,
-  ProjectCommitDetailResponse,
   ProjectFileResponse,
   ProjectFilesResponse,
   ProjectRecord,
@@ -70,7 +69,12 @@ import type {
   UpdateSkillBody,
   UserRecord,
 } from '@cairn/shared';
-import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
+import {
+  backupHealthSchema,
+  backupNotice,
+  SKILL_ENTRY_FILE,
+  tasksQuerySchema,
+} from '@cairn/shared';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -182,6 +186,13 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useTasks = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['tasks', teamId],
+    queryFn: async () => tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}`)),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -614,37 +625,6 @@ export const useProjectFile = (
         `/api/projects/${projectId}/file?path=${encodeURIComponent(path ?? '')}${ref !== undefined ? `&ref=${encodeURIComponent(ref)}` : ''}`,
       ),
     enabled: projectId !== undefined && path !== undefined,
-  });
-
-export const useProjectCommits = (projectId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['commits', projectId],
-    queryFn: () =>
-      api.get<{
-        ref: string;
-        commits: {
-          sha: string;
-          shortSha: string;
-          message: string;
-          authorName: string;
-          at: number;
-        }[];
-      }>(`/api/projects/${projectId}/commits`),
-    enabled: enabled && projectId !== undefined,
-  });
-
-export const useProjectCommitDetail = (
-  projectId: string | undefined,
-  sha: string | undefined,
-  enabled: boolean,
-) =>
-  useQuery({
-    queryKey: ['commit-detail', projectId, sha],
-    queryFn: () =>
-      api.get<ProjectCommitDetailResponse>(
-        `/api/projects/${projectId}/commits/${encodeURIComponent(sha ?? '')}`,
-      ),
-    enabled: enabled && projectId !== undefined && sha !== undefined,
   });
 
 export function useApiMutations(teamId: string | undefined) {
