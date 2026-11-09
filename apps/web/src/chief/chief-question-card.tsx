@@ -218,29 +218,37 @@ export function ChiefQuestionCard({
   const toggleCollapsed = () => questionDockState.toggleCollapsed(item.requestId);
 
   useLayoutEffect(() => {
-    if (
-      !pending ||
-      collapsed ||
-      !numberKeys ||
-      question === undefined ||
-      question.options.length === 0
-    )
-      return;
+    if (!pending || collapsed || question === undefined || question.options.length === 0) return;
     const max = question.options.length;
     const handler = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (cardRef.current?.checkVisibility() !== true) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing || e.keyCode === 229)
+        return;
+      const card = cardRef.current;
+      if (card?.checkVisibility() !== true) return;
       const target = e.target;
-      if (target instanceof HTMLElement && !digitsReachCard(target)) return;
-      const n = Number.parseInt(e.key, 10);
-      if (!Number.isInteger(n) || n < 1 || n > max) return;
+      if (!(target instanceof HTMLElement) || !digitsReachCard(target)) return;
+      const inCard = card.contains(target);
+      const inAnswer =
+        bound &&
+        target.hasAttribute('data-compose-target') &&
+        target.closest('[data-testid="chief-composer-block"]')?.contains(card) === true;
+      if (!inCard && !inAnswer && !numberKeys) return;
+      if (
+        !inCard &&
+        target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
+      )
+        return;
+      if (!/^[1-9]$/.test(e.key)) return;
+      const n = Number(e.key);
+      if (n > max) return;
       e.preventDefault();
+      if (e.repeat) return;
       if (question.multiSelect !== true) setTextAt(step, '');
       setDrafts((prev) => applyQuestionPick(prev, step, question, n - 1));
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [pending, collapsed, numberKeys, bound, step, question]);
+  }, [pending, collapsed, numberKeys, bound, step, question, drafts]);
 
   const [localTexts, setLocalTexts] = useState<Record<number, string>>({});
   const textAt = (index: number): string =>
