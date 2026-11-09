@@ -20,16 +20,18 @@ import { CAP_REVIEW_FOCUS, createPrWakes, focusedCodexReview } from '../src/serv
 import { createPrWatch } from '../src/services/pr-watch.js';
 import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import * as serverHelpers from './helpers.js';
+import { req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   for (const s of servers.splice(0)) s.dispose();
 });
 
 function fixture() {
-  const s = bootServer();
+  const s = serverHelpers.bootServer();
   servers.push(s);
   s.db
     .insert(project)
@@ -752,6 +754,11 @@ test('desiredAction covers every ordered rule and release blocker', () => {
 });
 
 test('each failed transition converges in exactly the remaining clean polls', async () => {
+  const boots = vi.spyOn(serverHelpers, 'bootServer');
+  const f = fixture();
+  const initial = structuredClone(f.state);
+  vi.useFakeTimers();
+  const now = Date.now();
   for (const operation of [
     'snapshot',
     'createLabel',
@@ -761,7 +768,8 @@ test('each failed transition converges in exactly the remaining clean polls', as
     'removeLabel',
   ]) {
     for (const kind of ['http', 'graphql', 'lost']) {
-      const f = fixture();
+      Object.assign(f.state, structuredClone(initial));
+      f.queries.length = 0;
       const poll = async (fails = false) => {
         const before = f.queries.length;
         if (fails && operation === 'snapshot') await expect(f.reconcile()).rejects.toThrow();
@@ -787,10 +795,13 @@ test('each failed transition converges in exactly the remaining clean polls', as
       for (let i = 0; i < remaining; i++) await poll();
       expect(f.state.draft).toBe(!f.state.resolved);
       expect(f.state.labels.includes(CAIRN_REVIEW_HOLD_LABEL)).toBe(!f.state.resolved);
-      f.s.dispose();
-      servers.splice(servers.indexOf(f.s), 1);
+      expect(f.s.db.select().from(step).all()).toEqual([]);
+      expect(f.s.db.select().from(message).all()).toEqual([]);
     }
   }
+  expect(boots).toHaveBeenCalledTimes(1);
+  expect(Date.now()).toBe(now);
+  expect(vi.getTimerCount()).toBe(0);
 });
 
 test('human label removal on a ready PR with findings re-adds the label and converts to draft', async () => {
@@ -965,14 +976,18 @@ test.each(['label', 'labels', 'changed', 'repeated', 'later-error'])(
   },
 );
 
-test.each(['createLabel', 'addLabel'])('failed %s preserves the review wake', async (operation) => {
-  for (const kind of ['http', 'graphql', 'lost']) {
-    const f = fixture();
-    if (operation === 'createLabel') f.state.labelId = null;
-    f.state.failure = { operation, kind };
-    await f.wake();
-    expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
-  }
+test.each(
+  ['createLabel', 'addLabel'].flatMap((operation) =>
+    ['http', 'graphql', 'lost'].map((kind) => ({ operation, kind })),
+  ),
+)('failed $operation preserves the review wake: $kind', async ({ operation, kind }) => {
+  const boots = vi.spyOn(serverHelpers, 'bootServer');
+  const f = fixture();
+  if (operation === 'createLabel') f.state.labelId = null;
+  f.state.failure = { operation, kind };
+  await f.wake();
+  expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
+  expect(boots).toHaveBeenCalledTimes(1);
 });
 
 test.each([false, true])(
