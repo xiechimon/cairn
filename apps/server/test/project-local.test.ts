@@ -10,7 +10,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { project } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
-import { expandHomePath } from '../src/services/git.js';
+import { expandHomePath, readFile } from '../src/services/git.js';
 import { bootServer, req } from './helpers.js';
 
 const s = bootServer();
@@ -185,7 +185,7 @@ describe('expandHomePath (the single source of `~` expansion; homeDir injected f
   });
 });
 
-describe('the local project read surface -- the Files tab gate opens (#1030)', () => {
+describe('retained local file mentions, branches and Coordinator document reads', () => {
   const READ_GIT_ENV = {
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
@@ -214,31 +214,11 @@ describe('the local project read surface -- the Files tab gate opens (#1030)', (
     return String(r.body.id);
   }
 
-  test('F1 a reachable repo: all five read surfaces return real values; readable even with HEAD on a non-main branch', async () => {
+  test('a reachable non-main repository retains mentions, branches and document reads', async () => {
     const repo = await makeLocalRepo();
     const id = await createLocalProject(repo);
 
-    const tree = (await (await req(s.app, 'GET', `/api/projects/${id}/tree`)).json()) as {
-      ref: string;
-      commit: string;
-      entries: { name: string; path: string; type: string; size: number }[];
-    };
-    expect(tree.ref).toBe('HEAD');
-    expect(tree.commit).toMatch(/^[0-9a-f]{40}$/);
-    expect(tree.entries).toContainEqual({
-      name: 'README.md',
-      path: 'README.md',
-      type: 'blob',
-      size: Buffer.byteLength('# local-read-probe\n'),
-    });
-
-    const file = (await (
-      await req(s.app, 'GET', `/api/projects/${id}/file?path=README.md`)
-    ).json()) as {
-      encoding: string;
-      content: string;
-      size: number;
-    };
+    const file = await readFile(s, id, 'README.md');
     expect(file.encoding).toBe('utf-8');
     expect(file.content).toBe('# local-read-probe\n');
     expect(file.size).toBe(Buffer.byteLength('# local-read-probe\n'));
@@ -250,34 +230,20 @@ describe('the local project read surface -- the Files tab gate opens (#1030)', (
     expect(branches.defaultBranch).toBe('trunk');
     expect(branches.branches).toEqual([{ name: 'trunk', isDefault: true }]);
 
-    const commits = (await (await req(s.app, 'GET', `/api/projects/${id}/commits`)).json()) as {
-      ref: string;
-      commits: { message: string; authorName: string }[];
-    };
-    expect(commits.ref).toBe('trunk');
-    expect(commits.commits).toHaveLength(1);
-    expect(commits.commits[0]?.message).toBe('init local probe');
-    expect(commits.commits[0]?.authorName).toBe('local-read-probe');
-
     const files = (await (await req(s.app, 'GET', `/api/projects/${id}/files`)).json()) as {
       files: { path: string }[];
     };
     expect(files.files.map((f) => f.path)).toContain('README.md');
   });
 
-  test('F2 the directory vanished -> 404 + reason=not_found (classified degradation; commits uses the same gate and shape)', async () => {
+  test('a vanished repository returns 404 with reason not_found for file mentions', async () => {
     const repo = await makeLocalRepo();
     const id = await createLocalProject(repo);
     rmSync(repo, { recursive: true, force: true });
-    const res = await req(s.app, 'GET', `/api/projects/${id}/tree`);
+    const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error?: string; reason?: LocalErrorReason };
     expect(body.reason).toBe<LocalErrorReason>('not_found');
-    const commits = await req(s.app, 'GET', `/api/projects/${id}/commits`);
-    expect(commits.status).toBe(404);
-    expect(((await commits.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
-      'not_found',
-    );
   });
 
   test('F3 the directory replaced by non-git content -> 404 + reason=not_git', async () => {
@@ -285,7 +251,7 @@ describe('the local project read surface -- the Files tab gate opens (#1030)', (
     const id = await createLocalProject(repo);
     rmSync(repo, { recursive: true, force: true });
     mkdirSync(repo, { recursive: true });
-    const res = await req(s.app, 'GET', `/api/projects/${id}/tree`);
+    const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
     expect(res.status).toBe(404);
     expect(((await res.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
       'not_git',
@@ -296,53 +262,11 @@ describe('the local project read surface -- the Files tab gate opens (#1030)', (
     const repo = await makeLocalRepo();
     const id = await createLocalProject(repo);
     s.db.update(project).set({ localPath: null }).where(eq(project.id, id)).run();
-    const res = await req(s.app, 'GET', `/api/projects/${id}/tree`);
+    const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error?: string; reason?: string };
     expect(String(body.error)).toContain('local repo');
     expect(body.reason).toBeUndefined();
-  });
-
-  test('F6 commit detail: the root commit = all files added against the empty tree; a vanished directory = the same gate reason', async () => {
-    const repo = await makeLocalRepo();
-    const id = await createLocalProject(repo);
-    const list = (await (await req(s.app, 'GET', `/api/projects/${id}/commits`)).json()) as {
-      commits: { sha: string; message: string; authorName: string; at: number }[];
-    };
-    const root = list.commits[0]!;
-
-    const res = await req(s.app, 'GET', `/api/projects/${id}/commits/${root.sha}`);
-    expect(res.status).toBe(200);
-    const detail = (await res.json()) as {
-      sha: string;
-      shortSha: string;
-      message: string;
-      authorName: string;
-      at: number;
-      files: {
-        path: string;
-        additions: number;
-        deletions: number;
-        hunks: { header: string; lines: string[] }[];
-      }[];
-    };
-    expect(detail.sha).toBe(root.sha);
-    expect(detail.message).toBe('init local probe');
-    expect(detail.authorName).toBe('local-read-probe');
-    expect(detail.at).toBe(root.at);
-    expect(detail.sha.startsWith(detail.shortSha)).toBe(true);
-    expect(detail.files).toHaveLength(1);
-    expect(detail.files[0]?.path).toBe('README.md');
-    expect(detail.files[0]?.additions).toBe(1);
-    expect(detail.files[0]?.deletions).toBe(0);
-    expect(detail.files[0]?.hunks[0]?.lines).toContain('+# local-read-probe');
-
-    rmSync(repo, { recursive: true, force: true });
-    const gone = await req(s.app, 'GET', `/api/projects/${id}/commits/${root.sha}`);
-    expect(gone.status).toBe(404);
-    expect(((await gone.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
-      'not_found',
-    );
   });
 });
 
@@ -434,135 +358,5 @@ describe('body dual-name compatibility: kind (the spec 12 contract) and repoKind
     const hit = rows.find((r) => r.id === created.body.id);
     expect(hit?.localPath).toBe(repo);
     expect(hit?.repoKind).toBe('local');
-  });
-});
-
-describe('the tree route passes the path parameter through (#1097)', () => {
-  const GIT_ENV = {
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'tree-path-probe',
-    GIT_AUTHOR_EMAIL: 'probe@localhost',
-    GIT_COMMITTER_NAME: 'tree-path-probe',
-    GIT_COMMITTER_EMAIL: 'probe@localhost',
-  };
-
-  interface TreeReply {
-    ref: string;
-    commit: string;
-    path: string;
-    entries: { name: string; path: string; type: string; size: number | null }[];
-  }
-
-  async function makeNestedRepo(): Promise<string> {
-    const dir = tempDir('cairn-tree-path-');
-    expect((await runGit(['init', '-b', 'trunk', dir], { env: GIT_ENV })).code).toBe(0);
-    mkdirSync(join(dir, 'docs', 'guide'), { recursive: true });
-    writeFileSync(join(dir, 'README.md'), '# root readme\n');
-    writeFileSync(join(dir, 'docs', 'README.md'), '# docs readme\n');
-    writeFileSync(join(dir, 'docs', 'guide', 'deep.md'), 'deep content\n');
-    for (const args of [
-      ['add', '.'],
-      ['commit', '-m', 'init nested probe'],
-    ] as string[][]) {
-      expect((await runGit(args, { cwd: dir, env: GIT_ENV })).code, args.join(' ')).toBe(0);
-    }
-    return dir;
-  }
-
-  async function makeNestedProject(): Promise<string> {
-    const repo = await makeNestedRepo();
-    const r = await postCreate({ name: 'p-tree-path', kind: 'local', localPath: repo });
-    expect(r.status).toBe(201);
-    return String(r.body.id);
-  }
-
-  test('P1 tree?path=docs -> the docs single level + path echoed, no top-level entries mixed in', async () => {
-    const id = await makeNestedProject();
-    const res = await req(s.app, 'GET', `/api/projects/${id}/tree?path=docs`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as TreeReply;
-    expect(body.path).toBe('docs');
-    expect(body.entries).toContainEqual({
-      name: 'README.md',
-      path: 'docs/README.md',
-      type: 'blob',
-      size: Buffer.byteLength('# docs readme\n'),
-    });
-    expect(body.entries).toContainEqual({
-      name: 'guide',
-      path: 'docs/guide',
-      type: 'tree',
-      size: null,
-    });
-    expect(body.entries.map((e) => e.path)).not.toContain('README.md');
-    expect(body.entries).toHaveLength(2);
-  });
-
-  test('P2 deep nesting: path=docs/guide returns its single level (3 levels drillable)', async () => {
-    const id = await makeNestedProject();
-    const res = await req(
-      s.app,
-      'GET',
-      `/api/projects/${id}/tree?path=${encodeURIComponent('docs/guide')}`,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as TreeReply;
-    expect(body.path).toBe('docs/guide');
-    expect(body.entries).toEqual([
-      {
-        name: 'deep.md',
-        path: 'docs/guide/deep.md',
-        type: 'blob',
-        size: Buffer.byteLength('deep content\n'),
-      },
-    ]);
-  });
-
-  test('P3 no path / empty path -> top level + path echoed as an empty string (zero regression)', async () => {
-    const id = await makeNestedProject();
-    for (const qs of ['', '?path=']) {
-      const res = await req(s.app, 'GET', `/api/projects/${id}/tree${qs}`);
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as TreeReply;
-      expect(body.path).toBe('');
-      expect(body.entries).toContainEqual({
-        name: 'README.md',
-        path: 'README.md',
-        type: 'blob',
-        size: Buffer.byteLength('# root readme\n'),
-      });
-      expect(body.entries).toContainEqual({
-        name: 'docs',
-        path: 'docs',
-        type: 'tree',
-        size: null,
-      });
-    }
-  });
-
-  test('P4 same-named files across directories: file?path= returns each one own truth', async () => {
-    const id = await makeNestedProject();
-    const root = (await (
-      await req(s.app, 'GET', `/api/projects/${id}/file?path=README.md`)
-    ).json()) as { content: string };
-    expect(root.content).toBe('# root readme\n');
-    const nested = (await (
-      await req(
-        s.app,
-        'GET',
-        `/api/projects/${id}/file?path=${encodeURIComponent('docs/README.md')}`,
-      )
-    ).json()) as { content: string };
-    expect(nested.content).toBe('# docs readme\n');
-  });
-
-  test('P5 path pointing at a nonexistent directory -> 200 + empty entries (the data source of the web empty-directory state)', async () => {
-    const id = await makeNestedProject();
-    const res = await req(s.app, 'GET', `/api/projects/${id}/tree?path=nope`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as TreeReply;
-    expect(body.path).toBe('nope');
-    expect(body.entries).toEqual([]);
   });
 });

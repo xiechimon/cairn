@@ -126,13 +126,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/projects/{id}/builds' },
   {
     method: 'GET',
-    path: '/api/projects/{id}/tree',
-    query: ['ref'],
-    note: '读裸库 ref 树（02 §3）',
-  },
-  { method: 'GET', path: '/api/projects/{id}/file', query: ['path', 'ref'] },
-  {
-    method: 'GET',
     path: '/api/projects/{id}/preview-token',
     query: ['ref'],
     note: '02 §9.3 在册不设计；触发条件 = 04 册附录 B',

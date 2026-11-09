@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { runGit } from '../src/lib/git.js';
 import { newUuidv7 } from '../src/lib/ids.js';
+import { readFile } from '../src/services/git.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
 const GIT_ENV = {
@@ -74,6 +75,14 @@ async function git(args: string[], cwd: string) {
 }
 
 describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () => {
+  test.each(['tree', 'file', 'commits', 'commits/HEAD'])(
+    'retired project browser endpoint %s returns 404',
+    async (endpoint) => {
+      const record = await createProject({ name: 'retired-browser', repoKind: 'hosted' });
+      expect((await req(s.app, 'GET', `/api/projects/${record.id}/${endpoint}`)).status).toBe(404);
+    },
+  );
+
   test('POST /api/projects repoKind:hosted -> bare repo landed + record carries repoName/cloneUrl', async () => {
     const record = await createProject({ name: 'r3-lifecycle', repoKind: 'hosted' });
     expect(record.repoKind).toBe('hosted');
@@ -99,13 +108,13 @@ describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () =
     expect(r2.code).not.toBe(0);
   });
 
-  test('clone/commit/push run green through (http-backend CGI full chain) -> branches/tree/file read back', async () => {
+  test('clone/commit/push preserves branches and the Coordinator file reader', async () => {
     const record = await createProject({ name: 'push-probe', repoKind: 'hosted' });
     const dir = workdir('push');
     const repoDir = join(dir, 'repo');
     const clone = await git(['clone', authedUrl(record), repoDir], dir);
     expect(clone.code, clone.stderr).toBe(0);
-    const readme = '# push-probe\n\n托管形态实走。\n';
+    const readme = '# push-probe\n\nHosted repository verification.\n';
     writeFileSync(join(repoDir, 'README.md'), readme);
     expect((await git(['checkout', '-B', 'main'], repoDir)).code).toBe(0);
     expect((await git(['add', 'README.md'], repoDir)).code).toBe(0);
@@ -119,33 +128,10 @@ describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () =
     expect(branches.defaultBranch).toBe('main');
     expect(branches.branches).toContainEqual({ name: 'main', isDefault: true });
 
-    const tree = (await (
-      await req(s.app, 'GET', `/api/projects/${record.id}/tree?ref=main`)
-    ).json()) as {
-      ref: string;
-      commit: string;
-      entries: { name: string; path: string; type: string; size: number | null }[];
-    };
-    expect(tree.ref).toBe('main');
-    expect(tree.commit).toMatch(/^[0-9a-f]{40}$/);
-    expect(tree.entries).toContainEqual({
-      name: 'README.md',
-      path: 'README.md',
-      type: 'blob',
-      size: Buffer.byteLength(readme),
-    });
-
-    const file = (await (
-      await req(s.app, 'GET', `/api/projects/${record.id}/file?path=README.md&ref=main`)
-    ).json()) as { encoding: string; content: string; size: number };
+    const file = await readFile(s, record.id, 'README.md', 'main');
     expect(file.encoding).toBe('utf-8');
     expect(file.content).toBe(readme);
     expect(file.size).toBe(Buffer.byteLength(readme));
-
-    const headTree = (await (
-      await req(s.app, 'GET', `/api/projects/${record.id}/tree`)
-    ).json()) as { entries: unknown[] };
-    expect(headTree.entries).toHaveLength(1);
   });
 
   test('GET /api/projects/{id}/files -> full recursion + directory entries + upper bound + round-trip (#760)', async () => {
@@ -202,157 +188,11 @@ describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () =
     expect(fallback.truncated).toBe(false);
     expect(fallback.files.length).toBe(body.files.length);
 
-    const file = (await (
-      await req(
-        s.app,
-        'GET',
-        `/api/projects/${record.id}/file?path=apps/web/src/button.tsx&ref=main`,
-      )
-    ).json()) as { content: string };
+    const file = await readFile(s, record.id, 'apps/web/src/button.tsx', 'main');
     expect(file.content).toBe('export const B = 1;\n');
 
     expect(
       (await req(s.app, 'GET', `/api/projects/${record.id}/files?ref=no-such-ref`)).status,
-    ).toBe(404);
-  });
-
-  test('GET /api/projects/{id}/commits -> commit history read back new to old', async () => {
-    const record = await createProject({ name: 'commits-probe', repoKind: 'hosted' });
-    const dir = workdir('commits');
-    const repoDir = join(dir, 'repo');
-    expect((await git(['clone', authedUrl(record), repoDir], dir)).code).toBe(0);
-    writeFileSync(join(repoDir, 'README.md'), '# commits-probe\n');
-    expect((await git(['checkout', '-B', 'main'], repoDir)).code).toBe(0);
-    expect((await git(['add', 'README.md'], repoDir)).code).toBe(0);
-    expect((await git(['commit', '-m', 'docs: README'], repoDir)).code).toBe(0);
-    expect((await git(['push', '-u', 'origin', 'main'], repoDir)).code, 'push').toBe(0);
-
-    const res = await req(s.app, 'GET', `/api/projects/${record.id}/commits`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      ref: string;
-      commits: { sha: string; shortSha: string; message: string; authorName: string; at: number }[];
-    };
-    expect(body.ref).toBe('main');
-    expect(body.commits).toHaveLength(2);
-    const head = body.commits[0]!;
-    expect(head.message).toBe('docs: README');
-    expect(head.sha).toMatch(/^[0-9a-f]{40}$/);
-    expect(head.shortSha).toMatch(/^[0-9a-f]{7,40}$/);
-    expect(head.sha.startsWith(head.shortSha)).toBe(true);
-    expect(head.authorName).toBe('r3-probe');
-    expect(head.at).toBeGreaterThan(0);
-    expect(Number.isFinite(head.at)).toBe(true);
-
-    const github = await createProject({
-      name: 'gh-probe',
-      repoKind: 'github',
-      githubRepo: 'octocat/hello',
-    });
-    const ghRes = await req(s.app, 'GET', `/api/projects/${github.id}/commits`);
-    expect(ghRes.status).toBe(404);
-    expect((await req(s.app, 'GET', `/api/projects/${newUuidv7()}/commits`)).status).toBe(404);
-  });
-
-  test('GET /api/projects/{id}/commits/{sha} -> metadata + first-parent diff; boundary 404/defined state', async () => {
-    const record = await createProject({ name: 'commit-detail-probe', repoKind: 'hosted' });
-    const dir = workdir('commit-detail');
-    const repoDir = join(dir, 'repo');
-    expect((await git(['clone', authedUrl(record), repoDir], dir)).code).toBe(0);
-    writeFileSync(join(repoDir, 'README.md'), '# detail-probe\n');
-    expect((await git(['checkout', '-B', 'main'], repoDir)).code).toBe(0);
-    expect((await git(['add', 'README.md'], repoDir)).code).toBe(0);
-    expect((await git(['commit', '-m', 'docs: README detail'], repoDir)).code).toBe(0);
-    expect((await git(['checkout', '-b', 'side'], repoDir)).code).toBe(0);
-    writeFileSync(join(repoDir, 'side.txt'), 'side work\n');
-    expect((await git(['add', 'side.txt'], repoDir)).code).toBe(0);
-    expect((await git(['commit', '-m', 'side: add side.txt'], repoDir)).code).toBe(0);
-    expect((await git(['checkout', 'main'], repoDir)).code).toBe(0);
-    writeFileSync(join(repoDir, 'another.txt'), 'main work\n');
-    expect((await git(['add', 'another.txt'], repoDir)).code).toBe(0);
-    expect((await git(['commit', '-m', 'main: add another.txt'], repoDir)).code).toBe(0);
-    expect(
-      (await git(['merge', '--no-ff', 'side', '-m', 'merge side into main'], repoDir)).code,
-    ).toBe(0);
-    expect((await git(['push', '-u', 'origin', 'main'], repoDir)).code, 'push').toBe(0);
-
-    const list = (await (await req(s.app, 'GET', `/api/projects/${record.id}/commits`)).json()) as {
-      commits: { sha: string; shortSha: string; message: string; authorName: string; at: number }[];
-    };
-    expect(list.commits).toHaveLength(5);
-    const byMessage = Object.fromEntries(list.commits.map((c) => [c.message, c]));
-    const merge = byMessage['merge side into main']!;
-    const readme = byMessage['docs: README detail']!;
-    const seed = byMessage[`init ${record.repoName}`]!;
-
-    type Detail = {
-      sha: string;
-      shortSha: string;
-      message: string;
-      authorName: string;
-      at: number;
-      files: {
-        path: string;
-        additions: number;
-        deletions: number;
-        hunks: { header: string; lines: string[] }[];
-      }[];
-    };
-
-    const mergeRes = await req(s.app, 'GET', `/api/projects/${record.id}/commits/${merge.sha}`);
-    expect(mergeRes.status).toBe(200);
-    const mergeDetail = (await mergeRes.json()) as Detail;
-    expect(mergeDetail.files.map((f) => f.path)).toEqual(['side.txt']);
-    expect(mergeDetail.files[0]?.additions).toBe(1);
-    expect(mergeDetail.sha).toBe(merge.sha);
-    expect(mergeDetail.shortSha).toBe(merge.shortSha);
-    expect(mergeDetail.message).toBe(merge.message);
-    expect(mergeDetail.authorName).toBe(merge.authorName);
-    expect(mergeDetail.at).toBe(merge.at);
-
-    const readmeDetail = (await (
-      await req(s.app, 'GET', `/api/projects/${record.id}/commits/${readme.sha}`)
-    ).json()) as Detail;
-    expect(readmeDetail.files).toHaveLength(1);
-    expect(readmeDetail.files[0]?.path).toBe('README.md');
-    expect(readmeDetail.files[0]?.hunks[0]?.lines).toContain('+# detail-probe');
-
-    const seedRes = await req(s.app, 'GET', `/api/projects/${record.id}/commits/${seed.sha}`);
-    expect(seedRes.status).toBe(200);
-    expect(((await seedRes.json()) as Detail).files).toEqual([]);
-
-    expect(
-      (await req(s.app, 'GET', `/api/projects/${record.id}/commits/${'0'.repeat(40)}`)).status,
-    ).toBe(404);
-    expect(
-      (
-        await req(
-          s.app,
-          'GET',
-          `/api/projects/${record.id}/commits/${encodeURIComponent('HEAD; echo hacked')}`,
-        )
-      ).status,
-    ).toBe(404);
-    expect(
-      (
-        await req(
-          s.app,
-          'GET',
-          `/api/projects/${record.id}/commits/${encodeURIComponent('--output=/tmp/evil')}`,
-        )
-      ).status,
-    ).toBe(404);
-
-    const github = await createProject({
-      name: 'gh-detail-probe',
-      repoKind: 'github',
-      githubRepo: 'octocat/hello',
-    });
-    expect(
-      (await req(s.app, 'GET', `/api/projects/${github.id}/commits/${'0'.repeat(40)}`)).status,
-    ).toBe(404);
-    expect(
-      (await req(s.app, 'GET', `/api/projects/${newUuidv7()}/commits/${'0'.repeat(40)}`)).status,
     ).toBe(404);
   });
 
@@ -380,9 +220,7 @@ describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () =
       await req(s.app, 'GET', `/api/projects/${record.id}/branches`)
     ).json()) as { branches: { name: string }[] };
     expect(branches.branches.map((b) => b.name).sort()).toEqual(['main', branch].sort());
-    const file = (await (
-      await req(s.app, 'GET', `/api/projects/${record.id}/file?path=icon.png&ref=${branch}`)
-    ).json()) as { encoding: string; content: string };
+    const file = await readFile(s, record.id, 'icon.png', branch);
     expect(file.encoding).toBe('base64');
     expect(Buffer.from(file.content, 'base64').equals(png)).toBe(true);
   });
@@ -401,21 +239,17 @@ describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () =
     expect(r.status).toBe(404);
   });
 
-  test('file-surface error shape: missing path 400 / unknown ref-or-file 404 / github project with no local repo 404', async () => {
+  test('retained reads reject unknown refs, traversal and unavailable repositories', async () => {
     const record = await createProject({ name: 'err-probe', repoKind: 'hosted' });
-    const missingPath = await req(s.app, 'GET', `/api/projects/${record.id}/file`);
-    expect(missingPath.status).toBe(400);
-    expect(Object.keys((await missingPath.json()) as Record<string, unknown>)).toEqual(['error']);
-    const badRef = await req(s.app, 'GET', `/api/projects/${record.id}/tree?ref=no-such-ref`);
-    expect(badRef.status).toBe(404);
-    const traversal = await req(s.app, 'GET', `/api/projects/${record.id}/file?path=../server.db`);
-    expect(traversal.status).toBe(400);
+    await expect(readFile(s, record.id, '../server.db')).rejects.toMatchObject({ status: 400 });
+    expect((await req(s.app, 'GET', `/api/projects/${record.id}/files?ref=missing`)).status).toBe(
+      404,
+    );
     const gh = await createProject({
       name: 'imported',
       repoKind: 'github',
       githubRepo: 'octocat/hello',
     });
-    expect((await req(s.app, 'GET', `/api/projects/${gh.id}/tree`)).status).toBe(404);
     expect((await req(s.app, 'GET', `/api/projects/${gh.id}/files`)).status).toBe(404);
     expect((await req(s.app, 'GET', `/api/projects/${newUuidv7()}/files`)).status).toBe(404);
   });
@@ -465,7 +299,7 @@ describe('GitHub integration form (02 section 3: record surface + executor contr
     await git(['push', '-u', 'origin', 'main'], repoDir);
     const branch = conversationBranch(newUuidv7());
     expect((await git(['checkout', '-b', branch], repoDir)).code).toBe(0);
-    writeFileSync(join(repoDir, 'CHANGELOG.md'), '# changelog\n\n- conv 轮改动\n');
+    writeFileSync(join(repoDir, 'CHANGELOG.md'), '# changelog\n\n- conv round changes\n');
     await git(['add', '.'], repoDir);
     await git(['commit', '-m', 'feat: conv round'], repoDir);
     const push = await git(['push', '-u', 'origin', branch], repoDir);

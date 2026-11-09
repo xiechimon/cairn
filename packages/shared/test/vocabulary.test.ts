@@ -210,7 +210,7 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
   const has = (method: string, path: string) =>
     WEB_REST_ENDPOINTS.some((e) => e.method === method && e.path === path);
 
-  it('covers the observed GET list', () => {
+  it('covers the current GET list', () => {
     for (const [method, path] of [
       ['GET', '/api/auth/session'],
       ['GET', '/api/user/me'],
@@ -235,8 +235,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['GET', '/api/projects/{id}/branches'],
       ['GET', '/api/projects/{id}/tags'],
       ['GET', '/api/projects/{id}/builds'],
-      ['GET', '/api/projects/{id}/tree'],
-      ['GET', '/api/projects/{id}/file'],
       ['GET', '/api/projects/{id}/preview-token'],
       ['GET', '/api/todos'],
       ['GET', '/api/todos/{id}'],
@@ -251,6 +249,15 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
     ] as const) {
       expect(has(method, path), `${method} ${path}`).toBe(true);
     }
+  });
+
+  it.each([
+    '/api/projects/{id}/tree',
+    '/api/projects/{id}/file',
+    '/api/projects/{id}/commits',
+    '/api/projects/{id}/commits/{sha}',
+  ])('does not register retired project browser route %s', (path) => {
+    expect(has('GET', path)).toBe(false);
   });
 
   it('covers the observed POST/PATCH list', () => {
@@ -275,8 +282,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
   it('carries query vocabularies for the parameterized GETs', () => {
     const q = (path: string) => WEB_REST_ENDPOINTS.find((e) => e.path === path)?.query ?? [];
     expect(q('/api/projects')).toEqual(['teamId']);
-    expect(q('/api/projects/{id}/tree')).toEqual(['ref']);
-    expect(q('/api/projects/{id}/file')).toEqual(['path', 'ref']);
     expect(q('/api/projects/{id}/preview-token')).toEqual(['ref']);
     expect(q('/api/todos')).toEqual(['teamId']);
     expect(q('/api/schedules')).toEqual(['team']);

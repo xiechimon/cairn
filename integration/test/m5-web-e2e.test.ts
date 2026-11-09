@@ -11,6 +11,7 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { step as stepTable } from '../../apps/server/src/db/schema.js';
+import { readFile } from '../../apps/server/src/services/git.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
@@ -323,12 +324,8 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     }[];
     const projectId = projects[0]!.id;
     await waitFor(async () => {
-      const f = await api(
-        server.url,
-        'GET',
-        `/api/projects/${projectId}/file?path=README.md&ref=main`,
-      );
-      return f.status === 200 && (f.body as { content: string }).content.includes('m5 spine probe');
+      const file = await readFile(server, projectId, 'README.md', 'main').catch(() => null);
+      return file?.content.includes('m5 spine probe') ?? false;
     }, 30_000);
     expect(server.todoPhase(spine!.id)).toBe('done');
   }, 300_000);
