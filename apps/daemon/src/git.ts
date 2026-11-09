@@ -568,6 +568,40 @@ export const gitPrim = {
     await gitPrim.unstagePaths(dir, [path]);
   },
 
+  async resetPathsToHead(dir: string, paths: readonly string[]): Promise<void> {
+    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
+      const chunk = paths.slice(i, i + PATHSPEC_CHUNK);
+      const tracked = new Set(
+        (
+          await runGitOk(['ls-tree', '-r', '-z', '--name-only', 'HEAD', '--', ...chunk], {
+            cwd: dir,
+            env: { GIT_LITERAL_PATHSPECS: '1' },
+            timeoutMs: META_TIMEOUT_MS,
+          })
+        )
+          .split('\0')
+          .filter((path) => path !== ''),
+      );
+      const restore = chunk.filter((path) => tracked.has(path));
+      const drop = chunk.filter((path) => !tracked.has(path));
+      if (restore.length > 0) {
+        await runGitOk(['checkout', 'HEAD', '--', ...restore], {
+          cwd: dir,
+          env: { GIT_LITERAL_PATHSPECS: '1' },
+          timeoutMs: META_TIMEOUT_MS,
+        });
+      }
+      if (drop.length > 0) {
+        await runGitOk(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '--', ...drop], {
+          cwd: dir,
+          env: { GIT_LITERAL_PATHSPECS: '1' },
+          timeoutMs: META_TIMEOUT_MS,
+        });
+        for (const path of drop) rmSync(join(dir, path), { recursive: true, force: true });
+      }
+    }
+  },
+
   async unstagePaths(dir: string, paths: readonly string[]): Promise<void> {
     for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
       await runGitOk(['reset', '-q', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)], {

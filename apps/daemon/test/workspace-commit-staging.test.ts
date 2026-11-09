@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { commitEnv, runGit } from '../src/git.js';
+import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -136,6 +136,38 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
       'feature.txt',
     ]);
     expect(result.setupDrift).toEqual(['pnpm-lock.yaml']);
+  }, 60_000);
+
+  test('a merge step over a setup-edited tracked file that changed upstream elsewhere merges and regenerates the setup output', async () => {
+    await seedRepo(userRepo, 'sed -i "s/^alpha$/alpha-setup/" config.txt\n');
+    writeFileSync(join(userRepo, 'config.txt'), 'alpha\nbeta\ngamma\n');
+    await git(userRepo, ['add', 'config.txt']);
+    await git(userRepo, ['commit', '-m', 'config']);
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const prepared = await ws.prepare(prepareInput());
+    expect(readFileSync(join(prepared.cwd, 'config.txt'), 'utf8')).toBe(
+      'alpha-setup\nbeta\ngamma\n',
+    );
+    writeFileSync(join(prepared.cwd, 'feature.txt'), 'agent work\n');
+    const committed = await ws.commitAll(prepared.cwd, 'build: feature', IDENTITY);
+    expect(committed.setupDrift).toContain('config.txt');
+
+    writeFileSync(join(userRepo, 'config.txt'), 'alpha\nbeta\ngamma-upstream\n');
+    await git(userRepo, ['commit', '-am', 'upstream: gamma']);
+    await gitPrim.fetch(prepared.baseRepoDir, null);
+
+    await ws.mergeDefaultBranch(prepared.cwd, prepared.defaultBranch, null);
+
+    expect(readFileSync(join(prepared.cwd, 'config.txt'), 'utf8')).toBe(
+      'alpha-setup\nbeta\ngamma-upstream\n',
+    );
+    expect(await git(prepared.cwd, ['show', 'HEAD:config.txt'])).toBe(
+      'alpha\nbeta\ngamma-upstream',
+    );
+    writeFileSync(join(prepared.cwd, 'after.txt'), 'more agent work\n');
+    const next = await ws.commitAll(prepared.cwd, 'build: after merge', IDENTITY);
+    expect(next.setupDrift).toContain('config.txt');
+    expect(await committedPaths(prepared.cwd)).toEqual(['after.txt']);
   }, 60_000);
 
   test('an agent making a setup-written script executable is the agent change and is committed', async () => {

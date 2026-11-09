@@ -1983,7 +1983,7 @@ async function runClaimedStep(
         });
       }
       if (claimed.step.kind === 'merge') {
-        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch);
+        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, creds.git);
         transcript.upsert({
           id: `merge-${stepId}`,
           role: 'system',
