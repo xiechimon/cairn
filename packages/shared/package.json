@@ -15,15 +15,18 @@
     "./merge-gate": "./src/records/merge-gate.ts",
     "./otel": "./src/otel.ts",
     "./repo-cache": "./src/repo-cache.ts",
-    "./commit-identity": "./src/commit-identity.ts"
+    "./commit-identity": "./src/commit-identity.ts",
+    "./langfuse": "./src/langfuse.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@langfuse/client": "6.1.1",
     "@langfuse/core": "6.1.1",
     "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/context-async-hooks": "3.1.0",
     "@opentelemetry/core": "3.1.0",
     "@opentelemetry/exporter-trace-otlp-http": "0.301.0",
     "@opentelemetry/resources": "3.1.0",
