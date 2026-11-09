@@ -23,7 +23,7 @@ export interface TailnetOwnerPolicy {
   ownerLogin: string | null;
   selfTagged: boolean;
   allowedLogins: readonly string[];
-  selfAddresses: readonly string[];
+  selfAddresses: readonly string[] | null;
 }
 
 interface TailnetListenerEnv {
@@ -81,7 +81,11 @@ export function tailnetOwnerIdentityOf(c: Context): TailnetIdentity | null {
   if (identity === null) return null;
   const policy = listener.ownerPolicy();
   const source = c.req.header(FORWARDED_FOR_HEADER)?.split(',')[0]?.trim();
-  if (source !== undefined && policy.selfAddresses.includes(source)) return null;
+  if (
+    source !== undefined &&
+    (policy.selfAddresses === null || policy.selfAddresses.includes(source))
+  )
+    return null;
   const allowed =
     !policy.selfTagged && policy.ownerLogin !== null
       ? identity.login === policy.ownerLogin

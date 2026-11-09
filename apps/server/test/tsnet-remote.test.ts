@@ -340,6 +340,72 @@ describe('enabled', () => {
       expect(actual).toBe(expected);
     },
   );
+  const selfTrafficStatus = (home: string, source: string) =>
+    new Promise<number>((resolve, reject) => {
+      const req = request(
+        {
+          socketPath: tsnetPathsOf(home).socketPath,
+          path: '/api/teams',
+          headers: {
+            host: 'cairn.tail.example',
+            'Tailscale-User-Login': 'owner@example.com',
+            'X-Forwarded-For': source,
+          },
+        },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+  test('socket-only identity behind Serve is refused while the self addresses were never read', async () => {
+    const home = freshHome();
+    const s = bootServer({ authToken: TOKEN });
+    const remote = await startTsnetRemote({
+      settings: settings(home, { mode: 'socket', allowedLogins: ['owner@example.com'] }),
+      homeDir: home,
+      app: s.app,
+      authToken: TOKEN,
+      logger: silentLogger,
+      readLocalStatus: async () => {
+        throw new Error('LocalAPI unavailable');
+      },
+    });
+    if (remote !== null) stoppers.push(() => remote.stop());
+    expect(await selfTrafficStatus(home, '100.64.0.7')).toBe(401);
+    expect(await selfTrafficStatus(home, '100.64.0.9')).toBe(401);
+  });
+  test('socket-only self addresses survive a failed LocalAPI refresh', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval'] });
+    const home = freshHome();
+    const s = bootServer({ authToken: TOKEN });
+    let available = true;
+    const remote = await startTsnetRemote({
+      settings: settings(home, { mode: 'socket', allowedLogins: ['owner@example.com'] }),
+      homeDir: home,
+      app: s.app,
+      authToken: TOKEN,
+      logger: silentLogger,
+      readLocalStatus: async () => {
+        if (!available) throw new Error('LocalAPI unavailable');
+        return {
+          BackendState: 'Running',
+          Self: { UserID: 7, DNSName: 'cairn.tail.example.' },
+          User: { '7': { LoginName: 'owner@example.com' } },
+          TailscaleIPs: ['100.64.0.7'],
+        };
+      },
+    });
+    if (remote !== null) stoppers.push(() => remote.stop());
+    available = false;
+    await vi.advanceTimersByTimeAsync(30_000);
+    vi.useRealTimers();
+    expect(remote?.status().ownerLogin).toBeNull();
+    expect(await selfTrafficStatus(home, '100.64.0.7')).toBe(401);
+    expect(await selfTrafficStatus(home, '100.64.0.9')).toBe(200);
+  });
   test('socket-only startup needs no binary, spawns nothing and uses explicit allowlist when LocalAPI is unavailable', async () => {
     const home = freshHome();
     const s = bootServer({ authToken: TOKEN });
