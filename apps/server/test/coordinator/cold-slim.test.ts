@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   COLD_CACHE_MISS_MIN_TOKENS,
   COLD_RECENT_EXCHANGES,
+  coldWindowStartFromRows,
   isColdResume,
   projectColdMessages,
   retentionMsFor,
@@ -193,6 +194,17 @@ describe('projectColdMessages', () => {
     });
     expect(out.some((message) => userText(message).includes('<summary>'))).toBe(true);
     expect(out.some((message) => userText(message) === 'now')).toBe(true);
+  });
+});
+
+describe('coldWindowStartFromRows', () => {
+  it('returns the oldest row inside the recent exchange window', () => {
+    const newestFirst = [];
+    for (let i = 20; i >= 0; i--) {
+      newestFirst.push({ at: i * 10, rowid: i, role: i % 2 === 0 ? 'user' : 'assistant' });
+    }
+    const start = coldWindowStartFromRows(newestFirst, 3);
+    expect(start).toEqual({ at: 160, rowid: 16 });
   });
 });
 
