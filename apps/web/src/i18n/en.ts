@@ -259,8 +259,6 @@ export const EN: Record<string, string> = {
   执行中: 'Running',
   已完成: 'Done',
   暂无: 'None',
-  // Paper card footer (DESIGN.md 任务卡): needs-you state flag + action link
-  待确认: 'Plan to confirm',
   审阅: 'Review',
   回复: 'Reply',
   选中文字的操作: 'Selection actions',
