@@ -73,7 +73,7 @@ export function MachinesPage() {
       testId="resource-empty"
       className="mt-6"
       icon={Monitor}
-      title={t('尚无机器。')}
+      title={t('尚无机器')}
       description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
       action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
     />

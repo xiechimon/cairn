@@ -273,3 +273,35 @@ test('ACP children remove inherited token variables when the step uses an App fi
   expect(inherited?.GH_TOKEN).toBeUndefined();
   expect(inherited?.GITHUB_TOKEN).toBeUndefined();
 });
+
+test.each(['new', 'load', 'resume'])(
+  'Gemini %s delivers runtime guidance through the ACP prompt',
+  async (mode) => {
+    const agent = backend({ ACP_RESUME: mode });
+    const sessionOpts = {
+      ...opts,
+      systemPrompt: 'Agent description\nMemory sentinel\nProject instructions',
+    };
+    const session =
+      mode === 'new'
+        ? await agent.createSession(sessionOpts)
+        : await agent.continueSession('session-1', sessionOpts);
+    const events = await collect(session.events);
+    expect(events.filter((event) => event.type === 'text_delta')).toEqual([
+      { type: 'text_delta', text: `${sessionOpts.systemPrompt}\n\n${opts.prompt}` },
+    ]);
+    expect(events).toContainEqual({ type: 'done', usage: [] });
+  },
+);
+
+test.each(['load', 'resume'])(
+  'Gemini %s without a new user prompt does not send runtime guidance as a turn',
+  async (mode) => {
+    const session = await backend({ ACP_RESUME: mode }).continueSession('session-1', {
+      ...opts,
+      prompt: undefined,
+      systemPrompt: 'Runtime guidance',
+    });
+    expect(await collect(session.events)).toEqual([]);
+  },
+);
