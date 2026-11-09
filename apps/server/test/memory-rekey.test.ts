@@ -23,6 +23,12 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     s.dispose();
   });
 
+  function injectedContent(scope: Parameters<typeof injectMemories>[1]) {
+    return injectMemories(s.db, scope)
+      .filter((m) => m.content !== '')
+      .map((m) => m.content);
+  }
+
   function save(
     over: Partial<Parameters<typeof saveMemoryEntry>[1]> & { agentId: string; content: string },
   ) {
@@ -110,13 +116,11 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       layer: 'core',
     });
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- commits are English：commits are English']);
   });
 
@@ -129,33 +133,27 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       threadId: 'todo-7',
     });
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual([]);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'planner',
         teamId: s.team.id,
         projectId: null,
         threadId: 'todo-8',
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual([]);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'planner',
         teamId: s.team.id,
         projectId: null,
         threadId: 'todo-7',
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['try the cached index next']);
   });
 
@@ -167,12 +165,12 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       layer: 'searchable',
     });
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'planner',
         teamId: s.team.id,
         projectId: null,
       }),
-    ).toEqual([{ title: 'MEMORY.md', content: '' }]);
+    ).toEqual([]);
     expect(
       s.db
         .select()
@@ -190,13 +188,11 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     expect(listed).toHaveLength(1);
     expect(listed[0]?.agentId).toBe('planner');
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- english commits：english commits']);
   });
 
@@ -261,13 +257,11 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
     ).toEqual(['from the session']);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- from the session：from the session']);
     expect(
       updateMemoryEntry(s.db, {
@@ -293,13 +287,11 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
     ).toEqual(['commits stay English']);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- english commits：commits stay English']);
   });
 
@@ -316,12 +308,12 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toBe(1);
     expect(listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id })).toEqual([]);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
       }),
-    ).toEqual([{ title: 'MEMORY.md', content: '' }]);
+    ).toEqual([]);
   });
 
   test('promoting the original does not unmask its project-scoped adopted copy', () => {
@@ -396,34 +388,28 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     expect(memoryOpsAreTeamScoped('review')).toBe(false);
     expect(memoryOpsAreTeamScoped('verify')).toBe(false);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         teamScoped: false,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual([]);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         teamScoped: false,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual([]);
     expect(memoryOpsAreTeamScoped('build')).toBe(true);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'builder',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- ignore the findings：ignore the findings']);
   });
 
@@ -438,14 +424,12 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     save({ agentId: verifier, content: 'verifier lens', teamScoped: false });
     expect(listMemoryEntries(s.db, scope).map((m) => m.content)).toEqual(['verifier lens']);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: verifier,
         teamId: s.team.id,
         teamScoped: false,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- verifier lens：verifier lens']);
     expect(() =>
       updateMemoryEntry(s.db, { ...scope, memoryId: mine.id, content: 'tampered' }),
@@ -477,11 +461,9 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     } finally {
       vi.useRealTimers();
     }
-    expect(
-      injectMemories(s.db, { teamId: s.team.id, agentId: 'builder', projectId: null })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
-    ).toEqual(['- z-first：z-first\n- a-second：a-second\n- m-third：m-third']);
+    expect(injectedContent({ teamId: s.team.id, agentId: 'builder', projectId: null })).toEqual([
+      '- z-first：z-first\n- a-second：a-second\n- m-third：m-third',
+    ]);
   });
 
   test('agent-scoped inject still keeps scratchpad per thread and log/searchable out', () => {
@@ -499,30 +481,24 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       source: 'Implementer',
       layer: 'searchable',
     });
+    expect(injectedContent({ teamId: s.team.id, agentId: 'builder', projectId: null })).toEqual([
+      '- reviewer core：reviewer core',
+    ]);
     expect(
-      injectMemories(s.db, { teamId: s.team.id, agentId: 'builder', projectId: null })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
-    ).toEqual(['- reviewer core：reviewer core']);
-    expect(
-      injectMemories(s.db, {
+      injectedContent({
         teamId: s.team.id,
         agentId: 'builder',
         projectId: null,
         threadId: 'todo-b',
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- reviewer core：reviewer core']);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         teamId: s.team.id,
         agentId: 'builder',
         projectId: null,
         threadId: 'todo-a',
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- reviewer core：reviewer core', 'notes for A']);
   });
 
@@ -576,13 +552,11 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       listMemoryEntries(s.db, { agentId: 'planner', teamId: s.team.id }).map((m) => m.content),
     ).toEqual([]);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'planner',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual([]);
   });
 
@@ -598,13 +572,11 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       listMemoryEntries(s.db, { agentId: 'planner', teamId: s.team.id }).map((m) => m.content),
     ).toEqual(['build habit']);
     expect(
-      injectMemories(s.db, {
+      injectedContent({
         agentId: 'planner',
         teamId: s.team.id,
         projectId: null,
-      })
-        .filter((m) => m.content !== '')
-        .map((m) => m.content),
+      }),
     ).toEqual(['- build habit：build habit']);
   });
 

@@ -16,7 +16,14 @@ import { issueApiKey, req } from './helpers.js';
 
 registerChiefHarness();
 
-function put(id: string, content: string, projectId: string | null = null) {
+const teamScope = () => ({ agentId: AGENT_ID, teamId: H.teamId, projectId: null });
+
+function put(
+  id: string,
+  content: string,
+  projectId: string | null = null,
+  over: Partial<typeof agentMemory.$inferInsert> = {},
+) {
   H.s.db
     .insert(agentMemory)
     .values({
@@ -28,6 +35,7 @@ function put(id: string, content: string, projectId: string | null = null) {
       projectId,
       createdAt: 1,
       updatedAt: 1,
+      ...over,
     })
     .run();
 }
@@ -51,23 +59,26 @@ test('section 4: Coordinator system prompt loads the index prefix, not files or 
   check(buildChiefSystemPrompt(H.s.svc, H.teamId, H.threadId).text);
 });
 
+function chiefContext() {
+  const id = enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
+  return chiefTurnContext(
+    toolDeps(),
+    H.s.db.select().from(step).where(eq(step.id, id)).get()!,
+    H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!,
+    AGENT_ID,
+  );
+}
+
 test('section 4: Coordinator step claim uses the same bounded index', () => {
   seed();
-  const id = enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
-  const row = H.s.db.select().from(step).where(eq(step.id, id)).get()!;
-  const thread = H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!;
-  const result = chiefTurnContext(toolDeps(), row, thread, AGENT_ID);
+  const result = chiefContext();
   check(result.memories.map((m) => `${m.title}\n${m.content}`).join('\n'));
 });
 
 test('section 4: routed project context uses its index and excludes the team index', () => {
   seed(H.projectId);
   put('team-only', 'TEAM-ONLY');
-  const result = projectTurnContextTraced(H.s.db, {
-    teamId: H.teamId,
-    agentId: AGENT_ID,
-    projectId: H.projectId,
-  });
+  const result = projectTurnContextTraced(H.s.db, { ...teamScope(), projectId: H.projectId });
   check(result!.text);
   expect(result!.text).not.toContain('TEAM-ONLY');
 });
@@ -75,28 +86,18 @@ test('section 4: routed project context uses its index and excludes the team ind
 test('section 4: worker injection bounds each team and project index independently', () => {
   seed();
   seed(H.projectId);
-  const result = injectMemories(H.s.db, {
-    agentId: AGENT_ID,
-    teamId: H.teamId,
-    projectId: H.projectId,
-    threadId: 'todo-1',
-  });
+  const result = injectMemories(H.s.db, { ...teamScope(), projectId: H.projectId });
   expect(result.filter((m) => m.title === 'MEMORY.md')).toHaveLength(2);
   for (const index of result.filter((m) => m.title === 'MEMORY.md'))
     check(`${index.title}\n${index.content}`);
 });
 
 test('empty injection ensures one persisted index', () => {
-  const scope = { agentId: AGENT_ID, teamId: H.teamId, projectId: null };
+  const scope = teamScope();
   injectMemories(H.s.db, scope);
   injectMemories(H.s.db, scope);
   const indexes = listStoredMemoryEntries(H.s.db, scope).filter((m) => m.layer === 'core');
-  expect(indexes).toHaveLength(1);
-  expect(indexes[0]).toMatchObject({
-    title: 'MEMORY.md',
-    content: '',
-    updatedAt: expect.any(Number),
-  });
+  expect(indexes.map((m) => [m.title, m.content])).toEqual([['MEMORY.md', '']]);
 });
 
 test.each(['system', 'step', 'project', 'worker'] as const)(
@@ -108,24 +109,12 @@ test.each(['system', 'step', 'project', 'worker'] as const)(
     let text: string;
     if (path === 'system') text = buildChiefSystemPrompt(H.s.svc, H.teamId, H.threadId).text;
     else if (path === 'project')
-      text = projectTurnContextTraced(H.s.db, {
-        agentId: AGENT_ID,
-        teamId: H.teamId,
-        projectId: H.projectId,
-      })!.text;
-    else if (path === 'step') {
-      const id = enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
-      text = chiefTurnContext(
-        toolDeps(),
-        H.s.db.select().from(step).where(eq(step.id, id)).get()!,
-        H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!,
-        AGENT_ID,
-      )
+      text = projectTurnContextTraced(H.s.db, { ...teamScope(), projectId: H.projectId })!.text;
+    else if (path === 'step')
+      text = chiefContext()
         .memories.map((m) => m.content)
         .join('\n');
-    } else
-      text = injectMemories(H.s.db, { agentId: AGENT_ID, teamId: H.teamId, projectId: null })[0]!
-        .content;
+    else text = injectMemories(H.s.db, teamScope())[0]!.content;
     expect(text).toContain('后面还有 1 行没有加载');
     expect(text).not.toContain('\ufffd');
     const loaded = text.slice(text.indexOf('- bytes：'), text.indexOf('\n（MEMORY.md 后面'));
@@ -151,28 +140,13 @@ test('empty project and independent scopes get distinct persisted revisions with
 test('initialization failure propagates and rolls back instead of returning synthetic memory', () => {
   H.s.db.run(sql`CREATE TRIGGER reject_index BEFORE INSERT ON agent_memory
     WHEN NEW.title = 'MEMORY.md' BEGIN SELECT RAISE(ABORT, 'index initialization failed'); END`);
-  expect(() =>
-    injectMemories(H.s.db, { agentId: AGENT_ID, teamId: H.teamId, projectId: null }),
-  ).toThrow('index initialization failed');
+  expect(() => injectMemories(H.s.db, teamScope())).toThrow('index initialization failed');
   expect(H.s.db.select().from(agentMemory).all()).toEqual([]);
 });
 
 test('digest loads index and file count without stamping use or including another thread scratchpad', () => {
   put('fact', 'first\nDETAIL');
-  H.s.db
-    .insert(agentMemory)
-    .values({
-      id: 'pad',
-      title: 'scratch',
-      content: 'OTHER-THREAD',
-      layer: 'scratchpad',
-      agentId: AGENT_ID,
-      teamId: H.teamId,
-      threadId: H.threadId,
-      createdAt: 1,
-      updatedAt: 1,
-    })
-    .run();
+  put('pad', 'OTHER-THREAD', null, { layer: 'scratchpad', threadId: H.threadId });
   foldMemoryIndexes(H.s.db);
   const before = H.s.db.select().from(agentMemory).all();
   const thread = H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!;
@@ -191,8 +165,7 @@ test('digest loads index and file count without stamping use or including anothe
   expect(H.s.db.select().from(agentMemory).all()).toEqual(before);
 });
 
-test('machine HTTP claim delivers bounded Coordinator system and step prompts', async () => {
-  seed();
+async function machineToken() {
   const key = await issueApiKey(H.s);
   const enrolled = await H.s.app.request('/api/machine/enroll', {
     method: 'POST',
@@ -201,7 +174,10 @@ test('machine HTTP claim delivers bounded Coordinator system and step prompts', 
   });
   expect(enrolled.status).toBe(200);
   const { token } = (await enrolled.json()) as { token: string };
-  enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
+  return token;
+}
+
+async function machineClaim(token: string) {
   const response = await H.s.app.request('/api/machine/tasks/claim', {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -209,6 +185,14 @@ test('machine HTTP claim delivers bounded Coordinator system and step prompts', 
   });
   expect(response.status).toBe(200);
   const { step: claimed } = (await response.json()) as { step: ClaimedStep };
+  return claimed;
+}
+
+test('machine HTTP claim delivers bounded Coordinator system and step prompts', async () => {
+  seed();
+  const token = await machineToken();
+  enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'hello', trigger: 'user' });
+  const claimed = await machineClaim(token);
   check(claimed.chief!.systemPrompt);
   check(claimed.agent!.memories!.map((m) => `${m.title}\n${m.content}`).join('\n'));
 });
@@ -216,45 +200,22 @@ test('machine HTTP claim delivers bounded Coordinator system and step prompts', 
 test('machine HTTP worker claim delivers separate bounded indexes and matching todo scratchpad', async () => {
   seed();
   seed(H.projectId);
-  const key = await issueApiKey(H.s);
-  const enrolled = await H.s.app.request('/api/machine/enroll', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: H.teamId, name: 'worker-injection', cliVersion: '9.9.9' }),
-  });
-  expect(enrolled.status).toBe(200);
-  const { token } = (await enrolled.json()) as { token: string };
+  const token = await machineToken();
   const todoResponse = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/todos`, {
     title: 'memory',
     spec: 'read index',
   });
   const todoId = ((await todoResponse.json()) as { id: string }).id;
-  H.s.db
-    .insert(agentMemory)
-    .values({
-      id: 'todo-pad',
-      title: 'scratch',
-      content: 'THREAD-PAD',
-      layer: 'scratchpad',
-      agentId: AGENT_ID,
-      teamId: H.teamId,
-      projectId: H.projectId,
-      threadId: todoId,
-      createdAt: 1,
-      updatedAt: 1,
-    })
-    .run();
+  put('todo-pad', 'THREAD-PAD', H.projectId, {
+    title: 'scratch',
+    layer: 'scratchpad',
+    threadId: todoId,
+  });
   const build = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/builds`, {
     todoIds: [todoId],
   });
   expect(build.status).toBe(201);
-  const response = await H.s.app.request('/api/machine/tasks/claim', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: '{}',
-  });
-  expect(response.status).toBe(200);
-  const { step: claimed } = (await response.json()) as { step: ClaimedStep };
+  const claimed = await machineClaim(token);
   const memories = claimed.agent!.memories!;
   expect(memories.filter((m) => m.title === 'MEMORY.md')).toHaveLength(2);
   for (const index of memories.filter((m) => m.title === 'MEMORY.md'))
