@@ -10,7 +10,6 @@ import {
 } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
@@ -23,8 +22,10 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { recordOutsideLocation } from '../settings/settings-href.js';
 import { useAttentionTitle } from './attention-title.js';
 import { fleetStatus } from './fleet-status.js';
-import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
+import { waitingProjectIds } from './sidebar-projects.js';
+import { needsYouBadge } from './tasks-sections.js';
+import { useTasksView } from './use-tasks-view.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
 
@@ -67,6 +68,7 @@ export function AppSidebar({
         name: p.name,
         icon: p.icon,
         color: p.color,
+        group: p.group,
         archivedAt: p.archivedAt,
       }));
     }
@@ -109,8 +111,9 @@ export function AppSidebar({
     () => todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos),
     [todos, live, todosQ.data, fixture.todos],
   );
-  const chiefRoot = useOptionalChiefRoot();
-  useAttentionTitle(needsYouCount(resolvedTodos, chiefRoot?.pendingQuestions.length ?? 0));
+  const tasks = useTasksView(fixture);
+  const waiting = useMemo(() => waitingProjectIds(tasks), [tasks]);
+  useAttentionTitle(needsYouBadge(tasks.entries, tasks.questions));
   const fixtureMachines = fixture.resources?.machines;
   const fleet = fleetStatus(live ? (machinesQ.data ?? []) : (fixtureMachines ?? []));
   const machinesOnline =
@@ -121,30 +124,36 @@ export function AppSidebar({
     [pathname, locationSearch],
   );
   useTypeToCompose();
-  const archiveProject = (id: string, archived: boolean) => {
+  const archiveProject = (id: string) => {
     mutations.setProjectArchived.mutate(
-      { id, archived },
+      { id, archived: true },
       {
         onSuccess: () => {
-          if (archived && new URLSearchParams(locationSearch).get('project') === id) {
+          if (new URLSearchParams(locationSearch).get('project') === id) {
             navigate({ pathname: '/app' });
           }
         },
-        onError: (error) =>
-          toastError(t(archived ? '无法归档项目。' : '无法取消归档项目。'), error),
+        onError: (error) => toastError(t('无法归档项目。'), error),
       },
+    );
+  };
+  const moveProject = (id: string, group: string | null) => {
+    mutations.patchProject.mutate(
+      { id, body: { group } },
+      { onError: (error) => toastError(t('无法移动项目。'), error) },
     );
   };
   const sidebarProps = {
     machinesOnline,
     machinesOffline: fleet.offline,
     offlineMachineNames: fleet.offlineNames,
-    todos: resolvedTodos,
+    waiting,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     usageNav: fixture.usageNav === true,
     selected,
     projects,
     onArchiveProject: live ? archiveProject : undefined,
+    onMoveProject: live ? moveProject : undefined,
     projectsState:
       projectsPhase === 'loading' || projectsPhase === 'error' ? projectsPhase : undefined,
     onRetryProjects: () => {
