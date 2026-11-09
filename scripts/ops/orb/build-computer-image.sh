@@ -102,7 +102,7 @@ guest_major=$(guest /usr/bin/node -p 'process.versions.node.split(".")[0]' | tr 
 for binary in Xvfb x11vnc fluxbox xdotool chromium import; do
   guest runuser -u agent -- sh -c "command -v $binary" > /dev/null || { printf '%s is not runnable by agent\n' "$binary" >&2; exit 1; }
 done
-guest runuser -u agent -- npm install -g "agent-browser@${agent_browser_version}"
+guest npm install -g "agent-browser@${agent_browser_version}"
 guest runuser -u agent -- sh -c 'command -v agent-browser' > /dev/null || {
   printf 'agent-browser is not runnable by agent\n' >&2
   exit 1
@@ -159,6 +159,7 @@ StartLimitIntervalSec=0
 User=agent
 Environment=CAIRN_ORB=1
 Environment=DISPLAY=:1
+Environment=AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 Restart=always
 RestartSec=1
 ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/computer.sock ]; do sleep 1; done'

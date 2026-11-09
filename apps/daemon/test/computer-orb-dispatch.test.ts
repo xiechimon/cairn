@@ -173,6 +173,40 @@ describe('orb routing', () => {
     expect(fake.frames.some((frame) => frame.kind === 'done')).toBe(true);
   });
 
+  test('browser_snapshot truncates oversized done text', async () => {
+    const fake = fakeClient();
+    const huge = 'x'.repeat(70_000);
+    const provider: ComputerProvider = {
+      async execute(request) {
+        expect(request.env).toBeUndefined();
+        return (async function* () {
+          yield { kind: 'stdout' as const, text: huge };
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: { forScope: () => provider, async killAll() {} },
+      ...FAST,
+    });
+    await dispatcher.dispatch(call('browser_snapshot', {}, { scopeKey: 'chief:c1' }));
+    const done = fake.frames.find((frame) => frame.kind === 'done');
+    expect(done?.kind).toBe('done');
+    if (done?.kind === 'done') {
+      expect(done.text.length).toBeLessThanOrEqual(64 * 1024);
+      expect(done.text.endsWith('[browser output truncated]')).toBe(true);
+    }
+  });
+
   test('the Orb shell keeps the desktop-protection guard but not the cairn host rules', async () => {
     const log: string[] = [];
     const fake = fakeClient();

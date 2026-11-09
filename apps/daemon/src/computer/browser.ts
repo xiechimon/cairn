@@ -39,7 +39,12 @@ export interface BrowserRunOptions {
   signal: AbortSignal;
   session?: string;
   binary?: string;
-  env?: Readonly<Record<string, string>>;
+}
+
+export function browserSessionName(scopeKey: string | undefined): string {
+  if (scopeKey === undefined || scopeKey.length === 0) return AGENT_BROWSER_SESSION;
+  const cleaned = scopeKey.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+  return cleaned.length > 0 ? cleaned.slice(0, 64) : AGENT_BROWSER_SESSION;
 }
 
 function sessionFlag(session: string): string[] {
@@ -48,6 +53,14 @@ function sessionFlag(session: string): string[] {
 
 function headedFlags(): string[] {
   return ['--headed'];
+}
+
+function bareRef(ref: string): string {
+  return ref.startsWith('@') ? ref.slice(1) : ref;
+}
+
+function normalizeRef(ref: string): string {
+  return `@${bareRef(ref)}`;
 }
 
 async function collectExecute(
@@ -59,7 +72,6 @@ async function collectExecute(
     argv: [...argv],
     timeoutMs: options.timeoutMs,
     signal: options.signal,
-    ...(options.env ? { env: options.env } : {}),
   });
   let text = '';
   let code: number | null = null;
@@ -68,10 +80,6 @@ async function collectExecute(
     else if (event.kind === 'exit') code = event.code;
   }
   return { text: text.trim(), code };
-}
-
-function normalizeRef(ref: string): string {
-  return ref.startsWith('@') ? ref : `@${ref}`;
 }
 
 function actionArgv(action: z.infer<typeof actActionSchema>): string[] {
@@ -95,7 +103,7 @@ function actionArgv(action: z.infer<typeof actActionSchema>): string[] {
       if (action.text === undefined) {
         throw new ComputerRefusal(`browser_act ${action.kind} needs text`);
       }
-      return [action.kind, ref, '--', action.text];
+      return [action.kind, ref, action.text];
     case 'press':
       if (action.text === undefined) {
         throw new ComputerRefusal('browser_act press needs text (the key name)');
@@ -109,8 +117,11 @@ function actionArgv(action: z.infer<typeof actActionSchema>): string[] {
 }
 
 function refPresent(snapshot: string, ref: string): boolean {
-  const needle = normalizeRef(ref);
-  return snapshot.includes(needle);
+  return snapshot.includes(`[ref=${bareRef(ref)}]`);
+}
+
+function refuse(message: string, started: boolean): never {
+  throw new ComputerRefusal(message, started ? 'unknown' : 'not_delivered');
 }
 
 export async function runBrowserTool(
@@ -120,54 +131,69 @@ export async function runBrowserTool(
   options: BrowserRunOptions,
 ): Promise<string> {
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
-  const session = options.session ?? AGENT_BROWSER_SESSION;
+  const session = browserSessionName(options.session);
   const prefix = [binary, ...sessionFlag(session), ...headedFlags()];
+  let started = false;
+
+  const execute = async (argv: readonly string[]) => {
+    started = true;
+    return collectExecute(provider, argv, options);
+  };
 
   if (tool === 'browser_navigate') {
     const parsed = navigateParams.safeParse(params);
     if (!parsed.success) {
-      throw new ComputerRefusal('browser_navigate needs a non-empty url string');
+      refuse('browser_navigate needs a non-empty url string', started);
     }
     const url = parsed.data.url;
     if (!/^https?:\/\//i.test(url)) {
-      throw new ComputerRefusal('browser_navigate only accepts http(s) URLs');
+      refuse('browser_navigate only accepts http(s) URLs', started);
     }
-    const result = await collectExecute(provider, [...prefix, 'open', url], options);
+    const result = await execute([...prefix, 'open', url]);
     if (result.code !== 0 && result.code !== null) {
-      throw new ComputerRefusal(
-        result.text || `agent-browser open failed with exit code ${result.code}`,
-      );
+      refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
     }
     return result.text || `opened ${url}`;
   }
 
   if (tool === 'browser_snapshot') {
-    const result = await collectExecute(provider, [...prefix, 'snapshot', '-i'], options);
-    if (result.code !== 0 && result.code !== null && result.text === '') {
-      throw new ComputerRefusal(`agent-browser snapshot failed with exit code ${result.code}`);
+    const result = await execute([...prefix, 'snapshot', '-i']);
+    if (result.code !== 0 && result.code !== null) {
+      refuse(result.text || `agent-browser snapshot failed with exit code ${result.code}`, started);
     }
     return result.text || '(empty snapshot)';
   }
 
   const parsed = actParams.safeParse(params);
   if (!parsed.success) {
-    throw new ComputerRefusal('browser_act needs a non-empty actions list');
+    refuse('browser_act needs a non-empty actions list', started);
   }
   const lines: string[] = [];
   for (const action of parsed.data.actions) {
     if (action.ref !== undefined) {
-      const snap = await collectExecute(provider, [...prefix, 'snapshot', '-i'], options);
+      const snap = await execute([...prefix, 'snapshot', '-i']);
+      if (snap.code !== 0 && snap.code !== null) {
+        refuse(snap.text || `agent-browser snapshot failed with exit code ${snap.code}`, started);
+      }
       if (!refPresent(snap.text, action.ref)) {
-        throw new ComputerRefusal(
+        refuse(
           `ref ${normalizeRef(action.ref)} was not in a fresh snapshot; take browser_snapshot again`,
+          started,
         );
       }
     }
-    const argv = [...prefix, ...actionArgv(action)];
-    const result = await collectExecute(provider, argv, options);
+    let argv: string[];
+    try {
+      argv = actionArgv(action);
+    } catch (error) {
+      if (error instanceof ComputerRefusal) refuse(error.message, started);
+      throw error;
+    }
+    const result = await execute([...prefix, ...argv]);
     if (result.code !== 0 && result.code !== null) {
-      throw new ComputerRefusal(
+      refuse(
         result.text || `agent-browser ${action.kind} failed with exit code ${result.code}`,
+        started,
       );
     }
     lines.push(result.text || `${action.kind} ok`);

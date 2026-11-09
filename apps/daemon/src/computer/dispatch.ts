@@ -7,7 +7,7 @@ import {
 import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
-import { AGENT_BROWSER_SESSION, type BrowserToolName, runBrowserTool } from './browser.js';
+import { type BrowserToolName, runBrowserTool } from './browser.js';
 import { FramePoster } from './frame-poster.js';
 import {
   desktopProtectionGuardMessage,
@@ -27,6 +27,7 @@ import {
 export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provider';
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
 export const FILE_TRUNCATED_MARKER = '\n[file truncated]';
+export const BROWSER_TRUNCATED_MARKER = '\n[browser output truncated]';
 
 export const COMPUTER_COMMAND_TIMEOUT_MS = 5 * 60_000;
 export const COMPUTER_OUTPUT_CAP_CHARS = 2 * 1024 * 1024;
@@ -383,6 +384,14 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     await poster.finish({ kind: 'done', text });
   }
 
+  function boundBrowserText(text: string): string {
+    if (text.length <= COMPUTER_FRAME_TEXT_MAX_CHARS) return text;
+    return (
+      text.slice(0, COMPUTER_FRAME_TEXT_MAX_CHARS - BROWSER_TRUNCATED_MARKER.length) +
+      BROWSER_TRUNCATED_MARKER
+    );
+  }
+
   async function handleBrowser(
     call: ComputerCall,
     route: Route,
@@ -398,17 +407,12 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       text = await runBrowserTool(route.provider, call.tool as BrowserToolName, call.params, {
         timeoutMs: Math.max(0, call.deadlineAt - now() - FINAL_FRAME_MARGIN_MS),
         signal: controller.signal,
-        session: call.scopeKey ?? AGENT_BROWSER_SESSION,
-        env: {
-          DISPLAY: ':1',
-          AGENT_BROWSER_EXECUTABLE_PATH: '/usr/bin/chromium',
-          AGENT_BROWSER_HEADED: '1',
-        },
+        session: call.scopeKey,
       });
     } catch (error) {
       await poster.finish(
         error instanceof ComputerRefusal
-          ? { kind: 'error', message: error.message, delivery: 'not_delivered' }
+          ? { kind: 'error', message: error.message, delivery: error.delivery }
           : {
               kind: 'error',
               message: 'The browser operation failed',
@@ -418,7 +422,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return;
     }
     if (poster.abandoned) return;
-    await poster.finish({ kind: 'done', text });
+    await poster.finish({ kind: 'done', text: boundBrowserText(text) });
   }
 
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
