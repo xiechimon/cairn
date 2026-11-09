@@ -147,6 +147,10 @@ export const EN: Record<string, string> = {
     'Lets agents operate apps on this computer. macOS needs Accessibility permission.',
   浏览器: 'Browser',
   '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
+  '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',
+  '这台机器已不再报告浏览器能力；可关闭已保存的偏好。':
+    'This machine no longer reports browser capability; you can turn off the saved preference.',
+  '浏览器偏好已绑定到另一台机器。': 'The browser preference is already bound to another machine.',
   '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
     'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',
@@ -381,7 +385,7 @@ export const EN: Record<string, string> = {
   面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
-  '搜索任务、项目、成员…': 'Search todos, projects, members…',
+  '搜索任务、项目…': 'Search todos, projects…',
   最近: 'Recent',
   '{dir} 里的仓库': 'Repositories in {dir}',
   查找文件夹或粘贴路径: 'Find a folder or paste a path',
@@ -1439,6 +1443,7 @@ export const EN: Record<string, string> = {
   规则与策略: 'Rules & policies',
   正在加载规则与策略: 'Loading rules & policies',
   规则与策略没能加载: 'Rules & policies did not load',
+  打开工作路由: 'Open work routing',
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
@@ -1540,7 +1545,6 @@ export const EN: Record<string, string> = {
   没有匹配的设置: 'No matching settings',
   只影响这台设备: 'Applies to this device only',
   模型与账户: 'Models & accounts',
-  工作路由: 'Work routing',
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
   '还没有路由规则。': 'No routing rules yet.',
@@ -1556,10 +1560,6 @@ export const EN: Record<string, string> = {
   '把固定在这台机器上的路由规则一起迁到另一台机器。':
     'Move the routing rules pinned to this machine to another machine.',
   引文检查: 'Citation check',
-  'Agent 已由路由规则取代': 'Agents are replaced by routing rules',
-  '模型、机器和权限现在由工作路由规则与工作策略决定。':
-    'Models, machines and permissions are now set by work routing rules and work policies.',
-  打开工作路由: 'Open work routing',
   模型与首选机器: 'Model and preferred machine',
   首选机器: 'Preferred machine',
   不固定: 'Any machine',

@@ -125,7 +125,7 @@ The per-task orb differentiator and the execution targets of D101: how a user se
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view and control handover have no design<br>Backend design: no design for computer access grants, the guard and the screen channel |
+| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view, browser toggle and control handover have no design<br>Backend design: no design for computer access grants, the browser preference, the guard and the screen channel |
 | [Per-task orb isolation](#orb-isolation) | 1 | Frontend design: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine |
 | [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | Research: no note comparing E2B and Daytona against the dispatch contract<br>Frontend design: no design for adding a sandbox provider and its key<br>Backend design: no design for the E2B and Daytona providers, key injection and teardown |
 
@@ -215,11 +215,11 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### agent-computer
 
-**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and control in the web app.
+**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
 
 - Research: [docs/research/coordinator-computer.md](research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view and control handover have no design
-- Backend design: **gap**: no design for computer access grants, the guard and the screen channel
+- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
 
 ### coordinator-chat
 
@@ -455,7 +455,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### account-and-team
 
-**Account and team** (shipped). The user's account, the team, its members and the PR attribution settings.
+**Account and team** (shipped). The user's account, the team record and the PR attribution settings.
 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](design/references/settings)

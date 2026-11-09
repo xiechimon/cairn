@@ -162,6 +162,21 @@ describe('host computer execute', () => {
     expect(result.stdout.trim()).toBe('token=[] call=[set]');
   });
 
+  test('agent-browser children keep the configured Chromium path', async () => {
+    const result = await run(
+      provider({
+        env: {
+          PATH: process.env.PATH,
+          HOME: home,
+          CAIRN_MACHINE_TOKEN: 'daemon-secret',
+          AGENT_BROWSER_EXECUTABLE_PATH: '/usr/bin/chromium',
+        },
+      }),
+      'printf %s "$AGENT_BROWSER_EXECUTABLE_PATH"',
+    );
+    expect(result.stdout).toBe('/usr/bin/chromium');
+  });
+
   test('a command that exits before its timeout keeps its exit code while output drains', async () => {
     const result = await run(provider({ streamDrainMs: 1_500 }), 'echo completed; exit 0', {
       timeoutMs: 700,
