@@ -25,9 +25,9 @@
     },
     {
       "file": "apps/web/src/chief/memory-tab.tsx",
-      "anchor": "rounded-none border-0 px-3 py-2.5 text-left",
+      "anchor": "rounded-none border-0 px-3 py-3 text-left",
       "kind": "deviation",
-      "reason": "Coordinator memory list row: a full-width Button between hairline dividers with no card, as in the claude.ai memory list. The hover fill must cover the whole row edge to edge (V21), and a radius would leave rounded fill corners against the square dividers, so the box stays square."
+      "reason": "Coordinator memory list row: a full-width Button between hairline dividers with no card, as in the Claude Code project memory page. The hover fill must cover the whole row edge to edge (V21), and a radius would leave rounded fill corners against the square dividers, so the box stays square."
     },
     {
       "file": "apps/web/src/components/thread/scheduled-task-row.tsx",
