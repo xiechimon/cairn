@@ -1,3 +1,6 @@
+import '../../temp-environment.test.mjs';
+import './lane-temp.test.mjs';
+import './temp-reclaim.test.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {

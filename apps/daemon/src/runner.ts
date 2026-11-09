@@ -71,6 +71,7 @@ import {
   transcriptPromptRowId,
   withCoAuthor,
 } from '@cairn/shared';
+import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
 import { prepareFileAttachment } from './attach-file.js';
@@ -986,8 +987,22 @@ async function runClaimedStep(
           GITHUB_TOKEN: creds.git.password,
         })
       : {};
+  let temporary: ReturnType<typeof createTempEnvironment>;
+  try {
+    temporary = createTempEnvironment({ ...process.env, ...opts.env });
+  } catch (error) {
+    await failStep(
+      deps,
+      heartbeat,
+      stepId,
+      `Temporary directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return;
+  }
+  credentialCleanups.push(temporary.cleanup);
   const stepEnv: Record<string, string> = {
     ...opts.env,
+    ...temporary.env,
     ...stepGitEnv,
     ...(readonlyWorkspace ? READONLY_GIT_ENV : {}),
   };

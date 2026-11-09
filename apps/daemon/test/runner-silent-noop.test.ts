@@ -1,3 +1,4 @@
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -137,10 +138,14 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-function scriptedBackend(script: StepEvent[]): { backend: AgentBackend; handle: null } {
+function scriptedBackend(
+  script: StepEvent[],
+  inspect?: (opts: SessionOpts) => void,
+): { backend: AgentBackend; handle: null } {
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
-    async createSession(_sessionOpts: SessionOpts): Promise<AgentSessionHandle> {
+    async createSession(sessionOpts: SessionOpts): Promise<AgentSessionHandle> {
+      inspect?.(sessionOpts);
       return {
         sessionId: 'pi-sess-noop',
         events: (async function* () {
@@ -151,20 +156,23 @@ function scriptedBackend(script: StepEvent[]): { backend: AgentBackend; handle: 
         usage: () => [],
       };
     },
-    async continueSession(): Promise<never> {
-      throw new Error('unused');
+    async continueSession(_id, sessionOpts): Promise<AgentSessionHandle> {
+      return backend.createSession(sessionOpts);
     },
   };
   return { backend, handle: null };
 }
 
-async function runNoopCase(script: StepEvent[]) {
+async function runNoopCase(
+  script: StepEvent[],
+  temporary?: { inspect: (opts: SessionOpts) => void; root: string; continuing?: boolean },
+) {
   const home = testTempDir('cairn-runner-noop-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
-  const { backend } = scriptedBackend(script);
+  const { backend } = scriptedBackend(script, temporary?.inspect);
   const deps = {
     client,
     journal,
@@ -175,7 +183,15 @@ async function runNoopCase(script: StepEvent[]) {
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
   };
-  await runStep(deps, claimedStep());
+  const claimed = claimedStep();
+  if (temporary?.continuing) claimed.session = { action: 'continue', sessionId: 'prior' };
+  await runStep(
+    deps,
+    claimed,
+    temporary
+      ? { env: { CAIRN_TEST_TEMP_ROOT: temporary.root, CAIRN_HEAVY_SLOTS_DIR: '/shared/slots' } }
+      : {},
+  );
   return { client, lines };
 }
 
@@ -254,3 +270,24 @@ describe('pi prompt() preflight rejection surfaces (#698 hole 2: swallowed error
     }
   }, 15_000);
 });
+
+for (const mode of ['new', 'continue', 'failed'] as const) {
+  test(`step temp environment is private on disk and reclaimed after ${mode}`, async () => {
+    const root = testTempDir('step-disk-');
+    let allocated: string | undefined;
+    const { client } = await runNoopCase(mode === 'failed' ? [] : [{ type: 'done', usage: [] }], {
+      root,
+      continuing: mode === 'continue',
+      inspect(opts) {
+        allocated = opts.env?.TMPDIR;
+        expect(allocated?.startsWith(`${root}/ct-`)).toBe(true);
+        expect(opts.env?.CAIRN_HEAVY_SLOTS_DIR).toBe('/shared/slots');
+        expect(existsSync(allocated!)).toBe(true);
+        writeFileSync(join(allocated!, 'step-file'), 'owned');
+      },
+    });
+    expect(allocated).toBeDefined();
+    expect(existsSync(allocated!)).toBe(false);
+    expect(client.doneBodies[0]?.body.status).toBe(mode === 'failed' ? 'failed' : 'success');
+  });
+}

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { createTempEnvironment } from '../packages/shared/src/node/temp-environment.ts';
 import { spawnOwned } from './owned-process.mjs';
 
 const [separator, command, ...args] = process.argv.slice(2);
@@ -11,13 +11,14 @@ if (separator !== '--' || !command) {
 }
 
 const runId = randomUUID();
-const root = join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `ct-${runId.slice(0, 8)}`);
-mkdirSync(root, { mode: 0o700 });
+const temporary = createTempEnvironment();
+const root = temporary.root;
 const report = join(root, 'allocations.jsonl');
 writeFileSync(report, '', { flag: 'wx', mode: 0o600 });
 const owned = spawnOwned(command, args, {
   env: {
     ...process.env,
+    ...temporary.env,
     CAIRN_TEST_RUN_ID: runId,
     CAIRN_TEST_TEMP_STRICT: '1',
     CAIRN_TEST_TEMP_REPORT: report,
@@ -69,7 +70,7 @@ function finish(code) {
       console.error(`test-temp-run: survivor ${path}`);
       rmSync(path, { recursive: true, force: true });
     }
-    rmSync(root, { recursive: true, force: true });
+    temporary.cleanup();
   } catch {
     console.error('test-temp-run: survivor inspection or cleanup failed');
     failed = true;
