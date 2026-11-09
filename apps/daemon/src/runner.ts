@@ -811,6 +811,7 @@ async function runClaimedStep(
       return verifyRewindError;
     }
     try {
+      rmSync(join(ws.cwd, '.cairn-verify'), { recursive: true, force: true });
       await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
     } catch (error) {
       verifyRewindError = error instanceof Error ? error.message : String(error);

@@ -129,15 +129,20 @@ async function setup(opts: { withVerifierRoute?: boolean } = {}) {
     enqueueVerify(buildId: string) {
       maybeEnqueueVerifyStep(s.svc, this.todoRow(), buildId);
     },
-    async claim() {
+    async tryClaim(supportsAttachmentVerify = true) {
       const res = await call(s.app, 'POST', '/api/machine/tasks/claim', {
         cred: machineToken,
-        body: {},
+        body: supportsAttachmentVerify ? { verifyAttachments: true } : {},
       });
       const body = (await res.json()) as { step?: unknown };
-      if (!body.step) throw new Error('claim returned no step');
+      if (!body.step) return null;
       const parsed = claimedStepSchema.parse(body.step);
       return { stepId: parsed.step.id, kind: parsed.step.kind };
+    },
+    async claim() {
+      const claimed = await this.tryClaim();
+      if (claimed === null) throw new Error('claim returned no step');
+      return claimed;
     },
     async done(stepId: string, body: Record<string, unknown>) {
       const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
@@ -405,3 +410,36 @@ test('a failed verify enqueue rolls back its evidence snapshot and announcement'
       .some((row) => row.content === VERIFY_ANNOUNCEMENT),
   ).toBe(false);
 });
+
+test.each(['attachments', 'repository'] as const)(
+  'legacy claim cannot take %s attachment-only work without a current-request capability',
+  async (evidenceStore) => {
+    world = await setup();
+    const w = world;
+    const buildId = await w.startBuild();
+    w.s.db
+      .update(projectTable)
+      .set({ evidenceStore })
+      .where(eq(projectTable.id, w.todoRow().projectId))
+      .run();
+    const author = await w.claim();
+    await w.done(author.stepId, { status: 'success', hasChanges: true, commit: HEAD });
+    w.enqueueVerify(buildId);
+    if (evidenceStore === 'repository') {
+      expect((await w.tryClaim(false))?.kind).toBe('verify');
+      return;
+    }
+    expect(await w.tryClaim(false)).toBeNull();
+    expect(w.stepsOf(buildId).find((row) => row.kind === 'verify')?.status).toBe('pending');
+    const verifier = await w.claim();
+    expect(verifier.kind).toBe('verify');
+    await w.done(verifier.stepId, {
+      status: 'success',
+      commit: HEAD,
+      verifyVerdict: { passed: true, conclusion: 'checked', evidence: [] },
+    });
+    maybeEnqueueVerifyStep(w.s.svc, w.todoRow(), buildId, { reverify: true });
+    expect(await w.tryClaim(false)).toBeNull();
+    expect((await w.claim()).kind).toBe('verify');
+  },
+);
