@@ -23,7 +23,7 @@ One `SettingsCard` titled `已归档项目`. Each row is a `SettingsRow`:
 | Rows | One row per archived project. Active projects are not listed; they are managed from the sidebar and project settings. |
 | Unarchiving | That row's button is disabled while the request runs. |
 | Unarchived | The row leaves the list and the project reappears in the sidebar (the mutation invalidates the shared queries). |
-| Unarchive failed | The row stays; `toastError('无法取消归档项目。', error)`. |
+| Unarchive failed | The row stays; a toast titled `取消归档失败，请重试。` with no server detail (UI rule C5). |
 | Phone width | Settings collapses to its list; the section is one more entry, and its rows follow the shared `SettingsRow` narrow layout. |
 
 Fixture mode reads `FixtureSet.archivedProjects` (id, name, archivedAt) so the gallery and e2e can show rows without a server.

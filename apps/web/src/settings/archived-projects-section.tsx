@@ -1,6 +1,7 @@
 import { Archive } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { toast } from 'sonner';
 import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
@@ -13,7 +14,6 @@ import {
   SettingsSection,
 } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
@@ -43,8 +43,8 @@ export function ArchivedProjectsSection() {
   ).toSorted((a, b) => b.archivedAt - a.archivedAt);
   const now = Date.now();
   const unarchive = (id: string) =>
-    startUnarchive(id, inFlight, setInFlight, mutations.setProjectArchived, (error) =>
-      toastError(t('无法取消归档项目。'), error),
+    startUnarchive(id, inFlight, setInFlight, mutations.setProjectArchived, () =>
+      toast.error(t('取消归档失败，请重试。')),
     );
   return (
     <PageShell route={`${SETTINGS_HREF}/projects`} title={t('项目')} fixture={fixture}>

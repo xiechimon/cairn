@@ -54,7 +54,9 @@ test('with nothing archived the section says so', async ({ page }) => {
 test('a failed unarchive keeps the row and says why', async ({ page }) => {
   await open(page, { failUnarchive: true });
   await rows(page).filter({ hasText: 'probe-older' }).getByTestId('archived-project-unarchive').click();
-  await expect(page.locator('[data-sonner-toast]').first()).toContainText('无法取消归档项目。');
+  const toast = page.locator('[data-sonner-toast]').first();
+  await expect(toast).toContainText('取消归档失败，请重试。');
+  await expect(toast).not.toContainText('boom');
   await expect(rows(page)).toHaveCount(2);
   await evidenceShot(page, 'archived-projects-unarchive-failed.png');
 });
