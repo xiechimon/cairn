@@ -377,7 +377,7 @@ test('schedule loading and failed loads never masquerade as an empty list', asyn
   await expect(page.getByText('No schedules yet', { exact: true })).toHaveCount(0);
   probe.rejectLoads(true);
   probe.releaseLoads();
-  await expect(page.getByTestId('schedules-error')).toContainText('Scheduled tasks could not be loaded.');
+  await expect(page.getByTestId('schedules-error')).toContainText('Scheduled tasks could not be loaded');
   await expect(page.getByText('No schedules yet', { exact: true })).toHaveCount(0);
   probe.rejectLoads(false);
   await page.getByTestId('schedules-error').getByRole('button', { name: 'Retry', exact: true }).click();

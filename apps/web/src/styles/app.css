@@ -326,6 +326,22 @@
   backdrop-filter: none;
 }
 
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"],
+[data-slot="dialog-content"] {
+  transition-property: opacity, transform, translate, scale, visibility;
+}
+
+[data-slot="empty-title"] {
+  letter-spacing: normal;
+}
+
+[data-slot="switch"],
+[data-slot="badge"],
+[data-slot="tabs-trigger"] {
+  transition-property: color, background-color, border-color;
+}
+
 .overlay-backdrop {
   z-index: var(--z-modal-scrim);
 }
