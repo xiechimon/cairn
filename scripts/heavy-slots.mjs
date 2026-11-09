@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   readdirSync,
@@ -9,9 +9,10 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { constants as osConstants, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { runOwned } from './owned-process.mjs';
 
 const DEFAULT_SLOTS = 2;
 const POLL_MS = 250;
@@ -285,14 +286,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     process.exit(2);
   }
   const lease = await acquireSlot();
-  const child = spawn(command[0], command.slice(1), { stdio: 'inherit', env: leaseEnv(lease) });
-  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
-    process.on(signal, () => child.kill(signal));
-  child.on('error', (error) => {
-    console.error(`[heavy-slots] ${command[0]}: ${error.message}`);
-    process.exit(127);
-  });
-  child.on('exit', (code, signal) =>
-    process.exit(code ?? 128 + (osConstants.signals[signal] ?? 0)),
+  process.exit(
+    await runOwned(command[0], command.slice(1), { env: leaseEnv(lease), name: 'heavy-slot' }),
   );
 }

@@ -66,7 +66,6 @@ export interface TodoRecord {
   buildHistory: BuildRef[];
   sourceTodo: string | null;
   v: number;
-  awaitingReply?: boolean;
   chiefCreated?: boolean;
   waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };
   quotaWait?: QuotaWait | null;
@@ -506,11 +505,6 @@ export interface RevisionStep {
   };
 }
 
-export interface ChiefExample {
-  icon: 'user-plus' | 'folder' | 'grid' | 'bars';
-  text: string;
-}
-
 export interface ChiefSegment {
   text: string;
   code?: boolean;
@@ -608,7 +602,7 @@ export interface ChiefThreadRef {
   active?: boolean;
 }
 
-export type ChiefSettingsTab = 'agent' | 'charter' | 'memory' | 'watches';
+export type ChiefSettingsTab = 'routing' | 'charter' | 'memory' | 'watches';
 
 export interface ModelOption {
   provider: string;
@@ -620,7 +614,7 @@ export interface ModelOption {
 }
 
 export interface ChiefContent {
-  view: 'drawer' | 'settings' | 'none';
+  view: 'settings' | 'none';
   tab?: ChiefSettingsTab;
   bound: boolean;
   modelSlot?: string;
@@ -629,7 +623,6 @@ export interface ChiefContent {
   threadTitle: string;
   threadId?: string;
   threads?: ChiefThreadRef[];
-  examples?: ChiefExample[];
   draft?: string;
   stream?: ChiefStreamItem[];
   streamAt?: number[];

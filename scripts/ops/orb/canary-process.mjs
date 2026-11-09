@@ -2,6 +2,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { closeSync, openSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { spawnOwned } from '../../owned-process.mjs';
 
 export async function withCleanup(work) {
   const cleanups = [];
@@ -27,23 +28,14 @@ export async function withCleanup(work) {
 export function runCommand(
   command,
   args,
-  {
-    cwd,
-    env = process.env,
-    signal,
-    timeout = 120000,
-    maxBuffer = 1024 * 1024,
-    detached = false,
-  } = {},
+  { cwd, env = process.env, signal, timeout = 120000, maxBuffer = 1024 * 1024, owned = false } = {},
 ) {
   return new Promise((resolveCommand, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      env,
-      signal,
-      detached,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const stdio = ['ignore', 'pipe', 'pipe'];
+    const ownedChild = owned ? spawnOwned(command, args, { cwd, env, stdio }) : undefined;
+    if (ownedChild && signal)
+      signal.addEventListener('abort', () => ownedChild.stop(), { once: true });
+    const child = ownedChild ? ownedChild.child : spawn(command, args, { cwd, env, signal, stdio });
     const timer = timeout === null ? undefined : setTimeout(() => child.kill('SIGKILL'), timeout);
     let stdout = '';
     child.stdout.on('data', (chunk) => {
@@ -142,11 +134,11 @@ export function spawnRecordedChild(cwd, entry, args, env, record) {
         0o600,
       )
     : 'ignore';
-  const child = spawn(process.execPath, ['--import', 'tsx', entry, ...args], {
+  const { child } = spawnOwned(process.execPath, ['--import', 'tsx', entry, ...args], {
     cwd,
     env,
     stdio: ['ignore', log, log],
-    detached: true,
+    name: 'orb-canary-server',
   });
   if (typeof log === 'number') closeSync(log);
   child.on('error', () => {});

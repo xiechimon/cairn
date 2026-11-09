@@ -66,6 +66,8 @@ export interface SidecarStatus {
   authUrl: string | null;
   ips: string[];
   dnsName: string | null;
+  ownerLogin?: string | null;
+  selfTagged?: boolean;
   lastError: string | null;
   restarts: number;
 }
@@ -120,6 +122,8 @@ const sidecarEventSchema = z.discriminatedUnion('type', [
     type: z.literal('ready'),
     ips: z.array(z.string()).default([]),
     dnsName: z.string().min(1),
+    ownerLogin: z.string().trim().min(1).max(254).nullable().default(null),
+    selfTagged: z.boolean().default(false),
   }),
   z.object({ type: z.literal('error'), error: z.string() }),
   z.object({ type: z.literal('funnel') }).passthrough(),
@@ -195,6 +199,10 @@ export function superviseSidecar(input: SuperviseInput): SidecarSupervisor {
 
   function update(patch: Partial<SidecarStatus>): void {
     status = { ...status, ...patch };
+    if (status.state !== 'ready' || status.lastError !== null) {
+      status.ownerLogin = null;
+      status.selfTagged = false;
+    }
     input.onStatus?.(snapshot());
   }
 
@@ -222,6 +230,8 @@ export function superviseSidecar(input: SuperviseInput): SidecarSupervisor {
           authUrl: null,
           ips: event.ips,
           dnsName: event.dnsName,
+          ownerLogin: event.ownerLogin,
+          selfTagged: event.selfTagged,
           lastError: null,
         });
         return;

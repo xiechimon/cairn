@@ -35,6 +35,7 @@ import {
 } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
+import { stepNamesTask } from './task-naming.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
 import { updateAutonomousTodo, writebackSelfIssueTitle } from './todos.js';
 import { askWorkerQuestion, recordThreadReportLine } from './worker-questions.js';
@@ -123,6 +124,7 @@ export async function executeRelayToolCall(
       machineHub: deps.machineHub,
       box: deps.box,
       githubAppTokenSocket: deps.githubAppTokenSocket,
+      githubAppIdentity: deps.githubAppIdentity,
       user: deps.user,
       vapidKeys: deps.vapidKeys,
       reposDir: deps.reposDir,
@@ -173,7 +175,12 @@ async function executeWorkerMemoryToolCall(
     return recordThreadReportLine(deps, row, params.line);
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
-  if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);
+  if (name === 'set_task_meta') {
+    if (!stepNamesTask(deps.db, row)) {
+      throw new HttpError(409, 'set_task_meta is reserved for the first implementation step');
+    }
+    return setTaskMeta(deps, todoRow, params);
+  }
   const profile = profileForStep(deps.db, todoRow, row.kind, row.id);
   if (name === 'create_skill' || name === 'update_skill') {
     if (!profile) throw new HttpError(409, 'step has no routing rule — skill write has no actor');
@@ -309,6 +316,7 @@ async function setTaskMetaGithubForm(
     vapidKeys: deps.vapidKeys,
     box: deps.box,
     githubAppTokenSocket: deps.githubAppTokenSocket,
+    githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
   const record = updateAutonomousTodo(todoDeps, todoRow.id, {

@@ -7,6 +7,7 @@ import type {
   AgentSessionHandle,
   AgentTodoItem,
   AgentTokenUsage,
+  AnswerDeliveryVia,
   BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
@@ -28,8 +29,10 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendAnswers,
   appendBlockerHandoff,
   appendConfirmedPlanNote,
+  appendDecisionsNote,
   appendPlanLocationNote,
   appendReportLocationNote,
   appendWorkBranchNote,
@@ -50,6 +53,7 @@ import {
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
   LocalRepoUnreachableError,
+  localCommitIdentity,
   normalizeClaudeResetsAt,
   noVisionSignalOf,
   PLAN_FILE_NAME,
@@ -65,6 +69,7 @@ import {
   stripAnsiEscapes,
   subscriptionKeyOf,
   transcriptPromptRowId,
+  withCoAuthor,
 } from '@cairn/shared';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
@@ -113,7 +118,6 @@ import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImages } from './step-attachments.js';
-import { ensureStepCoauthor } from './step-attribution.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
@@ -202,9 +206,9 @@ export function streamTimeoutMessage(
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
   if (!todo) return claimed.instruction ?? '';
-  const taskText = appendBlockerHandoff(
-    buildTaskPromptText(todo.title, todo.spec, todo),
-    todo.blockerHandoff,
+  const taskText = appendDecisionsNote(
+    appendBlockerHandoff(buildTaskPromptText(todo.title, todo.spec, todo), todo.blockerHandoff),
+    todo.decisions,
   );
   const instruction = claimed.instruction ?? null;
   if (instruction !== null && instruction.trim() !== '') {
@@ -214,6 +218,13 @@ export function buildTaskPrompt(claimed: ClaimedStep): string {
     return composeTaskPromptWithInstruction(taskText, buildPlanFirstRoundInstruction());
   }
   return taskText;
+}
+
+function carriedAnswers(claimed: ClaimedStep): { requestId: string; text: string }[] {
+  const carried = new Set(claimed.answerIds ?? []);
+  return (claimed.todo?.decisions ?? [])
+    .filter((decision) => carried.has(decision.requestId))
+    .map((decision) => ({ requestId: decision.requestId, text: decision.answer }));
 }
 
 function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
@@ -282,9 +293,11 @@ export function composeTaskMetaInstruction(currentTitle: string, meta?: TaskMeta
 }
 
 function taskMetaOpts(
-  todo: ClaimedStep['todo'],
+  claimed: Pick<ClaimedStep, 'todo' | 'remoteTools'>,
 ): { taskMeta: { currentTitle: string; meta?: TaskMetaForm } } | undefined {
+  const { todo } = claimed;
   if (!todo) return undefined;
+  if (!claimed.remoteTools?.some((tool) => tool.name === 'set_task_meta')) return undefined;
   if (todo.meta?.titleFinal === true || isIssueSourcedTask(todo)) return undefined;
   return {
     taskMeta: {
@@ -461,7 +474,10 @@ async function runClaimedStep(
     (isChief || isReview || isVerify
       ? (claimed.instruction ?? '')
       : claimed.session.action === 'continue' && claimed.session.sessionId
-        ? (claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind])
+        ? appendAnswers(
+            claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind],
+            carriedAnswers(claimed),
+          )
         : buildTaskPrompt(claimed));
   const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
   const readonlyWorkspace = !isChief && claimed.todo?.output === 'info';
@@ -770,7 +786,7 @@ async function runClaimedStep(
     isChief && claimed.chief
       ? claimed.chief.systemPrompt
       : composeWorkerSystemPrompt(agent.description, agent.memories, {
-          ...taskMetaOpts(claimed.todo),
+          ...taskMetaOpts(claimed),
           attachments: true,
           ...(claimed.project !== undefined ? { project: claimed.project } : {}),
         });
@@ -824,10 +840,9 @@ async function runClaimedStep(
         onAudit: (line) => logger.step(line),
       })
     : null;
-  const stepIdentity: CommitIdentity = {
-    name: claimed.agent?.displayName ?? 'cairn-agent',
-    email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
-  };
+  const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
+  const stepIdentity: CommitIdentity =
+    appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
   const withStepGit = async (
     operation: (credential: BoundGitCredentials | null) => Promise<void>,
   ) => {
@@ -920,6 +935,13 @@ async function runClaimedStep(
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
   let askKeepAlive: (() => void) | null = null;
+  const answeredPolls = new Set<string>();
+  const ackAnswers = async (answerIds: readonly string[], via: AnswerDeliveryVia) => {
+    if (answerIds.length === 0) return;
+    await client.steerAck?.(stepId, { answerIds: [...answerIds], via }).catch((err: unknown) => {
+      logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  };
   const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
     if (client.askUser === undefined) throw new Error('ask channel unavailable');
     const requestId = `ask-${randomUUID()}`;
@@ -935,6 +957,9 @@ async function runClaimedStep(
         },
         { signal: askAbort.signal },
       );
+      if (response.status === 'answered' && !askAbort.signal.aborted) {
+        answeredPolls.add(requestId);
+      }
       return JSON.stringify(response);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1573,6 +1598,7 @@ async function runClaimedStep(
     }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     deps.sessionHandles?.set(stepId, handle);
+    let promptDelivered = false;
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
@@ -1582,9 +1608,19 @@ async function runClaimedStep(
     if (pass === 0) armDurationCap();
     try {
       for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
+        if (!promptDelivered) {
+          promptDelivered = true;
+          await ackAnswers(claimed.answerIds ?? [], 'session-start');
+        }
         if (ev.type === 'toolcall_end') {
           if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
           else runningToolCalls.delete(ev.call.id);
+          if (ev.call.result !== undefined && answeredPolls.size > 0) {
+            const result = JSON.stringify(ev.call.result);
+            const reached = [...answeredPolls].filter((id) => result.includes(id));
+            for (const id of reached) answeredPolls.delete(id);
+            await ackAnswers(reached, 'poll');
+          }
         }
         armWatchdog(streamTimeouts.idle, 'idle');
         armBodyTimeout();
@@ -1739,7 +1775,13 @@ async function runClaimedStep(
               const failureKind = lastErrorWasProcessCrash
                 ? 'other'
                 : classifyAgentFailure(ev.error.message);
-              if (failureKind === 'quota' || failureKind === 'capacity') {
+              if (
+                !lastErrorWasProcessCrash &&
+                classifyStepFailure(ev.error.message) === 'model_unavailable'
+              ) {
+                logger.step(`model unavailable: ${modelKey} — stopping session without retry`);
+                await handle.stop();
+              } else if (failureKind === 'quota' || failureKind === 'capacity') {
                 if (quotaTrip === null) {
                   quotaTrip = {
                     kind: failureKind,
@@ -1790,11 +1832,14 @@ async function runClaimedStep(
           default:
             break;
         }
+        if (classifyStepFailure(lastModelError ?? '') === 'model_unavailable') break;
       }
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }
     stop.detach();
+    if (classifyStepFailure(lastModelError ?? '') === 'model_unavailable')
+      lastError = lastModelError;
     {
       const failureText = lastModelError ?? lastError;
       const stopPending = stop.request !== null;
@@ -1816,6 +1861,7 @@ async function runClaimedStep(
         continue;
       }
     }
+    if (classifyStepFailure(lastModelError ?? lastError ?? '') === 'model_unavailable') break;
     if (pass === 0 && !sawProgress && quotaTrip === null) {
       const failureText = lastModelError ?? lastError;
       if (
@@ -1923,14 +1969,11 @@ async function runClaimedStep(
 
   const pushStep = (git: WorktreeOps, workspace: PreparedWorkspace) =>
     withStepGit(async (credential) => {
-      await ensureStepCoauthor(
-        workspace.cwd,
-        workspace.branch,
-        headAtStart,
-        tokenRes.coAuthor ?? null,
-        credential,
-      );
-      await git.push(workspace.cwd, workspace.branch, credential);
+      await git.push(workspace.cwd, workspace.branch, credential, {
+        base: headAtStart,
+        identity: appIdentity,
+        coAuthor: tokenRes.coAuthor ?? null,
+      });
     });
   let headCommit: string | null = null;
   let branchDrift: { expected: string; actual: string } | null = null;
@@ -1962,13 +2005,19 @@ async function runClaimedStep(
       const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
       const committed = await git.commitAll(
         ws.cwd,
-        tokenRes.coAuthor
-          ? `${commitMessage}\n\nCo-authored-by: ${tokenRes.coAuthor.name} <${tokenRes.coAuthor.email}>`
-          : commitMessage,
+        withCoAuthor(commitMessage, tokenRes.coAuthor ?? null),
         stepIdentity,
       );
+      if (committed.setupDrift.length > 0) {
+        transcript.upsert({
+          id: `setup-drift-${stepId}`,
+          role: 'system',
+          content: `Workspace setup changed ${committed.setupDrift.join(', ')}; these changes were left out of the commit because the agent did not make them.`,
+          createdAt: now(),
+        });
+      }
       if (claimed.step.kind === 'merge') {
-        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch);
+        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, creds.git);
         transcript.upsert({
           id: `merge-${stepId}`,
           role: 'system',
@@ -2018,9 +2067,7 @@ async function runClaimedStep(
           );
         }
       }
-      headCommit = tokenRes.coAuthor
-        ? await git.headCommit(ws.cwd)
-        : (committed.head ?? (await git.headCommit(ws.cwd)));
+      headCommit = await git.headCommit(ws.cwd);
       const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
       if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
         try {

@@ -144,13 +144,8 @@ export function HomeC({
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState('');
-  const { chiefData, chiefView, setChiefView } = surface;
+  const { chiefData } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
-  useEffect(() => {
-    if (chiefView !== 'drawer') return;
-    setChiefView('none');
-    composerRef.current?.focus({ preventScroll: true });
-  }, [chiefView, setChiefView]);
   const loaded = surface.load === 'ready';
   useEffect(() => {
     if (composeAt === null || !loaded) return;
@@ -427,8 +422,7 @@ export function HomeC({
         )}
         <ChiefScrollProvider>
           <ChiefConversation
-            variant="global"
-            chief={{ ...chiefData, stream: conversation, examples: undefined }}
+            chief={{ ...chiefData, stream: conversation }}
             onSend={
               thread.picked !== null
                 ? thread.send
@@ -464,9 +458,7 @@ export function HomeC({
                   composerRef={composerRef}
                   onPick={thread.pick}
                 />
-                <ComposerSetupHint
-                  onOpenCoordinatorSettings={() => surface.setChiefView('settings')}
-                />
+                <ComposerSetupHint />
               </>
             }
             composerRef={(node) => {

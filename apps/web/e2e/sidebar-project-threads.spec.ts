@@ -82,6 +82,30 @@ test('opening and closing a thread keeps the project filter', async ({ page }) =
   await expect(sidebar).not.toContainText('Other project');
 });
 
+test('Escape closes a thread the moment its panel appears', async ({ page }) => {
+  await open(page);
+  const sidebar = page.locator('aside.board-sidebar');
+  await sidebar.locator('[data-slot="sidebar-project-row"]', { hasText: PROJECT.name }).click();
+  await expect(sidebar).not.toContainText('Other project');
+  await page.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[data-testid="side-chat"]') === null) return;
+      observer.disconnect();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      document.documentElement.dataset.escapeSent = '';
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+  await sidebar
+    .locator('[data-slot="sidebar-thread-row"]', { hasText: 'Pick a provider' })
+    .getByRole('button')
+    .click();
+  await expect(page.locator('html')).toHaveAttribute('data-escape-sent', '');
+  await expect(page).not.toHaveURL(/[?&]thread=/);
+  await expect(page).toHaveURL(/[?&]project=proj-1/);
+  await expect(page.getByTestId('side-chat')).toHaveCount(0);
+});
+
 test('threads of an archived project leave the groups and counts until it is selected', async ({
   page,
 }) => {

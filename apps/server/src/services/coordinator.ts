@@ -1,51 +1,8 @@
 import type { CoordinatorPageQuery, CoordinatorPageResponse } from '@cairn/shared';
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { chiefMessage } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
 import { type ChiefDeps, chiefThreadView, coordinatorThreadRow, ensureChief } from './chief.js';
-
-function earlierThan(deps: ChiefDeps, threadId: string, messageId: string) {
-  const cursor = deps.db
-    .select({ createdAt: chiefMessage.createdAt, rowid: sql<number>`rowid` })
-    .from(chiefMessage)
-    .where(and(eq(chiefMessage.id, messageId), eq(chiefMessage.threadId, threadId)))
-    .get();
-  if (!cursor) throw new HttpError(404, `chief message ${messageId}`);
-  return or(
-    lt(chiefMessage.createdAt, cursor.createdAt),
-    and(eq(chiefMessage.createdAt, cursor.createdAt), sql`rowid < ${cursor.rowid}`),
-  );
-}
-
-export function chiefMessagePage(
-  deps: ChiefDeps,
-  threadId: string,
-  query: { before?: string; limit: number; projectId?: string },
-) {
-  const rows = deps.db
-    .select({
-      id: chiefMessage.id,
-      role: chiefMessage.role,
-      content: chiefMessage.content,
-      createdAt: chiefMessage.createdAt,
-      projectId: chiefMessage.projectId,
-    })
-    .from(chiefMessage)
-    .where(
-      and(
-        eq(chiefMessage.threadId, threadId),
-        query.projectId !== undefined ? eq(chiefMessage.projectId, query.projectId) : undefined,
-        query.before !== undefined ? earlierThan(deps, threadId, query.before) : undefined,
-      ),
-    )
-    .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
-    .limit(query.limit + 1)
-    .all();
-  return {
-    messages: rows.slice(0, query.limit).reverse(),
-    hasEarlier: rows.length > query.limit,
-  };
-}
+import { newestMessagePage } from './message-page.js';
 
 export function readCoordinatorPage(
   deps: ChiefDeps,
@@ -53,8 +10,22 @@ export function readCoordinatorPage(
   query: CoordinatorPageQuery,
 ): CoordinatorPageResponse {
   const thread = coordinatorThreadRow(deps, ensureChief(deps, teamId));
+  const page = newestMessagePage(
+    deps.db,
+    chiefMessage,
+    thread.id,
+    query,
+    query.projectId !== undefined ? eq(chiefMessage.projectId, query.projectId) : undefined,
+  );
   return {
     thread: chiefThreadView(deps, teamId, thread),
-    ...chiefMessagePage(deps, thread.id, query),
+    messages: page.messages.map((r) => ({
+      id: r.id,
+      role: r.role,
+      content: r.content,
+      createdAt: r.createdAt,
+      projectId: r.projectId,
+    })),
+    hasEarlier: page.hasEarlier,
   };
 }

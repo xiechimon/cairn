@@ -34,6 +34,7 @@ const repositoriesSchema = z.object({
 type CachedInstallation = {
   token: AppToken;
   expiresAt: number;
+  appSlug: string;
   repositories: Set<string>;
 };
 

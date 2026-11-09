@@ -1,6 +1,8 @@
 import { type ClaimedStep, FIXED_TAGS, todoRecordSchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { backfillFixedTags, seedFixedTags } from '../src/services/tags.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
@@ -149,6 +151,69 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
     expect(bad.status).toBe(400);
     const empty = await relay(s.app, token, step.step.id, { title: '   ' });
     expect(empty.status).toBe(400);
+    s.dispose();
+  });
+
+  function finishFirstStep(s: ReturnType<typeof bootServer>, stepId: string) {
+    s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: Date.now() })
+      .where(eq(stepTable.id, stepId))
+      .run();
+    const first = s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
+    if (!first) throw new Error('first step missing');
+    return first;
+  }
+
+  test.each(['session', 'review', 'verify'] as const)(
+    'a %s step after the first implementation step cannot rename the task',
+    async (kind) => {
+      const { s, token, step, todoId } = await world();
+      const first = finishFirstStep(s, step.step.id);
+      const before = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.title;
+      s.db
+        .insert(stepTable)
+        .values({
+          id: `later-${kind}`,
+          buildId: first.buildId,
+          kind,
+          machineId: first.machineId,
+          status: 'claimed',
+          claimedAt: Date.now(),
+          lastHeartbeatAt: Date.now(),
+          createdAt: Date.now(),
+        })
+        .run();
+      const res = await relay(s.app, token, `later-${kind}`, { title: '只读审核本轮变更' });
+      expect(res.status).toBe(409);
+      expect(s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.title).toBe(
+        before,
+      );
+      s.dispose();
+    },
+  );
+
+  test('a later implementation step is claimed without set_task_meta or the naming instruction', async () => {
+    const { s, token, step } = await world();
+    const first = finishFirstStep(s, step.step.id);
+    s.db
+      .insert(stepTable)
+      .values({
+        id: 'later-session',
+        buildId: first.buildId,
+        kind: 'session',
+        status: 'pending',
+        createdAt: Date.now(),
+      })
+      .run();
+    const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
+      cred: token,
+      body: {},
+    });
+    const { step: later } = (await claimRes.json()) as { step: ClaimedStep | null };
+    expect(later?.step.id).toBe('later-session');
+    expect(later?.remoteTools?.map((t) => t.name)).not.toContain('set_task_meta');
+    expect(later?.todo?.meta).toBeUndefined();
     s.dispose();
   });
 });

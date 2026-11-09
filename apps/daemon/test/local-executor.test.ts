@@ -16,6 +16,8 @@ import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
+const NO_PUBLICATION = { base: null, identity: null, coAuthor: null };
+
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 const PROJECT_ID = 'proj-local-1';
 const CONV_A = '01a0b86f-aaaa-72a8-bba4-75c5cfd6598f';
@@ -127,7 +129,7 @@ describe("local-shape landing (#1211: pushing the conv branch is the delivery, u
     const headBefore = await headOf(userRepo);
     const reflogBefore = await runGit(['reflog', 'main'], { cwd: userRepo });
 
-    await ws.push(prepared.cwd, prepared.branch, null);
+    await ws.push(prepared.cwd, prepared.branch, null, NO_PUBLICATION);
 
     const onUser = await runGit(['rev-parse', '--verify', `refs/heads/${prepared.branch}`], {
       cwd: userRepo,
@@ -155,7 +157,7 @@ describe("local-shape landing (#1211: pushing the conv branch is the delivery, u
     writeFileSync(join(userRepo, 'README.md'), '# user repo\nUSER UNCOMMITTED\n');
     const headBefore = await headOf(userRepo);
 
-    await ws.push(prepared.cwd, prepared.branch, null);
+    await ws.push(prepared.cwd, prepared.branch, null, NO_PUBLICATION);
 
     const onUser = await runGit(['rev-parse', '--verify', `refs/heads/${prepared.branch}`], {
       cwd: userRepo,
@@ -214,8 +216,8 @@ describe('per-step credential argv discipline (spec 12 G2-T2: capturing fork+exe
     await gitPrim.fetch(cloneDir, PROBE_CRED);
     await runGit(['checkout', '-b', conversationBranch(CONV_A)], { cwd: cloneDir });
     writeFileSync(join(cloneDir, 'work.txt'), 'x\n');
-    await gitPrim.addAll(cloneDir);
-    await gitPrim.commit(cloneDir, 'work', IDENTITY);
+    await gitPrim.addPaths(cloneDir, ['work.txt']);
+    await gitPrim.commit(cloneDir, 'work', IDENTITY, 30_000);
     await gitPrim.push(cloneDir, conversationBranch(CONV_A), PROBE_CRED);
 
     const argv = readFileSync(argvLog, 'utf8');

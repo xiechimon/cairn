@@ -2,7 +2,7 @@
 Category: Squashing a bot-opened PR attributed the main commit to the bot opener despite valid branch authorship
 Source: Issues #2024, #2028, #2088 and #2136; PRs #1828, #1906, #2027, #2134 and #2135 (2026-10-28..2026-10-29)
 Level: 2
-Safeguard: The unchanged commit-author workflow rejects bot authors; merge preparation reads the PR opener and every author and uses the existing identity-aware merge helper instead of an unconditional squash command; scripts/commit-author-policy.test.mjs enforces the same routing in AGENTS.md; since 2026-10-28
+Safeguard: Retired by #2289 (2026-11-08). The bot is now the only software author, every PR squashes, and commit-author is an allowlist (scripts/commit-identity.mjs) instead of a bot ban; the rebase route, single-commit rule and product 409 are deleted
 Intercepts: 2
 Recurrences: 2
 Notes: Issue #2088 repeated the bot squash authorship failure on dedf30ea. Issue #2136 repeated it on c683123a and tip 78b85594 after squash auto-merge of #2134 and #2135. The new AGENTS.md policy case fails against the unconditional re-arm instruction and passes after identity-aware routing; this does not establish which instruction caused the merge. The main author gate rejected both 51cab1f0 and 4bbfe50e, then c683123a and 78b85594. Branch commit authors alone did not predict GitHub squash authorship. The external helper refuses bot PRs without one Cairnwright-authored commit. The reviewed change is carried into a single-commit PR opened by the verified current user without rewriting existing branches or main history.

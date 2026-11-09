@@ -24,7 +24,7 @@ describe('busy spiral motion has one look', () => {
 
   test('every spiral drawing that takes `busy` renders the spiral-trace stroke', () => {
     const spiralFiles = files.filter(
-      ({ text }) => text.includes('SPIRAL_PATH') && /busy/.test(text) && text.includes('<path'),
+      ({ text }) => text.includes('BRAND_GLYPH') && /busy/.test(text) && text.includes('<path'),
     );
     expect(spiralFiles.length).toBeGreaterThan(0);
     for (const { path, text } of spiralFiles) {

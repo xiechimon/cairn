@@ -9,6 +9,7 @@ import {
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import {
   addChiefWatch,
+  enqueueOwnershipWake,
   fireDueChiefWakes,
   setChiefWake,
   triggerChiefWakes,
@@ -93,7 +94,7 @@ describe('a Coordinator turn records its project scope as data (D74 P3)', () => 
       threadId: H.threadId,
     });
     setTodoPhase(deps(), todoId, 'queued');
-    triggerChiefWakes(deps(), getTodo(deps(), todoId)!, 'review');
+    enqueueOwnershipWake(deps(), { id: todoId }, 'review');
     triggerChiefWakes(deps(), getTodo(deps(), todoId)!, 'done');
     const wakes = chiefSteps(H.threadId).filter((s) => s.prompt?.startsWith('[wake:'));
     expect(wakes.length).toBeGreaterThanOrEqual(2);

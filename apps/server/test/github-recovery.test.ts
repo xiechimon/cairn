@@ -10,7 +10,7 @@ import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { prepareRecoveryBranch } from '../src/services/github-recovery.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer, postProject } from './helpers.js';
+import { bootServer, postProject, teamPausedForTest } from './helpers.js';
 
 test('recovery publishes one exact revert commit on a named branch and preserves later changes', async () => {
   const dir = makeTestTempDir('server-recovery-');
@@ -31,8 +31,22 @@ test('recovery publishes one exact revert commit on a named branch and preserves
     git('add', 'later');
     git('commit', '-m', 'later');
     const base = git('rev-parse', 'HEAD');
-    const branch = await prepareRecoveryBranch(dir, base, bad, 'token' as AutonomousToken);
+    const bot = {
+      name: 'cairnwright[bot]',
+      email: '347615582+cairnwright[bot]@users.noreply.github.com',
+    };
+    const branch = await prepareRecoveryBranch({
+      url: dir,
+      base,
+      reverted: bad,
+      token: 'token' as AutonomousToken,
+      identity: bot,
+    });
     expect(branch).toBe(`cairn-recovery/${bad.slice(0, 8)}`);
+    expect(git('show', '-s', '--format=%an <%ae>|%cn <%ce>', branch)).toBe(
+      `${bot.name} <${bot.email}>|${bot.name} <${bot.email}>`,
+    );
+    expect(git('for-each-ref', 'refs/cairn')).toBe('');
     expect(git('show', `${branch}:file`)).toBe('good');
     expect(git('show', `${branch}:later`)).toBe('keep');
     expect(git('rev-list', '--count', `${base}..${branch}`)).toBe('1');
@@ -108,6 +122,16 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
         .where(eq(project.id, projectId))
         .run();
       s.db
+        .insert(project)
+        .values({
+          id: 'other-repo',
+          teamId: s.team.id,
+          name: 'other',
+          repoKind: 'github',
+          githubRepo: 'owner/other',
+        })
+        .run();
+      s.db
         .insert(todo)
         .values({
           id: 'todo-brake',
@@ -149,6 +173,12 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
       await poller.sweep();
       await poller.sweep();
       expect(labelAttempts).toBe(2);
+      for (const repo of ['owner/repo', 'owner/other'])
+        expect(writes).toContainEqual({
+          path: `/repos/${repo}/issues`,
+          body: expect.objectContaining({ labels: ['autonomy-paused'] }),
+        });
+      expect(teamPausedForTest(s.db, s.team.id)).toBe(true);
       expect(identities.length).toBeGreaterThan(0);
       expect(identities.every(Boolean)).toBe(true);
       if (reason !== null) {

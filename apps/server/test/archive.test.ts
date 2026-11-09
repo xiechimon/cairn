@@ -36,7 +36,7 @@ import { projectAtInFlightCap } from '../src/services/issue-intake.js';
 import { claimStep, fetchStop, finishStep } from '../src/services/machines.js';
 import { deleteProject } from '../src/services/projects.js';
 import { inFlightIssues } from '../src/services/scheduling/sweep.js';
-import { deleteTodo, resetTodo } from '../src/services/todos.js';
+import { deleteTodo, getTodo, resetTodo } from '../src/services/todos.js';
 import { bootServer, insertMachine, req, seedSessionRoute } from './helpers.js';
 
 const files: DocumentDiffFile[] = [{ path: 'retained.ts', additions: 1, deletions: 0, hunks: [] }];
@@ -389,7 +389,7 @@ test('archive completion keeps session, checkpoint, usage and clears unconsumed 
 
 test.each(['finish', 'abandon'] as const)('regular stop rows are cleared on %s', async (mode) => {
   const { s, deps, now } = world();
-  requestStop(deps, 'build-archive', { discard: false });
+  requestStop(deps, 'build-archive', { discard: false }, { actor: 'person', reason: 'test stop' });
   if (mode === 'finish') {
     const row = s.db.select().from(step).where(eq(step.id, 'step-archive')).get()!;
     applyStepFailure(deps, row, 'Failure before polling');
@@ -461,8 +461,12 @@ test.each(['confirm', 'review', 'failed'] as const)(
     const before = needsYouQuerySchema.parse(
       await (await req(s.app, 'GET', '/api/needs-you')).json(),
     );
-    expect(before.current).toHaveLength(1);
+    expect(before.current).toHaveLength(phase === 'failed' ? 0 : 1);
+    expect(getTodo(s.svc, 'todo-archive')?.owner).toBe(
+      phase === 'failed' ? 'coordinator' : 'owner',
+    );
     await action(s, 'archive');
+    expect(getTodo(s.svc, 'todo-archive')?.owner).toBeNull();
     expect(await (await req(s.app, 'GET', '/api/needs-you')).json()).toEqual({
       current: [],
       stale: [],
@@ -549,7 +553,7 @@ test.each([
 ] as const)('archive stop cleanup survives without triggers through %s', async (path) => {
   const { s, deps, now } = world();
   await action(s, 'archive');
-  requestStop(deps, 'build-archive', { discard: false });
+  requestStop(deps, 'build-archive', { discard: false }, { actor: 'person', reason: 'test stop' });
   const row = s.db.select().from(step).where(eq(step.id, 'step-archive')).get()!;
   if (path === 'stop') applyStoppedStep(deps, row.id);
   else if (path === 'failure') applyStepFailure(deps, row, 'Late failure');
@@ -566,7 +570,7 @@ test.each([
 
 test('a regular stop survives release and same-machine reclaim before its late poll', async () => {
   const { s, deps, machineId, now } = world();
-  requestStop(deps, 'build-archive', { discard: true });
+  requestStop(deps, 'build-archive', { discard: true }, { actor: 'person', reason: 'test stop' });
   sweepAbandonedBuildSteps(deps, now + 300_000);
   expect(s.db.select().from(step).where(eq(step.id, 'step-archive')).get()?.status).toBe('pending');
   expect((await claimStep(deps, machineId, s.team.id, 0, 'http://localhost'))?.step.id).toBe(
@@ -580,7 +584,9 @@ test.each(['stopped', 'success', 'failed'] as const)(
   'archive preserves pending stop-and-mark-done after a %s report',
   async (status) => {
     const { s, deps, machineId } = world();
-    expect(prepareStopForDone(deps, 'todo-archive')).toEqual({ state: 'stopping' });
+    expect(
+      prepareStopForDone(deps, 'todo-archive', { actor: 'person', reason: 'test stop' }),
+    ).toEqual({ state: 'stopping' });
     await action(s, 'archive');
     await finishStep(deps, machineId, 'step-archive', { status, hasChanges: true });
     expect(await action(s, 'unarchive')).toMatchObject({ phase: 'done', archivedAt: null });

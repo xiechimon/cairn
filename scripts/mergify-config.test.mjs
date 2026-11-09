@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { configPath, mergifyConfig } from './mergify-config.mjs';
@@ -44,7 +45,7 @@ const rules = Object.fromEntries(
 
 for (const [name, author, method] of [
   ['default', '- -author = cairnwright[bot]', 'squash'],
-  ['bot', '- author = cairnwright[bot]', 'rebase'],
+  ['bot', '- author = cairnwright[bot]', 'squash'],
 ])
   test(`the ${name} rule requires the review-gate check from GitHub Actions and keeps PR-only gates off the draft`, () => {
     const [queue, merge] = rules[name].split('    merge_conditions:\n');
@@ -64,7 +65,8 @@ for (const [name, author, method] of [
     assert.match(merge, /max_checks_retries: 1$/m);
   });
 
-test('neither queue caps commit count; merge-pr.sh still enforces bot single-commit rebase identity', () => {
+test('neither queue caps commit count, and both squash so the PR opener authors the main commit', () => {
+  assert.doesNotMatch(readFileSync(configPath, 'utf8'), /merge_method: rebase/);
   assert.doesNotMatch(rules.bot, /#commits/);
   assert.doesNotMatch(rules.default, /#commits/);
 });
@@ -84,7 +86,7 @@ test('eligible PRs enter the queue on their own, and no merge protection rule ca
 test('merge conditions never require a PR-only fact the queue draft cannot carry', () => {
   for (const name of ['default', 'bot']) {
     const merge = rules[name].split('    merge_conditions:\n')[1];
-    for (const fact of ['review-gate', 'merge-route', 'pr-evidence', 'commit-author'])
+    for (const fact of ['review-gate', 'merge-route', 'pr-evidence', 'commit-author', 'pr-size'])
       assert.doesNotMatch(merge, new RegExp(fact), `${name}: ${fact}`);
   }
 });
@@ -117,10 +119,28 @@ test('a PR the coordinator holds never enters the queue', () => {
   }
 });
 
-test('the review-gate bot may run dequeue, and writers keep the default', () => {
-  assert.match(config, /commands_restrictions:\n {2}dequeue:\n {4}conditions:\n/);
-  assert.match(config, / {10}- sender = github-actions\[bot\]\n/);
-  assert.match(config, / {10}- sender-permission >= write\n/);
+test('only writers may dequeue by command; the review-gate bot leaves it to the queue conditions', () => {
+  assert.match(
+    config,
+    /commands_restrictions:\n {2}dequeue:\n {4}conditions:\n {6}- sender-permission >= write\nmerge_queue:/,
+  );
+  assert.doesNotMatch(config, /github-actions\[bot\]/);
+});
+
+test('both queues size batches dynamically from one to four pull requests', () => {
+  for (const name of ['default', 'bot']) {
+    assert.match(rules[name], /\n {4}batch_size:\n {6}min: 1\n {6}max: 4\n/, name);
+    assert.doesNotMatch(rules[name], /batch_size: \d/, name);
+  }
+});
+
+test('queue entry needs a green pr-size check, and batch PRs are not held to it', () => {
+  for (const name of ['default', 'bot']) {
+    const [queue, merge] = rules[name].split('    merge_conditions:\n');
+    assert.match(queue, /- check-success = merge-route\n {6}- check-success = pr-size\n/, name);
+    assert.doesNotMatch(queue, /check-skipped = pr-size/, name);
+    assert.doesNotMatch(merge, /pr-size/, name);
+  }
 });
 
 test('both queues require zero unresolved review threads exactly once immediately after draft', () => {
@@ -129,4 +149,17 @@ test('both queues require zero unresolved review threads exactly once immediatel
     assert.match(queue, /- -draft\n {6}- '#review-threads-unresolved = 0'\n/, name);
     assert.equal(queue.match(/#review-threads-unresolved = 0/g)?.length, 1, name);
   }
+});
+
+test('no tracked code or workflow posts a Mergify command; the queue conditions drive the queue', () => {
+  const sources = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
+    .split('\0')
+    .filter(
+      (path) =>
+        /\.(mjs|cjs|js|ts|tsx|sh|py|ya?ml)$/.test(path) &&
+        !/\.(test|spec)\.[cm]?[jt]sx?$|\.test\.py$/.test(path) &&
+        !path.startsWith('docs/'),
+    );
+  const posting = sources.filter((path) => /@mergifyio\s+[a-z]/.test(readFileSync(path, 'utf8')));
+  assert.deepEqual(posting, []);
 });

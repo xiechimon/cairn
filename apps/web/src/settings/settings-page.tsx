@@ -16,7 +16,7 @@ import {
   Waypoints,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -95,10 +95,10 @@ const GROUPS: Group[] = [
     heading: '模型与账户',
     sections: [
       { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
-      { id: 'routing', label: '模型路由', Icon: Route, element: () => <ModelRoutingPage /> },
+      { id: 'routing', label: '用量与连接', Icon: Route, element: () => <ModelRoutingPage /> },
       {
         id: 'work-routing',
-        label: '工作路由',
+        label: '规则与策略',
         Icon: Waypoints,
         element: () => <RoutingSettingsPage />,
       },
@@ -159,14 +159,11 @@ export function SettingsPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
-  useEffect(() => {
+  useLayoutEffect(() => {
     windowRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      const overlayOpen = [...document.querySelectorAll('[data-open]')].some(
-        (el) => el.closest('.chief-drawer') === null,
-      );
-      if (overlayOpen) return;
+      if (document.querySelector('[data-open]') !== null) return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&

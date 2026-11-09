@@ -9,7 +9,7 @@
 3. **Read the linked issues**: the full text (including comments) of every issue referenced in the body / comments / commit messages / cross-links. Understand "what is being asked for" before judging "is what is given that thing".
 4. **Read the diff without switching branches**: use only `gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>` (after fetch); if you need a PR file's contents, write it to a one-off file and read that. **Never `gh pr checkout`, never `git switch`** — this repo runs many lanes in parallel for the long term, each building in its own worktree; the moment a reviewer checks out, the worktree jumps onto someone else's branch and smashes the construction site; reviewing is a read-only action and changes no working-tree state.
    - Code files touched by the diff are read **in full** (no truncation) before being compared against the diff; code paths the diff does not touch but that verifying the behavior requires (callers, the other end of an interface, shared surfaces) are read as well.
-5. **Check whether docs need to stay in sync**: when existing behavior changed or a new mechanism was added, check whether document surfaces like `docs/spec/` (layering responsibilities, acceptance criteria), `docs/feature-map.md` (the feature-map living register), `apps/web/COMPONENTS.md`, and `.claude/skills/verify-pacman/SKILL.md` should change with it. Record gaps under `Bad` or `Tests`; do not fix them for the author on the spot.
+5. **Check whether docs need to stay in sync**: when existing behavior changed or a new mechanism was added, check whether document surfaces like `docs/spec/` (layering responsibilities, acceptance criteria), `.claude/skills/verify-cairn/feature-map.json` (the feature registry: entry points, research and design links; a new route or page needs a row), `apps/web/COMPONENTS.md`, and `.claude/skills/verify-pacman/SKILL.md` should change with it. Record gaps under `Bad` or `Tests`; do not fix them for the author on the spot.
 
 ## Exception: the `pr-gate` pre-merge workflow (spec 28 §7.5)
 
@@ -54,13 +54,9 @@ Three hard rules:
 
 The review verdict lands as a **PR comment** (`gh pr comment`; write long content to a one-off file and use `--body-file`), not by editing the PR body — the body is the author's evidence surface, and the review does not change it.
 
-## Merge method by commit author
+## Merge method and commit identity
 
-Read the PR opener and every commit author (`gh pr view <n> --json author,commits`) before choosing the merge method. A bot-opened PR merges by rebase from exactly one commit whose author is one of the accepted bot authors; a human-opened PR merges by squash.
-
-Accepted bot commit authors: `Cairnwright`, `cairnwright[bot]`.
-
-Both are treated the same by the merge helper `merge-pr.sh`. A `cairnwright[bot]` commit must also carry a `Cairn-Thread:` trailer and a `Co-authored-by: xiechimon` trailer. Any other bot author is foreign and the PR goes back to the dispatcher. The `commit-author` workflow still rejects `cairnwright[bot]` until the identity switch (#2289) lands, so a `cairnwright[bot]` commit that reaches main fails that check until then.
+Every PR merges by squash, whoever opened it. A squash commit is authored by the PR opener, so an App-opened PR lands on main as `cairnwright[bot]` and an ian-opened PR as ian. Inside the PR, every commit on a branch of this repository is authored by `cairnwright[bot]` or by ian, and a fork PR carries neither identity; the `commit-author` check enforces this from `packages/shared/commit-identity.json`, and `docs/ops/agent-bot-identity.md` explains the identity.
 
 ## Mechanical checks are not the reviewer's job (do not be a CI parrot)
 
@@ -70,4 +66,4 @@ lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check` job a
 - **Seam discipline**: whether dependencies locked by `biome.json`'s `noRestrictedImports` are being reached around the thin bridge modules (`apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam).
 - **Snapshot surfaces**: when the wire schema in `packages/shared` changes, whether `snapshot.test.ts` was updated in sync (a changed JSON projection with no snapshot update = guaranteed CI red).
 - **Closing-tag discipline**: whether `closes #N` is in the commit message (a squash merge carries only the commit message; the PR body never enters main); whether a staged PR **mistakenly carries** the whole ticket's closing tag.
-- **Review provenance and evidence quality**: check the Review section against the actual review and reasons for unfixed findings. `AGENTS.md`, "How to work", treats the Codex cloud review (`chatgpt-codex-connector[bot]`) on the PR head as the other-vendor review, and protected or security paths also need `/security-review`; check that the Review section links the review on the current head SHA. Check that Proof demonstrates the requested behavior and that any checked tasks have evidence; a checked box alone is not proof.
+- **Review provenance and evidence quality**: check the Review section against the actual review and reasons for unfixed findings. `AGENTS.md`, "How to work", treats the Codex cloud review (`chatgpt-codex-connector[bot]`) on the PR head as the required review, protected paths included; check that the Review section links the review on the current head SHA. Check that Proof demonstrates the requested behavior and that any checked tasks have evidence; a checked box alone is not proof.

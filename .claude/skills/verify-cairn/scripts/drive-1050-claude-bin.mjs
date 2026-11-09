@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { spawnOwned } from '../../../../scripts/owned-process.mjs';
 
 const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const REPO = process.env.VERIFY_REPO_ROOT ?? SCRIPT_REPO;
@@ -101,7 +101,7 @@ function writeStubBin(dir) {
 
 function spawnDaemon({ home, env }) {
   const out = [];
-  const child = spawn(
+  const { child, stop } = spawnOwned(
     process.execPath,
     [
       join(REPO, 'apps/daemon/node_modules/tsx/dist/cli.mjs'),
@@ -121,37 +121,13 @@ function spawnDaemon({ home, env }) {
       cwd: join(REPO, 'apps/daemon'),
       env: { ...env.env, CAIRN_HOME: home },
       stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
+      name: 'verify-1050-daemon',
+      graceMs: 6_000,
     },
   );
   child.stdout.on('data', (d) => out.push(String(d)));
   child.stderr.on('data', (d) => out.push(String(d)));
-  return { child, out };
-}
-
-function killDaemon(handle) {
-  return new Promise((resolveKill) => {
-    if (handle.child.exitCode !== null) return resolveKill();
-    handle.child.once('exit', () => resolveKill());
-    try {
-      process.kill(-handle.child.pid, 'SIGTERM');
-    } catch {
-
-      try {
-        handle.child.kill('SIGTERM');
-      } catch {
-
-      }
-    }
-    setTimeout(() => {
-      try {
-        process.kill(-handle.child.pid, 'SIGKILL');
-      } catch {
-
-      }
-      resolveKill();
-    }, 6_000);
-  });
+  return { child, out, stop };
 }
 
 async function waitForReport(name, predicate, timeoutMs = 30_000) {
@@ -254,7 +230,7 @@ try {
     `data-auth=${await headA.getAttribute('data-auth')}`,
   );
 
-  await killDaemon(handleA);
+  await handleA.stop();
   handleA = null;
 
   handleB = spawnDaemon({
@@ -309,8 +285,8 @@ try {
     textB.replace(/\n/g, ' | '),
   );
 } finally {
-  if (handleA) await killDaemon(handleA);
-  if (handleB) await killDaemon(handleB);
+  if (handleA) await handleA.stop();
+  if (handleB) await handleB.stop();
   await browser.close();
   finish();
 }

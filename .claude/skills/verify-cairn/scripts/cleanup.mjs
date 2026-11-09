@@ -152,12 +152,13 @@ async function sweepDaemons(port) {
 
 async function main() {
   const portsFile = join(RUN_DIR, 'ports.json');
-  const pids = { server: undefined, web: undefined };
+  const pids = { supervisor: undefined, server: undefined, web: undefined };
   let homeDir = null;
   let serverPort = null;
   if (existsSync(portsFile)) {
     try {
       const stack = JSON.parse(readFileSync(portsFile, 'utf8'));
+      pids.supervisor = stack.supervisorPid;
       pids.server = stack.serverPid;
       pids.web = stack.webPid;
       homeDir = stack.homeDir;
@@ -185,6 +186,11 @@ async function main() {
     process.exit(0);
   }
 
+  if (Number.isInteger(pids.supervisor) && commandOf(pids.supervisor).includes('launch.mjs')) {
+    process.kill(pids.supervisor, 'SIGTERM');
+    for (let i = 0; i < 100 && commandOf(pids.supervisor) !== ''; i += 1) await sleep(200);
+    console.log(`supervisor: ${commandOf(pids.supervisor) === '' ? 'stopped' : 'still running'} (pid ${pids.supervisor})`);
+  }
   await killStackPid(pids.web, 'vite dev');
   await killStackPid(pids.server, 'server');
 

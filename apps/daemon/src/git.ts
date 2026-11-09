@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
@@ -9,11 +9,22 @@ import { loopbackNoProxy } from './proxy.js';
 export interface GitRunResult {
   code: number | null;
   signal: NodeJS.Signals | null;
+  timedOut: boolean;
   stdout: string;
   stderr: string;
 }
 
 const LOOPBACK_URL_HOSTS = ['127.0.0.1', 'localhost', '[::1]'];
+
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+const TIMEOUT_KILL_GRACE_MS = 2_000;
+const FAILURE_TAIL_LINES = 40;
 
 export function runGit(
   args: string[],
@@ -25,27 +36,85 @@ export function runGit(
       (merged, host) => loopbackNoProxy({ NO_PROXY: merged }, `http://${host}`),
       env.NO_PROXY ?? env.no_proxy,
     );
+    const bounded = opts.timeoutMs !== undefined;
     const child = spawn('git', args, {
       cwd: opts.cwd,
       env: { ...env, NO_PROXY: noProxy, no_proxy: noProxy },
       windowsHide: true,
-      ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
+      detached: bounded,
     });
     if (opts.input !== undefined) child.stdin.end(opts.input);
+    let timedOut = false;
+    const killGroup = (signal: NodeJS.Signals) => {
+      if (child.pid === undefined) return;
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+          windowsHide: true,
+          stdio: 'ignore',
+        }).on('error', () => child.kill(signal));
+        return;
+      }
+      try {
+        process.kill(-child.pid, signal);
+      } catch {
+        child.kill(signal);
+      }
+    };
+    const releasePipes = () => {
+      child.stdout.destroy();
+      child.stderr.destroy();
+    };
+    const timers: NodeJS.Timeout[] = [];
+    if (bounded) {
+      timers.push(
+        setTimeout(() => {
+          timedOut = true;
+          killGroup('SIGTERM');
+          timers.push(setTimeout(() => killGroup('SIGKILL'), TIMEOUT_KILL_GRACE_MS));
+        }, opts.timeoutMs),
+      );
+    }
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     child.stdout.on('data', (c: Buffer) => stdout.push(c));
     child.stderr.on('data', (c: Buffer) => stderr.push(c));
-    child.on('error', reject);
-    child.on('close', (code, signal) =>
+    child.on('error', (err) => {
+      for (const t of timers) clearTimeout(t);
+      reject(err);
+    });
+    child.on('exit', () => {
+      if (!timedOut) return;
+      killGroup('SIGKILL');
+      timers.push(setTimeout(releasePipes, TIMEOUT_KILL_GRACE_MS));
+    });
+    child.on('close', (code, signal) => {
+      for (const t of timers) clearTimeout(t);
       resolve({
         code,
         signal,
+        timedOut,
         stdout: Buffer.concat(stdout).toString('utf8'),
         stderr: Buffer.concat(stderr).toString('utf8'),
-      }),
-    );
+      });
+    });
   });
+}
+
+function outputTail(r: GitRunResult): string {
+  const text = r.stderr.trim() || r.stdout.trim();
+  return text.split('\n').slice(-FAILURE_TAIL_LINES).join('\n');
+}
+
+export function gitFailureMessage(
+  subcommand: string | undefined,
+  r: GitRunResult,
+  timeoutMs: number | undefined,
+): string {
+  const status =
+    r.code !== null
+      ? `exit ${r.code}`
+      : `signal ${r.signal ?? 'unknown'}${r.timedOut ? `, timed out after ${timeoutMs} ms` : ''}`;
+  return `git ${subcommand ?? ''} failed (${status}): ${outputTail(r)}`;
 }
 
 export async function runGitOk(
@@ -54,12 +123,7 @@ export async function runGitOk(
 ): Promise<string> {
   const r = await runGit(args, opts);
   if (r.code === 0) return r.stdout.trim();
-  if (r.code === null) {
-    throw new Error(
-      `git ${args[0]} failed (signal ${r.signal ?? 'unknown'}): ${r.stderr.trim() || r.stdout.trim()}`,
-    );
-  }
-  throw new Error(`git ${args[0]} failed (${r.code}): ${r.stderr.trim() || r.stdout.trim()}`);
+  throw new Error(gitFailureMessage(args[0], r, opts.timeoutMs));
 }
 
 const CREDENTIAL_HELPER =
@@ -219,6 +283,7 @@ export function commitEnv(identity: CommitIdentity): NodeJS.ProcessEnv {
 }
 
 const META_TIMEOUT_MS = 30_000;
+const PATHSPEC_CHUNK = 200;
 const CHECKOUT_TIMEOUT_MS = 300_000;
 const NET_TIMEOUT_MS = 480_000;
 
@@ -460,8 +525,38 @@ export const gitPrim = {
     await runGitOk(['clean', '-fd'], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
   },
 
-  async addAll(dir: string): Promise<void> {
-    await runGitOk(['add', '-A'], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
+  async dirtyPaths(dir: string): Promise<string[]> {
+    const out = await runGit(
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--no-renames'],
+      { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+    );
+    if (out.code !== 0) throw new Error(gitFailureMessage('status', out, META_TIMEOUT_MS));
+    return out.stdout
+      .split('\0')
+      .filter((entry) => entry.length > 3)
+      .map((entry) => entry.slice(3));
+  },
+
+  async gitPath(dir: string, name: string): Promise<string> {
+    const path = await runGitOk(['rev-parse', '--path-format=absolute', '--git-path', name], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    return path;
+  },
+
+  async addPaths(dir: string, paths: readonly string[]): Promise<void> {
+    const indexed = await gitPrim.indexEntries(dir, paths);
+    const addable = paths.filter(
+      (path) => indexed.has(path) || existsSync(join(dir, path)) || isLink(join(dir, path)),
+    );
+    for (let i = 0; i < addable.length; i += PATHSPEC_CHUNK) {
+      await runGitOk(['add', '--', ...addable.slice(i, i + PATHSPEC_CHUNK)], {
+        cwd: dir,
+        env: { GIT_LITERAL_PATHSPECS: '1' },
+        timeoutMs: META_TIMEOUT_MS,
+      });
+    }
   },
 
   async stagedPathsContaining(
@@ -482,7 +577,70 @@ export const gitPrim = {
   },
 
   async unstagePath(dir: string, path: string): Promise<void> {
-    await runGitOk(['reset', '-q', '--', path], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
+    await gitPrim.unstagePaths(dir, [path]);
+  },
+
+  async resetPathsToHead(dir: string, paths: readonly string[]): Promise<void> {
+    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
+      const chunk = paths.slice(i, i + PATHSPEC_CHUNK);
+      const tracked = new Set(
+        (
+          await runGitOk(['ls-tree', '-r', '-z', '--name-only', 'HEAD', '--', ...chunk], {
+            cwd: dir,
+            env: { GIT_LITERAL_PATHSPECS: '1' },
+            timeoutMs: META_TIMEOUT_MS,
+          })
+        )
+          .split('\0')
+          .filter((path) => path !== ''),
+      );
+      const restore = chunk.filter((path) => tracked.has(path));
+      const drop = chunk.filter((path) => !tracked.has(path));
+      if (restore.length > 0) {
+        await runGitOk(['checkout', 'HEAD', '--', ...restore], {
+          cwd: dir,
+          env: { GIT_LITERAL_PATHSPECS: '1' },
+          timeoutMs: META_TIMEOUT_MS,
+        });
+      }
+      if (drop.length > 0) {
+        await runGitOk(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '--', ...drop], {
+          cwd: dir,
+          env: { GIT_LITERAL_PATHSPECS: '1' },
+          timeoutMs: META_TIMEOUT_MS,
+        });
+        for (const path of drop) rmSync(join(dir, path), { recursive: true, force: true });
+      }
+    }
+  },
+
+  async unstagePaths(dir: string, paths: readonly string[]): Promise<void> {
+    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
+      await runGitOk(['reset', '-q', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)], {
+        cwd: dir,
+        env: { GIT_LITERAL_PATHSPECS: '1' },
+        timeoutMs: META_TIMEOUT_MS,
+      });
+    }
+  },
+
+  async indexEntries(dir: string, paths: readonly string[]): Promise<Map<string, string>> {
+    const entries = new Map<string, string>();
+    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
+      const out = await runGitOk(
+        ['ls-files', '--stage', '-z', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)],
+        { cwd: dir, env: { GIT_LITERAL_PATHSPECS: '1' }, timeoutMs: META_TIMEOUT_MS },
+      );
+      for (const entry of out.split('\0')) {
+        const tab = entry.indexOf('\t');
+        if (tab < 0) continue;
+        const path = entry.slice(tab + 1);
+        const stage = entry.slice(0, tab);
+        const prior = entries.get(path);
+        entries.set(path, prior === undefined ? stage : `${prior},${stage}`);
+      }
+    }
+    return entries;
   },
 
   async pathsContainingInRef(
@@ -507,15 +665,20 @@ export const gitPrim = {
       });
   },
 
-  async commit(dir: string, message: string, identity: CommitIdentity): Promise<boolean> {
+  async commit(
+    dir: string,
+    message: string,
+    identity: CommitIdentity,
+    hookBudgetMs: number,
+  ): Promise<boolean> {
     const r = await runGit(['commit', '-m', message], {
       cwd: dir,
       env: commitEnv(identity),
-      timeoutMs: META_TIMEOUT_MS,
+      timeoutMs: hookBudgetMs,
     });
     if (r.code === 0) return true;
     if (/nothing to commit/i.test(r.stdout) || /nothing to commit/i.test(r.stderr)) return false;
-    throw new Error(`git commit failed (${r.code}): ${r.stderr.trim() || r.stdout.trim()}`);
+    throw new Error(gitFailureMessage('commit', r, hookBudgetMs));
   },
 
   async head(dir: string): Promise<string | null> {

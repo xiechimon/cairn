@@ -38,8 +38,12 @@ function setup(t) {
   const bin = join(root, 'bin');
   mkdirSync(tools);
   mkdirSync(bin);
-  for (const file of ['as-bot.sh', 'as-bot-policy.mjs'])
+  for (const file of ['as-bot.sh', 'as-bot-policy.mjs', 'bot-identity.mjs'])
     copyFileSync(join(sourceDir, file), join(tools, file));
+  copyFileSync(
+    resolve('packages/shared/commit-identity.json'),
+    join(tools, 'commit-identity.json'),
+  );
   writeFileSync(join(tools, 'token.mjs'), tokenStub);
   for (const name of ['gh', 'git', 'bash', 'curl']) {
     writeFileSync(join(bin, name), recorderStub);
@@ -122,7 +126,19 @@ for (const argv of allowed) {
   test(`allowed: ${argv.join(' ')}`, (t) => {
     const result = setup(t).run(...argv);
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.calls, [{ argv: argv.slice(1), token: 'stub-installation-token' }]);
+    const pushed = argv[0] === 'git' && argv.includes('push');
+    const expected =
+      argv[0] === 'git' && argv[1] === 'commit'
+        ? [
+            'commit',
+            '--trailer',
+            'Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>',
+            ...argv.slice(2),
+          ]
+        : argv.slice(1);
+    assert.deepEqual(pushed ? result.calls.slice(-1) : result.calls, [
+      { argv: expected, token: 'stub-installation-token' },
+    ]);
   });
 }
 
@@ -268,6 +284,7 @@ const denied = [
   [['git', 'reset', '--hard'], /not on the as-bot allowlist/],
   [['git', 'config', 'x', 'y'], /not on the as-bot allowlist/],
   [['git'], /not on the as-bot allowlist/],
+  [['git', 'sign', HEAD], /not on the as-bot allowlist/],
   [['bash', '-c', 'gh pr merge 1'], /only gh and git/],
   [['curl', 'https://example.invalid'], /only gh and git/],
   [[], /only gh and git/],

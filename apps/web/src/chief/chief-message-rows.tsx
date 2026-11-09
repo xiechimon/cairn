@@ -1,16 +1,18 @@
+import { parseReplyQuote } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { ChatMarkdown } from '../detail/chat-markdown.js';
-import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
+import { ChatMarkdown, MD_LIST, MD_LIST_ITEM } from '../detail/chat-markdown.js';
+import { TodoGlanceContext } from '../detail/segments.js';
 import type {
   ChiefContent,
   ChiefSegment,
@@ -21,10 +23,11 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
-import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
+import { ReplyQuoteBlock } from './reply-quote-block.js';
+import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
@@ -79,8 +82,6 @@ const BUBBLE_WRAP_CLS = 'w-full max-w-full';
 const BUBBLE_USER_CLS =
   'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bubble-gradient px-3 py-2 text-card-title [overflow-wrap:anywhere] text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 voice-response text-card-title';
-const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
-const MARKER_CONTENT_CLS = 'max-w-[85%]';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
@@ -159,8 +160,6 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string):
   });
 }
 
-export const TurnElapsedContext = createContext(true);
-
 export const HandoffCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
 
 function HandoffRow({ todoId }: { todoId: string }) {
@@ -180,20 +179,13 @@ function HandoffRow({ todoId }: { todoId: string }) {
     );
   }
   return (
-    <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-      <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="chief-handoff">
-        <MarkerContent className={MARKER_CONTENT_CLS}>
-          {t('已转给任务')}
-          <ThreadLink
-            todoId={todoId}
-            className={`${mentionChipClass('todo')} cursor-pointer`}
-            data-phase={glance?.phase}
-          >
-            {glance != null && <TodoStatus phase={glance.phase} />}
-            {glance?.seq != null ? `#${glance.seq}` : t('任务')}
-          </ThreadLink>
-        </MarkerContent>
-      </Marker>
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
+      <StatusLine testId="chief-handoff">
+        {t('已转给任务')}{' '}
+        <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
+          {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+        </ThreadLink>
+      </StatusLine>
     </MessageScrollerItem>
   );
 }
@@ -235,27 +227,24 @@ interface ChiefStreamRowProps {
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
   const { t } = useI18n();
   return (
-    <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-      <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="chief-stopped">
-        <MarkerContent className={MARKER_CONTENT_CLS}>
-          {todos.length === 0 ? (
-            t('已停止，没有建任务。')
-          ) : (
-            <>
-              {t('已停止。停之前已经建了任务')}
-              {todos.map((todo) => (
-                <ThreadLink
-                  key={todo.id}
-                  todoId={todo.id}
-                  className={`${mentionChipClass('todo')} cursor-pointer`}
-                >
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
+      <StatusLine testId="chief-stopped">
+        {todos.length === 0 ? (
+          t('已停止，没有建任务。')
+        ) : (
+          <>
+            {t('已停止。停之前已经建了任务')}
+            {todos.map((todo, n) => (
+              <span key={todo.id}>
+                {n === 0 ? ' ' : '、'}
+                <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
                   {`#${todo.seq} ${todo.title}`}
                 </ThreadLink>
-              ))}
-            </>
-          )}
-        </MarkerContent>
-      </Marker>
+              </span>
+            ))}
+          </>
+        )}
+      </StatusLine>
     </MessageScrollerItem>
   );
 }
@@ -280,7 +269,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onToggleTools,
   onRewindRequest,
 }: ChiefStreamRowProps) {
-  const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message')
@@ -321,21 +309,23 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
   if (item.kind === 'note')
     return (
-      <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-        <Marker variant="separator" className={MARKER_NOTE_CLS}>
-          <MarkerContent className={MARKER_CONTENT_CLS}>
-            {t(item.text)}
-            {item.machineName && (
-              <>
-                <span className="underline underline-offset-2">{item.machineName}</span>
-                {t('上')}
-              </>
-            )}
-          </MarkerContent>
-        </Marker>
+      <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
+        <StatusLine testId="chief-note">
+          {t(item.text)}
+          {item.machineName && (
+            <>
+              <span className="underline decoration-current/40 underline-offset-3">
+                {item.machineName}
+              </span>
+              {t('上')}
+            </>
+          )}
+        </StatusLine>
       </MessageScrollerItem>
     );
-  if (item.kind === 'user')
+  if (item.kind === 'user') {
+    const reply = parseReplyQuote(item.text);
+    const shown = reply?.body ?? item.markdown;
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`${USER_ROW_CLS} justify-end`} data-testid="chief-msg">
@@ -345,14 +335,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           >
             <div
               data-testid="chief-bubble"
-              data-md={item.markdown != null ? '' : undefined}
-              className={`${BUBBLE_USER_CLS} ${item.markdown != null ? BUBBLE_MD_CLS : ''}`}
+              data-md={shown != null ? '' : undefined}
+              {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+              className={`${BUBBLE_USER_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
             >
-              {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} conversational />
-              ) : (
-                item.text
-              )}
+              {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
+              {shown != null ? <ChatMarkdown text={shown} conversational /> : item.text}
             </div>
             <div
               className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
@@ -386,6 +374,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
+  }
   if (item.kind === 'thinking')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
@@ -470,7 +459,10 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             />
           )}
           <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
-            <BubbleContent className={BUBBLE_ROBOT_CLS}>
+            <BubbleContent
+              className={BUBBLE_ROBOT_CLS}
+              {...(item.id != null && item.typing !== true ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+            >
               {item.markdown != null ? (
                 <ChatMarkdown text={item.markdown} conversational />
               ) : (
@@ -480,14 +472,15 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                       <Segments segments={p} />
                     </p>
                   ))}
-                  {item.bullets?.map((b, j) => (
-                    <p key={`b${j}`} className="mt-0.5 flex gap-2 text-card-title">
-                      <span className="flex-none">•</span>
-                      <span>
-                        <Segments segments={b} />
-                      </span>
-                    </p>
-                  ))}
+                  {item.bullets != null && item.bullets.length > 0 && (
+                    <ul className={`mt-0.5 list-disc text-card-title ${MD_LIST}`}>
+                      {item.bullets.map((b, j) => (
+                        <li key={`b${j}`} className={MD_LIST_ITEM}>
+                          <Segments segments={b} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </>
               )}
             </BubbleContent>
@@ -512,9 +505,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 )}
               </Button>
               <MessageStamp createdAt={item.createdAt} />
-              {showElapsed && item.seconds !== '' && (
-                <span>{t('完成 {n}', { n: item.seconds })}</span>
-              )}
               {item.fallbackModel != null && (
                 <span data-testid="chief-fallback-note">
                   {t('由备用模型 {model} 回答', { model: item.fallbackModel })}

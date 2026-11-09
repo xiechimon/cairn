@@ -2,6 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context, Hono } from 'hono';
 import { sha256Hex } from './crypto.js';
+import { type LoopbackOwner, loopbackOwnerOriginOf } from './loopback-owner.js';
+import { tailnetOriginOf, tailnetOwnerIdentityOf } from './tailnet-listener.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -11,6 +13,7 @@ const STREAM_PATH_PATTERNS = [
 ];
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const AMBIENT_FETCH_SITES = new Set(['same-origin', 'none']);
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|feishu)(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
@@ -18,7 +21,12 @@ const OWNER_ONLY_PATTERNS = [
 ];
 
 export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
-  if (pathname === '/api/remote/pairing' || pathname.startsWith('/api/remote/devices')) return true;
+  if (
+    pathname === '/api/machine/enroll/confirm' ||
+    pathname === '/api/remote/pairing' ||
+    pathname.startsWith('/api/remote/devices')
+  )
+    return true;
   if (READ_METHODS.has(method.toUpperCase())) return false;
   return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
 }
@@ -32,7 +40,11 @@ export function isOpenRemotePath(pathname: string): boolean {
 function isExempt(pathname: string): boolean {
   if (pathname.includes('%')) return false;
   if (!pathname.startsWith('/api/')) return true;
-  if (pathname === '/api/machine' || pathname.startsWith('/api/machine/')) return true;
+  if (
+    pathname !== '/api/machine/enroll/confirm' &&
+    (pathname === '/api/machine' || pathname.startsWith('/api/machine/'))
+  )
+    return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
   if (isOpenRemotePath(pathname)) return true;
@@ -63,12 +75,38 @@ export function isLoopbackPeer(c: Context): boolean {
 
 export interface TokenAuthOptions {
   resolveDeviceId?: (provided: string) => string | null;
+  loopbackOwner?: LoopbackOwner | null;
 }
+
+export type OwnerIdentity = { via: 'tailscale'; login: string } | { via: 'loopback' };
 
 declare module 'hono' {
   interface ContextVariableMap {
     pairedDeviceId: string;
+    ownerIdentity: OwnerIdentity;
   }
+}
+
+interface AmbientOwner {
+  identity: OwnerIdentity;
+  origin: string | null;
+}
+
+function ambientOwnerOf(c: Context, loopbackOwner: LoopbackOwner | null): AmbientOwner | null {
+  const tailnet = tailnetOwnerIdentityOf(c);
+  if (tailnet !== null) {
+    return { identity: { via: 'tailscale', login: tailnet.login }, origin: tailnetOriginOf(c) };
+  }
+  if (loopbackOwner === null || !isLoopbackPeer(c)) return null;
+  const origin = loopbackOwnerOriginOf(c, loopbackOwner);
+  return origin === null ? null : { identity: { via: 'loopback' }, origin };
+}
+
+function provesSameOrigin(c: Context, origin: string | null): boolean {
+  const site = c.req.header('sec-fetch-site');
+  if (site !== undefined && !AMBIENT_FETCH_SITES.has(site)) return false;
+  if (READ_METHODS.has(c.req.method.toUpperCase())) return true;
+  return site === 'same-origin' || (origin !== null && c.req.header('origin') === origin);
 }
 
 export function pairedDeviceIdOf(c: Context): string | null {
@@ -82,6 +120,7 @@ export function registerTokenAuth(
 ): void {
   if (token === null) return;
   const verifyOwner = makeVerifier(token);
+  const loopbackOwner = options.loopbackOwner ?? null;
   app.use('*', async (c, next) => {
     const verify = (provided: string): boolean => {
       if (verifyOwner(provided)) return true;
@@ -94,7 +133,7 @@ export function registerTokenAuth(
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();
     const admit = () =>
-      pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, pathname)
+      pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, c.req.path)
         ? c.json({ error: 'only the owner token can do this' }, 403)
         : next();
     const authorization = c.req.header('authorization');
@@ -105,6 +144,14 @@ export function registerTokenAuth(
     if (STREAM_PATH_PATTERNS.some((pattern) => pattern.test(pathname))) {
       const queryToken = url.searchParams.get('token');
       if (queryToken !== null && verify(queryToken)) return admit();
+    }
+    const ambient = ambientOwnerOf(c, loopbackOwner);
+    if (ambient !== null) {
+      if (!provesSameOrigin(c, ambient.origin)) {
+        return c.json({ error: 'same-origin proof required for ambient owner identity' }, 403);
+      }
+      c.set('ownerIdentity', ambient.identity);
+      return next();
     }
     return c.json({ error: 'Unauthorized' }, 401);
   });

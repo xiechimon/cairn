@@ -62,9 +62,32 @@ test('agents admin-merge only a PR ian named in chat', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(
     agents,
-    /When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin`, using the merge method `docs\/ops\/agent-bot-identity.md` gives its opener/,
+    /When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin --squash`, whoever opened it,/,
   );
   assert.match(agents, /Without that per-PR authorization, agents never use `--admin`\./);
   const skill = readFileSync(join(ROOT, '.claude/skills/pr-cairn/SKILL.md'), 'utf8');
   assert.match(skill, /an agent uses `--admin` only on a PR ian named in chat/);
+});
+
+test('the review rules use the heading Codex reads and agree with the thread gate', () => {
+  const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+  assert.match(agents, /^## Code Review Rules$/m);
+  assert.doesNotMatch(agents, /^## Review guidelines$/m);
+  assert.doesNotMatch(agents, /P2\/P3 findings do not block/);
+  assert.match(agents, /#review-threads-unresolved = 0/);
+  assert.match(agents, /P0\/P1 findings must be fixed/);
+  assert.match(agents, /`valid, out of scope for this PR, tracked in #N`/);
+  assert.match(agents, /Never post Mergify commands/);
+  assert.match(agents, /Do not open a PR whose base is another open PR's branch/);
+  assert.match(agents, /Design first for a change to persisted state/);
+});
+
+test('no rule or brief spells out the focused Codex review command; the server builds it', () => {
+  for (const file of [
+    'AGENTS.md',
+    'docs/agent-dispatch-prompts.md',
+    '.claude/skills/pr-cairn/SKILL.md',
+    'docs/research/pr-flow-speed-2026-11-09.md',
+  ])
+    assert.doesNotMatch(readFileSync(join(ROOT, file), 'utf8'), /@codex review for/, file);
 });

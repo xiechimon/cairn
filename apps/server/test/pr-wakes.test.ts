@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { conversationBranch } from '@cairn/shared';
-import { eq, sql } from 'drizzle-orm';
+import { eq, ne, sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
@@ -18,11 +18,12 @@ import {
 } from '../src/db/schema.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { listNeedsYou, sweepFailedRetries } from '../src/services/needs-you.js';
+import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { createPrFeedbackPoller } from '../src/services/pr-feedback.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import { profileForStep } from '../src/services/routing-rules.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import { getTodo } from '../src/services/todos.js';
 import { readWorkerQuestion } from '../src/services/worker-question-store.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { bootServer, req, type TestServer } from './helpers.js';
@@ -45,11 +46,14 @@ interface PullSpec {
   additions?: number;
   deletions?: number;
   base?: string;
+  labels?: string[];
 }
 
 interface RunSpec {
   id?: number;
   summary?: string;
+  title?: string;
+  completedAt?: string;
   name: string;
   status: string;
   conclusion: string | null;
@@ -68,6 +72,7 @@ class GithubMock {
   requests: string[] = [];
   authorizations: string[] = [];
   notModified = 0;
+  threads: 'none' | 'failing' | null = null;
   fetch = vi.fn((input: string | URL, init?: { headers?: Record<string, string> }) => {
     const url = String(input);
     this.requests.push(url);
@@ -100,6 +105,29 @@ class GithubMock {
         text: () => Promise.resolve(JSON.stringify(body)),
       });
     };
+    if (url.endsWith('/graphql') && this.threads !== null) {
+      if (this.threads === 'failing') return send(502, { message: 'bad gateway' });
+      const spec = [...this.pulls.values()][0];
+      return send(200, {
+        data: {
+          repository: {
+            label: { id: 'LABEL_node' },
+            pullRequest: {
+              timelineItems: { nodes: [] },
+              id: 'PR_node',
+              state: 'OPEN',
+              isDraft: spec?.draft ?? false,
+              headRefOid: spec?.head ?? HEAD_A,
+              labels: {
+                nodes: (spec?.labels ?? []).map((name) => ({ name })),
+                pageInfo: { hasNextPage: false },
+              },
+              reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+            },
+          },
+        },
+      });
+    }
     const pull = /\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/.exec(url);
     if (pull) {
       const key = `${(pull[1] ?? '').toLowerCase()}#${pull[2]}`;
@@ -114,6 +142,7 @@ class GithubMock {
         mergeable_state: spec.mergeable ?? 'clean',
         additions: spec.additions ?? 12,
         deletions: spec.deletions ?? 3,
+        labels: (spec.labels ?? []).map((name) => ({ name })),
         head: { sha: spec.head ?? HEAD_A, ref: this.branch, repo: { id: 1 } },
         base: {
           sha: spec.base ?? 'c'.repeat(40),
@@ -127,7 +156,8 @@ class GithubMock {
       return send(200, {
         check_runs: (this.checks.get(runs[1] ?? '') ?? []).map((r) => ({
           ...r,
-          output: { title: null, summary: r.summary ?? null },
+          completed_at: r.completedAt ?? null,
+          output: { title: r.title ?? null, summary: r.summary ?? null },
         })),
       });
     }
@@ -226,20 +256,103 @@ function fixture() {
   const mock = new GithubMock();
   const t = seedThread(s);
   mock.branch = conversationBranch(t.buildId);
-  const pull = { head: HEAD_A, base: 'c'.repeat(40), mergeable: 'clean' };
+  const pull: PullSpec & { head: string; base: string } = {
+    head: HEAD_A,
+    base: 'c'.repeat(40),
+    mergeable: 'clean',
+  };
   mock.pulls.set(`octo/demo#${t.prNumber}`, pull);
   mock.checks.set(pull.base, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
   const fail = (id: number, summary = 'broken') =>
     mock.checks.set(pull.head, [
       { id, name: 'unit', status: 'completed', conclusion: 'failure', summary },
     ]);
-  const steps = () => s.db.select().from(stepTable).all();
+  const steps = () => s.db.select().from(stepTable).where(ne(stepTable.kind, 'chief')).all();
   const settle = () => s.db.update(stepTable).set({ status: 'done' }).run();
   const comment = (id: number, author = 'reviewer', body = `fix ${id}`) => {
     mock.comments.push({ id, user: { login: author }, body });
   };
   return { s, mock, t, pull, fail, steps, settle, comment };
 }
+
+describe('parked builds reject PR-driven redispatch', () => {
+  test.each(['model_not_found: glm-5.3', 'Task parked: 4 failed builds in one hour (limit 3).'])(
+    'managed CI, conflict and review events preserve parking: %s',
+    async (reason) => {
+      const f = fixture();
+      const watch = watchFor(f.s, f.mock);
+      await watch.sweep();
+      f.s.db.update(buildTable).set({ errorMessage: reason }).run();
+      f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+      f.fail(1);
+      f.comment(1);
+      f.pull.mergeable = 'dirty';
+      await watch.sweep();
+      await watchFor(f.s, f.mock).sweep();
+      expect(f.steps()).toHaveLength(0);
+      expect(f.s.db.select().from(todoTable).get()?.phase).toBe('failed');
+      expect(f.s.db.select().from(buildTable).get()?.errorMessage).toBe(reason);
+      expect(rows(f.s)[0]?.wakeRounds).toBe(0);
+    },
+  );
+
+  test.each(['model_not_found: glm-5.3', 'Task parked: 4 failed builds in one hour (limit 3).'])(
+    'legacy collaborator feedback preserves parking: %s',
+    async (reason) => {
+      const f = fixture();
+      const poller = createPrFeedbackPoller(
+        { ...f.s.svc, box: f.s.secretBox },
+        { githubFetch: f.mock.fetch },
+      );
+      await poller.sweep();
+      f.s.db.update(buildTable).set({ errorMessage: reason }).run();
+      f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+      f.comment(1);
+      await poller.sweep();
+      await poller.sweep();
+      expect(f.steps()).toHaveLength(0);
+      expect(f.s.db.select().from(todoTable).get()?.phase).toBe('failed');
+      expect(f.s.db.select().from(buildTable).get()?.errorMessage).toBe(reason);
+    },
+  );
+
+  test('a model rejection arriving during GitHub intake is checked before clearing the error', async () => {
+    const f = fixture();
+    const watch = watchFor(f.s, f.mock);
+    await watch.sweep();
+    f.fail(1);
+    const fetch = f.mock.fetch.getMockImplementation()!;
+    f.mock.fetch.mockImplementationOnce(async (input, init) => {
+      f.s.db.update(buildTable).set({ errorMessage: 'model_not_found: glm-5.3' }).run();
+      f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+      return fetch(input, init);
+    });
+    await watch.sweep();
+    expect(f.steps()).toHaveLength(0);
+    expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('glm-5.3');
+  });
+
+  test('a deferred PR cap notice cannot overwrite the terminal parking reason', async () => {
+    const f = fixture();
+    const watch = watchFor(f.s, f.mock);
+    await watch.sweep();
+    f.s.db
+      .update(message)
+      .set({
+        content: {
+          pendingNotice: { buildId: f.t.buildId, content: 'PR Auto-fix needs you: synthetic cap' },
+        },
+      })
+      .where(eq(message.id, `pr-wakes:${f.s.team.id}:octo/demo#${f.t.prNumber}`))
+      .run();
+    f.s.db.update(buildTable).set({ errorMessage: 'model_not_found: glm-5.3' }).run();
+    f.s.db.update(todoTable).set({ phase: 'failed' }).run();
+    f.mock.failing.add(`octo/demo#${f.t.prNumber}`);
+    await watch.sweep();
+    expect(f.s.db.select().from(buildTable).get()?.errorMessage).toBe('model_not_found: glm-5.3');
+    expect(f.steps()).toHaveLength(0);
+  });
+});
 
 describe('D109 S3 F2 bounded, durable PR wakes', () => {
   test('CI wakes three times per head, deduplicates reruns and survives poller restart', async () => {
@@ -522,7 +635,7 @@ describe('D109 S3 persistence and poller handoff', () => {
       await watchFor(f.s, f.mock).sweep();
       f.settle();
     }
-    expect(listNeedsYou(f.s.svc, f.s.team.id).current.map((i) => i.todo.id)).toContain(f.t.todoId);
+    expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
     await sweepFailedRetries(f.s.svc);
     expect(f.steps()).toHaveLength(3);
   });
@@ -778,7 +891,7 @@ test.each(['claimed', 'done'] as const)(
       { holdMs: 0 },
     );
     f.s.db.update(stepTable).set({ status }).run();
-    f.s.db.update(todoTable).set({ phase: 'review' }).run();
+    f.s.db.update(todoTable).set({ phase: 'needs_input' }).run();
     const before = readWorkerQuestion(f.s.db, f.t.buildId, 'parked-question');
     f.fail(1);
     f.comment(1);
@@ -787,10 +900,7 @@ test.each(['claimed', 'done'] as const)(
     expect(rows(f.s)[0]?.wakeRounds).toBe(0);
     expect(f.steps()).toHaveLength(1);
     expect(f.s.db.select().from(steerPending).get()).toBeUndefined();
-    expect(f.s.db.select().from(todoTable).get()).toMatchObject({
-      phase: 'review',
-      awaitingReply: true,
-    });
+    expect(f.s.db.select().from(todoTable).get()).toMatchObject({ phase: 'needs_input' });
     expect(readWorkerQuestion(f.s.db, f.t.buildId, 'parked-question')).toEqual(before);
     expect(
       f.s.db
@@ -847,8 +957,7 @@ test.each(['done', 'building', 'review', 'failed'] as const)(
     f.s.db.update(buildTable).set({ errorMessage: null }).run();
     f.mock.failing.add(`octo/demo#${f.t.prNumber}`);
     await watchFor(f.s, f.mock).sweep();
-    const item = listNeedsYou(f.s.svc, f.s.team.id).current.find((i) => i.todo.id === f.t.todoId);
-    expect(item).toMatchObject({ reason: 'failed' });
+    expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
     expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('Total wake cap (10)');
     await sweepFailedRetries(f.s.svc);
     expect(f.steps()).toHaveLength(10);
@@ -916,6 +1025,161 @@ test('a per-kind cap observed during a session survives disabling Auto-fix and s
   f.s.db.update(threadPrTable).set({ autoFix: false }).run();
   f.settle();
   await watchFor(f.s, f.mock).sweep();
-  expect(listNeedsYou(f.s.svc, f.s.team.id).current.map((i) => i.todo.id)).toContain(f.t.todoId);
+  expect(getTodo(f.s.svc, f.t.todoId)?.owner).toBe('coordinator');
   expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('CI fix cap (3 per head)');
+});
+
+describe('a green PR waiting for queue conditions wakes its owner with what is unmet', () => {
+  const T0 = Date.parse('2026-11-09T02:00:00Z');
+  const minutes = (n: number) => T0 + n * 60_000;
+  const waiting = (summary: string): RunSpec => ({
+    name: 'Mergify Merge Queue',
+    status: 'completed',
+    conclusion: 'neutral',
+    title: 'Waiting for queue conditions to match',
+    summary,
+  });
+  const unmet = [
+    '### Queue entry conditions',
+    '',
+    '- [ ] any of [🔀 queue conditions]:',
+    '  - [ ] all of [📌 queue conditions of queue rule `bot`]:',
+    '    - [ ] `check-success = pr-size`',
+    '    - [X] `-draft`',
+    '    - [X] `#files <= 80`',
+    '    - [X] any of:',
+    '      - [X] `check-success = check`',
+    '      - [ ] `check-skipped = check`',
+  ].join('\n');
+  const green = (f: ReturnType<typeof fixture>, summary = unmet, extra: RunSpec[] = []) => {
+    f.mock.threads ??= 'none';
+    f.mock.checks.set(f.pull.head, [
+      {
+        name: 'unit',
+        status: 'completed',
+        conclusion: 'success',
+        completedAt: new Date(T0).toISOString(),
+      },
+      {
+        name: 'e2e',
+        status: 'completed',
+        conclusion: 'skipped',
+        completedAt: new Date(minutes(-5)).toISOString(),
+      },
+      waiting(summary),
+      ...extra,
+    ]);
+  };
+  const prompts = (f: ReturnType<typeof fixture>) => f.steps().map((s) => s.prompt ?? '');
+
+  test('ten minutes after the last check turned green, one wake lists only the unmet conditions', async () => {
+    const f = fixture();
+    green(f);
+    await watchFor(f.s, f.mock).sweep(minutes(9));
+    expect(f.steps()).toHaveLength(0);
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    expect(f.steps()).toHaveLength(1);
+    const [prompt] = prompts(f);
+    expect(prompt).toContain('[queue-wait]');
+    expect(prompt).toContain('check-success = pr-size');
+    expect(prompt).not.toContain('-draft');
+    expect(prompt).not.toContain('#files <= 80');
+    expect(prompt).not.toContain('check-skipped = check');
+    f.settle();
+    await watchFor(f.s, f.mock).sweep(minutes(20));
+    expect(f.steps()).toHaveLength(1);
+  });
+
+  test('a changed list of unmet conditions on the same head wakes again', async () => {
+    const f = fixture();
+    green(f);
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    f.settle();
+    green(f, unmet.replace('pr-size', 'merge-route'));
+    await watchFor(f.s, f.mock).sweep(minutes(12));
+    expect(f.steps()).toHaveLength(2);
+    expect(prompts(f)[1]).toContain('check-success = merge-route');
+  });
+
+  test('an unreadable review-findings snapshot is unknown, so no queue wake fires', async () => {
+    const f = fixture();
+    green(f);
+    f.mock.threads = 'failing';
+    await watchFor(f.s, f.mock).sweep(minutes(30));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(0);
+    f.mock.threads = 'none';
+    await watchFor(f.s, f.mock).sweep(minutes(31));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(1);
+  });
+
+  test('a superseded failed attempt of a check does not hide a green rerun', async () => {
+    const f = fixture();
+    green(f, unmet, [
+      {
+        id: 1,
+        name: 'unit',
+        status: 'completed',
+        conclusion: 'failure',
+        completedAt: new Date(minutes(-20)).toISOString(),
+      },
+    ]);
+    const runs = f.mock.checks.get(f.pull.head) ?? [];
+    for (const run of runs) if (run.name === 'unit' && run.conclusion === 'success') run.id = 2;
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(1);
+  });
+
+  test.each([
+    [
+      'a pending check',
+      (f: ReturnType<typeof fixture>) =>
+        green(f, unmet, [{ name: 'gates', status: 'in_progress', conclusion: null }]),
+    ],
+    [
+      'a draft PR',
+      (f: ReturnType<typeof fixture>) => {
+        green(f);
+        f.pull.draft = true;
+      },
+    ],
+    [
+      'coordinator-hold',
+      (f: ReturnType<typeof fixture>) => {
+        green(f);
+        f.pull.labels = ['coordinator-hold'];
+      },
+    ],
+    [
+      'a queued PR',
+      (f: ReturnType<typeof fixture>) =>
+        f.mock.checks.set(f.pull.head, [
+          {
+            name: 'unit',
+            status: 'completed',
+            conclusion: 'success',
+            completedAt: new Date(T0).toISOString(),
+          },
+          {
+            name: 'Mergify Merge Queue',
+            status: 'in_progress',
+            conclusion: null,
+            title: 'Running merge queue checks',
+            summary: unmet,
+          },
+        ]),
+    ],
+    [
+      'a check without a completion time',
+      (f: ReturnType<typeof fixture>) =>
+        f.mock.checks.set(f.pull.head, [
+          { name: 'unit', status: 'completed', conclusion: 'success' },
+          waiting(unmet),
+        ]),
+    ],
+  ])('no queue wake with %s', async (_name, arrange) => {
+    const f = fixture();
+    arrange(f);
+    await watchFor(f.s, f.mock).sweep(minutes(30));
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(0);
+  });
 });

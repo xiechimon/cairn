@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
-import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { useOptionalChiefRoot } from '../chief/chief-root.js';
+import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
@@ -30,6 +30,7 @@ import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
 import { needsYouCount } from './needs-you.js';
+import { coordinatorSearch } from './open-composer.js';
 import { splitProjectsByArchive } from './project-archive.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
 import { SidebarThreadGroups } from './sidebar-thread-groups.js';
@@ -177,6 +178,7 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
   const threadParams = new URLSearchParams(baseParams);
   if (projectParam !== null) threadParams.set('project', projectParam);
   const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
@@ -276,10 +278,8 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link
-            {...railLink({ pathname: '/app', search: plain }, coordinatorActive, coordinatorLabel)}
-          >
-            <SpiralMark busy={false} className={ICON} />
+          <Link {...railLink(coordinatorTarget, coordinatorActive, coordinatorLabel)}>
+            <BrandGlyph className={ICON} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
             )}
@@ -371,10 +371,10 @@ export function BoardSidebar({
       <div className="mt-2 flex flex-none flex-col gap-px">
         <div className="relative">
           <SidebarNavRow
-            icon={<SpiralMark busy={false} className="size-4" />}
+            icon={<BrandGlyph className="size-4" />}
             label={t('Coordinator')}
             active={coordinatorActive}
-            onClick={() => navigate({ pathname: '/app', search: plain })}
+            onClick={() => navigate(coordinatorTarget)}
           />
           {attention > 0 && (
             <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2">

@@ -18,7 +18,7 @@ The script reads its JSON config from its first argument, then `CAIRN_APP_TOKEN_
 
 Use the existing host App key, owned by the service user with mode `0600`. No key migration or database storage is required. Symbolic links, non-regular keys, keys owned by another user, and group/world permissions are rejected. The socket directory must be owned by the service user and not writable by other users.
 
-`socketPath` is optional: it takes precedence over `CAIRN_APP_TOKEN_SOCKET`, whose default is `~/.cairn/run/app-token.sock`. Paths in JSON are literal absolute paths; shell tilde expansion does not apply. Set `CAIRN_APP_TOKEN_SOCKET` on the cairn server to the same socket path to enable the provider. An unset server setting leaves the feature off.
+`socketPath` is optional: it takes precedence over `CAIRN_APP_TOKEN_SOCKET`, whose default is `~/.cairn/run/app-token.sock`. Paths in JSON are literal absolute paths; shell tilde expansion does not apply. Set `CAIRN_APP_TOKEN_SOCKET` on the cairn server to the same socket path to enable the provider. An unset server setting leaves the feature off. The provider only supplies tokens: the commit author comes from `CAIRN_GITHUB_APP_SLUG` and `CAIRN_GITHUB_APP_BOT_ID`, which the server requires alongside the socket.
 
 ## Run
 

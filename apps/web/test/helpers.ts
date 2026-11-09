@@ -4,7 +4,6 @@ import type { TodoRecord } from '../src/fixtures/records.js';
 
 export const NOW = 1_758_000_000_000;
 
-export function todo(seq: number, phase: TodoRecord['phase'], awaitingReply?: boolean): TodoRecord {
-  const t = localTodo(seq, `task ${seq}`, NOW);
-  return awaitingReply === undefined ? { ...t, phase } : { ...t, phase, awaitingReply };
+export function todo(seq: number, phase: TodoRecord['phase']): TodoRecord {
+  return { ...localTodo(seq, `task ${seq}`, NOW), phase };
 }

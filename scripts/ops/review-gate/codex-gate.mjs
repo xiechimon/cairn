@@ -5,17 +5,20 @@ import {
   blockingThreads,
   blockRounds,
   decide,
+  deferredIssue,
+  deferredThreads,
   GATE_CHECK,
   HUMAN_LABEL,
+  markDeferrals,
   markPreExisting,
   preExistingThreads,
-  QUEUED_LABEL,
   retryStatus,
   reviewRequested,
   STALL_LABEL,
   shouldSkip,
   trustedStateComment,
   usageLimitHit,
+  writerReplies,
 } from './codex-gate-core.mjs';
 
 const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
@@ -29,7 +32,7 @@ const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cu
           line
           startLine
           diffSide
-          comments(first: 1) { nodes { author { login __typename } body url pullRequestReview { body } } }
+          comments(first: 100) { totalCount nodes { author { login __typename } authorAssociation body url pullRequestReview { body } } }
         }
         pageInfo { hasNextPage endCursor }
       }
@@ -74,7 +77,12 @@ function loadThreads(repo, number) {
     if (cursor) args.push('-f', `cursor=${cursor}`);
     const page = ghJson(args).data.repository.pullRequest.reviewThreads;
     for (const node of page.nodes) {
-      const first = node.comments.nodes[0];
+      const [first, ...replies] = node.comments.nodes;
+      if (
+        Number.isInteger(node.comments.totalCount) &&
+        node.comments.totalCount > node.comments.nodes.length
+      )
+        throw new Error('A review thread has more comments than one page');
       threads.push({
         isResolved: node.isResolved,
         isOutdated: node.isOutdated,
@@ -87,11 +95,32 @@ function loadThreads(repo, number) {
         body: first?.body ?? '',
         reviewBody: first?.pullRequestReview?.body ?? '',
         url: first?.url ?? '',
+        replies: writerReplies(replies),
       });
     }
     if (!page.pageInfo.hasNextPage) return threads;
     cursor = page.pageInfo.endCursor;
   }
+}
+
+function issueKind(repo, number) {
+  try {
+    const text = execFileSync('gh', ['api', '-i', `repos/${repo}/issues/${number}`], {
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const body = JSON.parse(text.slice(text.search(/\r?\n\r?\n/)).trim());
+    return body.pull_request ? 'pull' : 'issue';
+  } catch (error) {
+    if (/^HTTP\/[\d.]+ (404|410)\b/.test(String(error.stdout ?? ''))) return 'missing';
+    throw error;
+  }
+}
+
+function loadIssueKinds(repo, threads) {
+  const numbers = new Set(deferredThreads(threads).map(deferredIssue));
+  return new Map([...numbers].map((number) => [number, issueKind(repo, number)]));
 }
 
 function loadFiles(repo, pr) {
@@ -144,11 +173,6 @@ function writeCheck(repo, sha, newest, result, detailsUrl) {
   else ghWrite('POST', `repos/${repo}/check-runs`, payload);
 }
 
-function dequeueIfQueued(repo, pr) {
-  if (pr.labels.some((label) => label.name === QUEUED_LABEL))
-    ghWrite('POST', `repos/${repo}/issues/${pr.number}/comments`, { body: '@mergifyio dequeue' });
-}
-
 function evaluate(repo, number) {
   const pr = ghJson(['api', `repos/${repo}/pulls/${number}`]);
   const skip = shouldSkip(pr);
@@ -161,10 +185,12 @@ function evaluate(repo, number) {
   let files;
   let comments;
   let loaded;
+  let issueKinds;
   try {
     files = loadFiles(repo, pr);
     comments = listPaged(`repos/${repo}/issues/${number}/comments`);
     loaded = loadThreads(repo, number);
+    issueKinds = loadIssueKinds(repo, loaded);
   } catch (error) {
     console.error(error.message);
     writeCheck(repo, sha, check, {
@@ -174,12 +200,12 @@ function evaluate(repo, number) {
       summary:
         'The PR file list or review inputs could not be verified. Re-evaluate after the complete file list and review threads are available; a previous successful check cannot qualify this head.',
     });
-    dequeueIfQueued(repo, pr);
     return;
   }
   const stateEntry = trustedStateComment(comments);
-  const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
-  const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
+  const hasFindings =
+    blockingThreads(loaded).length + preExistingThreads(loaded).length + issueKinds.size > 0;
+  const threads = markDeferrals(hasFindings ? markPreExisting(loaded, files) : loaded, issueKinds);
   const retries = retryStatus(comments, sha, stateEntry?.comment ?? null);
   const start = attemptStart(comments, stateEntry, sha);
   const lastActivity = Math.max(check ? Date.parse(check.started_at) : 0, start?.time ?? 0);
@@ -213,7 +239,6 @@ function evaluate(repo, number) {
       body: `${result.block}\nReview-gate: ${result.title}`,
     });
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
-  if (result.conclusion === 'failure') dequeueIfQueued(repo, pr);
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);
   if (result.addStall && !stalled)

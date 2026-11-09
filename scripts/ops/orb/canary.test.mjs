@@ -520,14 +520,14 @@ test('a refused live bridge listener counts as a firewall block and tailnet targ
   assert.equal(JSON.stringify(result).includes(config.tailnetAddress), false);
 });
 
-test('a detached prerequisite process has its own terminal signal group', async () => {
+test('an owned prerequisite process has its own terminal signal group', async () => {
   const result = await runCommand(
     process.execPath,
     [
       '-e',
       "process.stdout.write(require('node:child_process').execFileSync('ps',['-o','pid=,pgid=','-p',String(process.pid)],{encoding:'utf8'}))",
     ],
-    { detached: true },
+    { owned: true },
   );
   const [pid, group] = result.trim().split(/\s+/);
   assert.equal(pid, group);

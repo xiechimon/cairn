@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
+import { stubCoordinatorChief } from './helpers.js';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
 
 // Composer wire single source (#625): both composer faces — the detail
 // conversation composer and the chief drawer composer — run the same
@@ -185,27 +185,25 @@ test('detail face: an accepted steer clears the draft', async ({ page }) => {
   await expect(input).toHaveValue('');
 });
 
-// —— chief face: drawer composer, the send opens/continues a thread ————
 
 const CHIEF_DRAFT = '帮我看看这个项目的进展';
 
-async function openChiefDrawer(page: Page) {
+async function openChiefHome(page: Page) {
   await stubBoot(page);
   await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: [] });
   });
-  await page.goto('/app/schedules');
-
-  await openChiefWindow(page);
-  const input = page.getByTestId('chief-composer-input');
+  await stubCoordinatorChief(page, TEAM_ID, USER.id);
+  await page.goto('/app');
+  const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
   return input;
 }
 
 test('chief face: a rejected send (500) keeps the draft and toasts', async ({ page }) => {
-  const input = await openChiefDrawer(page);
+  const input = await openChiefHome(page);
   let posts = 0;
   await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
@@ -228,7 +226,7 @@ test('chief face: a rejected send (500) keeps the draft and toasts', async ({ pa
 });
 
 test('chief face: an accepted send clears the draft', async ({ page }) => {
-  const input = await openChiefDrawer(page);
+  const input = await openChiefHome(page);
   let posts = 0;
   await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
     if (request.method() !== 'POST') return route.fallback();

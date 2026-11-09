@@ -55,7 +55,10 @@ describe('#1219 the chief cancel -> re-dispatch chain', () => {
     const started = (await relay('open_thread', { todoId: todoRec.id })) as { buildId: string };
     const buildId = started.buildId;
 
-    const cancelled = (await relay('cancel_builds', { buildIds: [buildId] })) as {
+    const cancelled = (await relay('cancel_builds', {
+      buildIds: [buildId],
+      reason: 'test cancel',
+    })) as {
       cancelled: string[];
     };
     expect(cancelled.cancelled).toEqual([buildId]);
@@ -85,9 +88,9 @@ describe('#1219 the chief cancel -> re-dispatch chain', () => {
   });
 
   test('cancel_builds cross-team / unknown build -> 404 (confirm/merge follow the same rule)', async () => {
-    await expect(relay('cancel_builds', { buildIds: ['build-nope'] })).rejects.toThrow(
-      'build build-nope',
-    );
+    await expect(
+      relay('cancel_builds', { buildIds: ['build-nope'], reason: 'test cancel' }),
+    ).rejects.toThrow('build build-nope');
   });
 });
 
@@ -160,7 +163,10 @@ describe('#1219 the cancelBuild funnel (claimed delegation / idempotent zombie r
       if ('type' in ev) events.push(ev as { type: string; stepId?: string });
     });
 
-    const out = cancelBuild(machineDepsOf(w.s), w.buildId);
+    const out = cancelBuild(machineDepsOf(w.s), w.buildId, {
+      actor: 'person',
+      reason: 'test stop',
+    });
 
     expect(out).toBe('delegated');
     const pending = w.s.db.select().from(stopPendingTable).all();
@@ -175,21 +181,29 @@ describe('#1219 the cancelBuild funnel (claimed delegation / idempotent zombie r
     const w = makeWorld({ status: 'failed', phase: 'queued' });
     const buildBefore = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
 
-    const out = cancelBuild(machineDepsOf(w.s), w.buildId);
+    const out = cancelBuild(machineDepsOf(w.s), w.buildId, {
+      actor: 'person',
+      reason: 'test stop',
+    });
 
     expect(out).toBe('released');
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
     expect(todoRow.phase).toBe('todo');
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
     expect(buildRow.errorMessage).toBe(buildBefore.errorMessage ?? STOP_MESSAGE);
-    expect(cancelBuild(machineDepsOf(w.s), w.buildId)).toBe('released');
+    expect(
+      cancelBuild(machineDepsOf(w.s), w.buildId, { actor: 'person', reason: 'test stop' }),
+    ).toBe('released');
     const todoRow2 = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
     expect(todoRow2.phase).toBe('todo');
   });
 
   test('no active step and the todo no longer queued (a terminal card): a no-op that changes no phase', () => {
     const w = makeWorld({ status: 'failed', phase: 'failed' });
-    const out = cancelBuild(machineDepsOf(w.s), w.buildId);
+    const out = cancelBuild(machineDepsOf(w.s), w.buildId, {
+      actor: 'person',
+      reason: 'test stop',
+    });
     expect(out).toBe('released');
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
     expect(todoRow.phase).toBe('failed');
@@ -198,7 +212,9 @@ describe('#1219 the cancelBuild funnel (claimed delegation / idempotent zombie r
   test('an unknown build: not-found does not throw (the idempotent surface for a stale id from the chief)', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
-    expect(cancelBuild(machineDepsOf(s), 'build-nope')).toBe('not-found');
+    expect(
+      cancelBuild(machineDepsOf(s), 'build-nope', { actor: 'person', reason: 'test stop' }),
+    ).toBe('not-found');
   });
 });
 

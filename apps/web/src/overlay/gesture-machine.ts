@@ -1,6 +1,4 @@
-import { isEditableOutsideChiefDrawer } from './hotkeys.js';
-
-export type ChiefView = 'none' | 'drawer' | 'settings';
+export type ChiefView = 'none' | 'settings';
 
 export interface GestureState {
   chief: ChiefView;
@@ -8,8 +6,6 @@ export interface GestureState {
 }
 
 export type GestureEvent =
-  | { type: 'chief/toggle' }
-  | { type: 'chief/open' }
   | { type: 'chief/minimize' }
   | { type: 'chief/settings' }
   | { type: 'esc/push'; id: string }
@@ -30,10 +26,6 @@ function withChief(state: GestureState, chief: ChiefView): GestureResult {
 
 export function reduceGesture(state: GestureState, event: GestureEvent): GestureResult {
   switch (event.type) {
-    case 'chief/toggle':
-      return withChief(state, state.chief === 'drawer' ? 'none' : 'drawer');
-    case 'chief/open':
-      return withChief(state, 'drawer');
     case 'chief/minimize':
       return withChief(state, 'none');
     case 'chief/settings':
@@ -128,17 +120,8 @@ export function getGestureStore(initialChief?: ChiefView): GestureStore {
 
 export function bindGestureKeys(store: GestureStore): () => void {
   const onKey = (event: KeyboardEvent) => {
-    if (event.isComposing) return;
-    if (event.key === 'Escape') {
-      store.dispatch({ type: 'escape' });
-      return;
-    }
-    if (event.defaultPrevented || event.repeat) return;
-    if (!(event.metaKey || event.ctrlKey)) return;
-    if (event.key.toLowerCase() !== 'j') return;
-    if (isEditableOutsideChiefDrawer(event.target)) return;
-    event.preventDefault();
-    store.dispatch({ type: 'chief/toggle' });
+    if (event.isComposing || event.key !== 'Escape') return;
+    store.dispatch({ type: 'escape' });
   };
   window.addEventListener('keydown', onKey);
   return () => window.removeEventListener('keydown', onKey);

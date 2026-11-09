@@ -32,7 +32,6 @@ function demoFixtureOf(): FixtureSet {
     hasPlan?: boolean;
     hasChanges?: boolean;
     buildHistory?: TodoRecord['buildHistory'];
-    awaitingReply?: boolean;
   }): TodoRecord {
     return {
       id: input.id,
@@ -54,7 +53,6 @@ function demoFixtureOf(): FixtureSet {
       buildHistory: input.buildHistory ?? [],
       sourceTodo: null,
       v: 3,
-      ...(input.awaitingReply === true ? { awaitingReply: true } : {}),
     };
   }
 

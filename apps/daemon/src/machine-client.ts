@@ -18,6 +18,7 @@ import {
   type MachineRecord,
   type MachineRecoverResponse,
   type MachineSkillsManifestResponse,
+  type MachineSteerAckBody,
   type MachineSteerResponse,
   type MachineStopResponse,
   type MachineStreamEvent,
@@ -137,8 +138,8 @@ export interface MachineApi {
   ): Promise<void>;
   done(stepId: string, body: MachineDoneBody): Promise<void>;
   reportClaudeRateLimit?(body: ClaudeRateLimitReport): Promise<void>;
-  steer(stepId: string): Promise<string | null>;
-  steerAck?(stepId: string): Promise<void>;
+  steer(stepId: string): Promise<MachineSteerResponse | null>;
+  steerAck?(stepId: string, body?: MachineSteerAckBody): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
   syncResult(syncId: string, body: MachineSyncResultBody): Promise<void>;
   computerFrames?(
@@ -526,17 +527,17 @@ export class MachineClient implements MachineApi {
     });
   }
 
-  async steer(stepId: string): Promise<string | null> {
-    const res = await this.request<MachineSteerResponse>(
+  async steer(stepId: string): Promise<MachineSteerResponse> {
+    return this.request<MachineSteerResponse>(
       'GET',
       `/api/machine/steer?stepId=${encodeURIComponent(stepId)}`,
       { parse: (raw) => machineSteerResponseSchema.parse(raw) },
     );
-    return res.content;
   }
 
-  async steerAck(stepId: string): Promise<void> {
+  async steerAck(stepId: string, body?: MachineSteerAckBody): Promise<void> {
     await this.request('POST', `/api/machine/steer/ack?stepId=${encodeURIComponent(stepId)}`, {
+      ...(body !== undefined ? { body } : {}),
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }

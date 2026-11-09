@@ -17,7 +17,7 @@ import { CORRECTION_GUARD_MISSING, correctionDoneCheck } from './correction.js';
 import { computePatchDigest } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import { isLiveHarnessAttempt } from './harness-eval-route.js';
-import { independenceVendorDetail, modelsAreIndependent } from './model-identity.js';
+import { codexReviewDetail, isCodexReviewModel } from './model-identity.js';
 import { classifyPaths, touchesHarness } from './paths.js';
 
 export interface GateVerdictView {
@@ -402,16 +402,13 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
           (v.outcome === 'pass' || v.outcome === 'block'),
       );
       const independent = bound.filter(
-        (v) =>
-          v.reviewerModel != null && modelsAreIndependent(author?.model ?? '', v.reviewerModel),
+        (v) => v.reviewerModel != null && isCodexReviewModel(v.reviewerModel),
       );
       if (!independent.some((v) => v.outcome === 'pass')) {
         const vendorDetail = [
           ...new Set(
             bound.flatMap((v) =>
-              v.reviewerModel == null
-                ? []
-                : independenceVendorDetail(author?.model ?? '', v.reviewerModel),
+              v.reviewerModel == null ? [] : codexReviewDetail(v.reviewerModel),
             ),
           ),
         ];

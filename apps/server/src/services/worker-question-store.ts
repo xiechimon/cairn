@@ -1,6 +1,5 @@
 import {
   ASK_USER_QUESTION_KIND,
-  type AskUserAnswer,
   type AskUserQuestionContent,
   askUserQuestionContentSchema,
 } from '@cairn/shared';
@@ -9,7 +8,7 @@ import type { Db } from '../db/client.js';
 import { message } from '../db/schema.js';
 import type { ConversationStreamHub } from './events.js';
 
-interface StoreDeps {
+export interface StoreDeps {
   db: Db;
   convHub?: ConversationStreamHub;
 }
@@ -90,7 +89,13 @@ export function updateWorkerQuestion(
   publishQuestion(deps, buildId, requestId, content, createdAt);
 }
 
-function pendingRows(db: Db, buildId: string) {
+export interface WorkerQuestionRow {
+  id: string;
+  createdAt: number;
+  content: AskUserQuestionContent;
+}
+
+export function workerQuestionRows(db: Db, buildId: string): WorkerQuestionRow[] {
   return db
     .select()
     .from(message)
@@ -98,43 +103,16 @@ function pendingRows(db: Db, buildId: string) {
     .all()
     .flatMap((row) => {
       const content = contentOf(row.content);
-      return content !== null && content.status === 'pending'
-        ? [{ id: row.id, createdAt: row.createdAt, content }]
-        : [];
+      return content !== null ? [{ id: row.id, createdAt: row.createdAt, content }] : [];
     });
+}
+
+function pendingRows(db: Db, buildId: string): WorkerQuestionRow[] {
+  return workerQuestionRows(db, buildId).filter((row) => row.content.status === 'pending');
 }
 
 export function pendingWorkerQuestionIds(db: Db, buildId: string): string[] {
   return pendingRows(db, buildId).map((row) => row.id);
-}
-
-export function answerWorkerQuestionsById(
-  deps: StoreDeps,
-  buildId: string,
-  ids: string[],
-  text: string,
-): void {
-  for (const id of ids) {
-    const row = deps.db
-      .select()
-      .from(message)
-      .where(and(eq(message.id, id), eq(message.conversationId, buildId)))
-      .get();
-    const content = row === undefined ? null : contentOf(row.content);
-    if (row === undefined || content === null || content.status === 'answered') continue;
-    const answers: AskUserAnswer[] = content.questions.map((question) => ({
-      header: question.header,
-      text,
-    }));
-    const { cancelReason: _cancelled, ...rest } = content;
-    updateWorkerQuestion(
-      deps,
-      buildId,
-      id,
-      { ...rest, status: 'answered', answers },
-      row.createdAt,
-    );
-  }
 }
 
 export function pendingWorkerQuestions(db: Db, buildId: string): AskUserQuestionContent[] {
@@ -143,28 +121,6 @@ export function pendingWorkerQuestions(db: Db, buildId: string): AskUserQuestion
 
 export function blockingWorkerQuestions(db: Db, buildId: string): AskUserQuestionContent[] {
   return pendingWorkerQuestions(db, buildId);
-}
-
-export function answerPendingWorkerQuestions(
-  deps: StoreDeps,
-  buildId: string,
-  text: string,
-): boolean {
-  const pending = pendingRows(deps.db, buildId);
-  for (const row of pending) {
-    const answers: AskUserAnswer[] = row.content.questions.map((question) => ({
-      header: question.header,
-      text,
-    }));
-    updateWorkerQuestion(
-      deps,
-      buildId,
-      row.id,
-      { ...row.content, status: 'answered', answers },
-      row.createdAt,
-    );
-  }
-  return pending.length > 0;
 }
 
 export function cancelPendingWorkerQuestions(

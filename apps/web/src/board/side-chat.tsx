@@ -1,10 +1,9 @@
 import { cn } from 'cn';
 import { FileDiff, X } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { useChiefRoot } from '../chief/chief-root.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
@@ -18,6 +17,7 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
@@ -95,7 +95,7 @@ function SourceLine({
   const { t } = useI18n();
   const { teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
-  const { openChiefThread } = useChiefRoot();
+  const openChiefThread = useOpenCoordinatorThread();
   return (
     <SourceIssueLine
       todo={wire}
@@ -230,7 +230,9 @@ function ThreadBody({
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}
-          spec={todo.spec.trim() !== '' ? todo.spec : undefined}
+          spec={todo.spec.trim() !== '' && !chat.hasEarlier ? todo.spec : undefined}
+          hasEarlier={chat.hasEarlier}
+          {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
           autoScroll={chat.transcript.length > 0}
           running={threadStatus(todo) === 'running'}
           settled={chat.transcriptSettled}
@@ -315,7 +317,7 @@ export function SideChat({
   const showsChanges = view === 'changes';
 
   const panelRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const releaseCovered = (target: EventTarget | null) => {
       const panel = panelRef.current;
       if (panel === null || !(target instanceof HTMLElement)) return;
@@ -334,7 +336,7 @@ export function SideChat({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       if (document.querySelector(OPEN_SURFACE) !== null) return;

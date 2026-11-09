@@ -1,5 +1,5 @@
-import { type ReactNode, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { type ReactNode, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import {
   useApiMutations,
   useBackupNotice,
@@ -36,7 +36,6 @@ import { SHEET_PANEL } from '../pages/shell.js';
 
 export function BoardPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
   const { surface: chief } = useChiefRoot();
@@ -90,15 +89,6 @@ export function BoardPage() {
             ? 'failed'
             : 'loading';
   const projectChat = searchParams.get('chat') === '1';
-  const previousChiefView = useRef(chiefView);
-  useEffect(() => {
-    const opened = chiefView === 'drawer' && previousChiefView.current !== 'drawer';
-    previousChiefView.current = chiefView;
-    if (homeProject === null || projectChat || !opened) return;
-    const params = new URLSearchParams(searchParams);
-    params.set('chat', '1');
-    navigate({ pathname: '/app', search: `?${params.toString()}` });
-  }, [homeProject, projectChat, chiefView, searchParams, navigate]);
   const schedules = live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? []);
   const now = live ? Date.now() : fixture.now;
   const chatParams = new URLSearchParams(searchParams);
@@ -198,11 +188,7 @@ export function BoardPage() {
       <div className={`board-sheet ${SHEET_PANEL}`}>
         <div className="relative flex min-h-0 min-w-0 flex-1">
           {chiefView === 'settings' ? (
-            <ChiefSettings
-              chief={chiefData}
-              onBack={() => setChiefView('drawer')}
-              machines={fixture.resources?.machines}
-            />
+            <ChiefSettings chief={chiefData} onBack={() => setChiefView('none')} />
           ) : projectLookup === 'loading' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <ProjectsLoading />

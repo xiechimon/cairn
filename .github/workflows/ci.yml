@@ -494,6 +494,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/autonomy-brake.test.mjs scripts/autonomy-brake-workflow.test.mjs
 
+      - name: Commit identity allowlist and hooks (#2289)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/commit-identity.test.mjs
+
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs
@@ -509,6 +513,14 @@ jobs:
       - name: Pages keep to tokens; gallery baselines map from CI renders
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-page-style-gate.test.mjs
+
+      - name: Feature map covers every route and stays in step with the code
+        if: ${{ !cancelled() }}
+        env:
+          FEATURE_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$FEATURE_REGISTRY_BASE_SHA" ]; then git fetch origin "$FEATURE_REGISTRY_BASE_SHA"; fi
+          node scripts/generate-feature-map.mjs --check
 
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
@@ -536,6 +548,10 @@ jobs:
       - name: Test temp guard fixtures (#1954)
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/host/test-temp-guard.test.mjs
+
+      - name: Worktree reaper removes only clean, idle, finished trees
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/host/worktree-reaper.test.mjs
 
       - name: merge-pr Mergify queue fixtures
         if: ${{ !cancelled() }}

@@ -347,6 +347,16 @@ test.each(['pause', 'review-gate'] as const)(
   },
 );
 
+test('a worker schedule stays paused while the task waits for an answer', async () => {
+  const s = await world();
+  const before = s.db.select().from(step).all().length;
+  s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, s.todoId)).run();
+  await s.scheduler.tick(s.due);
+  expect(s.db.select().from(step).all()).toHaveLength(before);
+  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.phase).toBe('needs_input');
+  expect(s.stored()).toMatchObject({ enabled: true, lastRunAt: null });
+});
+
 test.each(['pending-stop', 'acknowledged-stop', 'exit-stop'] as const)(
   'a fired one-shot never restarts after %s',
   async (ending) => {
@@ -354,11 +364,18 @@ test.each(['pending-stop', 'acknowledged-stop', 'exit-stop'] as const)(
     await s.scheduler.tick(s.due);
     expect(s.stored()?.nextRunAt).toBeNull();
     const fired = s.db.select().from(step).all().at(-1)!;
-    if (ending === 'pending-stop') builds.requestStop(s.svc, s.buildId, { discard: true });
+    if (ending === 'pending-stop')
+      builds.requestStop(
+        s.svc,
+        s.buildId,
+        { discard: true },
+        { actor: 'person', reason: 'test stop' },
+      );
     else if (ending === 'acknowledged-stop') {
       s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, fired.id)).run();
       builds.applyStoppedStep(s.svc, fired.id);
-    } else builds.stopActiveStepsAfterExit(s.svc, s.todoId);
+    } else
+      builds.stopActiveStepsAfterExit(s.svc, s.todoId, { actor: 'person', reason: 'test stop' });
     expect(s.stored()).toMatchObject({
       nextRunAt: null,
       lastRunStatus: 'stopped',

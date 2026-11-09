@@ -1,8 +1,9 @@
 import type { NetworkInterfaceInfo } from 'node:os';
-import type { TeamRecord, UserRecord } from '@cairn/shared';
+import type { GitIdentity, TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { FetchLike } from './lib/github.js';
+import type { LoopbackOwner } from './lib/loopback-owner.js';
 import type { KeySecretBox } from './lib/secret-box.js';
 import type { SidecarStatus } from './lib/tsnet-sidecar.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
@@ -22,6 +23,7 @@ export interface RemoteAccessContext {
 
 export interface AppContext {
   githubAppTokenSocket?: string | null | undefined;
+  githubAppIdentity?: GitIdentity | null | undefined;
   remote?: RemoteAccessContext;
   db: Db;
   hub: TeamStreamHub;
@@ -56,8 +58,11 @@ export interface AppContext {
   githubFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;
   oauthFetch?: FetchLike;
+  providerTestFetch?: typeof fetch;
+  providerTestTimeoutMs?: number;
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
+  loopbackOwner?: LoopbackOwner | null;
   mcpConfigPath: string;
   logger?: Logger;
 }

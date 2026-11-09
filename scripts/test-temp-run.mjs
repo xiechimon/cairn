@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { spawnOwned } from './owned-process.mjs';
 
 const [separator, command, ...args] = process.argv.slice(2);
 if (separator !== '--' || !command) {
@@ -15,7 +15,7 @@ const root = join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `ct-${runId.slic
 mkdirSync(root, { mode: 0o700 });
 const report = join(root, 'allocations.jsonl');
 writeFileSync(report, '', { flag: 'wx', mode: 0o600 });
-const child = spawn(command, args, {
+const owned = spawnOwned(command, args, {
   env: {
     ...process.env,
     CAIRN_TEST_RUN_ID: runId,
@@ -24,26 +24,12 @@ const child = spawn(command, args, {
     CAIRN_TEST_TEMP_ROOT: root,
   },
   stdio: 'inherit',
-  detached: true,
+  name: 'test-temp-run',
+  graceMs: 1_000,
 });
-let finished = false;
 let interrupted = false;
-let terminationTimer;
-
-function signalChild(signal) {
-  if (!child.pid) return;
-  try {
-    process.kill(-child.pid, signal);
-  } catch (error) {
-    if (error.code !== 'ESRCH') throw error;
-  }
-}
 
 function finish(code) {
-  if (finished) return;
-  finished = true;
-  clearTimeout(terminationTimer);
-  signalChild('SIGKILL');
   let failed = interrupted;
   const owned = new Set();
   try {
@@ -94,12 +80,9 @@ function finish(code) {
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(signal, () => {
     interrupted = true;
-    signalChild(signal);
-    terminationTimer ??= setTimeout(() => signalChild('SIGKILL'), 1000);
+    owned.stop();
   });
 }
-child.once('error', () => {
-  console.error('test-temp-run: child failed to start');
-  finish(1);
-});
-child.once('exit', (code) => finish(code ?? 1));
+const { code, error } = await owned.exited;
+if (error) console.error('test-temp-run: child failed to start');
+finish(error ? 1 : (code ?? 1));

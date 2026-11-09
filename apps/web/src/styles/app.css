@@ -13,6 +13,7 @@
   --color-icon: var(--icon);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-prose-mono: var(--font-system-mono);
   --font-heading: var(--font-display);
   --font-serif: var(--font-source-serif);
   --text-page: var(--type-page);
@@ -35,6 +36,17 @@
   --text-code--line-height: calc(20 / 13);
   --text-caption: var(--type-caption);
   --text-caption--line-height: calc(18 / 12);
+  --text-code-block: calc(0.875rem * var(--type-scale));
+  --text-code-block--line-height: 1.625;
+  --text-code-inline: 0.9em;
+  --text-code-inline--line-height: 1;
+  --text-code-lang: var(--type-caption);
+  --text-code-lang--line-height: calc(17 / 12);
+  --spacing-list-indent: 2em;
+  --spacing-list-item: 0.5em;
+  --spacing-list-step: 0.25em;
+  --spacing-prose-flow: 0.75em;
+  --spacing-list-break: 1.5em;
 }
 
 @layer base {
@@ -318,15 +330,6 @@
   z-index: var(--z-modal-scrim);
 }
 
-@layer base {
-  .chief-drawer[hidden] {
-    /* biome-ignore lint/complexity/noImportantStyles: tailwind preflight `[hidden] { display: none !important }` wins over the base layer, so the park state must counter it with !important */
-    display: flex !important;
-    visibility: hidden;
-    opacity: 0;
-  }
-}
-
 @supports (corner-shape: superellipse(1.5)) {
   .board-notify-banner {
     corner-shape: superellipse(1.5);
@@ -348,6 +351,11 @@
 @utility voice-response {
   font-family: var(--font-serif);
   font-weight: var(--voice-response-weight);
+}
+
+@utility agent-measure {
+  width: 100%;
+  max-width: 68ch;
 }
 
 @utility pe-chief-launcher {
@@ -507,10 +515,6 @@
 
   body:has(.side-panel) .app-menu-trigger {
     display: none;
-  }
-  .chief-drawer {
-    right: max(0.5rem, env(safe-area-inset-right));
-    bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 }
 
