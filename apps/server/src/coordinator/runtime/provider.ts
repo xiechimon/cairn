@@ -50,9 +50,10 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
           const key = resolveKey === undefined ? credential?.key : await resolveKey();
           const resolvedKey = key || KEYLESS_PLACEHOLDER;
           return {
-            auth: config.authHeader
-              ? { headers: { Authorization: `Bearer ${resolvedKey}` } }
-              : { apiKey: resolvedKey },
+            auth:
+              config.authHeader && !subscription
+                ? { headers: { Authorization: `Bearer ${resolvedKey}` } }
+                : { apiKey: resolvedKey },
             source: key ? 'cairn step token' : 'no key on the provider',
           };
         },
