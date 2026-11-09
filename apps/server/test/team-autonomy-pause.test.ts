@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { project, team } from '../src/db/schema.js';
+import { project } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { bootServer, postProject, req } from './helpers.js';
+import { bootServer, postProject, req, teamPausedForTest } from './helpers.js';
 
 test('team autonomy pause persists, is readable after reseeding, and unpauses without changing other settings', async () => {
   const s = bootServer();
@@ -13,10 +13,8 @@ test('team autonomy pause persists, is readable after reseeding, and unpauses wi
     const paused = await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, { autonomyPaused: true });
     expect(paused.status).toBe(200);
     expect(await paused.json()).toMatchObject({ autonomyPaused: true });
-    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()).toMatchObject({
-      autonomyPaused: true,
-    });
-    expect(seed(s.db).team).toMatchObject({ autonomyPaused: true });
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(true);
+    seed(s.db);
     expect(await (await req(s.app, 'GET', '/api/teams')).json()).toMatchObject([
       { autonomyPaused: true },
     ]);
