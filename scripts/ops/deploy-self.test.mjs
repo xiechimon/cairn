@@ -108,8 +108,9 @@ function fixture({ claimed = 0, digestClaimed = 0, heartbeatAgeMs = null, seedFi
   const db = join(data, 'server.db');
   sqlite(
     db,
-    `create table step(id text primary key, buildId text, status text, lastHeartbeatAt integer);
+    `create table step(id text primary key, buildId text, status text, lastHeartbeatAt integer, machineId text default 'm1');
      create table machine(id text primary key, name text, lastSeenAt integer, maxConcurrent integer default 1);
+     create table deploy_lease(id text primary key, owner text not null, status text not null, expiresAt integer not null);
      create table __drizzle_migrations(id integer primary key, hash text);
      insert into machine values ('m1', 'omarchy', 0, 1);
      insert into __drizzle_migrations(hash) values ('m0');`,
@@ -211,7 +212,7 @@ if [ "$2 $3" = "start cairn-server.service" ]; then
     [ ! -f "${fake}/write-on-broken-start" ] || sqlite3 "${db}" "insert or ignore into step(id, status) values ('written-after', 'done')"
     [ ! -f "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "alter table step add column note text; alter table step add column tier text default 'low'"
     [ ! -s "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "update step set note = '$(cat "${fake}/column-on-broken-start")'"
-  else touch "${fake}/up"; fi
+  else touch "${fake}/up"; sqlite3 "${db}" "update machine set lastSeenAt = (cast(strftime('%s','now') as integer) + 5) * 1000"; fi
 fi
 [ "$2 $3" = "stop cairn-server.service" ] && rm -f "${fake}/up"
 if [ "$2 $3" = "start cairn-daemon.service" ]; then
@@ -219,10 +220,36 @@ if [ "$2 $3" = "start cairn-daemon.service" ]; then
 fi
 exit 0`,
   );
+  writeFileSync(
+    join(fake, 'lease-api.mjs'),
+    `
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const args = process.argv.slice(2);
+const value = (flag) => args[args.indexOf(flag) + 1];
+const method = args.includes('-X') ? value('-X') : 'GET';
+const sql = (query) => execFileSync('sqlite3', ['${db}', query], { encoding: 'utf8' }).trim();
+let status = 200;
+let row = JSON.parse(sql("select json_object('owner',owner,'status',status,'expiresAt',expiresAt) from deploy_lease where id='server'") || '{"owner":null,"status":"accepting","expiresAt":0}');
+if (existsSync('${fake}/lease-unsupported')) status = 404;
+else if (method === 'PUT') {
+  const body = JSON.parse(value('--data-binary'));
+  row = { owner: body.owner, status: 'draining', expiresAt: Date.now() + body.ttlMs };
+  sql("insert or replace into deploy_lease values ('server','" + row.owner + "','draining'," + row.expiresAt + ")");
+  writeFileSync('${fake}/claims-paused', '');
+  if (existsSync('${fake}/continuous')) sql("update step set status='done' where status='claimed'");
+} else if (method === 'GET' && existsSync('${fake}/continuous') && row.status === 'draining') {
+  sql("update step set status='done' where status='claimed'");
+}
+writeFileSync(value('-o'), JSON.stringify(row));
+process.stdout.write(String(status));
+`,
+  );
   fakeTool(
     bin,
     'curl',
     `url="\${@: -1}"
+if [[ "$url" == */api/server/deploy/lease ]]; then exec "${process.execPath}" "${fake}/lease-api.mjs" "$@"; fi
 if [ -f "${fake}/up" ]; then
   case "$url" in */app) printf 200 ;; */api/user/me) printf 401 ;; *) printf 404 ;; esac
 else printf 000; fi`,
@@ -243,6 +270,7 @@ else printf 000; fi`,
     CAIRN_HEALTH_URL: 'http://127.0.0.1:8787',
     CAIRN_HEALTH_TRIES: '3',
     CAIRN_HEALTH_INTERVAL: '0',
+    CAIRN_DEPLOY_STEP_WAIT_SECONDS: '0',
   };
   const run = (script, args, extra = {}) =>
     spawnSync('/bin/bash', [script, ...args], { encoding: 'utf8', env: { ...env, ...extra } });
@@ -351,69 +379,15 @@ test('ignores a trailing comma added after an unchanged prepare hook', () => {
   assert.doesNotMatch(result.stderr, /install hooks/);
 });
 
-test('waits while a step is running or a deploy hold is set', () => {
-  const busy = fixture({ claimed: 1 });
-  const target = pushTarget(busy);
-  const result = busy.run(DEPLOY, [target]);
-  assert.equal(result.status, 75, result.stderr);
-  assert.match(result.stderr, /1 step running/);
-  assert.equal(busy.log('systemctl.log'), '');
-
-  const held = fixture();
-  const heldTarget = pushTarget(held);
-  mkdirSync(held.state, { recursive: true });
-  writeFileSync(join(held.state, 'hold'), 'orb trial-one\n');
-  const heldResult = held.run(DEPLOY, [heldTarget]);
-  assert.equal(heldResult.status, 75);
-  assert.match(heldResult.stderr, /hold: orb trial-one/);
-});
-
-test('a claimed Coordinator digest step does not hold the deploy back', () => {
-  const f = fixture({ digestClaimed: 1, heartbeatAgeMs: 1_000 });
-  const target = pushTarget(f);
-  const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 0, result.stderr);
-  assert.doesNotMatch(result.stderr, /step running/);
-});
-
-test('a digest step does not hide a real running step', () => {
-  const f = fixture({ claimed: 1, digestClaimed: 1, heartbeatAgeMs: 1_000 });
-  const target = pushTarget(f);
-  const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 75, result.stderr);
-  assert.match(result.stderr, /1 step running/);
-});
-
-test('forces the deploy past claimed steps with no heartbeat once the wait bound passes', () => {
-  const f = fixture({ claimed: 1, heartbeatAgeMs: 3_600_000 });
+test('respects an explicit operator hold without acquiring a lease', () => {
+  const f = fixture();
   const target = pushTarget(f);
   mkdirSync(f.state, { recursive: true });
-  writeFileSync(join(f.state, 'steps-waiting-since'), `${Math.floor(Date.now() / 1000) - 4_000}\n`);
+  writeFileSync(join(f.state, 'hold'), 'orb trial-one\n');
   const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /deploy-forced-past-stale-steps/);
-  assert.match(f.log('gh.log'), /issue create.*no heartbeat/);
-  const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
-  assert.equal(record.sha, target);
-  assert.equal(existsSync(join(f.state, 'alarms/deploy-forced-past-stale-steps')), false);
-});
-
-test('keeps waiting past the bound while the claimed step still heartbeats', () => {
-  const f = fixture({ claimed: 1, heartbeatAgeMs: 1_000 });
-  const target = pushTarget(f);
-  mkdirSync(f.state, { recursive: true });
-  writeFileSync(join(f.state, 'steps-waiting-since'), `${Math.floor(Date.now() / 1000) - 4_000}\n`);
-  const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 75, result.stderr);
-  assert.match(result.stderr, /1 step running/);
-});
-
-test('keeps waiting below the bound even without a heartbeat', () => {
-  const f = fixture({ claimed: 1, heartbeatAgeMs: 3_600_000 });
-  const target = pushTarget(f);
-  const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 75, result.stderr);
-  assert.match(result.stderr, /1 step running for 0s/);
+  assert.equal(result.status, 75);
+  assert.match(result.stderr, /hold: orb trial-one/);
+  assert.equal(sqlite(f.db, 'select count(*) from deploy_lease'), '0');
 });
 
 test('installs host tools from the deployed commit and records the installed SHA', () => {
@@ -1002,4 +976,58 @@ test('keeps a hand-edited bin script and reports it', () => {
     '#!/bin/bash\necho local\n',
   );
   assert.match(f.log('gh.log'), /issue create.*Host tools differ/);
+});
+
+test('server-only deploys under continuous active work without stopping either daemon', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  writeFileSync(join(f.fake, 'lease-unsupported'), '');
+  const target = pushTarget(f, 'server', {
+    files: {
+      'apps/server/src/probe.ts': 'export {};\n',
+      '.claude/skills/verify-cairn/feature-map.json': '{}\n',
+      'marker.txt': 'previous\n',
+    },
+  });
+  const started = Date.now();
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(Date.now() - started < 10_000);
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+for (const failure of [false, true]) {
+  test(`continuous traffic drains within the bound and resumes claims after deploy failure=${failure}`, () => {
+    const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+    writeFileSync(join(f.fake, 'continuous'), '');
+    const target = pushTarget(f, 'daemon');
+    if (failure) writeFileSync(join(f.fake, 'broken-sha'), target);
+    const result = f.run(DEPLOY, [target], { CAIRN_DEPLOY_STEP_WAIT_SECONDS: '2' });
+    assert.equal(result.status, failure ? 1 : 0, result.stderr);
+    assert.ok(existsSync(join(f.fake, 'claims-paused')));
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+    assert.match(result.stdout, /claims resumed/);
+  });
+}
+
+test('daemon changes fail closed against a server without lease support', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lease-unsupported'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /lease endpoint/);
+  assert.equal(f.log('systemctl.log'), '');
+});
+
+test('bounded drain timeout resumes claims without stopping services and names starvation in the lag alarm', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  pushTarget(f, 'daemon', { date: new Date(Date.now() - 3 * 3600_000).toISOString() });
+  const result = f.run(WATCH, [], {
+    CAIRN_DEPLOY_SCRIPT: DEPLOY,
+    CAIRN_DEPLOY_STEP_WAIT_SECONDS: '0',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('gh.log'), /starved: steps never idle/);
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+  assert.equal(f.log('systemctl.log'), '');
 });

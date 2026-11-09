@@ -21,9 +21,8 @@ usage: deploy-self.sh <40-hex sha on origin/main> | --recover
 Deploys one green main commit to this host's cairn checkout and user units, with rollback.
   1. refuses a SHA not on origin/main, without every required check green, while autonomy
      is paused, or whose pnpm-workspace.yaml allows a new install script (exit 2)
-  2. waits while a step is claimed or $CAIRN_DEPLOY_STATE/hold exists (exit 75), except that
-     claimed steps with no heartbeat for CAIRN_DEPLOY_STEP_STALE_SECONDS stop blocking the
-     deploy once CAIRN_DEPLOY_STEP_WAIT_SECONDS have passed; that deploy opens an alarm
+  2. respects $CAIRN_DEPLOY_STATE/hold; daemon changes pause claims with a durable lease
+     and drain within CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming
   3. rehearses the target's migrations on an online copy of the live DB in a scratch worktree
   4. checks out the target, installs with --frozen-lockfile, builds the daemon and web assets
   5. stops daemon and server, snapshots the DB, starts server then daemon, health-checks both
@@ -43,7 +42,6 @@ Environment (defaults in brackets):
   CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
   CAIRN_HEALTH_TRIES [60]  CAIRN_HEALTH_INTERVAL [2]  CAIRN_MACHINE_NAME [hostname -s]
   CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]  CAIRN_DEPLOY_STEP_WAIT_SECONDS [1800]
-  CAIRN_DEPLOY_STEP_STALE_SECONDS [600]
   CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
   CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
   CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
@@ -66,8 +64,6 @@ KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 NOTIFY_HOOK="${CAIRN_DEPLOY_NOTIFY:-$STATE/notify.sh}"
 NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
 STEP_WAIT_SECONDS="${CAIRN_DEPLOY_STEP_WAIT_SECONDS:-1800}"
-STEP_STALE_SECONDS="${CAIRN_DEPLOY_STEP_STALE_SECONDS:-600}"
-STEPS_ALARM_TITLE="Deploy forced past a claimed step with no heartbeat"
 HOST_TOOLS_ROOT="${CAIRN_HOST_TOOLS_ROOT:-$HOME/.cairn/tools}"
 HOST_LANES_ROOT="${CAIRN_HOST_LANES_ROOT:-$HOME/lanes}"
 HOST_BIN_ROOT="${CAIRN_HOST_BIN_ROOT:-$HOME/.local/bin}"
@@ -103,7 +99,7 @@ RUNNING_COPY="$0"
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
 refuse() { echo "refused: $*" >&2; exit "$EXIT_REFUSED"; }
-busy() { echo "busy: $*" >&2; exit "$EXIT_BUSY"; }
+busy() { printf '%s\n' "$*" >"$STATE/last-reason"; echo "busy: $*" >&2; exit "$EXIT_BUSY"; }
 
 LOCK="$STATE/lock"
 trap 'rm -f "$RUNNING_COPY"' EXIT
@@ -119,7 +115,45 @@ if ! mkdir "$LOCK" 2>/dev/null; then
   mkdir "$LOCK" 2>/dev/null || busy "deploy lock taken concurrently"
 fi
 echo $$ >"$LOCK/pid"
-trap 'rm -rf "$LOCK"; rm -f "$RUNNING_COPY"' EXIT
+RUNTIME=daemon
+LEASE_OWNER=""
+
+resume_claims() {
+  [ -n "$LEASE_OWNER" ] || return 0
+  [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || return 1
+  local tables
+  tables="$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" || return 1
+  if [ "$tables" = 1 ]; then
+    sqlite3 -cmd '.timeout 10000' "$DB" "update deploy_lease set status='accepting', expiresAt=0 where id='server' and owner='$LEASE_OWNER';" || return 1
+    [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 0 ] || return 1
+  fi
+  log "claims resumed: owned deployment lease released and read back"
+  rm -f "$STATE/lease-owner"
+  LEASE_OWNER=""
+}
+
+cleanup() {
+  local status=$?
+  if [ "$status" != 0 ] && [ -f "$STATE/in-progress" ] && grep -qx 'phase=building' "$STATE/in-progress"; then
+    switch_code "$PREVIOUS" || log "CRITICAL: restoring the previous checkout failed"
+    clear_in_progress
+  fi
+  if ! resume_claims; then
+    echo "CRITICAL: claims resume failed; recover $STATE/lease-owner" >&2
+    status=3
+  fi
+  rm -rf "$LOCK"
+  rm -f "$RUNNING_COPY"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+if [ -s "$STATE/lease-owner" ]; then
+  LEASE_OWNER="$(cat "$STATE/lease-owner")"
+  if [ ! -e "$STATE/in-progress" ]; then resume_claims || exit 3; fi
+fi
+rm -f "$STATE/last-reason"
 
 run_notify() {
   local record="$1" status=0
@@ -142,7 +176,7 @@ write_record() {
   local sha="$1" previous="$2" result="$3" failed="${4:-}" snapshot="${5:-}"
   local record
   if [ "$result" = deployed ]; then
-    rm -f "$STATE/steps-waiting-since" "$STATE/alarms/deploy-forced-past-stale-steps"
+    resume_claims || return 1
     install_host_tools "$sha" "$previous"
   fi
   record="$(printf '{"sha":"%s","previous":"%s","result":"%s","failed":"%s","snapshot":"%s","at":"%s","host":"%s"}\n' \
@@ -231,47 +265,51 @@ host_tools_alarm() {
   touch "$STATE/alarms/$reason" || true
 }
 
-step_counts() {
-  local cutoff=$(( ($(date +%s) - STEP_STALE_SECONDS) * 1000 ))
-  sqlite3 -readonly -separator ' ' "$DB" \
-    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed' and coalesce(buildId, '') not like 'chief-digest-%'"
-}
-
-step_wait_alarm() {
-  local running="$1" waited="$2" reason="deploy-forced-past-stale-steps" open_issue body
-  echo "$reason: $running claimed step(s) without a heartbeat for ${STEP_STALE_SECONDS}s blocked the deploy for ${waited}s; continuing" >&2
-  mkdir -p "$STATE/alarms" || return 0
-  [ ! -e "$STATE/alarms/$reason" ] || return 0
-  body="$reason: $running claimed step(s) on $MACHINE_NAME had no heartbeat for ${STEP_STALE_SECONDS}s and held the deploy for ${waited}s, past the ${STEP_WAIT_SECONDS}s bound. The deploy continued. Inspect the step and the daemon that owns it; the alarm clears on the next recorded deploy."
-  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$STEPS_ALARM_TITLE\" in:title" --json number --jq '.[0].number // empty')" || return 0
-  if [ -n "$open_issue" ]; then
-    gh issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null || return 0
-  else
-    gh issue create -R "$REPO" -t "$STEPS_ALARM_TITLE" -b "$body" -a xiechimon >/dev/null || return 0
-  fi
-  touch "$STATE/alarms/$reason" || true
-}
-
-assert_idle() {
+assert_hold() {
   [ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
-  local running stale now since waited counts
-  counts="$(step_counts)" || busy "cannot read the step counts"
-  if ! [[ "$counts" =~ ^([0-9]+)\ ([0-9]+)$ ]]; then
-    busy "cannot read the step counts"
-  fi
-  running="${BASH_REMATCH[1]}"
-  stale="${BASH_REMATCH[2]}"
-  if [ "$running" = 0 ]; then
-    rm -f "$STATE/steps-waiting-since"
-    return 0
-  fi
-  now="$(date +%s)"
-  [ -e "$STATE/steps-waiting-since" ] || printf '%s\n' "$now" >"$STATE/steps-waiting-since"
-  since="$(cat "$STATE/steps-waiting-since")"
-  waited=$((now - since))
-  [ "$waited" -ge "$STEP_WAIT_SECONDS" ] || busy "$running step running for ${waited}s"
-  [ "$stale" = "$running" ] || busy "$running step running for ${waited}s"
-  step_wait_alarm "$running" "$waited"
+}
+
+classify_runtime() {
+  local path
+  RUNTIME=server
+  while IFS= read -r path; do
+    case "$path" in
+      *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
+      apps/server/* | apps/web/* | integration/test/* | docs/* | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs) ;;
+      *) RUNTIME=daemon ;;
+    esac
+  done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")
+}
+
+lease_request() {
+  curl -sS --noproxy '*' --max-time 10 -o "$STATE/lease-response" -w '%{http_code}' \
+    -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
+}
+
+assert_lease() {
+  python3 - "$STATE/lease-response" "$LEASE_OWNER" <<'PYLEASE'
+import json, sys, time
+with open(sys.argv[1]) as response:
+    lease = json.load(response)
+assert lease['owner'] == sys.argv[2] and lease['status'] == 'draining'
+assert lease['expiresAt'] > time.time() * 1000
+PYLEASE
+}
+
+drain_steps() {
+  [ "$RUNTIME" = daemon ] || return 0
+  local deadline=$(( $(date +%s) + STEP_WAIT_SECONDS )) running
+  [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+  printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
+  [ "$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" = 200 ] && assert_lease || refuse "cannot acquire deployment lease"
+  while :; do
+    [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 1 ] || refuse "deployment lease lost during drain"
+    running="$(sqlite3 -readonly "$DB" "select count(*) from step where status='claimed' and machineId is not null")" || refuse "cannot read running steps"
+    [[ "$running" =~ ^[0-9]+$ ]] || refuse "invalid running step count"
+    [ "$running" != 0 ] || return 0
+    [ "$(date +%s)" -lt "$deadline" ] || busy "starved: steps never idle ($running still running after ${STEP_WAIT_SECONDS}s drain)"
+    sleep 1
+  done
 }
 
 allow_builds_block() {
@@ -339,7 +377,7 @@ rehearse_migrations() {
 switch_code() {
   git -C "$CHECKOUT" checkout -q --detach "$1" &&
     (cd "$CHECKOUT" && pnpm install --frozen-lockfile --reporter=silent) &&
-    (cd "$CHECKOUT" && pnpm -C apps/daemon build) &&
+    { [ "$RUNTIME" = server ] || (cd "$CHECKOUT" && pnpm -C apps/daemon build); } &&
     (cd "$CHECKOUT" && pnpm -C apps/web build)
 }
 
@@ -443,8 +481,11 @@ start_optional_unit() {
 }
 
 stop_services() {
-  stop_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
+  if [ "$RUNTIME" = daemon ]; then
+    stop_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
+    systemctl --user stop "$DAEMON_UNIT" || return 1
+  fi
+  systemctl --user stop "$SERVER_UNIT"
 }
 
 start_and_check() {
@@ -453,9 +494,11 @@ start_and_check() {
   systemctl --user start "$SERVER_UNIT"
   server_healthy || return 1
   started_ms="$(($(date +%s) * 1000))"
-  systemctl --user start "$DAEMON_UNIT"
+  if [ "$RUNTIME" = daemon ]; then
+    systemctl --user start "$DAEMON_UNIT" || return 1
+    start_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
+  fi
   daemon_healthy "$started_ms" || return 1
-  start_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
   return 0
 }
 
@@ -583,7 +626,7 @@ roll_back() {
 IN_PROGRESS="$STATE/in-progress"
 
 set_in_progress() {
-  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\nfailed=%s\n' "$1" "$TARGET" "$PREVIOUS" "${2:-}" "${3:-}" >"$IN_PROGRESS.tmp"
+  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\nfailed=%s\nruntime=%s\n' "$1" "$TARGET" "$PREVIOUS" "${2:-}" "${3:-}" "$RUNTIME" >"$IN_PROGRESS.tmp"
   mv "$IN_PROGRESS.tmp" "$IN_PROGRESS"
 }
 
@@ -615,6 +658,7 @@ recover_interrupted() {
   local phase="" key value snapshot="" failed_dir=""
   while IFS='=' read -r key value; do
     case "$key" in
+      runtime) RUNTIME="$value" ;;
       phase) phase="$value" ;;
       target) TARGET="$value" ;;
       previous) PREVIOUS="$value" ;;
@@ -628,6 +672,11 @@ recover_interrupted() {
     clear_in_progress
     log "restored the $PREVIOUS checkout; running services were not touched"
     return 0
+  fi
+  if [ -n "$LEASE_OWNER" ] && [ "$RUNTIME" = daemon ] && [ -s "$DB" ]; then
+    sqlite3 -cmd '.timeout 10000' "$DB" "update deploy_lease set status='draining', expiresAt=$(($(date +%s) * 1000 + 3600000)) where id='server' and owner='$LEASE_OWNER';" || refuse "cannot recover deployment lease"
+    [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 1 ] || refuse "recovery lease belongs to another owner"
+    [ "$(sqlite3 -readonly "$DB" "select count(*) from step where status='claimed' and machineId is not null")" = 0 ] || refuse "recovery needs running steps to finish before replacing the daemon"
   fi
   if [ "$phase" = restoring ] || [ "$phase" = restored ]; then
     stop_or_give_up "$snapshot"
@@ -687,7 +736,12 @@ if [ "$PREVIOUS" = "$TARGET" ]; then
   exit 1
 fi
 assert_deployable
-assert_idle
+assert_hold
+[[ "$STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$STEP_WAIT_SECONDS" -le 1800 ] || refuse "drain deadline must be between 0 and 1800 seconds"
+classify_runtime
+if [ "$RUNTIME" = daemon ]; then
+  [ "$(lease_request)" = 200 ] || refuse "server lacks the deployment lease endpoint; bootstrap server-only first"
+fi
 
 log "rehearsing migrations of $TARGET"
 if ! rehearse_migrations; then
@@ -706,11 +760,8 @@ if ! switch_code "$TARGET"; then
   exit 1
 fi
 
-if ! (assert_idle); then
-  switch_code "$PREVIOUS" || echo "CRITICAL: could not rebuild $PREVIOUS" >&2
-  clear_in_progress
-  busy "a step started during the build; restored $PREVIOUS"
-fi
+assert_hold
+drain_steps
 
 mkdir -p "$BACKUPS" || restart_previous "creating $BACKUPS failed"
 SNAPSHOT="$BACKUPS/stopped-$(date -u +%Y%m%dT%H%M%SZ)-${PREVIOUS:0:12}.db"
