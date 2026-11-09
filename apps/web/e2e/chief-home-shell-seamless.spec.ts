@@ -91,35 +91,6 @@ for (const theme of ['light', 'dark'] as const) {
       expect.soft(canvas.panelShadow).toBe('none');
       expect([canvas.panelTop, canvas.panelBottom]).toEqual([9, -1]);
     });
-
-    test('needs-you borders have symmetric room inside their scrollport', async ({ page }) => {
-      await page.goto('/app?scenario=home-c&thread=home-c-review');
-      const tray = page.getByTestId('needs-you');
-      await expect(tray.locator('[data-slot="thread-card"]')).toHaveCount(3);
-      const edges = await tray.evaluate((node) => {
-        const rect = node.getBoundingClientRect();
-        const left = rect.left + node.clientLeft;
-        const right = left + node.clientWidth;
-        return Array.from(node.querySelectorAll('[data-slot="thread-card"]'), (row) => {
-          const box = row.getBoundingClientRect();
-          return {
-            left: box.left - left,
-            right: right - box.right,
-            top: box.top - rect.top,
-            bottom: rect.top + node.clientHeight - box.bottom,
-            width: box.width,
-          };
-        });
-      });
-      for (const edge of edges) {
-        expect.soft(edge.left).toBeGreaterThanOrEqual(8);
-        expect.soft(edge.right).toBeGreaterThanOrEqual(8);
-        expect.soft(Math.abs(edge.left - edge.right)).toBeLessThanOrEqual(1);
-        expect.soft(edge.top).toBeGreaterThanOrEqual(1);
-        expect.soft(edge.bottom).toBeGreaterThanOrEqual(1);
-        expect(edge.width).toBeGreaterThan(0);
-      }
-    });
   });
 }
 
@@ -129,13 +100,13 @@ for (const theme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: 900 });
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.goto('/app?scenario=home-c');
-      await expect(page.getByTestId('needs-you')).toBeVisible();
+      await expect(page.getByTestId('home-c').locator('.chief-composer')).toBeVisible();
       for (const thread of [false, true]) {
         if (thread) {
           await page.goto('/app?scenario=home-c&thread=home-c-review');
           await expect(page.getByTestId('side-chat-action')).toBeVisible();
         }
-        const clipped = await page.locator('[data-slot="thread-card"], .chief-composer, .side-panel .composer, [data-testid="side-chat-action"], .side-panel [data-trace-card]').evaluateAll((nodes) => {
+        const clipped = await page.locator('[data-slot="thread-card"], [data-slot="task-card"], .chief-composer, .side-panel .composer, [data-testid="side-chat-action"], .side-panel [data-trace-card]').evaluateAll((nodes) => {
           const failures: string[] = [];
           for (const node of nodes) {
             const box = node.getBoundingClientRect();

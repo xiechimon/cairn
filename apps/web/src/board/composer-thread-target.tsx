@@ -20,7 +20,7 @@ import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, GitBranch, MessageSquare, X } from '../icons/index.js';
-import { replyDeliveryOf } from './needs-you-thread-card.js';
+import { replyDeliveryOf } from './reply-delivery.js';
 import { threadCopy } from './thread-copy.js';
 
 export interface ThreadTarget {
