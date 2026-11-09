@@ -528,10 +528,10 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### projects
 
-**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive and delete.
+**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.
 
-- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md)
-- Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
+- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
+- Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 
 ### quota-wait

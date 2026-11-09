@@ -1290,6 +1290,13 @@ export const EN: Record<string, string> = {
     'It failed. Retry, or reply below with what to change.',
   '已归档。': 'Archived.',
   取消归档: 'Unarchive',
+  归档于: 'Archived',
+  已归档项目: 'Archived projects',
+  没有已归档的项目: 'No archived projects',
+  '在侧栏项目菜单里归档的项目会出现在这里。':
+    'Projects you archive from the sidebar project menu appear here.',
+  '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',
+  '取消归档中…': 'Unarchiving…',
   '批准失败，请重试。': 'Could not approve. Try again.',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
