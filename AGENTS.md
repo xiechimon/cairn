@@ -53,6 +53,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Read files in full before editing, and check consumers before moving or renaming paths. Ask before removing intentional functionality or changing intended behavior.
 - Do not write code comments; express intent through naming and code structure. Only English documentation of a public API or external behavior the code cannot show (browser/platform bugs or third-party quirks) is allowed. Delete other legacy comments when touched.
 - Use top-level imports only, avoid unexplained `any`, and inline one-line helpers with a single call site. Verify external package APIs against the installed version's types and source.
+- Use the established library or SDK when one covers the need (for example the OpenTelemetry SDK for traces, a maintained parser for TOML or YAML). A hand-written replacement needs a stated reason in the design or PR body: the library can't meet a named requirement, or the code is a thin bridge over a locked seam.
 - Every user-facing feature has a row in `.claude/skills/verify-cairn/feature-map.json` with reach steps, states, research, frontend design and backend design. A new route, settings section or page needs a row whose research and designs exist first; run `node scripts/generate-feature-map.mjs` after changing routes, test ids or shortcuts.
 - Use real e2e for complex features; follow `docs/spec/19-test-layering-and-blast-radius.md` for test scope.
 - Run related tests by hand during development: `pnpm exec vitest run --changed` and `pnpm --filter @cairn/web e2e:affected`. The full suites run in CI; avoid routine full local e2e runs.
@@ -91,6 +92,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - On a later review of the same PR, read only the commits pushed since the last review and do not repeat a finding that is already raised or resolved.
 - Name the bug class of each finding and list every instance of it in the diff in one comment, so one push fixes the class instead of one line per round. When a later commit adds another instance of a class already raised on this PR, add it to that class's thread instead of opening a new one.
 - Use P0 or P1 only for a defect that breaks behavior, loses data or opens a security hole. P0/P1 findings fail `review-gate` until fixed. P2/P3 findings do not fail `review-gate`, but every review thread must be fixed or answered and resolved before the PR leaves draft and enters the queue (`#review-threads-unresolved = 0`); a real P2/P3 outside this PR's change may be answered `valid, out of scope for this PR, tracked in #N` with a real issue. Canonical security surfaces require zero unresolved security findings at every severity.
+- Flag hand-rolled code that re-implements what a maintained library or SDK already does (protocol encoders, parsers, retry and backoff, API clients), unless the PR states why the library can't be used.
 
 ## Worktrees and ports
 
