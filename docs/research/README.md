@@ -53,6 +53,43 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 | [r15-agent-responsibility-default.md](r15-agent-responsibility-default.md) | none | Default responsibility text for the first agent: evidence from seven ecosystems' sources and the trade-off (t-0198; shares a number with r15-multica-run-rendering but is a different ticket) |
 | [research-loop-plan.md](research-loop-plan.md) | none | Design plan for agents that research outward (D63, on D60's thread model): research threads before a stuck build's last retry and before new mechanisms, a search tool for pi, sourced expiring memory, daily intake; spikes, cost and open decisions |
 
+### Recovered research (2026-11-06 to 2026-11-09)
+
+These archived notes were recovered in #3597. Private measurements and account details are redacted; the original session labels are historical.
+
+| Note | Assets | Content |
+|---|---|---|
+| [agent-small-computer-2026-11-08.md](agent-small-computer-2026-11-08.md) | none | The agent's own computer: how others build it, and what cairn's lacks |
+| [ai-frontend-quality-2026-11-06.md](ai-frontend-quality-2026-11-06.md) | `ai-frontend-quality-2026-11-06/` | AI-written frontends: why others' look good, where cairn falls short, what to change (2026-11-06) |
+| [band-aid-audit-2026-11-08.md](band-aid-audit-2026-11-08.md) | none | Band-aid audit, 2026-11-08 |
+| [bot-identity-and-coauthorship-2026-11-07.md](bot-identity-and-coauthorship-2026-11-07.md) | none | Research: bot identity, human co-authorship and human override on GitHub (2026-11-07) |
+| [branch-model-2026-11-08.md](branch-model-2026-11-08.md) | none | Branch model: a thread owns one stored work ref |
+| [cairn-dogfood-feasibility-2026-11-06.md](cairn-dogfood-feasibility-2026-11-06.md) | none | Orchestrating cairn with cairn: feasibility checks, pilots and closing gaps (living document, since 2026-11-06) |
+| [chat-markdown-polish-2026-11-08.md](chat-markdown-polish-2026-11-08.md) | none | Research: claude.ai list bullets, code blocks, copy button and status lines, measured for cairn's chat transcript (2026-11-08) |
+| [coordinator-compaction-2026-11-07.md](coordinator-compaction-2026-11-07.md) | none | Coordinator context compaction: how others do it, and what cairn should do (2026-11-07) |
+| [desktop-app-stack-2026-11-08.md](desktop-app-stack-2026-11-08.md) | none | Desktop app stack for cairn (2026-11-08) |
+| [desktop-mobile-mcp-forms-2026-11-08.md](desktop-mobile-mcp-forms-2026-11-08.md) | none | Desktop app, mobile and MCP management: what form each takes (2026-11-08) |
+| [frontend-skills-and-storybook-loop-2026-11-06.md](frontend-skills-and-storybook-loop-2026-11-06.md) | none | What makes good-looking AI frontends: your starred skills, the Storybook self-check loop, and the gap to the cairn gallery (2026-11-06) |
+| [hand-rolled-audit-2026-11-09.md](hand-rolled-audit-2026-11-09.md) | none | Hand-rolled implementations audit |
+| [logo-design-2026-11-08.md](logo-design-2026-11-08.md) | none | Logo design prior art for Cairn (2026-11-08) |
+| [personal-agent-memory-2026-11-07.md](personal-agent-memory-2026-11-07.md) | none | Long-term memory and context compaction for personal agents: how others do it, and what the Coordinator should adopt (2026-11-07) |
+| [pr-evidence-review-2026-11-06.md](pr-evidence-review-2026-11-06.md) | none | PR evidence review: why screenshots disappeared, and how a backend PR can be reviewed in two minutes (2026-11-06) |
+| [pr-flow-speed-2026-11-09.md](pr-flow-speed-2026-11-09.md) | none | Research: why some PRs take hours from open to merge (2026-11-09) |
+| [research-docs-placement-2026-11-08.md](research-docs-placement-2026-11-08.md) | none | Where research notes, designs and evidence should live |
+| [review-findings-before-ready-2026-11-07.md](review-findings-before-ready-2026-11-07.md) | none | Research: address review findings before marking a PR ready (2026-11-07) |
+| [seamless-device-auth-2026-11-08.md](seamless-device-auth-2026-11-08.md) | none | Seamless browser auth from the owner's own tailnet devices (2026-11-08) |
+| [serif-typography-2026-11-08.md](serif-typography-2026-11-08.md) | none | Research: where claude.ai uses its serif, and where cairn should use Source Serif 4 (2026-11-08) |
+| [sidebar-coordinator-icon-2026-11-08.md](sidebar-coordinator-icon-2026-11-08.md) | none | Sidebar: brand mark vs. Coordinator row icon (2026-11-08) |
+| [single-bot-identity-2026-11-08.md](single-bot-identity-2026-11-08.md) | none | One bot identity for xiechimon/cairn |
+| [t3code-devices-and-scope-2026-11-06.md](t3code-devices-and-scope-2026-11-06.md) | `t3code-devices-and-scope-2026-11-06/` | t3code machines (Environments) and settings scope: hands-on research and comparison with cairn |
+| [task-stall-flow-2026-11-08-priorart.md](task-stall-flow-2026-11-08-priorart.md) | none | Prior art: keeping agent work moving when the agent asks the user mid-task (2026-11-08) |
+| [task-stall-flow-2026-11-08.md](task-stall-flow-2026-11-08.md) | none | Why Coordinator tasks stop midway, and the flow that keeps them moving (2026-11-08) |
+| [thread-pr-placement-2026-11-06.md](thread-pr-placement-2026-11-06.md) | `thread-pr-placement-2026-11-06/` | Where a thread's (agent task's) PR should live and how much to show: reference product survey |
+| [trajectory-self-improvement-2026-11-08.md](trajectory-self-improvement-2026-11-08.md) | none | Trajectory self-improvement: can cairn read its own traces daily and improve itself? (2026-11-08) |
+| [ui-ux-audit-2026-11-06.md](ui-ux-audit-2026-11-06.md) | `ui-ux-audit-2026-11-06/` | cairn UI/UX audit (2026-11-06) |
+| [user-computer-model-2026-11-08.md](user-computer-model-2026-11-08.md) | none | The user's own computer: drive it directly, in the background, and confine every harness the same way |
+| [zero-command-access-2026-11-08.md](zero-command-access-2026-11-08.md) | `zero-command-access-2026-11-08/` | Zero-command access from all of the owner's devices (2026-11-08) |
+
 ### Build-time captures (before ADR 0015, around 2026-09-24)
 
 | Folder | PR | Content |
