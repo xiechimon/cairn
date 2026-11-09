@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
@@ -15,6 +15,14 @@ export interface GitRunResult {
 }
 
 const LOOPBACK_URL_HOSTS = ['127.0.0.1', 'localhost', '[::1]'];
+
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
 const TIMEOUT_KILL_GRACE_MS = 2_000;
 const FAILURE_TAIL_LINES = 40;
 
@@ -538,8 +546,12 @@ export const gitPrim = {
   },
 
   async addPaths(dir: string, paths: readonly string[]): Promise<void> {
-    for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK) {
-      await runGitOk(['add', '--', ...paths.slice(i, i + PATHSPEC_CHUNK)], {
+    const indexed = await gitPrim.indexEntries(dir, paths);
+    const addable = paths.filter(
+      (path) => indexed.has(path) || existsSync(join(dir, path)) || isLink(join(dir, path)),
+    );
+    for (let i = 0; i < addable.length; i += PATHSPEC_CHUNK) {
+      await runGitOk(['add', '--', ...addable.slice(i, i + PATHSPEC_CHUNK)], {
         cwd: dir,
         env: { GIT_LITERAL_PATHSPECS: '1' },
         timeoutMs: META_TIMEOUT_MS,

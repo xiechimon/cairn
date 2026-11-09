@@ -404,8 +404,9 @@ export class WorkspaceManager implements WorktreeOps {
         const drift = readSetupDrift(file);
         for (const path of new Set([...Object.keys(before), ...Object.keys(after)])) {
           if (before[path] === after[path]) continue;
+          const agentOwned = before[path] !== undefined && drift[path] !== before[path];
           const now = after[path];
-          if (now === undefined) delete drift[path];
+          if (now === undefined || agentOwned) delete drift[path];
           else drift[path] = now;
         }
         writeFileSync(file, JSON.stringify(drift));
