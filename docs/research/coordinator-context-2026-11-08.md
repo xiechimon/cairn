@@ -1,6 +1,6 @@
 # Coordinator context: B1 current-source supplement
 
-Baseline: `f004cd719`, 2026-11-08. Claim labels: `实测` means first-hand source/document reading, not live deployment verification; `推断` means derived from those readings; `猜测` means unverified. Design: [context backend](../design/coordinator-context-backend.md).
+Baseline: `f004cd719`, 2026-11-08. Claim labels: **measured** means first-hand source/document reading, not live deployment verification; **inferred** means derived from those readings; **unverified** means not established. Design: [context backend](../design/coordinator-context-backend.md).
 
 ## Reuse and designated-source coverage
 
@@ -8,23 +8,23 @@ The SOURCES.md **Agent runtime: context, compaction, tool loops, sub-agents, ste
 
 | Source | Reused evidence and trade-off | B1 consequence |
 |---|---|---|
-| Claude Code official docs | Threshold compaction, re-injected durable instructions; closed summary prompt, baseline §1 | `推断`: retain durable facts outside summary |
-| Anthropic API official docs | Threshold/background compaction and history suffix preservation, baseline §1 | `推断`: checkpoint only the covered prefix |
-| Codex CLI pinned `f5ac7a7` | Summary plus bounded retained user history, baseline §1 | `推断`: bounded context must retain a history lookup path |
-| Installed pi-coding-agent 1.4.0 / pi-durable 1.5.0 | Baseline §2; current Cairn adapter read this round | `实测`: current adapter supplies thresholds and summary hook; not proof of a production compaction |
-| Amp manual / handoff article | Baseline §1 and memory note §6 explicitly leave manual sub-pages unread | `推断`: manual thread replacement does not fit a never-ending Coordinator; manual sub-pages remain a research limitation |
+| Claude Code official docs | Threshold compaction, re-injected durable instructions; closed summary prompt, baseline §1 | **inferred**: retain durable facts outside summary |
+| Anthropic API official docs | Threshold/background compaction and history suffix preservation, baseline §1 | **inferred**: checkpoint only the covered prefix |
+| Codex CLI pinned `f5ac7a7` | Summary plus bounded retained user history, baseline §1 | **inferred**: bounded context must retain a history lookup path |
+| Installed pi-coding-agent 1.4.0 / pi-durable 1.5.0 | Baseline §2; current Cairn adapter read this round | **measured**: current adapter supplies thresholds and summary hook; not proof of a production compaction |
+| Amp manual / handoff article | Baseline §1 and memory note §6 explicitly leave manual sub-pages unread | **inferred**: manual thread replacement does not fit a never-ending Coordinator; manual sub-pages remain a research limitation |
 
 ## Changes since the prior note
 
-`实测`: [compaction.ts](../../apps/server/src/coordinator/runtime/compaction.ts) now runs a memory flush before folding, memoizes flush and summary at compaction-task scope, reports flush and fold failures separately, and requests low reasoning. The prior note's recommendation to add a flush is already implemented (#3381/#3392/#3394).
+**measured**: [compaction.ts](../../apps/server/src/coordinator/runtime/compaction.ts) now runs a memory flush before folding, memoizes flush and summary at compaction-task scope, reports flush and fold failures separately, and requests low reasoning. The prior note's recommendation to add a flush is already implemented (#3381/#3392/#3394).
 
-`实测`: [seed-summary.ts](../../apps/server/src/coordinator/seed-summary.ts) reads the older gap on demand, bounded to 2,000 rows and eight batches; a nonempty successful fold writes summary and coverage fields together. Folding failure reports the error and returns the prior summary. #3362 already removed steady-state rolling summarization.
+**measured**: [seed-summary.ts](../../apps/server/src/coordinator/seed-summary.ts) reads the older gap on demand, bounded to 2,000 rows and eight batches; a nonempty successful fold writes summary and coverage fields together. Folding failure reports the error and returns the prior summary. #3362 already removed steady-state rolling summarization.
 
-`实测`: [coordinator-context.ts](../../apps/server/src/services/coordinator-context.ts) reports last-turn context tokens and resolves a display window, defaulting to 128,000. This file is not a request-budget assembler.
+**measured**: [coordinator-context.ts](../../apps/server/src/services/coordinator-context.ts) reports last-turn context tokens and resolves a display window, defaulting to 128,000. This file is not a request-budget assembler.
 
-`推断`: the registry's description of fresh per-turn assembly should not be read as authorization to replace the durable resumed session. #2981's measured spike favors resume plus tuned compaction; B1 preserves that mechanism.
+**inferred**: the registry's description of fresh per-turn assembly should not be read as authorization to replace the durable resumed session. #2981's measured spike favors resume plus tuned compaction; B1 preserves that mechanism.
 
-`推断`: bounded recovery can skip an older prefix while moving its cursor through newer rows. A recovery-summary design must make omitted-history semantics explicit rather than claim that the cursor proves every older row was summarized. Canonical history remains the recovery source.
+**inferred**: bounded recovery can skip an older prefix while moving its cursor through newer rows. A recovery-summary design must make omitted-history semantics explicit rather than claim that the cursor proves every older row was summarized. Canonical history remains the recovery source.
 
 ## Recommendation
 

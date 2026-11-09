@@ -53,7 +53,7 @@ At 390px preserve row order and avoid horizontal scrolling. Detail/confirmation 
 
 Keyboard reaches tabs, rows, detail and confirmation controls in visual order. Escape closes the top layer and restores origin focus. Cancel receives safe initial confirmation focus. Refresh errors announce without stealing focus; mutation progress uses a live region.
 
-The capture script measured zero WCAG A/AA/2.1/2.2 axe violations (including rendered contrast), no horizontal overflow in 52 fixtures, focus restoration after keyboard detail close and unchanged hover shadow/position with zero transition delay. These are fixture measurements, not live product acceptance or proof of every interaction rule. Long titles, actual query refetch, last-row deletion focus and complete-shell tab fallback remain implementation tests.
+The capture script measured zero WCAG A/AA/2.1/2.2 axe violations (including rendered contrast), no horizontal overflow in 52 fixtures, focus restoration after keyboard detail close, every visible phone button at least 44×44px, and unchanged hover shadow/position with zero transition delay. These are fixture measurements, not live product acceptance or proof of every interaction rule. Long titles, actual query refetch, last-row deletion focus and complete-shell tab fallback remain implementation tests.
 
 ## Tests to write first for implementation
 

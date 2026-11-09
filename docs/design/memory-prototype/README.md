@@ -16,9 +16,9 @@ Open `/docs/design/memory-prototype/index.html?state=populated&theme=light` on t
 B1_SCREEN_DIR="$HOME/.cache/codex-scratch/pi-146/screens" node docs/design/memory-prototype/capture.mjs
 ```
 
-The capture script starts one headless Chromium, visits 13 states at two widths in two themes, rejects requests outside the isolated origin, and records `results.json`. It asserts zero axe violations for WCAG A/AA/2.1/2.2 tags, no horizontal overflow, focus restored after keyboard opening/closing detail, safe initial confirmation focus and no hover shadow/position change or delayed hover. Reduced motion is enabled. Pending/error states are explicit fixtures, not delayed network requests or injected product failures.
+The capture script starts one headless Chromium, visits 13 states at two widths in two themes, rejects requests outside the isolated origin, and records `results.json`. It asserts zero axe violations for WCAG A/AA/2.1/2.2 tags, no horizontal overflow, focus restored after keyboard opening/closing detail, safe initial confirmation focus, every visible phone button at least 44×44px, and no hover shadow/position change or delayed hover. Reduced motion is enabled. Pending/error states are explicit fixtures, not delayed network requests or injected product failures.
 
-The red-first check failed on the missing Coordinator settings heading before the prototype existed. The final run produced 52 screenshots with zero reported violations. These are not product e2e results. API authorization, database mutation, query invalidation and live recovery remain implementation tests named in the designs.
+The red-first check failed on the missing Coordinator settings heading before the prototype existed. The final run produced 52 screenshots with zero reported violations. A second red-first assertion reproduced the shipped shell's undersized phone close button; prototype-only shell classes now enlarge it and reserve title space, without changing the product component. These are not product e2e results. API authorization, database mutation, query invalidation and live recovery remain implementation tests named in the designs.
 
 ## Fixture screenshots
 

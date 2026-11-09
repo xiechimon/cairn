@@ -87,7 +87,7 @@ function Prototype() {
         )}
         <p className="text-meta text-content-secondary">To correct a fact, tell the Coordinator what changed.</p>
       </section>
-      <DialogShell open={detail && confirmation === null} title={memory.title} subtitle={`${memory.scope} · ${memory.layer}`} onClose={() => setDetail(false)} footer={
+      <DialogShell className="max-sm:[&_[aria-label=Close]]:size-11 max-sm:[&_[data-testid=dialog-head]]:pr-16" open={detail && confirmation === null} title={memory.title} subtitle={`${memory.scope} · ${memory.layer}`} onClose={() => setDetail(false)} footer={
         <div className="flex flex-wrap gap-2">
           {memory.scope !== 'Team' && !offline && <Button variant="ghost" className="min-h-11" onClick={() => setConfirmation('promote')}>Promote to team…</Button>}
           {!offline && <Button variant="ghost" className="min-h-11 text-destructive" onClick={() => setConfirmation('delete')}>Delete…</Button>}
@@ -96,7 +96,7 @@ function Prototype() {
         <p className="text-ui break-words whitespace-pre-wrap">{body}</p>
         <p className="mt-4 text-meta text-content-secondary">Updated 8 Nov · saved during work on Field Notes</p>
       </DialogShell>
-      <AlertDialogShell open={confirmation !== null} ariaLabel={confirmation === 'delete' ? 'Delete saved memory' : 'Promote memory to team'} title={confirmation === 'delete' ? 'Delete saved memory?' : 'Make this a team memory?'} onClose={() => { if (!pending) setConfirmation(null); }} footer={
+      <AlertDialogShell className="max-sm:[&_[aria-label=Close]]:size-11 max-sm:[&_[data-testid=dialog-head]]:pr-16" open={confirmation !== null} ariaLabel={confirmation === 'delete' ? 'Delete saved memory' : 'Promote memory to team'} title={confirmation === 'delete' ? 'Delete saved memory?' : 'Make this a team memory?'} onClose={() => { if (!pending) setConfirmation(null); }} footer={
         <div className="flex flex-wrap gap-2">
           <Button ref={cancel} variant="ghost" className="min-h-11" disabled={pending} onClick={() => setConfirmation(null)}>Cancel</Button>
           <Button variant={confirmation === 'delete' ? 'destructive' : 'default'} className="min-h-11" disabled={pending} onClick={finish}>{pending ? 'Saving…' : confirmation === 'delete' ? 'Delete memory' : 'Promote to team'}</Button>

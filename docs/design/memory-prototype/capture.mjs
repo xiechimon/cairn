@@ -50,6 +50,13 @@ try {
           await page.mouse.move(0, 0);
         }
         if (state === 'delete' || state === 'promote') await expect(page.getByRole('button', { name: 'Cancel' })).toBeFocused();
+        if (width === 390) {
+          for (const button of await page.getByRole('button').all()) {
+            if (!(await button.isVisible())) continue;
+            const box = await button.boundingBox();
+            assert(box && box.width >= 44 && box.height >= 44, `${state}: touch target below 44px`);
+          }
+        }
         const a11y = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
         assert.deepEqual(a11y.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.map((n) => n.target) })), [], `${state} ${theme} ${width}: axe`);
         assert.deepEqual(errors, []);
