@@ -1,7 +1,7 @@
 import { chiefGetResponseSchema } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 
-async function runningTask(page: Page) {
+async function runningTask(page: Page, readDelay = 0) {
   const chief = chiefGetResponseSchema.parse({
     chief: {
       id: 'chief-user-1-team-1',
@@ -93,7 +93,7 @@ async function runningTask(page: Page) {
     }
     Object.defineProperty(window, 'EventSource', { value: FakeEventSource });
   });
-  await page.route('**/api/**', (route) => {
+  await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === '/api/teams') return route.fulfill({ json: [{ id: 'team-1', name: 'Team' }] });
@@ -130,7 +130,7 @@ async function runningTask(page: Page) {
       if (request.method() === 'POST') {
         const input = request.postDataJSON() as { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean; editQueued?: boolean };
         sent.push(input);
-        const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), deliverAfterStop: input.deliverAfterStop };
+        const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), ...(input.mode === 'queue' ? { deliverAfterStop: input.deliverAfterStop ?? false } : {}) };
         if (input.editQueued) {
           const row = queuedMessages.find((item) => item.id === input.queuedMessageId);
           if (!row) return route.fulfill({ status: 409, json: { error: 'Queued message was already delivered' } });
@@ -151,6 +151,7 @@ async function runningTask(page: Page) {
         task.v += 1;
         return route.fulfill({ status: 201, json: { message } });
       }
+      if (sent.length > 0 && readDelay > 0) await new Promise((resolve) => setTimeout(resolve, readDelay));
       return route.fulfill({
         json: {
           messages,
@@ -184,6 +185,16 @@ async function runningTask(page: Page) {
   await expect(input).toBeEnabled();
   return { input, sent, stops, steerPending, queuedMessages, finish, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
 }
+
+test('a confirmed queue capsule is visible before a slow transcript read without becoming a delivered bubble', async ({ page }) => {
+  const task = await runningTask(page, 3000);
+  await task.input.fill('Wait for the current turn');
+  await task.input.press('Control+Enter');
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toContainText('Wait for the current turn', { timeout: 700 });
+  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Wait for the current turn' })).toHaveCount(0);
+  await expect(task.input).toHaveValue('');
+  expect(task.steerPending).toEqual([]);
+});
 
 for (const chord of ['Meta+Enter', 'Control+Enter']) {
   test(`${chord} queues without steering and survives reload until completion`, async ({ page }) => {

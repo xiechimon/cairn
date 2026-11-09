@@ -22,6 +22,7 @@ import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
 import { textOfContent, thinkingOfContent } from './mappers.js';
+import { cacheUserMessage } from './message-cache.js';
 import { connect } from './sse-connection.js';
 import { streamGuards } from './sse-guards.js';
 import { teamEventInvalidations } from './sse-team-events.js';
@@ -222,6 +223,7 @@ export function startConversationStream(
         }
         case 'message': {
           const row = ev.message as TranscriptRow;
+          cacheUserMessage(qc, conversationId, row);
           if (row.role === 'assistant' && textOfContent(row.content).trim() !== '') {
             liveTextStore.noteSettled(conversationId, row.id);
           }

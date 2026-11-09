@@ -45,8 +45,13 @@ interface SendBody {
   clientMessageId?: string;
 }
 
-async function mockCoordinator(page: Page, dropFirstResponse: boolean) {
-  const messages: Row[] = [{ id: 'm1', role: 'user', content: 'Earlier note', createdAt: 10 }];
+async function mockCoordinator(
+  page: Page,
+  dropFirstResponse: boolean,
+  options: { readDelay?: number; postDelay?: number; rejectFirst?: boolean; firstThread?: boolean } = {},
+) {
+  const { readDelay = 0, postDelay = 0, rejectFirst = false, firstThread = false } = options;
+  const messages: Row[] = firstThread ? [] : [{ id: 'm1', role: 'user', content: 'Earlier note', createdAt: 10 }];
   const ledger = new Map<string, Row>();
   const posts: SendBody[] = [];
   let dropped = !dropFirstResponse;
@@ -67,14 +72,16 @@ async function mockCoordinator(page: Page, dropFirstResponse: boolean) {
     }
     Object.defineProperty(window, 'EventSource', { configurable: true, value: FakeEventSource });
   });
-  await page.route('**/api/**', (route) => {
+  await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     const json = (body: unknown, status = 200) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
-    if (path === '/api/conversations/chief-home/messages' && request.method() === 'POST') {
+    if ((path === '/api/conversations/chief-home/messages' || path === '/api/teams/t1/chief/threads') && request.method() === 'POST') {
       const body = JSON.parse(request.postData() ?? '{}') as SendBody;
       posts.push(body);
+      if (postDelay > 0) await new Promise((resolve) => setTimeout(resolve, postDelay));
+      if (rejectFirst && posts.length === 1) return json({ error: 'Submission refused' }, 503);
       const key = body.clientMessageId ?? `unkeyed-${posts.length}`;
       let row = ledger.get(key);
       if (row === undefined) {
@@ -91,7 +98,11 @@ async function mockCoordinator(page: Page, dropFirstResponse: boolean) {
     if (path === '/api/teams') return json([TEAM]);
     if (path === '/api/user/me') return json(USER);
     if (path === '/api/teams/t1/notifications') return json({ unreadThreadIds: [] });
-    if (path === '/api/teams/t1/chief/threads') return json([THREAD]);
+    if (path === '/api/teams/t1/chief/threads') {
+      if (firstThread && posts.length === 0) return json([]);
+      if (readDelay > 0 && posts.length > 0) await new Promise((resolve) => setTimeout(resolve, readDelay));
+      return json([THREAD]);
+    }
     if (path === '/api/teams/t1/chief')
       return json({
         chief: {
@@ -110,7 +121,11 @@ async function mockCoordinator(page: Page, dropFirstResponse: boolean) {
         wakes: [],
         outage: null,
       });
-    if (path === '/api/conversations/chief-home/messages') return json({ messages });
+    if (path === '/api/conversations/chief-home/messages') {
+      const snapshot = [...messages];
+      if (posts.length > 0 && readDelay > 0) await new Promise((resolve) => setTimeout(resolve, readDelay));
+      return json({ messages: snapshot });
+    }
     if (path === '/api/teams/t1/machines') return json([{ id: 'm-ready', name: 'omarchy', online: true }]);
     if (path === '/api/teams/t1/providers') {
       return json({ presets: [], providers: [{ id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' }] });
@@ -122,6 +137,44 @@ async function mockCoordinator(page: Page, dropFirstResponse: boolean) {
 
 const composer = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 const bubbles = (page: Page) => page.getByTestId('home-c').getByTestId('chief-bubble');
+
+test('a confirmed send is visible without waiting for a slow transcript read or an agent', async ({ page }) => {
+  await mockCoordinator(page, false, { readDelay: 3000 });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Show my confirmed message now');
+  await composer(page).press('Enter');
+  await expect(bubbles(page).filter({ hasText: 'Show my confirmed message now' })).toBeVisible({ timeout: 700 });
+});
+
+test('the first confirmed message does not wait for slow thread discovery', async ({ page }) => {
+  await mockCoordinator(page, false, { firstThread: true, readDelay: 3000 });
+  await page.goto('/app');
+  await expect(composer(page)).toBeEditable();
+  await composer(page).fill('First confirmed message');
+  await composer(page).press('Enter');
+  await expect(bubbles(page).filter({ hasText: 'First confirmed message' })).toBeVisible({ timeout: 700 });
+});
+
+test('slow rejected submissions preserve the draft and suppress duplicate submission', async ({ page }) => {
+  const { posts, ledger } = await mockCoordinator(page, false, { postDelay: 1000, rejectFirst: true });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Do not lose this draft');
+  await composer(page).press('Enter');
+  await composer(page).press('Enter');
+  await expect.poll(() => posts.length).toBe(1);
+  await expect(composer(page)).toHaveValue('Do not lose this draft');
+  await expect(bubbles(page)).toHaveCount(1);
+  await expect(page.getByText('发送失败，请重试。')).toBeVisible();
+  expect(ledger.size).toBe(0);
+  await composer(page).press('Enter');
+  await expect(bubbles(page).filter({ hasText: 'Do not lose this draft' })).toHaveCount(1);
+  await expect(composer(page)).toHaveValue('');
+  expect(posts).toHaveLength(2);
+  expect(posts[1]?.clientMessageId).toBe(posts[0]?.clientMessageId);
+  expect(ledger.size).toBe(1);
+});
 
 test('a send whose response is lost is retried with the same client message id and shows one message', async ({
   page,

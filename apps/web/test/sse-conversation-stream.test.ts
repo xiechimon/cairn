@@ -65,6 +65,62 @@ afterEach(() => {
   agentTodoStore.clear(CONV);
 });
 
+describe('confirmed user message visibility', () => {
+  it('keeps queued messages out of the delivered transcript and updates the capsule once', () => {
+    const qc = freshClient();
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+    qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
+    const es = startStream(qc);
+    const message = { id: 'queued-1', role: 'user', content: 'Wait for the current turn', createdAt: 3, deliverAfterStop: false };
+    es.push({ type: 'message', message });
+    es.push({ type: 'message', message });
+    expect(qc.getQueryData(['messages', CONV, 'pages'])).toEqual({
+      pages: [{ ...envelope, queuedMessages: [{ id: message.id, content: message.content, createdAt: 3 }] }],
+      pageParams: [null],
+    });
+    qc.clear();
+  });
+
+  it('does not let a pre-confirmation read erase a received message', async () => {
+    const qc = freshClient();
+    const key = ['messages', CONV, 'pages'];
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+    const initial = { pages: [envelope], pageParams: [null] };
+    qc.setQueryData(key, initial);
+    let finish = (_value: typeof initial) => {};
+    const read = qc.fetchQuery({ queryKey: key, queryFn: () => new Promise<typeof initial>((resolve) => { finish = resolve; }) }).catch(() => undefined);
+    const es = startStream(qc);
+    const message = { id: 'new-user', role: 'user', content: 'Keep my confirmation', createdAt: 3 };
+    es.push({ type: 'message', message });
+    finish(initial);
+    await read;
+    expect(qc.getQueryData(key)).toEqual({ pages: [{ ...envelope, messages: [message] }], pageParams: [null] });
+    qc.clear();
+  });
+
+  it.each(['chief-t-740', 'build-740'])('shows %s events before a transcript read and deduplicates replay', (id) => {
+    const qc = freshClient();
+    const message = { id: 'user-740', role: 'user', content: 'Show this now', createdAt: 3 };
+    const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+    const older = { ...envelope, messages: [{ ...message, id: 'older', createdAt: 1 }] };
+    qc.setQueryData(['messages', id, 'pages'], {
+      pages: [{ ...envelope, nextCursor: 'older' }, older],
+      pageParams: [null, 'older'],
+    });
+    const stop = startConversationStream(id, qc, {});
+    const es = FakeEventSource.instances.at(-1) as FakeEventSource;
+    es.fireOpen();
+    es.push({ type: 'message', message });
+    es.push({ type: 'message', message });
+    expect(qc.getQueryData(['messages', id, 'pages'])).toEqual({
+      pages: [{ ...envelope, messages: [message], nextCursor: 'older' }, older],
+      pageParams: [null, 'older'],
+    });
+    stop();
+    qc.clear();
+  });
+});
+
 describe('clear on entry: a replay is a snapshot (failure mode 1)', () => {
   it('stale buffer from before the subscription is cleared before the first event can arrive', () => {
 
