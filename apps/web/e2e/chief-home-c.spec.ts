@@ -64,11 +64,9 @@ test('the Tasks panel lists running threads and a running row opens its thread',
   page,
 }) => {
   await page.goto(home('home-c', '&pane=tasks'));
-  const rows = page
-    .locator('.side-panel [data-slot="stone-group"][data-tone="working"]')
-    .locator('[data-slot="thread-row"]');
-  await expect(rows).toHaveCount(3);
-  await rows.filter({ hasText: 'Push for finished threads' }).getByRole('button').first().click();
+  const rows = page.locator('.side-panel [data-section="working"] [data-slot="task-row"]');
+  await expect(rows).toHaveCount(4);
+  await rows.filter({ hasText: 'Push for finished threads' }).click();
   await expect(page).toHaveURL(/\/app\?.*thread=home-c-working-a/);
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
 });

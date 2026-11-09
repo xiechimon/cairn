@@ -143,7 +143,7 @@ test('staged scan reads index, not unstaged content, and redacts diagnostics', (
   assert.equal(run('--staged').status, 0);
 });
 
-test('push scan reads committed additions and ignores removed or unchanged disclosures', (t) => {
+test('push scan preserves disclosures removed by a later introduced commit', (t) => {
   const { cwd, git, run } = repository(t);
   writeFileSync(join(cwd, 'example.md'), 'safe\nusage: 37\u0025\n');
   git('add', 'example.md');
@@ -152,7 +152,7 @@ test('push scan reads committed additions and ignores removed or unchanged discl
   assert.equal(run().status, 1);
   git('add', 'example.md');
   git('commit', '-qm', 'remove synthetic addition');
-  assert.equal(run().status, 0);
+  assert.equal(run().status, 1);
 });
 
 test('staged scan supports unusual paths, extensionless text and binary files', (t) => {
@@ -204,6 +204,132 @@ test('the real commit hook refuses a type-change-only disclosure before formatti
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stderr, /"link.md":1: public-content identifier/);
   assert.ok(!result.stderr.includes(uuid));
+});
+
+test('multiline matching preserves attribution without joining separate blocks', () => {
+  for (const [content, kind] of [
+    [`"teamId":\n  "${nanoid}"`, 'identifier'],
+    ['quota remaining:\n  37\u0025', 'quota/usage'],
+    ['37\u0025\n  quota remaining', 'quota/usage'],
+    ['Resets in\n  2 hours', 'quota/usage'],
+    ['rate-limit status\u003a\n  exhausted', 'quota/usage'],
+  ]) {
+    assert.deepEqual(fileViolations('docs/example.md', content), [
+      { line: 1, kind },
+      { line: 2, kind },
+    ]);
+  }
+  for (const content of [
+    'Usage documentation\n\nCoverage: 95%',
+    `teamId:\n\n${nanoid}`,
+    `teamId:\r\n \t\r\n${nanoid}`,
+    'CI p90 15%\ncoverage 95%\nwidth: 50%;',
+  ])
+    assert.deepEqual(fileViolations('docs/example.md', content), []);
+  assert.deepEqual(fileViolations('apps/server/test/data.ts', `teamId:\n${nanoid}`), []);
+});
+
+for (const [key, value] of [
+  ['teamId:', nanoid],
+  ['quota remaining:', '37\u0025'],
+]) {
+  for (const changed of ['key', 'value']) {
+    test(`multiline ${key} catches an added ${changed} in staged and committed snapshots`, (t) => {
+      const { cwd, git, run } = repository(t);
+      const before = changed === 'key' ? `label:\n${value}\n` : `${key}\nexample\n`;
+      writeFileSync(join(cwd, 'example.md'), before);
+      git('add', 'example.md');
+      git('commit', '-qm', 'synthetic baseline');
+      const base = git('rev-parse', 'HEAD').trim();
+      writeFileSync(join(cwd, 'example.md'), `${key}\n${value}\n`);
+      git('add', 'example.md');
+      const staged = run('--staged');
+      assert.equal(staged.status, 1, staged.stderr);
+      assert.match(staged.stderr, new RegExp(`"example.md":${changed === 'key' ? 1 : 2}:`));
+      git('commit', '-qm', 'synthetic multiline change');
+      assert.equal(run('--base', base).status, 1);
+    });
+  }
+}
+
+for (const message of ['quota remaining: 37\u0025', `teamId: ${nanoid}`]) {
+  test('commit-message-only disclosures are rejected without echoing their content', (t) => {
+    const { git, run } = repository(t);
+    git('commit', '--allow-empty', '-qm', message);
+    const result = run();
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /commit message/);
+    assert.ok(!result.stderr.includes(message));
+    assert.ok(!result.stderr.includes(nanoid));
+    assert.equal(run('--staged').status, 0);
+  });
+}
+
+test('base messages and unchanged or removed base disclosures are excluded', (t) => {
+  const { cwd, git, run } = repository(t);
+  writeFileSync(join(cwd, 'example.md'), `teamId:\n${nanoid}\n`);
+  git('add', 'example.md');
+  git('commit', '-qm', 'quota remaining: 37\u0025');
+  const base = git('rev-parse', 'HEAD').trim();
+  writeFileSync(join(cwd, 'example.md'), `teamId:\n${nanoid}\nclean addition\n`);
+  git('add', 'example.md');
+  assert.equal(run('--staged').status, 0);
+  git('commit', '-qm', 'synthetic clean addition');
+  assert.equal(run('--base', base).status, 0);
+  writeFileSync(join(cwd, 'example.md'), 'safe\n');
+  git('add', 'example.md');
+  git('commit', '-qm', 'remove inherited disclosure');
+  assert.equal(run('--base', base).status, 0);
+});
+
+test('side-branch intermediate disclosures survive a clean merge result', (t) => {
+  const { cwd, git, run } = repository(t);
+  const branch = git('branch', '--show-current').trim();
+  git('switch', '-qc', 'synthetic-side');
+  writeFileSync(join(cwd, 'example.md'), `teamId: ${nanoid}\n`);
+  git('add', 'example.md');
+  git('commit', '-qm', 'synthetic side addition');
+  writeFileSync(join(cwd, 'example.md'), 'safe\n');
+  git('add', 'example.md');
+  git('commit', '-qm', 'synthetic side cleanup');
+  git('switch', '-q', branch);
+  git('merge', '-q', '--no-ff', 'synthetic-side', '-m', 'merge synthetic side');
+  assert.equal(run().status, 1);
+});
+
+test('merging the published base does not rescan its existing disclosures', (t) => {
+  const { cwd, git, run } = repository(t);
+  const branch = git('branch', '--show-current').trim();
+  git('switch', '-qc', 'synthetic-feature');
+  git('commit', '--allow-empty', '-qm', 'synthetic feature');
+  git('switch', '-q', branch);
+  writeFileSync(join(cwd, 'published.md'), `teamId: ${nanoid}\n`);
+  git('add', 'published.md');
+  git('commit', '-qm', 'quota remaining: 37\u0025');
+  const base = git('rev-parse', 'HEAD').trim();
+  git('switch', '-q', 'synthetic-feature');
+  git('merge', '-q', '--no-ff', branch, '-m', 'merge published base');
+  assert.equal(run('--base', base).status, 0);
+});
+
+test('a merge resolution that combines a key and value from different parents is checked', (t) => {
+  const { cwd, git, run } = repository(t);
+  const branch = git('branch', '--show-current').trim();
+  git('switch', '-qc', 'synthetic-feature');
+  writeFileSync(join(cwd, 'example.md'), 'teamId:\nexample\n');
+  git('add', 'example.md');
+  git('commit', '-qm', 'synthetic key');
+  git('switch', '-q', branch);
+  writeFileSync(join(cwd, 'example.md'), `label:\n${nanoid}\n`);
+  git('add', 'example.md');
+  git('commit', '-qm', 'synthetic value');
+  const base = git('rev-parse', 'HEAD').trim();
+  git('switch', '-q', 'synthetic-feature');
+  assert.throws(() => git('merge', '--no-commit', branch));
+  writeFileSync(join(cwd, 'example.md'), `teamId:\n${nanoid}\n`);
+  git('add', 'example.md');
+  git('commit', '-qm', 'synthetic merge resolution');
+  assert.equal(run('--base', base).status, 1);
 });
 
 test('invalid options and missing base fail closed', (t) => {
