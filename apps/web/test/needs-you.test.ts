@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { needsYouCount, needsYouThreads, pendingQuestions } from '../src/board/needs-you.js';
+import { needsYouThreads, pendingQuestions } from '../src/board/needs-you.js';
 import { todo } from './helpers.js';
 
 const question = (status: 'pending' | 'answered') => ({
@@ -10,7 +10,7 @@ const question = (status: 'pending' | 'answered') => ({
   questions: [{ header: 'h', question: 'Which first?', options: [{ label: 'A' }] }],
 });
 
-describe('the Needs you set, shared by the home list and the sidebar badge', () => {
+describe('the Needs you set of the home list', () => {
   test('counts confirm, review, failed and awaiting-reply threads, not Coordinator questions', () => {
     const set = [
       todo(1, 'confirm'),
@@ -22,7 +22,7 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
       todo(7, 'todo'),
     ];
     const stream = [question('pending'), question('answered')];
-    expect(needsYouCount(set)).toBe(4);
+    expect(needsYouThreads(set)).toHaveLength(4);
     expect(pendingQuestions(stream)).toHaveLength(1);
   });
 

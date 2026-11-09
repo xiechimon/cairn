@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import {
@@ -7,6 +7,7 @@ import {
   type DocumentDiffFile,
   type GithubRepoRef,
   gitHostedRepoPath,
+  normalizedRepoRef,
   type ProjectBranchesResponse,
   type ProjectCommitDetailResponse,
   type ProjectCommitsResponse,
@@ -18,6 +19,7 @@ import {
   projectMergeConfigSchema,
   type SecretBox,
 } from '@cairn/shared';
+import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { parsePatch } from 'diff';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -33,6 +35,7 @@ export type ProjectRow = typeof project.$inferSelect;
 export interface RepoCtx {
   db: Db;
   reposDir: string;
+  workspacesDir?: string | undefined;
 }
 
 export function slugifyRepoName(name: string): string {
@@ -210,11 +213,42 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
 
 export { isGithubRepoRef } from '@cairn/shared';
 
+async function requireGithubRepoIdentity(dir: string, ref: GithubRepoRef): Promise<void> {
+  const origin = await runGit(['config', '--local', '--get', 'remote.origin.url'], {
+    cwd: dir,
+    timeoutMs: 15000,
+  });
+  if (
+    origin.code !== 0 ||
+    normalizedRepoRef(origin.stdout.toString('utf8')).toLowerCase() !==
+      normalizedRepoRef(githubCloneUrl(ref)).toLowerCase()
+  ) {
+    throw new HttpError(409, 'project repository identity mismatch');
+  }
+}
+
 export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promise<string> {
   const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
   if (!row) throw notFound(`project ${projectId}`);
   if (row.repoKind === 'hosted' && row.repoName !== null) {
     return repoDirFor(ctx.reposDir, row.teamId, row.repoName);
+  }
+  if (row.repoKind === 'github' && ctx.workspacesDir !== undefined) {
+    const ref = githubRepoOfProject(row);
+    if (ref === null) throw new HttpError(409, 'invalid GitHub repository binding');
+    if (!/^[A-Za-z0-9_-]+$/.test(row.id))
+      throw new HttpError(409, 'invalid project repository identity');
+    const cache = join(ctx.workspacesDir, row.id, 'repo');
+    if (existsSync(cache)) {
+      const expected = join(realpathSync(ctx.workspacesDir), row.id, 'repo');
+      if (realpathSync(cache) !== expected)
+        throw new HttpError(403, 'project repository cache escapes its root');
+      await requireGithubRepoIdentity(cache, ref);
+      return cache;
+    }
+  }
+  if (row.repoKind === 'github') {
+    throw new HttpError(404, 'github repository cache unavailable on this server');
   }
   if (row.repoKind === 'local') {
     if (row.localPath === null) {
@@ -232,11 +266,65 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
     }
     return row.localPath;
   }
-  throw notFound(`hosted repo for project ${projectId}`);
+  throw notFound(`repository binding for project ${projectId}`);
 }
 
-async function resolveCommitOr404(dir: string, ref: string): Promise<string> {
-  const commit = await systemGitOps.resolveCommit(dir, ref);
+async function resolveReadCommit(
+  ctx: RepoCtx,
+  projectId: string,
+  dir: string,
+  ref: string,
+): Promise<string | null> {
+  if (ctx.workspacesDir === undefined || dir !== join(ctx.workspacesDir, projectId, 'repo')) {
+    return systemGitOps.resolveCommit(dir, ref);
+  }
+  const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+  if (row?.repoKind !== 'github') return systemGitOps.resolveCommit(dir, ref);
+  const binding = githubRepoOfProject(row);
+  if (binding === null) throw new HttpError(409, 'project repository binding changed during read');
+  const prefix = repositoryCacheRefPrefix(githubCloneUrl(binding));
+  const verified = await runGit(
+    ['for-each-ref', '--count=1', '--format=%(refname)', `${prefix}/`],
+    { cwd: dir, timeoutMs: 15000 },
+  );
+  if (verified.code !== 0 || verified.stdout.toString('utf8').trim() === '') {
+    throw new HttpError(
+      403,
+      'repository cache not verified yet; restart the daemon to run cache verification and check daemon logs if it fails',
+    );
+  }
+  const shortName = !ref.startsWith('refs/') && ref !== 'HEAD' && !/^[0-9a-f]{40,64}$/i.test(ref);
+  const candidates: string[] = [];
+  if (shortName || ref.startsWith('refs/tags/')) {
+    const tag = ref.replace(/^refs\/tags\//, '');
+    candidates.push(`${prefix}/tags/${tag}`, `refs/tags/${tag}`);
+  }
+  if (shortName || ref.startsWith('refs/heads/') || ref.startsWith('refs/remotes/origin/')) {
+    candidates.push(`${prefix}/heads/${ref.replace(/^refs\/(?:heads|remotes\/origin)\//, '')}`);
+  }
+  let commit: string | null = null;
+  for (const candidate of [...candidates, ref]) {
+    commit = await systemGitOps.resolveCommit(dir, candidate);
+    if (commit !== null) break;
+  }
+  if (commit === null) return null;
+  const reachable = await runGit(
+    ['for-each-ref', `--contains=${commit}`, '--format=%(refname)', `${prefix}/`],
+    { cwd: dir, timeoutMs: 15000 },
+  );
+  if (reachable.code !== 0 || reachable.stdout.toString('utf8').trim() === '') {
+    throw new HttpError(403, 'commit is not reachable from the current repository verified refs');
+  }
+  return commit;
+}
+
+async function resolveCommitOr404(
+  ctx: RepoCtx,
+  projectId: string,
+  dir: string,
+  ref: string,
+): Promise<string> {
+  const commit = await resolveReadCommit(ctx, projectId, dir, ref);
   if (commit === null) throw notFound(`ref ${ref}`);
   return commit;
 }
@@ -249,7 +337,7 @@ export async function readTree(
 ): Promise<ProjectTreeResponse> {
   const dir = await requireRepoReadDir(ctx, projectId);
   const ref = refParam ?? 'HEAD';
-  const commit = await resolveCommitOr404(dir, ref);
+  const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
   const subPath = pathParam !== undefined && pathParam !== '' ? pathParam : undefined;
   const entries = await systemGitOps.lsTree(dir, commit, subPath);
   return { ref, commit, path: subPath ?? '', entries };
@@ -266,7 +354,7 @@ export async function readFiles(
 ): Promise<ProjectFilesResponse> {
   const dir = await requireRepoReadDir(ctx, projectId);
   const ref = refParam ?? 'HEAD';
-  const commit = await resolveCommitOr404(dir, ref);
+  const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
   const parsed = limitParam === undefined || limitParam === '' ? NaN : Number(limitParam);
   const limit = Number.isInteger(parsed)
     ? Math.min(Math.max(parsed, 1), PROJECT_FILES_MAX_LIMIT)
@@ -286,11 +374,64 @@ export async function readFile(
   projectId: string,
   path: string,
   refParam?: string,
+  options: { defaultBranch?: boolean; maxBytes?: number } = {},
 ): Promise<ProjectFileResponse> {
   if (!isSafeRepoPath(path)) throw new HttpError(400, `invalid query path: ${path}`);
   const dir = await requireRepoReadDir(ctx, projectId);
-  const ref = refParam ?? 'HEAD';
-  const commit = await resolveCommitOr404(dir, ref);
+  let ref = refParam ?? 'HEAD';
+  if (ctx.workspacesDir !== undefined && dir === join(ctx.workspacesDir, projectId, 'repo')) {
+    const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+    if (refParam === undefined && row?.baseBranch != null) {
+      ref = `refs/remotes/origin/${row.baseBranch}`;
+    } else if (refParam === undefined) {
+      const head = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
+        cwd: dir,
+        timeoutMs: 15000,
+      });
+      if (head.code !== 0)
+        throw new HttpError(409, 'project repository cache has no default remote branch');
+      ref = head.stdout.toString('utf8').trim();
+    }
+  }
+  if (
+    refParam === undefined &&
+    options.defaultBranch === true &&
+    !(ctx.workspacesDir !== undefined && dir === join(ctx.workspacesDir, projectId, 'repo'))
+  ) {
+    const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+    if (row?.baseBranch != null) {
+      ref = `refs/heads/${row.baseBranch}`;
+    } else if (row?.repoKind !== 'hosted') {
+      const remoteHead = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
+        cwd: dir,
+        timeoutMs: 15000,
+      });
+      if (remoteHead.code === 0) {
+        ref = remoteHead.stdout.toString('utf8').trim();
+      } else {
+        throw new HttpError(
+          409,
+          'repository default branch is unknown; configure baseBranch or supply ref',
+        );
+      }
+    }
+  }
+  const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
+  if (options.maxBytes !== undefined) {
+    const sizeResult = await runGit(['cat-file', '-s', `${commit}:${path}`], {
+      cwd: dir,
+      timeoutMs: 15000,
+    });
+    if (sizeResult.code !== 0) throw notFound(`file ${path} at ref ${ref}`);
+    const size = Number(sizeResult.stdout.toString('utf8').trim());
+    if (!Number.isSafeInteger(size) || size < 0)
+      throw new HttpError(409, 'invalid repository blob size');
+    if (size > options.maxBytes)
+      throw new HttpError(
+        413,
+        `repository document too large: ${size} bytes exceeds limit ${options.maxBytes}`,
+      );
+  }
   const file = await systemGitOps.readFileAt(dir, commit, path);
   if (file === null) throw notFound(`file ${path} at ref ${ref}`);
   const binary = looksBinary(file.content);
@@ -330,7 +471,7 @@ export async function readCommitHistory(
   const dir = await requireRepoReadDir(ctx, projectId);
   const { defaultBranch } = await systemGitOps.listBranches(dir);
   const ref = refParam ?? defaultBranch ?? 'HEAD';
-  const commit = await systemGitOps.resolveCommit(dir, ref);
+  const commit = await resolveReadCommit(ctx, projectId, dir, ref);
   if (commit === null) return { ref, commits: [] };
   const r = await runGit(
     ['log', `--max-count=${COMMITS_LIMIT}`, '--format=%H%x00%h%x00%aI%x00%an%x00%s', commit],
@@ -360,7 +501,7 @@ export async function readCommitDetail(
   sha: string,
 ): Promise<ProjectCommitDetailResponse> {
   const dir = await requireRepoReadDir(ctx, projectId);
-  const commit = await resolveCommitOr404(dir, sha);
+  const commit = await resolveCommitOr404(ctx, projectId, dir, sha);
   const r = await runGit(
     ['show', '--format=%H%x00%h%x00%aI%x00%an%x00%s', '--patch', '--first-parent', commit],
     { cwd: dir, timeoutMs: 30_000 },

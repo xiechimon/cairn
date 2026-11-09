@@ -225,12 +225,15 @@
       "id": "memory",
       "name": "Memory",
       "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.",
-      "states": "Coordinator settings list the memories in use; a memory can be deleted or promoted from project to team.",
+      "states": "Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-settings.tsx"
+          "apps/web/src/chief/chief-settings.tsx",
+          "apps/web/src/chief/memory-panel.tsx",
+          "apps/web/src/chief/memory-list.ts",
+          "apps/web/src/board/project-instructions-field.tsx"
         ],
         "server": [
           "apps/server/src/services/memory.ts",
@@ -260,6 +263,8 @@
         "docs/design/memory-inplace-edit.md"
       ],
       "evidence": [
+        "apps/web/e2e/chief-memory.spec.ts",
+        "apps/web/test/memory-list.test.ts",
         "apps/server/test/memory-consolidation.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"
@@ -530,7 +535,8 @@
       },
       "reach": [
         "open /app",
-        "click testid:thread-group-running",
+        "click testid:tasks-toggle",
+        "click testid:tasks-section",
         "click testid:side-chat-action"
       ],
       "verify": [
@@ -1530,6 +1536,7 @@
       "code": {
         "web": [
           "apps/web/src/pages/project-new-page.tsx",
+          "apps/web/src/pages/project-page.tsx",
           "apps/web/src/pages/project-settings-page.tsx",
           "apps/web/src/board/project-home.tsx"
         ],
@@ -1542,6 +1549,7 @@
         "web": [
           "/app/project/new",
           "/app/project/:id",
+          "/app/project/:id/tasks",
           "/app/project/:id/settings"
         ],
         "server": [
@@ -1550,6 +1558,11 @@
           "/api/projects/:id/${action}",
           "/api/projects/:id/autonomy",
           "/api/projects/:id/branches",
+          "/api/projects/:id/file",
+          "/api/projects/:id/files",
+          "/api/projects/:id/tree",
+          "/api/projects/:id/commits",
+          "/api/projects/:id/commits/:sha",
           "/api/fs/list",
           "/api/fs/pick"
         ]
@@ -1557,6 +1570,7 @@
       "reach": [
         "open /app/project/new",
         "click testid:github-picker",
+        "open /app/project/<id of a project listed by the projects API>/tasks",
         "open /app/project/<id of a project listed by the projects API>/settings",
         "click testid:project-instructions-input"
       ],
@@ -1566,7 +1580,8 @@
         ".claude/skills/verify-cairn/features/local-repo-api.md"
       ],
       "research": [
-        "docs/research/project-coordinators.md"
+        "docs/research/project-coordinators.md",
+        "docs/research/project-files-retirement-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md",
@@ -1580,55 +1595,6 @@
         "apps/web/e2e/project-settings-autonomy.spec.ts",
         "apps/server/test/project-delete.test.ts"
       ]
-    },
-    {
-      "id": "project-files",
-      "name": "Project files",
-      "summary": "The remaining project file tree and viewer, pending retirement in #3479.",
-      "states": "A file tree with a viewer; unavailable for some project kinds. Commit history has been retired.",
-      "centrality": 3,
-      "status": "shipped",
-      "code": {
-        "web": [
-          "apps/web/src/pages/project-page.tsx"
-        ],
-        "server": [
-          "apps/server/src/routes-projects.ts"
-        ]
-      },
-      "routes": {
-        "web": [
-          "/app/project/:id/files"
-        ],
-        "server": [
-          "/api/projects/:id/file",
-          "/api/projects/:id/files",
-          "/api/projects/:id/tree",
-          "/api/projects/:id/commits",
-          "/api/projects/:id/commits/:sha"
-        ]
-      },
-      "reach": [
-        "open /app/project/<id of a project listed by the projects API>/files"
-      ],
-      "verify": [
-        ".claude/skills/verify-cairn/features/project-files-drill.md",
-        ".claude/skills/verify-cairn/features/project-files-local.md"
-      ],
-      "research": [
-        "docs/research/project-files-retirement-2026-11-09.md"
-      ],
-      "frontendDesign": {
-        "gap": "the files tab has no design"
-      },
-      "backendDesign": {
-        "gap": "no design for reading files and commits from local and hosted repos"
-      },
-      "evidence": [
-        "apps/web/e2e/project-files-tree.spec.ts",
-        "apps/web/e2e/project-commit-detail.spec.ts"
-      ],
-      "batch": "B8"
     },
     {
       "id": "github",
@@ -1780,16 +1746,16 @@
     },
     {
       "id": "sidebar",
-      "name": "Sidebar and thread list",
-      "summary": "The sidebar with the Coordinator row, projects and thread groups, unread marks and the project menu.",
-      "states": "Groups for needs-you, running and done threads, projects with archived ones folded, an attention badge, and loading or error rows.",
+      "name": "Sidebar",
+      "summary": "The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.",
+      "states": "Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/sidebar.tsx",
           "apps/web/src/board/app-sidebar.tsx",
-          "apps/web/src/board/sidebar-thread-groups.tsx"
+          "apps/web/src/board/sidebar-projects.ts"
         ],
         "server": [
           "apps/server/src/services/notifications.ts"
@@ -1802,8 +1768,8 @@
       },
       "reach": [
         "open /app",
-        "click testid:thread-groups",
-        "click testid:project-group"
+        "click testid:project-group",
+        "click testid:project-group-header"
       ],
       "research": [
         "docs/research/sidebar-coordinator-icon-2026-11-08.md"
@@ -1817,7 +1783,7 @@
       },
       "evidence": [
         "apps/web/e2e/sidebar-nav.spec.ts",
-        "apps/web/e2e/sidebar-project-threads.spec.ts",
+        "apps/web/e2e/sidebar-projects.spec.ts",
         "apps/server/test/unread-notifications.test.ts"
       ],
       "batch": "B7"

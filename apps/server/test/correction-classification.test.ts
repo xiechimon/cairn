@@ -10,6 +10,12 @@ import { isCorrectionTask } from '../src/services/correction.js';
 import { bootServer, postProject, req } from './helpers.js';
 import { migrateUpTo } from './migrate-helpers.js';
 
+type MigrationSnapshot = {
+  id: string;
+  prevId: string;
+  tables: { todo: { columns: Record<string, unknown> } };
+};
+
 const dirs: string[] = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
@@ -24,7 +30,7 @@ function previousDatabase(): string {
     sqlite.pragma('foreign_keys = ON');
     migrateUpTo(sqlite, dir, '0119_agent_layer_backup');
     runAgentLayerDataMigration(sqlite);
-    migrateUpTo(sqlite, dir, '0136_evidence_store');
+    migrateUpTo(sqlite, dir, '0138_step_prompt_origin');
     sqlite.exec(`
       INSERT INTO user (id, displayName) VALUES ('u', 'Owner');
       INSERT INTO team (id, name, createdAt) VALUES ('team', 'Team', 1);
@@ -101,6 +107,34 @@ describe('internal correction classification', () => {
     expect(journal.entries[position]?.when).toBeGreaterThan(
       Math.max(...previous.map((entry) => entry.when)),
     );
+  });
+
+  test('the correction snapshot chains to its predecessor and adds only classification', () => {
+    const snapshot = JSON.parse(
+      readFileSync(join(MIGRATIONS_FOLDER, 'meta/0139_snapshot.json'), 'utf8'),
+    ) as MigrationSnapshot;
+    const previous = JSON.parse(
+      readFileSync(join(MIGRATIONS_FOLDER, 'meta/0138_snapshot.json'), 'utf8'),
+    ) as MigrationSnapshot;
+    expect(snapshot.prevId).toBe(previous.id);
+    const { correctionRequired, ...columns } = snapshot.tables.todo.columns;
+    expect(correctionRequired).toEqual({
+      name: 'correctionRequired',
+      type: 'integer',
+      primaryKey: false,
+      notNull: true,
+      autoincrement: false,
+      default: false,
+    });
+    expect({
+      ...snapshot,
+      id: previous.id,
+      prevId: previous.prevId,
+      tables: {
+        ...snapshot.tables,
+        todo: { ...snapshot.tables.todo, columns },
+      },
+    }).toEqual(previous);
   });
 
   test('fresh tasks default to ordinary and the flag is not a public todo field', async () => {

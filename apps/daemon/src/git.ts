@@ -4,6 +4,7 @@ import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
+import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { loopbackNoProxy } from './proxy.js';
 
 export interface GitRunResult {
@@ -362,12 +363,31 @@ export const gitPrim = {
     });
   },
 
-  async fetch(repoDir: string, cred: BoundGitCredentials | null): Promise<void> {
-    await runGitOk(['fetch', '--prune', 'origin'], {
-      cwd: repoDir,
-      env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
-      timeoutMs: NET_TIMEOUT_MS,
-    });
+  async fetch(
+    repoDir: string,
+    cred: BoundGitCredentials | null,
+    options: { origin?: string; timeoutMs?: number } = {},
+  ): Promise<void> {
+    const origin = options.origin ?? (await gitPrim.originConfigUrl(repoDir));
+    if (origin === null) throw new Error('repository has no origin for verified cache fetch');
+    const prefix = repositoryCacheRefPrefix(origin);
+    await runGitOk(
+      [
+        'fetch',
+        '--atomic',
+        '--prune',
+        '--end-of-options',
+        origin,
+        '+refs/heads/*:refs/remotes/origin/*',
+        `+refs/heads/*:${prefix}/heads/*`,
+        `+refs/tags/*:${prefix}/tags/*`,
+      ],
+      {
+        cwd: repoDir,
+        env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
+        timeoutMs: options.timeoutMs ?? NET_TIMEOUT_MS,
+      },
+    );
   },
 
   async remoteDefaultBranch(repoDir: string): Promise<string> {

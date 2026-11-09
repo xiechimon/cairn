@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files';
+const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings';
 
 interface Control {
   name: string;
@@ -11,9 +11,9 @@ interface Control {
 
 const CONTROLS: Control[] = [
   {
-    name: 'project tabs',
-    url: `${PROJ}?scenario=r2-24b`,
-    track: (page) => page.getByRole('banner').getByRole('tablist'),
+    name: 'project settings tabs',
+    url: `${PROJ}?scenario=r2-24c`,
+    track: (page) => page.locator('.page-tabs-group'),
   },
   {
     name: 'settings appearance',

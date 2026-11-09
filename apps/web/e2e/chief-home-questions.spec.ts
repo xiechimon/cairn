@@ -91,7 +91,7 @@ test('no pending question means no card and no pill', async ({ page }) => {
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
   await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
-  await expect(page.getByTestId('attention-badge')).toHaveCount(0);
+  await expect(page).toHaveTitle('Cairn');
 });
 
 test('the header carries no question pill on any page', async ({ page }) => {
@@ -112,21 +112,20 @@ test('answering removes the card and the badge count; the next question takes it
   await mockLive(page, state, answerRoute(state, answered));
   await page.goto('/app');
   const dock = page.getByTestId('chief-question-dock');
-  const badge = page.getByRole('complementary').getByTestId('attention-badge');
   await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
-  await expect(badge).toHaveText('2');
+  await expect(page).toHaveTitle('(2) Cairn');
   await dock.getByTestId('chief-question-option-0-0').click();
   await page.getByTestId('chief-question-primary').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]?.path).toContain(`/chief/threads/${THREAD.id}/questions/ask-0000000a/answer`);
   await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
   await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
-  await expect(badge).toHaveText('1');
+  await expect(page).toHaveTitle('(1) Cairn');
   await dock.getByTestId('chief-question-option-0-0').click();
   await page.getByTestId('chief-question-primary').click();
   await expect.poll(() => answered.length).toBe(2);
   await expect(dock).toHaveCount(0);
-  await expect(badge).toHaveCount(0);
+  await expect(page).toHaveTitle('Cairn');
 });
 
 test('free text answers inline', async ({ page }) => {
@@ -143,13 +142,12 @@ test('free text answers inline', async ({ page }) => {
   await expect(dock).toHaveCount(0);
 });
 
-test('the sidebar Coordinator badge counts pending questions and opens the card from another page', async ({
+test('the tab title counts pending questions and the Coordinator row opens the card from another page', async ({
   page,
 }) => {
   await mockLive(page, structuredClone(TWO));
   await page.goto('/app/schedules');
-  const badge = page.getByRole('complementary').getByTestId('attention-badge');
-  await expect(badge).toHaveText('2');
+  await expect(page).toHaveTitle('(2) Cairn');
   await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
   await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();

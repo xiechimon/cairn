@@ -198,8 +198,6 @@ export const EN: Record<string, string> = {
   目前用团队密钥: 'Team secrets for now',
   目前跟随机器上限: 'Machine limits for now',
   保存项目说明: 'Save instructions',
-  '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':
-    'Every thread and the Coordinator read these in this project, after the repository AGENTS.md.',
   '例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。':
     'For example: repository content is English; run pnpm lint after changes; never force push.',
   '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
@@ -221,14 +219,18 @@ export const EN: Record<string, string> = {
   '{n} 分': '{n}m',
   '{n} 小时': '{n}h',
   '{n} 天': '{n}d',
-  已归档: 'Archived',
   归档: 'Archive',
   '{name} 的菜单': '{name} menu',
   '无法归档项目。': 'Could not archive the project.',
-  '无法取消归档项目。': 'Could not unarchive the project.',
+  '无法移动项目。': 'Could not move the project.',
+  有任务在等你: 'A task is waiting on you',
+  '{name}：有任务在等你': '{name}: A task is waiting on you',
+  移到分组: 'Move to group',
+  新建分组: 'New group',
+  移出分组: 'Remove from group',
+  分组名称: 'Group name',
+  移入: 'Move',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
-  需要你: 'Needs you',
-  在跑: 'Running',
   看板: 'Board',
   技能: 'Skills',
   密钥: 'Secrets',
@@ -561,11 +563,7 @@ export const EN: Record<string, string> = {
   历史: 'History',
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
-  // #1097 files-pane folder drill-down
-  目录导航: 'Directory navigation',
   根目录: 'Root',
-  '此目录为空。': 'This folder is empty.',
-  '文件树读取失败。': 'Failed to read the file tree.',
   '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
@@ -628,7 +626,6 @@ export const EN: Record<string, string> = {
   // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
   额度空: 'out of quota',
   限流: 'rate limited',
-  请选择一个文件查看: 'Select a file to view',
   // #202 文件查看器三态（loading / error / 不可预览）
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
@@ -938,6 +935,16 @@ export const EN: Record<string, string> = {
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
+  'CI 修复第 {round}/{max} 轮：推送前检查未通过':
+    'CI fix round {round}/{max}: pre-push checks failed',
+  'CI 修复第 {round}/{max} 轮：CI 检查未通过': 'CI fix round {round}/{max}: CI checks failed',
+  '解冲突第 {round}/{max} 轮：PR 与默认分支冲突':
+    'Conflict fix round {round}/{max}: the PR conflicts with the default branch',
+  '按反馈返工，继续本会话': 'Reworking from feedback in this session',
+  查看原始日志: 'View raw log',
+  原始日志: 'Raw log',
+  查看完整指令: 'View full instruction',
+  完整指令: 'Full instruction',
   // #1285 失败行指引按分类分族
   '请将其重新上线，或重新运行任务以改派其他机器。':
     'Reconnect the machine, or rerun the task to assign another machine.',
@@ -1076,13 +1083,6 @@ export const EN: Record<string, string> = {
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
 
-  // —— local 项目 Files tab 读面（#1030 开闸；不可达降级文案）——
-  '本地仓库当前无法读取。': 'The local repository cannot be read right now.',
-
-  // —— github 项目 Files tab 诚实降级面（#704 / B-C1：文件在 GitHub，外链承接）——
-  'GitHub 仓库项目的文件在 GitHub 上查看': 'Files for GitHub repository projects live on GitHub',
-  '打开 GitHub 仓库': 'Open the GitHub repository',
-
   // —— #403/#445 看板筛选面（仓库 chip 组 + 类型 popover + 空结果态）——
   类型: 'Type',
 
@@ -1170,15 +1170,37 @@ export const EN: Record<string, string> = {
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
-  '尚无记忆。Coordinator 会在工作中将值得沉淀的经验存入此处。':
-    'No memories yet. The Coordinator stores experience worth keeping here as it works.',
+  'Coordinator 在所有项目里都会用到的笔记。': 'Notes the Coordinator uses across every project.',
+  '像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。':
+    'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
+  自动记忆: 'Auto memory',
+  'Coordinator 在这个项目里工作时自己写下的笔记。':
+    'Notes the Coordinator writes itself as it works in this project.',
+  'Coordinator 还没有记下团队笔记。': 'The Coordinator has not written team notes yet.',
+  'Coordinator 还没有在这个项目里记下笔记。':
+    'The Coordinator has not written notes in this project yet.',
+  可自动注入: 'Eligible for automatic injection',
+  记忆文件: 'Memory files',
+  '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
+  正在加载记忆: 'Loading memories',
+  '打开记忆：{title}': 'Open memory: {title}',
+  '可检索 · 不自动注入': 'Searchable · not injected automatically',
+  核心: 'Core',
+  '更新于 {date}': 'Updated {date}',
+  更新于: 'Updated',
+  概要: 'Summary',
+  '删除…': 'Delete…',
+  删除这条记忆: 'Delete this memory',
+  '删除这条记忆？': 'Delete this memory?',
+  删除记忆: 'Delete memory',
+  '正在删除…': 'Deleting…',
+  '只删除这条记忆，不影响保存它的对话。':
+    'Deletes only this memory, not the conversation it was saved from.',
+  '没有删除成功，记忆保持原样，请重试。': 'The memory was not deleted and is unchanged. Try again.',
+  '离线中。记忆只能查看，重新连接后才能删除。':
+    'Offline. Memories are read-only until you reconnect.',
   模型与机器: 'Model & machine',
 
-  // —— #499 记忆 tab 的搜索与排序（配额头 + 搜索框 + 排序档）——
-  // `记忆 · {n} / {max}`：{max} = shared MEMORY_QUOTA_PER_AGENT 插值，不写死
-  // 数字；`搜索记忆…` = shared MEMORY_UI_COPY.searchPlaceholder（经 t() 消费、
-  // 不作字面量出现，i18n-coverage COMPUTED_KEYS 登记）。
-  '记忆 · {n} / {max}': 'Memory · {n} / {max}',
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。

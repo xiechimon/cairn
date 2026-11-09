@@ -3965,6 +3965,25 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
     {
       "additionalProperties": false,
       "properties": {
+        "conversationId": {
+          "type": "string",
+        },
+        "deliveredQueue": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string",
+            },
+            "messageId": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "conversationId",
+            "messageId",
+          ],
+          "type": "object",
+        },
         "message": {
           "additionalProperties": {},
           "properties": {
@@ -4233,6 +4252,81 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "type": [
                 "string",
                 "null",
+              ],
+            },
+            "promptOrigin": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "ci-fix",
+                      "type": "string",
+                    },
+                    "round": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    "roundsMax": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    "trigger": {
+                      "enum": [
+                        "ci-checks",
+                        "pre-push",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "trigger",
+                    "round",
+                    "roundsMax",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "merge-conflict",
+                      "type": "string",
+                    },
+                    "round": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    "roundsMax": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "round",
+                    "roundsMax",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "rework",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
               ],
             },
             "queue": {
@@ -5646,6 +5740,81 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       "type": [
         "string",
         "null",
+      ],
+    },
+    "promptOrigin": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "ci-fix",
+              "type": "string",
+            },
+            "round": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "roundsMax": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "trigger": {
+              "enum": [
+                "ci-checks",
+                "pre-push",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+            "trigger",
+            "round",
+            "roundsMax",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "merge-conflict",
+              "type": "string",
+            },
+            "round": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "roundsMax": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "kind",
+            "round",
+            "roundsMax",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "rework",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
       ],
     },
     "queue": {
