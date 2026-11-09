@@ -144,7 +144,13 @@ export function coordinatorTool(
         return { output: [{ type: 'text', text }] };
       }
       try {
-        const text = await channel.relayTool(stepId, def.name, params, api.callId);
+        const text = await channel.relayTool(
+          stepId,
+          def.name,
+          params,
+          api.callId,
+          context.abortSignal,
+        );
         if (def.name === 'attachment') {
           const attachment = JSON.parse(text) as {
             mimeType: string;

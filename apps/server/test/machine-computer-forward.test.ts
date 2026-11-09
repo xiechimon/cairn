@@ -615,6 +615,21 @@ describe('stop and finish', () => {
     stopStepComputer(ctx.deps, 'step-a');
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
   });
+
+  test('aborting the relay signal cancels the dispatched call instead of abandoning it', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const controller = new AbortController();
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('sleep 99'), {
+      signal: controller.signal,
+    });
+    const id = computerCallId('step-a', 'tc-1');
+    controller.abort();
+    expect((await result).text).toContain('cancelled');
+    expect(callRow(ctx.s, id).state).toBe('cancelled');
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+  });
 });
 
 describe('leases', () => {

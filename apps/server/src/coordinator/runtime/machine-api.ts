@@ -21,6 +21,7 @@ export interface MachineApi {
     name: string,
     params: Record<string, unknown>,
     toolCallId?: string,
+    signal?: AbortSignal,
   ): Promise<string>;
   askUser(stepId: string, body: MachineAskBody, signal?: AbortSignal): Promise<MachineAskResponse>;
   transcriptRow(stepId: string, row: TranscriptRow, entryId?: string): Promise<void>;

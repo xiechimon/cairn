@@ -96,6 +96,7 @@ export async function executeRelayToolCall(
   name: string,
   params: Record<string, unknown>,
   toolCallId?: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
   if (isComputerBrowserTool(name)) {
@@ -123,7 +124,7 @@ export async function executeRelayToolCall(
         toolCallId: callId,
         params,
       },
-      { signal: undefined },
+      signal !== undefined ? { signal } : {},
     );
     return result.text;
   }

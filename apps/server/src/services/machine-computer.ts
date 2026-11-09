@@ -633,18 +633,17 @@ function acquireExecutionLease(
 }
 
 async function waitForCall(
+  deps: Pick<MachineDeps, 'db'> & { machineHub?: MachineWakeHub },
   pending: PendingCall,
+  stepId: string,
   signal: AbortSignal | undefined,
 ): Promise<ComputerRelayResult> {
   if (!signal) return pending.result;
-  let onAbort = (): void => {};
-  const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(new Error('computer request aborted'));
-    if (signal.aborted) onAbort();
-    else signal.addEventListener('abort', onAbort, { once: true });
-  });
+  const onAbort = () => stopStepComputer(deps, stepId);
+  if (signal.aborted) onAbort();
+  else signal.addEventListener('abort', onAbort, { once: true });
   try {
-    return await Promise.race([pending.result, aborted]);
+    return await pending.result;
   } finally {
     signal.removeEventListener('abort', onAbort);
   }
@@ -690,7 +689,7 @@ export async function forwardComputerCall(
     throw new HttpError(409, `tool call ${body.toolCallId} was already used for ${existing.tool}`);
   }
   const live = pendingCalls.get(callId);
-  if (live) return waitForCall(live, opts.signal);
+  if (live) return waitForCall(deps, live, stepId, opts.signal);
 
   if (existing && !existing.replaySafe) {
     if (!isFinalState(existing.state)) {
@@ -801,5 +800,5 @@ export async function forwardComputerCall(
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishFeed(db, deps.hub, row);
-  return waitForCall(pending, opts.signal);
+  return waitForCall(deps, pending, stepId, opts.signal);
 }
