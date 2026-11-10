@@ -26,7 +26,11 @@ import {
   CHIEF_DIGEST_THRESHOLD_CHARS,
   planChiefDigests,
 } from '../src/services/chief-digest.js';
-import { foldMemoryIndexes, listMemoryEntries } from '../src/services/memory.js';
+import {
+  foldMemoryIndexes,
+  injectMemoryDocuments,
+  listMemoryEntries,
+} from '../src/services/memory.js';
 import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 
 const COORDINATOR_RULE = 'route-digest';
@@ -340,8 +344,12 @@ describe('chief long-chat digests (#1939)', () => {
       items: { memory?: { id: string } }[];
     };
     expect(content.items[3]?.memory?.id).toBe('mem-old');
-    expect(listMemoryEntries(w.s.db, { teamId: w.teamId, agentId: COORDINATOR_RULE })).toHaveLength(
-      1,
+    const scope = { teamId: w.teamId, agentId: COORDINATOR_RULE };
+    expect(
+      listMemoryEntries(w.s.db, scope).filter((row) => row.layer === 'searchable'),
+    ).toHaveLength(1);
+    expect(injectMemoryDocuments(w.s.db, scope).memories[0]!.content).toContain(
+      `](${encodeURIComponent('发布')})`,
     );
   });
 

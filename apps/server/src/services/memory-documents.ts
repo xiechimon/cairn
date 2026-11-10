@@ -373,6 +373,24 @@ function indexWithReference(content: string, reference: string) {
     : appended;
 }
 
+function ensureMemoryFileReference(
+  tx: Tx,
+  owner: MemoryDocumentOwner,
+  index: Row,
+  title: string,
+  file: string,
+) {
+  const content = memoryIndexText(index);
+  if (content.includes(`](${encodeURIComponent(file)})`)) return false;
+  executeMemoryDocumentTool(tx, owner, 'update_memory', {
+    scope: owner.projectId ?? 'team',
+    file: MEMORY_INDEX_TITLE,
+    baseVersion: memoryDocumentVersion(index),
+    content: indexWithReference(content, memoryFileReference(title, file)),
+  });
+  return true;
+}
+
 export function appendMemoryIndex(
   db: Db,
   owner: MemoryDocumentOwner,
@@ -388,10 +406,14 @@ export function appendMemoryIndex(
         const line = `- ${label}：${detail}`;
         const files = scopedRows(tx, namespace(tx, owner, owner.projectId ?? 'team')).all();
         const existing = files.find(
-          (row) => row.layer === 'searchable' && row.invalidAt === null && row.content === detail,
+          (row) =>
+            row.layer === 'searchable' &&
+            row.invalidAt === null &&
+            row.supersededBy === null &&
+            row.content === detail,
         );
+        if (existing) return ensureMemoryFileReference(tx, owner, index, title, existing.title);
         if (
-          existing ||
           currentText
             .split('\n')
             .some(
@@ -441,29 +463,33 @@ export function rememberMemoryFile(
     const ns = namespace(tx, owner, owner.projectId ?? 'team', true);
     const existing = scopedRows(tx, ns)
       .all()
-      .find((r) => r.layer === 'searchable' && r.invalidAt === null && r.content === content);
-    if (existing) return existing;
-    const file = allocateMemoryFileName(
-      title,
-      new Set([
-        MEMORY_INDEX_TITLE,
-        ...scopedRows(tx, ns)
-          .all()
-          .map((row) => row.title),
-      ]),
-    );
-    const saved = executeMemoryDocumentTool(tx, owner, 'save_memory', {
-      scope: owner.projectId ?? 'team',
-      file,
-      content,
-    }) as { id: string };
+      .find(
+        (r) =>
+          r.layer === 'searchable' &&
+          r.invalidAt === null &&
+          r.supersededBy === null &&
+          r.content === content,
+      );
+    const file =
+      existing?.title ??
+      allocateMemoryFileName(
+        title,
+        new Set([
+          MEMORY_INDEX_TITLE,
+          ...scopedRows(tx, ns)
+            .all()
+            .map((row) => row.title),
+        ]),
+      );
+    const saved =
+      existing ??
+      (executeMemoryDocumentTool(tx, owner, 'save_memory', {
+        scope: owner.projectId ?? 'team',
+        file,
+        content,
+      }) as { id: string });
     const index = ensureMemoryIndex(tx, ns);
-    executeMemoryDocumentTool(tx, owner, 'update_memory', {
-      scope: owner.projectId ?? 'team',
-      file: MEMORY_INDEX_TITLE,
-      baseVersion: memoryDocumentVersion(index),
-      content: indexWithReference(memoryIndexText(index), memoryFileReference(title, file)),
-    });
+    ensureMemoryFileReference(tx, owner, index, title, file);
     return saved;
   });
 }
