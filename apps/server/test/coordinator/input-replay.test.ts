@@ -311,3 +311,12 @@ test('a host binding write failure blocks the provider until the same binding co
   expect(w.requests()).toBe(2);
   expect(H.s.db.select().from(coordinatorInput).all()).toHaveLength(1);
 });
+
+test('a store behind the host watermark cannot replay older rows before reconciliation', async () => {
+  const w = await fixture();
+  await w.finish();
+  H.s.db.update(coordinatorConversation).set({ lastMirroredEntryId: '9999' }).run();
+  await w.replay();
+  expect(w.api.transcriptRow).not.toHaveBeenCalled();
+  expect(H.s.db.select().from(coordinatorConversation).get()?.lastMirroredEntryId).toBe('9999');
+});

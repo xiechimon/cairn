@@ -56,6 +56,7 @@ export async function replayCoordinatorInputs(
     entries.push(...page.items);
     cursor = page.next;
   } while (cursor !== undefined);
+  if (watermark !== null && Number(entries.at(-1)?.id ?? 0) < watermark.entryId) return;
   const runs = new Map(
     (await channel.runs(threadId))
       .filter((run) => run.conversationId === conversationKey)
