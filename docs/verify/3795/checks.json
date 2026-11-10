@@ -1,0 +1,61 @@
+[
+  {
+    "label": "before",
+    "theme": "dark",
+    "width": 1440,
+    "cards": 0,
+    "overflow": false
+  },
+  {
+    "label": "before",
+    "theme": "light",
+    "width": 1440,
+    "cards": 0,
+    "overflow": false
+  },
+  {
+    "label": "before",
+    "theme": "dark",
+    "width": 390,
+    "cards": 0,
+    "overflow": false
+  },
+  {
+    "label": "before",
+    "theme": "light",
+    "width": 390,
+    "cards": 0,
+    "overflow": false
+  },
+  {
+    "label": "after",
+    "theme": "dark",
+    "width": 1440,
+    "cards": 1,
+    "overflow": false
+  },
+  {
+    "opensTask": true
+  },
+  {
+    "label": "after",
+    "theme": "light",
+    "width": 1440,
+    "cards": 1,
+    "overflow": false
+  },
+  {
+    "label": "after",
+    "theme": "dark",
+    "width": 390,
+    "cards": 1,
+    "overflow": false
+  },
+  {
+    "label": "after",
+    "theme": "light",
+    "width": 390,
+    "cards": 1,
+    "overflow": false
+  }
+]
