@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { applyFlush, flushPrompt } from '../src/coordinator/memory-flush.js';
-import { agentMemory, memoryCandidate } from '../src/db/schema.js';
+import { agentMemory, memoryCandidate, project } from '../src/db/schema.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { injectMemoryDocuments } from '../src/services/memory.js';
 import { memoryPassDue } from '../src/services/memory-consolidation.js';
@@ -291,4 +291,45 @@ test('flush prompt retains project scopes and a prefix of an oversized team inde
   expect(existing).toContain('PROJECT-COVERED-FACT');
   expect(existing).toContain(`${H.projectId} | MEMORY.md`);
   expect(existing.length).toBeLessThanOrEqual(8000);
+});
+
+test.each(['same fact', 'same\nmultiline fact'])(
+  'flush idempotence ignores generated titles for %s',
+  (detail) => {
+    const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: null };
+    expect(appendMemoryIndex(H.s.db, owner, 'first：title', detail)).toBe(true);
+    const before = H.s.db.select().from(agentMemory).all();
+    expect(appendMemoryIndex(H.s.db, owner, 'another generated title', detail)).toBe(false);
+    expect(H.s.db.select().from(agentMemory).all()).toEqual(before);
+  },
+);
+
+test('flush scope headers leave bounded room for represented facts', () => {
+  const scopes = Array.from({ length: 80 }, (_, i) => `scope-${i}`);
+  H.s.db
+    .insert(project)
+    .values(scopes.map((id) => ({ id, teamId: H.teamId, name: id })))
+    .run();
+  H.s.db
+    .insert(agentMemory)
+    .values(
+      scopes.map((projectId) => ({
+        id: `fact-${projectId}`,
+        agentId: AGENT_ID,
+        teamId: H.teamId,
+        projectId,
+        title: 'fact',
+        content: `FACT-${projectId}!`,
+        layer: 'core' as const,
+        createdAt: 1,
+        updatedAt: 1,
+      })),
+    )
+    .run();
+  const prompt = flushPrompt(H.s.db, { teamId: H.teamId, threadId: H.threadId }, 'transcript');
+  const existing = prompt.split('Existing memories:\n')[1]!.split('\n\nProjects:')[0]!;
+  expect(existing.length).toBeLessThanOrEqual(8000);
+  for (const scope of scopes.filter((scope) => existing.includes(`${scope} | MEMORY.md`)))
+    expect(existing).toContain(`FACT-${scope}!`);
+  expect(existing).toContain('additional scopes omitted');
 });

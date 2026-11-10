@@ -95,14 +95,29 @@ function existingLines(db: Db, scope: { teamId: string; threadId: string }): str
   const owner = { agentId, teamId: scope.teamId };
   const scopes = new Set([null, ...listStoredMemoryEntries(db, owner).map((row) => row.projectId)]);
   const indexes = [...scopes].map((projectId) => ensureMemoryIndex(db, { ...owner, projectId }));
-  const headers = indexes.map(
-    (index) => `${index.projectId ?? 'team'} | MEMORY.md | ${memoryDocumentVersion(index)}`,
+  const selected: { header: string; content: string }[] = [];
+  const noteBudget = `\n(${indexes.length} additional scopes omitted from this excerpt.)`.length;
+  let reserved = noteBudget;
+  for (const index of indexes) {
+    const header = `${index.projectId ?? 'team'} | MEMORY.md | ${memoryDocumentVersion(index)}`;
+    const content = memoryIndexText(index);
+    const required = header.length + Math.min(256, content.length) + 3;
+    if (reserved + required > EXISTING_MAX_CHARS) break;
+    selected.push({ header, content });
+    reserved += required;
+  }
+  const omitted = indexes.length - selected.length;
+  const note = omitted > 0 ? `\n(${omitted} additional scopes omitted from this excerpt.)` : '';
+  const remaining =
+    EXISTING_MAX_CHARS -
+    note.length -
+    selected.map(({ header }) => header).join('\n\n').length -
+    selected.length;
+  const perIndex = Math.floor(remaining / Math.max(1, selected.length));
+  return (
+    selected.map(({ header, content }) => `${header}\n${content.slice(0, perIndex)}`).join('\n\n') +
+    note
   );
-  const remaining = Math.max(0, EXISTING_MAX_CHARS - headers.join('\n\n').length - indexes.length);
-  const perIndex = Math.floor(remaining / indexes.length);
-  return indexes
-    .map((index, i) => `${headers[i]}\n${memoryIndexText(index).slice(0, perIndex)}`)
-    .join('\n\n');
 }
 
 export function flushPrompt(

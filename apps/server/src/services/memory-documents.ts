@@ -384,24 +384,34 @@ export function appendMemoryIndex(
       return db.transaction((tx) => {
         const index = ensureMemoryIndex(tx, namespace(tx, owner, owner.projectId ?? 'team', true));
         const currentText = memoryIndexText(index);
-        const label = title.replace(/[\r\n\0]+/g, ' ');
+        const label = title.replace(/[\r\n\0]+/g, ' ').replace(/：/g, ':');
         const line = `- ${label}：${detail}`;
         const files = scopedRows(tx, namespace(tx, owner, owner.projectId ?? 'team')).all();
         const existing = files.find(
           (row) => row.layer === 'searchable' && row.invalidAt === null && row.content === detail,
         );
-        const file =
-          existing?.title ??
-          allocateMemoryFileName(
-            title,
-            new Set([MEMORY_INDEX_TITLE, ...files.map((row) => row.title)]),
-          );
+        if (
+          existing ||
+          currentText
+            .split('\n')
+            .some(
+              (entry) =>
+                entry.startsWith('- ') &&
+                entry.includes('：') &&
+                entry.slice(entry.indexOf('：') + 1) === detail,
+            )
+        )
+          return false;
+        const file = allocateMemoryFileName(
+          title,
+          new Set([MEMORY_INDEX_TITLE, ...files.map((row) => row.title)]),
+        );
         const reference = memoryFileReference(title, file);
         if (currentText.split('\n').includes(line) || currentText.split('\n').includes(reference))
           return false;
         const content = [currentText, line].filter(Boolean).join('\n');
         const spill = detail.includes('\n') || boundMemoryIndex(content).omitted > 0;
-        if (spill && !existing)
+        if (spill)
           executeMemoryDocumentTool(tx, owner, 'save_memory', {
             scope: owner.projectId ?? 'team',
             file,
