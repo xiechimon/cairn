@@ -26,12 +26,14 @@ GitHub-backed projects retain their dedicated names-based label form: optional `
 
 ## Staged legacy compatibility
 
-This segment retires only the ordinary worker category writer. Generic REST project routes, REST/Coordinator/MCP assignments, fixed seeding/backfill, legacy tables and read-only record `tagIds` remain until their ordered retirement segments. Retained representation is not a current UI or worker category capability. Existing generic membership continues to participate in correction classification until its final provenance snapshot.
+Ordinary worker categories and generic vocabulary GET/POST routes are retired. REST and Coordinator project creation and server startup no longer seed or backfill categories. Legacy REST/Coordinator/MCP assignment inputs, tables and read-only record `tagIds` remain until their ordered retirement segments. The fixed-vocabulary constant is retained only for existing web/gallery fixtures until final model/fixture removal. Retained representation is not a current UI or worker category capability. Existing generic membership continues to participate in correction classification until its final provenance snapshot.
 
 The settings Tags tab is already removed. Historical category-chip and filter recipes are not current UI acceptance checks. Git release `create_tag` is unrelated and remains available through its existing daemon-local boundary.
 
 ## Regression contract
 
+- Create plain/local/hosted/GitHub projects through REST or supported Coordinator shapes: no generic categories are seeded; vocabulary routes return 404 without mutation.
+- Restart with legacy categories: exact existing rows/associations and correction requirements survive; no fixed vocabulary is recreated.
 - Save a multi-line body: the first non-empty line becomes the title; long lines truncate consistently in server and fixture surfaces.
 - Claim an ordinary first implementation step: the advertised tool requires only `title`; its daemon prompt contains no category input or fixed vocabulary.
 - Name a task: the title updates and version advances without altering its body, associations or correction requirement.

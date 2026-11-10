@@ -74,7 +74,6 @@ import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { snoozeTodo } from './snooze.js';
 import { listBuildStepRoutes } from './step-route.js';
-import { seedFixedTags } from './tags.js';
 import { startThreadBuild } from './thread-message.js';
 import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
@@ -644,7 +643,6 @@ export async function executeChiefTool(
           githubRepo: null,
         })
         .run();
-      seedFixedTags(db, id);
       return json({
         id,
         name,

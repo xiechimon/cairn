@@ -1,6 +1,5 @@
 import {
   createProjectBodySchema,
-  createTagBodySchema,
   type FsListResult,
   type FsPickResult,
   githubIssuesResponseSchema,
@@ -16,7 +15,7 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { build, project, tag, todo } from './db/schema.js';
+import { build, project, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import {
@@ -28,7 +27,6 @@ import {
   requireProject,
   requireTeam,
   svcOf,
-  toTagRecord,
 } from './routes-helpers.js';
 import { patchAutonomy, readAutonomy } from './services/autonomy-gates.js';
 import { toBuildRecord } from './services/builds.js';
@@ -57,7 +55,6 @@ import {
   updateProjectShipRoute,
 } from './services/projects.js';
 import { latestScheduleReport } from './services/scheduling/store.js';
-import { seedFixedTags } from './services/tags.js';
 import { listTodos } from './services/todos.js';
 
 function parseNamedPromptId(raw: string): NamedPromptId {
@@ -126,32 +123,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     if (todoIds.length === 0) return c.json([]);
     const builds = ctx.db.select().from(build).where(inArray(build.todoId, todoIds)).all();
     return c.json(builds.map(toBuildRecord));
-  });
-
-  app.get('/api/projects/:id/tags', (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    const tags = ctx.db.select().from(tag).where(eq(tag.projectId, row.id)).all();
-    return c.json(tags.map(toTagRecord));
-  });
-
-  app.post('/api/projects/:id/tags', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    const body = parseWith(createTagBodySchema, await jsonBody(c), 'body');
-    const id = newRecordId();
-    ctx.db
-      .insert(tag)
-      .values({
-        id,
-        projectId: row.id,
-        name: body.name,
-        color: body.color,
-        createdAt: nowMs(),
-        v: 1,
-      })
-      .run();
-    const created = ctx.db.select().from(tag).where(eq(tag.id, id)).get();
-    if (!created) throw new Error(`tag ${id} missing after insert`);
-    return c.json(toTagRecord(created), 201);
   });
 
   app.get('/api/projects/:id/github/issues', async (c) => {
@@ -232,7 +203,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
         localPath,
       })
       .run();
-    if (kind !== 'github') seedFixedTags(ctx.db, id);
     const row = requireProject(ctx, id);
     return c.json(toProjectRecord(row, requestOrigin(c)), 201);
   });

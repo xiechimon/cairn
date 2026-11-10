@@ -2424,20 +2424,20 @@
     {
       "id": "thread-tags",
       "name": "Thread tags",
-      "summary": "Legacy category APIs retained during staged retirement; ordinary worker metadata is title-only.",
-      "states": "No category settings tab or ordinary worker category input. Legacy assignment APIs and read-only membership remain until their retirement segments; GitHub labels are separate.",
+      "summary": "Category vocabulary routes and seeding are retired; legacy assignment inputs remain during staged retirement.",
+      "states": "Vocabulary GET/POST return 404; project creation and startup seed no categories. Existing category assignments and read-only membership remain temporarily; ordinary metadata is title-only and GitHub labels are separate.",
       "centrality": 4,
       "status": "shipped",
       "code": {
         "server": [
-          "apps/server/src/services/tags.ts",
           "apps/server/src/routes-projects.ts",
           "apps/server/src/services/todos.ts"
         ]
       },
       "routes": {
         "server": [
-          "/api/projects/:id/tags"
+          "/api/projects/:id/todos",
+          "/api/todos/:id"
         ]
       },
       "reach": [
@@ -2457,6 +2457,7 @@
       ],
       "evidence": [
         "apps/server/test/task-meta.test.ts",
+        "apps/server/test/category-vocabulary-retirement.test.ts",
         "apps/server/test/correction-classification.test.ts",
         "apps/daemon/test/task-meta-prompt.test.ts",
         "apps/daemon/test/worker-meta-sdk.test.ts"

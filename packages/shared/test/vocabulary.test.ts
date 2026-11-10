@@ -233,7 +233,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['GET', '/api/projects'],
       ['GET', '/api/projects/{id}/todos'],
       ['GET', '/api/projects/{id}/branches'],
-      ['GET', '/api/projects/{id}/tags'],
       ['GET', '/api/projects/{id}/builds'],
       ['GET', '/api/projects/{id}/preview-token'],
       ['GET', '/api/todos'],
@@ -259,6 +258,13 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
   ])('does not register retired project browser route %s', (path) => {
     expect(has('GET', path)).toBe(false);
   });
+
+  it.each(['GET', 'POST'])(
+    'does not register the retired category vocabulary %s route',
+    (method) => {
+      expect(has(method, '/api/projects/{id}/tags')).toBe(false);
+    },
+  );
 
   it('covers the observed POST/PATCH list', () => {
     for (const [method, path] of [

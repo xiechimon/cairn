@@ -12,6 +12,7 @@ import {
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
+import { insertLegacyCategory } from './legacy-category-fixtures.js';
 
 registerChiefHarness();
 
@@ -157,11 +158,7 @@ describe('moving an unstarted todo to another project (#2009)', () => {
   test('PATCH projectId moves the todo to the end of the target column and drops the old tags', async () => {
     const site = await postProject(H.s.app, 'cairn-site');
     await postTodo(site, { title: '已有任务' });
-    const tagRes = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/tags`, {
-      name: 'docs',
-      color: '#6366f1',
-    });
-    const tag = (await tagRes.json()) as { id: string };
+    const tag = insertLegacyCategory(H.s.db, H.projectId, 'docs', '#6366f1');
     const created = await postTodo(H.projectId, { tagIds: [tag.id] });
     const res = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, { projectId: site });
     expect(res.status).toBe(200);
@@ -186,15 +183,8 @@ describe('moving an unstarted todo to another project (#2009)', () => {
 
   test('tags sent with a move must belong to the target project', async () => {
     const site = await postProject(H.s.app, 'cairn-site');
-    const oldTag = (await (
-      await req(H.s.app, 'POST', `/api/projects/${H.projectId}/tags`, {
-        name: 'docs',
-        color: '#6366f1',
-      })
-    ).json()) as { id: string };
-    const newTag = (await (
-      await req(H.s.app, 'POST', `/api/projects/${site}/tags`, { name: 'site', color: '#6366f1' })
-    ).json()) as { id: string };
+    const oldTag = insertLegacyCategory(H.s.db, H.projectId, 'docs', '#6366f1');
+    const newTag = insertLegacyCategory(H.s.db, site, 'site', '#6366f1');
     const created = await postTodo(H.projectId);
     const bad = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, {
       projectId: site,
