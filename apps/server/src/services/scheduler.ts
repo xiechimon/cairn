@@ -41,6 +41,10 @@ import { planChiefDigests } from './chief-digest.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import { sweepIdleComposerDrafts } from './composer-drafts.js';
+import {
+  COORDINATOR_SNAPSHOT_CLEANUP_INTERVAL_MS,
+  sweepCoordinatorTurnSnapshots,
+} from './coordinator-turn-snapshot.js';
 import { createDueRunner, type DueClock } from './due-events.js';
 import { projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
@@ -666,6 +670,9 @@ export function createScheduler(
     clock,
     {
       sweep: (_event, now) => runTick(now),
+      'coordinator-snapshot-gc': (_event, now) => {
+        sweepCoordinatorTurnSnapshots(deps.db, now);
+      },
       schedule: async (event, now) => {
         const id = event.id.slice('schedule:'.length);
         const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
@@ -775,6 +782,11 @@ export function createScheduler(
       dueStarted = true;
       setScheduleClockListener(() => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
+      ensureDue(
+        'gc:coordinator-snapshots',
+        'coordinator-snapshot-gc',
+        COORDINATOR_SNAPSHOT_CLEANUP_INTERVAL_MS,
+      );
       if (ciPoller !== null) ensureDue('poll:ci', 'ci', CI_POLL_INTERVAL_MS);
       if (prWatch !== null) ensureDue('poll:pr-watch', 'pr-watch', PR_WATCH_INTERVAL_MS);
       if (issueIntake !== null) ensureDue('poll:intake', 'intake', ISSUE_INTAKE_INTERVAL_MS);
