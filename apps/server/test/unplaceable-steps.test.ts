@@ -9,7 +9,6 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
-import { OVERFLOW_AFTER_MS } from '../src/services/machine-routing.js';
 import { NO_MACHINE_ALERT_MS, sweepUnplaceableSteps } from '../src/services/unplaceable-steps.js';
 import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
 
@@ -183,14 +182,15 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     expect(alerts(w)).toHaveLength(0);
   });
 
-  test('no alert while some online machine could take the step', async () => {
+  test('an offline named machine alerts even when another machine is online', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     await machineOf(w, 'mac');
     routeOf(w, omarchy);
-    pendingStep(w, { ageMs: OVERFLOW_AFTER_MS * 3 });
+    pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
     sweepUnplaceableSteps(w.s.svc, Date.now());
-    expect(alerts(w)).toHaveLength(0);
+    expect(alerts(w)[0]?.snippet).toContain('omarchy');
+    expect(alerts(w)[0]?.snippet).toContain('不会改派');
   });
 
   test('a missing capability on the online machines is named', async () => {

@@ -233,9 +233,14 @@ function waitingOnOf(
     const agentRow = profileForStep(deps.db, row, s.kind, s.id);
     if (agentRow === null) continue;
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
-    const runnable = online.some(
-      (m) => runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
-    );
+    const runnable =
+      agentRow.machineId !== null &&
+      online.some(
+        (m) =>
+          m.id === agentRow.machineId &&
+          runtimeGatePasses(m, provider) &&
+          capabilityGatePasses(m, agentRow),
+      );
     if (!runnable) return { on: 'machine', retryAt: null };
   }
   if (online.length === 0) {

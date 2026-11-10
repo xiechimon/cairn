@@ -13,7 +13,7 @@ import {
   team as teamTable,
 } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
-import { routeVerdict, targetUnavailable } from '../src/services/machine-routing.js';
+import { routeVerdict } from '../src/services/machine-routing.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { seedLocalMachine } from '../src/services/machines.js';
 import * as shipGate from '../src/services/ship-gate.js';
@@ -141,29 +141,10 @@ function tapPresence(s: TestServer): PresenceEvent[] {
   return events;
 }
 
-function pinnedHold(s: TestServer, machineId: string) {
-  const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get();
-  const now = Date.now();
+function pinnedHold(_s: TestServer, machineId: string) {
   return routeVerdict({
     machineId: 'other-machine',
-    targets: [{ machineId, session: false }],
-    unavailable: (id) =>
-      id !== machineId ||
-      targetUnavailable(
-        s.db,
-        row,
-        s.team.id,
-        {
-          agentRow: { machineId, requiredCapabilities: null },
-          model: { provider: 'stub-gw', modelId: 'stub-model' },
-          localProject: false,
-          localMerge: true,
-        },
-        [],
-        now,
-      ),
-    waitingSince: now,
-    now,
+    targets: [{ machineId }],
   });
 }
 
@@ -598,7 +579,6 @@ describe('machine token revocation (#2494)', () => {
       expect(pinnedHold(w.s, w.a.machineId)).toEqual({
         claim: false,
         waitingFor: w.a.machineId,
-        fallbackAt: expect.any(Number),
       });
       const events = tapPresence(w.s);
       const stream = await openMachineStream(w.s.app, w.a.token);
@@ -626,7 +606,7 @@ describe('machine token revocation (#2494)', () => {
         online: false,
         events: [{ type: 'machine_presence', machineId: w.a.machineId, online: false }],
         order: ['offline-before-revoke'],
-        hold: { claim: true },
+        hold: { claim: false, waitingFor: w.a.machineId },
         oldToken: 401,
         newToken: 200,
         streamEnded: true,
@@ -663,7 +643,6 @@ describe('machine token revocation (#2494)', () => {
       expect(pinnedHold(w.s, first.machineId)).toEqual({
         claim: false,
         waitingFor: first.machineId,
-        fallbackAt: expect.any(Number),
       });
       const events = tapPresence(w.s);
       const stream = await openMachineStream(w.s.app, first.token);
@@ -691,7 +670,7 @@ describe('machine token revocation (#2494)', () => {
         online: false,
         events: [{ type: 'machine_presence', machineId: first.machineId, online: false }],
         order: ['offline-before-revoke'],
-        hold: { claim: true },
+        hold: { claim: false, waitingFor: first.machineId },
         oldToken: 401,
         newToken: 200,
         streamEnded: true,

@@ -14,11 +14,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../../../scripts/test
 import { openDbWithHandle } from '../../../src/db/client.js';
 import * as schema from '../../../src/db/schema.js';
 import { capabilityGatePasses } from '../../../src/services/dispatch-eligibility.js';
-import {
-  OVERFLOW_AFTER_MS,
-  routeTargets,
-  routeVerdict,
-} from '../../../src/services/machine-routing.js';
+import { routeTargets, routeVerdict } from '../../../src/services/machine-routing.js';
 import { listMemoryEntries } from '../../../src/services/memory.js';
 import { modelsAreIndependent } from '../../../src/services/merge-gate/model-identity.js';
 import { seedDefaultRouting } from '../../../src/services/routing-migration.js';
@@ -356,13 +352,10 @@ function placement(caps: unknown, machineId: string | null) {
     capabilities: { mcpServers: ['codegraph'], skills: [], executor: 'host' as const },
     claudeCodeReport: null,
   };
-  return (['online', 'offline', 'busy'] as const).map((state) => {
+  return (['online', 'offline', 'busy'] as const).map((_state) => {
     const verdict = routeVerdict({
       machineId: 'm-other',
       targets: routeTargets(null, machineId),
-      unavailable: () => state === 'offline',
-      waitingSince: 0,
-      now: state === 'busy' ? OVERFLOW_AFTER_MS + 1 : 1,
     });
     return (
       verdict.claim &&

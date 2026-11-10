@@ -261,10 +261,11 @@ describe.each(['subscription-only', 'allow-paid'] as const)('%s machine auth', (
                 return insertBuildStep(s, projectId);
               })();
         const claimed = await claimAs(s, claimantId);
-        const modelUnverifiable = kind === 'build' && role === 'spare' && noReport;
-        if (modelUnverifiable && claudeUsage === 'allow-paid') {
+        if (role === 'spare') {
           expect(claimed).toBeNull();
-          expect(stepStatus(s, stepId)).toBe('pending');
+          expect(
+            s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()?.machineId,
+          ).toBe(null);
         } else if (claudeUsage === 'allow-paid' || subscription) {
           expect(claimed?.step).toMatchObject({ id: stepId, machineId: claimantId });
         } else {
@@ -273,13 +274,7 @@ describe.each(['subscription-only', 'allow-paid'] as const)('%s machine auth', (
             {
               status: 'waiting_quota',
               machineId: null,
-              quotaBlock:
-                role === 'spare'
-                  ? {
-                      source: 'claude_rate_limit',
-                      reason: 'Claude subscription five_hour rejected',
-                    }
-                  : { source: 'subscription_policy', reason: 'subscription-only' },
+              quotaBlock: { source: 'subscription_policy', reason: 'subscription-only' },
             },
           );
         }

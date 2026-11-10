@@ -73,9 +73,7 @@ import {
   priorSessionOf,
   routeTargets,
   routeVerdict,
-  targetUnavailable,
   type WorkerStepFacts,
-  waitingSince,
   workerIneligibility,
 } from './machine-routing.js';
 import { injectMemories } from './memory.js';
@@ -337,9 +335,7 @@ function claimChiefTurn(
     }
     const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
-    if (cand.agentRow.machineId !== null && cand.agentRow.machineId !== machineId) {
-      if (chiefRuntime !== 'claude-code' || !claudeBlocked(cand.agentRow.machineId)) continue;
-    }
+    if (cand.agentRow.machineId !== machineId) continue;
     const claimed = buildChiefClaim(
       deps,
       machineId,
@@ -371,13 +367,6 @@ async function tryClaim(
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
   const catalog = mergedCatalogModels();
-  const machineCache = new Map<string, typeof machine.$inferSelect | undefined>();
-  const machineById = (id: string) => {
-    if (!machineCache.has(id)) {
-      machineCache.set(id, db.select().from(machine).where(eq(machine.id, id)).get());
-    }
-    return machineCache.get(id);
-  };
   const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
   const queued = full ? [] : claimCandidates(deps, machineId, teamId);
   const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
@@ -459,10 +448,6 @@ async function tryClaim(
         !freshSession && priorSessionId !== null ? priorMachineId : null,
         agentRow.machineId,
       ),
-      unavailable: (targetId) =>
-        targetUnavailable(db, machineById(targetId), teamId, facts, catalog, now),
-      waitingSince: waitingSince(cand.stepRow),
-      now,
     }).claim;
     if (!allowed) continue;
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);

@@ -133,13 +133,11 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const model = effectiveModel(agentRow, stepRow);
     const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
-    const pinned = stepRow.kind === 'chief' && agentRow.machineId !== null;
     const claimants = machines.filter(
       (row) =>
         row.online &&
-        (!pinned ||
-          row.id === agentRow.machineId ||
-          (stepRuntimeFor(model.provider) === 'claude-code' && ownerBlock !== null)) &&
+        agentRow.machineId !== null &&
+        row.id === agentRow.machineId &&
         runtimeGatePasses(row, model.provider) &&
         capabilityGatePasses(row, agentRow) &&
         claudeRateBlock(row.claudeRateLimits ?? [], now) === null,
@@ -205,13 +203,12 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       return;
     }
     if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
-    const runnable = machines.some((row) => {
-      if (!row.online) return false;
-      if (!runtimeGatePasses(row, 'claude-code')) return false;
-      if (!capabilityGatePasses(row, agentRow)) return false;
-      if (!localMerge && !claudeUsageGatePasses(deps, row, model)) return false;
-      return claudeRateBlock(row.claudeRateLimits ?? [], now) === null;
-    });
+    const runnable =
+      owner?.online === true &&
+      runtimeGatePasses(owner, 'claude-code') &&
+      capabilityGatePasses(owner, agentRow) &&
+      (localMerge || claudeUsageGatePasses(deps, owner, model)) &&
+      claudeRateBlock(owner.claudeRateLimits ?? [], now) === null;
     const todoId = todoRow?.id ?? null;
     if (ownerBlock && !runnable) {
       const first = stepRow.quotaBlock?.source !== 'claude_rate_limit';

@@ -80,7 +80,6 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
           name: z.string(),
           running: z.number().int(),
           capacity: z.number().int(),
-          fallbackAt: epochMs.optional(),
         })
         .nullable(),
       hold: z

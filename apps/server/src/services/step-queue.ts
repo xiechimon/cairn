@@ -17,7 +17,6 @@ import {
   routeVerdict,
   targetUnavailable,
   type WorkerStepFacts,
-  waitingSince,
   workerIneligibility,
 } from './machine-routing.js';
 import { effectiveModel } from './model-fallback.js';
@@ -141,12 +140,14 @@ export function stepQueueProjector(db: Db, teamId: string) {
         !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null,
         target.homeMachineId,
       ),
-      unavailable,
-      waitingSince: waitingSince({ createdAt: row.createdAt, holdUntil: row.holdUntil }),
-      now,
     });
-    if (teamMachines.some((m) => !unavailable(m.id))) return { verdict, blocked: undefined };
-    const home = target.homeMachineId === null ? undefined : machineRowOf(target.homeMachineId);
+    if (verdict.claim) return { verdict, blocked: undefined };
+    const named = verdict.waitingFor;
+    if (named === null) {
+      return { verdict, blocked: { kind: 'machine-offline', missing: [] } };
+    }
+    if (!unavailable(named)) return { verdict, blocked: undefined };
+    const home = machineRowOf(named);
     if (home === undefined || !home.online) {
       return { verdict, blocked: { kind: 'machine-offline', missing: [] } };
     }
@@ -156,7 +157,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       blocked:
         gap?.kind === 'capability'
           ? { kind: 'capability-missing', missing: gap.missing }
-          : undefined,
+          : { kind: 'machine-offline', missing: [] },
     };
   }
 
@@ -206,9 +207,6 @@ export function stepQueueProjector(db: Db, teamId: string) {
           name: row.name,
           running: claimedCount(row.id),
           capacity: row.maxConcurrent,
-          ...(routing !== null && !routing.verdict.claim
-            ? { fallbackAt: routing.verdict.fallbackAt }
-            : {}),
         };
       }
     }
