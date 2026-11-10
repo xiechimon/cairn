@@ -1,0 +1,142 @@
+[
+  {
+    "method": "POST",
+    "path": "/api/projects",
+    "status": 201,
+    "result": {
+      "id": "example-record-1",
+      "name": "Schedule history verification",
+      "group": null,
+      "teamId": "synthetic-team",
+      "splitPolicy": "human",
+      "evidenceStore": "attachments",
+      "baseBranch": null,
+      "archivedAt": null,
+      "planAutoApproveEnabled": true,
+      "mergePolicy": "autonomous",
+      "localChecks": [],
+      "requireUpToDate": false
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/projects/example-record-1/todos",
+    "status": 201,
+    "result": {
+      "id": "example-record-2",
+      "teamId": "synthetic-team",
+      "projectId": "example-record-1",
+      "title": "One-time follow-up",
+      "spec": "Inspect the completed run",
+      "phase": "todo",
+      "phaseAt": 1794277173991,
+      "archivedAt": null,
+      "snoozedUntil": null,
+      "snoozeMode": null,
+      "seqNum": 1,
+      "orderIndex": 0,
+      "tagIds": [],
+      "githubLabelIds": [],
+      "latestBuildId": null,
+      "lastRunAt": null,
+      "hasChanges": false,
+      "hasPlan": false,
+      "buildHistory": [],
+      "sourceTodo": null,
+      "blockedBy": null,
+      "v": 1,
+      "createdBy": "synthetic-owner",
+      "ownerId": "synthetic-owner",
+      "sourceBuildId": null,
+      "sourceKind": null,
+      "sourceRef": null,
+      "output": "code",
+      "owner": null,
+      "section": "up_next",
+      "quotaWait": null
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/schedules",
+    "status": 201,
+    "result": {
+      "id": "example-record-3",
+      "teamId": "synthetic-team",
+      "projectId": "example-record-1",
+      "todoId": "example-record-2",
+      "kind": "once",
+      "cron": null,
+      "prompt": "",
+      "enabled": true,
+      "at": 1794276900000,
+      "tz": "UTC",
+      "nextRunAt": 1794276900000,
+      "lastRunAt": null,
+      "lastRunStatus": null,
+      "lastRunError": null,
+      "pausedReason": null,
+      "createdBy": "synthetic-owner",
+      "todo": {
+        "seqNum": 1,
+        "title": "One-time follow-up",
+        "phase": "todo",
+        "projectName": "Schedule history verification",
+        "ownerId": "synthetic-owner"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/todos/example-record-2",
+    "status": 200,
+    "result": {
+      "id": "example-record-2",
+      "teamId": "synthetic-team",
+      "projectId": "example-record-1",
+      "title": "One-time follow-up",
+      "spec": "Inspect the completed run",
+      "phase": "queued",
+      "phaseAt": 1794277174020,
+      "archivedAt": null,
+      "snoozedUntil": null,
+      "snoozeMode": null,
+      "seqNum": 1,
+      "orderIndex": 0,
+      "tagIds": [],
+      "githubLabelIds": [],
+      "latestBuildId": "example-record-4",
+      "lastRunAt": 1794277174018,
+      "hasChanges": false,
+      "hasPlan": false,
+      "buildHistory": [
+        {
+          "buildId": "example-record-4",
+          "createdAt": 1794277174018
+        }
+      ],
+      "sourceTodo": null,
+      "blockedBy": null,
+      "v": 2,
+      "createdBy": "synthetic-owner",
+      "ownerId": "synthetic-owner",
+      "sourceBuildId": null,
+      "sourceKind": null,
+      "sourceRef": null,
+      "output": "code",
+      "owner": null,
+      "section": "working",
+      "waitingOn": {
+        "on": "machine",
+        "retryAt": null
+      },
+      "quotaWait": null
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/schedules",
+    "status": 200,
+    "result": []
+  }
+]

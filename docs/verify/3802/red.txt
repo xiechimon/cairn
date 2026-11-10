@@ -1,0 +1,180 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 <worktree>
+
+Schedule VF1f6M1K3ZKC881g4U_XN failed: connection reset
+Schedule KXEu5vpPqbC3x8YkLPxhO failed: Invalid API key
+Schedule YC0M5c7gFnS0IXo0h8T6v failed: Scheduled continuation would require a new build after the previous delivery. Create a new task.
+Schedule R9mfHtrkwbxCRnrCSPpIl failed: PR #43 is already merged. Create a new task for further changes; this task cannot merge a second delivery.
+Schedule VupINksB3NhiGM44HoEmt failed: Scheduled continuation would require a new build after the previous delivery. Create a new task.
+Schedule Hmzg0JpX6TCjNKeDXizYx failed: Could not read PR #43. Please retry before continuing this task.
+Schedule q1tWO-mLPyCxpNzvdw5uE failed: connection reset
+ ❯ |@xiechimon/cairn| test/schedules.test.ts (21 tests | 1 failed) 2629ms
+   ❯ scheduled thread continuation (6)
+     × a once schedule retains its completed run without scheduling another wake 182ms
+Schedule kPP62gkOzYQcBlhyLvFSR failed: connection reset
+ ❯ |@xiechimon/cairn| test/schedule-continue.test.ts (39 tests | 6 failed) 5705ms
+   × a scheduled once push-hook completion settles its schedule before queuing a CI fix 196ms
+   × completed once metadata stays visible and is excluded from later due selections 140ms
+   × replayed once completion does not renotify or end a newer snooze 111ms
+   × once completion preserves a future cadence set on the same row during the run 116ms
+   × recreating a completed once schedule replaces its unique row and clears previous metadata 110ms
+   × explicitly deleting a retained once row still ends snooze and removes it 105ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/schedule-continue.test.ts > a scheduled once push-hook completion settles its schedule before queuing a CI fix
+AssertionError: expected undefined to match object { lastRunStatus: 'completed', …(3) }
+
+- Expected:
+{
+  "lastRunError": null,
+  "lastRunStatus": "completed",
+  "lastRunStepId": "xOKSjqhZe1XpA2A2bOR3d",
+  "nextRunAt": null,
+}
+
++ Received:
+undefined
+
+ ❯ test/schedule-continue.test.ts:516:24
+    514|       prompt: expect.stringContaining('pre-push: lint failed'),
+    515|     });
+    516|     expect(s.stored()).toMatchObject({
+       |                        ^
+    517|       lastRunStatus: 'completed',
+    518|       lastRunError: null,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/schedule-continue.test.ts > completed once metadata stays visible and is excluded from later due selections
+AssertionError: expected undefined to match object { id: 'Qm0cmBamJ4rzc1_Q03yPC', …(7) }
+
+- Expected:
+{
+  "enabled": true,
+  "id": "Qm0cmBamJ4rzc1_Q03yPC",
+  "lastRunAt": 1794278700000,
+  "lastRunError": null,
+  "lastRunStatus": "completed",
+  "lastRunStepId": "qFSieTu5XiCub0Rqeeivp",
+  "nextRunAt": null,
+  "retryNotBefore": null,
+}
+
++ Received:
+undefined
+
+ ❯ test/schedule-continue.test.ts:531:22
+    529|   setTodoPhase(s.svc, s.todoId, 'building');
+    530|   builds.completeStep(s.svc, fired.id);
+    531|   expect(s.stored()).toMatchObject({
+       |                      ^
+    532|     id: s.saved.id,
+    533|     enabled: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/schedule-continue.test.ts > replayed once completion does not renotify or end a newer snooze
+AssertionError: expected "notifyScheduleRun" to be called once, but got 2 times
+ ❯ test/schedule-continue.test.ts:561:18
+    559|   snoozeTodo(s.svc, s.todoId, { until: 'needed' });
+    560|   finishScheduledStep(s.svc, fired);
+    561|   expect(notice).toHaveBeenCalledOnce();
+       |                  ^
+    562|   expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.…
+    563|   expect(notifications.markNotificationRead(s.svc, s.team.id, s.todoId…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/schedule-continue.test.ts > once completion preserves a future cadence set on the same row during the run
+AssertionError: expected undefined to match object { id: 'TqkPqdyWsq3TDosqbkq-L', …(3) }
+
+- Expected:
+{
+  "enabled": true,
+  "id": "TqkPqdyWsq3TDosqbkq-L",
+  "lastRunStatus": "completed",
+  "nextRunAt": 1794280500000,
+}
+
++ Received:
+undefined
+
+ ❯ test/schedule-continue.test.ts:596:22
+    594|   setTodoPhase(s.svc, s.todoId, 'building');
+    595|   builds.completeStep(s.svc, fired.id);
+    596|   expect(s.stored()).toMatchObject({
+       |                      ^
+    597|     id: s.saved.id,
+    598|     enabled: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/schedule-continue.test.ts > recreating a completed once schedule replaces its unique row and clears previous metadata
+AssertionError: expected undefined to be 'completed' // Object.is equality
+
+- Expected:
+"completed"
+
++ Received:
+undefined
+
+ ❯ test/schedule-continue.test.ts:610:37
+    608|   setTodoPhase(s.svc, s.todoId, 'building');
+    609|   builds.completeStep(s.svc, fired.id);
+    610|   expect(s.stored()?.lastRunStatus).toBe('completed');
+       |                                     ^
+    611|   const replacement = createSchedule(s.svc, {
+    612|     teamId: s.team.id,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/schedule-continue.test.ts > explicitly deleting a retained once row still ends snooze and removes it
+AssertionError: expected 404 to be 204 // Object.is equality
+
+- Expected
++ Received
+
+- 204
++ 404
+
+ ❯ test/schedule-continue.test.ts:632:79
+    630|   builds.completeStep(s.svc, fired.id);
+    631|   snoozeTodo(s.svc, s.todoId, { until: 'needed' });
+    632|   expect((await req(s.app, 'DELETE', `/api/schedules/${s.saved.id}`)).…
+       |                                                                               ^
+    633|   expect(s.stored()).toBeUndefined();
+    634|   expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/schedules.test.ts > scheduled thread continuation > a once schedule retains its completed run without scheduling another wake
+ZodError: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ ❯ test/schedules.test.ts:301:44
+    299|     setTodoPhase(s.svc, s.todoDoc.id, 'building');
+    300|     completeStep(s.svc, steps[0]!.id);
+    301|     const completed = scheduleRecordSchema.parse(
+       |                                            ^
+    302|       ((await (await req(s.app, 'GET', '/api/schedules')).json()) as S…
+    303|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  7 failed | 53 passed (60)
+   Start at  18:16:27
+   Duration  9.34s (tests 54%, transform 32%, import 14%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 4.84s · 32% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

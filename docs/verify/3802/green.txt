@@ -1,0 +1,18 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 <worktree>
+
+Schedule p8I49OrhkbVdNc9oW1eiF failed: connection reset
+Schedule WWlg6KA8VhGnWQBjX_kSd failed: Invalid API key
+Schedule tkxbI7i9tW_qaCHouI-sC failed: Scheduled continuation would require a new build after the previous delivery. Create a new task.
+Schedule 3pL0OHSUDFgaAZPGbxGmH failed: PR #43 is already merged. Create a new task for further changes; this task cannot merge a second delivery.
+Schedule 6SwsHdf7Vfb_xijuHpsBq failed: Scheduled continuation would require a new build after the previous delivery. Create a new task.
+Schedule P0LFrzgkJ2iX9dZhpKb1k failed: Could not read PR #43. Please retry before continuing this task.
+Schedule X1Xvopq39l2aZIyJ3xMOs failed: connection reset
+Schedule MAYxYiglTdDDQNARe8X18 failed: connection reset
+
+ Test Files  4 passed (4)
+      Tests  125 passed (125)
+   Start at  18:19:39
+   Duration  11.77s (tests 73%, transform 16%, import 10%)
+

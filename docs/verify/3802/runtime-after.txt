@@ -1,0 +1,15 @@
+[heavy-slots] queued, position 1 (all 2 slots are busy); slot 1: pid 26, cwd /home/ian/Code/AgentProjects/cairn/.claude/worktrees/evidence-rest; slot 2: pid 28, cwd <worktree>
+[heavy-slots] acquired slot 2/2
+
+ RUN  v5.0.1 <worktree>
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  18:19:18
+   Duration  5.40s (transform 63%, import 27%, tests 9%, setup 1%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 3.36s · 63% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
