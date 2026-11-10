@@ -180,7 +180,7 @@ describe('#1312 other-machine mark on a resumed session', () => {
     expect(doneRes.status).toBe(200);
   }
 
-  test('same-machine resume carries no priorMachineId; claim after rebind carries the previous-round machine', async () => {
+  test('same-machine resume carries no priorMachineId; rebinding the rule does not move the session', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId);
     startLegacyBuild(w.s, todoId, { withPlan: true });
@@ -218,13 +218,7 @@ describe('#1312 other-machine mark on a resumed session', () => {
       .where(eq(stepTable.status, 'pending'))
       .run();
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    const moved = await claim(w.s.app, w.tokenB);
-    expect(moved).not.toBeNull();
-    expect(moved!.step.kind).toBe('build');
-    expect(moved!.session.action).toBe('continue');
-    expect(moved!.session.sessionId).toBe('sess-moved');
-    const priorMachineId = (moved!.session as { priorMachineId?: string }).priorMachineId;
-    expect(priorMachineId).toBe(w.machineAId);
+    expect(await claim(w.s.app, w.tokenB)).toBeNull();
   });
 });
 

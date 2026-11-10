@@ -243,7 +243,7 @@ describe('#1251 capability report persistence + heartbeat red line', () => {
 });
 
 describe('#1251 claim capability gate', () => {
-  test('failure mode 3: MCP dimension -- the home machine missing a slug claims empty and the step stays pending until a complete machine takes it', async () => {
+  test('failure mode 3: MCP dimension -- a step named to the lacking machine stays pending; a complete machine does not take it', async () => {
     const w = await setupWorld();
     const lacking = await enrollMachineRest(w, {
       name: 'cap-lacking',
@@ -259,11 +259,8 @@ describe('#1251 claim capability gate', () => {
     });
 
     expect(await claimAs(w, lacking.machineId)).toBeNull();
+    expect(await claimAs(w, capable.machineId)).toBeNull();
     expect(stepRow(w, blocked.stepId).status).toBe('pending');
-
-    const claimed = await claimAs(w, capable.machineId);
-    expect(claimed?.step.id).toBe(blocked.stepId);
-    expect(stepRow(w, blocked.stepId).status).toBe('claimed');
   });
 
   test('failure mode 3: the capability on the session rule gates every step of the team', async () => {
@@ -281,7 +278,7 @@ describe('#1251 claim capability gate', () => {
       name: 'cap-rule-capable',
       capabilities: { mcpServers: ['figma'], skills: [] },
     });
-    const { stepId } = insertPendingStep(w);
+    const { stepId } = insertPendingStep(w, { homeMachineId: capable.machineId });
     expect(await claimAs(w, lacking.machineId)).toBeNull();
     expect(stepRow(w, stepId).status).toBe('pending');
     expect((await claimAs(w, capable.machineId))?.step.id).toBe(stepId);
@@ -304,8 +301,8 @@ describe('#1251 claim capability gate', () => {
       homeMachineId: noModel.machineId,
     });
     expect(await claimAs(w, noModel.machineId)).toBeNull();
+    expect(await claimAs(w, hasModel.machineId)).toBeNull();
     expect(stepRow(w, blocked.stepId).status).toBe('pending');
-    expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(blocked.stepId);
   });
 
   test('D71 failure mode 5: no snapshot reported fails closed -- a legacy daemon does not claim a step that requires a capability', async () => {

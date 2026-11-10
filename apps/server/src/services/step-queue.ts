@@ -157,7 +157,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       blocked:
         gap?.kind === 'capability'
           ? { kind: 'capability-missing', missing: gap.missing }
-          : { kind: 'machine-offline', missing: [] },
+          : undefined,
     };
   }
 
