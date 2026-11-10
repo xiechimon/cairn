@@ -74,7 +74,8 @@ export async function publishVerifyPrComment(
     const verifyStep = deps.db.select().from(step).where(eq(step.id, bound.stepId)).get();
     if (verifyStep?.status !== 'done' || verifyStep.buildId !== buildId) continue;
     if (answer.verdict.passed) {
-      conclusion = renderAttachmentTokensToLabels(answer.verdict.conclusion)
+      conclusion = renderAttachmentTokensToLabels(answer.verdict.conclusion.replace(/\p{Cf}/gu, ''))
+        .replace(/attachment:[^\s)]+/gi, '[attachment]')
         .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
         .replace(/[&<>\\`*_{}[\]#!|@]/g, (char) => `&#${char.charCodeAt(0)};`);
       break;

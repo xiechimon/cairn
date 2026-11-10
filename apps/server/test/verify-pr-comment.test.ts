@@ -358,3 +358,19 @@ test('an unreadable comment list defers writing until a later poll', async () =>
   await w.poll();
   expect(w.comments).toHaveLength(1);
 });
+
+test.each([
+  'attachment:private-token',
+  '[proof](attachment:private-token)',
+  '![proof](attachment:private-token)',
+  '[proof](ATTACHMENT:private-token)',
+  'attach\u200bment:private-token',
+])('the public conclusion strips every attachment URI form: %s', async (reference) => {
+  const w = await world();
+  w.setConclusion(`Checked API: ${reference}`);
+  await w.verify();
+  await w.poll();
+  expect(w.comments).toHaveLength(1);
+  expect(w.comments[0]?.body).toContain('Checked API');
+  expect(w.comments[0]?.body).not.toMatch(/attachment:|private-token/i);
+});
