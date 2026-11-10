@@ -5,6 +5,7 @@ import type {
   MachineAttachmentResponse,
   MachineCapabilities,
   MachineDoneBody,
+  MachinePresenceBody,
   MachineSteerAckBody,
   MachineStreamEvent,
   SteerAnswer,
@@ -110,6 +111,9 @@ export class FakeMachineApi implements MachineApi {
       latestCliVersion: null,
       kind: 'remote' as const,
       enabledRuntimes: [],
+      capabilities: (this.presenceBodies.at(-1) as MachinePresenceBody | undefined)?.capabilities as
+        | MachineCapabilities
+        | undefined,
       ...this.mePatch,
     });
   }
@@ -273,6 +277,8 @@ export async function boot(opts: {
   capEnv?: NodeJS.ProcessEnv;
   orbProvider?: OrbProvider;
   orbComputer?: ScopedComputerProviders;
+  confinementPlatform?: string;
+  confinementPreflight?: import('../src/machine-loop.js').MachineLoopOpts['confinementPreflight'];
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
 }) {
   const home = makeTestTempDir('loop-');
@@ -305,6 +311,8 @@ export async function boot(opts: {
       paths,
       logger,
       client: api,
+      confinementPlatform: opts.confinementPlatform ?? 'darwin',
+      confinementPreflight: opts.confinementPreflight,
       ...(opts.useDefaultBackend ? {} : { backend: opts.backend ?? fakeBackend([]).backend }),
       claudeCodeBackend: opts.claudeCodeBackend,
       claudeCodeAuthProbe:

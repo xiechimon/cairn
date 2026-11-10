@@ -64,6 +64,7 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
       skills: ['verify-cairn'],
       executor: 'host',
       codexLogin: { state: 'absent' },
+      confinement: expect.objectContaining({ state: 'checking', generation: 1 }),
     });
     await handle.stop();
     await handle.done;

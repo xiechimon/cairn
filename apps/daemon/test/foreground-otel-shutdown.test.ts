@@ -57,7 +57,12 @@ test.each(['normal', 'control-stream', 'SIGTERM', 'SIGINT', 'failure'] as const)
     const stop = vi.fn(async () => {
       finishMachine();
     });
-    vi.mocked(runMachine).mockResolvedValueOnce({ machineId: 'synthetic', done, stop });
+    vi.mocked(runMachine).mockResolvedValueOnce({
+      machineId: 'synthetic',
+      done,
+      stop,
+      recheckConfinement: vi.fn(),
+    });
     let completed = false;
     const termListeners = process.listeners('SIGTERM');
     const intListeners = process.listeners('SIGINT');

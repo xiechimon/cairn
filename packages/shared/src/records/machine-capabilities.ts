@@ -17,6 +17,34 @@ const codexLoginSchema = z.object({
   expiresAt: z.number().int().nonnegative().optional(),
 });
 
+export const confinementIdentitySchema = z.object({
+  invocation: z.uuid(),
+  generation: z.number().int().positive(),
+});
+export const confinementReportSchema = z.discriminatedUnion('state', [
+  confinementIdentitySchema
+    .extend({
+      state: z.enum(['checking', 'ready', 'not-applicable']),
+      revision: z.number().int().positive(),
+    })
+    .strict(),
+  confinementIdentitySchema
+    .extend({
+      state: z.literal('unavailable'),
+      revision: z.number().int().positive(),
+      reason: z.enum(['startup-failed', 'cleanup-failed', 'unsupported-platform']),
+    })
+    .strict(),
+]);
+export type ConfinementReport = z.infer<typeof confinementReportSchema>;
+
+export function confinementDispatchReady(
+  capabilities: MachineCapabilities | null | undefined,
+): boolean {
+  const state = capabilities?.confinement?.state;
+  return state === 'ready' || state === 'not-applicable';
+}
+
 export const machineCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()),
   skills: z.array(z.string()),
@@ -26,6 +54,7 @@ export const machineCapabilitiesSchema = z.object({
   ownComputer: z.literal(true).optional(),
   browser: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
+  confinement: confinementReportSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -39,11 +68,13 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     })
     .safeParse({ mcpServers: rec.mcpServers, skills: rec.skills });
   if (!base.success) return undefined;
+  const confinement = confinementReportSchema.safeParse(rec.confinement);
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
   return {
     ...base.data,
+    ...(confinement.success ? { confinement: confinement.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),

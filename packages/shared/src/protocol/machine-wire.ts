@@ -5,6 +5,7 @@ import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
+import { confinementIdentitySchema } from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
   messageRoleSchema,
@@ -101,6 +102,7 @@ export const machineRecoverResponseSchema = z.object({
 export type MachineRecoverResponse = z.infer<typeof machineRecoverResponseSchema>;
 
 export const machineClaimBodySchema = z.object({
+  confinement: confinementIdentitySchema.optional(),
   verifyAttachments: z.literal(true).optional(),
   maxWorkers: z.number().int().min(1).optional(),
   role: z.literal('coordinator').optional(),
