@@ -35,6 +35,9 @@ const NO_OWNER_WORDS =
   "create_todo needs the owner's words: cite owner messages of this thread with messageIds, or a todo with sourceTodoId. Ask the owner with ask_user when there is nothing to cite.";
 
 function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): CitedSegment[] {
+  if (new Set(messageIds).size !== messageIds.length) {
+    throw new HttpError(400, 'message IDs must be unique');
+  }
   const rows = db
     .select()
     .from(chiefMessage)

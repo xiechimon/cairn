@@ -71,7 +71,7 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
 5. Every Coordinator step records `step.ownerMessageIds` (JSON, nullable, `[]` when absent), written explicitly by the code path that enqueues or extends the turn. `create_todo` requires explicit `messageIds` or `sourceTodoId`; the turn list records attribution, never an implicit task source (#3842). The id-prefix, rewind-text and answer-timestamp inference is deleted.
 6. `create_todo` (Coordinator surface) has a strict schema. Unknown keys return 400. Its fields:
    - `projectId`;
-   - `messageIds?`: ids of `chief_message` rows in this thread that are owner messages or owner-answered questions. Required unless `sourceTodoId` is supplied; no default.
+   - `messageIds?`: ids of `chief_message` rows in this thread that are owner messages or owner-answered questions. Required unless `sourceTodoId` is supplied; no default. IDs must be unique, as must `update_todo.addMessageIds`; duplicate input returns 400 before writes.
    - `sourceTodoId?`: replaces `messageIds`;
    - `quotes?`;
    - `dependsOn?`: writes `blockedBy`;

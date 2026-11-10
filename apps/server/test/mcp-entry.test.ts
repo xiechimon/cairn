@@ -212,7 +212,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
   });
 
   test.each([false, true])(
-    'an MCP answer is included in default task creation (parked=%s)',
+    'an MCP answer is explicitly cited once in task creation (parked=%s)',
     async (parked) => {
       const { s, client, projectId, threadId } = await world();
       const turn = s.db.select().from(step).where(eq(step.buildId, threadId)).get()!;
@@ -275,10 +275,25 @@ describe('Coordinator terminal entry through an MCP client', () => {
             turnMessageIds: current.ownerMessageIds ?? [],
           },
           'create_todo',
-          { projectId },
+          { projectId, messageIds: current.ownerMessageIds ?? [] },
         ),
-      ) as { spec: string };
+      ) as { id: string; spec: string };
       expect(created.spec).toBe('Improve the Project\n\nThe public API only');
+      await expect(
+        executeChiefTool(
+          { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
+          {
+            teamId: s.team.id,
+            userId: s.user.id,
+            chiefId: thread.chiefId,
+            chiefAgentId: null,
+            threadId,
+            conversationId: threadId,
+          },
+          'create_todo',
+          { projectId, messageIds: ['mcp-owner-answer'] },
+        ),
+      ).rejects.toMatchObject({ status: 409, message: expect.stringContaining(created.id) });
       expect(current.ownerMessageIds).toEqual([
         ...(turn.ownerMessageIds ?? []),
         'mcp-owner-answer',

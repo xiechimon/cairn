@@ -2,7 +2,7 @@ import { coordinatorCreateTodoParamsSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { todo } from '../src/db/schema.js';
-import { createRequestTodo } from '../src/services/coordinator-request.js';
+import { createRequestTodo, updateRequestTodo } from '../src/services/coordinator-request.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { seedOwnerMessage } from './owner-message.js';
 
@@ -124,6 +124,37 @@ describe('Coordinator source bindings', () => {
       'Add preview.',
     );
   });
+
+  test.each(['tool', 'request-service'] as const)(
+    '%s rejects duplicate input IDs on create and append before any writes',
+    async (entry) => {
+      const id = message('Fix the caret.');
+      const create = async () =>
+        entry === 'tool'
+          ? relay('create_todo', { projectId: H.projectId, messageIds: [id, id] })
+          : unstarted([id, id]);
+      await expect(create()).rejects.toMatchObject({ status: 400 });
+      expect(H.s.db.select().from(todo).all()).toHaveLength(0);
+      const first = unstarted([id]);
+      const addition = message('Add preview.');
+      const params = {
+        todoId: first.id,
+        title: 'Must not change',
+        addMessageIds: [addition, addition],
+      };
+      const append = async () =>
+        entry === 'tool'
+          ? relay('update_todo', params)
+          : updateRequestTodo(toolDeps(), ctx(), params);
+      await expect(append()).rejects.toMatchObject({ status: 400 });
+      expect(H.s.db.select().from(todo).where(eq(todo.id, first.id)).get()?.spec).toBe(
+        'Fix the caret.',
+      );
+      expect(H.s.db.select().from(todo).where(eq(todo.id, first.id)).get()?.title).toBe(
+        'Fix the caret.',
+      );
+    },
+  );
 
   test('an appended source prevents a later create', async () => {
     const first = unstarted([message('Add preview.')]);

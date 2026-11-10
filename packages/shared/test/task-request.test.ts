@@ -82,6 +82,24 @@ describe('Coordinator tools that write todo text take no task text', () => {
     ).toBe(false);
   });
 
+  it('both source lists reject duplicate IDs in the advertised and execution schemas', () => {
+    for (const [name, field] of [
+      ['create_todo', 'messageIds'],
+      ['update_todo', 'addMessageIds'],
+    ] as const) {
+      const tool = CHIEF_REMOTE_TOOLS.find((entry) => entry.name === name);
+      expect(tool?.parameters).toMatchObject({ properties: { [field]: { uniqueItems: true } } });
+    }
+    expect(
+      coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', messageIds: ['m', 'm'] })
+        .success,
+    ).toBe(false);
+    expect(
+      coordinatorUpdateTodoParamsSchema.safeParse({ todoId: 't', addMessageIds: ['m', 'm'] })
+        .success,
+    ).toBe(false);
+  });
+
   it('update_todo parameters equal the routing allowlist', () => {
     expect(paramNames('update_todo')).toEqual(
       ['todoId', 'title', 'tagIds', 'projectId', 'addMessageIds', 'blockedBy'].sort(),

@@ -176,11 +176,14 @@ export const githubReadToolParamsSchemas = {
 } as const;
 
 const todoIdListSchema = z.array(z.string().min(1)).max(50);
+const ownerMessageIdListSchema = todoIdListSchema
+  .min(1)
+  .refine((ids) => new Set(ids).size === ids.length, { message: 'message IDs must be unique' });
 
 export const coordinatorCreateTodoParamsSchema = z
   .object({
     projectId: z.string().min(1),
-    messageIds: todoIdListSchema.min(1).optional(),
+    messageIds: ownerMessageIdListSchema.optional(),
     sourceTodoId: z.string().min(1).optional(),
     quotes: z.array(z.string().trim().min(1)).min(1).max(50).optional(),
     dependsOn: todoIdListSchema.optional(),
@@ -201,7 +204,7 @@ export const coordinatorUpdateTodoParamsSchema = z
     title: z.string().trim().min(1).max(200).optional(),
     tagIds: todoIdListSchema.optional(),
     projectId: z.string().min(1).optional(),
-    addMessageIds: todoIdListSchema.min(1).optional(),
+    addMessageIds: ownerMessageIdListSchema.optional(),
     blockedBy: todoIdListSchema.optional(),
   })
   .strict();
@@ -414,9 +417,12 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       ...obj(
         {
           projectId: str('Project id.'),
-          messageIds: idArr(
-            'Ids of owner messages or owner-answered questions in this Coordinator thread. Required unless sourceTodoId is supplied; no turn default. Already-bound messages return 409 unless quotes explicitly splits the request.',
-          ),
+          messageIds: {
+            ...idArr(
+              'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Required unless sourceTodoId is supplied; no turn default. Already-bound messages return 409 unless quotes explicitly splits the request.',
+            ),
+            uniqueItems: true,
+          },
           sourceTodoId: str(
             'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
           ),
@@ -458,9 +464,12 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         blockedBy: idArr(
           'Optional replacement list of todo ids that must finish first; [] removes every blocker.',
         ),
-        addMessageIds: idArr(
-          'Optional ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
-        ),
+        addMessageIds: {
+          ...idArr(
+            'Optional unique ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
+          ),
+          uniqueItems: true,
+        },
       },
       ['todoId'],
     ),

@@ -54,3 +54,26 @@ Coordinator source replay (synthetic identifiers normalized): {"dispatched":[{"a
 
 
 Boundary: real in-server Coordinator, tool schema, request services and SQLite; stateful faux model, no daemon or external GitHub dispatch. Existing live database was read only.
+
+Review round 1: repeated IDs in one source list
+Red command: targeted vitest -t "duplicate input IDs", --maxWorkers=4, on 0523ab2a35bbda2807ecde586b4af11ec4c6a625
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/coordinator-source-binding.test.ts (13 tests | 2 failed | 11 skipped) 217ms
+   ❯ Coordinator source bindings (13)
+     × tool rejects duplicate input IDs on create and append before any writes 135ms
+     × request-service rejects duplicate input IDs on create and append before any writes 81ms
+
+
+Green command: targeted vitest (11 files), --maxWorkers=4
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 <worktree>
+
+
+ Test Files  11 passed (11)
+      Tests  252 passed (252)
+   Start at  20:43:09
+   Duration  8.34s (tests 54%, import 24%, transform 21%, setup 1%)
