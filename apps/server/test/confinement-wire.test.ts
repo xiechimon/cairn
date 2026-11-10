@@ -83,7 +83,7 @@ async function world(osPlatform: string | null = 'linux', capabilities?: unknown
       })
       .run();
   const read = () => s.db.select().from(machine).where(eq(machine.id, machineId)).get()!;
-  return { s, report, presence, claim, enqueue, read, machineId, token };
+  return { s, report, presence, claim, enqueue, read, machineId, token, key };
 }
 
 test('old macOS daemon without platform or confinement report still claims', async () => {
@@ -264,3 +264,24 @@ test('non-enforcing ready fixture can enroll and claim without a Linux handshake
   w.enqueue();
   expect((await w.claim(null))?.step.id).toBe('step-availability');
 });
+
+test.each([undefined, 'darwin', 'other'] as const)(
+  'non-enforcing %s report never prevents credential rotation on re-enrollment',
+  async (osPlatform) => {
+    const capabilities = readyMachine({
+      capabilities: { mcpServers: [], skills: [], osPlatform },
+    }).capabilities;
+    const w = await world(osPlatform ?? null, capabilities);
+    const response = await w.s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${w.key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ teamId: w.s.team.id, name: 'availability', capabilities }),
+    });
+    expect(response.status).toBe(200);
+    const rotated = (await response.json()) as { machineId: string; token: string };
+    expect(rotated.machineId).toBe(w.machineId);
+    expect(rotated.token).not.toBe(w.token);
+    w.enqueue();
+    expect((await w.claim(null))?.step.id).toBe('step-availability');
+  },
+);

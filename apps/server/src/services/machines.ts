@@ -201,9 +201,10 @@ function mergeReportedCapabilities(
   const previousReport = previous?.confinement;
   const report = reported.confinement;
   if (
+    reported.osPlatform === 'linux' &&
     report &&
     (report.generation === (previousReport?.generation ?? 0) + 1
-      ? reported.osPlatform === 'linux' && report.state !== 'checking'
+      ? report.state !== 'checking'
       : !previousReport ||
         report.generation !== previousReport.generation ||
         report.invocation !== previousReport.invocation ||
