@@ -31,7 +31,6 @@ import {
   MCP_TOOL_REGISTRY,
   MCP_TOOLS_READ,
   MCP_TOOLS_WRITE,
-  MEMORY_QUOTA_PER_AGENT,
   MEMORY_TOOLS,
   MODEL_SOURCE_RUNTIMES,
   maskApiKey,
@@ -157,7 +156,6 @@ describe('machine protocol (02 §5, r3 §1.6)', () => {
       streamBodyTimeout: 540_000,
     });
     expect(ORPHAN_WORKTREE_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000);
-    expect(MEMORY_QUOTA_PER_AGENT).toBe(100);
   });
 
   it('pi stream event vocabulary is the 17-item bundle extraction (02 §5.6)', () => {
@@ -393,14 +391,7 @@ describe('worker memory tools (02 §4.4/r5 §6: worker-step remoteTools memory t
     expect(save).toBeDefined();
     const props = (save as { parameters: { properties: Record<string, unknown> } }).parameters
       .properties;
-    expect(Object.keys(props).sort()).toEqual([
-      'content',
-      'force',
-      'layer',
-      'projectId',
-      'sourceTodoId',
-      'title',
-    ]);
+    expect(Object.keys(props).sort()).toEqual(['content', 'file', 'scope']);
   });
 });
 

@@ -86,7 +86,7 @@ const GITHUB_READ_TOOLS: ReadonlySet<string> = new Set([
   'workflow_runs',
 ]);
 const READ_TOOLS: ReadonlySet<string> = new Set(
-  CHIEF_TOOL_CATEGORIES.read.filter((name) => !GITHUB_READ_TOOLS.has(name)),
+  [...CHIEF_TOOL_CATEGORIES.read, 'memories'].filter((name) => !GITHUB_READ_TOOLS.has(name)),
 );
 
 export const CHIEF_DIGEST_REMOTE_TOOLS = CHIEF_REMOTE_TOOLS.filter((t) => READ_TOOLS.has(t.name));
@@ -619,7 +619,9 @@ export function finishChiefDigest(
         ? (parsed as { memory?: unknown }).memory
         : undefined;
     if (owner !== undefined && agentId !== undefined && memory !== undefined) {
-      applyMemoryPass(db, { teamId: owner.teamId, agentId }, memory, now);
+      const result = applyMemoryPass(db, { teamId: owner.teamId, agentId }, memory, now);
+      if (result.skipped > 0)
+        db.update(step).set({ status: 'failed' }).where(eq(step.id, stepRow.id)).run();
     }
   }
   if (!ok) return;
@@ -649,11 +651,11 @@ export function finishChiefDigest(
         sourceTodoId: null,
         sourceBuildId: null,
       };
+      const existing = listMemoryEntries(db, scope).find((row) => row.content === item.text);
+      if (existing) return link(existing.id);
       try {
         const saved = saveMemoryEntry(db, entry);
-        if (!('status' in saved)) return link(saved.id);
-        const forced = saveMemoryEntry(db, { ...entry, force: true });
-        return 'status' in forced ? item : link(forced.id);
+        return link(saved.id);
       } catch (err) {
         if (!(err instanceof HttpError) || err.status !== 409) return item;
         const same = listMemoryEntries(db, scope).find((row) => row.content === item.text);

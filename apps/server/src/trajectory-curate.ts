@@ -92,14 +92,6 @@ function promote(
     sourceBuildId,
     force,
   });
-  if ('status' in saved) {
-    const conflictIds = saved.candidates.map((memory) => memory.id);
-    db.update(memoryCandidate)
-      .set({ conflictIds, updatedAt: nowMs() })
-      .where(eq(memoryCandidate.id, row.id))
-      .run();
-    return { promoted: false, conflictIds };
-  }
   db.update(memoryCandidate)
     .set({ status: 'promoted', memoryId: saved.id, updatedAt: nowMs() })
     .where(eq(memoryCandidate.id, row.id))

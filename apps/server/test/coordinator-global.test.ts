@@ -538,7 +538,7 @@ describe('archived projects stay read-only for the Coordinator', () => {
     ).rejects.toThrow(/archived/);
     await expect(relay('open_thread', { todoId: created.id })).rejects.toThrow(/archived/);
     await expect(
-      relay('save_memory', { title: 't', content: 'c', sourceTodoId: created.id }),
+      relay('save_memory', { scope: H.projectId, file: 't', content: 'c' }),
     ).rejects.toThrow(/archived/);
     const other = await postProject(H.s.app, 'cairn-site');
     const otherTodo = (await relay('create_todo', ownerTodo('other', other))) as { id: string };
