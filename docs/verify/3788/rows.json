@@ -1,0 +1,66 @@
+[
+  {
+    "title": "MEMORY.md",
+    "content": "",
+    "layer": "core",
+    "projectId": null,
+    "invalidAt": 1794275948668,
+    "supersededBy": "memory-index:markdown:probe-record-15"
+  },
+  {
+    "title": "MEMORY.md",
+    "content": "",
+    "layer": "core",
+    "projectId": "probe-record-2",
+    "invalidAt": 1794275948582,
+    "supersededBy": "memory-index:markdown:probe-record-6"
+  },
+  {
+    "title": "MEMORY.md",
+    "content": "- Prefer small PRs; details live in lesson.md.",
+    "layer": "core",
+    "projectId": "probe-record-2",
+    "invalidAt": null,
+    "supersededBy": null
+  },
+  {
+    "title": "lesson.md",
+    "content": "Verify the real tool relay before shipping.",
+    "layer": "searchable",
+    "projectId": "probe-record-2",
+    "invalidAt": 1794275948591,
+    "supersededBy": "probe-record-10"
+  },
+  {
+    "title": "lesson.md",
+    "content": "Verify the real tool relay before merging.",
+    "layer": "searchable",
+    "projectId": "probe-record-2",
+    "invalidAt": 1794275948610,
+    "supersededBy": "probe-record-11"
+  },
+  {
+    "title": "lesson.md",
+    "content": "Verify the real tool relay before shipping.",
+    "layer": "searchable",
+    "projectId": "probe-record-2",
+    "invalidAt": 1794275948614,
+    "supersededBy": "probe-record-12"
+  },
+  {
+    "title": "shared.md",
+    "content": "Verify the real tool relay before shipping.",
+    "layer": "searchable",
+    "projectId": null,
+    "invalidAt": null,
+    "supersededBy": null
+  },
+  {
+    "title": "MEMORY.md",
+    "content": "- [Tool relay verification](shared.md)",
+    "layer": "core",
+    "projectId": null,
+    "invalidAt": null,
+    "supersededBy": null
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "worker": true,
+  "coordinator": true,
+  "missingBase": 400,
+  "staleBase": 409,
+  "restored": true,
+  "moved": true,
+  "historyIds": [
+    "probe-record-10",
+    "probe-record-9"
+  ]
+}

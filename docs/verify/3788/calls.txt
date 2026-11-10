@@ -1,0 +1,74 @@
+POST /api/machine/tool/probe-record-1
+{"name":"memories","params":{"scope":"probe-record-2","file":"MEMORY.md"}}
+HTTP 200
+{"text":"{\"id\":\"memory-index:probe-record-3\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":null,\"sourceTodoId\":null,\"sourceBuildId\":null,\"file\":\"MEMORY.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"memory-index:probe-record-3:1794275948511:live:probe-record-5:probe-record-2:probe-record-4:false:core:MEMORY.md\",\"updatedAt\":1794275948511,\"deleted\":false,\"content\":\"\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"update_memory","params":{"scope":"probe-record-2","file":"MEMORY.md","baseVersion":"memory-index:probe-record-3:1794275948511:live:probe-record-5:probe-record-2:probe-record-4:false:core:MEMORY.md","content":"- Prefer small PRs; details live in lesson.md."}}
+HTTP 200
+{"text":"{\"id\":\"memory-index:markdown:probe-record-6\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"MEMORY.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"memory-index:markdown:probe-record-6:1794275948582:live:probe-record-5:probe-record-2:probe-record-4:false:core:MEMORY.md\",\"updatedAt\":1794275948582,\"deleted\":false,\"content\":\"- Prefer small PRs; details live in lesson.md.\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"save_memory","params":{"scope":"probe-record-2","file":"lesson.md","content":"Verify the real tool relay before shipping."}}
+HTTP 200
+{"text":"{\"id\":\"probe-record-9\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"lesson.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"probe-record-9:1794275948587:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md\",\"updatedAt\":1794275948587,\"deleted\":false,\"content\":\"Verify the real tool relay before shipping.\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"update_memory","params":{"scope":"probe-record-2","file":"lesson.md","baseVersion":"probe-record-9:1794275948587:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md","old_str":"before shipping","new_str":"before merging"}}
+HTTP 200
+{"text":"{\"id\":\"probe-record-10\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"lesson.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"probe-record-10:1794275948591:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md\",\"updatedAt\":1794275948591,\"deleted\":false,\"content\":\"Verify the real tool relay before merging.\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"update_memory","params":{"scope":"probe-record-2","file":"lesson.md","content":"missing revision"}}
+HTTP 400
+{"error":"invalid params at baseVersion: Invalid input: expected string, received undefined"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"delete_memory","params":{"scope":"probe-record-2","file":"lesson.md","baseVersion":"probe-record-9:1794275948587:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md"}}
+HTTP 409
+{"error":"stale memory base; current probe-record-10 revision probe-record-10:1794275948591:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"delete_memory","params":{"scope":"probe-record-2","file":"lesson.md","baseVersion":"probe-record-10:1794275948591:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md"}}
+HTTP 200
+{"text":"{\"id\":\"probe-record-10\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"lesson.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"probe-record-10:1794275948603:1794275948603:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md\",\"updatedAt\":1794275948603,\"deleted\":true,\"content\":\"Verify the real tool relay before merging.\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"memories","params":{"scope":"probe-record-2","file":"lesson.md","versions":"list"}}
+HTTP 200
+{"text":"{\"id\":\"probe-record-10\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"lesson.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"probe-record-10:1794275948603:1794275948603:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md\",\"updatedAt\":1794275948603,\"deleted\":true,\"versions\":[{\"id\":\"probe-record-10\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"lesson.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"probe-record-10:1794275948603:1794275948603:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md\",\"updatedAt\":1794275948603,\"deleted\":true,\"content\":\"Verify the real tool relay before merging.\",\"nextOffset\":null},{\"id\":\"probe-record-9\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"lesson.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"probe-record-9:1794275948587:1794275948591:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md\",\"updatedAt\":1794275948587,\"deleted\":true,\"content\":\"Verify the real tool relay before shipping.\",\"nextOffset\":null}],\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"update_memory","params":{"scope":"probe-record-2","file":"lesson.md","baseVersion":"probe-record-10:1794275948603:1794275948603:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md","restoreVersion":"probe-record-9"}}
+HTTP 200
+{"text":"{\"id\":\"probe-record-11\",\"agentId\":\"probe-record-4\",\"projectId\":\"probe-record-2\",\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"lesson.md\",\"scope\":\"probe-record-2\",\"baseVersion\":\"probe-record-11:1794275948610:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md\",\"updatedAt\":1794275948610,\"deleted\":false,\"content\":\"Verify the real tool relay before shipping.\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-1
+{"name":"update_memory","params":{"scope":"probe-record-2","file":"lesson.md","baseVersion":"probe-record-11:1794275948610:live:probe-record-5:probe-record-2:probe-record-4:false:searchable:lesson.md","moveTo":"team","renameTo":"shared.md"}}
+HTTP 200
+{"text":"{\"id\":\"probe-record-12\",\"agentId\":\"probe-record-4\",\"projectId\":null,\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"shared.md\",\"scope\":\"team\",\"baseVersion\":\"probe-record-12:1794275948614:live:probe-record-5:team:probe-record-4:false:searchable:shared.md\",\"updatedAt\":1794275948614,\"deleted\":false,\"content\":\"Verify the real tool relay before shipping.\",\"nextOffset\":null}"}
+
+POST /api/machine/done/probe-record-1
+{"status":"success","sessionId":"probe-worker","hasChanges":false}
+HTTP 200
+{"ok":true}
+
+POST /api/machine/tool/probe-record-13
+{"name":"memories","params":{"scope":"team","file":"shared.md"}}
+HTTP 200
+{"text":"{\"id\":\"probe-record-12\",\"agentId\":\"probe-record-4\",\"projectId\":null,\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"shared.md\",\"scope\":\"team\",\"baseVersion\":\"probe-record-12:1794275948614:live:probe-record-5:team:probe-record-4:false:searchable:shared.md\",\"updatedAt\":1794275948614,\"deleted\":false,\"content\":\"Verify the real tool relay before shipping.\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-13
+{"name":"memories","params":{"scope":"team","file":"MEMORY.md"}}
+HTTP 200
+{"text":"{\"id\":\"memory-index:probe-record-14\",\"agentId\":\"probe-record-4\",\"projectId\":null,\"source\":null,\"sourceTodoId\":null,\"sourceBuildId\":null,\"file\":\"MEMORY.md\",\"scope\":\"team\",\"baseVersion\":\"memory-index:probe-record-14:1794275948510:live:probe-record-5:team:probe-record-4:false:core:MEMORY.md\",\"updatedAt\":1794275948510,\"deleted\":false,\"content\":\"\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-13
+{"name":"update_memory","params":{"scope":"team","file":"MEMORY.md","baseVersion":"memory-index:probe-record-14:1794275948510:live:probe-record-5:team:probe-record-4:false:core:MEMORY.md","content":"- [Tool relay verification](shared.md)"}}
+HTTP 200
+{"text":"{\"id\":\"memory-index:markdown:probe-record-15\",\"agentId\":\"probe-record-4\",\"projectId\":null,\"source\":\"Coordinator\",\"sourceTodoId\":null,\"sourceBuildId\":\"chief-01a1c32e-385c-77a8-a01b-5f26618fb1bf\",\"file\":\"MEMORY.md\",\"scope\":\"team\",\"baseVersion\":\"memory-index:markdown:probe-record-15:1794275948668:live:probe-record-5:team:probe-record-4:false:core:MEMORY.md\",\"updatedAt\":1794275948668,\"deleted\":false,\"content\":\"- [Tool relay verification](shared.md)\",\"nextOffset\":null}"}
+
+POST /api/machine/tool/probe-record-13
+{"name":"memories","params":{"scope":"team"}}
+HTTP 200
+{"text":"{\"documents\":[{\"id\":\"probe-record-12\",\"agentId\":\"probe-record-4\",\"projectId\":null,\"source\":\"Session\",\"sourceTodoId\":\"probe-record-7\",\"sourceBuildId\":\"probe-record-8\",\"file\":\"shared.md\",\"scope\":\"team\",\"baseVersion\":\"probe-record-12:1794275948614:live:probe-record-5:team:probe-record-4:false:searchable:shared.md\",\"updatedAt\":1794275948614,\"deleted\":false,\"firstLine\":\"Verify the real tool relay before shipping.\"},{\"id\":\"memory-index:markdown:probe-record-15\",\"agentId\":\"probe-record-4\",\"projectId\":null,\"source\":\"Coordinator\",\"sourceTodoId\":null,\"sourceBuildId\":\"chief-01a1c32e-385c-77a8-a01b-5f26618fb1bf\",\"file\":\"MEMORY.md\",\"scope\":\"team\",\"baseVersion\":\"memory-index:markdown:probe-record-15:1794275948668:live:probe-record-5:team:probe-record-4:false:core:MEMORY.md\",\"updatedAt\":1794275948668,\"deleted\":false,\"firstLine\":\"- [Tool relay verification](shared.md)\"}],\"nextOffset\":null}"}
