@@ -47,6 +47,7 @@ let establishing: Promise<boolean> | null = null;
 function establishSession(): Promise<boolean> {
   if (establishing !== null) return establishing;
   establishing = (async () => {
+    if (DEMO_MODE) return false;
     if (parsePairFragment(window.location.hash) !== null) {
       let failed = false;
       await consumePairFragment(() => {

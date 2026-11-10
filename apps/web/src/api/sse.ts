@@ -13,6 +13,7 @@ import {
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 import { EN } from '../i18n/en.js';
 import { readStoredLocale } from '../i18n/locale.js';
 import { translate } from '../i18n/translate.js';
@@ -32,6 +33,7 @@ import { streamGuards } from './sse-guards.js';
 import { teamEventInvalidations } from './sse-team-events.js';
 
 async function streamUrl(path: string): Promise<string> {
+  if (DEMO_MODE) return path;
   const res = await fetch('/api/auth/stream-ticket', { method: 'POST' });
   if (!res.ok) return path;
   const body = (await res.json()) as { ticket?: string };

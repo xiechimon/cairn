@@ -11,6 +11,7 @@ import {
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Input } from '../components/ui/input.js';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 
 export function TokenGate() {
@@ -22,7 +23,7 @@ export function TokenGate() {
   useEffect(() => {
     void (async () => {
       await consumePairFragment(() => rejectGate());
-      if (await bootstrapLoopback()) passGate();
+      if (!DEMO_MODE && (await bootstrapLoopback())) passGate();
     })();
   }, []);
 
