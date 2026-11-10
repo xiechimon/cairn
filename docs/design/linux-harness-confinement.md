@@ -42,7 +42,7 @@ Git/workspace management, daemon supervisors and computer-driver helpers are not
 
 [Primary-source research](../research/confine-process-ownership-2026-11-09.md) identifies the parent-already-dead race in bwrap's `--die-with-parent`; retain the flag only as cleanup assistance. One systemd-owned transient task service/cgroup, established before bwrap starts, uses `BindsTo=` plus `After=` on the owning daemon unit, `Restart=no`, `KillMode=control-group` and final SIGKILL. bwrap remains the single sandbox. No cgroup delegation, writable cgroup controls or manager-control sockets/FDs reach the child. Missing manager/owner-unit/cgroup support fails preflight; no alternative launch mode.
 
-A trusted confine init gate inside bwrap starts no harness until it validates an explicit current-invocation acknowledgement after manager ownership and sandbox readiness. EOF, cancellation or stale/malformed acknowledgement aborts; bwrap's `--block-fd` alone is insufficient because EOF releases it. Parent loss stops the bound task unit even before acknowledgement. Cancel/start races reconcile the unique launch unit; release paths only after terminal manager state **and** `cgroup.events populated=0`, not a PID exit or successful stop request. Unverifiable cleanup reserves paths and marks the machine unavailable.
+A trusted confine init gate inside bwrap starts no harness until it validates an explicit current-invocation acknowledgement after manager ownership and sandbox readiness. EOF, cancellation or stale/malformed acknowledgement aborts; bwrap's `--block-fd` alone is insufficient because EOF releases it. Parent loss stops the bound task unit even before acknowledgement. Cancel/start races reconcile the unique launch unit; release paths only after terminal manager confirmation (inactive/dead with Result, or a completed D-Bus stop job / successful `systemd-run --wait`) **and** either `cgroup.events populated=0`, path `ENOENT`, or held-FD `ENODEV`, never a PID exit or an asynchronous stop request. Accept removal only after terminal confirmation because [cgroup-v2 removal requires no live processes](https://docs.kernel.org/admin-guide/cgroup-v2.html#organizing-processes-and-threads) and rejects populated cgroups with `EBUSY`, so systemd removal proves emptiness. An active unit with a missing cgroup, other errors, timeout, or remaining `populated=1` fails closed. Unverifiable cleanup reserves paths and marks the machine unavailable.
 
 | Availability reader/writer | Transition, failure behavior and required test |
 | --- | --- |
@@ -52,6 +52,17 @@ A trusted confine init gate inside bwrap starts no harness until it validates an
 | Machines page; notification writer | Show unavailable with the repair reason. Server persists one outage identity until confirmed recovery; deduplicate notification by machine/outage across heartbeats and restarts. Test one notification for repeated failure, visible reason, recovery and one new notice for a later outage. |
 
 Implementation touches `machine-loop.ts`, shared machine capabilities, server presence/eligibility/routing/claim/notification paths and the existing machines surface together; do not ship readiness reporting without enforcement or UI visibility.
+
+### Ownership segment contract
+
+`launchConfined` is the backend launch seam; harness adapters migrate in the later integration segment. The caller reserves paths until `completed` or `stop()` succeeds; rejection means unavailable and reserved. `completed` proves cleanup, while the returned process carries the harness exit status. Resume paused stdout after attaching the consumer. Only three standard streams cross systemd; extra credential FDs are not yet supported. The manager establishes ownership before bwrap; the trusted shell init reads exactly one nonce line without buffering harness input. Clear the environment inside bwrap and pass only the caller's explicit allowlist.
+
+| Reader / writer | Expected behavior and test |
+| --- | --- |
+| Owner check / acknowledgement | Require this process's active owner cgroup and invocation, recheck before releasing the nonce; EOF, malformed or stale nonce starts nothing. |
+| Start / cancel | Unique task unit; cancelled or failed starts reconcile via a synchronous manager stop; unprovable cleanup rejects. |
+| Completion / stop | Successful terminal wait or synchronous stop job, then independent emptiness/removal proof; active, unexpected errors, timeout and populated leftovers reject. |
+| Escaped process / manager | `ExitType=cgroup` keeps the unit alive for survivors; `KillMode=control-group` kills even session-changing or externally joined processes. |
 
 ## Pi protocol and state ownership
 
