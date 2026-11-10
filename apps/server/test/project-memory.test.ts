@@ -36,60 +36,64 @@ describe('Coordinator memory is scoped by project (D74 P2)', () => {
     expect(prompt).not.toContain('other rule');
   });
 
-  test('a memory saved in a project-scoped turn is project-only by default', async () => {
+  test('an explicitly project-scoped file stays in that project', async () => {
     const saved = (await relay(
       'save_memory',
-      { title: 'scoped', content: 'only here' },
+      { scope: H.projectId, file: 'scoped', content: 'only here' },
       { turnScopeProjectId: H.projectId },
-    )) as { projectId: string | null };
-    expect(saved.projectId).toBe(H.projectId);
+    )) as { scope: string };
+    expect(saved.scope).toBe(H.projectId);
   });
 
-  test('the default project of a scoped turn is refused once that project is archived', async () => {
+  test('writing an archived project scope is refused', async () => {
     H.s.db.update(project).set({ archivedAt: nowMs() }).where(eq(project.id, H.projectId)).run();
     await expect(
       relay(
         'save_memory',
-        { title: 'late', content: 'after archive' },
+        { scope: H.projectId, file: 'late', content: 'after archive' },
         { turnScopeProjectId: H.projectId },
       ),
     ).rejects.toThrow(/archived/);
   });
 
   test('a memory saved in an unscoped turn stays team-wide', async () => {
-    const saved = (await relay('save_memory', { title: 'team', content: 'everywhere' })) as {
-      projectId: string | null;
+    const saved = (await relay('save_memory', {
+      scope: 'team',
+      file: 'team',
+      content: 'everywhere',
+    })) as {
+      scope: string;
     };
-    expect(saved.projectId).toBeNull();
+    expect(saved.scope).toBe('team');
   });
 
-  test('an explicit project on save_memory wins over the turn scope', async () => {
+  test('an explicit scope wins over the turn scope', async () => {
     const other = await postProject(H.s.app, 'other');
     const saved = (await relay(
       'save_memory',
-      { title: 'other', content: 'for other', projectId: other },
+      { file: 'other', content: 'for other', scope: other },
       { turnScopeProjectId: H.projectId },
-    )) as { projectId: string | null };
-    expect(saved.projectId).toBe(other);
+    )) as { scope: string };
+    expect(saved.scope).toBe(other);
   });
 });
 
 describe('a turn that was steered into another project (D74 P2)', () => {
-  test('save_memory without a project is refused once the turn covers two projects', async () => {
+  test('save_memory requires an explicit scope even in a mixed turn', async () => {
     await expect(
       relay(
         'save_memory',
-        { title: 'ambiguous', content: 'which project?' },
+        { file: 'ambiguous', content: 'which project?' },
         { turnScopeProjectId: H.projectId, turnScopeMixed: true },
       ),
-    ).rejects.toThrow(/pass projectId/);
+    ).rejects.toThrow(/scope/);
     const other = await postProject(H.s.app, 'other');
     const saved = (await relay(
       'save_memory',
-      { title: 'explicit', content: 'for other', projectId: other },
+      { file: 'explicit', content: 'for other', scope: other },
       { turnScopeProjectId: H.projectId, turnScopeMixed: true },
-    )) as { projectId: string | null };
-    expect(saved.projectId).toBe(other);
+    )) as { scope: string };
+    expect(saved.scope).toBe(other);
   });
 
   test('only a message steered into the turn from another project marks it mixed, not a queued one', async () => {

@@ -13,7 +13,7 @@ import {
 } from './trajectory-curate.js';
 
 const USAGE =
-  'Use --in <candidates.jsonl>, --confirm <candidateId> [--force] or --dismiss <candidateId>, with optional --out-dir <dir>';
+  'Use --in <candidates.jsonl>, --confirm <candidateId> or --dismiss <candidateId>, with optional --out-dir <dir>';
 
 try {
   const { values } = parseArgs({
@@ -21,7 +21,6 @@ try {
       in: { type: 'string' },
       confirm: { type: 'string' },
       dismiss: { type: 'string' },
-      force: { type: 'boolean', default: false },
       'out-dir': { type: 'string' },
     },
   });
@@ -32,7 +31,7 @@ try {
   const opened = openDbWithHandle(config.dbPath);
   try {
     if (values.confirm !== undefined) {
-      const memoryId = confirmCandidate(opened.db, values.confirm, values.force);
+      const memoryId = confirmCandidate(opened.db, values.confirm);
       console.log(`promoted=${values.confirm} memory=${memoryId}`);
     } else if (values.dismiss !== undefined) {
       dismissCandidate(opened.db, values.dismiss);

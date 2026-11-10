@@ -30,9 +30,7 @@ function remember(
     projectId,
     sourceTodoId: null,
     sourceBuildId: null,
-    force: true,
   });
-  if ('status' in saved) throw new Error('memory not saved');
   return saved.id;
 }
 

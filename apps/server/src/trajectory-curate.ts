@@ -19,7 +19,8 @@ import type { Db } from './db/client.js';
 import { build, memoryCandidate, todo } from './db/schema.js';
 import { HttpError } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
-import { memoriesInScope, overlaps, saveMemoryEntry } from './services/memory.js';
+import { memoriesInScope, overlaps } from './services/memory.js';
+import { rememberMemoryFile } from './services/memory-documents.js';
 import { memoryOwnerOf } from './services/routing-rules.js';
 import { resolveLocalSkill } from './services/skills.js';
 
@@ -79,27 +80,20 @@ function promote(
   db: Db,
   row: CandidateRow,
   sourceBuildId: string,
-  force: boolean,
-): { promoted: true; memoryId: string } | { promoted: false; conflictIds: string[] } {
+): { promoted: true; memoryId: string } {
   const source = db.select().from(build).where(eq(build.id, sourceBuildId)).get();
-  const saved = saveMemoryEntry(db, {
-    agentId: row.agentId,
-    teamId: row.teamId,
-    projectId: row.projectId,
-    title: row.title,
-    content: row.content,
-    sourceTodoId: source?.todoId ?? null,
-    sourceBuildId,
-    force,
-  });
-  if ('status' in saved) {
-    const conflictIds = saved.candidates.map((memory) => memory.id);
-    db.update(memoryCandidate)
-      .set({ conflictIds, updatedAt: nowMs() })
-      .where(eq(memoryCandidate.id, row.id))
-      .run();
-    return { promoted: false, conflictIds };
-  }
+  const saved = rememberMemoryFile(
+    db,
+    {
+      agentId: row.agentId,
+      teamId: row.teamId,
+      projectId: row.projectId,
+      sourceTodoId: source?.todoId ?? null,
+      sourceBuildId,
+    },
+    row.title,
+    row.content,
+  );
   db.update(memoryCandidate)
     .set({ status: 'promoted', memoryId: saved.id, updatedAt: nowMs() })
     .where(eq(memoryCandidate.id, row.id))
@@ -239,13 +233,6 @@ export function curateCandidates(
             content: candidate.content,
             buildIds: merged.buildIds,
             evidence: merged.evidence,
-            conflictIds: memories
-              .filter(
-                (memory) =>
-                  overlaps(memory.title, candidate.title) ||
-                  overlaps(memory.content, candidate.content),
-              )
-              .map((memory) => memory.id),
             createdAt: now,
             updatedAt: now,
           })
@@ -267,7 +254,7 @@ export function curateCandidates(
         merged.buildIds.length >= PROMOTION_MIN_BUILDS
       ) {
         try {
-          const result = promote(db, { ...existing, ...merged }, candidate.buildId, false);
+          const result = promote(db, { ...existing, ...merged }, candidate.buildId);
           if (result.promoted) summary.memoryPromoted++;
         } catch (error) {
           if (!(error instanceof HttpError)) throw error;
@@ -284,7 +271,7 @@ export function curateCandidates(
   return summary;
 }
 
-export function confirmCandidate(db: Db, id: string, force: boolean) {
+export function confirmCandidate(db: Db, id: string) {
   const row = db.select().from(memoryCandidate).where(eq(memoryCandidate.id, id)).get();
   if (row === undefined) throw new CurateError(`Candidate ${id} not found`);
   if (row.status !== 'pending')
@@ -295,15 +282,11 @@ export function confirmCandidate(db: Db, id: string, force: boolean) {
     );
   let result: ReturnType<typeof promote>;
   try {
-    result = promote(db, row, row.buildIds.at(-1) as string, force);
+    result = promote(db, row, row.buildIds.at(-1) as string);
   } catch (error) {
     if (error instanceof HttpError) throw new CurateError(`Candidate ${id}: ${error.message}`);
     throw error;
   }
-  if (!result.promoted)
-    throw new CurateError(
-      `Candidate ${id} overlaps memories ${result.conflictIds.join(', ')}; update those or pass --force`,
-    );
   return result.memoryId;
 }
 

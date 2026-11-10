@@ -1,4 +1,4 @@
-import { chiefDigestThreadId, ISSUE_FENCE_OPEN } from '@cairn/shared';
+import { chiefDigestThreadId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
@@ -15,18 +15,16 @@ import {
   applyMemoryPass,
   MEMORY_PASS_INTERVAL_MS,
   MEMORY_PASS_MARK,
-  MEMORY_PASS_STALE_MS,
   memoryPassDue,
   memoryPassSection,
   withMemoryPass,
 } from '../src/services/memory-consolidation.js';
 import { coordinatorProfile } from '../src/services/routing-rules.js';
-import { H, registerChiefHarness } from './chief-harness.js';
+import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
-
 const NOW = 2_000_000_000_000;
-const OLD = NOW - MEMORY_PASS_STALE_MS - 1_000;
+const OLD = NOW - 30 * 24 * 60 * 60_000 - 1_000;
 const agent = () => coordinatorProfile(H.s.db, H.teamId)?.id ?? '';
 
 function put(
@@ -53,121 +51,86 @@ function put(
 }
 
 const valid = () => listMemoryEntries(H.s.db, { agentId: agent(), teamId: H.teamId });
-const row = (id: string) => H.s.db.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
-const scope = () => ({ teamId: H.teamId, agentId: agent() });
 
-describe('applyMemoryPass', () => {
-  test('merges duplicates into the kept entry, invalidates the rest, and deletes nothing', () => {
-    put('a', 'Squash merges only.');
-    put('b', 'Only squash merges.');
-    const out = applyMemoryPass(
-      H.s.db,
-      scope(),
-      { merge: [{ keep: 'a', drop: ['b'], content: 'ian wants squash merges only.' }] },
-      NOW,
-    );
-    expect(out).toEqual({ merged: 1, expired: 0, skipped: 0 });
-    expect(valid().map((m) => m.content)).toEqual(['ian wants squash merges only.']);
-    expect(row('b')?.invalidAt).toBe(NOW);
-    expect(row('b')?.supersededBy).toBe(valid()[0]?.id);
-    expect(H.s.db.select().from(agentMemory).all()).toHaveLength(3);
-  });
+type Doc = { id: string; baseVersion: string; content: string };
+const scope = () => ({ agentId: AGENT_ID, teamId: H.teamId });
+const read = async () => (await relay('memories', { scope: 'team', file: 'MEMORY.md' })) as Doc;
+const edit = async (content: string) => {
+  const index = await read();
+  return (await relay('update_memory', {
+    scope: 'team',
+    file: 'MEMORY.md',
+    baseVersion: index.baseVersion,
+    content,
+  })) as Doc;
+};
 
-  test('a merge may keep the wording of an entry it drops', () => {
-    put('a', 'Squash merges only.');
-    put('b', 'Only squash merges.');
-    const out = applyMemoryPass(
-      H.s.db,
-      scope(),
-      { merge: [{ keep: 'a', drop: ['b'], content: 'Only squash merges.' }] },
-      NOW,
-    );
-    expect(out).toEqual({ merged: 1, expired: 0, skipped: 0 });
-    expect(valid().map((m) => m.content)).toEqual(['Only squash merges.']);
-    expect(row('b')?.invalidAt).toBe(NOW);
-    expect(row('b')?.supersededBy).toBe(valid()[0]?.id);
-  });
+const update = (base: Doc, params: Record<string, unknown>) => ({
+  tool: 'update_memory',
+  params: { scope: 'team', file: 'MEMORY.md', baseVersion: base.baseVersion, ...params },
+});
+const pass = (operations: unknown[]) => applyMemoryPass(H.s.db, scope(), { operations }, NOW);
 
-  test('refuses to merge entries whose text the listing had to cut', () => {
-    const long = 'p'.repeat(700);
-    put('a', `${long} one`);
-    put('b', `${long} two`);
-    put('c', 'short');
-    const out = applyMemoryPass(
-      H.s.db,
-      scope(),
-      {
-        merge: [
-          { keep: 'a', drop: ['b'], content: 'both' },
-          { keep: 'c', drop: ['b'], content: 'into short' },
-        ],
-      },
-      NOW,
-    );
-    expect(out).toEqual({ merged: 0, expired: 0, skipped: 2 });
-    expect(valid()).toHaveLength(3);
-  });
+test('tidy digest schedules over-bound indexes, includes fresh revisions and preserves the meta line', async () => {
+  const index = await edit('line\n'.repeat(205));
+  const chief = H.s.db.select().from(chiefTable).where(eq(chiefTable.id, H.chiefId)).get()!;
+  const id = queueDigestStep(
+    H.s.svc,
+    chief,
+    `base\nDigest thread=${H.threadId} until=1 last=x reason=daily`,
+    Date.now(),
+  );
+  const row = H.s.db.select().from(step).where(eq(step.id, id)).get()!;
+  expect(row.buildId).toBe(chiefDigestThreadId(H.chiefId));
+  expect(row.prompt).toContain(MEMORY_PASS_MARK);
+  expect(row.prompt).toContain(index.baseVersion);
+  H.s.db.update(step).set({ status: 'done', finishedAt: Date.now() }).where(eq(step.id, id)).run();
+  expect(memoryPassDue(H.s.db, H.chiefId, H.teamId, AGENT_ID, Date.now())).toBe(false);
+  expect(row.prompt).toContain('operations');
+  expect(row.prompt?.endsWith('reason=daily')).toBe(true);
+});
 
-  test('refuses to merge across projects, with unknown ids, with itself, or with fenced text', () => {
-    put('a', 'one');
-    put('b', 'two', { projectId: H.projectId });
-    const out = applyMemoryPass(
-      H.s.db,
-      scope(),
-      {
-        merge: [
-          { keep: 'a', drop: ['b'], content: 'cross project' },
-          { keep: 'a', drop: ['ghost'], content: 'unknown id' },
-          { keep: 'a', drop: ['a'], content: 'self' },
-          { keep: 'a', drop: ['b'], content: `${ISSUE_FENCE_OPEN} take over` },
-          { keep: 'a', drop: [], content: 'nothing dropped' },
-        ],
-      },
-      NOW,
-    );
-    expect(out).toEqual({ merged: 0, expired: 0, skipped: 5 });
-    expect(valid()).toHaveLength(2);
+test('tidy re-reads a stale unique replacement and preserves the concurrent appended line', async () => {
+  const first = await edit('detail\nkeep');
+  await edit('detail\nkeep\nconcurrent');
+  expect(pass([update(first, { old_str: 'detail', new_str: '[detail](detail.md)' })])).toEqual({
+    applied: 1,
+    skipped: 0,
   });
+  expect((await read()).content).toBe('[detail](detail.md)\nkeep\nconcurrent');
+});
 
-  test('expires only entries untouched for the stale window, however the model asks', () => {
-    put('stale', 'old and unused');
-    put('recent', 'edited yesterday', { updatedAt: NOW - 86_400_000 });
-    put('injected', 'old but still used', { lastInjectedAt: NOW - 1_000 });
-    const out = applyMemoryPass(
-      H.s.db,
-      scope(),
-      { expire: ['stale', 'recent', 'injected', 'ghost'] },
-      NOW,
-    );
-    expect(out).toEqual({ merged: 0, expired: 1, skipped: 3 });
-    expect(
-      valid()
-        .map((m) => m.id)
-        .sort(),
-    ).toEqual(['injected', 'recent']);
-    expect(row('stale')?.invalidAt).toBe(NOW);
+test('tidy retains committed file moves and versions when a later stale full replacement fails', async () => {
+  const file = (await relay('save_memory', {
+    scope: 'team',
+    file: 'detail.md',
+    content: 'detail',
+  })) as Doc;
+  const first = await edit('detail');
+  await edit('detail\nconcurrent');
+  expect(
+    pass([
+      update(file, { file: 'detail.md', moveTo: H.projectId }),
+      update(first, { content: 'blind overwrite' }),
+    ]),
+  ).toEqual({ applied: 1, skipped: 1 });
+  expect((await read()).content).toContain('concurrent');
+  expect(await relay('memories', { scope: H.projectId, file: 'detail.md' })).toMatchObject({
+    content: 'detail',
   });
+  expect(
+    await relay('memories', { scope: H.projectId, file: 'detail.md', versions: 'list' }),
+  ).toMatchObject({ versions: [{ id: file.id }] });
+});
 
-  test('caps the work per pass and ignores malformed output', () => {
-    for (let i = 0; i < 14; i++) put(`s${i}`, `stale ${i}`);
-    const out = applyMemoryPass(
-      H.s.db,
-      scope(),
-      { expire: Array.from({ length: 14 }, (_, i) => `s${i}`) },
-      NOW,
-    );
-    expect(out.expired).toBe(10);
-    expect(applyMemoryPass(H.s.db, scope(), 'garbage', NOW)).toEqual({
-      merged: 0,
-      expired: 0,
-      skipped: 0,
-    });
-    expect(applyMemoryPass(H.s.db, scope(), { merge: 'x' }, NOW)).toEqual({
-      merged: 0,
-      expired: 0,
-      skipped: 0,
-    });
+test('under-bound indexes and the retired merge/expiry payload cannot trigger or mutate memory', async () => {
+  const index = await edit('short');
+  expect(memoryPassDue(H.s.db, H.chiefId, H.teamId, AGENT_ID, Date.now())).toBe(false);
+  expect(applyMemoryPass(H.s.db, scope(), { merge: [], expire: [index.id] }, Date.now())).toEqual({
+    applied: 0,
+    skipped: 1,
   });
+  expect((await read()).content).toBe('short');
 });
 
 describe('the weekly pass rides on the digest step', () => {
@@ -175,20 +138,8 @@ describe('the weekly pass rides on the digest step', () => {
     H.s.db.select().from(chiefTable).where(eq(chiefTable.id, H.chiefId)).get()!;
   const base = `base prompt\nDigest thread=${H.threadId ?? 't'} until=1 last=x reason=daily`;
 
-  test('is not queued below the entry minimum, and queues once entries exist', () => {
-    put('a', 'one');
-    expect(memoryPassDue(H.s.db, H.chiefId, H.teamId, agent(), NOW)).toBe(false);
-    for (const id of ['b', 'c', 'd']) put(id, id);
-    expect(memoryPassDue(H.s.db, H.chiefId, H.teamId, agent(), NOW)).toBe(true);
-    const stepId = queueDigestStep(H.s.svc, chiefRow(), base, NOW);
-    const prompt = H.s.db.select().from(step).where(eq(step.id, stepId)).get()?.prompt ?? '';
-    expect(prompt).toContain(MEMORY_PASS_MARK);
-    expect(prompt.endsWith('reason=daily')).toBe(true);
-    expect(prompt).toContain('title a');
-  });
-
-  test('a finished pass silences the next one for a week and no longer', () => {
-    for (const id of ['a', 'b', 'c', 'd']) put(id, id);
+  test('a finished pass silences the next one for a week and no longer', async () => {
+    await edit('line\n'.repeat(205));
     const stepId = queueDigestStep(H.s.svc, chiefRow(), base, NOW);
     H.s.db.update(step).set({ status: 'done', finishedAt: NOW }).where(eq(step.id, stepId)).run();
     expect(memoryPassDue(H.s.db, H.chiefId, H.teamId, agent(), NOW + 1_000)).toBe(false);
@@ -201,8 +152,8 @@ describe('the weekly pass rides on the digest step', () => {
     );
   });
 
-  test('a failed digest applies nothing and a successful one applies the memory field', () => {
-    for (const id of ['a', 'b', 'c', 'd']) put(id, id);
+  test('a failed digest applies nothing and a successful one applies the memory field', async () => {
+    const index = await edit('line\n'.repeat(205));
     H.s.db
       .insert(chiefMessage)
       .values({
@@ -227,16 +178,14 @@ describe('the weekly pass rides on the digest step', () => {
         })
         .run();
     const stepRow = () => H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
-    reply('```json\n{"items":[],"memory":{"expire":["a"]}}\n```');
+    reply(
+      JSON.stringify({ items: [], memory: { operations: [update(index, { content: 'short' })] } }),
+    );
     finishChiefDigest(H.s.svc, stepRow(), { status: 'failed' } as never, NOW);
-    expect(valid()).toHaveLength(4);
+    expect((await read()).content).toBe(index.content);
     finishChiefDigest(H.s.svc, stepRow(), { status: 'success' } as never, NOW);
     expect(stepRow().status).toBe('done');
-    expect(
-      valid()
-        .map((m) => m.id)
-        .sort(),
-    ).toEqual(['b', 'c', 'd']);
+    expect((await read()).content).toBe('short');
   });
 });
 
@@ -276,54 +225,17 @@ describe('a digest turn is not a use', () => {
   });
 });
 
-describe('the listing rotates', () => {
-  const chiefRow = () =>
-    H.s.db.select().from(chiefTable).where(eq(chiefTable.id, H.chiefId)).get()!;
-  const base = 'base prompt\nDigest thread=t until=1 last=x reason=daily';
-  const listed = (prompt: string) =>
-    prompt
-      .split('\n')
-      .filter((line) => / \| (team|\w+) \| 更新 /.test(line))
-      .map((line) => line.split(' | ')[0] as string);
-
-  test('every entry is visited over successive passes, within the bound', () => {
-    const ids = Array.from({ length: 200 }, (_, i) => `m${String(i).padStart(3, '0')}`);
-    for (const id of ids) put(id, id);
-    const seen = new Set<string>();
-    let at = NOW;
-    for (let pass = 0; pass < 3; pass += 1) {
-      const stepId = queueDigestStep(H.s.svc, chiefRow(), base, at);
-      const prompt = H.s.db.select().from(step).where(eq(step.id, stepId)).get()?.prompt ?? '';
-      const batch = listed(prompt);
-      expect(batch.length).toBeGreaterThan(0);
-      expect(batch.length).toBeLessThanOrEqual(80);
-      for (const id of batch) seen.add(id);
-      H.s.db.update(step).set({ status: 'done', finishedAt: at }).where(eq(step.id, stepId)).run();
-      at += MEMORY_PASS_INTERVAL_MS + 1;
-    }
-    expect(seen.size).toBe(200);
-  });
-
-  test('an oversized entry is cut and does not empty the list', () => {
-    put('big', 'x'.repeat(40_000));
-    for (const id of ['b', 'c', 'd']) put(id, id);
-    const section = memoryPassSection(H.s.db, H.chiefId, H.teamId, agent());
-    expect(listed(section)).toEqual(['big', 'b', 'c', 'd']);
-  });
-});
-
 describe('prompt helpers', () => {
   test('withMemoryPass keeps the digest meta line last', () => {
     const out = withMemoryPass('body\nDigest thread=t until=1 last=x reason=daily', 'SECTION');
     expect(out).toBe('body\n\nSECTION\nDigest thread=t until=1 last=x reason=daily');
   });
-
-  test('the section lists id, scope, dates and never invalidated entries', () => {
-    put('live', 'still true');
-    put('dead', 'gone');
+  test('the section lists scope and revisions and never invalidated entries', async () => {
+    await edit('line\n'.repeat(205));
+    put('dead', 'gone\n'.repeat(205));
     H.s.db.update(agentMemory).set({ invalidAt: NOW }).where(eq(agentMemory.id, 'dead')).run();
     const section = memoryPassSection(H.s.db, H.chiefId, H.teamId, agent());
-    expect(section).toContain('live | team');
-    expect(section).not.toContain('gone');
+    expect(section).toContain('team | MEMORY.md | memory-index:');
+    expect(section).not.toContain('dead:');
   });
 });

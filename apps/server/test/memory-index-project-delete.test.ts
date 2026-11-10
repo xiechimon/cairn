@@ -2,19 +2,30 @@ import { MEMORY_INDEX_TITLE } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { agentMemory } from '../src/db/schema.js';
-import { foldMemoryIndexes, listMemoryEntries } from '../src/services/memory.js';
+import { foldMemoryIndexes, listMemoryEntries, saveMemoryEntry } from '../src/services/memory.js';
 import { deleteProject } from '../src/services/projects.js';
-import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
+import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
 
 registerChiefHarness();
 
 test('deleting a project merges its MEMORY.md into the one team MEMORY.md', async () => {
-  await relay('save_memory', { title: 'team fact', content: '- 团队：一条', force: true });
-  await relay('save_memory', {
+  saveMemoryEntry(H.s.db, {
+    agentId: AGENT_ID,
+    teamId: H.teamId,
+    projectId: null,
+    sourceTodoId: null,
+    sourceBuildId: null,
+    title: 'team fact',
+    content: '- 团队：一条',
+  });
+  saveMemoryEntry(H.s.db, {
+    agentId: AGENT_ID,
+    teamId: H.teamId,
+    sourceTodoId: null,
+    sourceBuildId: null,
     title: 'project fact',
     content: '- 项目：一条',
     projectId: H.projectId,
-    force: true,
   });
   foldMemoryIndexes(H.s.db);
 

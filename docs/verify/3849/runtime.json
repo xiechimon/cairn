@@ -1,0 +1,89 @@
+{
+  "mode": "standalone process, real disk SQLite and production database reopen",
+  "injected": {
+    "id": "memory-index:tHOzSxv_VGqHkAWHl-2TB",
+    "title": "MEMORY.md",
+    "content": "",
+    "baseVersion": "memory-index:tHOzSxv_VGqHkAWHl-2TB:1794286204003:live:probe-team:team:probe-agent:false:core:MEMORY.md"
+  },
+  "workerUpdate": {
+    "id": "memory-index:markdown:5S4xuPngr624M5dxtFcjT",
+    "agentId": "probe-agent",
+    "projectId": null,
+    "source": "probe",
+    "sourceTodoId": "probe-todo",
+    "sourceBuildId": "probe-build",
+    "file": "MEMORY.md",
+    "scope": "team",
+    "baseVersion": "memory-index:markdown:5S4xuPngr624M5dxtFcjT:1794286204008:live:probe-team:team:probe-agent:false:core:MEMORY.md",
+    "updatedAt": 1794286204008,
+    "deleted": false,
+    "content": "- injected revision accepted",
+    "nextOffset": null
+  },
+  "staleUpdateStatus": 409,
+  "files": [
+    {
+      "id": "mInhITnEflYwx4W3dZqef",
+      "agentId": "probe-agent",
+      "projectId": null,
+      "source": null,
+      "sourceTodoId": null,
+      "sourceBuildId": null,
+      "file": "MEMORY (2).md",
+      "scope": "team",
+      "baseVersion": "mInhITnEflYwx4W3dZqef:1794286204013:live:probe-team:team:probe-agent:false:searchable:MEMORY (2).md",
+      "updatedAt": 1794286204013,
+      "deleted": false,
+      "firstLine": "first detail"
+    },
+    {
+      "id": "TZrgrLGZhFQJMSP0Vx3UV",
+      "agentId": "probe-agent",
+      "projectId": null,
+      "source": null,
+      "sourceTodoId": null,
+      "sourceBuildId": null,
+      "file": "MEMORY (3).md",
+      "scope": "team",
+      "baseVersion": "TZrgrLGZhFQJMSP0Vx3UV:1794286204018:live:probe-team:team:probe-agent:false:searchable:MEMORY (3).md",
+      "updatedAt": 1794286204018,
+      "deleted": false,
+      "firstLine": "second"
+    },
+    {
+      "id": "memory-index:markdown:BeKZn4yPvXTi7ZaTed7O6",
+      "agentId": "probe-agent",
+      "projectId": null,
+      "source": "memory-tidy",
+      "sourceTodoId": "probe-todo",
+      "sourceBuildId": "probe-build",
+      "file": "MEMORY.md",
+      "scope": "team",
+      "baseVersion": "memory-index:markdown:BeKZn4yPvXTi7ZaTed7O6:1794286204025:live:probe-team:team:probe-agent:false:core:MEMORY.md",
+      "updatedAt": 1794286204025,
+      "deleted": false,
+      "firstLine": "- tidied"
+    }
+  ],
+  "tidy": {
+    "applied": 1,
+    "skipped": 0
+  },
+  "reopened": {
+    "id": "memory-index:markdown:BeKZn4yPvXTi7ZaTed7O6",
+    "agentId": "probe-agent",
+    "projectId": null,
+    "source": "memory-tidy",
+    "sourceTodoId": "probe-todo",
+    "sourceBuildId": "probe-build",
+    "file": "MEMORY.md",
+    "scope": "team",
+    "baseVersion": "memory-index:markdown:BeKZn4yPvXTi7ZaTed7O6:1794286204025:live:probe-team:team:probe-agent:false:core:MEMORY.md",
+    "updatedAt": 1794286204025,
+    "deleted": false,
+    "content": "- tidied\n- [MEMORY.md](MEMORY%20(2).md)\n- [MEMORY.md](MEMORY%20(3).md)",
+    "nextOffset": null
+  },
+  "firstFileId": "mInhITnEflYwx4W3dZqef"
+}

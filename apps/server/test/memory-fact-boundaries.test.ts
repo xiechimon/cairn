@@ -54,8 +54,10 @@ test('every REST history flag and chief/worker tool lists active logical facts e
     expect(listMemoryEntries(H.s.db, scope(), suffix.endsWith('true'))).toHaveLength(1);
   }
   foldAndPurge();
-  const params = { includeInvalid: true };
-  expect(await relay('memories', params)).toMatchObject([{ id: 'fact', invalidAt: null }]);
+  const params = { scope: 'team' };
+  expect(await relay('memories', params)).toMatchObject({
+    documents: [{ file: 'fact' }, { file: 'MEMORY.md' }],
+  });
   const worker = JSON.parse(
     await executeWorkerMemoryTool(
       H.s.db,
@@ -70,8 +72,7 @@ test('every REST history flag and chief/worker tool lists active logical facts e
       params,
     ),
   );
-  expect(worker).toMatchObject([{ id: 'fact', invalidAt: null }]);
-  expect(worker).toHaveLength(1);
+  expect(worker.documents).toHaveLength(2);
 });
 
 test('projection preserves fact sources, dates and history instead of document metadata', () => {

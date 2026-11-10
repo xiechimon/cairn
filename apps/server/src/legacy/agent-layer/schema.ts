@@ -604,12 +604,6 @@ export const agentMemory = sqliteTable('agent_memory', {
   updatedAt: epochMs('updatedAt').notNull(),
 });
 
-export const memorySaveConflict = sqliteTable('memory_save_conflict', {
-  id: text('id').primaryKey(),
-  candidateIds: json<string[]>('candidateIds').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-});
-
 export const memoryCandidate = sqliteTable(
   'memory_candidate',
   {

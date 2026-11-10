@@ -1,9 +1,7 @@
 import { ISSUE_FENCE_OPEN } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
-import { memorySaveConflict } from '../src/db/schema.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { AGENT_ID, AGENT2_ID, H, registerChiefHarness, relay } from './chief-harness.js';
-import { postProject } from './helpers.js';
 
 registerChiefHarness();
 afterEach(() => H.s.dispose());
@@ -23,12 +21,13 @@ const saveIndependent = async (params: Record<string, unknown>) =>
         teamScoped: false,
       },
       'save_memory',
-      params,
+      { scope: 'team', file: params.title, content: params.content },
     ),
   ) as { id: string };
 
 for (const mode of ['chief', 'worker'] as const) {
   const invoke = async (name: string, params: Record<string, unknown>) => {
+    params = { scope: 'team', ...params };
     if (mode === 'chief') return relay(name, params);
     return JSON.parse(
       await executeWorkerMemoryTool(
@@ -47,272 +46,65 @@ for (const mode of ['chief', 'worker'] as const) {
       ),
     ) as unknown;
   };
-  const save = (params: Record<string, unknown>) =>
-    invoke('save_memory', { projectId: H.projectId, ...params });
+  const save = (params: Record<string, unknown>) => invoke('save_memory', params);
 
   describe(`${mode} memory dedupe`, () => {
-    test.each([
-      ['本仓包管理器', '本仓使用 npm 安装依赖', '本仓包管理器', '改成使用 pnpm'],
-      ['旧约定', '本仓使用 npm 安装依赖', '安装方式', '本仓使用 pnpm 安装依赖'],
-      [
-        'Runtime commands',
-        'Use npm for dependency installation',
-        'Dependencies',
-        'Use pnpm for dependency installation',
-      ],
-    ])('候选提示不落库：%s', async (title, content, nextTitle, nextContent) => {
-      const old = (await save({ title, content })) as { id: string };
-      const result = await save({ title: nextTitle, content: nextContent });
-      expect(result).toMatchObject({
-        status: 'candidates',
-        candidates: [{ id: old.id, title, content }],
-      });
-      expect((result as { hint: string }).hint).toContain('update_memory');
-      expect(await invoke('memories', {})).toHaveLength(1);
-    });
-
-    test('candidates only include same-project and global team memories, independent agents excluded, explicit project wins', async () => {
-      const otherProject = await postProject(H.s.app, 'other');
-      const global = (await relay('save_memory', {
-        title: '包管理器',
-        content: '全局使用 npm',
-      })) as { id: string };
-      const local = (await save({ title: '包管理器', content: '本仓使用 npm', force: true })) as {
-        id: string;
-      };
-      await relay('save_memory', {
-        title: '包管理器',
-        content: '别仓使用 yarn',
-        projectId: otherProject,
-        force: true,
-      });
-      await saveIndependent({ title: '包管理器', content: '别人使用 bun', projectId: H.projectId });
-      const result = (await save({ title: '包管理器', content: '本仓使用 pnpm' })) as {
-        candidates: { id: string }[];
-      };
-      expect(result.candidates.map((c) => c.id).sort()).toEqual([global.id, local.id].sort());
-      const other = (await save({
-        projectId: otherProject,
-        title: '包管理器',
-        content: '切换安装工具',
-      })) as { candidates: { id: string }[] };
-      expect(other.candidates.map((c) => c.id)).not.toContain(local.id);
-      const globalOnly = (await relay('save_memory', {
-        title: '包管理器',
-        content: '通用安装工具',
-      })) as { candidates: { id: string }[] };
-      expect(globalOnly.candidates.map((c) => c.id)).toEqual([global.id]);
-    });
-
-    test('different topics added directly, candidate only adds with force:true', async () => {
-      await save({ title: '包管理器', content: '使用 npm 安装依赖' });
-      await save({ title: '界面配色', content: '按钮采用蓝色' });
-      await expect(
-        save({ title: '包管理器', content: '使用 pnpm 安装依赖', force: 'true' }),
-      ).rejects.toMatchObject({ status: 400 });
-      expect(await save({ title: '包管理器', content: '使用 pnpm 安装依赖' })).toMatchObject({
-        status: 'candidates',
-      });
-      const added = (await save({
-        title: '包管理器',
-        content: '使用 pnpm 安装依赖',
-        force: true,
-      })) as { id: string };
-      expect(added.id).toEqual(expect.any(String));
-      expect(await invoke('memories', {})).toHaveLength(3);
-      await expect(
-        save({ title: '包管理器', content: '使用 pnpm 安装依赖', force: true }),
-      ).rejects.toMatchObject({ status: 409 });
-    });
-
-    test('candidate request same content retry returns 409, saved content retry also 409', async () => {
-      await save({ title: '包管理器', content: '使用 npm 安装依赖' });
-      const input = { title: '包管理器', content: '使用 pnpm 安装依赖' };
-      expect(await save(input)).toMatchObject({ status: 'candidates' });
-      await expect(save(input)).rejects.toMatchObject({ status: 409 });
-      await expect(save({ ...input, title: '安装工具' })).rejects.toMatchObject({ status: 409 });
-      await expect(save({ title: '包管理器', content: '使用 npm 安装依赖' })).rejects.toMatchObject(
-        { status: 409 },
-      );
-      expect(await invoke('memories', {})).toHaveLength(1);
-    });
-
-    test('same content with a changed title, no longer hitting a candidate, still cannot bypass the retry 409', async () => {
-      await save({ title: '工作规则', content: '蓝色按钮' });
-      expect(await save({ title: '工作规则', content: '部署使用容器' })).toMatchObject({
-        status: 'candidates',
-      });
-      await expect(save({ title: '发布环境', content: '部署使用容器' })).rejects.toMatchObject({
-        status: 409,
-      });
-    });
-
-    test('same body saves normally and clears the fingerprint after all candidates deleted, stays 409 while a candidate survives', async () => {
-      const first = (await save({ title: '包管理器', content: '使用 npm 安装依赖' })) as {
-        id: string;
-      };
-      const second = (await save({
-        title: '包管理器',
-        content: '使用 yarn 安装依赖',
-        force: true,
-      })) as { id: string };
-      const input = { title: '包管理器', content: '使用 pnpm 安装依赖' };
-      expect(await save(input)).toMatchObject({ status: 'candidates' });
-      expect(H.s.db.select().from(memorySaveConflict).all()).toHaveLength(1);
-
-      await invoke('delete_memory', { memoryId: first.id });
-      await expect(save(input)).rejects.toMatchObject({ status: 409 });
-
-      await invoke('delete_memory', { memoryId: second.id });
-      expect(H.s.db.select().from(memorySaveConflict).all()).toHaveLength(0);
-      expect(await save(input)).toMatchObject({ content: input.content });
-      expect(await invoke('memories', {})).toHaveLength(1);
-    });
-
-    test('when the candidate is deleted and a new similar entry replaces it, the same body gets a candidate again', async () => {
-      const first = (await save({ title: '包管理器', content: '使用 npm 安装依赖' })) as {
-        id: string;
-      };
-      const input = { title: '包管理器', content: '使用 pnpm 安装依赖' };
-      expect(await save(input)).toMatchObject({ status: 'candidates' });
-      await invoke('delete_memory', { memoryId: first.id });
-      const replacement = (await save({ title: '包管理器', content: '使用 bun 安装依赖' })) as {
-        id: string;
-      };
-      expect(await save(input)).toMatchObject({
-        status: 'candidates',
-        candidates: [{ id: replacement.id }],
-      });
-    });
-
-    test('a global memory changed to the body of a team project memory returns 409, an independent agent does not count', async () => {
-      const global = (await relay('save_memory', {
-        title: '全局约定',
-        content: '全局使用 npm',
-      })) as {
-        id: string;
-      };
-      const project = (await save({
-        title: '项目约定',
-        content: '本仓使用 pnpm',
-        force: true,
-      })) as {
-        id: string;
-      };
-      await saveIndependent({ title: '他人', content: '他人使用 bun', projectId: H.projectId });
-      const rejected = invoke('update_memory', { memoryId: global.id, content: '本仓使用 pnpm' });
-      await expect(rejected).rejects.toMatchObject({ status: 409 });
-      await expect(rejected).rejects.toThrow(project.id);
-      expect(
-        await invoke('update_memory', { memoryId: global.id, content: '他人使用 bun' }),
-      ).toMatchObject({ content: '他人使用 bun', projectId: null });
-    });
-
-    test('update_memory new entry inherits provenance, reuses old chain values, no change adds no entry', async () => {
-      const original = (await save({ title: '包管理器', content: '使用 npm' })) as {
-        id: string;
-        updatedAt: number;
-        projectId: string | null;
-        sourceTodoId: string | null;
-        sourceBuildId: string | null;
-      };
-      const second = (await invoke('update_memory', {
-        memoryId: original.id,
-        content: '使用 pnpm',
-      })) as { id: string };
-      expect(second).toMatchObject({
-        title: '包管理器',
-        content: '使用 pnpm',
-        projectId: original.projectId,
-        sourceTodoId: original.sourceTodoId,
-        sourceBuildId: original.sourceBuildId,
-        history: [{ title: '包管理器', content: '使用 npm', updatedAt: original.updatedAt }],
-      });
-      const third = (await invoke('update_memory', {
-        memoryId: second.id,
-        content: '使用 bun',
-      })) as { id: string };
-      await invoke('update_memory', { memoryId: third.id, content: '使用 bun' });
-      const rows = (await invoke('memories', {})) as {
-        id: string;
-        content: string;
-        history: { content: string }[];
-      }[];
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ id: third.id, content: '使用 bun' });
-      expect(rows[0]?.history.map((h) => h.content)).toEqual(['使用 npm', '使用 pnpm']);
-      expect(await invoke('memories', { includeInvalid: true })).toHaveLength(3);
-    });
-
-    test('update_memory changed to the body of another same-criteria entry returns 409 and names that id, cross-project or an independent agent does not count', async () => {
-      const otherProject = await postProject(H.s.app, 'other');
-      const local = (await save({ title: '包管理器', content: '使用 npm' })) as { id: string };
-      const global = (await relay('save_memory', {
-        title: '界面配色',
-        content: '按钮采用蓝色',
-      })) as { id: string };
-      const target = (await save({ title: '部署', content: '部署使用容器', force: true })) as {
-        id: string;
-      };
-      await relay('save_memory', {
-        title: '别仓',
-        content: '别仓使用 yarn',
-        projectId: otherProject,
-        force: true,
-      });
-      await saveIndependent({ title: '他人', content: '他人使用 bun', projectId: H.projectId });
-      for (const [content, id] of [
-        ['使用 npm', local.id],
-        ['按钮采用蓝色', global.id],
-      ] as const) {
-        const rejected = invoke('update_memory', { memoryId: target.id, content });
-        await expect(rejected).rejects.toMatchObject({ status: 409 });
-        await expect(rejected).rejects.toThrow(id);
-      }
-      for (const content of ['别仓使用 yarn', '他人使用 bun', '部署使用容器']) {
-        const updated = (await invoke('update_memory', {
-          memoryId: target.id,
-          content,
-        })) as { id: string };
-        expect(updated).toMatchObject({ content });
-        target.id = updated.id;
-      }
-      const contents = ((await invoke('memories', {})) as { content: string }[]).map(
-        (row) => row.content,
-      );
-      expect(new Set(contents).size).toBe(contents.length);
-    });
-
     test('updating a nonexistent or an independent agent memory returns 404', async () => {
-      const other = await saveIndependent({ title: '他人', content: '不可改' });
-      for (const memoryId of [other.id, 'missing']) {
-        await expect(invoke('update_memory', { memoryId, content: '覆盖' })).rejects.toMatchObject({
+      await saveIndependent({ title: '他人', content: '不可改' });
+      for (const memoryId of ['他人', 'missing']) {
+        await expect(
+          invoke('update_memory', { file: memoryId, baseVersion: 'missing', content: '覆盖' }),
+        ).rejects.toMatchObject({
           status: 404,
         });
       }
       await expect(
-        relay('update_memory', { memoryId: other.id, content: '覆盖' }, { chiefAgentId: null }),
-      ).rejects.toMatchObject({ status: 404 });
+        relay(
+          'update_memory',
+          { scope: 'team', file: '他人', baseVersion: 'missing', content: '覆盖' },
+          { chiefAgentId: null },
+        ),
+      ).rejects.toMatchObject({ status: 409 });
     });
 
-    test('issue fence cannot enter memory via save force or update', async () => {
-      const original = (await save({ title: '安全约定', content: '可信内容' })) as { id: string };
-      for (const field of ['title', 'content']) {
+    test('issue fence cannot enter memory via save or update', async () => {
+      const original = (await save({ file: '安全约定', content: '可信内容' })) as {
+        id: string;
+        baseVersion: string;
+      };
+      for (const field of ['file', 'content']) {
         await expect(
           save({
-            title: '安全约定',
+            file: 'new-file',
             content: '可信内容',
             [field]: `${ISSUE_FENCE_OPEN}untrusted`,
-            force: true,
           }),
         ).rejects.toMatchObject({ status: 400 });
       }
       await expect(
-        invoke('update_memory', { memoryId: original.id, content: `${ISSUE_FENCE_OPEN}untrusted` }),
+        invoke('update_memory', {
+          file: '安全约定',
+          baseVersion: original.baseVersion,
+          content: `${ISSUE_FENCE_OPEN}untrusted`,
+        }),
       ).rejects.toMatchObject({ status: 400 });
-      expect(await invoke('memories', {})).toMatchObject([
-        { id: original.id, content: '可信内容' },
-      ]);
+      expect(await invoke('memories', { file: '安全约定' })).toMatchObject({
+        id: original.id,
+        content: '可信内容',
+      });
     });
   });
 }
+
+test('only exact names conflict, content overlap never needs confirmation', async () => {
+  await relay('save_memory', { scope: 'team', file: 'one.md', content: 'same lesson' });
+  await expect(
+    relay('save_memory', { scope: 'team', file: 'two.md', content: 'same lesson' }),
+  ).resolves.toMatchObject({ content: 'same lesson' });
+  await expect(
+    relay('save_memory', { scope: 'team', file: 'one.md', content: 'other' }),
+  ).rejects.toMatchObject({ status: 409 });
+  await expect(
+    relay('save_memory', { scope: H.projectId, file: 'one.md', content: 'other' }),
+  ).resolves.toMatchObject({ content: 'other' });
+});

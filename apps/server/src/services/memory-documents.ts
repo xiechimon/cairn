@@ -5,6 +5,7 @@ import { agentMemory, project } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
+  allocateMemoryFileName,
   boundMemoryIndex,
   ensureMemoryIndex,
   MEMORY_MARKDOWN_INDEX_PREFIX,
@@ -355,5 +356,95 @@ export function executeMemoryDocumentTool(
     if (row.layer !== 'core')
       rewriteMemoryReferences(tx, row, [{ before: row, after: successor }], now);
     return result(successor);
+  });
+}
+
+export function appendMemoryIndex(
+  db: Db,
+  owner: MemoryDocumentOwner,
+  title: string,
+  detail: string,
+) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return db.transaction((tx) => {
+        const index = ensureMemoryIndex(tx, namespace(tx, owner, owner.projectId ?? 'team', true));
+        const currentText = memoryIndexText(index);
+        const label = title.replace(/[\r\n\0]+/g, ' ');
+        const line = `- ${label}：${detail}`;
+        const files = scopedRows(tx, namespace(tx, owner, owner.projectId ?? 'team')).all();
+        const existing = files.find(
+          (row) => row.layer === 'searchable' && row.invalidAt === null && row.content === detail,
+        );
+        const file =
+          existing?.title ??
+          allocateMemoryFileName(
+            title,
+            new Set([MEMORY_INDEX_TITLE, ...files.map((row) => row.title)]),
+          );
+        const reference = `- [${label}](${encodeURIComponent(file)})`;
+        if (currentText.split('\n').includes(line) || currentText.split('\n').includes(reference))
+          return false;
+        const content = [currentText, line].filter(Boolean).join('\n');
+        const spill = detail.includes('\n') || boundMemoryIndex(content).omitted > 0;
+        if (spill && !existing)
+          executeMemoryDocumentTool(tx, owner, 'save_memory', {
+            scope: owner.projectId ?? 'team',
+            file,
+            content: detail,
+          });
+        executeMemoryDocumentTool(tx, owner, 'update_memory', {
+          scope: owner.projectId ?? 'team',
+          file: MEMORY_INDEX_TITLE,
+          baseVersion: memoryDocumentVersion(index),
+          content: spill ? [currentText, reference].filter(Boolean).join('\n') : content,
+        });
+        return true;
+      });
+    } catch (error) {
+      if (!(error instanceof HttpError) || error.status !== 409 || attempt >= 1) throw error;
+    }
+  }
+}
+
+export function rememberMemoryFile(
+  db: Db,
+  owner: MemoryDocumentOwner,
+  title: string,
+  content: string,
+) {
+  return db.transaction((tx) => {
+    const ns = namespace(tx, owner, owner.projectId ?? 'team', true);
+    const existing = scopedRows(tx, ns)
+      .all()
+      .find((r) => r.layer === 'searchable' && r.invalidAt === null && r.content === content);
+    if (existing) return existing;
+    const file = allocateMemoryFileName(
+      title,
+      new Set([
+        MEMORY_INDEX_TITLE,
+        ...scopedRows(tx, ns)
+          .all()
+          .map((row) => row.title),
+      ]),
+    );
+    const saved = executeMemoryDocumentTool(tx, owner, 'save_memory', {
+      scope: owner.projectId ?? 'team',
+      file,
+      content,
+    }) as { id: string };
+    const index = ensureMemoryIndex(tx, ns);
+    executeMemoryDocumentTool(tx, owner, 'update_memory', {
+      scope: owner.projectId ?? 'team',
+      file: MEMORY_INDEX_TITLE,
+      baseVersion: memoryDocumentVersion(index),
+      content: [
+        memoryIndexText(index),
+        `- [${title.replace(/[\r\n\0]+/g, ' ')}](${encodeURIComponent(file)})`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
+    return saved;
   });
 }

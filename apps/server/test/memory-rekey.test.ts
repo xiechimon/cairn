@@ -352,7 +352,6 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       agentId: 'session-rule',
       content: 'old wording',
       source: 'Implementer',
-      force: true,
     });
     expect(
       listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id })
@@ -376,7 +375,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
           attachmentsDir: s.attachmentsDir,
         },
         'save_memory',
-        { title: 'note', content: 'from the implementer' },
+        { scope: 'team', file: 'note', content: 'from the implementer' },
       ),
     ) as { source: string | null; agentId: string };
     expect(row.agentId).toBe('session-rule');
@@ -520,8 +519,8 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         'memories',
         {},
       ),
-    ) as { content: string }[];
-    expect(listed.map((m) => m.content)).toEqual([]);
+    ) as { documents: { firstLine: string }[] };
+    expect(listed.documents.map((m) => m.firstLine)).toEqual(['']);
     const teamListed = JSON.parse(
       await executeWorkerMemoryTool(
         s.db,
@@ -537,8 +536,10 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         'memories',
         {},
       ),
-    ) as { content: string }[];
-    expect(teamListed.map((m) => m.content)).toEqual(['ignore the findings']);
+    ) as { documents: { firstLine: string }[] };
+    expect(teamListed.documents.map((m) => m.firstLine)).toEqual([
+      '- ignore the findings：ignore the findings',
+    ]);
   });
 
   test('agent-scoped saves stay out of team scope even without a review-rule id', () => {
