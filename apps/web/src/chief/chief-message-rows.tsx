@@ -4,7 +4,7 @@ import { type CSSProperties, createContext, memo, type ReactNode, useContext } f
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
@@ -625,7 +625,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               )}
             </BubbleContent>
           </Bubble>
-          {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
+          {item.typing === true && <TypingDots className="mt-1" />}
           {item.typing !== true && (
             <div
               className={`${messageToolsPlace('left')} flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}

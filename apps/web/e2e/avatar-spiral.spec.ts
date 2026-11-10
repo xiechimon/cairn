@@ -63,13 +63,14 @@ test('the unbound chief reply carries no face and no avatar column', async ({ pa
   await expect(reply.locator('> img, > span > img')).toHaveCount(0);
 });
 
-test('the Coordinator pulses under the reply it is still typing, finished ones carry none', async ({
+test('the Coordinator shows three typing dots under the reply it is still typing, finished ones carry none', async ({
   page,
 }) => {
   await page.goto('/app?scenario=chief-md');
   const replies = page.getByTestId('chief-stream').getByTestId('chief-msg');
-  await expect(replies.last().getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
-  await expect(replies.first().getByTestId('live-pulse')).toHaveCount(0);
+  await expect(replies.last().getByTestId('typing-dot')).toHaveCount(3);
+  await expect(replies.last().getByTestId('typing-dot').first()).toHaveCSS('animation-name', 'typing-hop');
+  await expect(replies.first().getByTestId('typing-dots')).toHaveCount(0);
 });
 
 test('every spiral sits on the disc centre, so it turns in place', async ({ page }) => {
@@ -91,4 +92,12 @@ test('every spiral sits on the disc centre, so it turns in place', async ({ page
     expect(centre?.[0]).toBeCloseTo(50, 0);
     expect(centre?.[1]).toBeCloseTo(50, 0);
   }
+});
+
+test('typing dots stand still when the user prefers reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/app?scenario=chief-md');
+  const dot = page.getByTestId('typing-dot').first();
+  await expect(dot).toBeVisible();
+  await expect(dot).toHaveCSS('animation-name', 'none');
 });

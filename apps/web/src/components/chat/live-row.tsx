@@ -39,6 +39,28 @@ export function LivePulse({ className }: { className?: string }) {
   );
 }
 
+export function TypingDots({ className }: { className?: string }) {
+  const { t } = useI18n();
+  return (
+    <span
+      role="status"
+      aria-label={t('正在回复')}
+      data-testid="typing-dots"
+      className={`inline-flex w-fit items-center gap-1 rounded-full bg-secondary px-3 py-2.5 ${className ?? ''}`}
+    >
+      {[0, 1, 2].map((n) => (
+        <span
+          key={n}
+          aria-hidden="true"
+          data-testid="typing-dot"
+          style={{ animationDelay: `${n * 0.15}s` }}
+          className="typing-dot block size-1.5 rounded-full bg-(--text-tertiary)"
+        />
+      ))}
+    </span>
+  );
+}
+
 export function LiveSignal({ at, className }: { at?: number | null; className: string }) {
   const { t } = useI18n();
   const secs = useLiveSeconds(at ?? null);
@@ -103,7 +125,12 @@ export function LiveRow({
         </Button>
       )}
       {disclosure != null && expanded && children}
-      {!waiting && <LivePulse className="mt-1 ml-0.5" />}
+      {!waiting &&
+        (variant === 'chief' ? (
+          <TypingDots className="mt-1" />
+        ) : (
+          <LivePulse className="mt-1 ml-0.5" />
+        ))}
     </div>
   );
 }

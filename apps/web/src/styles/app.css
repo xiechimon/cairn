@@ -444,6 +444,27 @@
   }
 }
 
+@keyframes typing-hop {
+  0%,
+  60%,
+  100% {
+    opacity: 0.45;
+    transform: none;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@utility typing-dot {
+  animation: typing-hop 1.2s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 @keyframes spiral-trace {
   from {
     stroke-dashoffset: 1;
