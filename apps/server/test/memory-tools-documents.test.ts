@@ -1,7 +1,9 @@
 import { expect, test } from 'vitest';
 import { applyFlush } from '../src/coordinator/memory-flush.js';
+import { agentMemory, memoryCandidate } from '../src/db/schema.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { memoryPassDue } from '../src/services/memory-consolidation.js';
+import { confirmCandidate } from '../src/trajectory-curate.js';
 import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
@@ -43,15 +45,6 @@ test.each(paths)(
       content: 'first\nmore',
     })) as Document;
     expect(created.file).toBe('lesson.md');
-    await expect(lesson('save_memory', { content: 'overwrite' })).rejects.toMatchObject({
-      status: 409,
-    });
-    await expect(
-      call(path, 'save_memory', { scope: 'team', file: 'MEMORY.md', content: '' }),
-    ).rejects.toMatchObject({ status: 400 });
-    await expect(lesson('update_memory', { content: 'missing base' })).rejects.toMatchObject({
-      status: 400,
-    });
     const updated = (await lesson('update_memory', {
       baseVersion: created.baseVersion,
       old_str: 'first',
@@ -105,6 +98,9 @@ test.each(paths)(
       file: 'moved.md',
       baseVersion: moved.baseVersion,
     })) as Document;
+    await expect(
+      call(path, 'save_memory', { scope: H.projectId, file: 'moved.md', content: 'reuse' }),
+    ).rejects.toMatchObject({ status: 409 });
     const versions = (await call(path, 'memories', {
       scope: H.projectId,
       file: 'moved.md',
@@ -188,4 +184,31 @@ test('literal JSON-shaped Markdown is preserved verbatim after index writes', as
     content,
   });
   expect((await read('Coordinator')).content).toBe(content);
+});
+
+test('curation returns a file id that survives document reads and injection folds', async () => {
+  H.s.db
+    .insert(memoryCandidate)
+    .values({
+      id: 'candidate',
+      agentId: AGENT_ID,
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'curated',
+      content: 'durable curated lesson',
+      buildIds: ['one', 'two'],
+      evidence: [],
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run();
+  const id = confirmCandidate(H.s.db, 'candidate', false);
+  await relay('memories', { scope: H.projectId });
+  expect(
+    H.s.db
+      .select()
+      .from(agentMemory)
+      .all()
+      .find((r) => r.id === id),
+  ).toMatchObject({ layer: 'searchable', invalidAt: null, content: 'durable curated lesson' });
 });

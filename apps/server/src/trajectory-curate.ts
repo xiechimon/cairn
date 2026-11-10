@@ -19,7 +19,8 @@ import type { Db } from './db/client.js';
 import { build, memoryCandidate, todo } from './db/schema.js';
 import { HttpError } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
-import { memoriesInScope, overlaps, saveMemoryEntry } from './services/memory.js';
+import { memoriesInScope, overlaps } from './services/memory.js';
+import { rememberMemoryFile } from './services/memory-documents.js';
 import { memoryOwnerOf } from './services/routing-rules.js';
 import { resolveLocalSkill } from './services/skills.js';
 
@@ -79,19 +80,21 @@ function promote(
   db: Db,
   row: CandidateRow,
   sourceBuildId: string,
-  force: boolean,
+  _force: boolean,
 ): { promoted: true; memoryId: string } | { promoted: false; conflictIds: string[] } {
   const source = db.select().from(build).where(eq(build.id, sourceBuildId)).get();
-  const saved = saveMemoryEntry(db, {
-    agentId: row.agentId,
-    teamId: row.teamId,
-    projectId: row.projectId,
-    title: row.title,
-    content: row.content,
-    sourceTodoId: source?.todoId ?? null,
-    sourceBuildId,
-    force,
-  });
+  const saved = rememberMemoryFile(
+    db,
+    {
+      agentId: row.agentId,
+      teamId: row.teamId,
+      projectId: row.projectId,
+      sourceTodoId: source?.todoId ?? null,
+      sourceBuildId,
+    },
+    row.title,
+    row.content,
+  );
   db.update(memoryCandidate)
     .set({ status: 'promoted', memoryId: saved.id, updatedAt: nowMs() })
     .where(eq(memoryCandidate.id, row.id))

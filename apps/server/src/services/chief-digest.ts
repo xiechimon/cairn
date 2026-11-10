@@ -53,7 +53,6 @@ import {
 import { coordinatorServerContextEnabled } from './coordinator-context.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { listMemoryEntries, saveMemoryEntry } from './memory.js';
 import {
   applyMemoryPass,
   MEMORY_PASS_MARK,
@@ -61,6 +60,7 @@ import {
   memoryPassSection,
   withMemoryPass,
 } from './memory-consolidation.js';
+import { rememberMemoryFile } from './memory-documents.js';
 import type { VapidKeys } from './push.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { serverTimezone } from './schedules.js';
@@ -643,23 +643,18 @@ export function finishChiefDigest(
         ...item,
         memory: { id, agentId: rememberAs },
       });
-      const entry = {
-        ...scope,
-        title: item.text.slice(0, 40),
-        content: item.text,
-        projectId: null,
-        sourceTodoId: null,
-        sourceBuildId: null,
-      };
-      const existing = listMemoryEntries(db, scope).find((row) => row.content === item.text);
-      if (existing) return link(existing.id);
       try {
-        const saved = saveMemoryEntry(db, entry);
-        return link(saved.id);
+        return link(
+          rememberMemoryFile(
+            db,
+            { ...scope, projectId: null, source: 'digest', sourceBuildId: thread.id },
+            item.text.slice(0, 40),
+            item.text,
+          ).id,
+        );
       } catch (err) {
-        if (!(err instanceof HttpError) || err.status !== 409) return item;
-        const same = listMemoryEntries(db, scope).find((row) => row.content === item.text);
-        return same === undefined ? item : link(same.id);
+        if (!(err instanceof HttpError)) throw err;
+        return item;
       }
     }),
   };

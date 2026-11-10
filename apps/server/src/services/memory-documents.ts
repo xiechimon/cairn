@@ -1,5 +1,5 @@
 import { MEMORY_INDEX_ID_PREFIX, MEMORY_INDEX_TITLE, memoryToolParamsSchemas } from '@cairn/shared';
-import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agentMemory, project } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
@@ -62,6 +62,9 @@ function scoped(owner: MemoryDocumentOwner) {
       : eq(agentMemory.projectId, owner.projectId),
   );
 }
+function scopedRows(db: Db | Tx, owner: MemoryDocumentOwner) {
+  return db.select().from(agentMemory).where(scoped(owner));
+}
 function metadata(row: Row) {
   return {
     id: row.id,
@@ -78,18 +81,10 @@ function metadata(row: Row) {
   };
 }
 function current(db: Db | Tx, owner: MemoryDocumentOwner, file: string) {
-  const rows = db
-    .select()
-    .from(agentMemory)
-    .where(
-      and(
-        scoped(owner),
-        eq(agentMemory.title, file),
-        or(eq(agentMemory.layer, 'core'), eq(agentMemory.layer, 'searchable')),
-      ),
-    )
+  const rows = scopedRows(db, owner)
     .orderBy(desc(agentMemory.updatedAt), sql`${agentMemory}.rowid desc`)
-    .all();
+    .all()
+    .filter((r) => r.title === file && (r.layer === 'core' || r.layer === 'searchable'));
   const leaves = rows.filter((r) => r.supersededBy === null);
   const row = leaves.find((r) => r.invalidAt === null) ?? leaves[0];
   if (!row) {
@@ -105,11 +100,9 @@ function current(db: Db | Tx, owner: MemoryDocumentOwner, file: string) {
 }
 function reserve(db: Db | Tx, owner: MemoryDocumentOwner, file: string, except?: string) {
   if (file === MEMORY_INDEX_TITLE) throw new HttpError(400, 'MEMORY.md is reserved for the index');
-  const row = db
-    .select()
-    .from(agentMemory)
-    .where(and(scoped(owner), eq(agentMemory.title, file), isNull(agentMemory.invalidAt)))
-    .get();
+  const row = scopedRows(db, owner)
+    .all()
+    .find((r) => r.title === file && (r.invalidAt === null || r.supersededBy === null));
   if (row && row.id !== except) throw new HttpError(409, `memory file ${file} already exists`);
 }
 function page(row: Row, offset = 0) {
@@ -211,17 +204,9 @@ export function executeMemoryDocumentTool(
         return response;
       }
       const all = namespaces.flatMap((ns) =>
-        tx
-          .select()
-          .from(agentMemory)
-          .where(
-            and(
-              scoped(ns),
-              isNull(agentMemory.invalidAt),
-              or(eq(agentMemory.layer, 'core'), eq(agentMemory.layer, 'searchable')),
-            ),
-          )
-          .all(),
+        scopedRows(tx, ns)
+          .all()
+          .filter((r) => r.invalidAt === null && (r.layer === 'core' || r.layer === 'searchable')),
       );
       const rows =
         input.query === undefined
@@ -403,4 +388,38 @@ export function appendMemoryIndex(
       if (!(error instanceof HttpError) || error.status !== 409 || attempt >= 1) throw error;
     }
   }
+}
+
+export function rememberMemoryFile(
+  db: Db,
+  owner: MemoryDocumentOwner,
+  title: string,
+  content: string,
+) {
+  return db.transaction((tx) => {
+    const ns = namespace(tx, owner, owner.projectId ?? 'team', true);
+    const existing = scopedRows(tx, ns)
+      .all()
+      .find((r) => r.layer === 'searchable' && r.invalidAt === null && r.content === content);
+    if (existing) return existing;
+    const file = `${title.replace(/[\r\n]+/g, ' ')}-${newRecordId()}.md`;
+    const saved = executeMemoryDocumentTool(tx, owner, 'save_memory', {
+      scope: owner.projectId ?? 'team',
+      file,
+      content,
+    }) as { id: string };
+    const index = ensureMemoryIndex(tx, ns);
+    executeMemoryDocumentTool(tx, owner, 'update_memory', {
+      scope: owner.projectId ?? 'team',
+      file: MEMORY_INDEX_TITLE,
+      baseVersion: memoryDocumentVersion(index),
+      content: [
+        memoryIndexText(index),
+        `- [${title.replace(/[\r\n]+/g, ' ')}](${encodeURIComponent(file)})`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
+    return saved;
+  });
 }

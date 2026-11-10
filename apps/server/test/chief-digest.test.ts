@@ -274,6 +274,17 @@ describe('chief long-chat digests (#1939)', () => {
       .get();
     expect(memory?.content).toBe('发布卡住时先查 npm 源');
     expect(memory?.agentId).toBe(COORDINATOR_RULE);
+    composeChiefSystemPrompt(
+      { db: w.s.db, hub: w.s.hub, user: w.s.user, skillsDir: w.s.skillsDir },
+      w.teamId,
+    );
+    expect(
+      w.s.db.select().from(agentMemory).where(eq(agentMemory.id, memoryId!)).get()?.invalidAt,
+    ).toBeNull();
+    const listed = await call(w.s.app, 'GET', `/api/teams/${w.teamId}/memories`);
+    expect(((await listed.json()) as { id: string }[]).some((row) => row.id === memoryId)).toBe(
+      true,
+    );
     const main = w.s.db.select().from(chiefThread).where(eq(chiefThread.id, w.threadId)).get();
     expect(main?.sessionId).toBe('');
     expect(
@@ -308,6 +319,7 @@ describe('chief long-chat digests (#1939)', () => {
       .insert(agentMemory)
       .values({
         id: 'mem-old',
+        layer: 'searchable',
         agentId: COORDINATOR_RULE,
         teamId: w.teamId,
         title: '发布',

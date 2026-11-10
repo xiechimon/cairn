@@ -15,6 +15,8 @@ import { req } from './helpers.js';
 
 registerChiefHarness();
 const scope = () => ({ agentId: AGENT_ID, teamId: H.teamId, projectId: null });
+const update = async (params: { memoryId: string; content: string }) =>
+  updateMemoryEntry(H.s.db, { ...scope(), ...params });
 const facts = () => H.s.db.transaction((tx) => memoriesInScope(tx, scope()));
 const save = async (title: string, content: string) =>
   saveMemoryEntry(H.s.db, {
@@ -74,6 +76,46 @@ test('forgetting a retained fact removes only that fact after its original row h
   );
   expect(facts()).toMatchObject([{ id: second.id, content: 'Attach evidence.' }]);
   expect(facts()).toHaveLength(1);
+});
+
+test('fact updates version just that fact and leave sibling references intact', async () => {
+  const first = await save('release', 'Squash only.');
+  const second = await save('proof', 'Attach evidence.');
+  foldMemoryIndexes(H.s.db);
+  const updated = (await update({
+    memoryId: first.id,
+    content: 'Use merge commits.',
+  })) as { id: string; createdAt: number; updatedAt: number };
+  expect(updated.id).not.toBe(first.id);
+  expect(updated.createdAt).toBe(updated.updatedAt);
+  const document = listStoredMemoryEntries(H.s.db, scope()).find((row) => row.layer === 'core')!;
+  await expect(
+    update({ memoryId: document.id, content: 'not an encoded index' }),
+  ).rejects.toMatchObject({ status: 400 });
+  expect(facts()).toMatchObject([
+    { id: updated.id, content: 'Use merge commits.' },
+    { id: second.id, content: 'Attach evidence.' },
+  ]);
+  await expect(update({ memoryId: first.id, content: 'stale' })).rejects.toMatchObject({
+    status: 409,
+  });
+});
+
+test('multiline facts stay lossless through repeated folds and file edits', async () => {
+  const first = await save('DB：prod\nnotes', 'first\nsecond\n');
+  foldMemoryIndexes(H.s.db);
+  expect(facts()).toMatchObject([{ id: first.id, content: 'first\nsecond\n' }]);
+  const response = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/memories`);
+  expect(await response.json()).toHaveLength(1);
+  const file = listStoredMemoryEntries(H.s.db, scope()).find((row) => row.layer === 'searchable')!;
+  const updated = (await update({
+    memoryId: file.id,
+    content: 'edited\nfile',
+  })) as { id: string };
+  foldMemoryIndexes(H.s.db);
+  expect(facts()).toMatchObject([
+    { id: updated.id, title: 'DB：prod\nnotes', content: 'edited\nfile' },
+  ]);
 });
 
 test('promotion retains the fact ID referenced by digest and trajectory rows', async () => {

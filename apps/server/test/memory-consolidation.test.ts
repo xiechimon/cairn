@@ -1,8 +1,14 @@
 import { chiefDigestThreadId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agentMemory, chief as chiefTable, chiefThread, step } from '../src/db/schema.js';
-import { queueDigestStep } from '../src/services/chief-digest.js';
+import {
+  agentMemory,
+  chiefMessage,
+  chief as chiefTable,
+  chiefThread,
+  step,
+} from '../src/db/schema.js';
+import { finishChiefDigest, queueDigestStep } from '../src/services/chief-digest.js';
 import { chiefTurnContext } from '../src/services/coordinator-steps.js';
 import { listMemoryEntries } from '../src/services/memory.js';
 import {
@@ -59,6 +65,12 @@ const edit = async (content: string) => {
   })) as Doc;
 };
 
+const update = (base: Doc, params: Record<string, unknown>) => ({
+  tool: 'update_memory',
+  params: { scope: 'team', file: 'MEMORY.md', baseVersion: base.baseVersion, ...params },
+});
+const pass = (operations: unknown[]) => applyMemoryPass(H.s.db, scope(), { operations }, NOW);
+
 test('tidy digest schedules over-bound indexes, includes fresh revisions and preserves the meta line', async () => {
   const index = await edit('line\n'.repeat(205));
   const chief = H.s.db.select().from(chiefTable).where(eq(chiefTable.id, H.chiefId)).get()!;
@@ -82,27 +94,10 @@ test('tidy digest schedules over-bound indexes, includes fresh revisions and pre
 test('tidy re-reads a stale unique replacement and preserves the concurrent appended line', async () => {
   const first = await edit('detail\nkeep');
   await edit('detail\nkeep\nconcurrent');
-  expect(
-    applyMemoryPass(
-      H.s.db,
-      scope(),
-      {
-        operations: [
-          {
-            tool: 'update_memory',
-            params: {
-              scope: 'team',
-              file: 'MEMORY.md',
-              baseVersion: first.baseVersion,
-              old_str: 'detail',
-              new_str: '[detail](detail.md)',
-            },
-          },
-        ],
-      },
-      Date.now(),
-    ),
-  ).toEqual({ applied: 1, skipped: 0 });
+  expect(pass([update(first, { old_str: 'detail', new_str: '[detail](detail.md)' })])).toEqual({
+    applied: 1,
+    skipped: 0,
+  });
   expect((await read()).content).toBe('[detail](detail.md)\nkeep\nconcurrent');
 });
 
@@ -115,33 +110,10 @@ test('tidy retains committed file moves and versions when a later stale full rep
   const first = await edit('detail');
   await edit('detail\nconcurrent');
   expect(
-    applyMemoryPass(
-      H.s.db,
-      scope(),
-      {
-        operations: [
-          {
-            tool: 'update_memory',
-            params: {
-              scope: 'team',
-              file: 'detail.md',
-              baseVersion: file.baseVersion,
-              moveTo: H.projectId,
-            },
-          },
-          {
-            tool: 'update_memory',
-            params: {
-              scope: 'team',
-              file: 'MEMORY.md',
-              baseVersion: first.baseVersion,
-              content: 'blind overwrite',
-            },
-          },
-        ],
-      },
-      Date.now(),
-    ),
+    pass([
+      update(file, { file: 'detail.md', moveTo: H.projectId }),
+      update(first, { content: 'blind overwrite' }),
+    ]),
   ).toEqual({ applied: 1, skipped: 1 });
   expect((await read()).content).toContain('concurrent');
   expect(await relay('memories', { scope: H.projectId, file: 'detail.md' })).toMatchObject({
@@ -179,6 +151,42 @@ describe('the weekly pass rides on the digest step', () => {
     expect(H.s.db.select().from(step).where(eq(step.id, later)).get()?.prompt).not.toContain(
       MEMORY_PASS_MARK,
     );
+  });
+
+  test('a failed digest applies nothing and a successful one applies the memory field', async () => {
+    const index = await edit('line\n'.repeat(205));
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'last-row',
+        threadId: H.threadId,
+        role: 'user',
+        content: 'hi',
+        createdAt: NOW - 5,
+      })
+      .run();
+    const meta = `\nDigest thread=${H.threadId} until=${NOW - 5} last=last-row reason=daily`;
+    const stepId = queueDigestStep(H.s.svc, chiefRow(), `prompt${meta}`, NOW);
+    const reply = (text: string) =>
+      H.s.db
+        .insert(chiefMessage)
+        .values({
+          id: `reply-${Math.random()}`,
+          threadId: chiefDigestThreadId(H.chiefId),
+          role: 'assistant',
+          content: text,
+          createdAt: NOW,
+        })
+        .run();
+    const stepRow = () => H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
+    reply(
+      JSON.stringify({ items: [], memory: { operations: [update(index, { content: 'short' })] } }),
+    );
+    finishChiefDigest(H.s.svc, stepRow(), { status: 'failed' } as never, NOW);
+    expect((await read()).content).toBe(index.content);
+    finishChiefDigest(H.s.svc, stepRow(), { status: 'success' } as never, NOW);
+    expect(stepRow().status).toBe('done');
+    expect((await read()).content).toBe('short');
   });
 });
 

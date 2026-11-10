@@ -100,6 +100,16 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     s.dispose();
   });
 
+  test('chief 51-vocabulary does not leak out: worker step relay with a non-memory tool = 400 (org/execution surfaces chief-only)', async () => {
+    const { s, token, step } = await world();
+    for (const name of ['create_todo', 'run_builds', 'projects', 'schedule_todo', 'models']) {
+      const res = await relay(s.app, token, step.step.id, name, {});
+      expect(res.status, name).toBe(400);
+      expect(Object.keys((await res.json()) as Record<string, unknown>)).toEqual(['error']);
+    }
+    s.dispose();
+  });
+
   test('HTTP worker relay rejects missing, stale and reserved writes', async () => {
     const { s, token, step, projectId } = await world();
     const send = (name: string, params: Record<string, unknown>) =>
