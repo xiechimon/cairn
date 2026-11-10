@@ -1,26 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, TASK, taskEntry, THREAD } from './chief-home-mock';
+import { createdTodoMessage as created } from '../test/fixtures/chief-create-todo.js';
+import { mockLive, TASK as BASE_TASK, taskEntry, THREAD } from './chief-home-mock';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-const created = {
-  id: 'm2',
-  role: 'assistant',
-  content: {
-    kind: 'toolcall',
-    call: {
-      id: 'c-m2',
-      name: 'create_todo',
-      arguments: { title: TASK.title, projectId: 'proj-1', spec: 's' },
-      result: { id: TASK.id, seqNum: TASK.seqNum, title: TASK.title },
-      startedAt: 11,
-      endedAt: 12,
-    },
-  },
-  createdAt: 11,
-};
+const TASK = { ...BASE_TASK, title: created.content.call.arguments.title };
 
 const report = (id: string, line: string, createdAt: number) => ({
   id,
@@ -60,7 +46,8 @@ test('a task the Coordinator created shows as a card after its reply, with statu
   await mockLive(page, {
     threads: [THREAD],
     messages: MESSAGES,
-    tasks: [taskEntry({ section: 'working' })],
+    todos: [TASK],
+    tasks: [taskEntry({ section: 'working', title: TASK.title })],
   });
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
@@ -80,7 +67,7 @@ test('a task the Coordinator created shows as a card after its reply, with statu
 });
 
 test('a created task the Tasks read no longer lists falls back to a one-line link', async ({ page }) => {
-  await mockLive(page, { threads: [THREAD], messages: MESSAGES, tasks: [] });
+  await mockLive(page, { threads: [THREAD], messages: MESSAGES, todos: [TASK], tasks: [] });
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
   await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);

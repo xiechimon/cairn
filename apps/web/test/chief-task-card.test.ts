@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapChiefStream } from '../src/api/mappers.js';
 import { taskCardFacts } from '../src/board/task-card-facts.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
+import { createdTodoMessage as created } from './fixtures/chief-create-todo.js';
 
 const NOW = 1_758_000_000_000;
 
@@ -32,6 +33,13 @@ function said(id: string, role: 'user' | 'assistant', text: string): MessageRow 
 const CREATE = { projectId: 'p1', title: 'Enforce public-content checks', spec: 's' };
 
 describe('a task the Coordinator creates becomes a task card in the conversation', () => {
+  test('a stored MCP create_todo result renders the task card', () => {
+    expect(mapChiefStream([created])).toContainEqual({
+      kind: 'task-card', todoId: 'todo-1', id: 'm2:task-card',
+      projectId: 'proj-1', seq: 9, title: 'Enforce public-content checks',
+    });
+  });
+
   test('the card follows the reply that announced it and carries the task project', () => {
     const items = mapChiefStream([
       said('u1', 'user', 'Block internal addresses in hooks and CI'),
