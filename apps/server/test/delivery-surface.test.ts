@@ -3,6 +3,7 @@ import { CHANGES_DIFF_MAX_BYTES, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   apiKey,
   build as buildTable,
@@ -51,7 +52,7 @@ async function setupWorld(): Promise<World> {
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'm704', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'm704', cliVersion: '0.1.0' }),
   });
   const machineJson = (await enrollRes.json()) as { token: string };
   seedSessionRoute(s, {

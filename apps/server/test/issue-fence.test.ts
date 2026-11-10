@@ -2,6 +2,7 @@ import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   chiefMessage as chiefMessageTable,
   chief as chiefTable,
@@ -101,7 +102,7 @@ beforeEach(async () => {
   const key = await issueApiKey(s);
   const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'fence-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'fence-mbp', cliVersion: '0.1.0' }),
   });
   machineToken = ((await enroll.json()) as { token: string }).token;
   seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model' });

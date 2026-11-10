@@ -13,6 +13,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { onTestFinished } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
@@ -101,7 +102,7 @@ export class FakeMachineApi implements MachineApi {
     };
   }
   async me() {
-    return {
+    return readyMachine({
       id: 'm1',
       name: 'n',
       teamId: 't1',
@@ -110,7 +111,7 @@ export class FakeMachineApi implements MachineApi {
       kind: 'remote' as const,
       enabledRuntimes: [],
       ...this.mePatch,
-    };
+    });
   }
   async presence(body?: { cliVersion?: string; claudeCode?: unknown }) {
     this.calls.push('presence');

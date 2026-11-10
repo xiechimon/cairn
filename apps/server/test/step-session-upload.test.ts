@@ -9,6 +9,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { step as stepTable } from '../src/db/schema.js';
 import { ATTACHMENT_ORPHAN_GRACE_MS, sweepStepSessions } from '../src/services/attachment-gc.js';
 import { readStepSession, stepSessionPath } from '../src/services/machine-uploads.js';
@@ -32,7 +33,7 @@ async function setupWorld(): Promise<World> {
   const enrollAuth = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ teamId: s.team.id, name: 'session-machine' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'session-machine' })),
   });
   expect(enrollAuth.status).toBe(200);
   const machineJson = machineEnrollResponseSchema.parse(await enrollAuth.json());

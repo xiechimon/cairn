@@ -12,6 +12,7 @@ import {
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { skillAudit } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
@@ -441,7 +442,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
     const key = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: key,
-      body: { teamId: s.team.id, name: 'skill-write', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name: 'skill-write', cliVersion: '0.1.0' }),
     });
     const { token } = (await enroll.json()) as { token: string };
     const routeId = seedSessionRoute(s, { provider: 'p', modelId: 'm', tools: opts.tools });
@@ -669,7 +670,7 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
     const key = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: key,
-      body: { teamId: s.team.id, name: 'skill-pkg', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name: 'skill-pkg', cliVersion: '0.1.0' }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedSessionRoute(s, {
@@ -737,7 +738,7 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
       const key2 = await issueApiKey(s);
       const enroll2 = await call(s.app, 'POST', '/api/machine/enroll', {
         cred: key2,
-        body: { teamId: s.team.id, name: 'other-machine', cliVersion: '0.1.0' },
+        body: readyMachine({ teamId: s.team.id, name: 'other-machine', cliVersion: '0.1.0' }),
       });
 
       const { token: token2 } = (await enroll2.json()) as { token: string };
@@ -814,7 +815,7 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
     const key = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: key,
-      body: { teamId: s.team.id, name: 'chief-pkg', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name: 'chief-pkg', cliVersion: '0.1.0' }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedRoute(s, 'coordinator', { provider: 'p', modelId: 'stub-model' });

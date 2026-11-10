@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -56,17 +57,19 @@ function makeWorld(step: {
   s.db.insert(projectTable).values({ id: 'proj-sweep', name: 'sweep', teamId }).run();
   s.db
     .insert(machineTable)
-    .values({
-      id: machineId,
-      teamId,
-      name: 'sweep-box',
-      online: step.machineOnline ?? false,
-      ...(step.machineRuntimes !== undefined
-        ? { enabledRuntimes: step.machineRuntimes }
-        : step.withRoute
-          ? { enabledRuntimes: ['pi'] }
-          : {}),
-    })
+    .values(
+      readyMachine({
+        id: machineId,
+        teamId,
+        name: 'sweep-box',
+        online: step.machineOnline ?? false,
+        ...(step.machineRuntimes !== undefined
+          ? { enabledRuntimes: step.machineRuntimes }
+          : step.withRoute
+            ? { enabledRuntimes: ['pi'] }
+            : {}),
+      }),
+    )
     .run();
   const routeId = withRoute
     ? seedSessionRoute(s, {
@@ -165,7 +168,10 @@ function stepEventOf(events: object[], stepId: string): { status: string } {
 
 function addOnlineMachine(w: BuildWorld, name = 'mea'): string {
   const id = `machine-${Math.random().toString(36).slice(2)}`;
-  w.s.db.insert(machineTable).values({ id, teamId: w.teamId, name, online: true }).run();
+  w.s.db
+    .insert(machineTable)
+    .values(readyMachine({ id, teamId: w.teamId, name, online: true }))
+    .run();
   return id;
 }
 
@@ -220,7 +226,15 @@ describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildStep
     const meaId = `machine-mea-${Math.random().toString(36).slice(2)}`;
     w.s.db
       .insert(machineTable)
-      .values({ id: meaId, teamId: w.teamId, name: 'mea', online: true, enabledRuntimes: ['pi'] })
+      .values(
+        readyMachine({
+          id: meaId,
+          teamId: w.teamId,
+          name: 'mea',
+          online: true,
+          enabledRuntimes: ['pi'],
+        }),
+      )
       .run();
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -300,12 +314,14 @@ describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildStep
     const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
     w.s.db
       .insert(machineTable)
-      .values({
-        id: `machine-mea-${Math.random().toString(36).slice(2)}`,
-        teamId: w.teamId,
-        name: 'mea',
-        online: true,
-      })
+      .values(
+        readyMachine({
+          id: `machine-mea-${Math.random().toString(36).slice(2)}`,
+          teamId: w.teamId,
+          name: 'mea',
+          online: true,
+        }),
+      )
       .run();
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);

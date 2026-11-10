@@ -1,6 +1,7 @@
 import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, step, todo } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
 import { requestMerge } from '../src/services/builds.js';
@@ -137,7 +138,7 @@ test('claiming an enqueued merge keeps its pinned base in the daemon repository 
     const enrolled = await w.s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: w.s.team.id, name: 'pinned-builder' }),
+      body: JSON.stringify(readyMachine({ teamId: w.s.team.id, name: 'pinned-builder' })),
     });
     const { token } = (await enrolled.json()) as { token: string };
     await req(w.s.app, 'PATCH', `/api/projects/${w.project.id}`, { baseBranch: 'main' });

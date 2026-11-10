@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ClaudeAuthStateWire, ClaudeCodeReport } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chief as chiefTable,
@@ -416,7 +417,9 @@ describe('presence stores Claude Code login and the machine record exposes it', 
     const enrolled = await s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: s.team.id, name: 'omarchy', cliVersion: '0.1.0' }),
+      body: JSON.stringify(
+        readyMachine({ teamId: s.team.id, name: 'omarchy', cliVersion: '0.1.0' }),
+      ),
     });
     expect(enrolled.status).toBe(200);
     const { machineId, token } = (await enrolled.json()) as { machineId: string; token: string };

@@ -8,6 +8,7 @@ import {
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { agentMemory } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
@@ -213,7 +214,7 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     const plain = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: plain,
-      body: { teamId: s.team.id, name: 'm4b-mbp', cliVersion },
+      body: readyMachine({ teamId: s.team.id, name: 'm4b-mbp', cliVersion }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });

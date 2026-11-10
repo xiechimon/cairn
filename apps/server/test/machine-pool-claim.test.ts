@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -46,12 +47,14 @@ async function machineOf(
   const res = await w.s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      teamId: w.s.team.id,
-      name,
-      cliVersion: '0.1.0',
-      capabilities: { mcpServers: [], skills: [], executor: opts.executor ?? 'host' },
-    }),
+    body: JSON.stringify(
+      readyMachine({
+        teamId: w.s.team.id,
+        name,
+        cliVersion: '0.1.0',
+        capabilities: { mcpServers: [], skills: [], executor: opts.executor ?? 'host' },
+      }),
+    ),
   });
   expect(res.status).toBe(200);
   const { machineId } = (await res.json()) as { machineId: string };

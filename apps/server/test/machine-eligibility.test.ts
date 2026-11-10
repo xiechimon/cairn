@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   type EligibilityInput,
   machineEligibility,
@@ -12,7 +13,7 @@ function input(over: {
   rest?: Partial<Omit<EligibilityInput, 'machine' | 'agent' | 'model'>>;
 }): EligibilityInput {
   return {
-    machine: {
+    machine: readyMachine({
       id: 'mac',
       name: 'mac',
       enabledRuntimes: ['claude-code', 'pi'],
@@ -23,7 +24,7 @@ function input(over: {
       },
       capabilities: { mcpServers: ['figma'], skills: [], executor: 'host' },
       ...over.machine,
-    },
+    }),
     agent: { machineId: 'omarchy', requiredCapabilities: null, ...over.agent },
     model: { provider: 'claude-code', modelId: 'claude-sonnet-5-5', ...over.model },
     catalog: [],

@@ -1,6 +1,7 @@
 import { type ClaimedStep, MEMORY_QUOTA_PER_TEAM, memoryRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { agentMemory, build as buildTable } from '../src/db/schema.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { listMemoryEntries } from '../src/services/memory.js';
@@ -31,7 +32,7 @@ async function world() {
   const plain = await issueApiKey(s);
   const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: plain,
-    body: { teamId: s.team.id, name: 'm4b-mem', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'm4b-mem', cliVersion: '0.1.0' }),
   });
   const { token } = (await enroll.json()) as { token: string };
   seedSessionRoute(s, { id: OWNER_ID, provider: 'p', modelId: 'm' });

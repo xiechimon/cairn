@@ -1,6 +1,7 @@
 import { type ClaimedStep, chiefDigestThreadId } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { agentMemory, chiefThread, step } from '../src/db/schema.js';
 import { buildChiefSystemPrompt, enqueueChiefStep } from '../src/services/chief.js';
 import { chiefTurnContext } from '../src/services/coordinator-steps.js';
@@ -165,7 +166,9 @@ async function machineToken() {
   const enrolled = await H.s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: H.teamId, name: 'injection', cliVersion: '9.9.9' }),
+    body: JSON.stringify(
+      readyMachine({ teamId: H.teamId, name: 'injection', cliVersion: '9.9.9' }),
+    ),
   });
   expect(enrolled.status).toBe(200);
   const { token } = (await enrolled.json()) as { token: string };
