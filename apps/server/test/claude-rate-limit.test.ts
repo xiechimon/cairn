@@ -309,6 +309,39 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
+  test('a continuing session on A is not parked for a rate-blocked rule machine B', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const session = await enroll(s, await issueKey(s, 'session-key'), 'session-host');
+    const rule = await enroll(s, await issueKey(s, 'rule-key'), 'rule-host');
+    useSessionRoute(s, rule.machineId, 'claude-code');
+    const buildId = await startBuild(s);
+    const pending = stepOfBuild(s, buildId);
+    s.db
+      .insert(stepTable)
+      .values({
+        id: `prior-${pending.id}`,
+        buildId,
+        kind: 'session',
+        machineId: session.machineId,
+        status: 'done',
+        prompt: null,
+        freshSession: false,
+        sessionId: 'sess-a',
+        createdAt: pending.createdAt - 1,
+      })
+      .run();
+    await report(s, rule.token, rule.machineId, {
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      resetsAt: Date.now() + 2 * HOUR,
+    });
+    expect(s.db.select().from(stepTable).where(eq(stepTable.id, pending.id)).get()?.status).toBe(
+      'pending',
+    );
+    expect((await claim(s, session.token))?.step.buildId).toBe(buildId);
+    s.dispose();
+  });
+
   test('another online machine does not take a rate-blocked owner step', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const owner = await enroll(s, await issueKey(s, 'owner-key'), 'omarchy');
