@@ -1899,6 +1899,7 @@ export const EN: Record<string, string> = {
   定时没能加载: 'Schedules could not be loaded',
   '添加任务…': 'Add a task…',
   添加: 'Add',
+  '任务没有发出，请重试。': 'The task was not sent. Try again.',
   暂停定时: 'Pause schedule',
   恢复定时: 'Resume schedule',
   立即运行: 'Run now',

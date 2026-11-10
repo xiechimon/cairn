@@ -269,9 +269,9 @@ export function TasksPanel({
       {adding && (
         <TasksAddInput
           onClose={() => setAdding(false)}
-          onSubmit={(text) => {
+          onSubmit={async (text) => {
+            await onAddTask(text);
             setAdding(false);
-            void onAddTask(text);
           }}
         />
       )}
