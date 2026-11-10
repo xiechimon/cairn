@@ -568,6 +568,14 @@ test('without a computer row the machine keeps the waiting placeholder and disab
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
+  await card.getByRole('switch', { name: '桌面控制' }).click({ force: true });
+  await expect(
+    page.locator('[data-sonner-toast]', { hasText: '未开启桌面控制，开启后这里显示屏幕' }),
+  ).toBeVisible();
+  await card.getByRole('switch', { name: '浏览器' }).click({ force: true });
+  await expect(
+    page.locator('[data-sonner-toast]', { hasText: '这台机器还不支持浏览器。' }),
+  ).toBeVisible();
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);

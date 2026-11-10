@@ -1,5 +1,7 @@
 import type { Switch as SwitchPrimitive } from '@base-ui/react/switch';
 import { cn } from 'cn';
+import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import { Switch } from './ui/switch.js';
 
 const TOGGLE_SWITCH_CLS =
@@ -7,4 +9,30 @@ const TOGGLE_SWITCH_CLS =
 
 export function ToggleSwitch({ className, ...props }: SwitchPrimitive.Root.Props) {
   return <Switch className={cn(TOGGLE_SWITCH_CLS, className)} {...props} />;
+}
+
+export function ExplainDisabledToggle({
+  disabled,
+  reason,
+  className,
+  children,
+}: {
+  disabled: boolean;
+  reason: string | undefined;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={className}
+      onClickCapture={(event) => {
+        if (!disabled || reason === undefined || reason === '') return;
+        event.preventDefault();
+        event.stopPropagation();
+        toast(reason);
+      }}
+    >
+      {children}
+    </span>
+  );
 }
