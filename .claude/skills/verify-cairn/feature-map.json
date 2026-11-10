@@ -2424,16 +2424,15 @@
     {
       "id": "thread-tags",
       "name": "Thread tags",
-      "summary": "The fixed tag vocabulary on threads, set by agents and users.",
-      "states": "Tags from the fixed vocabulary appear on thread rows.",
+      "summary": "Legacy category APIs retained during staged retirement; ordinary worker metadata is title-only.",
+      "states": "No category settings tab or ordinary worker category input. Legacy assignment APIs and read-only membership remain until their retirement segments; GitHub labels are separate.",
       "centrality": 4,
       "status": "shipped",
       "code": {
         "server": [
-          "apps/server/src/services/tags.ts"
-        ],
-        "daemon": [
-          "apps/daemon/src/tag-tool.ts"
+          "apps/server/src/services/tags.ts",
+          "apps/server/src/routes-projects.ts",
+          "apps/server/src/services/todos.ts"
         ]
       },
       "routes": {
@@ -2447,9 +2446,9 @@
       "verify": [
         ".claude/skills/verify-cairn/features/tags.md"
       ],
-      "research": {
-        "gap": "no note on whether tags still earn their place after D58"
-      },
+      "research": [
+        "docs/research/thread-category-runtime-cutover-3481.md"
+      ],
       "frontendDesign": [
         "docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md"
       ],
@@ -2457,10 +2456,41 @@
         "docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md"
       ],
       "evidence": [
+        "apps/server/test/task-meta.test.ts",
+        "apps/server/test/correction-classification.test.ts",
+        "apps/daemon/test/task-meta-prompt.test.ts",
+        "apps/daemon/test/worker-meta-sdk.test.ts"
+      ]
+    },
+    {
+      "id": "git-release-tags",
+      "name": "Git release tags",
+      "summary": "The existing daemon-local create_tag tool creates and pushes annotated Git tags, independently of task categories.",
+      "states": "Repository-bound invocation, successful tag push, invalid input or Git failure; no product page.",
+      "centrality": 4,
+      "status": "shipped",
+      "code": {
+        "daemon": [
+          "apps/daemon/src/tag-tool.ts"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "type a repository task whose worker claim enables create_tag"
+      ],
+      "research": [
+        "docs/research/thread-category-runtime-cutover-3481.md"
+      ],
+      "frontendDesign": {
+        "na": "an existing daemon-local repository tool with no UI"
+      },
+      "backendDesign": [
+        "docs/research/thread-category-runtime-cutover-3481.md"
+      ],
+      "evidence": [
         "apps/daemon/test/tag-tool.test.ts",
         "apps/daemon/test/runner-create-tag.test.ts"
-      ],
-      "batch": "B11"
+      ]
     },
     {
       "id": "ios-app",

@@ -66,7 +66,7 @@ describe('step execution full chain (02 §5.7 lifecycle lines + journal endpoint
     );
     expect(opts.systemPrompt).toContain('职责说明');
     expect(opts.systemPrompt).toContain('set_task_meta');
-    expect(opts.systemPrompt).toContain('bug');
+    expect(opts.systemPrompt).not.toMatch(/`tags?`|bug|feature|improvement|refactor|docs|chore/);
     expect(opts.provider.providerId).toBe('stub-gw');
     expect(opts.modelId).toBe('stub-model');
     expect(opts.cwd).toBe(join(paths.workspacesDir, 'conv-1'));
