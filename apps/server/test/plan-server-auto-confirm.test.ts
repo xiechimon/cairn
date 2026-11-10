@@ -286,6 +286,7 @@ describe('#1791 server auto-confirm after plan step', () => {
         threadId: thread.id,
         requestId: 'ask-plan-confirm',
         questions: [{ header: 'Storage', question: 'Which backend?', options: [] }],
+        askedFor: [],
       });
       createScheduler(w.s.svc, { tickMs: 15_000 }).tick(Date.now() + 600_000);
       expect(w.todoRow().phase).toBe('confirm');
@@ -318,6 +319,7 @@ describe('#1791 server auto-confirm after plan step', () => {
         threadId: thread.id,
         requestId: 'ask-other-thread',
         questions: [{ header: 'Lunch', question: 'Sandwiches?', options: [] }],
+        askedFor: [],
       });
       const confirmedAt = w.todoRow().phaseAt;
       const scheduler = createScheduler(w.s.svc, { tickMs: 15_000 });

@@ -158,7 +158,7 @@ test('Tasks scopes both sources to the team and lists parked pending standalone 
   const { thread } = (await start.json()) as { thread: { id: string } };
   const questions = [{ header: 'Scope', question: 'Which scope?', options: [] }];
   for (const requestId of ['pending', 'answered', 'cancelled']) {
-    createOrGetQuestion({ db: s.db }, { threadId: thread.id, requestId, questions });
+    createOrGetQuestion({ db: s.db }, { threadId: thread.id, requestId, questions, askedFor: [] });
   }
   answerQuestion(
     { db: s.db },
@@ -211,7 +211,10 @@ test('Tasks scopes both sources to the team and lists parked pending standalone 
     { threadId: thread.id, requestId: 'pending', answers: [{ header: 'Scope', text: 'small' }] },
   );
   expect(await read(s.team.id)).toMatchObject({ questions: [] });
-  createOrGetQuestion({ db: s.db }, { threadId: thread.id, requestId: 'archived', questions });
+  createOrGetQuestion(
+    { db: s.db },
+    { threadId: thread.id, requestId: 'archived', questions, askedFor: [] },
+  );
   expect(await read(s.team.id)).toMatchObject({ questions: [{ requestId: 'archived' }] });
   s.db
     .update(chiefThread)

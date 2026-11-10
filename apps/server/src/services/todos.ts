@@ -4,6 +4,7 @@ import type {
   Phase,
   RouteOverride,
   SecretBox,
+  TaskRequest,
   TodoOutputKind,
   TodoRecord,
   TodoSection,
@@ -20,8 +21,9 @@ import {
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
+  renderTaskText,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -43,6 +45,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
 import { triggerChiefWakes } from './chief.js';
 import { assertCorrectionDone } from './correction.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
@@ -197,6 +200,7 @@ export function toTodoRecord(
         }
       : {}),
     ...(row.routeOverride != null ? { routeOverride: row.routeOverride } : {}),
+    ...(row.request != null ? { request: row.request } : {}),
   };
 }
 
@@ -279,6 +283,17 @@ export function getTodo<D extends Pick<TodoDeps, 'db'>>(deps: D, id: string): To
   return row ? toTodoRecord(deps, row) : null;
 }
 
+function correctionFromTags(db: Db, tagIds: string[]): boolean {
+  if (tagIds.length === 0) return false;
+  return (
+    db
+      .select({ id: tag.id })
+      .from(tag)
+      .where(and(inArray(tag.id, tagIds), eq(sql`lower(${tag.name})`, 'correction')))
+      .get() !== undefined
+  );
+}
+
 function assertTagsInProject(db: Db, projectId: string, tagIds: readonly string[]): void {
   if (tagIds.length === 0) return;
   const owned = new Set(
@@ -312,6 +327,7 @@ export function createAutonomousTodo(
     title: string;
     spec: string;
     tagIds?: string[];
+    correctionRequired?: boolean;
     createdBy: string | null;
     ownerId: string | null;
     sourceKind?: TodoSourceKind;
@@ -319,6 +335,9 @@ export function createAutonomousTodo(
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
+    request?: TaskRequest;
+    blockedBy?: string[];
+    orderFirst?: boolean;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -331,57 +350,66 @@ export function createAutonomousTodo(
     .get();
   const seqNum = (seqRow?.n ?? 0) + 1;
   const orderRow = db
-    .select({ n: max(todo.orderIndex) })
+    .select({ n: input.orderFirst === true ? min(todo.orderIndex) : max(todo.orderIndex) })
     .from(todo)
-    .where(and(eq(todo.projectId, input.projectId), eq(todo.phase, 'todo')))
+    .where(and(eq(todo.projectId, input.projectId), inArray(todo.phase, ['todo', 'queued'])))
     .get();
   const now = nowMs();
   const id = newRecordId();
+  const blockedBy =
+    input.blockedBy === undefined
+      ? undefined
+      : checkBlockedBy(db, { id, teamId: input.teamId, latestBuildId: null }, input.blockedBy);
   const title =
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
   const selfIssue =
     input.sourceKind === undefined ? planSelfIssue(deps, input.teamId, input.projectId) : null;
-  db.insert(todo)
-    .values({
-      id,
-      teamId: input.teamId,
-      projectId: input.projectId,
-      title,
-      spec: input.spec,
-      phase: 'todo',
-      phaseAt: now,
-      seqNum,
-      orderIndex: (orderRow?.n ?? -1) + 1,
-      latestBuildId: null,
-      lastRunAt: null,
-      hasChanges: false,
-      hasPlan: false,
-      sourceTodo: null,
-      v: 1,
-      createdBy: input.createdBy,
-      ownerId: input.ownerId,
-      sourceBuildId: null,
-      sourceKind:
-        input.sourceKind ??
-        (selfIssue !== null
-          ? 'github-issue-self'
-          : input.orchestration !== undefined
-            ? 'orchestration'
+  db.transaction((tx) => {
+    tx.insert(todo)
+      .values({
+        id,
+        teamId: input.teamId,
+        projectId: input.projectId,
+        title,
+        spec: input.spec,
+        correctionRequired: input.correctionRequired ?? correctionFromTags(db, tagIds),
+        phase: 'todo',
+        phaseAt: now,
+        seqNum,
+        orderIndex: input.orderFirst === true ? (orderRow?.n ?? 1) - 1 : (orderRow?.n ?? -1) + 1,
+        latestBuildId: null,
+        lastRunAt: null,
+        hasChanges: false,
+        hasPlan: false,
+        sourceTodo: null,
+        v: 1,
+        createdBy: input.createdBy,
+        ownerId: input.ownerId,
+        sourceBuildId: null,
+        sourceKind:
+          input.sourceKind ??
+          (selfIssue !== null
+            ? 'github-issue-self'
+            : input.orchestration !== undefined
+              ? 'orchestration'
+              : null),
+        sourceRef:
+          input.sourceRef ??
+          (selfIssue === null && input.orchestration !== undefined
+            ? orchestrationSourceRef(input.orchestration.threadId)
             : null),
-      sourceRef:
-        input.sourceRef ??
-        (selfIssue === null && input.orchestration !== undefined
-          ? orchestrationSourceRef(input.orchestration.threadId)
-          : null),
-      output: input.output ?? 'code',
-      ...(input.userSpecAttachmentIds !== undefined
-        ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
-        : {}),
-    })
-    .run();
-  for (const tagId of tagIds) {
-    db.insert(todoTag).values({ todoId: id, tagId }).run();
-  }
+        output: input.output ?? 'code',
+        ...(input.userSpecAttachmentIds !== undefined
+          ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
+          : {}),
+        ...(input.request !== undefined ? { request: input.request } : {}),
+        ...(blockedBy !== undefined ? { blockedBy } : {}),
+      })
+      .run();
+    for (const tagId of tagIds) {
+      tx.insert(todoTag).values({ todoId: id, tagId }).run();
+    }
+  });
   const record = getTodo(deps, id);
   if (!record) throw new Error('todo missing after insert');
   hub.publishTodoDoc(input.teamId, record);
@@ -399,9 +427,11 @@ export function updateTodo(
     { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
     id,
     patch,
-    opts,
+    { ...opts, textWriter: { ownerEdit: deps.user.id } },
   );
 }
+
+export type TodoTextWriter = 'request-service' | { ownerEdit: string };
 
 export function updateAutonomousTodo(
   deps: TodoDeps,
@@ -414,23 +444,65 @@ export function updateAutonomousTodo(
     orderIndex?: number;
     projectId?: string;
     routeOverride?: RouteOverride | null;
+    blockedBy?: string[];
   },
-  opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
+  opts: {
+    manualPhase?: boolean;
+    userSpecAttachmentIds?: string[];
+    textWriter?: TodoTextWriter;
+  } = {},
 ): TodoRecord | null {
   const { db, hub } = deps;
   const row = getRow(deps, id);
   if (!row) return null;
+  if (
+    row.request !== null &&
+    (patch.title !== undefined || patch.spec !== undefined) &&
+    opts.textWriter === undefined
+  ) {
+    throw new HttpError(
+      409,
+      `todo ${id} carries the owner's cited words; edit it in the board, or send owner messages through the Coordinator`,
+    );
+  }
 
   const sets: Partial<TodoRow> = {};
+  if (patch.blockedBy !== undefined) sets.blockedBy = checkBlockedBy(db, row, patch.blockedBy);
+  const tagIds = patch.tagIds === undefined ? undefined : [...new Set(patch.tagIds)];
   const move =
     patch.projectId !== undefined && patch.projectId !== row.projectId
-      ? planProjectMove(deps, row, patch.projectId, patch.tagIds ?? [])
+      ? planProjectMove(deps, row, patch.projectId, tagIds ?? [])
       : null;
+  if (tagIds !== undefined && move === null) assertTagsInProject(db, row.projectId, tagIds);
   if (move !== null) Object.assign(sets, move.sets);
+  if (tagIds !== undefined) sets.correctionRequired = correctionFromTags(db, tagIds);
+  else if (move !== null) sets.correctionRequired = false;
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
     sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
+    const editor = opts.textWriter;
+    if (row.request !== null && editor !== undefined && editor !== 'request-service') {
+      sets.request = {
+        ...row.request,
+        segments: [
+          {
+            source: { kind: 'edit', userId: editor.ownerEdit, at: nowMs(), span: 'whole' },
+            author: 'owner',
+            sourceRef: null,
+            text: patch.spec,
+          },
+        ],
+      };
+      sets.spec = renderTaskText(sets.request);
+    }
+  }
+  if (patch.title !== undefined && row.request !== null) {
+    sets.request = {
+      ...(sets.request ?? row.request),
+      titleSource: 'owner',
+      titleSourceRef: null,
+    };
   }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
   if (patch.routeOverride !== undefined) {
@@ -463,29 +535,25 @@ export function updateAutonomousTodo(
     sets.phase = patch.phase;
     sets.phaseAt = nowMs();
   }
-  if (Object.keys(sets).length > 0) {
-    sets.v = row.v + 1;
-    db.update(todo).set(sets).where(eq(todo.id, id)).run();
-  }
-  if (move !== null) {
-    db.update(schedule)
-      .set({ projectId: move.sets.projectId })
-      .where(eq(schedule.todoId, id))
-      .run();
-    if (patch.tagIds === undefined) db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
-  }
-  if (patch.tagIds !== undefined) {
-    db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
-    for (const tagId of patch.tagIds) {
-      db.insert(todoTag).values({ todoId: id, tagId }).run();
+  db.transaction((tx) => {
+    if (Object.keys(sets).length > 0) {
+      sets.v = row.v + 1;
+      tx.update(todo).set(sets).where(eq(todo.id, id)).run();
     }
-    if (Object.keys(sets).length === 0) {
-      db.update(todo)
-        .set({ v: row.v + 1 })
-        .where(eq(todo.id, id))
+    if (move !== null) {
+      tx.update(schedule)
+        .set({ projectId: move.sets.projectId })
+        .where(eq(schedule.todoId, id))
         .run();
+      if (tagIds === undefined) tx.delete(todoTag).where(eq(todoTag.todoId, id)).run();
     }
-  }
+    if (tagIds !== undefined) {
+      tx.delete(todoTag).where(eq(todoTag.todoId, id)).run();
+      for (const tagId of tagIds) {
+        tx.insert(todoTag).values({ todoId: id, tagId }).run();
+      }
+    }
+  });
 
   if (
     sets.phase === 'done' &&
@@ -495,6 +563,8 @@ export function updateAutonomousTodo(
     insertGateAnnouncement(deps, row.latestBuildId, DONE_ANNOUNCEMENT, deps.user.displayName);
   }
 
+  if (sets.blockedBy !== undefined && row.latestBuildId !== null)
+    holdBlockedBuild(db, row.latestBuildId);
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
@@ -623,6 +693,7 @@ export function setTodoPhase(
     deps.hub.publishTodoDoc(record.teamId, record);
     notifyPhaseEntry(deps, record, row.phase, to);
     if (to === 'done') settleSplitOnDone(deps, id);
+    if (to === 'done' || to === 'review') releaseBlockedSteps(deps);
     return record;
   });
 }
@@ -634,20 +705,6 @@ export function childrenOfTodo(db: Db, parentId: string): TodoRow[] {
     .where(eq(todo.sourceTodo, parentId))
     .orderBy(asc(todo.seqNum))
     .all();
-}
-
-export function splitBlockersSatisfied(db: Db, row: TodoRow): boolean {
-  const ids = row.blockedBy ?? [];
-  if (ids.length === 0) return true;
-  const done = new Set(
-    db
-      .select({ id: todo.id })
-      .from(todo)
-      .where(and(inArray(todo.id, ids), eq(todo.phase, 'done')))
-      .all()
-      .map((r) => r.id),
-  );
-  return ids.every((id) => done.has(id));
 }
 
 export function settleSplitOnDone(deps: TodoDeps, childId: string): void {

@@ -1,15 +1,17 @@
+import { House, ListChecks, MessageSquareWarning, PackageCheck, Settings2 } from 'lucide-react';
 import {
-  FolderOpen,
-  House,
-  ListChecks,
-  MessageSquareWarning,
-  PackageCheck,
-  Settings2,
-} from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
+import { TaskCardContext } from '../chief/chief-message-rows.js';
 import { questionDockState } from '../chief/question-dock-state.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
@@ -26,9 +28,9 @@ import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { needsYouThreads } from './needs-you.js';
-import { NeedsYouTray } from './needs-you-tray.js';
 import { composeRequest } from './open-composer.js';
+import { TaskCard } from './task-card.js';
+import { taskCardFacts } from './task-card-facts.js';
 import { TasksPanel } from './tasks-panel.js';
 import {
   needsYouBadge,
@@ -173,9 +175,28 @@ export function HomeC({
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
-  const entries = needsYouThreads(scoped);
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
+  const taskById = useMemo(
+    () => new Map(tasks.entries.map((entry) => [entry.todo.id, entry])),
+    [tasks.entries],
+  );
+  const fullStream = chiefData.stream;
+  const renderTaskCard = useCallback(
+    (todoId: string) => {
+      const entry = taskById.get(todoId);
+      if (entry === undefined) return null;
+      return (
+        <TaskCard
+          entry={entry}
+          facts={taskCardFacts(fullStream ?? [], todoId)}
+          now={now}
+          onOpen={() => openThread(todoId)}
+        />
+      );
+    },
+    [taskById, fullStream, openThread, now],
+  );
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const questionView: QuestionThreadView = {
@@ -234,7 +255,7 @@ export function HomeC({
           day: 'numeric',
           weekday: 'short',
         }).format(now),
-        ...(entries.length > 0 ? [t('{n} 项待你处理', { n: entries.length })] : []),
+        ...(badge > 0 ? [t('{n} 项待你处理', { n: badge })] : []),
         ...(running.length > 0 ? [t('{n} 件在进行', { n: running.length })] : []),
       ].join(' · ')}
     </p>
@@ -259,10 +280,10 @@ export function HomeC({
         variant="ghost"
         size="sm"
         className="text-meta text-content-secondary"
-        render={<Link to={`/app/project/${projectId}/files`} />}
+        render={<Link to={`/app/project/${projectId}/tasks`} />}
       >
-        <FolderOpen aria-hidden="true" className="size-3.5" />
-        {t('文件')}
+        <ListChecks aria-hidden="true" className="size-3.5" />
+        {t('任务')}
       </Button>
       <Button
         variant="ghost"
@@ -284,7 +305,7 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      {entries.length === 0 && (
+      {badge === 0 && (
         <div data-testid="home-c-starters" className="mt-4 flex flex-wrap gap-2">
           {STARTERS.map(({ label, Icon }) => (
             <SuggestionChip
@@ -473,52 +494,53 @@ export function HomeC({
             {banner}
           </div>
         )}
-        <ChiefScrollProvider>
-          <ChiefConversation
-            chief={{ ...chiefData, stream: conversation }}
-            onSend={
-              thread.picked !== null
-                ? thread.send
-                : surface.onSend != null
-                  ? (text: string) => surface.onSend?.(text, projectId)
-                  : live
-                    ? undefined
-                    : () => Promise.resolve()
-            }
-            onRewind={surface.onRewind}
-            onWithdraw={surface.onWithdraw}
-            onSteer={surface.onSteer}
-            onStop={surface.onStop}
-            earlier={surface.earlier}
-            onSettings={() => surface.setChiefView('settings')}
-            showBindGate={!live}
-            hero={hero}
-            lead={lead}
-            prefill={prefill}
-            placeholder={
-              projectName != null
-                ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                : t('跟 Coordinator 说点什么，或描述一个新任务…')
-            }
-            composerError={thread.error}
-            targetPlaceholder={thread.placeholder}
-            tray={<NeedsYouTray threads={entries} />}
-            composerTools={
-              <>
-                <ComposerThreadTarget
-                  targets={thread.targets}
-                  picked={thread.picked}
-                  composerRef={composerRef}
-                  onPick={thread.pick}
-                />
-                <ComposerSetupHint />
-              </>
-            }
-            composerRef={(node) => {
-              composerRef.current = node;
-            }}
-          />
-        </ChiefScrollProvider>
+        <TaskCardContext.Provider value={renderTaskCard}>
+          <ChiefScrollProvider>
+            <ChiefConversation
+              chief={{ ...chiefData, stream: conversation }}
+              onSend={
+                thread.picked !== null
+                  ? thread.send
+                  : surface.onSend != null
+                    ? (text: string) => surface.onSend?.(text, projectId)
+                    : live
+                      ? undefined
+                      : () => Promise.resolve()
+              }
+              onRewind={surface.onRewind}
+              onWithdraw={surface.onWithdraw}
+              onSteer={surface.onSteer}
+              onStop={surface.onStop}
+              earlier={surface.earlier}
+              onSettings={() => surface.setChiefView('settings')}
+              showBindGate={!live}
+              hero={hero}
+              lead={lead}
+              prefill={prefill}
+              placeholder={
+                projectName != null
+                  ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+                  : t('跟 Coordinator 说点什么，或描述一个新任务…')
+              }
+              composerError={thread.error}
+              targetPlaceholder={thread.placeholder}
+              composerTools={
+                <>
+                  <ComposerThreadTarget
+                    targets={thread.targets}
+                    picked={thread.picked}
+                    composerRef={composerRef}
+                    onPick={thread.pick}
+                  />
+                  <ComposerSetupHint />
+                </>
+              }
+              composerRef={(node) => {
+                composerRef.current = node;
+              }}
+            />
+          </ChiefScrollProvider>
+        </TaskCardContext.Provider>
       </section>
       {workPanel}
     </div>

@@ -11,6 +11,7 @@ import type {
   SecretBox,
   StepJournalRow,
   StepKind,
+  StepPromptOrigin,
   StepRecord,
   TriggerSource,
   UserRecord,
@@ -117,6 +118,7 @@ import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
+import { BLOCKED_STEP_KINDS, blockedHold, blockedNow } from './blockers.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import {
@@ -183,7 +185,6 @@ import {
   getTodo,
   setTodoPhase,
   settleSplitOnDone,
-  splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 import {
@@ -408,6 +409,8 @@ export async function sendBuildSteer(
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
   }
+  const afterCommit: (() => void)[] = [];
+  const transcriptDeps = { ...deps, afterCommit };
   let sent: BuildSteerResult;
   try {
     sent = db.transaction((): BuildSteerResult => {
@@ -462,7 +465,7 @@ export async function sendBuildSteer(
             createdAt: now,
           })
           .run();
-        insertMessageRow(deps, targetBuildId, {
+        insertMessageRow(transcriptDeps, targetBuildId, {
           id: newRecordId(),
           role: 'system',
           content:
@@ -477,7 +480,15 @@ export async function sendBuildSteer(
           createdAt: now,
         });
       }
-      if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
+      if (!continuationOptions.schedule)
+        insertMessageRow(
+          transcriptDeps,
+          targetBuildId,
+          messageRow,
+          body.queuedMessageId === undefined
+            ? undefined
+            : { conversationId, messageId: body.queuedMessageId },
+        );
       if (running && !answered) {
         db.insert(steerPending)
           .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
@@ -536,7 +547,7 @@ export async function sendBuildSteer(
               .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
               .where(eq(step.id, continuedStep.id))
               .run();
-            insertMessageRow(deps, targetBuildId, {
+            insertMessageRow(transcriptDeps, targetBuildId, {
               id: `schedule-wake-${continuedStep.id}`,
               role: 'system',
               content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
@@ -565,6 +576,7 @@ export async function sendBuildSteer(
   } catch (error) {
     return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
   }
+  for (const publish of afterCommit) publish();
   const fromUser =
     continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
   if (fromUser && !continuationOptions.schedule) endSnoozeOn(deps, buildRow.todoId, 'user-message');
@@ -655,10 +667,7 @@ function landReservedPhase(
       deps.hub.publishTodoDoc(record.teamId, record);
     }
   }
-  if (desired === 'done') {
-    settleSplitOnDone(deps, todoRow.id);
-    advanceSplitWaves(deps, todoRow.id);
-  }
+  if (desired === 'done') settleSplitOnDone(deps, todoRow.id);
 }
 
 export function requestStop(
@@ -1017,12 +1026,17 @@ export function enqueueStep(
   prompt?: string,
   freshSession?: boolean,
   byPerson?: boolean,
+  promptOrigin?: StepPromptOrigin,
 ): StepRecord {
   const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (byPerson !== true && current && retryIsParked(current.errorMessage ?? ''))
     throw new HttpError(409, current.errorMessage ?? 'Task parked');
   const id = newRecordId();
   const createdAt = nowMs();
+  const owner =
+    current === undefined || !BLOCKED_STEP_KINDS.includes(kind)
+      ? undefined
+      : deps.db.select().from(todo).where(eq(todo.id, current.todoId)).get();
   deps.db
     .insert(step)
     .values({
@@ -1032,9 +1046,11 @@ export function enqueueStep(
       machineId: null,
       status: 'pending',
       prompt: prompt ?? null,
+      promptOrigin: promptOrigin ?? null,
       freshSession: freshSession === true,
       byPerson: byPerson === true,
       createdAt,
+      ...(owner !== undefined && blockedNow(deps.db, owner) ? blockedHold() : {}),
     })
     .run();
   clearStop(deps.db, buildId);
@@ -1103,6 +1119,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
     ...(r.status === 'waiting_quota' && r.quotaBlock !== null
       ? { quotaWait: toQuotaWait(r.quotaBlock) }
       : {}),
+    ...(r.promptOrigin !== null ? { promptOrigin: r.promptOrigin } : {}),
   }));
 }
 
@@ -1233,17 +1250,33 @@ export function maybeEnqueueVerifyStep(
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined) return;
   if (githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (projectRow === undefined) return;
   const planRow = latestPlanRow(deps, buildId);
-  const prompt = buildVerifyStepPrompt({
-    ticketRef: ticketRefOf(todoRow),
-    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
-    planText: planRow?.content ?? '',
-    verificationItems: planVerificationItems(planRow?.content ?? ''),
-    pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
-    expectedHeadSha,
+  deps.db.transaction(() => {
+    deps.db
+      .update(build)
+      .set({ evidenceStore: projectRow.evidenceStore })
+      .where(and(eq(build.id, buildId), isNull(build.evidenceStore)))
+      .run();
+    const snapshot = deps.db
+      .select({ evidenceStore: build.evidenceStore })
+      .from(build)
+      .where(eq(build.id, buildId))
+      .get();
+    if (snapshot?.evidenceStore == null) throw new Error('Verify evidence snapshot unavailable');
+    const prompt = buildVerifyStepPrompt({
+      ticketRef: ticketRefOf(todoRow),
+      taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
+      planText: planRow?.content ?? '',
+      verificationItems: planVerificationItems(planRow?.content ?? ''),
+      pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+      expectedHeadSha,
+      evidenceStore: snapshot.evidenceStore,
+    });
+    insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
+    enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
   });
-  insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
-  enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
 }
 
 const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
@@ -1306,29 +1339,9 @@ export function maybeEnqueueIndependentReview(
   enqueueStep(deps, buildId, 'review', todoRow.teamId, prompt);
 }
 
-export function advanceSplitWaves(deps: BuildDeps, childTodoId: string): void {
-  const row = deps.db.select().from(todo).where(eq(todo.id, childTodoId)).get();
-  if (row === undefined || row.sourceTodo === null) return;
-  const ready = childrenOfTodo(deps.db, row.sourceTodo).filter(
-    (c) => c.phase === 'todo' && splitBlockersSatisfied(deps.db, c),
-  );
-  for (const child of ready) {
-    try {
-      startBuilds(deps, {
-        projectId: child.projectId,
-        todoIds: [child.id],
-        triggerSource: 'chief',
-      });
-    } catch {}
-  }
-}
-
 export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number {
-  const ready = childrenOfTodo(deps.db, parentId).filter(
-    (c) => c.phase === 'todo' && splitBlockersSatisfied(deps.db, c),
-  );
   let dispatched = 0;
-  for (const child of ready) {
+  for (const child of childrenOfTodo(deps.db, parentId).filter((c) => c.phase === 'todo')) {
     try {
       startBuilds(deps, {
         projectId: child.projectId,
@@ -1496,7 +1509,9 @@ export async function applyBuildStepAction(
     const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
     const prClosed: 'merged' | 'closed' | null =
       reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
-    return deps.db.transaction(() => {
+    const afterCommit: (() => void)[] = [];
+    const transcriptDeps = { ...deps, afterCommit };
+    deps.db.transaction(() => {
       const current = getTodo(deps, row.todoId);
       if (
         !current ||
@@ -1523,7 +1538,7 @@ export async function applyBuildStepAction(
         const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
         recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
         if (feedbackText !== null) {
-          insertMessageRow(deps, reworkTarget.id, {
+          insertMessageRow(transcriptDeps, reworkTarget.id, {
             id: newRecordId(),
             role: 'user',
             content: feedbackText,
@@ -1534,7 +1549,7 @@ export async function applyBuildStepAction(
           reworkTarget.errorMessage !== null &&
           !hasFailureRow(deps, reworkTarget.id, reworkTarget.errorMessage)
         ) {
-          insertMessageRow(deps, reworkTarget.id, {
+          insertMessageRow(transcriptDeps, reworkTarget.id, {
             id: newRecordId(),
             role: 'system',
             content: buildFailureRowContent({
@@ -1547,7 +1562,7 @@ export async function applyBuildStepAction(
             createdAt: now - 1,
           });
         }
-        insertMessageRow(deps, reworkTarget.id, {
+        insertMessageRow(transcriptDeps, reworkTarget.id, {
           id: newRecordId(),
           role: 'system',
           content: buildReworkReuseNote({ prNumber: reworkTarget.prNumber }),
@@ -1611,7 +1626,7 @@ export async function applyBuildStepAction(
         })
         .run();
       if (feedbackText !== null) {
-        insertMessageRow(deps, newId, {
+        insertMessageRow(transcriptDeps, newId, {
           id: newRecordId(),
           role: 'user',
           content: feedbackText,
@@ -1619,7 +1634,7 @@ export async function applyBuildStepAction(
         });
       }
       if (prClosed !== null && reworkTarget !== null) {
-        insertMessageRow(deps, newId, {
+        insertMessageRow(transcriptDeps, newId, {
           id: newRecordId(),
           role: 'system',
           content: buildReworkNewBranchNote({
@@ -1650,6 +1665,8 @@ export async function applyBuildStepAction(
       publishBuild(deps, newRow);
       return;
     });
+    for (const publish of afterCommit) publish();
+    return;
   }
 
   if (body.action === 'confirm') {
@@ -1746,6 +1763,7 @@ export async function applyBuildStepAction(
       `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
       false,
       origin === 'person',
+      { kind: 'rework' },
     );
     return;
   }
@@ -3436,7 +3454,6 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     content: DONE_ROW,
     createdAt: nowMs(),
   });
-  advanceSplitWaves(deps, todoId);
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
   markFirstPrPromptDue(deps.db, buildId);
 }

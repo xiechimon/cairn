@@ -32,7 +32,7 @@ describe('team event → invalidation keys', () => {
     expect(keys).toContain('plans/build-1');
   });
 
-  it('notification: board, threads and Tasks keys verbatim (the desktop-notification side effect is not in the map)', () => {
+  it('notification: board, threads, chief context and Tasks keys verbatim (the desktop-notification side effect is not in the map)', () => {
     const keys = keysOf({
       type: 'notification',
       notification: { id: 'n-1', type: 'plan_ready', entityId: 'todo-7' },
@@ -40,6 +40,7 @@ describe('team event → invalidation keys', () => {
     expect(keys).toEqual([
       `notifications/${TEAM}`,
       `chiefThreads/${TEAM}`,
+      `chief/${TEAM}`,
       'todos',
       `tasks/${TEAM}`,
     ]);

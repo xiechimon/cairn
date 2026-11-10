@@ -323,6 +323,7 @@ export const askUserQuestionContentSchema = z.object({
   deliveredAt: z.number().int().nullable().optional(),
   deliveredVia: answerDeliveryViaSchema.optional(),
   deliveredStepId: z.string().optional(),
+  askedFor: z.array(z.string().min(1)).optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;
 

@@ -15,14 +15,14 @@
 
 | Item | Count |
 |---|---|
-| Features | 54 |
-| status shipped | 45 |
+| Features | 52 |
+| status shipped | 43 |
 | status partial | 7 |
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 19 |
-| Research gaps | 17 |
-| Frontend design gaps | 23 |
-| Backend design gaps | 21 |
+| Research gaps | 16 |
+| Frontend design gaps | 20 |
+| Backend design gaps | 19 |
 | notes cited but not on main | 21 |
 
 ## Coverage
@@ -38,7 +38,7 @@
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
-| [Needs-you tray](#needs-you) | 1 | shipped | yes | gap | gap | B2 |
+| [Task cards and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
 | [Phone push](#push-notifications) | 1 | shipped | gap | gap | gap | B2 |
@@ -70,8 +70,7 @@
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
 | [MCP servers](#mcp-servers) | 3 | shipped | gap | yes | yes | B9 |
-| [Project files](#project-files) | 3 | shipped | yes | gap | gap | B8 |
-| [Projects](#projects) | 3 | shipped | yes (not on main) | yes | yes |  |
+| [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
 | [Scheduled tasks](#schedules) | 3 | shipped | gap | gap | gap | B7 |
@@ -80,7 +79,6 @@
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
 | [Sidebar](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
-| [Feishu integration](#feishu) | 4 | shipped | gap | gap | gap | B11 |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
 | [Thread tags](#thread-tags) | 4 | shipped | gap | yes | yes | B11 |
 
@@ -95,7 +93,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
-| [Needs-you tray](#needs-you) | 1 | Frontend design: D121 decided the tray, but no design or approved screenshot set shows its states<br>Backend design: no design for which records enter the tray, their order and when they leave |
+| [Task cards and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Research: no prior-art note on agent notifications and push delivery<br>Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns behind D85 and D119 were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
 
@@ -149,15 +147,14 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
-### B8 · Composer, attachments and project files
+### B8 · Composer and attachments
 
-Everything typed or attached before a message is sent and the files a project shows: mentions, slash commands, named prompts, drafts that survive a restart, attachments, and the files and commits tab. Research claude.ai, Amp and t3code; design the draft and attachment model and the files view.
+Everything typed or attached before a message is sent: mentions, slash commands, named prompts, drafts that survive a restart and attachments. Research claude.ai, Amp and t3code; design the draft and attachment model.
 
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Attachments](#attachments) | 3 | Research: no note on attachment handling in reference products<br>Frontend design: attachment cards and previews have no design |
 | [Composer](#composer) | 3 | Research: no note comparing composers in claude.ai, Amp and t3code<br>Backend design: no design for server drafts (D110) and named prompts |
-| [Project files](#project-files) | 3 | Frontend design: the files tab has no design<br>Backend design: no design for reading files and commits from local and hosted repos |
 
 ### B9 · Execution settings: skills, MCP, harness profile, quota wait
 
@@ -182,14 +179,13 @@ Who can do what and with which credentials: the secrets page, API keys with gran
 
 ### B11 · Peripheral surfaces
 
-Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, Feishu, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
+Small surfaces that work today without research or design: the Coordinator MCP face for external harnesses, built-in git hosting, server backup and deploy banners, and thread tags. Each needs a short note and a design, or a decision to retire it.
 
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository |
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
 | [Server backup and deploy status](#server-status) | 3 | Frontend design: the banners have no design |
-| [Feishu integration](#feishu) | 4 | Research: no note on why Feishu and what it delivers<br>Frontend design: the Feishu settings have no design<br>Backend design: no design for the Feishu delivery path |
 | [Thread tags](#thread-tags) | 4 | Research: no note on whether tags still earn their place after D58 |
 
 ### B12 · Phase 3: iOS app
@@ -260,9 +256,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads.
+**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.
 
-- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md)
+- Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 - Backend design: [docs/design/memory-backend.md](design/memory-backend.md), [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
 
@@ -276,10 +272,10 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### needs-you
 
-**Needs-you tray** (shipped). Questions, failures, pending approvals and reviews that wait on the user, shown as at most three cards above the composer.
+**Task cards and needs-you** (shipped). A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.
 
-- Research: [docs/research/link-roundup-2026-11-01.md](research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
-- Frontend design: **gap**: D121 decided the tray, but no design or approved screenshot set shows its states
+- Research: [docs/research/link-roundup-2026-11-01.md](research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
+- Frontend design: [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
 
 ### orb-isolation
@@ -530,20 +526,12 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 
-### project-files
-
-**Project files** (shipped). The remaining project file tree and viewer, pending retirement in #3479.
-
-- Research: [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md)
-- Frontend design: **gap**: the files tab has no design
-- Backend design: **gap**: no design for reading files and commits from local and hosted repos
-
 ### projects
 
-**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive and delete.
+**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.
 
-- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main)
-- Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
+- Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
+- Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 
 ### quota-wait
@@ -609,14 +597,6 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](spec/14-skills-execution-surface-injection.md)
-
-### feishu
-
-**Feishu integration** (shipped). Team settings for a Feishu bot connection.
-
-- Research: **gap**: no note on why Feishu and what it delivers
-- Frontend design: **gap**: the Feishu settings have no design
-- Backend design: **gap**: no design for the Feishu delivery path
 
 ### ios-app
 

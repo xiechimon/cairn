@@ -34,6 +34,7 @@ describe('ask_user commits the question card with its notification', () => {
         threadId: H.threadId,
         requestId: 'req-1',
         questions: QUESTIONS,
+        askedFor: [],
       }),
     ).toThrow('killed between decision and act');
     expect(questionRows()).toHaveLength(0);
@@ -49,12 +50,14 @@ describe('ask_user commits the question card with its notification', () => {
         threadId: H.threadId,
         requestId: 'req-1',
         questions: QUESTIONS,
+        askedFor: [],
       }),
     ).toThrow();
     const retry = createOrGetQuestion(deps(), {
       threadId: H.threadId,
       requestId: 'req-1',
       questions: QUESTIONS,
+      askedFor: [],
     });
     expect(retry.created).toBe(true);
     expect(questionRows()).toHaveLength(1);
@@ -62,12 +65,18 @@ describe('ask_user commits the question card with its notification', () => {
   });
 
   test('a repeat after success returns the same question and does not notify again', () => {
-    createOrGetQuestion(deps(), { threadId: H.threadId, requestId: 'req-1', questions: QUESTIONS });
+    createOrGetQuestion(deps(), {
+      threadId: H.threadId,
+      requestId: 'req-1',
+      questions: QUESTIONS,
+      askedFor: [],
+    });
     const publish = vi.spyOn(H.s.hub, 'publishNotification');
     const again = createOrGetQuestion(deps(), {
       threadId: H.threadId,
       requestId: 'req-1',
       questions: QUESTIONS,
+      askedFor: [],
     });
     expect(again.created).toBe(false);
     expect(publish).not.toHaveBeenCalled();

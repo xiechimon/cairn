@@ -1,18 +1,14 @@
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, gateState, message, step, tag, type todo, todoTag } from '../db/schema.js';
+import { build, gateState, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { CORRECTION_GUARD_MISSING } from './merge-gate/correction.js';
 
 export function isCorrectionTask(db: Db, todoId: string): boolean {
   return (
-    db
-      .select({ id: tag.id })
-      .from(todoTag)
-      .innerJoin(tag, eq(tag.id, todoTag.tagId))
-      .where(and(eq(todoTag.todoId, todoId), eq(sql`lower(${tag.name})`, 'correction')))
-      .get() !== undefined
+    db.select({ required: todo.correctionRequired }).from(todo).where(eq(todo.id, todoId)).get()
+      ?.required === true
   );
 }
 

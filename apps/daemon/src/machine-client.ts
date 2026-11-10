@@ -269,7 +269,7 @@ export class MachineClient implements MachineApi {
       'POST',
       '/api/machine/tasks/claim',
       {
-        body: body ?? {},
+        body: { ...body, verifyAttachments: true },
         signal,
         parse: (raw) => machineClaimResponseSchema.parse(raw) as { step: ClaimedStep | null },
       },

@@ -17,12 +17,12 @@ import {
   team,
   todo,
 } from '../src/db/schema.js';
+import { BLOCKED_BY_HOLD, releaseBlockedSteps } from '../src/services/blockers.js';
 import { buildChiefSystemPrompt, chiefToolDefHashes } from '../src/services/chief.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
-import { releaseResearchBeforePlanHolds } from '../src/services/research-before-plan.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
-import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { AGENT_ID, H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { seedSessionRoute } from './helpers.js';
 
 registerChiefHarness();
@@ -136,11 +136,7 @@ describe('router tools', () => {
     });
 
     test('the other base tools keep working', async () => {
-      const created = (await relay('create_todo', {
-        projectId: H.projectId,
-        title: 'Still creatable',
-        spec: 'spec',
-      })) as { id: string };
+      const created = (await relay('create_todo', ownerTodo('Still creatable'))) as { id: string };
       expect(created.id).toBeTruthy();
       expect(await relay('projects', {})).toHaveLength(1);
     });
@@ -184,12 +180,12 @@ describe('router tools', () => {
       expect(code?.blockedBy).toEqual([research[0]?.id]);
       const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get();
       expect(session?.kind).toBe('session');
-      expect(session?.holdReason).toBe('research-before-plan');
+      expect(session?.holdReason).toBe(BLOCKED_BY_HOLD);
       expect(session?.holdUntil ?? 0).toBeGreaterThan(Date.now() + 24 * 60 * 60_000);
       H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, research[0]!.id)).run();
-      releaseResearchBeforePlanHolds(toolDeps());
+      releaseBlockedSteps(toolDeps());
       expect(H.s.db.select().from(step).where(eq(step.id, session!.id)).get()?.holdReason).toBe(
-        'research-before-plan',
+        BLOCKED_BY_HOLD,
       );
       storeInfoReport(
         { db: H.s.db, attachmentsDir: H.s.attachmentsDir },
@@ -200,7 +196,7 @@ describe('router tools', () => {
           report: 'Use a streaming export.\nhttps://example.com/export',
         },
       );
-      releaseResearchBeforePlanHolds(toolDeps());
+      releaseBlockedSteps(toolDeps());
       const released = H.s.db.select().from(step).where(eq(step.id, session!.id)).get();
       expect(released?.holdUntil).toBeNull();
       expect(released?.holdReason).toBeNull();
@@ -236,7 +232,7 @@ describe('router tools', () => {
           report: 'Stream the rows.\nhttps://example.com/export',
         },
       );
-      releaseResearchBeforePlanHolds(toolDeps());
+      releaseBlockedSteps(toolDeps());
       const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get();
       expect(session?.holdReason).toBeNull();
       expect(session?.prompt ?? '').toContain('Stream the rows.');
@@ -255,7 +251,7 @@ describe('router tools', () => {
         .from(step)
         .where(eq(step.buildId, resumed?.latestBuildId as string))
         .get();
-      expect(session?.holdReason).toBe('research-before-plan');
+      expect(session?.holdReason).toBe(BLOCKED_BY_HOLD);
       expect(session?.status).toBe('pending');
     });
 

@@ -16,7 +16,12 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { classifyStepFailure, ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
+import {
+  classifyStepFailure,
+  ENV_VARS,
+  THINKING_LEVELS,
+  contextTokensOf as usageContextTokens,
+} from '@cairn/shared';
 import { getSystemMessageText } from '@earendil-works/pi-ai';
 import {
   type BuiltinProvider,
@@ -688,8 +693,7 @@ function contextTokensOf(msg: PiMessageLike): number {
   if (msg.stopReason === 'aborted' || msg.stopReason === 'error' || msg.usage === undefined) {
     return 0;
   }
-  const u = msg.usage;
-  return (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+  return usageContextTokens(msg.usage);
 }
 
 function settledUsage(state: MapState): ModelUsage[] {

@@ -156,20 +156,10 @@ export const darkFreshProbe: TodoRecord = {
 
 export const projectContent: ProjectContent = {
   name: PROJECT_NAME,
-  branch: 'main',
-  files: ['README.md'],
   repoName: PROJECT_NAME,
   hosted: true,
   defaultBranch: 'main',
   description: null,
-  fileContents: {
-    'README.md': [
-      `# ${PROJECT_NAME}`,
-      '',
-      '托管演示仓:任务全生命周期走查(待开始 → 规划中 → 待确认 → 执行中 → 待验收 → 已完成)。',
-      '',
-    ].join('\n'),
-  },
 };
 export function localTodo(seqNum: number, spec: string, now: number): TodoRecord {
   return {

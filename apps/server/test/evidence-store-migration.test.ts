@@ -50,7 +50,7 @@ test('migration initializes only existing cairn projects and never reassigns mod
   }
 });
 
-test('evidence migration upgrades the latest main database without replacing its schema', () => {
+test('evidence migration upgrades its predecessor database without replacing its schema', () => {
   const directory = makeTestTempDir('cairn-evidence-main-upgrade-');
   const sqlite = new Database(join(directory, 'db.sqlite'));
   try {
@@ -58,7 +58,7 @@ test('evidence migration upgrades the latest main database without replacing its
       readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
     ) as { entries: { idx: number; tag: string; when: number }[] };
     const index = journal.entries.findIndex((entry) => entry.tag.endsWith('_evidence_store'));
-    expect(index).toBe(journal.entries.length - 1);
+    expect(index).toBeGreaterThanOrEqual(0);
     const evidence = journal.entries[index];
     const previous = journal.entries[index - 1];
     if (evidence === undefined || previous === undefined)
@@ -73,6 +73,11 @@ test('evidence migration upgrades the latest main database without replacing its
     expect(sqlite.prepare('SELECT evidenceStore FROM build').all()).toEqual([]);
     expect(sqlite.prepare('SELECT browserEnabled FROM computer').all()).toEqual([]);
     expect(sqlite.prepare('SELECT coordinatorTurn FROM todo').all()).toEqual([]);
+    expect(
+      sqlite
+        .prepare('SELECT lastColdSlimAt, lastColdSlimStepId FROM coordinator_conversation')
+        .all(),
+    ).toEqual([]);
     expect(
       sqlite.prepare("SELECT name FROM sqlite_master WHERE name = 'feature_flag'").get(),
     ).toBeUndefined();

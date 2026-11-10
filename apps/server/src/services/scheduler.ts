@@ -24,6 +24,7 @@ import {
   sweepAttachmentBatches,
   sweepStepSessions,
 } from './attachment-gc.js';
+import { releaseBlockedSteps } from './blockers.js';
 import {
   BuildContinuationPhaseError,
   type BuildDeps,
@@ -49,6 +50,7 @@ import {
   type IssueIntakeLogger,
 } from './issue-intake.js';
 import { sweepStaleMachines } from './machines.js';
+import { purgeExpiredMemoryVersions } from './memory.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { reconcileOwners } from './owner.js';
@@ -57,7 +59,6 @@ import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
-import { releaseResearchBeforePlanHolds } from './research-before-plan.js';
 import { planResearchIntake } from './research-intake.js';
 import {
   ARCHIVED_SCHEDULE_PAUSE_REASON,
@@ -499,7 +500,6 @@ export function createScheduler(
     sweepSnoozeExpiry(deps, now);
     fireDueChiefWakes(deps, now);
     try {
-      releaseResearchBeforePlanHolds(deps);
       planResearchIntake(deps, opts.researchIntakeProjectId ?? null, now);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -508,6 +508,7 @@ export function createScheduler(
         process.stderr.write(`Research intake failed: ${reason}\n`);
       }
     }
+    releaseBlockedSteps(deps);
     planChiefDigests(deps, now);
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
@@ -549,6 +550,7 @@ export function createScheduler(
           now,
         );
         sweepIdleComposerDrafts(deps.db, now);
+        purgeExpiredMemoryVersions(deps.db, now);
         advanceGc();
         sweepStepSessions(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },

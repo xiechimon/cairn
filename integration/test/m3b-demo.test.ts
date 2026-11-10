@@ -14,6 +14,7 @@ import {
   tokenUsage,
 } from '../../apps/server/src/db/schema.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
+import { readFile } from '../../apps/server/src/services/git.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
@@ -176,9 +177,7 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
 
     await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
 
-    const mainFile = (
-      await api(server.url, 'GET', `/api/projects/${world.projectId}/file?path=README.md&ref=main`)
-    ).body as { content: string; commit: string };
+    const mainFile = await readFile(server, world.projectId, 'README.md', 'main');
     expect(mainFile.content).toContain('m3b probe line');
 
     const steps = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();

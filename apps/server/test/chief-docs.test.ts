@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
+import { backfillRepositoryCaches } from '../../daemon/src/backend/repo-cache-backfill.js';
 import { loadDaemonConfig } from '../../daemon/src/config.js';
 import { gitPrim } from '../../daemon/src/git.js';
 import { ensureStateDirs, statePaths } from '../../daemon/src/state.js';
@@ -10,13 +11,7 @@ import { project } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
 import { localWorkspaceRoot } from '../src/lib/workspace-root.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
-import {
-  readCommitDetail,
-  readCommitHistory,
-  readFile,
-  readFiles,
-  readTree,
-} from '../src/services/git.js';
+import { readFile, readFiles } from '../src/services/git.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
 registerChiefHarness();
@@ -65,7 +60,12 @@ async function bindRepo(kind: 'github' | 'local' | 'hosted') {
   return dir;
 }
 
-async function fetchFixture(cache: string, source: string, repository = 'fixture/repository') {
+async function fetchFixture(
+  cache: string,
+  source: string,
+  repository = 'fixture/repository',
+  backfillRoot?: string,
+) {
   const url = `https://github.com/${repository}.git`;
   await gitPrim.setRemoteUrl(cache, url);
   const configIndex = Number(process.env.GIT_CONFIG_COUNT ?? '0');
@@ -73,7 +73,8 @@ async function fetchFixture(cache: string, source: string, repository = 'fixture
   vi.stubEnv(`GIT_CONFIG_KEY_${configIndex}`, `url.${source}.insteadOf`);
   vi.stubEnv(`GIT_CONFIG_VALUE_${configIndex}`, url);
   try {
-    await gitPrim.fetch(cache, null);
+    if (backfillRoot === undefined) await gitPrim.fetch(cache, null);
+    else await backfillRepositoryCaches(backfillRoot, () => {});
   } finally {
     vi.unstubAllEnvs();
   }
@@ -168,7 +169,7 @@ describe('Coordinator repository reads', () => {
     expect((await read()).files[0]?.error).toMatch(/repository.*mismatch/i);
   });
 
-  test.each(['docs', 'file', 'tree', 'files', 'history', 'detail'] as const)(
+  test.each(['docs', 'file', 'files'] as const)(
     '%s rejects refs retained from the previous cache binding',
     async (entry) => {
       const dir = await bindRepo('github');
@@ -239,16 +240,96 @@ describe('Coordinator repository reads', () => {
         } else {
           const reads = {
             file: () => readFile(repo, H.projectId, 'scripts/owned-process.mjs', ref),
-            tree: () => readTree(repo, H.projectId, ref),
             files: () => readFiles(repo, H.projectId, ref),
-            history: () => readCommitHistory(repo, H.projectId, ref),
-            detail: () => readCommitDetail(repo, H.projectId, ref),
           };
           await expect(reads[entry]()).rejects.toMatchObject({ status: 403 });
         }
       }
     },
   );
+
+  test('live legacy cache: no base branch and obsolete localPath read exact source after daemon backfill', async () => {
+    const source = await bindRepo('github');
+    const content = readFileSync('scripts/owned-process.mjs', 'utf8');
+    writeFileSync(join(source, 'scripts/owned-process.mjs'), content);
+    for (const args of [
+      ['add', 'scripts/owned-process.mjs'],
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.test',
+        'commit',
+        '-m',
+        'actual source',
+      ],
+    ])
+      expect((await runGit(args, { cwd: source })).code).toBe(0);
+    const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: source })).stdout.toString().trim();
+    const workspacesDir = join(H.s.reposDir, 'legacy-workspaces');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', source, cache])).code).toBe(0);
+    await gitPrim.setRemoteUrl(cache, 'https://github.com/fixture/repository.git');
+    H.s.db
+      .update(project)
+      .set({ baseBranch: null, localPath: '/Users/fixture/obsolete/project' })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    const read = async () =>
+      JSON.parse(
+        await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+          projectId: H.projectId,
+          paths: ['scripts/owned-process.mjs'],
+        }),
+      ) as Docs;
+    const pending = await read();
+    expect(pending.files[0]?.content).toBeUndefined();
+    expect(pending.files[0]?.error).toMatch(/repository cache not verified yet.*restart.*daemon/);
+    for (const operation of [
+      () => readFile(repo, H.projectId, 'scripts/owned-process.mjs'),
+      () => readFiles(repo, H.projectId),
+    ])
+      await expect(operation()).rejects.toMatchObject({
+        status: 403,
+        message: expect.stringContaining('repository cache not verified yet'),
+      });
+    await fetchFixture(cache, source, 'fixture/repository', workspacesDir);
+    expect((await read()).files[0]).toMatchObject({
+      path: 'scripts/owned-process.mjs',
+      content,
+      commit,
+    });
+    expect(await readFile(repo, H.projectId, 'scripts/owned-process.mjs')).toMatchObject({
+      content,
+      commit,
+    });
+    expect((await readFiles(repo, H.projectId)).commit).toBe(commit);
+  });
+
+  test('failed daemon backfill keeps an actionable refusal until a later pass succeeds', async () => {
+    const source = await bindRepo('github');
+    const workspacesDir = join(H.s.reposDir, 'failed-backfill');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', source, cache])).code).toBe(0);
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    await fetchFixture(
+      cache,
+      join(H.s.reposDir, 'absent-remote'),
+      'fixture/repository',
+      workspacesDir,
+    );
+    await expect(readFile(repo, H.projectId, 'scripts/owned-process.mjs')).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringMatching(/repository cache not verified yet.*restart.*daemon/),
+    });
+    await fetchFixture(cache, source, 'fixture/repository', workspacesDir);
+    expect((await readFile(repo, H.projectId, 'scripts/owned-process.mjs')).content).toBe(
+      'export const spawn = true;\n',
+    );
+  });
 
   test('legacy and failed-retarget caches fail closed until the current origin is fetched', async () => {
     const dir = await bindRepo('github');
@@ -361,7 +442,7 @@ describe('Coordinator repository reads', () => {
   });
 
   for (const withCacheRoot of [false, true]) {
-    test.each(['docs', 'file', 'tree', 'files', 'history', 'detail'] as const)(
+    test.each(['docs', 'file', 'files'] as const)(
       `%s never uses a GitHub localPath when its cache is unavailable (root=${withCacheRoot})`,
       async (entry) => {
         const dir = await bindRepo('github');
@@ -393,10 +474,7 @@ describe('Coordinator repository reads', () => {
           } else {
             const reads = {
               file: () => readFile(repo, H.projectId, 'scripts/owned-process.mjs', ref),
-              tree: () => readTree(repo, H.projectId, ref),
               files: () => readFiles(repo, H.projectId, ref),
-              history: () => readCommitHistory(repo, H.projectId, ref),
-              detail: () => readCommitDetail(repo, H.projectId, ref),
             };
             await expect(reads[entry]()).rejects.toMatchObject({
               status: 404,
@@ -611,7 +689,7 @@ describe('Coordinator repository reads', () => {
     );
   });
 
-  test('credential restrictions apply to Coordinator reads, not authenticated file browsing', async () => {
+  test('credential restrictions apply to Coordinator reads, not lower-level Git reads', async () => {
     await bindRepo('local');
     const file = await readFile({ db: H.s.db, reposDir: H.s.reposDir }, H.projectId, '.env');
     expect(file.content).toBe('PRIVATE_FIXTURE=not-a-real-secret\n');
@@ -707,7 +785,7 @@ describe('Coordinator repository reads', () => {
       ) as Docs;
     const unverified = await read();
     expect(unverified.files[0]?.content).toBeUndefined();
-    expect(unverified.files[0]?.error).toMatch(/current repository|verified repository/);
+    expect(unverified.files[0]?.error).toMatch(/repository cache not verified yet/);
     expect(
       (await runGit(['update-ref', 'refs/heads/cache-source', commit], { cwd: source })).code,
     ).toBe(0);

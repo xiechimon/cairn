@@ -46,7 +46,9 @@ import type {
   SnoozeMode,
   SplitPolicy,
   StepKind,
+  StepPromptOrigin,
   TaskDecision,
+  TaskRequest,
   TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
@@ -149,6 +151,7 @@ export const todo = sqliteTable(
       .references(() => project.id),
     title: text('title').notNull(),
     spec: text('spec').notNull().default(''),
+    correctionRequired: bool('correctionRequired').notNull().default(false),
     phase: text('phase').$type<Phase>().notNull().default('todo'),
     phaseAt: epochMs('phaseAt').notNull(),
     archivedAt: epochMs('archivedAt'),
@@ -180,6 +183,7 @@ export const todo = sqliteTable(
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
       .default(sql`'[]'`),
+    request: json<TaskRequest | null>('request'),
   },
   (t) => [index('todo_phase_idx').on(t.phase)],
 );
@@ -283,7 +287,9 @@ export const step = sqliteTable(
     lastHeartbeatAt: epochMs('lastHeartbeatAt'),
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
+    promptOrigin: json<StepPromptOrigin>('promptOrigin'),
     scopeProjectId: text('scopeProjectId'),
+    ownerMessageIds: json<string[]>('ownerMessageIds'),
     byPerson: bool('byPerson').notNull().default(false),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
@@ -922,6 +928,8 @@ export const coordinatorConversation = sqliteTable('coordinator_conversation', {
   threadId: text('threadId').primaryKey(),
   conversationId: text('conversationId').notNull(),
   lastMirroredEntryId: text('lastMirroredEntryId'),
+  lastColdSlimAt: epochMs('lastColdSlimAt'),
+  lastColdSlimStepId: text('lastColdSlimStepId'),
   piVersion: text('piVersion').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
 });
@@ -1257,25 +1265,6 @@ export const buildOutcomeBackfill = sqliteTable('build_outcome_backfill', {
   mergeCommit: text('mergeCommit').notNull(),
   checkedAt: epochMs('checkedAt').notNull(),
 });
-
-export const feishuBinding = sqliteTable(
-  'feishu_binding',
-  {
-    teamId: text('teamId')
-      .primaryKey()
-      .references(() => team.id, { onDelete: 'cascade' }),
-    userId: text('userId')
-      .notNull()
-      .references(() => user.id),
-    openId: text('openId').notNull(),
-    cairnOrigin: text('cairnOrigin').notNull(),
-    appIdCipher: text('appIdCipher').notNull(),
-    appSecretCipher: text('appSecretCipher').notNull(),
-    createdAt: epochMs('createdAt').notNull(),
-    updatedAt: epochMs('updatedAt').notNull(),
-  },
-  (t) => [uniqueIndex('feishu_binding_openId_unique').on(t.openId)],
-);
 
 export const scheduleReport = sqliteTable(
   'schedule_report',

@@ -26,7 +26,7 @@ import {
   stepTeamId,
   upsertChiefRow,
 } from './machine-deps.js';
-import { injectMemoriesCapped, MEMORY_INJECT_TOKEN_CAP } from './memory.js';
+import { injectMemoryDocuments } from './memory.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
 import { scanLocalSkills } from './skills.js';
@@ -78,17 +78,17 @@ export function chiefTurnContext(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const memories = injectMemoriesCapped(
-    deps.db,
-    {
-      agentId,
-      teamId: threadRow.teamId,
-      threadId: threadRow.id,
-      projectId: null,
-      recordUse: !digest,
-    },
-    MEMORY_INJECT_TOKEN_CAP,
-  ).memories.map(({ title, content }) => ({ title, content }));
+  const injected = injectMemoryDocuments(deps.db, {
+    agentId,
+    teamId: threadRow.teamId,
+    threadId: threadRow.id,
+    projectId: null,
+    recordUse: !digest,
+  });
+  const memories = [
+    ...injected.memories.map(({ title, content }) => ({ title, content })),
+    { title: '记忆文件', content: `${injected.fileCount} 个；用 memories 按需读取。` },
+  ];
   const project = digest
     ? null
     : projectTurnContextTraced(deps.db, {

@@ -12,6 +12,15 @@ import { api } from './client.js';
 
 export const ROUTING_SETTINGS_KEY = 'routing-settings';
 
+export function routingRuleInvalidateKeys(
+  teamId: string,
+  use: RouteUse,
+): ReadonlyArray<readonly unknown[]> {
+  const keys: Array<readonly unknown[]> = [[ROUTING_SETTINGS_KEY, teamId]];
+  if (use === 'coordinator') keys.push(['chief', teamId]);
+  return keys;
+}
+
 export function useRoutingSettings(teamId: string | undefined, live: boolean) {
   return useQuery({
     queryKey: [ROUTING_SETTINGS_KEY, teamId],
@@ -28,7 +37,15 @@ export function useRoutingSettingsMutations(teamId: string | undefined) {
     patchRule: useMutation({
       mutationFn: ({ use, body }: { use: RouteUse; body: PatchRoutingRuleBody }) =>
         api.patch<RoutingRuleRecord>(`/api/teams/${teamId}/routing-rules/${use}`, body),
-      onSuccess: () => invalidate(),
+      onSuccess: (_data, vars) => {
+        if (teamId === undefined) {
+          void invalidate();
+          return;
+        }
+        for (const queryKey of routingRuleInvalidateKeys(teamId, vars.use)) {
+          void client.invalidateQueries({ queryKey });
+        }
+      },
     }),
     patchPolicy: useMutation({
       mutationFn: ({ use, body }: { use: PolicyUse; body: PatchWorkPolicyBody }) =>

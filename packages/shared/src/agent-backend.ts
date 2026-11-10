@@ -44,6 +44,20 @@ export const modelUsageSchema = z.object({
 });
 export type ModelUsage = z.infer<typeof modelUsageSchema>;
 
+export type UsageTokenCounts = {
+  input?: number | null;
+  output?: number | null;
+  cacheRead?: number | null;
+  cacheWrite?: number | null;
+};
+
+export function contextTokensOf(usage: UsageTokenCounts | null | undefined): number {
+  if (usage == null) return 0;
+  return (
+    (usage.input ?? 0) + (usage.output ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
+  );
+}
+
 export type AgentTokenUsage = readonly ModelUsage[];
 
 export const agentTokenUsageSchema = z.array(modelUsageSchema);

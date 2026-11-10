@@ -40,7 +40,7 @@ describe('D71 memory owned by the session rule', () => {
     expect(memoryOwnerOf(s.db, s.team.id, 'build')).toBe(s.team.id);
   });
 
-  test('injection through the rule owner returns what the rule remembered', () => {
+  test('injection through the rule owner returns the team index', () => {
     const s = world();
     const ruleId = seedRoute(s, 'session', { provider: 'stub-gw', modelId: 'stub-model' });
     for (const [agentId, content] of [
@@ -62,9 +62,12 @@ describe('D71 memory owned by the session rule', () => {
         .run();
     }
     expect(
-      injectMemories(s.db, { agentId: memoryOwnerOf(s.db, s.team.id, 'plan') }).map(
-        (m) => m.content,
-      ),
-    ).toEqual(['run pnpm lint before push']);
+      injectMemories(s.db, {
+        teamId: s.team.id,
+        agentId: memoryOwnerOf(s.db, s.team.id, 'plan'),
+      }).map((m) => m.content),
+    ).toEqual([
+      '- run pnpm lint before：run pnpm lint before push\n- unrelated lesson：unrelated lesson',
+    ]);
   });
 });

@@ -114,6 +114,7 @@ describe('thread.orchestration describes the latest orchestrate turn', () => {
       prompt: 'gate facts',
       trigger: 'gate',
       provenance: 'watch:test',
+      ownerMessageIds: [],
     });
     expect(await orchestrationOf()).toEqual({ todoId, state: 'running', error: null });
   });

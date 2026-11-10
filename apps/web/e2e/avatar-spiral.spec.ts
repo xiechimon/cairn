@@ -24,7 +24,7 @@ test('search drops agent rows; project task rows stay seeded', async ({ page }) 
   await page.keyboard.type('r3-builder');
   await expect(searchPanel.locator('[data-row-kind="agent"]')).toHaveCount(0);
 
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
   await expect(page.locator('.prj-task-avatar img').first()).toHaveAttribute('src', USER_SRC);
 });
 

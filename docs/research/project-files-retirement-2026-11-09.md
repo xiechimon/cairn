@@ -18,8 +18,8 @@ Baseline: [`0719ece9f`](https://github.com/xiechimon/cairn/tree/0719ece9fc6c07f8
 Keep each review under 1000 changed non-generated lines, on the same branch, waiting for main between segments:
 
 1. Remove project commit-history UI, hooks, fixtures and active verification registration. Keep thread run history and diff UI unchanged.
-2. Remove project file navigation, route and components. Old URLs leave the surface; project home, task creation, settings and issue import remain.
-3. Remove page-exclusive tree, file and commit APIs, schemas and services. Tests prove retired endpoints return 404 and retained thread/project paths still work. Only this segment closes the issue.
+2. Remove project file navigation, route, viewer and hooks. Old URLs leave the surface; preserve the existing task list, filters and issue import at `/app/project/:id/tasks`, reached from project home and chat. Settings and thread file access remain unchanged.
+3. Remove page-exclusive tree, file and commit APIs, schemas and services. Preserve the shared `readFile` service and its response schema: the Coordinator `docs` tool reads repository documents through them, including verified GitHub cache refs. Preserve recursive mentions, branch settings and build-scoped diff/full-file readers. Tests prove retired endpoints return 404 and retained thread/project paths still work. Only this segment closes the issue.
 
 No persisted state, execution protocol or concurrency behavior changes. No migration or new dependency is needed. Historical evidence stays historical; obsolete live probes are archived and unregistered.
 

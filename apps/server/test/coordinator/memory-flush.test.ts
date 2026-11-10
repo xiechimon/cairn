@@ -1,10 +1,14 @@
-import { COORDINATOR_MEMORY_FLUSH_MAX, ISSUE_FENCE_OPEN } from '@cairn/shared';
+import { COORDINATOR_MEMORY_FLUSH_MAX, ISSUE_FENCE_OPEN, MEMORY_INDEX_TITLE } from '@cairn/shared';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 import { applyFlush, FLUSH_SOURCE, parseFlushOutput } from '../../src/coordinator/memory-flush.js';
 import { flushTranscript, summarizerFor } from '../../src/coordinator/runtime/compaction.js';
 import { agentMemory, project } from '../../src/db/schema.js';
-import { listMemoryEntries, saveMemoryEntry } from '../../src/services/memory.js';
+import {
+  foldMemoryIndexes,
+  listMemoryEntries,
+  saveMemoryEntry,
+} from '../../src/services/memory.js';
 import { coordinatorProfile } from '../../src/services/routing-rules.js';
 import { boot, world } from './runner-world.js';
 
@@ -48,6 +52,34 @@ describe('flushTranscript', () => {
 });
 
 describe('applyFlush', () => {
+  it('appends instead of overwriting when a flush entry names the MEMORY.md id', async () => {
+    const w = await world('hi');
+    const scope = { teamId: w.teamId, threadId: w.threadId };
+    applyFlush(w.s.db, scope, json({ title: 'Merge', content: 'ian wants squash merges only.' }));
+    foldMemoryIndexes(w.s.db);
+    const index = w.s.db
+      .select()
+      .from(agentMemory)
+      .all()
+      .find((row) => row.title === MEMORY_INDEX_TITLE && row.invalidAt === null);
+    expect(index).toBeDefined();
+    const result = applyFlush(
+      w.s.db,
+      scope,
+      json({ title: 'Deploy', content: 'Deploy on weekdays.', replaces: index?.id }),
+    );
+    expect(result).toEqual({ saved: 1, updated: 0, skipped: 0 });
+    const still = w.s.db
+      .select()
+      .from(agentMemory)
+      .all()
+      .find((row) => row.id === index?.id);
+    expect(still).toMatchObject({
+      invalidAt: null,
+      content: index?.content,
+    });
+  });
+
   it('saves a new fact with its source, skips a repeat, and never throws on quota or fences', async () => {
     const w = await world('hi');
     const scope = { teamId: w.teamId, threadId: w.threadId };
@@ -141,6 +173,7 @@ describe('applyFlush', () => {
 describe('flush before a real compaction', () => {
   it('saves the facts, survives a failing flush, and the next turn sees the saved fact', async () => {
     const w = await world('Please remember: ian wants squash merges only.');
+    const memoryScope = { teamId: w.teamId, agentId: coordinatorProfile(w.s.db, w.teamId)!.id };
     const faux = fauxProvider({
       provider: 'stub',
       models: [{ id: 'm', contextWindow: 20_000 }],
@@ -164,10 +197,10 @@ describe('flush before a real compaction', () => {
     coordinator.wake(w.threadId);
     await coordinator.idle();
     const deadline = Date.now() + 8_000;
-    while (Date.now() < deadline && w.s.db.select().from(agentMemory).all().length === 0) {
+    while (Date.now() < deadline && listMemoryEntries(w.s.db, memoryScope).length === 0) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    const rows = w.s.db.select().from(agentMemory).all();
+    const rows = listMemoryEntries(w.s.db, memoryScope);
     expect(rows.map((r) => r.content)).toEqual(['ian wants squash merges only.']);
     expect(rows[0]?.source).toBe(FLUSH_SOURCE);
     expect(prompts).toHaveLength(1);
@@ -176,6 +209,7 @@ describe('flush before a real compaction', () => {
 
   it('a failing flush call never blocks the summary fold', async () => {
     const w = await world('Please remember: ian wants squash merges only.');
+    const memoryScope = { teamId: w.teamId, agentId: coordinatorProfile(w.s.db, w.teamId)!.id };
     const faux = fauxProvider({
       provider: 'stub',
       models: [{ id: 'm', contextWindow: 20_000 }],
@@ -203,7 +237,7 @@ describe('flush before a real compaction', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     expect(folded).toBeGreaterThan(0);
-    expect(w.s.db.select().from(agentMemory).all()).toEqual([]);
+    expect(listMemoryEntries(w.s.db, memoryScope)).toEqual([]);
   }, 20_000);
 });
 
