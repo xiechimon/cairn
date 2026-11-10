@@ -159,11 +159,10 @@ test('the full 4-shard e2e runs exactly on merge-queue drafts and pushes', () =>
   }
 });
 
-test('a docs-only pull request skips both e2e tiers, a push never does', () => {
+test('no e2e tier runs when the classifier found nothing left to test', () => {
   for (const [name, github] of Object.entries(events)) {
     const { e2e, 'e2e-affected': affected } = plan(github, 'false');
-    const push = github['github.event_name'] === 'push';
-    assert.equal(e2e, push, `${name}: e2e`);
+    assert.equal(e2e, false, `${name}: e2e`);
     assert.equal(affected, false, `${name}: e2e-affected`);
   }
 });

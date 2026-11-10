@@ -207,7 +207,7 @@ const workflowJobs = () => {
 
 const sidecarJobs = ['tsnet-sidecar-test', 'tsnet-sidecar-build'];
 
-test('CI classifies before heavy work and always runs push coverage', () => {
+test('CI classifies before heavy work and skips it only for a classified reason', () => {
   const jobs = workflowJobs();
   const changes = jobs.get('changes');
   assert.ok(changes);
@@ -226,25 +226,29 @@ test('CI classifies before heavy work and always runs push coverage', () => {
   assert.match(changes, /node scripts\/prepush.mjs --has-sidecar/);
   assert.match(changes, /has_sidecar=true/);
   assert.match(changes, /\|\| has_sidecar=true/);
+  assert.match(changes, /tested-in-queue: \$\{\{ steps.classify.outputs.tested-in-queue \}\}/);
+  assert.match(changes, /^ {10}tested_in_queue=false$/m);
+  assert.match(changes, /elif \[ "\$GITHUB_REF" = refs\/heads\/main \]; then/);
+  assert.ok(
+    changes.includes(
+      'tested_in_queue=$(node scripts/ops/merge-route-audit.mjs landed $commits) || tested_in_queue=false',
+    ),
+  );
+  const warm = jobs.get('warm-caches');
+  assert.match(warm ?? '', /^ {4}if: needs.changes.outputs.tested-in-queue == 'true'$/m);
+  assert.ok(warm.includes('pnpm install --frozen-lockfile'));
+  assert.ok(warm.includes('uses: ./.github/actions/playwright-chromium\n'));
   assert.match(changes, /fetch-depth: 0/);
   assert.doesNotMatch(readFileSync('.github/workflows/ci.yml', 'utf8'), /^ {4}paths(?:-ignore)?:/m);
   for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke', 'dead-class-gate']) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
-    assert.match(
-      job,
-      /^ {4}if: github.event_name != 'pull_request' \|\| needs.changes.outputs.has-code != 'false'$/m,
-      name,
-    );
+    assert.match(job, /^ {4}if: needs.changes.outputs.has-code != 'false'$/m, name);
   }
   for (const name of sidecarJobs) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
-    assert.match(
-      job,
-      /^ {4}if: github.event_name != 'pull_request' \|\| needs.changes.outputs.has-sidecar != 'false'$/m,
-      name,
-    );
+    assert.match(job, /^ {4}if: needs.changes.outputs.has-sidecar != 'false'$/m, name);
   }
   for (const [name, suite] of [
     ['vitest-light', 'light'],
