@@ -477,6 +477,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       coordinatorServerContext,
       coordinatorMachineId,
       coordinatorInServer,
+      confinementPlatform,
       trajectoryOutcomeBackfill,
       trajectoryReflectCurate,
       trajectoryReflectOpenGuardIssues,
@@ -514,6 +515,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(coordinatorServerContext).toBe('CAIRN_COORDINATOR_SERVER_CONTEXT');
     expect(coordinatorMachineId).toBe('CAIRN_COORDINATOR_MACHINE_ID');
     expect(coordinatorInServer).toBe('CAIRN_COORDINATOR_IN_SERVER');
+    expect(confinementPlatform).toBe('CAIRN_CONFINEMENT_PLATFORM');
     expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
     expect(trajectoryReflectCurate).toBe('CAIRN_TRAJ_REFLECT_CURATE');
     expect(trajectoryReflectOpenGuardIssues).toBe('CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES');
