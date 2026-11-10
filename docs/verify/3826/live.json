@@ -1,0 +1,26 @@
+{
+  "request": {
+    "tool": "create_todo",
+    "message": "<!-- reply source=source-172 -->\n> Previous task context (redacted).\n\nPlease dispatch."
+  },
+  "response": {
+    "status": 200,
+    "title": "Please dispatch.",
+    "spec": "<!-- reply source=source-172 -->\n> Previous task context (redacted).\n\nPlease dispatch.",
+    "segments": [
+      {
+        "source": {
+          "kind": "chat",
+          "threadId": "chief-01a1c378-1aa6-738a-8455-71b11b8b1f88",
+          "messageId": "sanitized-live-172",
+          "span": "whole"
+        },
+        "author": "owner",
+        "sourceRef": null,
+        "text": "<!-- reply source=source-172 -->\n> Previous task context (redacted).\n\nPlease dispatch."
+      }
+    ],
+    "notificationTitle": "Please dispatch."
+  },
+  "todoId": "j2oph6Raf7ZvqVp52kdk1"
+}
