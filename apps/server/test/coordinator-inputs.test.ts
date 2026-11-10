@@ -262,3 +262,38 @@ test('an old admitted initial input cannot adopt later mutable owners during an 
   const initial = prepareCoordinatorInput(H.s.db, parentId, 'conversation-1', 'Start.', '1');
   expect(initial.ownerMessageIds).toEqual([parentId]);
 });
+
+test('a rebuilt store gets a fresh initial request identity without rewriting its predecessor', () => {
+  H.s.db.update(coordinatorConversation).set({ storeId: 'store_one', conversationId: '1' }).run();
+  const before = prepareCoordinatorInput(H.s.db, parentId, 'store_one:1', 'Start.');
+  consumeCoordinatorInput(H.s.db, before.id, 'store_one:1', '5');
+  H.s.db.update(coordinatorConversation).set({ storeId: 'store_two', conversationId: '1' }).run();
+  const after = prepareCoordinatorInput(H.s.db, parentId, 'store_two:1', 'Restart.');
+  expect(after.id).not.toBe(before.id);
+  expect(prepareCoordinatorInput(H.s.db, parentId, 'store_two:1', 'Changed.')).toEqual(after);
+  expect(batch(before.id)).toEqual({ ...before, state: 'consumed', entryId: '5' });
+});
+
+test('a stale store callback cannot consume or release pending work after replacement', () => {
+  H.s.db.update(coordinatorConversation).set({ storeId: 'store_one', conversationId: '1' }).run();
+  const id = queue();
+  pullCoordinatorInput(H.s.db, parentId, 'store_one:1');
+  H.s.db.update(coordinatorConversation).set({ storeId: 'store_two', conversationId: '1' }).run();
+  expect(() => consumeCoordinatorInput(H.s.db, id, 'store_one:1', '5')).toThrow(
+    'conversation changed',
+  );
+  expect(() => releaseCoordinatorInput(H.s.db, id, 'store_one:1')).toThrow('conversation changed');
+  expect(batch(id)?.state).toBe('pending');
+});
+
+test('admission scheduling can reach a later batch while default retries retain the first', () => {
+  const first = queue('First.');
+  pull();
+  const second = queue('Second.');
+  expect(pull()?.id).toBe(first);
+  expect(pullCoordinatorInput(H.s.db, parentId, 'conversation-1', [first])?.id).toBe(second);
+  expect(row(parentId)?.ownerMessageIds).toEqual([parentId]);
+  expect(() => pullCoordinatorInput(H.s.db, parentId, 'conversation-1', ['unknown'])).toThrow(
+    'admission',
+  );
+});
