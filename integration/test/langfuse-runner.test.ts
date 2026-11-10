@@ -10,7 +10,7 @@ import {
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import type { ProviderConfig } from '@cairn/shared';
+import type { CoordinatorCreateTodoParams, ProviderConfig } from '@cairn/shared';
 import { openExperimentClient } from '@cairn/shared/langfuse';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
@@ -155,9 +155,7 @@ describe('Langfuse Coordinator runner', () => {
           name: 'create_todo',
           arguments: {
             projectId: 'project-0',
-            title: 'Update docs',
-            spec: 'Owner request: update docs',
-          },
+          } satisfies CoordinatorCreateTodoParams,
         },
       },
       {
@@ -175,12 +173,15 @@ describe('Langfuse Coordinator runner', () => {
       const model = await startStubLlm([test, { content: 'recorded' }]);
       closers.push(() => model.close());
       const output = await runSandboxedTurn(
-        input,
+        { ...input, request: 'Update docs' },
         modelProvider(model.url),
         'model-test-key',
         30_000,
       );
-      expect(output).toMatchObject({ decision: test.decision });
+      expect(output).toMatchObject({
+        decision: test.decision,
+        parts: test.decision === 'route' ? [{ project: 'docs', title: 'Update docs' }] : [],
+      });
     }
   }, 90_000);
 
