@@ -199,6 +199,7 @@ async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
     .values({
       id: buildId,
       todoId,
+      evidenceStore: 'repository',
       withPlan: false,
       triggerSource: 'user',
       prNumber: 7,
