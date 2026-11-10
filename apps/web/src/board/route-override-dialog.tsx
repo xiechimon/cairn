@@ -154,14 +154,14 @@ export function RouteOverrideDialog({
               >
                 <SelectValue>
                   {machineId === null
-                    ? t('不固定')
+                    ? t(machines.length > 1 ? '选择机器' : '不固定')
                     : pickedMachine === undefined
                       ? machineId
                       : machineLabel(pickedMachine, machines)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>{t('不固定')}</SelectItem>
+                {machines.length > 1 ? null : <SelectItem value={null}>{t('不固定')}</SelectItem>}
                 {machines.map((machine) => (
                   <SelectItem key={machine.id} value={machine.id}>
                     <MachineName machine={machine} all={machines} />

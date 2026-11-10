@@ -1142,9 +1142,7 @@ function namedMachineForStart(
     .all();
   const only = online[0];
   if (online.length === 1 && only !== undefined) return { machineId: only.id, pin: true };
-  if (online.length > 1) {
-    throw new HttpError(409, 'Name a machine before starting this task');
-  }
+  if (online.length > 1) throw new HttpError(409, 'Name a machine before starting this task');
   return null;
 }
 

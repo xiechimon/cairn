@@ -26,6 +26,7 @@ import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
 import { mapPlanDoc, mapPlanVersions, mapTranscript, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
@@ -121,6 +122,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const { query: messagesQ, messages, newest } = useConversationMessages(buildId, live);
   const plansQ = usePlans(buildId, live);
   const machinesQ = useMachines(teamId, live);
+  const routingQ = useRoutingSettings(teamId, live);
 
   const known = useMemo(() => new Set(messages.map((m) => m.id)), [messages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
@@ -171,9 +173,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const machineName = useMemo(() => {
     const claimed = machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id))?.name;
     if (claimed != null) return claimed;
-    const pinned = listed?.routeOverride?.machineId;
+    const pinned =
+      listed?.routeOverride?.machineId ??
+      routingQ.data?.rules.find((rule) => rule.use === 'session')?.machineId ??
+      null;
     return machinesQ.data?.find((m) => m.id === pinned)?.name ?? null;
-  }, [machinesQ.data, steps, listed?.routeOverride?.machineId]);
+  }, [machinesQ.data, steps, listed?.routeOverride?.machineId, routingQ.data]);
   const todo = live ? (wire != null ? toDisplayTodo(wire) : (listed ?? null)) : (listed ?? null);
   const fixture = resolveScenario(searchParams);
   const fixtureDetail = fixture.details?.[todoId] ?? fixture.detail;
