@@ -178,6 +178,17 @@ test('the Tasks panel lists schedules in the Schedules tab only, with a link to 
   await expect(panel.locator('[data-slot="schedule-row"]')).toContainText('Nightly release checks');
 });
 
+test('the Schedules tab lists schedules while the tasks request has failed', async ({ page }) => {
+  await setup(page, { kind: 'once', nextRunAt: null });
+  await page.route('**/api/tasks?*', (route) => route.fulfill({ status: 500, body: '{}' }));
+  await page.goto('/app?pane=tasks');
+  const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
+  await expect(panel.getByTestId('query-error')).toBeVisible();
+  await panel.getByRole('tab', { name: 'Schedules' }).click();
+  await expect(panel.getByTestId('query-error')).toHaveCount(0);
+  await expect(panel.locator('[data-slot="schedule-row"]')).toContainText('Nightly release checks');
+});
+
 for (const surface of ['global', 'project'] as const) {
   const path = surface === 'global' ? '/app/schedules' : '/app?project=proj-1';
   const summary = (page: Page) => surface === 'global'

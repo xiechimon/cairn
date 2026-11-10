@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { withCreatedSchedules, withoutDeleted } from '../fixtures/deletions.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
@@ -34,26 +35,20 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
     .sort(byNextRun);
   return (
     <>
-      {live && query.isError ? (
-        <p className="m-0 flex items-center gap-2 px-2.5 py-2 text-meta text-content-tertiary">
-          {t('定时没能加载')}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6.5 text-meta"
-            onClick={() => void query.refetch()}
+      <QueryBoundary
+        query={live ? query : undefined}
+        isEmpty={rows.length === 0}
+        loadingLabel={t('正在加载定时')}
+        errorTitle={t('定时没能加载')}
+        empty={
+          <p
+            data-testid="tasks-schedules-empty"
+            className="m-0 px-2.5 py-2 text-meta text-content-tertiary"
           >
-            {t('重试')}
-          </Button>
-        </p>
-      ) : rows.length === 0 ? (
-        <p
-          data-testid="tasks-schedules-empty"
-          className="m-0 px-2.5 py-2 text-meta text-content-tertiary"
-        >
-          {t('还没有定时任务')}
-        </p>
-      ) : (
+            {t('还没有定时任务')}
+          </p>
+        }
+      >
         <section data-testid="tasks-section" data-section="scheduled" className="flex flex-col">
           {rows.map((row) => (
             <div key={row.id} data-slot="schedule-row-frame" className="group/task relative">
@@ -88,7 +83,7 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
             </div>
           ))}
         </section>
-      )}
+      </QueryBoundary>
       <Button
         variant="ghost"
         size="sm"

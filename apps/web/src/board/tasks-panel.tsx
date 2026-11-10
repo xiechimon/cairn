@@ -234,17 +234,11 @@ export function TasksPanel({
       </section>
     );
   const body =
-    tab === 'active' ? (
-      active
-    ) : tab === 'next' ? (
-      listOf('up_next', t('接下来没有安排'))
-    ) : tab === 'scheduled' ? (
-      <div className="flex flex-col">
-        <TasksScheduleList projectId={projectId} now={now} />
-      </div>
-    ) : (
-      listOf('resolved', t('还没有完成的任务'))
-    );
+    tab === 'active'
+      ? active
+      : tab === 'next'
+        ? listOf('up_next', t('接下来没有安排'))
+        : listOf('resolved', t('还没有完成的任务'));
   return (
     <SidePanel label={t('任务')} onDismiss={onClose} phoneTab>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
@@ -294,15 +288,19 @@ export function TasksPanel({
         />
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
-        <QueryBoundary
-          query={query}
-          isEmpty={empty !== null}
-          loadingLabel={t('正在加载任务')}
-          errorTitle={t('任务没能加载')}
-          empty={body}
-        >
-          {body}
-        </QueryBoundary>
+        {tab === 'scheduled' ? (
+          <TasksScheduleList projectId={projectId} now={now} />
+        ) : (
+          <QueryBoundary
+            query={query}
+            isEmpty={empty !== null}
+            loadingLabel={t('正在加载任务')}
+            errorTitle={t('任务没能加载')}
+            empty={body}
+          >
+            {body}
+          </QueryBoundary>
+        )}
       </div>
     </SidePanel>
   );

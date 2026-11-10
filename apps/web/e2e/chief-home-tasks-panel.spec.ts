@@ -120,6 +120,8 @@ test('a scheduled row menu offers run, pause and delete; delete asks first', asy
   await expect(menuSlot).toHaveCSS('opacity', '0');
   await rows.first().hover();
   await expect(menuSlot).toHaveCSS('opacity', '1');
+  await rows.first().getByTestId('schedule-row-menu-button').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('更多');
   await rows.first().getByTestId('schedule-row-menu-button').click();
   const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitem')).toHaveText([/立即运行/, /暂停定时/, /删除/]);

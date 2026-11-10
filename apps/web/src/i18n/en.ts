@@ -1897,6 +1897,7 @@ export const EN: Record<string, string> = {
   现在没有进行中的任务: 'Nothing is in progress right now',
   还没有完成的任务: 'No finished tasks yet',
   定时没能加载: 'Schedules could not be loaded',
+  正在加载定时: 'Loading schedules',
   '添加任务…': 'Add a task…',
   添加: 'Add',
   '任务没有发出，请重试。': 'The task was not sent. Try again.',
