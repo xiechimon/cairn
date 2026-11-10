@@ -481,6 +481,15 @@ export function updateAutonomousTodo(
       `todo ${id} carries the owner's cited words; edit it in the board, or send owner messages through the Coordinator`,
     );
   }
+  if (
+    opts.textWriter === 'coordinator-title' &&
+    (patch.title === undefined || row.request === null)
+  ) {
+    throw new HttpError(
+      409,
+      `todo ${id} has no cited request; summary titles are only for Coordinator-created request tasks`,
+    );
+  }
 
   const sets: Partial<TodoRow> = {};
   if (patch.blockedBy !== undefined) sets.blockedBy = checkBlockedBy(db, row, patch.blockedBy);

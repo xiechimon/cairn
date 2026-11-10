@@ -270,6 +270,29 @@ describe('update_todo', () => {
     expect(stored.request?.titleSourceRef).toBe(null);
     expect(fencedTitle(stored.title, stored)).toBe('named by the Coordinator: Markdown 预览与编辑');
   });
+
+  test('a summary title is refused when the todo has no cited request', async () => {
+    const board = createTodo(H.s, {
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'Board task',
+      spec: 'owner typed this on the board',
+      createdBy: H.userId,
+      ownerId: H.userId,
+    });
+    expect(row(board.id).request).toBe(null);
+    await expect(
+      relay('update_todo', { todoId: board.id, title: 'Should not stick' }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(row(board.id).title).toBe('Board task');
+
+    const issue = issueTask('Fix the crash.', 91);
+    expect(row(issue.id).request).toBe(null);
+    await expect(
+      relay('update_todo', { todoId: issue.id, title: 'Should not stick' }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(row(issue.id).title).toBe('Crash');
+  });
 });
 
 describe('static: Coordinator todo writes take no body text from tool params', () => {

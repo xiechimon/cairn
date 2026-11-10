@@ -440,12 +440,12 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_todo',
     description:
-      "Update a todo's summary title, tags, move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds, copied verbatim). After create_todo, set title to a short summary (≤50 chars) for the Tasks panel; the owner's cited request body stays in the task text and is never rewritten here. A running thread gets body corrections through message_thread.",
+      "Update a todo's summary title (Coordinator create_todo request tasks only), tags, move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds, copied verbatim). After create_todo, set title to a short summary (≤50 chars) for the Tasks panel; the owner's cited request body stays in the task text and is never rewritten here. Board tasks and imported GitHub issues keep their titles. A running thread gets body corrections through message_thread.",
     parameters: obj(
       {
         todoId: str('Todo id.'),
         title: str(
-          'Optional short summary title for the Tasks panel (≤50 chars, plain text). Does not change the owner request body.',
+          'Optional short summary title for a Coordinator-created request task (≤50 chars, plain text). Refused when the todo has no cited request. Does not change the owner request body.',
         ),
         tagIds: idArr('Optional replacement tag ids.'),
         projectId: str(
