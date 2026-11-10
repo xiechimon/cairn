@@ -19,6 +19,7 @@ import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
+import { STATUS_WORDS } from './status-words.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
@@ -36,10 +37,12 @@ function StatusLine({
   todo,
   machineName,
   now,
+  waitingOnChecks,
 }: {
   todo: TodoRecord;
   machineName: string | null;
   now: number;
+  waitingOnChecks: boolean;
 }) {
   const { t } = useI18n();
   const meta = joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
@@ -49,7 +52,11 @@ function StatusLine({
       className="m-0 flex min-w-0 items-center gap-1.5 pl-5 text-meta text-content-tertiary"
     >
       <span className="flex-none font-medium text-content-secondary">
-        {todo.quotaWait != null ? t('等额度') : t(threadCopy(todo).state)}
+        {todo.quotaWait != null
+          ? t('等额度')
+          : waitingOnChecks
+            ? t(STATUS_WORDS.waitingChecks)
+            : t(threadCopy(todo).state)}
       </span>
       {meta !== '' && (
         <>
@@ -410,7 +417,12 @@ function ReadyThread({
             }
           : {})}
       >
-        <StatusLine todo={todo} machineName={chat.machineName} now={now} />
+        <StatusLine
+          todo={todo}
+          machineName={chat.machineName}
+          now={now}
+          waitingOnChecks={chat.waitingOnChecks}
+        />
         <ThreadUsageFooter key={todo.id} todo={todo} />
       </Head>
       <ThreadPrPanel

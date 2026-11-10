@@ -80,7 +80,9 @@ export function priorSessionOf(
         eq(step.buildId, stepRow.buildId),
         sql`${step.sessionId} is not null`,
         ...(isBuildStepKind(stepRow.kind) &&
-        (buildRow.prevPhase === 'done' || buildRow.prevPhase === 'review')
+        (buildRow.prevPhase === 'done' ||
+          buildRow.prevPhase === 'review' ||
+          buildRow.prevPhase === 'building')
           ? [inArray(step.kind, ['build', 'session'])]
           : []),
       ),
