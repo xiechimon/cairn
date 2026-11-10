@@ -5,6 +5,7 @@
     "id": 157263579,
     "emails": ["xiechimon@qq.com", "157263579+xiechimon@users.noreply.github.com"]
   },
+  "cloudAgents": [{ "name": "Claude", "email": "noreply@anthropic.com" }],
   "platformCommitters": [
     { "name": "GitHub", "email": "noreply@github.com" },
     { "name": "Mergify", "email": "commit-signer@mergify.com" }
