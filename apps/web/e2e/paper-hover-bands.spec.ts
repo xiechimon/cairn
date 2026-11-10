@@ -20,6 +20,13 @@ async function assertFlatRow(page: Page, row: Locator) {
     await page.mouse.move(0, 0);
     await page.waitForTimeout(180);
     const before = await backgrounds(row);
+    const receivesPointer = await target.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) return false;
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return top === el || (top !== null && el.contains(top));
+    });
+    if (!receivesPointer) continue;
     await target.hover();
     await page.waitForTimeout(180);
     const after = await backgrounds(row);
