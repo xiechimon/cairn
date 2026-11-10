@@ -691,6 +691,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       s.promptOrigin !== undefined ? [[transcriptPromptRowId(s.id), s.promptOrigin] as const] : [],
     ),
   );
+  const stepPromptIds = new Set(steps.map((step) => transcriptPromptRowId(step.id)));
   const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
@@ -744,6 +745,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         });
         continue;
       }
+      if (stepPromptIds.has(m.id)) continue;
       if (GATE_ANNOUNCEMENTS.includes(text)) {
         entries.push({
           at: m.createdAt,
