@@ -168,10 +168,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     stopRequested.current = false;
   }, [buildId]);
 
-  const machineName = useMemo(
-    () => machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id))?.name ?? null,
-    [machinesQ.data, steps],
-  );
+  const machineName = useMemo(() => {
+    const claimed = machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id))?.name;
+    if (claimed != null) return claimed;
+    const pinned = listed?.routeOverride?.machineId;
+    return machinesQ.data?.find((m) => m.id === pinned)?.name ?? null;
+  }, [machinesQ.data, steps, listed?.routeOverride?.machineId]);
   const todo = live ? (wire != null ? toDisplayTodo(wire) : (listed ?? null)) : (listed ?? null);
   const fixture = resolveScenario(searchParams);
   const fixtureDetail = fixture.details?.[todoId] ?? fixture.detail;

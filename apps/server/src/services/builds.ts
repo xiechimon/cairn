@@ -1126,6 +1126,28 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
   }));
 }
 
+function namedMachineForStart(
+  deps: BuildDeps,
+  todoRecord: { teamId: string; routeOverride?: { machineId?: string } | null },
+  routeOverride: { machineId?: string } | undefined,
+): { machineId: string; pin: boolean } | null {
+  const profile = profileForStep(deps.db, todoRecord, 'session', null);
+  const named =
+    routeOverride?.machineId ?? todoRecord.routeOverride?.machineId ?? profile?.machineId ?? null;
+  if (named !== null) return { machineId: named, pin: false };
+  const online = deps.db
+    .select({ id: machine.id })
+    .from(machine)
+    .where(and(eq(machine.teamId, todoRecord.teamId), eq(machine.online, true)))
+    .all();
+  const only = online[0];
+  if (online.length === 1 && only !== undefined) return { machineId: only.id, pin: true };
+  if (online.length > 1) {
+    throw new HttpError(409, 'Name a machine before starting this task');
+  }
+  return null;
+}
+
 export function startBuilds(
   deps: BuildDeps,
   input: {
@@ -1158,6 +1180,7 @@ export function startBuilds(
     ) {
       throw new NotFoundError(`machine ${overrideMachine}`);
     }
+    namedMachineForStart(deps, todoRecord, input.routeOverride);
     const previous =
       todoRecord.latestBuildId === null
         ? undefined
@@ -1175,6 +1198,11 @@ export function startBuilds(
     const todoRecord = getTodo(deps, todoId);
     if (!todoRecord) throw new NotFoundError(`todo ${todoId}`);
     assertPhaseTransition(todoRecord.phase, 'queued');
+    const named = namedMachineForStart(deps, todoRecord, input.routeOverride);
+    const routeOverride =
+      named?.pin === true
+        ? { ...(input.routeOverride ?? todoRecord.routeOverride ?? {}), machineId: named.machineId }
+        : input.routeOverride;
     const id = newUuidv7();
     const createdAt = nowMs();
     deps.db
@@ -1207,7 +1235,7 @@ export function startBuilds(
       [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
     );
     setTodoPhase(deps, todoId, 'queued', {
-      ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
+      ...(routeOverride !== undefined ? { routeOverride } : {}),
       latestBuildId: id,
       lastRunAt: createdAt,
     });
