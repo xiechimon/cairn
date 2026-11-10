@@ -1,0 +1,19 @@
+{
+  "mode": "Isolated receipt/replay engine: real host SQLite and SDK MemoryStorage; controlled provider",
+  "beforeHostWriteRetry": {
+    "receipt": "pending",
+    "providerRequests": 0,
+    "mirrorRows": 0
+  },
+  "afterRetry": {
+    "receipt": "consumed",
+    "providerRequests": 2,
+    "allRequestsHadDurableBinding": true,
+    "storedRunBindings": 2,
+    "toolExecutions": 1,
+    "mirrorRows": 2,
+    "repeatedReplayStableRowCount": true,
+    "watermark": "16"
+  },
+  "coverage": "Provider output and echo tool are controlled. No production activation, image bytes or external backend."
+}
