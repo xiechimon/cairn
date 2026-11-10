@@ -3,12 +3,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { ChevronRight, Ellipsis } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { MachineName, machineLabel } from '../components/machine-label.js';
 import { SETTINGS_SELECT_TRIGGER_CLS, SettingsSelectTrigger } from '../components/settings-list.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
+import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
@@ -108,6 +109,7 @@ export function MachineRowView({
   const setAccepting = (next: boolean) => {
     if (next) {
       onOpenSection('runtime');
+      toast(t('选择这台机器接哪些运行时'));
       return;
     }
     writeRuntimes([]);
@@ -175,6 +177,10 @@ export function MachineRowView({
       ? t('最后在线 {time}', { time: relativeTime(machine.lastSeenAt, now, t) })
       : null;
   const canMutate = machine.id != null && online;
+  const acceptFrozen = !canMutate || mutations.patchMachine.isPending;
+  const acceptBlockedReason = online
+    ? undefined
+    : t('重新连接 {name} 后才能修改它的设置。', { name: machine.name });
   const bodyId = `machine-body-${machineId}`;
   return (
     <div
@@ -268,17 +274,22 @@ export function MachineRowView({
             )}
           </div>
         </div>
-        <ToggleSwitch
-          data-testid="machine-accept-toggle"
-          aria-label={t('{name} 接任务', { name: machine.name })}
+        <ExplainDisabledToggle
           className="relative z-10"
-          checked={enabled}
-          disabled={!canMutate || mutations.patchMachine.isPending}
-          title={
-            online ? undefined : t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
-          }
-          onCheckedChange={setAccepting}
-        />
+          disabled={acceptFrozen}
+          reason={acceptBlockedReason}
+        >
+          <ToggleSwitch
+            data-testid="machine-accept-toggle"
+            aria-label={t('{name} 接任务', { name: machine.name })}
+            checked={enabled}
+            disabled={acceptFrozen}
+            title={
+              online ? (enabled ? undefined : t('选择这台机器接哪些运行时')) : acceptBlockedReason
+            }
+            onCheckedChange={setAccepting}
+          />
+        </ExplainDisabledToggle>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={

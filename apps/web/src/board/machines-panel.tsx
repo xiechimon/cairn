@@ -18,7 +18,7 @@ import { useLiveData } from '../api/provider.js';
 import { ListCard } from '../components/list-card.js';
 import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
+import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -109,6 +109,7 @@ function CapabilityRow({
   hint,
   checked,
   disabled,
+  disabledReason,
   onCheckedChange,
 }: {
   icon: ReactNode;
@@ -116,8 +117,10 @@ function CapabilityRow({
   hint: string;
   checked: boolean;
   disabled: boolean;
+  disabledReason?: string;
   onCheckedChange?: (checked: boolean) => void;
 }) {
+  const reason = disabled ? (disabledReason ?? hint) : undefined;
   return (
     <div className="flex items-center gap-3 px-3.5 py-2.5">
       <span className="flex-none text-content-tertiary">{icon}</span>
@@ -125,12 +128,15 @@ function CapabilityRow({
         <span className="text-ui text-foreground">{label}</span>
         <span className="text-meta text-content-tertiary">{hint}</span>
       </span>
-      <ToggleSwitch
-        checked={checked}
-        disabled={disabled}
-        aria-label={label}
-        onCheckedChange={onCheckedChange}
-      />
+      <ExplainDisabledToggle disabled={disabled} reason={reason}>
+        <ToggleSwitch
+          checked={checked}
+          disabled={disabled}
+          aria-label={label}
+          title={reason}
+          onCheckedChange={onCheckedChange}
+        />
+      </ExplainDisabledToggle>
     </div>
   );
 }
@@ -207,6 +213,13 @@ function MachineCard({
       : browserEnabled
         ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
         : t('这台机器还不支持浏览器。');
+  const desktopBlockedReason = !online
+    ? t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
+    : computer === null
+      ? coordinator
+        ? t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')
+        : t('这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。')
+      : undefined;
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -421,6 +434,7 @@ function MachineCard({
         hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
         checked={desktopInstalled && controlHeld}
         disabled={!canToggleDesktop}
+        disabledReason={desktopBlockedReason}
         onCheckedChange={canToggleDesktop ? onDesktopToggle : undefined}
       />
       <CapabilityRow
@@ -429,6 +443,7 @@ function MachineCard({
         hint={browserHint}
         checked={browserEnabled}
         disabled={!canToggleBrowser}
+        disabledReason={browserHint}
         onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
       />
     </ListCard>
