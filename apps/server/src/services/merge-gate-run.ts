@@ -46,6 +46,7 @@ import {
 } from './merge-gate/github-facts.js';
 import type { GateGithubPort } from './merge-gate/github-port.js';
 import { type GateVerdictView, isFullSha, mergeReadiness } from './merge-gate/readiness.js';
+import { hasVerifyRecording } from './merge-gate/recording-attachment.js';
 import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdict-line.js';
 import { githubGatePort } from './merge-gate-github.js';
 import { effectiveModel } from './model-fallback.js';
@@ -144,6 +145,7 @@ export async function evaluateMergeGate(
       repo: repo.repo,
       prNumber: buildRow.prNumber,
       ticketRef,
+      evidenceStore: buildRow.evidenceStore,
       now: opts.now ?? nowMs(),
       harnessEval: {
         coordinator: createHarnessEvalCoordinator({
@@ -247,6 +249,19 @@ export async function evaluateMergeGate(
       outcome: row.outcome,
       patchDigest: row.patchDigest,
       headSha: row.headSha,
+      recordingAttached:
+        buildRow.evidenceStore === 'attachments' &&
+        row.kind === 'verify' &&
+        row.headSha === row.expectedHeadSha &&
+        row.outcome === 'pass' &&
+        row.patchDigest !== null &&
+        row.patchDigest === digest?.patchDigest &&
+        reviewStep?.kind === 'verify' &&
+        hasVerifyRecording(deps, {
+          stepId: row.stepId,
+          todoId: todoRow.id,
+          teamId: todoRow.teamId,
+        }),
       reviewerId,
       reviewerModel: reviewStep?.kind === 'review' ? reviewModelOf(reviewStep) : null,
       gateLoosening: answer?.gateLoosening ?? null,
@@ -274,6 +289,7 @@ export async function evaluateMergeGate(
     opts.now ?? nowMs(),
   );
   const readiness = mergeReadiness({
+    evidenceStore: buildRow.evidenceStore,
     correction: isCorrectionTask(deps.db, todoRow.id),
     author:
       authorAgent !== null && authorStep !== undefined

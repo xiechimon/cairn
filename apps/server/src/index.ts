@@ -175,6 +175,7 @@ const scheduler = createScheduler(
     convHub,
     box: secretBox,
     reposDir,
+    attachmentsDir,
     githubFetch,
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
