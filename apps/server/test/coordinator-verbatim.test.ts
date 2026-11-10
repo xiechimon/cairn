@@ -67,7 +67,7 @@ describe('create_todo copies the owner words verbatim', () => {
     const id = ownerMessage(content);
     const created = (await relay(
       'create_todo',
-      { projectId: H.projectId },
+      { projectId: H.projectId, messageIds: [id] },
       {
         turnMessageIds: [id],
         turnPrompt: `【输入框选定项目：demo（id: ${H.projectId}）】\n${content}`,

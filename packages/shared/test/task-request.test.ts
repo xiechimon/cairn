@@ -67,6 +67,21 @@ describe('Coordinator tools that write todo text take no task text', () => {
     );
   });
 
+  it('the tool schema and description require exactly one explicit source', () => {
+    const tool = CHIEF_REMOTE_TOOLS.find((entry) => entry.name === 'create_todo');
+    expect(tool?.parameters).toMatchObject({
+      oneOf: [{ required: ['messageIds'] }, { required: ['sourceTodoId'] }],
+    });
+    expect(tool?.description).toContain('explicit messageIds required');
+    expect(
+      coordinatorCreateTodoParamsSchema.safeParse({
+        projectId: 'p',
+        messageIds: ['m'],
+        sourceTodoId: 't',
+      }).success,
+    ).toBe(false);
+  });
+
   it('update_todo parameters equal the routing allowlist', () => {
     expect(paramNames('update_todo')).toEqual(
       ['todoId', 'title', 'tagIds', 'projectId', 'addMessageIds', 'blockedBy'].sort(),
@@ -86,7 +101,7 @@ describe('Coordinator tools that write todo text take no task text', () => {
     expect(
       coordinatorUpdateTodoParamsSchema.safeParse({ todoId: 't', title: 'Markdown 预览' }).success,
     ).toBe(true);
-    expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(true);
+    expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(false);
   });
 });
 
