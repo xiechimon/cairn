@@ -168,12 +168,14 @@ test('Run now schedules the actual run endpoint and reports queued status', asyn
   expect(probe.calls).toContainEqual({ method: 'POST', path: '/api/schedules/schedule-1/run', body: {} });
 });
 
-test('the Tasks panel links to schedules instead of summarising them', async ({ page }) => {
+test('the Tasks panel lists schedules in the Schedules tab only, with a link to the schedules page', async ({ page }) => {
   await setup(page, { kind: 'once', nextRunAt: null });
   await page.goto('/app?pane=tasks');
   const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
+  await expect(panel.getByRole('link', { name: 'Manage schedules' })).toHaveCount(0);
+  await panel.getByRole('tab', { name: 'Schedules' }).click();
   await expect(panel.getByRole('link', { name: 'Manage schedules' })).toHaveAttribute('href', '/app/schedules');
-  await expect(panel).not.toContainText('No upcoming runs');
+  await expect(panel.locator('[data-slot="schedule-row"]')).toContainText('Nightly release checks');
 });
 
 for (const surface of ['global', 'project'] as const) {
