@@ -11,6 +11,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { REPLY_TASK_172 } from '../../../packages/shared/test/fixtures/reply-todo-172.js';
 import { chiefMessage, todo as todoTable } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { wakeFacts } from '../src/services/chief.js';
@@ -40,6 +41,20 @@ const fenceOpens = (text: string) =>
     .length;
 
 describe('create_todo copies the owner words verbatim', () => {
+  test('a reply has a body title while spec, segments and splits preserve its cited context', async () => {
+    const id = ownerMessage(REPLY_TASK_172.content);
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [id],
+    })) as Created;
+    expect(created.title).toBe(REPLY_TASK_172.title);
+    expect(created.spec).toBe(REPLY_TASK_172.content);
+    expect(row(created.id).request?.segments[0]?.text).toBe(REPLY_TASK_172.content);
+    const split = unstartedRequest({ sourceTodoId: created.id });
+    expect(split.title).toBe(REPLY_TASK_172.title);
+    expect(split.spec).toBe(REPLY_TASK_172.content);
+  });
+
   test('a spec or title argument is refused', async () => {
     await expect(
       relay('create_todo', { projectId: H.projectId, title: 'x', spec: 'paraphrase' }),
@@ -242,25 +257,60 @@ describe('splitting one request', () => {
 });
 
 describe('update_todo', () => {
-  test('title and spec are refused', async () => {
+  test('spec is refused; a summary title persists without rewriting the request body', async () => {
+    const content =
+      '并且我想让你支持这个md文件的预览功能，最好还能编辑，另外表格也要好看一点才行啊';
     const created = (await relay('create_todo', {
       projectId: H.projectId,
-      messageIds: [ownerMessage('x')],
+      messageIds: [ownerMessage(content)],
     })) as Created;
+    expect(created.title.startsWith('并且我想让你支持这个md文件的预览')).toBe(true);
+    expect(created.title).not.toBe('Markdown 预览与编辑');
     await expect(
       relay('update_todo', { todoId: created.id, spec: 'rewrite' }),
     ).rejects.toMatchObject({
       status: 400,
     });
-    await expect(
-      relay('update_todo', { todoId: created.id, title: 'rewrite' }),
-    ).rejects.toMatchObject({
-      status: 400,
+    const updated = (await relay('update_todo', {
+      todoId: created.id,
+      title: 'Markdown 预览与编辑',
+    })) as Created;
+    expect(updated.title).toBe('Markdown 预览与编辑');
+    const stored = row(created.id);
+    expect(stored.title).toBe('Markdown 预览与编辑');
+    expect(stored.spec).toBe(content);
+    expect(stored.request?.segments).toHaveLength(1);
+    expect(stored.request?.segments[0]?.text).toBe(content);
+    expect(stored.request?.titleSource).toBe('coordinator');
+    expect(stored.request?.titleSourceRef).toBe(null);
+    expect(fencedTitle(stored.title, stored)).toBe('named by the Coordinator: Markdown 预览与编辑');
+  });
+
+  test('a summary title is refused when the todo has no cited request', async () => {
+    const board = createTodo(H.s, {
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'Board task',
+      spec: 'owner typed this on the board',
+      createdBy: H.userId,
+      ownerId: H.userId,
     });
+    expect(row(board.id).request).toBe(null);
+    await expect(
+      relay('update_todo', { todoId: board.id, title: 'Should not stick' }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(row(board.id).title).toBe('Board task');
+
+    const issue = issueTask('Fix the crash.', 91);
+    expect(row(issue.id).request).toBe(null);
+    await expect(
+      relay('update_todo', { todoId: issue.id, title: 'Should not stick' }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(row(issue.id).title).toBe('Crash');
   });
 });
 
-describe('static: Coordinator todo writes take no text from tool params', () => {
+describe('static: Coordinator todo writes take no body text from tool params', () => {
   const source = (file: string) =>
     readFileSync(join(import.meta.dirname, '../src/services', file), 'utf8');
 
@@ -273,18 +323,20 @@ describe('static: Coordinator todo writes take no text from tool params', () => 
     },
   );
 
-  test('the create_todo and update_todo cases read no title or spec', () => {
+  test('create_todo reads no title or spec; update_todo may set title only', () => {
     const text = source('chief-tools.ts');
-    for (const name of ['create_todo', 'update_todo']) {
-      const start = text.indexOf(`case '${name}': {`);
-      expect(start).toBeGreaterThan(-1);
-      const block = text.slice(start, text.indexOf("\n    case '", start + 1));
-      expect(block).not.toMatch(/['"](spec|title)['"]|params\.(spec|title)/);
-    }
+    const createStart = text.indexOf(`case 'create_todo': {`);
+    expect(createStart).toBeGreaterThan(-1);
+    const createBlock = text.slice(createStart, text.indexOf("\n    case '", createStart + 1));
+    expect(createBlock).not.toMatch(/['"](spec|title)['"]|params\.(spec|title)/);
+    const updateStart = text.indexOf(`case 'update_todo': {`);
+    expect(updateStart).toBeGreaterThan(-1);
+    const updateBlock = text.slice(updateStart, text.indexOf("\n    case '", updateStart + 1));
+    expect(updateBlock).not.toMatch(/['"]spec['"]|params\.spec/);
   });
 
-  test('the request service takes no spec or title from tool params', () => {
-    expect(source('coordinator-request.ts')).not.toMatch(/params\.(spec|title)\b/);
+  test('the request service takes no spec from tool params', () => {
+    expect(source('coordinator-request.ts')).not.toMatch(/params\.spec\b/);
   });
 });
 

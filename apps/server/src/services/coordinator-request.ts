@@ -266,11 +266,36 @@ export function updateRequestTodo(
       ? null
       : citedMessages(db, ctx, params.addMessageIds).map((c) => c.segment);
   if (added !== null) appendableRow(db, ctx, params.todoId);
-  const routed = updateAutonomousTodo(deps, params.todoId, {
-    ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
-    ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
-    ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
-  });
+  const summaryTitle =
+    params.title === undefined ? undefined : derivePlaceholderTitle(params.title);
+  if (params.title !== undefined && summaryTitle === '') {
+    throw new HttpError(400, 'invalid params.title: expected non-empty summary');
+  }
+  if (summaryTitle !== undefined) {
+    const existing = db
+      .select({ id: todo.id, request: todo.request })
+      .from(todo)
+      .where(and(eq(todo.id, params.todoId), eq(todo.teamId, ctx.teamId)))
+      .get();
+    if (existing === undefined) throw new HttpError(404, `todo ${params.todoId}`);
+    if (existing.request === null) {
+      throw new HttpError(
+        409,
+        `todo ${params.todoId} has no cited request; summary titles are only for Coordinator-created request tasks`,
+      );
+    }
+  }
+  const routed = updateAutonomousTodo(
+    deps,
+    params.todoId,
+    {
+      ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
+      ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
+      ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
+      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+    },
+    summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},
+  );
   if (added === null || routed === null) return routed;
   const row = appendableRow(db, ctx, params.todoId);
   const request: TaskRequest = { ...row.request, segments: [...row.request.segments, ...added] };

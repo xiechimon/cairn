@@ -121,7 +121,11 @@
   },
   "overrides": [
     {
-      "includes": ["packages/shared/src/otel.ts", "packages/shared/src/genai-conventions.ts"],
+      "includes": [
+        "packages/shared/src/otel.ts",
+        "packages/shared/src/genai-conventions.ts",
+        "packages/shared/src/langfuse.ts"
+      ],
       "linter": {
         "rules": {
           "style": {

@@ -3374,6 +3374,7 @@ export function completeStep(
       role: 'system',
       content: JSON.stringify({
         kind: VERIFY_VERDICT_KIND,
+        ...(buildRow.evidenceStore === 'attachments' ? { stepId: stepRow.id } : {}),
         verdict,
         ...(outcome.verifyVerdictError !== undefined
           ? { extractionError: outcome.verifyVerdictError }

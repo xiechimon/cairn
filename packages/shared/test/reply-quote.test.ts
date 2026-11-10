@@ -62,6 +62,20 @@ describe('parseReplyQuote', () => {
 });
 
 describe('replyQuoteText', () => {
+  test.each(['<!-- reply -->', '<!-- reply source=m -->'])(
+    'strips an orphan leading marker through the shared parser: %s',
+    (marker) => {
+      expect(replyQuoteText(marker)).toBe('');
+      expect(replyQuoteText(`${marker}\nFinish the task`)).toBe('Finish the task');
+      expect(parseReplyQuote(`${marker}\nFinish the task`)).toBeNull();
+    },
+  );
+
+  test('keeps marker-like text outside the leading wire envelope', () => {
+    const text = 'Explain this literal: \n<!-- reply source=m -->';
+    expect(replyQuoteText(text)).toBe(text);
+  });
+
   test('shows the reply alone for a quoted message and the text otherwise', () => {
     expect(replyQuoteText('<!-- reply source=m -->\n> q\n\nbody')).toBe('body');
     expect(replyQuoteText('plain')).toBe('plain');
