@@ -46,7 +46,6 @@ import {
 } from './merge-gate/github-facts.js';
 import type { GateGithubPort } from './merge-gate/github-port.js';
 import { type GateVerdictView, isFullSha, mergeReadiness } from './merge-gate/readiness.js';
-import { hasVerifyRecording } from './merge-gate/recording-attachment.js';
 import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdict-line.js';
 import { githubGatePort } from './merge-gate-github.js';
 import { effectiveModel } from './model-fallback.js';
@@ -54,6 +53,7 @@ import { reconcileOwners } from './owner.js';
 import { projectMergeConfigOf } from './projects.js';
 import { coordinatorProfile, profileForStep, routeForStep } from './routing-rules.js';
 import { insertMessageRow } from './transcript.js';
+import { hasVerifyRecording } from './verify-recording.js';
 
 export const MERGE_GATE_RUN_KIND = 'merge_gate_run';
 export const MERGE_GATE_MISMATCH_KIND = 'merge_gate_mismatch_filed';

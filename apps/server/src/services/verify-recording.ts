@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RECORDING_MAX_BYTES } from '@cairn/shared/merge-gate';
 import { and, eq } from 'drizzle-orm';
-import type { Db } from '../../db/client.js';
-import { attachment } from '../../db/schema.js';
+import type { Db } from '../db/client.js';
+import { attachment } from '../db/schema.js';
 
 export function hasVerifyRecording(
   deps: { db: Db; attachmentsDir?: string },
