@@ -193,7 +193,9 @@ test('an offline accept switch stays disabled and explains why on click', async 
   await page.goto('/app/settings/machines');
   const toggle = settings(page).getByTestId('machine-accept-toggle');
   await expect(toggle).toBeDisabled();
-  await toggle.click({ force: true });
+  const box = await toggle.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await expect(page.locator('[data-sonner-toast]')).toContainText(
     '重新连接 omarchy 后才能修改它的设置。',
   );

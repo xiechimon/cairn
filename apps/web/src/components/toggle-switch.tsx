@@ -22,17 +22,21 @@ export function ExplainDisabledToggle({
   className?: string;
   children: ReactNode;
 }) {
+  const explain = disabled && reason !== undefined && reason !== '';
   return (
-    <span
-      className={className}
-      onClickCapture={(event) => {
-        if (!disabled || reason === undefined || reason === '') return;
-        event.preventDefault();
-        event.stopPropagation();
-        toast(reason);
-      }}
-    >
-      {children}
+    <span className={cn('relative inline-flex', className)}>
+      <span className={explain ? 'pointer-events-none' : undefined}>{children}</span>
+      {explain ? (
+        <span
+          aria-hidden
+          className="absolute inset-0 cursor-not-allowed"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            toast(reason);
+          }}
+        />
+      ) : null}
     </span>
   );
 }
