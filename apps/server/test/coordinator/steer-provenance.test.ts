@@ -46,11 +46,7 @@ test('a quoted answer inherits an image consumed as a steer in the real Coordina
   const { faux } = stub('Complete.');
   faux.setResponses([
     () => {
-      firstRequestBound = w.s.db
-        .select()
-        .from(coordinatorRun)
-        .all()
-        .some((run) => run.stepId === w.stepId);
+      firstRequestBound = w.s.db.select().from(coordinatorRun).get()?.stepId === w.stepId;
       return fauxAssistantMessage(
         [
           fauxToolCall('ask_user', {

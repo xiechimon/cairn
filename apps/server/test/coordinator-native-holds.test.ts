@@ -69,30 +69,33 @@ test('finishing a target retains uncertain native work for durable reconciliatio
 
 test('a released successor displays and withdraws under its authentic owner identity', () => {
   const b = heldBatch();
+  H.s.db
+    .update(step)
+    .set({ status: 'waiting_quota', holdReason: null })
+    .where(eq(step.id, b.id))
+    .run();
   releaseCoordinatorInput(H.s.db, b.id, null);
+  expect(row(b.id)).toBeUndefined();
   expect(chiefPendingMessages(H.s.db, H.threadId)).toContainEqual({
     messageId: b.id,
-    state: 'queued',
+    state: 'held',
   });
   expect(withdrawChiefMessage({ db: H.s.db }, H.teamId, H.threadId, b.id)).toEqual({ ok: true });
   expect(H.s.db.select().from(step).all()).toHaveLength(1);
 });
 
-test('a genuine receipt retires its waiting execution even after hold metadata is lost', () => {
-  const b = heldBatch();
-  H.s.db.update(step).set({ holdReason: null }).where(eq(step.id, b.id)).run();
-  H.s.db
-    .insert(coordinatorConversation)
-    .values({
-      threadId: H.threadId,
-      storeId: 'store',
-      conversationId: '2',
-      piVersion: '1.5.0',
-      updatedAt: 1,
-    })
-    .run();
-  expect(pullCoordinatorInput(H.s.db, b.parentId, 'store:2')?.id).toBe(b.id);
-  consumeCoordinatorInput(H.s.db, b.id, 'store:2', '4');
-  expect(row(b.id)).toBeUndefined();
-  expect(H.s.db.select().from(step).all()).toHaveLength(1);
-});
+test.each(['pending', 'waiting_quota'] as const)(
+  'a receipt retires its %s execution after hold metadata loss',
+  (status) => {
+    const b = heldBatch();
+    H.s.db.update(step).set({ holdReason: null, status }).where(eq(step.id, b.id)).run();
+    H.s.db
+      .insert(coordinatorConversation)
+      .values({ threadId: H.threadId, conversationId: '2', piVersion: '1.5.0', updatedAt: 1 })
+      .run();
+    expect(pullCoordinatorInput(H.s.db, b.parentId, '2')?.id).toBe(b.id);
+    consumeCoordinatorInput(H.s.db, b.id, '2', '4');
+    expect(row(b.id)).toBeUndefined();
+    expect(H.s.db.select().from(step).all()).toHaveLength(1);
+  },
+);
