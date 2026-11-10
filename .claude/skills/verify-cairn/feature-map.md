@@ -1053,9 +1053,9 @@ Reach:
 
 ### thread-tags
 
-**Thread tags** (shipped, centrality 4). Category vocabulary routes and seeding are retired; legacy assignment inputs remain during staged retirement.
+**Thread tags** (shipped, centrality 4). Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.
 
-States: Vocabulary GET/POST return 404; project creation and startup seed no categories. Existing category assignments and read-only membership remain temporarily; ordinary metadata is title-only and GitHub labels are separate.
+States: Vocabulary GET/POST return 404; no category seeding or assignment writers remain. Retired tagIds fail before writes across REST/Coordinator/MCP and canonical services, including SDK transports. Existing read-only membership and classification remain until final data removal; GitHub labels are separate.
 
 Reach:
 
@@ -1068,4 +1068,4 @@ Reach:
 - Research: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
 - Backend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
-- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/category-vocabulary-retirement.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`
+- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/category-vocabulary-retirement.test.ts`, `apps/server/test/category-assignment-retirement.test.ts`, `packages/shared/test/task-request.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`

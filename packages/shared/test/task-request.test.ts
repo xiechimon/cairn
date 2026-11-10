@@ -104,7 +104,7 @@ describe('Coordinator tools that write todo text take no task text', () => {
 
   it('update_todo parameters equal the routing allowlist', () => {
     expect(paramNames('update_todo')).toEqual(
-      ['todoId', 'title', 'tagIds', 'projectId', 'addMessageIds', 'blockedBy'].sort(),
+      ['todoId', 'title', 'projectId', 'addMessageIds', 'blockedBy'].sort(),
     );
   });
 

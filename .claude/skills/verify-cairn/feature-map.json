@@ -2424,19 +2424,25 @@
     {
       "id": "thread-tags",
       "name": "Thread tags",
-      "summary": "Category vocabulary routes and seeding are retired; legacy assignment inputs remain during staged retirement.",
-      "states": "Vocabulary GET/POST return 404; project creation and startup seed no categories. Existing category assignments and read-only membership remain temporarily; ordinary metadata is title-only and GitHub labels are separate.",
+      "summary": "Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.",
+      "states": "Vocabulary GET/POST return 404; no category seeding or assignment writers remain. Retired tagIds fail before writes across REST/Coordinator/MCP and canonical services, including SDK transports. Existing read-only membership and classification remain until final data removal; GitHub labels are separate.",
       "centrality": 4,
       "status": "shipped",
       "code": {
         "server": [
           "apps/server/src/routes-projects.ts",
-          "apps/server/src/services/todos.ts"
+          "apps/server/src/routes-todos.ts",
+          "apps/server/src/services/todos.ts",
+          "apps/server/src/services/coordinator-request.ts",
+          "apps/server/src/services/mcp-face.ts"
+        ],
+        "daemon": [
+          "apps/daemon/src/backend/claude-code.ts"
         ]
       },
       "routes": {
         "server": [
-          "/api/projects/:id/todos",
+          "/api/todos",
           "/api/todos/:id"
         ]
       },
@@ -2458,6 +2464,8 @@
       "evidence": [
         "apps/server/test/task-meta.test.ts",
         "apps/server/test/category-vocabulary-retirement.test.ts",
+        "apps/server/test/category-assignment-retirement.test.ts",
+        "packages/shared/test/task-request.test.ts",
         "apps/server/test/correction-classification.test.ts",
         "apps/daemon/test/task-meta-prompt.test.ts",
         "apps/daemon/test/worker-meta-sdk.test.ts"

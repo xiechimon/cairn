@@ -9,6 +9,7 @@ import {
   updateAutonomousTodo,
 } from '../src/services/todos.js';
 import { bootServer, postProject, req } from './helpers.js';
+import { insertLegacyMembership } from './legacy-category-fixtures.js';
 
 async function labelWorld() {
   const s = bootServer();
@@ -46,21 +47,28 @@ function state(s: ReturnType<typeof bootServer>, taskId: string) {
 }
 
 describe('dedicated GitHub-label state', () => {
-  test('projection and generic category replacement do not conflate labels or weaken correction', async () => {
+  test('projection and retired category inputs do not conflate labels or weaken correction', async () => {
     const { s, taskId } = await labelWorld();
     expect(getTodo(s.svc, taskId)).toMatchObject({
       tagIds: [],
       githubLabelIds: ['correction-label'],
     });
+    const before = state(s, taskId);
+    const rejected = await req(s.app, 'PATCH', `/api/todos/${taskId}`, {
+      title: 'Must not persist',
+      tagIds: ['ordinary-category'],
+      githubLabelIds: [],
+    });
+    expect(rejected.status).toBe(400);
+    expect(state(s, taskId)).toEqual(before);
     const patched = await req(s.app, 'PATCH', `/api/todos/${taskId}`, {
       title: 'Public edit',
-      tagIds: ['ordinary-category'],
       githubLabelIds: [],
     });
     expect(patched.status).toBe(200);
     expect(getTodo(s.svc, taskId)).toMatchObject({
       title: 'Public edit',
-      tagIds: ['ordinary-category'],
+      tagIds: [],
       githubLabelIds: ['correction-label'],
     });
     expect(isCorrectionTask(s.db, taskId)).toBe(true);
@@ -68,10 +76,8 @@ describe('dedicated GitHub-label state', () => {
     updateAutonomousTodo(s.svc, taskId, { githubLabelIds: [] });
     expect(isCorrectionTask(s.db, taskId)).toBe(false);
     s.db.run("UPDATE tag SET name = 'correction' WHERE id = 'ordinary-category'");
-    updateAutonomousTodo(s.svc, taskId, {
-      tagIds: ['ordinary-category'],
-      githubLabelIds: ['correction-label'],
-    });
+    insertLegacyMembership(s.db, taskId, ['ordinary-category'], true);
+    updateAutonomousTodo(s.svc, taskId, { githubLabelIds: ['correction-label'] });
     updateAutonomousTodo(s.svc, taskId, { githubLabelIds: [] });
     expect(isCorrectionTask(s.db, taskId)).toBe(true);
   });
@@ -99,7 +105,7 @@ describe('dedicated GitHub-label state', () => {
         method: 'tools/call',
         params: {
           name: 'update_todo',
-          arguments: { todoId: taskId, title: 'MCP edit', tagIds: [] },
+          arguments: { todoId: taskId, title: 'MCP edit' },
         },
       }),
     });
