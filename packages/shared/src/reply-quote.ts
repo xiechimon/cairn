@@ -12,7 +12,7 @@ export interface ParsedReplyQuote {
 }
 
 const SAFE_SOURCE = /^[A-Za-z0-9_.:-]{1,128}$/;
-const MARKER = /^<!-- reply(?: source=([A-Za-z0-9_.:-]{1,128}))? -->\n/;
+const MARKER = /^<!-- reply(?: source=([A-Za-z0-9_.:-]{1,128}))? -->(?:\n|$)/;
 const QUOTE_LINE = /^>(?: (.*))?$/;
 
 function clip(text: string): string {
@@ -37,7 +37,7 @@ export function encodeReplyQuote(source: ReplyQuoteSource, body: string): string
   return `${marker}\n${quoted}\n\n${body.trim()}`;
 }
 
-export function parseReplyQuote(content: string): ParsedReplyQuote | null {
+function parseReply(content: string): { reply: ParsedReplyQuote; quoted: boolean } | null {
   const marker = MARKER.exec(content);
   if (marker === null) return null;
   const lines = content.slice(marker[0].length).split('\n');
@@ -48,14 +48,21 @@ export function parseReplyQuote(content: string): ParsedReplyQuote | null {
     if (match === null) break;
     quote.push(match[1] ?? '');
   }
-  if (quote.length === 0) return null;
   return {
-    sourceMessageId: marker[1] ?? null,
-    quote: quote.join('\n'),
-    body: lines.slice(index).join('\n').trim(),
+    quoted: quote.length > 0,
+    reply: {
+      sourceMessageId: marker[1] ?? null,
+      quote: quote.join('\n'),
+      body: lines.slice(index).join('\n').trim(),
+    },
   };
 }
 
+export function parseReplyQuote(content: string): ParsedReplyQuote | null {
+  const parsed = parseReply(content);
+  return parsed?.quoted === true ? parsed.reply : null;
+}
+
 export function replyQuoteText(content: string): string {
-  return parseReplyQuote(content)?.body ?? content;
+  return parseReply(content)?.reply.body ?? content;
 }

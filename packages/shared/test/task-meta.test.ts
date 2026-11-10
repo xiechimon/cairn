@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { derivePlaceholderTitle, FIXED_TAGS } from '../src/task-meta.js';
+import { REPLY_TASK_172 } from './fixtures/reply-todo-172.js';
 
 describe('derivePlaceholderTitle', () => {
+  it('titles the sanitized live todo 172 reply from its body', () => {
+    expect(derivePlaceholderTitle(REPLY_TASK_172.content)).toBe(REPLY_TASK_172.title);
+  });
+
+  it.each(['<!-- reply -->\n> context\n\n', '<!-- reply source=m -->\n> context\n\n'])(
+    'uses the existing reply parser before attachment handling: %s',
+    (prefix) => {
+      expect(derivePlaceholderTitle(`${prefix}![a.png](attachment:t/i.png)\nFix save`)).toBe(
+        'Fix save',
+      );
+      expect(derivePlaceholderTitle(prefix)).toBe('');
+    },
+  );
+
   it('single-line input returned verbatim', () => {
     expect(derivePlaceholderTitle('给登录页加验证码')).toBe('给登录页加验证码');
   });
