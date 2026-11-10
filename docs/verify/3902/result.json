@@ -1,4 +1,8 @@
 {
+  "behindStore": {
+    "rowsWritten": 0,
+    "watermark": "9999"
+  },
   "mode": "Isolated receipt/replay engine: real host SQLite and SDK MemoryStorage; controlled provider",
   "beforeHostWriteRetry": {
     "receipt": "pending",
