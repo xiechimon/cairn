@@ -53,6 +53,7 @@ import { reconcileOwners } from './owner.js';
 import { projectMergeConfigOf } from './projects.js';
 import { coordinatorProfile, profileForStep, routeForStep } from './routing-rules.js';
 import { insertMessageRow } from './transcript.js';
+import { publishVerifyPrComment } from './verify-pr-comment.js';
 import { hasVerifyRecording } from './verify-recording.js';
 
 export const MERGE_GATE_RUN_KIND = 'merge_gate_run';
@@ -204,6 +205,7 @@ export async function evaluateMergeGate(
       row.patchDigest = digest.patchDigest;
     }
   }
+  await publishVerifyPrComment(deps, buildId, head, digest?.patchDigest ?? null);
   const answers = new Map<string, ReviewVerdict>();
   const reviewStepIds = new Set(
     steps.filter((item) => item.kind === 'review').map((item) => item.id),
