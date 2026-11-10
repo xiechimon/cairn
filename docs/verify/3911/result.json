@@ -1,4 +1,5 @@
 {
+  "earlierAdmissionBlocked": true,
   "mode": "Isolated real host SQLite; direct compatibility APIs, no production activation",
   "beforeReceipt": [
     "initial",
