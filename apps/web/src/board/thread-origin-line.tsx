@@ -1,3 +1,4 @@
+import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { clockTime, type ThreadOrigin } from './thread-panel-model.js';
 
@@ -13,14 +14,15 @@ export function ThreadOriginLine({ origin, onJump }: { origin: ThreadOrigin; onJ
           ? t('来自主对话')
           : t('来自主对话 · {time}', { time: clockTime(origin.at, locale) })}
       </span>
-      <button
-        type="button"
+      <Button
+        variant="link"
+        size="sm"
         data-testid="thread-origin-jump"
         onClick={onJump}
-        className="flex-none cursor-pointer border-0 bg-transparent p-0 text-meta font-medium text-foreground underline-offset-3 hover:underline"
+        className="h-auto flex-none p-0 text-meta font-medium text-foreground"
       >
         {t('在主对话中查看')}
-      </button>
+      </Button>
     </div>
   );
 }
