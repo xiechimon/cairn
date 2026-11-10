@@ -18,9 +18,13 @@ import { githubRepoIssue, githubRepoIssues, githubRepoLabels } from '../lib/gith
 import { githubRepoOfProject } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { teamUserToken } from './github-connection.js';
+import {
+  normalizeGithubLabelColor,
+  resolveProjectGithubLabelIds,
+  syncGithubLabels,
+} from './github-labels.js';
 import { CORRECTION_PROMPT } from './merge-gate/correction.js';
 import type { OAuthClientConfig } from './oauth.js';
-import { normalizeGithubLabelColor, resolveProjectTagIds, syncGithubLabels } from './tags.js';
 import { createTodo, type TodoDeps } from './todos.js';
 
 type ProjectRow = typeof projectTable.$inferSelect;
@@ -134,8 +138,8 @@ export async function importGithubIssue(
     const repoLabels = await githubRepoLabels(fetchImpl, token, owner, repo);
     syncGithubLabels(deps.db, row.id, [...repoLabels, ...detail.labels]);
     const names = [...new Set(detail.labels.map((l) => l.name))];
-    const resolved = resolveProjectTagIds(deps.db, row.id, names);
-    const tagIds = names
+    const resolved = resolveProjectGithubLabelIds(deps.db, row.id, names);
+    const githubLabelIds = names
       .map((name) => resolved.get(name))
       .filter((id): id is string => id !== undefined);
     return createTodo(deps, {
@@ -143,7 +147,7 @@ export async function importGithubIssue(
       projectId: row.id,
       title: neutralizeIssueAttachmentTokens(detail.title),
       spec: `${names.some((name) => name.toLowerCase() === 'correction') ? `${CORRECTION_PROMPT}\n\n` : ''}${neutralizeIssueAttachmentTokens(detail.body ?? '')}`,
-      tagIds,
+      githubLabelIds,
       correctionRequired: names.some((name) => name.toLowerCase() === 'correction'),
       createdBy: opts.createdBy ?? deps.user.id,
       ownerId: deps.user.id,

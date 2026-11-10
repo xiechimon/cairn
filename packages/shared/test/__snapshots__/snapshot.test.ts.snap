@@ -6539,6 +6539,12 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               },
               "type": "array",
             },
+            "githubLabelIds": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
             "hasChanges": {
               "type": "boolean",
             },
@@ -8352,6 +8358,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "todo",
   "tag",
   "todo_tag",
+  "github_label",
+  "todo_github_label",
   "build",
   "step",
   "steer_pending",
@@ -9623,6 +9631,46 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
     "toolDefHashes",
     "toolResultHashes",
     "activeRun",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > github_label > github_label.json 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "color": {
+      "type": "string",
+    },
+    "createdAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
+    "id": {
+      "type": "string",
+    },
+    "name": {
+      "type": "string",
+    },
+    "projectId": {
+      "type": "string",
+    },
+    "v": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
+  },
+  "required": [
+    "id",
+    "projectId",
+    "name",
+    "color",
+    "createdAt",
+    "v",
   ],
   "type": "object",
 }
@@ -10923,6 +10971,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
           "at",
         ],
         "type": "object",
+      },
+      "type": "array",
+    },
+    "githubLabelIds": {
+      "items": {
+        "type": "string",
       },
       "type": "array",
     },

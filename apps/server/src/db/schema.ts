@@ -222,6 +222,30 @@ export const todoTag = sqliteTable(
   (t) => [primaryKey({ columns: [t.todoId, t.tagId] })],
 );
 
+export const githubLabel = sqliteTable('github_label', {
+  id: text('id').primaryKey(),
+  projectId: text('projectId')
+    .notNull()
+    .references(() => project.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  color: text('color').notNull().default('#6366f1'),
+  createdAt: epochMs('createdAt').notNull().default(0),
+  v: integer('v').notNull().default(1),
+});
+
+export const todoGithubLabel = sqliteTable(
+  'todo_github_label',
+  {
+    todoId: text('todoId')
+      .notNull()
+      .references(() => todo.id, { onDelete: 'cascade' }),
+    labelId: text('labelId')
+      .notNull()
+      .references(() => githubLabel.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.todoId, t.labelId] })],
+);
+
 export const build = sqliteTable('build', {
   id: text('id').primaryKey(),
   todoId: text('todoId')

@@ -37,6 +37,7 @@ import {
   tag,
   taskIssueClose,
   todo,
+  todoGithubLabel,
   todoTag,
   tokenUsage,
 } from '../db/schema.js';
@@ -53,6 +54,11 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
+import {
+  assertGithubLabelsInProject,
+  correctionFromGithubLabels,
+  todoGithubLabelIds,
+} from './github-labels.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -166,6 +172,7 @@ export function toTodoRecord(
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
+    githubLabelIds: todoGithubLabelIds(db, row.id),
     latestBuildId: row.latestBuildId,
     lastRunAt: row.lastRunAt,
     hasChanges: row.hasChanges,
@@ -327,6 +334,7 @@ export function createAutonomousTodo(
     title: string;
     spec: string;
     tagIds?: string[];
+    githubLabelIds?: string[];
     correctionRequired?: boolean;
     createdBy: string | null;
     ownerId: string | null;
@@ -343,6 +351,8 @@ export function createAutonomousTodo(
   const { db, hub } = deps;
   const tagIds = [...new Set(input.tagIds ?? [])];
   assertTagsInProject(db, input.projectId, tagIds);
+  const githubLabelIds = [...new Set(input.githubLabelIds ?? [])];
+  assertGithubLabelsInProject(db, input.projectId, githubLabelIds);
   const seqRow = db
     .select({ n: max(todo.seqNum) })
     .from(todo)
@@ -372,7 +382,9 @@ export function createAutonomousTodo(
         projectId: input.projectId,
         title,
         spec: input.spec,
-        correctionRequired: input.correctionRequired ?? correctionFromTags(db, tagIds),
+        correctionRequired:
+          input.correctionRequired ??
+          (correctionFromTags(db, tagIds) || correctionFromGithubLabels(db, githubLabelIds)),
         phase: 'todo',
         phaseAt: now,
         seqNum,
@@ -409,6 +421,9 @@ export function createAutonomousTodo(
     for (const tagId of tagIds) {
       tx.insert(todoTag).values({ todoId: id, tagId }).run();
     }
+    for (const labelId of githubLabelIds) {
+      tx.insert(todoGithubLabel).values({ todoId: id, labelId }).run();
+    }
   });
   const record = getTodo(deps, id);
   if (!record) throw new Error('todo missing after insert');
@@ -441,6 +456,7 @@ export function updateAutonomousTodo(
     spec?: string;
     phase?: Phase;
     tagIds?: string[];
+    githubLabelIds?: string[];
     orderIndex?: number;
     projectId?: string;
     routeOverride?: RouteOverride | null;
@@ -469,14 +485,31 @@ export function updateAutonomousTodo(
   const sets: Partial<TodoRow> = {};
   if (patch.blockedBy !== undefined) sets.blockedBy = checkBlockedBy(db, row, patch.blockedBy);
   const tagIds = patch.tagIds === undefined ? undefined : [...new Set(patch.tagIds)];
+  const githubLabelIds =
+    patch.githubLabelIds === undefined ? undefined : [...new Set(patch.githubLabelIds)];
   const move =
     patch.projectId !== undefined && patch.projectId !== row.projectId
       ? planProjectMove(deps, row, patch.projectId, tagIds ?? [])
       : null;
   if (tagIds !== undefined && move === null) assertTagsInProject(db, row.projectId, tagIds);
+  if (githubLabelIds !== undefined)
+    assertGithubLabelsInProject(db, move?.sets.projectId ?? row.projectId, githubLabelIds);
   if (move !== null) Object.assign(sets, move.sets);
-  if (tagIds !== undefined) sets.correctionRequired = correctionFromTags(db, tagIds);
-  else if (move !== null) sets.correctionRequired = false;
+  if (tagIds !== undefined || githubLabelIds !== undefined || move !== null) {
+    const nextTags =
+      tagIds ??
+      (move !== null
+        ? []
+        : db
+            .select({ id: todoTag.tagId })
+            .from(todoTag)
+            .where(eq(todoTag.todoId, id))
+            .all()
+            .map((link) => link.id));
+    const nextLabels = githubLabelIds ?? (move !== null ? [] : todoGithubLabelIds(db, id));
+    sets.correctionRequired =
+      correctionFromTags(db, nextTags) || correctionFromGithubLabels(db, nextLabels);
+  }
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
@@ -546,6 +579,14 @@ export function updateAutonomousTodo(
         .where(eq(schedule.todoId, id))
         .run();
       if (tagIds === undefined) tx.delete(todoTag).where(eq(todoTag.todoId, id)).run();
+      if (githubLabelIds === undefined)
+        tx.delete(todoGithubLabel).where(eq(todoGithubLabel.todoId, id)).run();
+    }
+    if (githubLabelIds !== undefined) {
+      tx.delete(todoGithubLabel).where(eq(todoGithubLabel.todoId, id)).run();
+      for (const labelId of githubLabelIds) {
+        tx.insert(todoGithubLabel).values({ todoId: id, labelId }).run();
+      }
     }
     if (tagIds !== undefined) {
       tx.delete(todoTag).where(eq(todoTag.todoId, id)).run();

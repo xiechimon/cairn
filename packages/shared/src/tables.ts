@@ -5,6 +5,8 @@ export const DB_TABLES = [
   'todo',
   'tag',
   'todo_tag',
+  'github_label',
+  'todo_github_label',
   'build',
   'step',
   'steer_pending',
@@ -70,7 +72,7 @@ export const DB_TABLES = [
 
 export type DbTable = (typeof DB_TABLES)[number];
 
-export const JOIN_ONLY_TABLES = ['todo_tag'] as const;
+export const JOIN_ONLY_TABLES = ['todo_tag', 'todo_github_label'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'steer_pending',
