@@ -10,6 +10,7 @@ import { cn } from 'cn';
 import { Link } from 'react-router';
 import { ReplyQuoteBlock } from '../chief/reply-quote-block.js';
 import { StatusLine } from '../components/chat/status-line.js';
+import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChatMarkdown } from './chat-markdown.js';
@@ -97,6 +98,7 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
           (candidate) =>
             candidate.messageId === reply?.sourceMessageId && candidate.threadId === row.threadId,
         );
+        const MessageBody = row.role === 'owner' ? UserMessageBubble : 'div';
         return (
           <Message
             key={row.id}
@@ -109,12 +111,11 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
               {row.role === 'coordinator' && (
                 <span className="text-meta text-content-tertiary">{t('Coordinator')}</span>
               )}
-              <div
+              <MessageBody
                 className={cn(
-                  'min-w-0 text-card-title break-words text-foreground',
                   row.role === 'owner'
-                    ? 'chat-bubble bubble-gradient max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2'
-                    : 'voice-response w-full',
+                    ? 'chat-bubble max-w-[min(85%,42rem)] break-words'
+                    : 'min-w-0 text-card-title break-words text-foreground voice-response w-full',
                 )}
               >
                 {reply !== null && (
@@ -126,7 +127,7 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
                   />
                 )}
                 <ChatMarkdown text={reply?.body ?? text} conversational />
-              </div>
+              </MessageBody>
             </MessageContent>
           </Message>
         );

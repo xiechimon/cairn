@@ -107,7 +107,10 @@ describe('quoted Coordinator context at dispatch', () => {
     'machine %s downloads inherited image bytes through the authenticated attachment route',
     async (cliVersion) => {
       const source = sourceTurn();
-      const bytes = Buffer.from('89504e470d0a1a0a', 'hex');
+      const bytes = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGP48OHDfxBmgDEAiNQPPZGgNrYAAAAASUVORK5CYII=',
+        'base64',
+      );
       const grantResponse = await req(H.s.app, 'POST', '/api/uploads/grant', {
         kind: 'attachment',
         fileName: 'caret.png',

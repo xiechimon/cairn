@@ -11,6 +11,7 @@ Status: implemented for review under [#3843](https://github.com/xiechimon/cairn/
 | Keep context roles explicit and grant attachments only from authentic owner messages. | Assistant text and synthetic wake rows cannot authorize attachments. | Revert resolver and grant expansion together. |
 | Render an attributed opening conversation using existing message, Markdown/image preview, and reply-quote components. | The observed Claude and Amp behavior preserves original message boundaries. | Legacy requests continue through the existing brief renderer. |
 | Use one rendering path for model context and one structured snapshot for visible history. | Prompt text must include the same relevant messages the UI shows; internal reply markers are transport metadata. | Revert shared renderer and UI consumer together. |
+| Share one user-message bubble across Coordinator, task transcript and source history. Deduplicate context only after complete source rendering. | CI caught duplicated bubble styling; cloud review reproduced image loss after an earlier partial citation. The shared component and regression controls keep these constraints executable. | Revert each complete change, including its consumers and tests. |
 
 ## Snapshot and transitions
 

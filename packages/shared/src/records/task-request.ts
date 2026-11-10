@@ -134,7 +134,7 @@ export function renderTaskText(request: Pick<TaskRequest, 'segments'>): string {
     }
     const text = renderReplyText(segment.text);
     parts.push(segment.source.span === 'quote' ? blockquote(text) : text);
-    if (segment.source.kind === 'chat')
+    if (segment.source.kind === 'chat' && segment.source.span === 'whole')
       shown.add(`${segment.source.threadId}:${segment.source.messageId}`);
   }
   flush();
