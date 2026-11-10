@@ -15,7 +15,7 @@ A separate real-SDK negative control confirmed that `createSdkMcpServer` with th
 | Path | Required observation | Regression |
 |---|---|---|
 | Ordinary claim | Only `title` advertised/required | `task-meta.test.ts`, `github-issues.test.ts` |
-| Daemon instruction | Title summary without category input/vocabulary | `task-meta-prompt.test.ts`, `runner-issue-fence.test.ts` |
+| Daemon instruction | Title summary without category input/vocabulary | `task-meta-prompt.test.ts`, `runner-issue-fence.test.ts`, `machine-step-exec.test.ts` |
 | Direct machine relay | Retired `tag`/`tags`/`tagIds`, including null/empty/populated values, fail before writes | `task-meta.test.ts` |
 | SDK tool invocation | Ordinary stale arguments reach canonical validation intact; GitHub names remain intact | `worker-meta-sdk.test.ts` |
 | Ordinary title write | Version/title update; body, associations and correction state retained | `task-meta.test.ts` |
@@ -32,8 +32,9 @@ The authenticated claim advertises only `title`. Twelve stale-argument HTTP case
 
 ## Local checks
 
-- 308 targeted tests / 15 files pass, including real SDK transport, claim/relay, owner protection, dedicated labels, correction, shared snapshots and Git release tags. Command: `pnpm exec vitest run <files in the table plus claude-t4-tools, claude-mcp-strict, ask-channel, correction-classification, github-label-state, shared task-meta and snapshot> --maxWorkers=4 --no-file-parallelism --testTimeout=120000`, with the lane's `CAIRN_TEST_TEMP_ROOT`.
+- 312 targeted tests / 16 files pass, including real SDK transport, claim/relay, owner protection, dedicated labels, correction, shared snapshots and Git release tags. Command: `pnpm exec vitest run <files in the table plus claude-t4-tools, claude-mcp-strict, ask-channel, correction-classification, github-label-state, shared task-meta and snapshot> --maxWorkers=4 --no-file-parallelism --testTimeout=120000`, with the lane's `CAIRN_TEST_TEMP_ROOT`.
 - Scoped `pnpm --filter @cairn/web e2e:affected apps/server/src/services/machine-relay.ts apps/web/e2e/home-composer-new-task.spec.ts apps/web/e2e/project-github-issues.spec.ts apps/web/e2e/github-issue-writeback.spec.ts`: 33 pass. The shared protocol file selects a full fallback, intentionally left to CI rather than running the full local suite.
+- The broader daemon changed selection exposed one obsolete positive `bug` prompt assertion in `machine-step-exec.test.ts`; the initial CI head independently caught the same assertion. It now pins absence of category inputs/vocabulary in the actual machine-loop injected prompt. A subsequent broader run had 2502 passes, one expected failure and a workspace `beforeEach` 10-second setup timeout; that unchanged file passes all 30 cases on a focused rerun. The broad run is not claimed green.
 - Lint, typecheck, spec parsing, prepush and verification registry/self-test pass. Regenerated feature maps accurately separate staged category APIs from Git release tags.
 
 Limits: the HTTP/SDK path uses an enrolled test client, not a real model or Claude CLI process. Browser regressions are fixture evidence, not a real-provider claim. Sealed-owner behavior is covered by isolated route regressions, not the separate production-entry-point probe. No UI layout, database schema, dependency or correction-provenance migration is changed. Deploy server and daemon together; code rollback retains all legacy data.
