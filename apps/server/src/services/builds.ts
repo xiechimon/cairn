@@ -302,11 +302,12 @@ function continuationTodo(
       .get() !== undefined;
   const resumable =
     row?.phase === 'done' ||
+    row?.phase === 'building' ||
     (options.allowReviewContinuation === true && row?.phase === 'review') ||
     row?.phase === 'needs_input' ||
     (options.afterTurn === true &&
       row !== undefined &&
-      (['planning', 'building', 'confirm', 'review', 'failed'].includes(row.phase) ||
+      (['planning', 'confirm', 'review', 'failed'].includes(row.phase) ||
         (row.phase === 'todo' && stopped)));
   if (row && row.archivedAt === null && row.latestBuildId === buildRow.id && (!resumable || active))
     throw new BuildContinuationPhaseError();
