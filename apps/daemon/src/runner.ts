@@ -45,7 +45,6 @@ import {
   classifyStepFailure,
   composeTaskPromptWithInstruction,
   conversationBranch,
-  FIXED_TAGS,
   gitCredentialRowContent,
   INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
@@ -280,8 +279,7 @@ export interface TaskMetaForm {
 
 export function composeTaskMetaInstruction(currentTitle: string, meta?: TaskMetaForm): string {
   if (meta === undefined) {
-    const vocab = FIXED_TAGS.map((t) => `- ${t.name}：${t.description}`).join('\n');
-    return `## 任务元信息\n本任务当前标题是占位截断：「${currentTitle}」。正式开工前，先调用一次 \`set_task_meta\` 工具回填元信息：\`title\` = 用不超过 50 个字总结任务正文（平文本，无 markdown，覆盖占位标题）；\`tag\` = 从下面的固定词表选至多 1 个最贴切的类别，判不出就不传 \`tag\`：\n${vocab}`;
+    return `## 任务元信息\n本任务当前标题是占位截断：「${currentTitle}」。正式开工前，先调用一次 \`set_task_meta\` 工具回填标题：\`title\` = 用不超过 50 个字总结任务正文（平文本，无 markdown，覆盖占位标题）。`;
   }
   const tagInstruction =
     meta.vocab.length > 0

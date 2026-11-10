@@ -681,14 +681,14 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
       body: { name: 'set_task_meta', params },
     });
 
-  test('F27 local(plain) claim: todo.meta default, tool surface = single tag shape (current behavior unchanged)', async () => {
+  test('ordinary claim: todo.meta default, tool surface is title-only', async () => {
     const { s, step } = await world('plain', false);
     expect(step.todo?.meta).toBeUndefined();
     const def = step.remoteTools?.find((t) => t.name === 'set_task_meta');
     expect(def).toBeDefined();
     const params = def!.parameters as { required?: string[]; properties: Record<string, unknown> };
     expect(params.required).toEqual(['title']);
-    expect(Object.keys(params.properties).sort()).toEqual(['tag', 'title']);
+    expect(Object.keys(params.properties)).toEqual(['title']);
     s.dispose();
   });
 
@@ -774,15 +774,15 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
     manual.s.dispose();
   });
 
-  test('E23 local(plain) relay: FIXED_TAGS whitelist unchanged -- custom tag rows also refused', async () => {
+  test('ordinary relay rejects both fixed and custom category names', async () => {
     const { s, token, step, projectId } = await world('plain', false);
     await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
       body: { name: 'urgent', color: '#ef4444' },
     });
     const bad = await relay(s.app, token, step.step.id, { title: 'x', tag: 'urgent' });
     expect(bad.status).toBe(400);
-    const ok = await relay(s.app, token, step.step.id, { title: 'x', tag: 'feature' });
-    expect(ok.status).toBe(200);
+    const fixed = await relay(s.app, token, step.step.id, { title: 'x', tag: 'feature' });
+    expect(fixed.status).toBe(400);
     s.dispose();
   });
 });

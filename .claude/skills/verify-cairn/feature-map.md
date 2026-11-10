@@ -1019,6 +1019,25 @@ Reach:
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
 - Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
 
+### git-release-tags
+
+**Git release tags** (shipped, centrality 4). The existing daemon-local create_tag tool creates and pushes annotated Git tags, independently of task categories.
+
+States: Repository-bound invocation, successful tag push, invalid input or Git failure; no product page.
+
+Reach:
+
+1. `open /app`
+2. `type a repository task whose worker claim enables create_tag`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: none
+- Research: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
+- Frontend design: n/a: an existing daemon-local repository tool with no UI
+- Backend design: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
+- Evidence: `apps/daemon/test/tag-tool.test.ts`, `apps/daemon/test/runner-create-tag.test.ts`
+
 ### ios-app
 
 **iOS app** (planned, centrality 4). D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.
@@ -1034,9 +1053,9 @@ Reach:
 
 ### thread-tags
 
-**Thread tags** (shipped, centrality 4). The fixed tag vocabulary on threads, set by agents and users.
+**Thread tags** (shipped, centrality 4). Legacy category APIs retained during staged retirement; ordinary worker metadata is title-only.
 
-States: Tags from the fixed vocabulary appear on thread rows.
+States: No category settings tab or ordinary worker category input. Legacy assignment APIs and read-only membership remain until their retirement segments; GitHub labels are separate.
 
 Reach:
 
@@ -1046,7 +1065,7 @@ Reach:
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/tags.md](features/tags.md)
-- Research: **gap**: no note on whether tags still earn their place after D58
+- Research: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
 - Backend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
-- Evidence: `apps/daemon/test/tag-tool.test.ts`, `apps/daemon/test/runner-create-tag.test.ts`
+- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`

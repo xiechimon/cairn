@@ -1,6 +1,6 @@
 # Remaining thread-category retirement: state and wire cutover
 
-Status: proposed for coordinator review before state/wire implementation. This refines the staging of the [approved retirement](thread-tags-retirement-3481.md), after correction independence #3727, GitHub-label isolation #3782 and UI retirement #3804. Audited main: `3f75ace9ff1bb69d0cbca73d39acbdf579769789`.
+Status: [approved by the orchestrator](https://github.com/xiechimon/cairn/pull/3836#issuecomment-6759210956) before state/wire implementation. This refines the staging of the [approved retirement](thread-tags-retirement-3481.md), after correction independence #3727, GitHub-label isolation #3782 and UI retirement #3804. Audited main: `3f75ace9ff1bb69d0cbca73d39acbdf579769789`.
 
 ## Primary-source audit
 
@@ -22,7 +22,7 @@ Inference: a naive future generic-data deletion would make this guard weakening 
 
 ## Proposed ordered states
 
-1. **Current:** UI entry/queries gone; generic routes, assignment inputs, seeding, ordinary worker categories and legacy read/storage contracts remain. Dedicated GitHub labels and the internal materialized correction flag are independent storage.
+1. **Current:** UI entry/queries gone; generic routes, REST/Coordinator/MCP assignment inputs, seeding and legacy read/storage contracts remain. Ordinary worker metadata is now title-only. Dedicated GitHub labels and the internal materialized correction flag are independent storage.
 2. **Writer retirement:** a coordinated phase removes generic GET/POST routes, all generic assignment inputs, fixed seeding/backfill and ordinary worker category advertising/assignment. Every writer-removal PR updates its affected active feature-map, verification registry/recipes and normative specs in that same head, then regenerates the map. No shipped entry may advertise a removed route, argument or flow. Stale REST/Coordinator/MCP/ordinary-worker assignments fail before writes. Ordinary naming and sealed-owner behavior remain. Keep legacy tables, read-only wire `tagIds` and their lifecycle cleanup temporarily, so model removal is independently reviewable. Existing generic membership still participates in classification until the final snapshot.
 3. **Final data/model retirement:** one migration adds internal boolean `correctionBaselineRequired` (default false), snapshots case-insensitive legacy correction membership into it before dropping `todo_tag` then `tag`, and preserves existing materialized true requirements. Atomically replace storage readers, wire/model exports and their client/gallery/fixture consumers. Active category discovery and normative contracts have already moved with their writers; only inactive historical cleanup can be independent. If review size requires splitting the writer phase, each independent writer PR carries its matching active-contract updates. Preserve untitled naming documentation and Git release-tag registration. Number/timestamp/snapshot come from latest main at implementation; no slot is reserved.
 
@@ -58,12 +58,12 @@ Reject obsolete assignments before changing title, classification, associations,
 
 Deploy server and daemon together for the ordinary metadata contract. The writer-retirement stage is code-revertible because legacy data is retained. Final data/model removal is one-way relative to old code: use a pre-migration backup, not a code-only downgrade. After the final migration, the baseline has no assignment API; only a validated project move clears it, while normal title/spec/reset paths preserve it. Failed requests leave every classification and unrelated row unchanged.
 
-## Decision requested
+## Approved decisions
 
 | Decision | Recommendation | Status |
 |---|---|---|
-| Review-size staging | Retire writers before final schema/wire deletion; update affected active discovery/verification/spec contracts in each writer-removal head; temporarily retain legacy read contracts, with no new writer or dual mirror | Pending coordinator review |
-| Correction provenance | Add the internal baseline in the final migration, preserving both legacy-origin protection and reversible dedicated labels | Pending coordinator review |
-| Compatibility boundary | Reject retired category arguments before writes without changing unrelated ignored REST fields | Pending coordinator review |
+| Review-size staging | Retire writers before final schema/wire deletion; update affected active discovery/verification/spec contracts in each writer-removal head; temporarily retain legacy read contracts, with no new writer or dual mirror | Approved |
+| Correction provenance | Add the internal baseline in the final migration, preserving both legacy-origin protection and reversible dedicated labels | Approved |
+| Compatibility boundary | Reject retired category arguments before writes without changing unrelated ignored REST fields | Approved |
 
-No state, schema, wire or agent behavior is changed by this design PR. Keep `coordinator-hold` while these cutover decisions are pending. Only the final completed retirement segment closes #3481.
+The design landed in #3836. The first implementation segment retires ordinary worker category advertising/assignment together with its active contracts; other writers and legacy read/storage remain for subsequent segments. Only the final completed retirement segment closes #3481.
