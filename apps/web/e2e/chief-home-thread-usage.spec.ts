@@ -85,7 +85,7 @@ const footer = (page: Page) => page.getByTestId('thread-usage');
 const toggle = (page: Page) => footer(page).getByRole('button', { name: 'Thread usage' });
 
 for (const theme of ['light', 'dark'] as const) {
-test(`the footer includes past runs and expands above the composer (${theme})`, async ({ page }) => {
+test(`usage sits under the thread header and expands below the meta (${theme})`, async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
   const requested = await setup(page);
   await page.goto('/app?thread=todo-1');
@@ -103,9 +103,14 @@ test(`the footer includes past runs and expands above the composer (${theme})`, 
   await expect(footer(page)).toContainText('Mac');
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').nth(2)).toHaveText('—');
   expect(new Set(requested).size).toBe(2);
+  const headerBox = await page.getByTestId('side-chat').boundingBox();
   const footerBox = await footer(page).boundingBox();
   const composerBox = await page.locator('.side-panel .composer').boundingBox();
-  expect((footerBox?.y ?? 0) + (footerBox?.height ?? 0)).toBeLessThanOrEqual(composerBox?.y ?? 0);
+  expect(footerBox?.y ?? 0).toBeGreaterThanOrEqual(headerBox?.y ?? 0);
+  expect((footerBox?.y ?? 0) + (footerBox?.height ?? 0)).toBeLessThanOrEqual(
+    (headerBox?.y ?? 0) + (headerBox?.height ?? 0) + 1,
+  );
+  expect((footerBox?.y ?? 0) + (footerBox?.height ?? 0)).toBeLessThan(composerBox?.y ?? Number.POSITIVE_INFINITY);
   await expect(footer(page)).toContainText('Total duration is unavailable.');
   await evidencePanelShot(page, `thread-usage-expanded-${theme}.png`, page.locator('.side-panel'));
   await toggle(page).press('Enter');
