@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { type ExperimentClient, openExperimentClient } from '@cairn/shared/langfuse';
 import { z } from 'zod';
 import { evalCodexKey } from '../../../apps/daemon/src/backend/eval-auth.js';
-import { decisionOutput, expectedOutput, type ReplayInput, replayInput } from './contract.mts';
+import { decisionOutput, parseExpectedOutput, type ReplayInput, replayInput } from './contract.mts';
 import { runSandboxedTurn } from './sandbox.mts';
 
 const itemBudgetMs = 610_000;
@@ -74,11 +74,16 @@ export async function runExperiment(
     new Set(items.map((item) => item.sourceTraceId)).size !== items.length
   )
     throw new Error('incomplete: missing or duplicate harvested provenance');
-  for (const item of items) {
-    const expected = expectedOutput.safeParse(item.expectedOutput);
-    if (!expected.success) throw new Error('incomplete: invalid expectedOutput');
+  const cases = items.map((item) => ({ item, input: replayInput.parse(item.input) }));
+  const inputs = cases.map(({ input }) => input);
+  const inputsById = new Map(cases.map(({ item, input }) => [item.id, input]));
+  for (const { item, input } of cases) {
+    try {
+      parseExpectedOutput(item.expectedOutput, input);
+    } catch {
+      throw new Error('incomplete: invalid expectedOutput');
+    }
   }
-  const inputs = items.map((item) => replayInput.parse(item.input));
   if (items.some((item, n) => item.sourceTraceId !== inputs[n]?.snapshot.sourceTraceId))
     throw new Error('incomplete: snapshot provenance mismatch');
   const hash = fingerprint({
@@ -101,10 +106,11 @@ export async function runExperiment(
       task: async (item) => {
         if (failed) throw new Error('incomplete: prior item failed');
         try {
-          if (!('id' in item) || !items.some((i) => i.id === item.id) || completed.has(item.id))
+          const input = 'id' in item ? inputsById.get(item.id) : undefined;
+          if (!input || !('id' in item) || completed.has(item.id))
             throw new Error('Unexpected experiment item');
           const output = decisionOutput.parse(
-            await within(execute(replayInput.parse(item.input)), itemBudgetMs),
+            await within(execute(replayInput.parse(input)), itemBudgetMs),
           );
           completed.add(item.id);
           return output;

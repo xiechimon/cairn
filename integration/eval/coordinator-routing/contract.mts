@@ -138,6 +138,12 @@ export function normalize(status: string, placed: readonly string[], asked: bool
   throw new Error('Empty turn');
 }
 
+function validDependencyEndpoints(value: { parts: unknown[]; blockedBy: [number, number][] }) {
+  return value.blockedBy.every(
+    ([from, to]) => from !== to && from < value.parts.length && to < value.parts.length,
+  );
+}
+
 export const expectedOutput = z
   .object({
     decision: z.enum(['route', 'ask', 'answer']),
@@ -146,18 +152,28 @@ export const expectedOutput = z
     blockedBy: z.array(z.tuple([z.number().int().min(0), z.number().int().min(0)])),
     notes: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .refine(validDependencyEndpoints, 'Invalid dependency endpoints');
 
-export const decisionOutput = z.object({
-  decision: z.enum(['route', 'ask', 'answer']),
-  parts: z.array(z.object({ project: z.string().min(1), title: z.string() })),
-  questions: z.array(askUserQuestionSchema),
-  askCandidates: z.array(z.string()),
-  blockedBy: z.array(z.tuple([z.number().int().min(0), z.number().int().min(0)])),
-  stepStatus: z.string(),
-  turnTraceId: z.string().regex(/^[a-f0-9]{32}$/),
-  promptSha256: z.string().regex(/^[a-f0-9]{64}$/),
-});
+export function parseExpectedOutput(raw: unknown, input: ReplayInput) {
+  const expected = expectedOutput.parse(raw);
+  if (expected.parts.some((part) => !input.projects.some((p) => p.name === part.project)))
+    throw new Error('incomplete: invalid expectedOutput project reference');
+  return expected;
+}
+
+export const decisionOutput = z
+  .object({
+    decision: z.enum(['route', 'ask', 'answer']),
+    parts: z.array(z.object({ project: z.string().min(1), title: z.string() })),
+    questions: z.array(askUserQuestionSchema),
+    askCandidates: z.array(z.string()),
+    blockedBy: z.array(z.tuple([z.number().int().min(0), z.number().int().min(0)])),
+    stepStatus: z.string(),
+    turnTraceId: z.string().regex(/^[a-f0-9]{32}$/),
+    promptSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .refine(validDependencyEndpoints, 'Invalid dependency endpoints');
 
 export const turnObservations = z
   .object({

@@ -17,13 +17,22 @@ import {
   chiefMessage,
   chiefThread,
   message,
+  project,
   step,
   todo,
 } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { candidateClosure } from '../eval/coordinator-routing/closure.mts';
-import { normalize, observeTurn, replayInput } from '../eval/coordinator-routing/contract.mts';
+import {
+  decisionOutput,
+  expectedOutput,
+  normalize,
+  observeTurn,
+  replayInput,
+  replayThread,
+  replayTodo,
+} from '../eval/coordinator-routing/contract.mts';
 import * as runner from '../eval/coordinator-routing/run.mts';
 import { type Manifest, runExperiment } from '../eval/coordinator-routing/run.mts';
 import { runSandboxedTurn } from '../eval/coordinator-routing/sandbox.mts';
@@ -89,6 +98,186 @@ const manifest: Manifest = {
 };
 
 describe('Langfuse Coordinator runner', () => {
+  it.each(['expected', 'observed'])('validates %s dependency endpoints', (kind) => {
+    const schema = kind === 'expected' ? expectedOutput : decisionOutput;
+    const output = {
+      decision: 'route',
+      parts: [
+        { project: 'docs', title: 'one' },
+        { project: 'docs', title: 'two' },
+      ],
+      questions: [],
+      askCandidates: [],
+      blockedBy: [[1, 0]],
+      stepStatus: 'done',
+      turnTraceId: 'a'.repeat(32),
+      promptSha256: 'b'.repeat(64),
+    };
+    const raw =
+      kind === 'expected'
+        ? {
+            decision: output.decision,
+            parts: output.parts.map(({ project }) => ({ project })),
+            askCandidates: [],
+            blockedBy: output.blockedBy,
+          }
+        : output;
+    expect(schema.safeParse(raw).success).toBe(true);
+    for (const edge of [
+      [2, 0],
+      [0, 2],
+      [0, 0],
+      [1, 1],
+      [-1, 0],
+      [0.5, 1],
+    ])
+      expect(schema.safeParse({ ...raw, blockedBy: [edge] }).success).toBe(false);
+  });
+
+  it.each(['project', 'todo', 'build', 'source', 'ownership'])(
+    'fails closed on unknown or future %s time',
+    (site) => {
+      const oldTodo = {
+        id: 'old',
+        projectId: 'project-0',
+        title: 'Old',
+        spec: '',
+        phase: 'done',
+        phaseAt: 1,
+        archivedAt: null,
+        seqNum: 1,
+        orderIndex: 0,
+        blockedBy: null,
+        latestBuildId: null,
+        sourceKind: null,
+        sourceRef: null,
+        request: null,
+        output: 'info',
+        createdAt: 1,
+        updatedAt: 10,
+      };
+      const oldBuild = {
+        id: 'old-build',
+        todoId: 'old',
+        withPlan: false,
+        prevPhase: null,
+        triggerSource: 'user',
+        planDocId: null,
+        errorMessage: null,
+        prUrl: null,
+        prNumber: null,
+        diffHash: null,
+        reportAttachmentId: null,
+        stop: null,
+        reportLine: null,
+        createdAt: 1,
+        updatedAt: 10,
+      };
+      const rows = new Map<unknown, Record<string, unknown>[]>([
+        [step, [{ id: 'source', kind: 'chief', buildId: 'thread', createdAt: 10 }]],
+        [chiefMessage, [{ role: 'user', threadId: 'thread', content: 'request', projectId: null }]],
+        [chiefThread, [{ teamId: 'team' }]],
+        [project, [{ ...input.projects[0], createdAt: 1, updatedAt: 10 }]],
+        [todo, [oldTodo]],
+        [build, [oldBuild]],
+      ]);
+      const db = {
+        transaction: (work: () => unknown) => work(),
+        select: () => ({
+          from: (table: unknown) => {
+            const query = {
+              where: (_value: unknown) => query,
+              get: () => rows.get(table)?.[0],
+              all: () => rows.get(table) ?? [],
+            };
+            return query;
+          },
+        }),
+      } as unknown as Parameters<typeof harvestReplayInput>[0];
+      expect(harvestReplayInput(db, 'source').snapshot.todos).toHaveLength(1);
+      expect(
+        harvestReplayItem(db, 'source', {
+          decision: 'route',
+          parts: [{ project: 'docs' }],
+          askCandidates: [],
+          blockedBy: [],
+        }).input.snapshot.todos,
+      ).toHaveLength(1);
+      expect(() =>
+        harvestReplayItem(db, 'source', {
+          decision: 'route',
+          parts: [{ project: 'missing' }],
+          askCandidates: [],
+          blockedBy: [],
+        }),
+      ).toThrow('expectedOutput');
+      if (site === 'ownership') {
+        const row = rows.get(todo)![0]!;
+        row.phase = 'review';
+        row.coordinatorTurn = { workKey: 'review::1', stepId: 'source' };
+        rows.get(step)![0]!.status = 'pending';
+        expect(harvestReplayInput(db, 'source').snapshot.visible[0]?.ownership).toEqual({
+          owner: 'coordinator',
+          reason: 'review',
+        });
+        return;
+      }
+      const row = rows.get({ project, todo, build, source: step }[site])![0]!;
+      for (const field of site === 'source' ? ['createdAt'] : ['createdAt', 'updatedAt']) {
+        const previous = row[field];
+        for (const time of [undefined, null, 0, -1, NaN, ...(site === 'source' ? [] : [11])]) {
+          row[field] = time;
+          expect(() => harvestReplayInput(db, 'source')).toThrow(/incomplete:.*time/);
+        }
+        row[field] = previous;
+      }
+      expect(harvestReplayInput(db, 'source').snapshot.todos).toHaveLength(1);
+    },
+  );
+
+  it.each(['project reference', 'pinned input'])('validates experiment %s', async (site) => {
+    const item = {
+      id: '1',
+      datasetId: 'd',
+      sourceTraceId: 'source-1',
+      status: 'ACTIVE',
+      input,
+      expectedOutput: {
+        decision: 'route',
+        parts: [{ project: 'missing' }],
+        askCandidates: [],
+        blockedBy: [],
+      },
+    };
+    const execute = vi.fn(async () => ({
+      decision: 'answer',
+      parts: [],
+      questions: [],
+      askCandidates: [],
+      blockedBy: [],
+      stepStatus: 'done',
+      turnTraceId: 'a'.repeat(32),
+      promptSha256: 'b'.repeat(64),
+    }));
+    const experiment = vi.fn(async ({ task }: { task: (item: unknown) => Promise<unknown> }) => ({
+      itemResults: [
+        await task({ ...item, input: { ...input, request: 'changed after preflight' } }),
+      ],
+    }));
+    const client = {
+      dataset: { get: async () => ({ items: [item] }) },
+      experiment: { run: experiment },
+    } as unknown as Parameters<typeof runExperiment>[0];
+    if (site === 'project reference') {
+      await expect(runExperiment(client, manifest, execute)).rejects.toThrow('expectedOutput');
+      expect(experiment).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+    }
+    item.expectedOutput.parts[0]!.project = 'docs';
+    await runExperiment(client, manifest, execute);
+    expect(execute).toHaveBeenCalledWith(input);
+  });
+
   it('uses one observable decision and rejects mixed, failed and empty turns', () => {
     expect(normalize('done', [], false, 'answer')).toBe('answer');
     expect(normalize('done', ['docs'], false, '')).toBe('route');
@@ -315,7 +504,7 @@ describe('Langfuse Coordinator runner', () => {
     });
   }, 90_000);
 
-  it('harvests the source turn with its DB todo/thread snapshot and seeds a fresh DB', async () => {
+  it('rejects unverifiable DB harvests and seeds independently captured snapshots', async () => {
     const source = openDbWithHandle(':memory:');
     const target = openDbWithHandle(':memory:');
     try {
@@ -382,25 +571,47 @@ describe('Langfuse Coordinator runner', () => {
           createdAt: 1,
         })
         .run();
-      const expectation = {
-        decision: 'route',
-        parts: [{ project: 'docs-site' }],
-        blockedBy: [[1, 0]],
-        askCandidates: [],
-        notes: '...',
-      };
-      const item = harvestReplayItem(source.db, 'source-turn', expectation);
-      expect(item.expectedOutput).toEqual(expectation);
-      expect(item.sourceTraceId).toBe(item.input.snapshot.sourceTraceId);
-      expect(() =>
-        harvestReplayItem(source.db, 'source-turn', { ...expectation, parts: [{}] }),
-      ).toThrow();
-      const harvested = item.input;
+      expect(() => harvestReplayInput(source.db, 'source-turn')).toThrow(
+        'incomplete: unknown project time',
+      );
+      const harvested = replayInput.parse({
+        ...input,
+        request: 'The original request',
+        chip: 'docs',
+        snapshot: {
+          ...input.snapshot,
+          source: 'trace',
+          sourceTraceId: 'a'.repeat(32),
+          todos: source.db
+            .select()
+            .from(todo)
+            .all()
+            .map((row) =>
+              replayTodo.parse(
+                Object.fromEntries(
+                  Object.keys(replayTodo.shape).map((key) => [key, row[key as keyof typeof row]]),
+                ),
+              ),
+            ),
+          threads: source.db
+            .select()
+            .from(build)
+            .all()
+            .map((row) =>
+              replayThread.parse(
+                Object.fromEntries(
+                  Object.keys(replayThread.shape).map((key) => [key, row[key as keyof typeof row]]),
+                ),
+              ),
+            ),
+          visible: [{ id: 'old', ownership: null, blocks: true }],
+        },
+      });
       expect(harvested).toMatchObject({
         request: 'The original request',
         chip: 'docs',
         snapshot: {
-          source: 'harvest-db',
+          source: 'trace',
           sourceTraceId: expect.stringMatching(/^[a-f0-9]{32}$/),
           todos: [{ id: 'old', latestBuildId: 'old-build', spec: 'Original words' }],
           threads: [{ id: 'old-build', todoId: 'old' }],
@@ -428,7 +639,16 @@ describe('Langfuse Coordinator runner', () => {
           createdAt: 20,
         })
         .run();
-      const waiting = harvestReplayInput(source.db, 'source-turn');
+      expect(() => harvestReplayInput(source.db, 'source-turn')).toThrow('incomplete');
+      const waiting = replayInput.parse({
+        ...harvested,
+        snapshot: {
+          ...harvested.snapshot,
+          visible: [
+            { id: 'old', ownership: { owner: 'coordinator', reason: 'question' }, blocks: true },
+          ],
+        },
+      });
       expect(waiting.snapshot.visible).toEqual([
         { id: 'old', ownership: { owner: 'coordinator', reason: 'question' }, blocks: true },
       ]);
@@ -578,7 +798,7 @@ registerHooks({resolve(specifier,context,next){const key=specifier.includes('eva
             input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: `source-${n}` } },
             expectedOutput: {
               decision: 'route',
-              parts: [{ project: 'docs-site' }],
+              parts: [{ project: 'docs' }],
               notes: 'ANSWER-SECRET',
               askCandidates: [],
               blockedBy: [],

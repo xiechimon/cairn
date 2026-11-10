@@ -1,5 +1,6 @@
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Db } from '../../../apps/server/src/db/client.js';
 import {
   build,
@@ -12,7 +13,7 @@ import {
 import { blockedNow } from '../../../apps/server/src/services/blockers.js';
 import { ownershipOf } from '../../../apps/server/src/services/owner.js';
 import {
-  expectedOutput,
+  parseExpectedOutput,
   type ReplayInput,
   replayInput,
   replayThread,
@@ -20,8 +21,8 @@ import {
 } from './contract.mts';
 
 export function harvestReplayItem(db: Db, sourceTurnId: string, expectation: unknown) {
-  const expected = expectedOutput.parse(expectation);
   const input = harvestReplayInput(db, sourceTurnId);
+  const expected = parseExpectedOutput(expectation, input);
   return { input, expectedOutput: expected, sourceTraceId: input.snapshot.sourceTraceId };
 }
 
@@ -36,6 +37,8 @@ export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
       typeof message.content !== 'string'
     )
       throw new Error('Missing harvest source turn');
+    const sourceTime = z.number().int().positive().safeParse(turn.createdAt);
+    if (!sourceTime.success) throw new Error('incomplete: unknown source turn time');
     const thread = db.select().from(chiefThread).where(eq(chiefThread.id, message.threadId)).get();
     if (!thread) throw new Error('Missing harvest source thread');
     const projects = db.select().from(project).where(eq(project.teamId, thread.teamId)).all();
@@ -43,6 +46,27 @@ export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
       throw new Error('Missing harvest project chip');
     const todos = db.select().from(todo).where(eq(todo.teamId, thread.teamId)).all();
     const ids = new Set(todos.map((t) => t.id));
+    const threads = db
+      .select()
+      .from(build)
+      .all()
+      .filter((b) => ids.has(b.todoId));
+    const timestamps = z.object({
+      createdAt: z.number().int().positive(),
+      updatedAt: z.number().int().positive(),
+    });
+    for (const [kind, rows] of [
+      ['project', projects],
+      ['todo', todos],
+      ['build', threads],
+    ] as const) {
+      for (const row of rows) {
+        const time = timestamps.safeParse(row);
+        if (!time.success) throw new Error(`incomplete: unknown ${kind} time for ${row.id}`);
+        if (time.data.createdAt > sourceTime.data || time.data.updatedAt > sourceTime.data)
+          throw new Error(`incomplete: ${kind} time newer than source turn for ${row.id}`);
+      }
+    }
     return replayInput.parse({
       request: message.content,
       projects: projects.map(({ id, name, description, repoKind, archivedAt }) => ({
@@ -60,7 +84,7 @@ export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
         sourceTraceId: otlpTraceIdOfTurn(sourceTurnId),
         capturedAt: Date.now(),
         visible: todos.map((row) => {
-          const ownership = ownershipOf(db, row);
+          const ownership = ownershipOf(db, row, sourceTime.data);
           return {
             id: row.id,
             ownership:
@@ -75,18 +99,13 @@ export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
             ),
           ),
         ),
-        threads: db
-          .select()
-          .from(build)
-          .all()
-          .filter((b) => ids.has(b.todoId))
-          .map((row) =>
-            replayThread.parse(
-              Object.fromEntries(
-                Object.keys(replayThread.shape).map((key) => [key, row[key as keyof typeof row]]),
-              ),
+        threads: threads.map((row) =>
+          replayThread.parse(
+            Object.fromEntries(
+              Object.keys(replayThread.shape).map((key) => [key, row[key as keyof typeof row]]),
             ),
           ),
+        ),
       },
     });
   });
