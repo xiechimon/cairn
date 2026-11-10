@@ -1,5 +1,6 @@
 import type { PROVIDER_PRESET_IDS } from '@cairn/shared';
 import { ProviderIcon } from '@lobehub/icons';
+import { useLayoutEffect, useRef } from 'react';
 
 const PRESET_ICON: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
   'github-copilot': 'github-copilot',
@@ -43,13 +44,19 @@ const PRESET_ICON: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
 };
 
 export function ProviderPresetIcon({ id }: { id: (typeof PROVIDER_PRESET_IDS)[number] }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    for (const node of ref.current?.querySelectorAll('title') ?? []) node.remove();
+  }, [id]);
   return (
-    <ProviderIcon
-      provider={PRESET_ICON[id]}
-      size={14}
-      type="mono"
-      forceMono
-      className="text-current"
-    />
+    <span ref={ref} className="contents">
+      <ProviderIcon
+        provider={PRESET_ICON[id]}
+        size={14}
+        type="mono"
+        forceMono
+        className="text-current"
+      />
+    </span>
   );
 }
