@@ -1135,14 +1135,20 @@ function namedMachineForStart(
   const named =
     routeOverride?.machineId ?? todoRecord.routeOverride?.machineId ?? profile?.machineId ?? null;
   if (named !== null) return { machineId: named, pin: false };
-  const online = deps.db
-    .select({ id: machine.id })
+  const registered = deps.db
+    .select({ id: machine.id, online: machine.online })
     .from(machine)
-    .where(and(eq(machine.teamId, todoRecord.teamId), eq(machine.online, true)))
+    .where(eq(machine.teamId, todoRecord.teamId))
     .all();
-  const only = online[0];
-  if (online.length === 1 && only !== undefined) return { machineId: only.id, pin: true };
-  if (online.length > 1) throw new HttpError(409, 'Name a machine before starting this task');
+  const online = registered.filter((row) => row.online);
+  const onlyOnline = online[0];
+  if (online.length === 1 && onlyOnline !== undefined)
+    return { machineId: onlyOnline.id, pin: true };
+  const onlyRegistered = registered[0];
+  if (registered.length === 1 && onlyRegistered !== undefined) {
+    return { machineId: onlyRegistered.id, pin: true };
+  }
+  if (registered.length > 1) throw new HttpError(409, 'Name a machine before starting this task');
   return null;
 }
 
