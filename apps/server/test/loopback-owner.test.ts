@@ -179,6 +179,14 @@ test('a same-origin write from the owner browser can do owner-only work after bo
       })
     ).status,
   ).toBe(201);
+  expect(
+    (
+      await call(port, '/api/remote/pairing', {
+        method: 'POST',
+        headers: { cookie: cookie ?? '', 'sec-fetch-site': 'same-site' },
+      })
+    ).status,
+  ).toBe(403);
 });
 
 test('a paired-device token on loopback keeps its narrower authority', async () => {

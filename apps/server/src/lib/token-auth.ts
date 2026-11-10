@@ -88,6 +88,21 @@ declare module 'hono' {
   }
 }
 
+function cookieWriteAllowed(c: Context): boolean {
+  const site = c.req.header('sec-fetch-site');
+  if (site === 'same-origin' || site === 'none') return true;
+  if (site !== undefined) return false;
+  const origin = c.req.header('origin');
+  if (origin === undefined) return false;
+  try {
+    const expected = new URL(c.req.url);
+    const actual = new URL(origin);
+    return actual.protocol === expected.protocol && actual.host === expected.host;
+  } catch {
+    return false;
+  }
+}
+
 function cookieValue(c: Context, name: string): string | undefined {
   const header = c.req.header('cookie');
   if (header === undefined) return undefined;
@@ -157,6 +172,9 @@ export function registerTokenAuth(
       if (session !== null) {
         const denied = applySession(c, session);
         if (denied !== null) return denied;
+        if (!READ_METHODS.has(c.req.method.toUpperCase()) && !cookieWriteAllowed(c)) {
+          return c.json({ error: 'same-origin proof required' }, 403);
+        }
         return admit();
       }
     }

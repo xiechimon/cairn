@@ -54,17 +54,10 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
       computerFeedStore.clear();
       return;
     }
-    let stop = (): void => {
-      cancelled = true;
-    };
-    let cancelled = false;
-    void streamUrl(`/api/teams/${teamId}/stream`).then((url) => {
-      if (cancelled) return;
-      const ticket = new URL(url, window.location.origin).searchParams.get('ticket');
-      stop = startTeamStream(teamId, qc, auth.generation, ticket);
-    });
+    const stop = startTeamStream(teamId, qc, auth.generation, null, () =>
+      streamUrl(`/api/teams/${teamId}/stream`),
+    );
     return () => {
-      cancelled = true;
       stop();
     };
   }, [teamId, enabled, qc, auth]);
@@ -75,6 +68,7 @@ export function startTeamStream(
   qc: QueryClient,
   generation = 0,
   ticket: string | null = null,
+  resolvePath: (() => Promise<string>) | null = null,
 ): () => void {
   computerFeedStore.clear();
   const resync = () => {
@@ -83,7 +77,7 @@ export function startTeamStream(
   };
   const guards = streamGuards(qc);
   const disconnect = connect(
-    withTicket(`/api/teams/${teamId}/stream`, ticket),
+    resolvePath ?? withTicket(`/api/teams/${teamId}/stream`, ticket),
     (ev) => {
       for (const queryKey of teamEventInvalidations(ev, teamId)) {
         void invalidateConverged(qc, { queryKey });
@@ -208,17 +202,10 @@ export function useConversationStream(
   const auth = useAuth();
   useEffect(() => {
     if (conversationId === undefined || !enabled || auth.gateOpen) return;
-    let stop = (): void => {
-      cancelled = true;
-    };
-    let cancelled = false;
-    void streamUrl(`/api/conversations/${conversationId}/stream`).then((url) => {
-      if (cancelled) return;
-      const ticket = new URL(url, window.location.origin).searchParams.get('ticket');
-      stop = startConversationStream(conversationId, qc, { onMessage, onStep }, ticket);
-    });
+    const stop = startConversationStream(conversationId, qc, { onMessage, onStep }, null, () =>
+      streamUrl(`/api/conversations/${conversationId}/stream`),
+    );
     return () => {
-      cancelled = true;
       stop();
     };
   }, [conversationId, enabled, qc, onMessage, onStep, auth]);
@@ -229,6 +216,7 @@ export function startConversationStream(
   qc: QueryClient,
   handlers: ConversationStreamHandlers,
   ticket: string | null = null,
+  resolvePath: (() => Promise<string>) | null = null,
 ): () => void {
   const onMessage = handlers.onMessage;
   const onStep = handlers.onStep;
@@ -244,7 +232,7 @@ export function startConversationStream(
     void invalidateConverged(qc);
   };
   return connect(
-    withTicket(`/api/conversations/${conversationId}/stream`, ticket),
+    resolvePath ?? withTicket(`/api/conversations/${conversationId}/stream`, ticket),
     (ev) => {
       switch (ev.type) {
         case 'text_delta':

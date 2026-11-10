@@ -20,9 +20,11 @@ import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import {
+  AUTH_COOKIE,
   issueBrowserSession,
   issueStreamTicket,
   requestIsSecure,
+  resolveBrowserSession,
   setAuthCookie,
 } from './services/browser-session.js';
 import { readDeployStatus } from './services/deploy-status.js';
@@ -63,6 +65,8 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (site !== undefined && site !== 'same-origin' && site !== 'none') {
       return c.json({ error: 'same-origin proof required' }, 403);
     }
+    const existing = resolveBrowserSession(ctx.db, getCookie(c, AUTH_COOKIE) ?? '');
+    if (existing?.kind === 'owner') return c.json({ ok: true });
     const session = issueBrowserSession(ctx.db, 'owner');
     setAuthCookie(c, session.token, requestIsSecure(c));
     return c.json({ ok: true });

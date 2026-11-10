@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, lte } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import type { Db } from '../db/client.js';
@@ -27,6 +27,7 @@ export function issueBrowserSession(
 ): { token: string; expiresAt: number } {
   const token = randomBytes(TOKEN_BYTES).toString('hex');
   const expiresAt = now + SESSION_TTL_MS;
+  db.delete(browserSession).where(lte(browserSession.expiresAt, now)).run();
   db.insert(browserSession)
     .values({
       id: newRecordId(),
@@ -84,6 +85,9 @@ export function issueStreamTicket(
   ticket: string;
   expiresAt: number;
 } {
+  for (const [key, row] of tickets) {
+    if (row.expiresAt <= now) tickets.delete(key);
+  }
   const ticket = randomBytes(24).toString('base64url');
   const expiresAt = now + TICKET_TTL_MS;
   tickets.set(ticket, { session, expiresAt });

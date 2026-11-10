@@ -10,7 +10,7 @@ export interface StreamGuards {
 }
 
 export function connect(
-  path: string,
+  path: string | (() => Promise<string>),
   onEvent: (ev: Record<string, unknown>) => void,
   onResync: () => void,
   guards: StreamGuards,
@@ -53,7 +53,24 @@ export function connect(
 
   function open(): void {
     if (disposed) return;
-    es = new EventSource(path);
+    const resolved = typeof path === 'function' ? path() : path;
+    if (typeof resolved !== 'string') {
+      void resolved.then((url) => {
+        if (!disposed) attach(url);
+      });
+      return;
+    }
+    attach(resolved);
+  }
+
+  function attach(url: string): void {
+    if (disposed) return;
+    es?.close();
+    es = new EventSource(url);
+    es.onerror = () => {
+      es?.close();
+      open();
+    };
     es.onopen = () => {
       if (openedOnce) onResync();
       openedOnce = true;

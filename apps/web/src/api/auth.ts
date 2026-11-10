@@ -25,6 +25,10 @@ export function syncPushAuthToken(token: string | null): Promise<void> {
   return pushAuthWrites;
 }
 
+export function clearLegacyBrowserToken(): void {
+  clearStoredToken();
+}
+
 function clearStoredToken(): void {
   void syncPushAuthToken(null);
   try {

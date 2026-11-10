@@ -3,10 +3,10 @@ import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import {
   awaitGate,
   bootstrapLoopback,
+  clearLegacyBrowserToken,
   consumePairFragment,
   demandGate,
   isLoopbackPage,
-  readStoredToken,
 } from './auth.js';
 
 export class ApiError extends Error {
@@ -24,8 +24,6 @@ export class ApiError extends Error {
 function send(path: string, init?: { method?: string; body?: unknown }): Promise<Response> {
   const headers: Record<string, string> = {};
   if (init?.body !== undefined) headers['content-type'] = 'application/json';
-  const token = typeof window === 'undefined' ? null : readStoredToken();
-  if (token !== null) headers.authorization = `Bearer ${token}`;
   return fetch(path, {
     method: init?.method ?? 'GET',
     headers,
@@ -33,6 +31,8 @@ function send(path: string, init?: { method?: string; body?: unknown }): Promise
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
 }
+
+if (typeof window !== 'undefined') clearLegacyBrowserToken();
 
 let bootstrapped = false;
 
