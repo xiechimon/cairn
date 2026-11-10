@@ -1,0 +1,43 @@
+{
+  "provider": "not called; seeded conversation and answer",
+  "head": "b6fd964011c5b69f78422933d5f95de46b10740b",
+  "beforeHead": "04084f4a1ae6d856640186b9201c8145e7d2c6dd",
+  "results": [
+    {
+      "label": "before",
+      "theme": "light",
+      "images": 2,
+      "startupBubbles": 1,
+      "sourceOwner": 2,
+      "sourceAssistant": 1,
+      "answerRetained": 1
+    },
+    {
+      "label": "before",
+      "theme": "dark",
+      "images": 2,
+      "startupBubbles": 1,
+      "sourceOwner": 2,
+      "sourceAssistant": 1,
+      "answerRetained": 1
+    },
+    {
+      "label": "after",
+      "theme": "light",
+      "images": 1,
+      "startupBubbles": 0,
+      "sourceOwner": 2,
+      "sourceAssistant": 1,
+      "answerRetained": 1
+    },
+    {
+      "label": "after",
+      "theme": "dark",
+      "images": 1,
+      "startupBubbles": 0,
+      "sourceOwner": 2,
+      "sourceAssistant": 1,
+      "answerRetained": 1
+    }
+  ]
+}
