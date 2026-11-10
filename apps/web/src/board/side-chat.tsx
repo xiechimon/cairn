@@ -261,7 +261,6 @@ function ThreadBody({
           />
         </div>
       )}
-      <ThreadUsageFooter key={todo.id} todo={todo} />
       <Composer
         placeholder={
           archived
@@ -411,6 +410,7 @@ function ReadyThread({
           : {})}
       >
         <StatusLine todo={todo} machineName={chat.machineName} now={now} />
+        <ThreadUsageFooter key={todo.id} todo={todo} />
       </Head>
       <ThreadPrPanel
         status={prs.status}

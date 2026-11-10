@@ -17,7 +17,7 @@ export function ThreadUsageSection() {
     <Section
       id="thread-usage"
       title="Thread usage"
-      lede="A quiet footer above the composer opens into totals across every run. Unknown prices and unavailable duration stay blank; models and machines remain readable in the expanded view."
+      lede="A quiet disclosure under the thread header meta opens into totals across every run. Unknown prices and unavailable duration stay blank; models and machines remain readable in the expanded view."
     >
       <Specimen id="collapsed-thread-usage" title="Collapsed thread usage" stage="canvas">
         <div className="w-full max-w-105">
