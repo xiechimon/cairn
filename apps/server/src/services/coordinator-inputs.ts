@@ -1,4 +1,5 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { coordinatorConversationKey } from '@cairn/shared';
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   chiefMessage,
@@ -62,13 +63,22 @@ export function queueCoordinatorInput(
   });
 }
 
-function requireConversation(db: Db, threadId: string, conversationId: string): void {
+export function requireCoordinatorConversation(
+  db: Db,
+  threadId: string,
+  conversationId: string,
+): void {
   const current = db
     .select()
     .from(coordinatorConversation)
     .where(eq(coordinatorConversation.threadId, threadId))
     .get();
-  if (current?.conversationId !== conversationId)
+  if (
+    current === undefined ||
+    (current.storeId === null
+      ? current.conversationId
+      : coordinatorConversationKey(current.storeId, current.conversationId)) !== conversationId
+  )
     throw new HttpError(409, 'Coordinator input conversation changed');
 }
 
@@ -79,7 +89,17 @@ export function prepareCoordinatorInput(
   content: string,
   existingEntryId?: string,
 ): CoordinatorInput {
-  const prior = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, stepId)).get();
+  const prior = db
+    .select()
+    .from(coordinatorInput)
+    .where(
+      and(
+        eq(coordinatorInput.stepId, stepId),
+        eq(coordinatorInput.kind, 'initial'),
+        eq(coordinatorInput.conversationId, conversationId),
+      ),
+    )
+    .get();
   if (prior !== undefined) {
     if (prior.kind !== 'initial' || prior.conversationId !== conversationId)
       throw new HttpError(409, 'Coordinator input identity changed');
@@ -88,7 +108,7 @@ export function prepareCoordinatorInput(
   const row = db.select().from(step).where(eq(step.id, stepId)).get();
   if (row?.kind !== 'chief' || row.machineId !== null || row.status !== 'claimed')
     throw new HttpError(409, 'Coordinator input has no native claimed step');
-  requireConversation(db, row.buildId, conversationId);
+  requireCoordinatorConversation(db, row.buildId, conversationId);
   const owners = row.ownerMessageIds ?? [];
   const frozen =
     existingEntryId === undefined
@@ -105,7 +125,10 @@ export function prepareCoordinatorInput(
           );
         });
   const input: CoordinatorInput = {
-    id: stepId,
+    id:
+      db.select().from(coordinatorInput).where(eq(coordinatorInput.id, stepId)).get() === undefined
+        ? stepId
+        : newRecordId(),
     threadId: row.buildId,
     stepId,
     kind: 'initial',
@@ -125,6 +148,7 @@ export function pullCoordinatorInput(
   db: Db,
   stepId: string,
   conversationId?: string,
+  admittedRequestIds: readonly string[] = [],
 ): CoordinatorInput | null {
   const target = db.select().from(step).where(eq(step.id, stepId)).get();
   if (target?.kind !== 'chief' || target.machineId !== null || target.status !== 'claimed')
@@ -134,9 +158,25 @@ export function pullCoordinatorInput(
     .from(coordinatorConversation)
     .where(eq(coordinatorConversation.threadId, target.buildId))
     .get();
-  const bound = conversationId ?? current?.conversationId;
+  const bound =
+    conversationId ??
+    (current === undefined
+      ? undefined
+      : current.storeId === null
+        ? current.conversationId
+        : coordinatorConversationKey(current.storeId, current.conversationId));
   if (bound === undefined) throw new HttpError(409, 'Coordinator input conversation is missing');
-  requireConversation(db, target.buildId, bound);
+  requireCoordinatorConversation(db, target.buildId, bound);
+  for (const id of admittedRequestIds) {
+    const admitted = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, id)).get();
+    if (
+      admitted?.stepId !== stepId ||
+      admitted.conversationId !== bound ||
+      admitted.kind !== 'steer'
+    )
+      throw new HttpError(409, 'Invalid Coordinator admission exclusion');
+  }
+
   const batch = db
     .select()
     .from(coordinatorInput)
@@ -145,6 +185,9 @@ export function pullCoordinatorInput(
         eq(coordinatorInput.stepId, stepId),
         eq(coordinatorInput.kind, 'steer'),
         eq(coordinatorInput.state, 'pending'),
+        admittedRequestIds.length === 0
+          ? undefined
+          : notInArray(coordinatorInput.id, [...admittedRequestIds]),
       ),
     )
     .orderBy(asc(coordinatorInput.createdAt), sql`rowid`)
@@ -179,7 +222,7 @@ export function consumeCoordinatorInput(
     return;
   }
   if (batch.state !== 'pending') throw new HttpError(409, 'Coordinator input is already released');
-  requireConversation(db, batch.threadId, conversationId);
+  requireCoordinatorConversation(db, batch.threadId, conversationId);
   db.transaction(() => {
     const producer = db.select().from(step).where(eq(step.id, batch.stepId)).get();
     const owners: string[] = [];
@@ -230,6 +273,7 @@ export function releaseCoordinatorInput(
   if (batch === undefined || batch.state !== 'pending') return;
   if (batch.conversationId !== conversationId)
     throw new HttpError(409, 'Coordinator input release has the wrong conversation');
+  if (conversationId !== null) requireCoordinatorConversation(db, batch.threadId, conversationId);
   db.transaction(() => {
     let successorStepId: string | null = null;
     if (batch.kind === 'steer') {
