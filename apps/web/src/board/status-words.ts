@@ -6,19 +6,17 @@ export const STATUS_WORDS = {
   waitingChecks: '等待检查',
   inReview: '审阅中',
   failed: '失败',
-  doneUnverified: '已完成，未验证',
-  verified: '已验证',
+  done: '已完成',
+  cancelled: '已取消',
   idle: '空闲',
 } as const;
 
 export type StatusWord = (typeof STATUS_WORDS)[keyof typeof STATUS_WORDS];
 
-export function reportStatusWord(
-  report: Pick<ThreadReportContent, 'phase' | 'verified'>,
-): StatusWord {
+export function reportStatusWord(report: Pick<ThreadReportContent, 'phase'>): StatusWord {
   switch (report.phase) {
     case 'done':
-      return report.verified === true ? STATUS_WORDS.verified : STATUS_WORDS.doneUnverified;
+      return STATUS_WORDS.done;
     case 'failed':
       return STATUS_WORDS.failed;
     case 'review':

@@ -84,10 +84,9 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
     case 'building':
       return { state: STATUS_WORDS.running, reason: '正在动手。' };
     case 'done':
+      return { state: STATUS_WORDS.done, reason: '任务已完成，发送消息即可继续。' };
     case 'closed':
-      return todo.verified === true
-        ? { state: STATUS_WORDS.verified, reason: '验证通过。' }
-        : { state: STATUS_WORDS.doneUnverified, reason: '完成了，还没有验证结论。' };
+      return { state: STATUS_WORDS.cancelled, reason: '任务已取消。' };
     case 'todo':
       return { state: STATUS_WORDS.idle, reason: '还没开始。' };
   }
