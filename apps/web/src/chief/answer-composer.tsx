@@ -25,6 +25,7 @@ export interface AnswerComposerProps {
   handleRef?: Ref<ComposerSurfaceHandle>;
   above: ReactNode;
   tools: ReactNode;
+  menu?: ReactNode;
   running: boolean;
   turnElapsed: number | null;
   threadId?: string | null;
@@ -42,6 +43,7 @@ export function AnswerComposer({
   handleRef,
   above,
   tools,
+  menu,
   running,
   turnElapsed,
   threadId = null,
@@ -104,6 +106,7 @@ export function AnswerComposer({
       composerRef={composerRef}
       above={above}
       tools={tools}
+      menu={menu}
       canStop={false}
       running={running}
       turnElapsed={turnElapsed}

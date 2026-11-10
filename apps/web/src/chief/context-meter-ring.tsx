@@ -1,6 +1,7 @@
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 
 export const MOCK_CONTEXT_PERCENT = 5;
 
@@ -70,6 +71,50 @@ export function contextMeterArcPath(percent: number, cx = CX, cy = CY, radius = 
   return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
 }
 
+function contextMeterLabel(
+  t: TFunc,
+  filled: number,
+  mock: boolean,
+  resume: ContextResumeState | null,
+): string {
+  const short = resume != null ? t(CONTEXT_RESUME_SHORT[resume]) : null;
+  if (short != null) {
+    return mock
+      ? t('{state} · {percent}%（示意）', { state: short, percent: filled })
+      : t('{state} · {percent}%', { state: short, percent: filled });
+  }
+  return mock
+    ? t('上下文 {percent}%（示意）', { percent: filled })
+    : t('上下文 {percent}%', { percent: filled });
+}
+
+function ContextMeterGlyph({ filled }: { filled: number }) {
+  const arc = contextMeterArcPath(filled);
+  return (
+    <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-4">
+      <circle
+        cx={CX}
+        cy={CY}
+        r={RADIUS}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={STROKE}
+        opacity={0.28}
+      />
+      {arc !== '' && (
+        <path
+          d={arc}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={STROKE}
+          strokeLinecap="round"
+          className="text-foreground"
+        />
+      )}
+    </svg>
+  );
+}
+
 export type ContextMeterRingProps = {
   percent?: number;
   mock?: boolean;
@@ -83,19 +128,9 @@ export function ContextMeterRing({
 }: ContextMeterRingProps) {
   const { t } = useI18n();
   const filled = clampContextPercent(percent);
-  const arc = contextMeterArcPath(filled);
-  const short = resume != null ? t(CONTEXT_RESUME_SHORT[resume]) : null;
-  const label =
-    short != null
-      ? mock
-        ? t('{state} · {percent}%（示意）', { state: short, percent: filled })
-        : t('{state} · {percent}%', { state: short, percent: filled })
-      : mock
-        ? t('上下文 {percent}%（示意）', { percent: filled })
-        : t('上下文 {percent}%', { percent: filled });
   return (
     <IconTooltip
-      label={label}
+      label={contextMeterLabel(t, filled, mock, resume)}
       trigger={
         <Button
           variant="ghost"
@@ -109,27 +144,29 @@ export function ContextMeterRing({
         />
       }
     >
-      <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-4">
-        <circle
-          cx={CX}
-          cy={CY}
-          r={RADIUS}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={STROKE}
-          opacity={0.28}
-        />
-        {arc !== '' && (
-          <path
-            d={arc}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={STROKE}
-            strokeLinecap="round"
-            className="text-foreground"
-          />
-        )}
-      </svg>
+      <ContextMeterGlyph filled={filled} />
     </IconTooltip>
+  );
+}
+
+export function ContextMeterMenuRow({
+  percent = MOCK_CONTEXT_PERCENT,
+  mock = true,
+  resume = null,
+}: ContextMeterRingProps) {
+  const { t } = useI18n();
+  const filled = clampContextPercent(percent);
+  return (
+    <div
+      role="presentation"
+      data-testid="composer-context-meter"
+      data-mock={mock ? '' : undefined}
+      data-percent={filled}
+      data-resume={resume ?? undefined}
+      className="flex items-center gap-2 px-2.5 py-1.5 text-ui text-(--text-secondary)"
+    >
+      <ContextMeterGlyph filled={filled} />
+      <span>{contextMeterLabel(t, filled, mock, resume)}</span>
+    </div>
   );
 }

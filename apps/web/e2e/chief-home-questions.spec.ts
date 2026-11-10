@@ -582,7 +582,7 @@ test('a question left pending while the composer targets a thread stays its own 
   const scope = page.getByTestId('home-c');
   const card = scope.getByTestId('chief-question-card');
   await expect(card).toBeVisible();
-  await page.getByRole('button', { name: '对某个 thread 说' }).click();
+  await page.locator('[data-testid="composer-plus"]:visible').click();
   await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
   await expect(page.getByRole('menu')).toHaveCount(0);
   await expect(card.getByRole('button', { name: '提交回答' })).toBeVisible();
@@ -773,7 +773,7 @@ test('targeting a thread turns the composer back into a normal send and leaves t
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   await expect(page.getByTestId('chief-question-primary')).toBeVisible();
-  await page.getByRole('button', { name: '对某个 thread 说' }).click();
+  await page.locator('[data-testid="composer-plus"]:visible').click();
   await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
   await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '发送' })).toBeVisible();
@@ -804,7 +804,7 @@ test('with a thread targeted, digits type, option clicks and page switches leave
   });
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
-  await page.getByRole('button', { name: '对某个 thread 说' }).click();
+  await page.locator('[data-testid="composer-plus"]:visible').click();
   await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
   await expect(page.getByRole('menu')).toHaveCount(0);
   await composer.click();
@@ -951,7 +951,7 @@ test('answer drafts per request and the thread draft stay separate through every
   const option = (n: number) =>
     page.getByTestId('chief-question-dock').getByTestId(`chief-question-option-0-${n}`);
   const toThread = async () => {
-    await page.getByRole('button', { name: '对某个 thread 说' }).click();
+    await page.locator('[data-testid="composer-plus"]:visible').click();
     await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
     await expect(page.getByRole('menu')).toHaveCount(0);
   };
@@ -1124,8 +1124,11 @@ test('answer drafts per request and the thread draft stay separate through every
       name: 'Previous and the destination switch are blocked while it uploads',
       run: async () => {
         await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
-        await expect(page.getByRole('button', { name: '对某个 thread 说' })).toBeDisabled();
+        await page.locator('[data-testid="composer-plus"]:visible').click();
+        await expect(page.getByRole('menuitem', { name: '对某个 thread 说' })).toBeDisabled();
         await expect(page.getByTitle('附件上传中').first()).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('menu')).toHaveCount(0);
       },
       composer: 'ansB',
       extra: async () => {

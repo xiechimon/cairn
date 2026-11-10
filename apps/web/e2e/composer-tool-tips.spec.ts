@@ -18,7 +18,5 @@ test('detail composer tools name themselves on hover', async ({ page }) => {
 
 test('chief composer tools name themselves on hover', async ({ page }) => {
   await page.goto(CHIEF);
-  const chief = page.getByTestId('home-c').locator('.chief-composer');
-  await expect(chief).toBeVisible();
-  await expectTip(page, chief.getByRole('button', { name: '添加附件' }), '添加附件');
+  await expectTip(page, page.locator('[data-testid="composer-plus"]:visible'), '更多');
 });

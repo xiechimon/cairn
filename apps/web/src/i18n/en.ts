@@ -1423,8 +1423,6 @@ export const EN: Record<string, string> = {
   待你决定: 'Needs you',
   首页概况: 'Home overview',
   '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
-  '跟 Coordinator 说点什么，或描述一个新任务…':
-    'Tell the Coordinator something, or describe a new task…',
   首页: 'Home',
   往上滑看更早的对话: 'Scroll up for earlier messages',
   'Claude 登录需要处理': 'Claude sign-in needs attention',

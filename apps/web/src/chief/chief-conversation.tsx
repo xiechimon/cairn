@@ -118,6 +118,7 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
+  composerMenu?: ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -145,6 +146,7 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
+  composerMenu,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
@@ -549,6 +551,7 @@ export function ChiefConversation({
               composerRef={answerActive ? undefined : composerRef}
               above={answerActive ? null : capsules}
               tools={answerActive ? null : composerTools}
+              menu={answerActive ? null : composerMenu}
               canStop={canStop}
               onStop={stopTurn}
               running={chief.running === true}
@@ -571,6 +574,7 @@ export function ChiefConversation({
                 composerRef={answerActive ? composerRef : undefined}
                 above={answerActive ? capsules : null}
                 tools={answerActive ? composerTools : null}
+                menu={answerActive ? composerMenu : null}
                 running={chief.running === true}
                 turnElapsed={turnElapsed}
                 threadId={chief.threadId ?? null}

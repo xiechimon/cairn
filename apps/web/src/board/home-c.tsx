@@ -25,7 +25,11 @@ import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/record
 import { useI18n } from '../i18n/provider.js';
 import { GitBranch, History, ListLines, Puzzle } from '../icons/index.js';
 import { ComposerSetupHint } from './composer-setup-hint.js';
-import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
+import {
+  ComposerThreadTarget,
+  ComposerThreadTargetMenu,
+  useComposerThreadTarget,
+} from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { type ComposeState, composeRequest } from './open-composer.js';
@@ -452,7 +456,7 @@ export function HomeC({
   const composerPlaceholder =
     projectName != null
       ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-      : t('跟 Coordinator 说点什么，或描述一个新任务…');
+      : t('给 Coordinator 发消息');
   const handedOver = load === 'ready' && loadingDraft !== '';
   useEffect(() => {
     if (!handedOver) return;
@@ -546,10 +550,17 @@ export function HomeC({
                 placeholder={
                   projectName != null
                     ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                    : t('跟 Coordinator 说点什么，或描述一个新任务…')
+                    : t('给 Coordinator 发消息')
                 }
                 composerError={thread.error}
                 targetPlaceholder={thread.placeholder}
+                composerMenu={
+                  <ComposerThreadTargetMenu
+                    targets={thread.targets}
+                    picked={thread.picked}
+                    onPick={thread.pick}
+                  />
+                }
                 composerTools={
                   <>
                     <ComposerThreadTarget
