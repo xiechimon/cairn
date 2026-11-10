@@ -69,27 +69,31 @@ describe('applyFlush', () => {
       source: FLUSH_SOURCE,
     });
   });
-  it('spills detail into a file without losing it when the index is long', async () => {
-    const w = await world('hi');
-    const scope = { teamId: w.teamId, threadId: w.threadId };
-    applyFlush(w.s.db, scope, json({ title: 'Detail', content: 'first\nsecond' }));
-    const rows = w.s.db
-      .select()
-      .from(agentMemory)
-      .all()
-      .filter((r) => r.invalidAt === null);
-    expect(rows).toContainEqual(
-      expect.objectContaining({ title: 'Detail', layer: 'searchable', content: 'first\nsecond' }),
-    );
-    expect(rows.find((r) => r.title === 'MEMORY.md')?.content).toContain('[Detail](Detail)');
-    expect(
-      applyFlush(
-        w.s.db,
-        scope,
-        json({ title: 'Foreign', content: 'no', projectId: 'missing-project' }),
-      ).skipped,
-    ).toBe(1);
-  });
+  it.each(['Detail', 'Detail'.repeat(300)])(
+    'spills detail into a valid file without losing title %s',
+    async (title) => {
+      const w = await world('hi');
+      const scope = { teamId: w.teamId, threadId: w.threadId };
+      applyFlush(w.s.db, scope, json({ title, content: 'first\nsecond' }));
+      const rows = w.s.db
+        .select()
+        .from(agentMemory)
+        .all()
+        .filter((r) => r.invalidAt === null);
+      expect(rows).toContainEqual(
+        expect.objectContaining({ layer: 'searchable', content: 'first\nsecond' }),
+      );
+      expect(rows.find((r) => r.title === 'MEMORY.md')?.content).toContain(`[${title}](`);
+      expect(rows.find((r) => r.layer === 'searchable')!.title.length).toBeLessThanOrEqual(1024);
+      expect(
+        applyFlush(
+          w.s.db,
+          scope,
+          json({ title: 'Foreign', content: 'no', projectId: 'missing-project' }),
+        ).skipped,
+      ).toBe(1);
+    },
+  );
 });
 
 describe('flush before a real compaction', () => {

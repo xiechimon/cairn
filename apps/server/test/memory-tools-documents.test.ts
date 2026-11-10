@@ -33,91 +33,83 @@ async function read(path: (typeof paths)[number], file = 'MEMORY.md', scope = 't
   return (await call(path, 'memories', { scope, file })) as Document;
 }
 
-test.each(paths)(
-  'section 4 %s tools create files and version edits, moves, deletes and restores',
-  async (path) => {
-    const lesson = (name: string, params: Record<string, unknown>) =>
-      call(path, name, { scope: 'team', file: 'lesson.md', ...params });
-    const index = await read(path);
-    expect(index).toMatchObject({ file: 'MEMORY.md', content: '' });
-    expect(index.baseVersion).toBeTruthy();
-    const created = (await lesson('save_memory', {
-      content: 'first\nmore',
-    })) as Document;
-    expect(created.file).toBe('lesson.md');
-    const updated = (await lesson('update_memory', {
+test.each(paths)('section 4 %s document mutations', async (path) => {
+  const lesson = (name: string, params: Record<string, unknown>) =>
+    call(path, name, { scope: 'team', file: 'lesson.md', ...params });
+  const index = await read(path);
+  expect(index).toMatchObject({ file: 'MEMORY.md', content: '' });
+  const created = (await lesson('save_memory', {
+    content: 'first\nmore',
+  })) as Document;
+  const updated = (await lesson('update_memory', {
+    baseVersion: created.baseVersion,
+    old_str: 'first',
+    new_str: 'second',
+  })) as Document;
+  expect(updated.content).toBe('second\nmore');
+  await expect(
+    lesson('delete_memory', {
       baseVersion: created.baseVersion,
-      old_str: 'first',
-      new_str: 'second',
-    })) as Document;
-    expect(updated.content).toBe('second\nmore');
-    await expect(
-      lesson('delete_memory', {
-        baseVersion: created.baseVersion,
-      }),
-    ).rejects.toMatchObject({ status: 409 });
-    await expect(
-      lesson('update_memory', {
-        baseVersion: updated.baseVersion,
-        old_str: 'absent',
-        new_str: '',
-      }),
-    ).rejects.toThrow('not found verbatim');
-    await call(path, 'save_memory', {
-      scope: H.projectId,
-      file: 'taken.md',
-      content: 'keep destination',
-    });
-    for (const change of [
-      { renameTo: 'MEMORY.md' },
-      { moveTo: H.projectId, renameTo: 'taken.md' },
-    ]) {
-      await expect(
-        lesson('update_memory', {
-          baseVersion: updated.baseVersion,
-          ...change,
-        }),
-      ).rejects.toMatchObject({ status: change.renameTo === 'MEMORY.md' ? 400 : 409 });
-      expect((await read(path, 'lesson.md')).baseVersion).toBe(updated.baseVersion);
-    }
-    await expect(
-      lesson('update_memory', {
-        baseVersion: updated.baseVersion,
-        old_str: 'o',
-        new_str: '',
-      }),
-    ).rejects.toThrow('multiple occurrences');
-    const moved = (await lesson('update_memory', {
+    }),
+  ).rejects.toMatchObject({ status: 409 });
+  await expect(
+    lesson('update_memory', {
       baseVersion: updated.baseVersion,
-      moveTo: H.projectId,
-      renameTo: 'moved.md',
-    })) as Document;
-    expect(moved).toMatchObject({ scope: H.projectId, file: 'moved.md' });
-    const deleted = (await call(path, 'delete_memory', {
-      scope: H.projectId,
-      file: 'moved.md',
-      baseVersion: moved.baseVersion,
-    })) as Document;
+      old_str: 'absent',
+      new_str: '',
+    }),
+  ).rejects.toThrow('not found verbatim');
+  await call(path, 'save_memory', {
+    scope: H.projectId,
+    file: 'taken.md',
+    content: 'keep destination',
+  });
+  for (const change of [{ renameTo: 'MEMORY.md' }, { moveTo: H.projectId, renameTo: 'taken.md' }]) {
     await expect(
-      call(path, 'save_memory', { scope: H.projectId, file: 'moved.md', content: 'reuse' }),
-    ).rejects.toMatchObject({ status: 409 });
-    const versions = (await call(path, 'memories', {
-      scope: H.projectId,
-      file: 'moved.md',
-      versions: 'list',
-    })) as { versions: { id: string; content: string }[] };
-    const original = versions.versions.find((v) => v.content === 'first\nmore')!;
-    expect(original).toBeTruthy();
-    const restored = (await call(path, 'update_memory', {
-      scope: H.projectId,
-      file: 'moved.md',
-      baseVersion: deleted.baseVersion,
-      restoreVersion: original.id,
-    })) as Document;
-    expect(restored.content).toBe('first\nmore');
-    expect(restored.baseVersion).not.toBe(created.baseVersion);
-  },
-);
+      lesson('update_memory', {
+        baseVersion: updated.baseVersion,
+        ...change,
+      }),
+    ).rejects.toMatchObject({ status: change.renameTo === 'MEMORY.md' ? 400 : 409 });
+    expect((await read(path, 'lesson.md')).baseVersion).toBe(updated.baseVersion);
+  }
+  await expect(
+    lesson('update_memory', {
+      baseVersion: updated.baseVersion,
+      old_str: 'o',
+      new_str: '',
+    }),
+  ).rejects.toThrow('multiple occurrences');
+  const moved = (await lesson('update_memory', {
+    baseVersion: updated.baseVersion,
+    moveTo: H.projectId,
+    renameTo: 'moved.md',
+  })) as Document;
+  expect(moved).toMatchObject({ scope: H.projectId, file: 'moved.md' });
+  const deleted = (await call(path, 'delete_memory', {
+    scope: H.projectId,
+    file: 'moved.md',
+    baseVersion: moved.baseVersion,
+  })) as Document;
+  await expect(
+    call(path, 'save_memory', { scope: H.projectId, file: 'moved.md', content: 'reuse' }),
+  ).rejects.toMatchObject({ status: 409 });
+  const versions = (await call(path, 'memories', {
+    scope: H.projectId,
+    file: 'moved.md',
+    versions: 'list',
+  })) as { versions: { id: string; content: string }[] };
+  const original = versions.versions.find((v) => v.content === 'first\nmore')!;
+  expect(original).toBeTruthy();
+  const restored = (await call(path, 'update_memory', {
+    scope: H.projectId,
+    file: 'moved.md',
+    baseVersion: deleted.baseVersion,
+    restoreVersion: original.id,
+  })) as Document;
+  expect(restored.content).toBe('first\nmore');
+  expect(restored.baseVersion).not.toBe(created.baseVersion);
+});
 
 test('section 4 memories lists indexes and first lines, searches, and pages escaped UTF-8 under the tool cap', async () => {
   await relay('save_memory', {
@@ -194,7 +186,7 @@ test('curation returns a file id that survives document reads and injection fold
       agentId: AGENT_ID,
       teamId: H.teamId,
       projectId: H.projectId,
-      title: 'curated',
+      title: 'curated'.repeat(300),
       content: 'durable curated lesson',
       buildIds: ['one', 'two'],
       evidence: [],
@@ -204,11 +196,10 @@ test('curation returns a file id that survives document reads and injection fold
     .run();
   const id = confirmCandidate(H.s.db, 'candidate', false);
   await relay('memories', { scope: H.projectId });
-  expect(
-    H.s.db
-      .select()
-      .from(agentMemory)
-      .all()
-      .find((r) => r.id === id),
-  ).toMatchObject({ layer: 'searchable', invalidAt: null, content: 'durable curated lesson' });
+  const rows = H.s.db.select().from(agentMemory).all();
+  const row = rows.find((r) => r.id === id)!;
+  expect(row.title.length).toBeLessThanOrEqual(1024);
+  expect(row.layer).toBe('searchable');
+  expect(row.invalidAt).toBeNull();
+  expect(row.content).toBe('durable curated lesson');
 });

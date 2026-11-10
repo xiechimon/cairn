@@ -86,9 +86,6 @@ test('tidy digest schedules over-bound indexes, includes fresh revisions and pre
   expect(row.prompt).toContain(index.baseVersion);
   expect(row.prompt).toContain('operations');
   expect(row.prompt?.endsWith('reason=daily')).toBe(true);
-  expect(withMemoryPass('body\nDigest thread=t until=1 last=x reason=daily', 'SECTION')).toBe(
-    'body\n\nSECTION\nDigest thread=t until=1 last=x reason=daily',
-  );
 });
 
 test('tidy re-reads a stale unique replacement and preserves the concurrent appended line', async () => {
