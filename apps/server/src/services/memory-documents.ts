@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { MEMORY_INDEX_ID_PREFIX, MEMORY_INDEX_TITLE, memoryToolParamsSchemas } from '@cairn/shared';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -6,6 +5,7 @@ import { agentMemory, project } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
+  allocateMemoryFileName,
   boundMemoryIndex,
   ensureMemoryIndex,
   MEMORY_MARKDOWN_INDEX_PREFIX,
@@ -354,12 +354,6 @@ export function executeMemoryDocumentTool(
   });
 }
 
-function internalFileName(title: string) {
-  const name = title.replace(/[\r\n]+/g, ' ');
-  if (name.length <= 1024 && name !== MEMORY_INDEX_TITLE) return name;
-  return `${name.slice(0, 980).replace(/[\uD800-\uDBFF]$/, '')}-${createHash('sha256').update(title).digest('hex').slice(0, 32)}.md`;
-}
-
 export function appendMemoryIndex(
   db: Db,
   owner: MemoryDocumentOwner,
@@ -372,7 +366,7 @@ export function appendMemoryIndex(
         const index = ensureMemoryIndex(tx, namespace(tx, owner, owner.projectId ?? 'team', true));
         const currentText = memoryIndexText(index);
         const line = `- ${title}：${detail}`;
-        const file = internalFileName(title);
+        const file = allocateMemoryFileName(title, new Set([MEMORY_INDEX_TITLE]));
         const reference = `- [${title}](${encodeURIComponent(file)})`;
         if (currentText.split('\n').includes(line) || currentText.split('\n').includes(reference))
           return false;
@@ -410,7 +404,10 @@ export function rememberMemoryFile(
       .all()
       .find((r) => r.layer === 'searchable' && r.invalidAt === null && r.content === content);
     if (existing) return existing;
-    const file = internalFileName(`${title.replace(/[\r\n]+/g, ' ')}-${newRecordId()}.md`);
+    const file = allocateMemoryFileName(
+      `${title}-${newRecordId()}.md`,
+      new Set([MEMORY_INDEX_TITLE]),
+    );
     const saved = executeMemoryDocumentTool(tx, owner, 'save_memory', {
       scope: owner.projectId ?? 'team',
       file,

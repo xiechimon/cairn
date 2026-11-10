@@ -285,6 +285,7 @@ const indexFactSchema = factMetadataSchema
     title: z.string(),
     content: z.string(),
     fileId: z.string().nullable(),
+    fileName: z.string().optional(),
   })
   .strict();
 type IndexFact = z.infer<typeof indexFactSchema>;
@@ -321,7 +322,7 @@ export function memoryIndexText(row: MemoryRow): string {
     return readIndex(row)
       .map(
         (fact) =>
-          `- ${fact.title.replace(/[\r\n]+/g, ' ')}：${fact.content}${fact.fileId === null ? '' : `（记忆文件：${fact.title.replace(/[\r\n]+/g, ' ')}）`}`,
+          `- ${fact.title.replace(/[\r\n]+/g, ' ')}：${fact.content}${fact.fileId === null ? '' : `（记忆文件：${(fact.fileName ?? fact.title).replace(/[\r\n]+/g, ' ')}）`}`,
       )
       .join('\n');
   } catch {
@@ -773,6 +774,25 @@ export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): numbe
   });
 }
 
+export function normalizeMemoryFileName(title: string): string {
+  const name = title.replace(/[\r\n\0]+/g, ' ') || 'untitled.md';
+  return name.length <= 1024
+    ? name
+    : `${name.slice(0, 980).replace(/[\uD800-\uDBFF]$/, '')}-${createHash('sha256').update(title).digest('hex').slice(0, 32)}.md`;
+}
+
+export function allocateMemoryFileName(title: string, reserved: ReadonlySet<string>): string {
+  const normalized = normalizeMemoryFileName(title);
+  if (!reserved.has(normalized)) return normalized;
+  const stem = normalized.endsWith('.md') ? normalized.slice(0, -3) : normalized;
+  const extension = normalized.endsWith('.md') ? '.md' : '';
+  for (let n = 2; ; n++) {
+    const suffix = ` (${n})${extension}`;
+    const candidate = `${stem.slice(0, 1024 - suffix.length).replace(/[\uD800-\uDBFF]$/, '')}${suffix}`;
+    if (!reserved.has(candidate)) return candidate;
+  }
+}
+
 export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scope?: SQL): void {
   db.transaction((tx) => {
     const markdownFolds: { id: string; render: () => string }[] = [];
@@ -807,11 +827,11 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
             if (typeof part === 'string') return part;
             const allocated = part.map((fact) => ({
               ...fact,
-              title:
+              fileName:
                 fact.fileId === null
-                  ? fact.title
+                  ? fact.fileName
                   : (tx.select().from(agentMemory).where(eq(agentMemory.id, fact.fileId)).get()
-                      ?.title ?? fact.title),
+                      ?.title ?? fact.fileName),
             }));
             return memoryIndexText({
               ...head,
@@ -873,15 +893,18 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
       namespaces.set(key, [...(namespaces.get(key) ?? []), row]);
     }
     for (const files of namespaces.values()) {
-      const reserved = new Set([MEMORY_INDEX_TITLE, ...files.map((row) => row.title)]);
+      const reserved = new Set([
+        MEMORY_INDEX_TITLE,
+        ...files.map((row) => normalizeMemoryFileName(row.title)),
+      ]);
       const used = new Set([MEMORY_INDEX_TITLE]);
       const renamed = new Map<string, string>();
       for (const row of files) {
-        let title = row.title;
-        if (used.has(title)) {
-          const stem = title.endsWith('.md') ? title.slice(0, -3) : title;
-          const suffix = title.endsWith('.md') ? '.md' : '';
-          for (let n = 2; reserved.has(title); n++) title = `${stem} (${n})${suffix}`;
+        const normalized = normalizeMemoryFileName(row.title);
+        const title = used.has(normalized)
+          ? allocateMemoryFileName(normalized, reserved)
+          : normalized;
+        if (title !== row.title) {
           tx.update(agentMemory)
             .set({ title, updatedAt: Math.max(now, row.updatedAt + 1) })
             .where(eq(agentMemory.id, row.id))
@@ -914,9 +937,9 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
         const facts = readIndex(index);
         const allocated = facts.map((fact) => ({
           ...fact,
-          title: (fact.fileId === null ? undefined : renamed.get(fact.fileId)) ?? fact.title,
+          fileName: (fact.fileId === null ? undefined : renamed.get(fact.fileId)) ?? fact.fileName,
         }));
-        if (allocated.some((fact, i) => fact.title !== facts[i]?.title))
+        if (allocated.some((fact, i) => fact.fileName !== facts[i]?.fileName))
           tx.update(agentMemory)
             .set({ content: writeIndex(allocated), updatedAt: Math.max(now, index.updatedAt + 1) })
             .where(eq(agentMemory.id, index.id))
