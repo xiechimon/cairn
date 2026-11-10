@@ -52,6 +52,7 @@ function view(row: typeof schedule.$inferSelect) {
         : cronExpressionFor(row.kind, row.at, row.tz, row.cron),
     nextRunAt: row.nextRunAt,
     lastRunAt: row.lastRunAt,
+    lastRunStatus: row.lastRunStatus,
     enabled: row.enabled,
   };
 }
