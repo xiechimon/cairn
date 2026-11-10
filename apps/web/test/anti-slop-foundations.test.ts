@@ -57,7 +57,6 @@ describe('V16 no texture or gradient surfaces', () => {
   test('only user message rows wear the bubble', () => {
     expect(offenders(/bubble-gradient/).sort()).toEqual([
       'components/chat/user-message-bubble.tsx',
-      'design/components-content.tsx',
       'styles/app.css',
     ]);
   });
