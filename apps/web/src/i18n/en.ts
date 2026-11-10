@@ -1260,6 +1260,10 @@ export const EN: Record<string, string> = {
     'The Coordinator plans first, then dispatches each piece to the right agent.',
   查看会话: 'View session',
   未能开始编排: 'Could not start orchestration',
+  先选择机器: 'Choose a machine first',
+  '多台机器在线时，开工前要在规则里点名一台。':
+    'Name a machine in routing rules before starting, while several are online.',
+  去选择: 'Choose',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
   '等 {machine} 上线': 'waiting for {machine} to come online',
   等机器上线: 'waiting for a machine to come online',

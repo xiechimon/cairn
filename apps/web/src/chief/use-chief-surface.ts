@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
 import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
@@ -17,12 +17,14 @@ import {
   useChief,
   useChiefThreads,
   useConversationMessages,
+  useMachines,
   useNotifications,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
 import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
@@ -38,11 +40,13 @@ import {
   type GestureEvent,
   getGestureStore,
 } from '../overlay/gesture-machine.js';
+import { settingsHref } from '../settings/settings-href.js';
 import {
   type CoordinatorLoad,
   coordinatorLoad,
   globalCoordinatorThread,
 } from './coordinator-load.js';
+import { needsMachineName } from './needs-machine-name.js';
 import {
   questionActionThread,
   questionDraftKey,
@@ -88,6 +92,9 @@ function placeOf(pathname: string, search: string): string {
 
 export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): ChiefSurface {
   const { live, teamId } = useLiveData();
+  const navigate = useNavigate();
+  const machinesQ = useMachines(teamId, live);
+  const routingQ = useRoutingSettings(teamId, live);
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
@@ -300,6 +307,19 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
 
   const onSend = live
     ? (text: string, projectId: string | null) => {
+        const sessionMachineId = routingQ.data?.rules.find(
+          (rule) => rule.use === 'session',
+        )?.machineId;
+        if (activeThread == null && needsMachineName(machinesQ.data, sessionMachineId)) {
+          toast.warning(t('先选择机器'), {
+            description: t('多台机器在线时，开工前要在规则里点名一台。'),
+            action: {
+              label: t('去选择'),
+              onClick: () => navigate(settingsHref('work-routing')),
+            },
+          });
+          return;
+        }
         const { key } = sendKey.attempt([projectId ?? '', text].join('\n'), 'chief');
         return mutations.chiefSend
           .mutateAsync({
