@@ -1692,7 +1692,6 @@ export const EN: Record<string, string> = {
   '包含全部运行；总时长暂不可用。': 'Across all runs. Total duration is unavailable.',
   未知机器: 'Unknown machine',
   'Token 数：{tokens}': 'Tokens: {tokens}',
-  用量暂不可用: 'Usage unavailable',
   'Auto-disabled': 'Auto-disabled',
   'Automation update failed': 'Automation update failed',
   Automations: 'Automations',

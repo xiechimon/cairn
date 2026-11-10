@@ -35,6 +35,7 @@ export function ThreadUsageDisclosure({
       : state === 'error'
         ? t('用量加载失败')
         : threadUsageCaption(summary, t);
+  if (caption === null) return null;
   const toggle = (
     <Button
       variant="ghost"

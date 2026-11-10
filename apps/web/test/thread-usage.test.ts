@@ -107,10 +107,8 @@ describe('threadUsageCaption', () => {
     expect(threadUsageCaption(summary({ tokens: '—', models: [] }), t)).toBe('$1.25');
   });
 
-  test('says the usage is unavailable instead of printing placeholders', () => {
-    const caption = threadUsageCaption(summary({ cost: '—', tokens: '—', models: [] }), t);
-    expect(caption).toBe('用量暂不可用');
-    expect(caption).not.toContain('—');
+  test('returns null when no usage facts are known', () => {
+    expect(threadUsageCaption(summary({ cost: '—', tokens: '—', models: [] }), t)).toBeNull();
   });
 
   test('counts several models instead of listing them', () => {

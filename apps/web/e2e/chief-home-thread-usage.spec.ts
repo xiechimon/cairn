@@ -133,19 +133,24 @@ test('an unpriced thread shows an unknown cost and never a free price', async ({
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
 });
 
-for (const missing of ['unpriced row', 'empty run'] as const) {
-  test(`a priced aggregate stays unknown with an ${missing}`, async ({ page }) => {
-    await setup(page, { mixedPricing: missing === 'unpriced row', emptyRun: missing === 'empty run' });
-    await page.goto('/app?thread=todo-1');
-    await expect(footer(page)).toHaveAttribute('data-state', 'ready');
-    await toggle(page).click();
-    await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
-    await expect(footer(page)).not.toContainText('$4.00');
-    await expect(footer(page)).not.toContainText('$0.00');
-    if (missing === 'empty run') await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').nth(1)).toHaveText('—');
-    else await expect(footer(page)).toContainText('2.5k');
-  });
-}
+test('a priced aggregate stays unknown with an unpriced row', async ({ page }) => {
+  await setup(page, { mixedPricing: true });
+  await page.goto('/app?thread=todo-1');
+  await expect(footer(page)).toHaveAttribute('data-state', 'ready');
+  await toggle(page).click();
+  await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
+  await expect(footer(page)).not.toContainText('$4.00');
+  await expect(footer(page)).not.toContainText('$0.00');
+  await expect(footer(page)).toContainText('2.5k');
+});
+
+test('an empty run with no known usage facts hides the footer', async ({ page }) => {
+  await setup(page, { emptyRun: true });
+  await page.goto('/app?thread=todo-1');
+  await expect(page.getByTestId('side-chat')).toBeVisible();
+  await expect(footer(page)).toHaveCount(0);
+  await evidencePanelShot(page, 'thread-usage-unavailable-hidden-dark.png', page.locator('.side-panel'));
+});
 
 test('a pending run never appears as a partial thread total', async ({ page }) => {
   let release: () => void = () => {};
