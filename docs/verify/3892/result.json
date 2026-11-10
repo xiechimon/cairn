@@ -1,0 +1,33 @@
+{
+  "mode": "Isolated SQLite transition API; Coordinator and provider not invoked",
+  "migration": {
+    "tableBefore": 0,
+    "tableAfter": 1
+  },
+  "pull": {
+    "request": "pull(owner, conversation 1)",
+    "sameBatchOnRetry": true,
+    "ownersBeforeConsumption": [
+      "owner"
+    ]
+  },
+  "consume": {
+    "request": "consume(first-image, conversation 1, entry 5)",
+    "state": "consumed",
+    "entryId": "5",
+    "ownersAfterConsumption": [
+      "owner",
+      "first-image"
+    ],
+    "newerBatchStateAfterOldAck": "pending"
+  },
+  "release": {
+    "request": "release(second-image, conversation 1) twice",
+    "state": "released",
+    "successorUsesFreshIdentity": true,
+    "successorOwners": [
+      "second-image"
+    ],
+    "waitingSteps": 2
+  }
+}
