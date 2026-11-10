@@ -136,3 +136,35 @@ test('keyboard focus on an action button is an outline, not a glow', async ({ pa
   expect(face.outlineStyle).toBe('solid');
   expect(face.outlineWidth).toBe('2px');
 });
+
+test('the message toolbar replies by quoting into the composer and rewinds from the more menu', async ({
+  page,
+}) => {
+  await mockHistory(page);
+  await page.goto('/app');
+  await expect(messageOf(page, 'second answer')).toBeVisible();
+  const older = messageOf(page, 'first answer');
+  await older.hover();
+  await older.getByTestId('chief-msg-reply').click();
+  await expect(page.getByTestId('composer-reply-quote')).toContainText('first answer');
+  await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+
+  const question = messageOf(page, 'first question');
+  await question.hover();
+  await question.getByTestId('chief-msg-more').click();
+  await page.getByRole('menuitem', { name: '恢复到此处' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('on a touch device the toolbar of an older message is reachable without hover', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+  const page = await context.newPage();
+  await mockHistory(page);
+  await page.goto('/app');
+  const older = messageOf(page, 'first answer');
+  await expect(older).toBeVisible();
+  await expect.poll(() => opacityOf(tools(older))).toBe(1);
+  await context.close();
+});

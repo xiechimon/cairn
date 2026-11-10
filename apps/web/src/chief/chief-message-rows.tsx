@@ -1,4 +1,5 @@
 import { parseReplyQuote } from '@cairn/shared';
+import { Ellipsis, Reply } from 'lucide-react';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
@@ -9,9 +10,16 @@ import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/tr
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { ChatMarkdown, MD_LIST, MD_LIST_ITEM } from '../detail/chat-markdown.js';
 import { type TodoGlance, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type {
@@ -30,6 +38,7 @@ import { ChiefReportRow } from './chief-report-row.js';
 import { taskRefsOf } from './chief-task-refs.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
+import type { ReplyQuoteDraft } from './selection-reply.js';
 import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
@@ -297,6 +306,7 @@ interface ChiefStreamRowProps {
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
+  onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -324,6 +334,58 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   );
 }
 
+function ReplyToolButton({ onClick }: { onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={MSG_TOOL_BTN_CLS}
+      aria-label={t('回复这条')}
+      data-testid="chief-msg-reply"
+      onClick={onClick}
+    >
+      <Reply width={13} height={13} />
+    </Button>
+  );
+}
+
+function MessageMoreMenu({ onRewind }: { onRewind: () => void }) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={MSG_TOOL_BTN_CLS}
+                  aria-label={t('更多')}
+                  data-testid="chief-msg-more"
+                />
+              }
+            />
+          }
+        >
+          <Ellipsis width={13} height={13} />
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={8}>
+          {t('更多')}
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" aria-label={t('更多')} className="w-auto min-w-40">
+        <DropdownMenuItem data-action="rewind" onClick={onRewind}>
+          <Restore width={16} height={16} />
+          {t('恢复到此处')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 const messageToolsReveal = (latest: boolean) =>
   latest
     ? 'opacity-100'
@@ -343,6 +405,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   toolsOpen,
   onToggleTools,
   onRewindRequest,
+  onReply,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
@@ -424,6 +487,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               data-testid="chief-msg-tools"
             >
               <MessageStamp createdAt={item.createdAt} fallback={item.at} />
+              {onReply !== undefined && item.id != null && (
+                <ReplyToolButton
+                  onClick={() =>
+                    onReply({ sourceMessageId: item.id ?? '', quote: reply?.body ?? item.text })
+                  }
+                />
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -437,15 +507,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   <Copy width={13} height={13} />
                 )}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('恢复到此处')}
-                onClick={() => onRewindRequest(i, item.id ?? null)}
-              >
-                <Restore width={13} height={13} />
-              </Button>
+              <MessageMoreMenu onRewind={() => onRewindRequest(i, item.id ?? null)} />
             </div>
           </MessageContent>
         </Message>
@@ -582,6 +644,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   <Copy width={13} height={13} />
                 )}
               </Button>
+              {onReply !== undefined && item.id != null && (
+                <ReplyToolButton
+                  onClick={() =>
+                    onReply({ sourceMessageId: item.id ?? '', quote: robotText(item) })
+                  }
+                />
+              )}
               <MessageStamp createdAt={item.createdAt} />
               {item.fallbackModel != null && (
                 <span data-testid="chief-fallback-note">

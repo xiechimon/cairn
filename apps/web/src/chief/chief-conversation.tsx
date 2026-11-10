@@ -458,6 +458,7 @@ export function ChiefConversation({
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
+      onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
     />
   );
   const keepsOwnRow = (item: ChiefStreamItem) =>

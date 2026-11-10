@@ -340,15 +340,15 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(page).toHaveURL(/[?&]thread=t16/);
   });
 
-  test('F-R15: copy payload = markdown source (not rendered output); the two-button row (copy/restore) is unaffected', async ({
+  test('F-R15: copy payload = markdown source (not rendered output); the tool row (reply/copy/more) is unaffected', async ({
     page,
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     const coordinator = await boot(page);
     const firstUser = coordinator.getByTestId('chief-msg').first();
     const tools = firstUser.getByTestId('chief-msg-tools');
-    await expect(tools.getByRole('button')).toHaveCount(2);
-    await expect(tools.getByRole('button', { name: '恢复到此处' })).toBeVisible();
+    await expect(tools.getByRole('button', { name: '更多' })).toBeVisible();
+    await expect(tools.getByRole('button', { name: '复制' })).toBeVisible();
     await tools.getByRole('button', { name: '复制' }).click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
 

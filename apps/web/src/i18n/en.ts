@@ -251,6 +251,7 @@ export const EN: Record<string, string> = {
   '展开{label}': 'Expand {label}',
   返回: 'Back',
   更多: 'More',
+  回复这条: 'Reply to this message',
   关闭: 'Close',
   滚动到最新: 'Scroll to latest',
   取消: 'Cancel',
