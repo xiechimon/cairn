@@ -18,6 +18,7 @@ import {
   ciOnlyScripts,
   ciOnlyTestSteps,
   hasCode,
+  hasSidecar,
   localOnly,
   needsGates,
   prepushModules,
@@ -28,6 +29,7 @@ import {
   workflowTestSteps,
 } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const prepushFixtureFiles = [
   ...prepushModules,
@@ -98,6 +100,49 @@ for (const [name, paths, expected] of [
   });
 }
 
+for (const [name, paths, expected] of [
+  ['sidecar sources', ['apps/tsnet-sidecar/main.go', 'apps/tsnet-sidecar/go.sum'], true],
+  ['the workflow that builds it', ['.github/workflows/ci.yml'], true],
+  ['server code that starts it', ['apps/server/src/services/tsnet-remote.ts'], false],
+  ['other workflows and documents', ['.github/workflows/release.yml', 'README.md'], false],
+  ['empty changes', [], false],
+]) {
+  test(`hasSidecar classifies ${name}`, () => {
+    assert.equal(hasSidecar(paths), expected);
+    for (const path of paths) assert.equal(hasSidecar([path]), expected, path);
+  });
+}
+
+test('--has-sidecar prints only a boolean and fails closed', () => {
+  const directory = makeTestTempDir('cairn-has-sidecar-');
+  const run = (base) => {
+    const result = spawnSync(process.execPath, ['scripts/prepush.mjs', '--has-sidecar'], {
+      cwd: directory,
+      encoding: 'utf8',
+      env: prepushEnv({ PREPUSH_BASE_SHA: base }),
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^(true|false)\n$/);
+    return result.stdout.trim();
+  };
+  try {
+    mkdirSync(join(directory, 'scripts'));
+    for (const file of prepushFixtureFiles) copyFileSync(file, join(directory, file));
+    gitIn(directory, ['init']);
+    gitIn(directory, ['add', ...prepushFixtureFiles]);
+    gitIn(directory, ['commit', '-m', 'initial']);
+    const base = gitIn(directory, ['rev-parse', 'HEAD']).trim();
+    writeFileSync(join(directory, 'unknown-config'), 'code\n');
+    assert.equal(run(base), 'false');
+    mkdirSync(join(directory, 'apps/tsnet-sidecar'), { recursive: true });
+    writeFileSync(join(directory, 'apps/tsnet-sidecar/main.go'), 'package main\n');
+    assert.equal(run(base), 'true');
+    assert.equal(run('missing-ref'), 'true');
+  } finally {
+    releaseTestTempDir(directory);
+  }
+});
+
 test('--has-code prints only a boolean, uses the supplied base and fails closed', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-has-code-'));
   const slots = join(directory, 'unused-slots');
@@ -160,6 +205,8 @@ const workflowJobs = () => {
   );
 };
 
+const sidecarJobs = ['tsnet-sidecar-test', 'tsnet-sidecar-build'];
+
 test('CI classifies before heavy work and always runs push coverage', () => {
   const jobs = workflowJobs();
   const changes = jobs.get('changes');
@@ -175,21 +222,27 @@ test('CI classifies before heavy work and always runs push coverage', () => {
   assert.match(changes, /node scripts\/prepush.mjs --has-code/);
   assert.match(changes, /has_code=true/);
   assert.match(changes, /\|\| has_code=true/);
+  assert.match(changes, /has-sidecar: \$\{\{ steps.classify.outputs.has-sidecar \}\}/);
+  assert.match(changes, /node scripts\/prepush.mjs --has-sidecar/);
+  assert.match(changes, /has_sidecar=true/);
+  assert.match(changes, /\|\| has_sidecar=true/);
   assert.match(changes, /fetch-depth: 0/);
   assert.doesNotMatch(readFileSync('.github/workflows/ci.yml', 'utf8'), /^ {4}paths(?:-ignore)?:/m);
-  for (const name of [
-    'vitest-light',
-    'vitest-integration',
-    'tsnet-sidecar-test',
-    'tsnet-sidecar-build',
-    'pack-smoke',
-    'dead-class-gate',
-  ]) {
+  for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke', 'dead-class-gate']) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
     assert.match(
       job,
       /^ {4}if: github.event_name != 'pull_request' \|\| needs.changes.outputs.has-code != 'false'$/m,
+      name,
+    );
+  }
+  for (const name of sidecarJobs) {
+    const job = jobs.get(name);
+    assert.match(job ?? '', /^ {4}needs: changes$/m, name);
+    assert.match(
+      job,
+      /^ {4}if: github.event_name != 'pull_request' \|\| needs.changes.outputs.has-sidecar != 'false'$/m,
       name,
     );
   }
@@ -231,7 +284,7 @@ test('CI classifies before heavy work and always runs push coverage', () => {
   assert.doesNotMatch(core, /0{40}/);
 });
 
-test('required aggregates only accept skipped work after a successful docs-only classification', () => {
+test('required aggregates only accept skipped work its classification excused', () => {
   const jobs = workflowJobs();
   for (const [name, dependencies] of [
     [
@@ -267,10 +320,14 @@ test('required aggregates only accept skipped work after a successful docs-only 
         ]),
       ),
     );
-    for (const hasCode of ['true', 'false', '', 'unknown']) {
+    const classifications = ['true', 'false', '', 'unknown'].flatMap((hasCode) =>
+      ['true', 'false', '', 'unknown'].map((sidecar) => ({ hasCode, sidecar })),
+    );
+    for (const { hasCode, sidecar } of classifications) {
       for (const results of scenarios) {
         const shell = command.replace(/\$\{\{ (.*?) \}\}/g, (_, expression) => {
           if (expression === 'needs.changes.outputs.has-code') return hasCode;
+          if (expression === 'needs.changes.outputs.has-sidecar') return sidecar;
           const match = /^needs\.([\w-]+)\.result$/.exec(expression);
           assert.ok(match, expression);
           assert.ok(dependencies.includes(match[1]), expression);
@@ -287,9 +344,10 @@ test('required aggregates only accept skipped work after a successful docs-only 
               .every(
                 (dependency) =>
                   results[dependency] === 'success' ||
-                  (hasCode === 'false' && results[dependency] === 'skipped'),
+                  ((sidecarJobs.includes(dependency) ? sidecar : hasCode) === 'false' &&
+                    results[dependency] === 'skipped'),
               ),
-          `${name}: ${hasCode} ${JSON.stringify(results)}`,
+          `${name}: ${hasCode} ${sidecar} ${JSON.stringify(results)}`,
         );
       }
     }

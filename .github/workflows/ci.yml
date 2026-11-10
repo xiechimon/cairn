@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       has-code: ${{ steps.classify.outputs.has-code }}
+      has-sidecar: ${{ steps.classify.outputs.has-sidecar }}
       gates-needed: ${{ steps.classify.outputs.gates-needed }}
       e2e-tier: ${{ (github.event_name == 'push' || (github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/'))) && 'full' || 'affected' }}
     steps:
@@ -32,12 +33,15 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           has_code=true
+          has_sidecar=true
           gates_needed=true
           if [ "$EVENT_NAME" = "pull_request" ]; then
             has_code=$(node scripts/prepush.mjs --has-code) || has_code=true
+            has_sidecar=$(node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
             gates_needed=$(node scripts/prepush.mjs --needs-gates) || gates_needed=true
           fi
           echo "has-code=$has_code" >> "$GITHUB_OUTPUT"
+          echo "has-sidecar=$has_sidecar" >> "$GITHUB_OUTPUT"
           echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
@@ -49,11 +53,17 @@ jobs:
       - name: Aggregate check parts
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
-          for result in "${{ needs.check-core.result }}" "${{ needs.vitest-light.result }}" "${{ needs.vitest-integration.result }}" "${{ needs.tsnet-sidecar-test.result }}" "${{ needs.tsnet-sidecar-build.result }}"; do
+          for result in "${{ needs.check-core.result }}" "${{ needs.vitest-light.result }}" "${{ needs.vitest-integration.result }}"; do
             if [ "$result" = "success" ]; then
               continue
             fi
             [ "${{ needs.changes.outputs.has-code }}" = "false" ] && [ "$result" = "skipped" ] || exit 1
+          done
+          for result in "${{ needs.tsnet-sidecar-test.result }}" "${{ needs.tsnet-sidecar-build.result }}"; do
+            if [ "$result" = "success" ]; then
+              continue
+            fi
+            [ "${{ needs.changes.outputs.has-sidecar }}" = "false" ] && [ "$result" = "skipped" ] || exit 1
           done
 
   check-core:
@@ -328,7 +338,7 @@ jobs:
 
   tsnet-sidecar-test:
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+    if: github.event_name != 'pull_request' || needs.changes.outputs.has-sidecar != 'false'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -356,7 +366,7 @@ jobs:
 
   tsnet-sidecar-build:
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+    if: github.event_name != 'pull_request' || needs.changes.outputs.has-sidecar != 'false'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
