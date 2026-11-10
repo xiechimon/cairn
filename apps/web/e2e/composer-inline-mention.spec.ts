@@ -634,6 +634,67 @@ test('highlight: deleting a letter inside the label retires the highlight', asyn
   await expect(mentionSpan(page, 'skill')).toHaveCount(0);
 });
 
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [1440, 390]) {
+    test(`caret alignment: numeric glyphs match the textarea at ${width}px in ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 });
+      const { input } = await openDetail(page);
+      await page.evaluate(async (theme) => {
+        document.documentElement.classList.toggle('light', theme === 'light');
+        await document.fonts.ready;
+      }, theme);
+      await input.pressSequentially('1111111111 0123456789');
+      await input.press('ArrowLeft');
+      await input.press('ArrowLeft');
+      await input.press('5');
+      await expect(input).toHaveValue('1111111111 01234567589');
+      const mirror = page.getByTestId('composer-card').getByTestId('mention-highlight');
+      for (const value of [await input.inputValue(), '数字 1111111111 abc\n' + '0123456789 '.repeat(12)]) {
+        await input.fill(value);
+        await expect(mirror).toContainText(value.trim());
+        const metrics = await input.evaluate((textarea) => {
+          const mirror = textarea.parentElement?.querySelector('[data-testid="mention-highlight"]');
+          if (!(mirror instanceof HTMLElement)) throw new Error('Missing text mirror');
+          const style = getComputedStyle(textarea);
+          const probe = mirror.cloneNode(true) as HTMLElement;
+          probe.style.fontVariantNumeric = style.fontVariantNumeric;
+          probe.style.visibility = 'hidden';
+          mirror.parentElement?.append(probe);
+          const boundaries = (element: HTMLElement) => {
+            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+            const result: { x: number; y: number }[] = [];
+            const origin = element.getBoundingClientRect();
+            while (walker.nextNode()) {
+              const node = walker.currentNode;
+              for (let offset = 0; offset < (node.textContent?.length ?? 0); offset++) {
+                const range = document.createRange();
+                range.setStart(node, offset);
+                range.setEnd(node, offset + 1);
+                const rect = range.getBoundingClientRect();
+                result.push({ x: rect.right - origin.left, y: rect.top - origin.top });
+              }
+            }
+            return result;
+          };
+          const actual = boundaries(mirror);
+          const expected = boundaries(probe);
+          const drift = Math.max(...actual.map((point, i) => Math.max(
+            Math.abs(point.x - expected[i].x), Math.abs(point.y - expected[i].y),
+          )));
+          const numeric = getComputedStyle(mirror).fontVariantNumeric;
+          probe.remove();
+          return { drift, numeric, expectedNumeric: style.fontVariantNumeric };
+        });
+        await page.getByTestId('composer-card').screenshot({
+          path: testInfo.outputPath(`caret-${theme}-${width}.png`),
+        });
+        expect(metrics.drift, JSON.stringify(metrics)).toBeLessThanOrEqual(0.5);
+        expect(metrics.numeric).toBe(metrics.expectedNumeric);
+      }
+    });
+  }
+}
+
 const FOUR_KIND = {
   skills: [{ id: 'skill-1', name: 'code-review', description: 'Reviews code' }],
   machines: [{ id: 'machine-1', name: 'mea' }],
