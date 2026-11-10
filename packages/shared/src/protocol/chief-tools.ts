@@ -286,7 +286,8 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'schedules',
-    description: 'List scheduled reruns (kind, next run, bound todo).',
+    description:
+      'List schedules and their retained run history (kind, nextRunAt, lastRunAt, lastRunStatus, bound todo). Completed one-shot schedules are retained; nextRunAt null means no upcoming run even when enabled is true.',
     parameters: obj({}),
     replaySafe: true,
   },
@@ -1017,7 +1018,7 @@ const WORKER_SCHEDULE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'get_schedule',
     description:
-      'Read your current thread schedule as {prompt, cadence, nextRunAt, lastRunAt, enabled}, or null. A one-shot cadence is returned as "at <ISO timestamp>"; a one-shot schedule is removed after its run succeeds. Failed runs retain their schedule for retry or inspection.',
+      'Read your current thread schedule as {prompt, cadence, nextRunAt, lastRunAt, lastRunStatus, enabled}, or null when none exists. A one-shot cadence is returned as "at <ISO timestamp>". Completed one-shot schedules are retained with lastRunStatus "completed"; nextRunAt null means no upcoming run even when enabled is true. Use schedule_create to replace the schedule or schedule_update with a new cadence for another run. Failed runs retain their schedule for inspection.',
     parameters: obj({}),
     replaySafe: true,
   },

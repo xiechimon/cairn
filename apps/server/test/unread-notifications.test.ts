@@ -148,10 +148,11 @@ describe('a scheduled run finishing upserts an unread notification', () => {
     expect(await listUnread(w)).toEqual([w.todoId]);
   });
 
-  test('completed once-schedule that deletes itself', async () => {
+  test('completed once-schedule retains its notification and history', async () => {
     const { w, stepId } = await scheduled('once');
     builds.completeStep(w.svc, stepId);
     expect(rowOf(w)).toMatchObject({ type: 'schedule_run', readAt: null });
+    expect(w.db.select().from(schedule).get()?.lastRunStatus).toBe('completed');
   });
 
   test('failed carries the reason', async () => {

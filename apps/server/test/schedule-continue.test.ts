@@ -3,13 +3,23 @@ import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, plan, project, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
 import { sweepFailedRetries } from '../src/services/needs-you.js';
+import * as notifications from '../src/services/notifications.js';
 import { PhaseTransitionError } from '../src/services/phase.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { createSchedule, workerScheduleRunHistory } from '../src/services/schedules.js';
+import {
+  createSchedule,
+  dueSchedules,
+  finishScheduledStep,
+  workerScheduleRunHistory,
+} from '../src/services/schedules.js';
+import { snoozeTodo } from '../src/services/snooze.js';
+import { executeThreadScheduleTool } from '../src/services/thread-schedule-tools.js';
+import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -504,13 +514,163 @@ test.each(['once', 'cron'] as const)(
       status: 'pending',
       prompt: expect.stringContaining('pre-push: lint failed'),
     });
-    if (kind === 'once') expect(s.stored()).toBeUndefined();
-    else
-      expect(s.stored()).toMatchObject({
-        lastRunStatus: 'completed',
-        lastRunError: null,
-        lastRunStepId: claimed!.step.id,
-      });
+    expect(s.stored()).toMatchObject({
+      lastRunStatus: 'completed',
+      lastRunError: null,
+      lastRunStepId: claimed!.step.id,
+      nextRunAt: kind === 'once' ? null : expect.any(Number),
+    });
+  },
+);
+
+test('completed once metadata stays visible and is excluded from later due selections', async () => {
+  const s = await world('once');
+  await s.scheduler.tick(s.due);
+  const fired = s.db.select().from(step).all().at(-1)!;
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  expect(s.stored()).toMatchObject({
+    id: s.saved.id,
+    enabled: true,
+    nextRunAt: null,
+    lastRunAt: s.due,
+    lastRunStatus: 'completed',
+    lastRunError: null,
+    lastRunStepId: fired.id,
+    retryNotBefore: null,
+  });
+  expect(dueSchedules(s.svc, s.due + 86_400_000)).toEqual([]);
+  const stepCount = s.db.select().from(step).all().length;
+  await createScheduler(s.svc, { tickMs: 60_000 }).tick(s.due + 86_400_000);
+  expect(s.db.select().from(step).all()).toHaveLength(stepCount);
+});
+
+test('replayed once completion does not renotify or end a newer snooze', async () => {
+  const s = await world('once');
+  const notice = vi.spyOn(notifications, 'notifyScheduleRun');
+  await s.scheduler.tick(s.due);
+  s.db.update(schedule).set({ enabled: false }).where(eq(schedule.id, s.saved.id)).run();
+  const fired = s.db.select().from(step).all().at(-1)!;
+  snoozeTodo(s.svc, s.todoId, { until: 'needed' });
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.snoozeMode).toBeNull();
+  expect(notice).toHaveBeenCalledOnce();
+  const readNotice = notifications.markNotificationRead(s.svc, s.team.id, s.todoId);
+  snoozeTodo(s.svc, s.todoId, { until: 'needed' });
+  finishScheduledStep(s.svc, fired);
+  expect(notice).toHaveBeenCalledOnce();
+  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.snoozeMode).toBe('needed');
+  expect(notifications.markNotificationRead(s.svc, s.team.id, s.todoId)).toEqual(readNotice);
+});
+
+test('once completion leaves a replacement schedule and its fresh metadata unchanged', async () => {
+  const s = await world('once');
+  await s.scheduler.tick(s.due);
+  const fired = s.db.select().from(step).all().at(-1)!;
+  const replacement = createSchedule(s.svc, {
+    teamId: s.team.id,
+    createdBy: s.user.id,
+    todoId: s.todoId,
+    kind: 'cron',
+    cron: '*/30 * * * *',
+    tz: 'UTC',
+  });
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  expect(s.db.select().from(schedule).all()).toMatchObject([
+    { id: replacement.id, nextRunAt: replacement.nextRunAt, lastRunStatus: null, lastRunAt: null },
+  ]);
+});
+
+test('once completion preserves a future cadence set on the same row during the run', async () => {
+  const s = await world('once');
+  await s.scheduler.tick(s.due);
+  const fired = s.db.select().from(step).all().at(-1)!;
+  vi.spyOn(Date, 'now').mockReturnValue(s.due);
+  const task = s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()!;
+  executeThreadScheduleTool(s.svc, task, `worker:${fired.id}`, 'schedule_update', {
+    cadence: 'in 30 minutes',
+  });
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  expect(s.stored()).toMatchObject({
+    id: s.saved.id,
+    enabled: true,
+    lastRunStatus: 'completed',
+    nextRunAt: s.due + 1_800_000,
+  });
+});
+
+test('recreating a completed once schedule replaces its unique row and clears previous metadata', async () => {
+  const s = await world('once');
+  await s.scheduler.tick(s.due);
+  const fired = s.db.select().from(step).all().at(-1)!;
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  expect(s.stored()?.lastRunStatus).toBe('completed');
+  const replacement = createSchedule(s.svc, {
+    teamId: s.team.id,
+    createdBy: s.user.id,
+    todoId: s.todoId,
+    kind: 'once',
+    at: s.due + 900_000,
+    tz: 'UTC',
+  });
+  expect(replacement.id).not.toBe(s.saved.id);
+  expect(s.db.select().from(schedule).all()).toMatchObject([
+    { id: replacement.id, lastRunAt: null, lastRunStatus: null, lastRunStepId: null },
+  ]);
+});
+
+test('explicitly deleting a retained once row still ends snooze and removes it', async () => {
+  const s = await world('once');
+  await s.scheduler.tick(s.due);
+  const fired = s.db.select().from(step).all().at(-1)!;
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  snoozeTodo(s.svc, s.todoId, { until: 'needed' });
+  expect((await req(s.app, 'DELETE', `/api/schedules/${s.saved.id}`)).status).toBe(204);
+  expect(s.stored()).toBeUndefined();
+  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.snoozeMode).toBeNull();
+});
+
+test.each(['task-api', 'coordinator'] as const)(
+  '%s deletion removes retained completed history without a scheduler sweep',
+  async (entry) => {
+    const s = await world('once');
+    await s.scheduler.tick(s.due);
+    const fired = s.db.select().from(step).all().at(-1)!;
+    setTodoPhase(s.svc, s.todoId, 'building');
+    builds.completeStep(s.svc, fired.id);
+    expect(s.stored()?.lastRunStatus).toBe('completed');
+    if (entry === 'task-api') {
+      expect((await req(s.app, 'DELETE', `/api/todos/${s.todoId}`)).status).toBe(204);
+    } else {
+      const deps = {
+        ...s.svc,
+        box: s.secretBox,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        skillsDir: s.skillsDir,
+      };
+      const context = {
+        teamId: s.team.id,
+        userId: s.user.id,
+        chiefId: 'cleanup-chief',
+        threadId: 'cleanup-thread',
+        chiefAgentId: null,
+        conversationId: 'cleanup-thread',
+      };
+      expect(JSON.parse(await executeChiefTool(deps, context, 'schedules', {}))).toMatchObject([
+        { id: s.saved.id, lastRunStatus: 'completed', nextRunAt: null },
+      ]);
+      const result = await executeChiefTool(deps, context, 'delete_todos', { todoIds: [s.todoId] });
+      expect(JSON.parse(result)).toEqual({ deleted: [s.todoId] });
+    }
+    expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()).toBeUndefined();
+    expect(s.stored()).toBeUndefined();
+    expect((await req(s.app, 'GET', '/api/schedules')).status).toBe(200);
   },
 );
 
