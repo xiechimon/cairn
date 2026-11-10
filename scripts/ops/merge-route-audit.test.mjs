@@ -43,15 +43,17 @@ console.error('unexpected ' + args.join(' ')); process.exit(1);
 `,
     { mode: 0o755 },
   );
+  const command = (args, data) => {
+    writeFileSync(join(dir, 'data.json'), JSON.stringify(data));
+    return spawnSync(process.execPath, ['scripts/ops/merge-route-audit.mjs', ...args], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, DATA: join(dir, 'data.json') },
+    });
+  };
   return {
     dir,
-    run: (sha, data) => {
-      writeFileSync(join(dir, 'data.json'), JSON.stringify(data));
-      return spawnSync(process.execPath, ['scripts/ops/merge-route-audit.mjs', 'commit', sha], {
-        encoding: 'utf8',
-        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, DATA: join(dir, 'data.json') },
-      });
-    },
+    run: (sha, data) => command(['commit', sha], data),
+    landed: (shas, data) => command(['landed', ...shas], data),
   };
 }
 
@@ -72,5 +74,28 @@ test('the command fails on a commit merged outside the queue and passes inside i
   });
   assert.equal(inside.status, 0, inside.stderr);
   assert.match(inside.stdout, /through the queue/);
+  releaseTestTempDir(f.dir);
+});
+
+test('landed is true only when every commit came from a queued pull request', () => {
+  const f = fixture();
+  const sha = 'a'.repeat(40);
+  const queued = {
+    pulls: [{ number: 3032, state: 'closed' }],
+    pull: { number: 3032, merged_at: '2026-11-05T20:17:24Z' },
+    timeline: [labeled('queued', '2026-11-05T20:11:34Z')],
+  };
+  for (const [name, shas, data, expected, status] of [
+    ['one queued commit', [sha], queued, 'true', 0],
+    ['two queued commits', [sha, 'b'.repeat(40)], queued, 'true', 0],
+    ['a merge outside the queue', [sha], { ...queued, timeline: [] }, 'false', 0],
+    ['a direct push with no pull request', [sha], { ...queued, pulls: [] }, 'false', 0],
+    ['no commits', [], queued, 'false', 0],
+    ['a malformed sha', ['main'], queued, '', 2],
+  ]) {
+    const result = f.landed(shas, data);
+    assert.equal(result.status, status, `${name}: ${result.stderr}`);
+    assert.equal(result.stdout.trim(), expected, name);
+  }
   releaseTestTempDir(f.dir);
 });

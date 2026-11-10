@@ -36,6 +36,16 @@ export function pullNumbersForCommit(repo, sha) {
   return pulls.filter((pull) => pull.state === 'closed').map((pull) => pull.number);
 }
 
+export function landedThroughQueue(repo, commits) {
+  return (
+    commits.length > 0 &&
+    commits.every((sha) => {
+      const numbers = pullNumbersForCommit(repo, sha);
+      return numbers.length > 0 && numbers.every((number) => auditPull(repo, number).queued);
+    })
+  );
+}
+
 function main() {
   const [command, ...args] = process.argv.slice(2);
   const repo = process.env.GITHUB_REPOSITORY ?? 'xiechimon/cairn';
@@ -51,7 +61,11 @@ function main() {
     process.exitCode = results.every((result) => result.queued) ? 0 : 1;
     return;
   }
-  throw new Error('usage: merge-route-audit commit <sha>');
+  if (command === 'landed') {
+    console.log(landedThroughQueue(repo, args));
+    return;
+  }
+  throw new Error('usage: merge-route-audit commit <sha> | landed <sha>...');
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
