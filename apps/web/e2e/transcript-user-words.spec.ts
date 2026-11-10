@@ -1,4 +1,8 @@
-import { appendPlanLocationNote, buildPlanFirstRoundInstruction } from '@cairn/shared';
+import {
+  appendPlanLocationNote,
+  buildPlanFirstRoundInstruction,
+  transcriptPromptRowId,
+} from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 
 const TEAM_ID = 'team-1';
@@ -90,7 +94,25 @@ const MESSAGES = [
   msg('assistant', [{ type: 'text', text: '已完成修改。' }], 1700),
 ];
 
-async function stubWorld(page: Page) {
+async function stubWorld(page: Page, recordedSession = false) {
+  const card = recordedSession ? { ...WIRE_CARD, title: 'Updated task title' } : WIRE_CARD;
+  const messages = recordedSession
+    ? MESSAGES.map((message, index) =>
+        index === 0 ? { ...message, id: transcriptPromptRowId('session-uw') } : message,
+      )
+    : MESSAGES;
+  const steps = recordedSession
+    ? [{
+        id: 'session-uw',
+        buildId: BUILD_ID,
+        kind: 'session',
+        machineId: null,
+        createdAt: 900,
+        status: 'done',
+        checkpointCommit: null,
+        skillInjection: null,
+      }]
+    : [];
   const json = (body: unknown, status = 200) => ({
     status,
     contentType: 'application/json',
@@ -103,8 +125,8 @@ async function stubWorld(page: Page) {
       if (path === '/api/teams') return route.fulfill(json([TEAM]));
       if (path === '/api/user/me') return route.fulfill(json(USER));
       if (path === '/api/projects') return route.fulfill(json([PROJECT]));
-      if (path === '/api/todos') return route.fulfill(json([WIRE_CARD]));
-      if (path === `/api/todos/${CARD_ID}`) return route.fulfill(json(WIRE_CARD));
+      if (path === '/api/todos') return route.fulfill(json([card]));
+      if (path === `/api/todos/${CARD_ID}`) return route.fulfill(json(card));
       if (path === `/api/teams/${TEAM_ID}/members`) {
         return route.fulfill(json([
           { id: 'member-user', teamId: TEAM_ID, actorId: USER_ID, memberType: 'user', actor: USER },
@@ -135,7 +157,7 @@ async function stubWorld(page: Page) {
         return route.fulfill(json({ unreadThreadIds: [] }));
       }
       if (path === `/api/builds/${BUILD_ID}`) return route.fulfill(json(WIRE_BUILD));
-      if (path === `/api/builds/${BUILD_ID}/steps`) return route.fulfill(json([]));
+      if (path === `/api/builds/${BUILD_ID}/steps`) return route.fulfill(json(steps));
       if (path === `/api/builds/${BUILD_ID}/plans`) return route.fulfill(json([]));
       if (path === `/api/builds/${BUILD_ID}/usage`) return route.fulfill(json([]));
       if (path === `/api/builds/${BUILD_ID}/changes`) {
@@ -144,7 +166,7 @@ async function stubWorld(page: Page) {
       if (path === `/api/conversations/${BUILD_ID}/messages`) {
         return route.fulfill(
           json({
-            messages: MESSAGES,
+            messages,
             chips: [],
             historyEpoch: 0,
             steerPending: [],
@@ -222,4 +244,13 @@ test('5. a one-line message keeps the one-line bubble height (no geometry drift)
 test('6. taskline does not mis-attach: after the task text row retires no #seq row residue remains', async ({ page }) => {
   await stubWorld(page);
   await expect(page.getByTestId('taskline')).toHaveCount(0);
+});
+
+test('a renamed task does not repeat its recorded startup prompt before the answer', async ({ page }) => {
+  await stubWorld(page, true);
+  await expect(page.getByTestId('transcript-col').locator('section')).toContainText('任务目标');
+  await expect(page.getByTestId('user-bubble')).toHaveCount(2);
+  await expect(page.getByTestId('user-bubble').filter({ hasText: '任务目标' })).toHaveCount(0);
+  await expect(page.getByTestId('user-bubble').filter({ hasText: '本步的交接物是' })).toHaveCount(0);
+  await expect(page.getByTestId('agent-text').filter({ hasText: '已完成修改。' })).toBeVisible();
 });
