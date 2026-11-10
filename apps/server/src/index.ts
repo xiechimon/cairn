@@ -49,7 +49,6 @@ import {
   trajectoryOutcomeRunOf,
   trajectoryReflectCurateRunOf,
 } from './services/scheduler.js';
-import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
@@ -95,7 +94,6 @@ const vapidKeys = loadOrCreateVapidKeys(
 );
 const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
-backfillFixedTags(db);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
