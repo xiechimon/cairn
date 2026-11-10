@@ -11,7 +11,9 @@ import {
   todo,
 } from '../../../apps/server/src/db/schema.js';
 import { blockedNow } from '../../../apps/server/src/services/blockers.js';
+import type { MachineDeps } from '../../../apps/server/src/services/machine-deps.js';
 import { ownershipOf } from '../../../apps/server/src/services/owner.js';
+import { assertReplayContext } from './context.mts';
 import {
   parseExpectedOutput,
   type ReplayInput,
@@ -20,13 +22,22 @@ import {
   replayTodo,
 } from './contract.mts';
 
-export function harvestReplayItem(db: Db, sourceTurnId: string, expectation: unknown) {
-  const input = harvestReplayInput(db, sourceTurnId);
+export function harvestReplayItem(
+  db: Db,
+  sourceTurnId: string,
+  expectation: unknown,
+  resources?: MachineDeps,
+) {
+  const input = harvestReplayInput(db, sourceTurnId, resources);
   const expected = parseExpectedOutput(expectation, input);
   return { input, expectedOutput: expected, sourceTraceId: input.snapshot.sourceTraceId };
 }
 
-export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
+export function harvestReplayInput(
+  db: Db,
+  sourceTurnId: string,
+  resources?: MachineDeps,
+): ReplayInput {
   return db.transaction(() => {
     const turn = db.select().from(step).where(eq(step.id, sourceTurnId)).get();
     const message = db.select().from(chiefMessage).where(eq(chiefMessage.id, sourceTurnId)).get();
@@ -51,23 +62,26 @@ export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
       .from(build)
       .all()
       .filter((b) => ids.has(b.todoId));
-    const timestamps = z.object({
-      createdAt: z.number().int().positive(),
-      updatedAt: z.number().int().positive(),
-    });
-    for (const [kind, rows] of [
-      ['project', projects],
-      ['todo', todos],
-      ['build', threads],
-    ] as const) {
-      for (const row of rows) {
-        const time = timestamps.safeParse(row);
-        if (!time.success) throw new Error(`incomplete: unknown ${kind} time for ${row.id}`);
-        if (time.data.createdAt > sourceTime.data || time.data.updatedAt > sourceTime.data)
-          throw new Error(`incomplete: ${kind} time newer than source turn for ${row.id}`);
+    const assertTimes = () => {
+      const timestamps = z.object({
+        createdAt: z.number().int().positive(),
+        updatedAt: z.number().int().positive(),
+      });
+      for (const [kind, rows] of [
+        ['project', projects],
+        ['todo', todos],
+        ['build', threads],
+      ] as const) {
+        for (const row of rows) {
+          const time = timestamps.safeParse(row);
+          if (!time.success) throw new Error(`incomplete: unknown ${kind} time for ${row.id}`);
+          if (time.data.createdAt > sourceTime.data || time.data.updatedAt > sourceTime.data)
+            throw new Error(`incomplete: ${kind} time newer than source turn for ${row.id}`);
+        }
       }
-    }
-    return replayInput.parse({
+    };
+    if (!resources) assertTimes();
+    const input = replayInput.parse({
       request: message.content,
       projects: projects.map(({ id, name, description, repoKind, archivedAt }) => ({
         id,
@@ -108,6 +122,19 @@ export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
         ),
       },
     });
+    if (resources) {
+      if (resources.db !== db)
+        throw new Error('incomplete: replay context resources database mismatch');
+      try {
+        assertReplayContext(resources, turn, thread, input);
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('incomplete:')) throw error;
+        throw new Error('incomplete: replay context could not reproduce production inputs');
+      }
+    }
+    assertTimes();
+    if (!resources) throw new Error('incomplete: replay context missing source resources');
+    return input;
   });
 }
 

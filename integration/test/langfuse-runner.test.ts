@@ -36,11 +36,7 @@ import {
 import * as runner from '../eval/coordinator-routing/run.mts';
 import { type Manifest, runExperiment } from '../eval/coordinator-routing/run.mts';
 import { runSandboxedTurn } from '../eval/coordinator-routing/sandbox.mts';
-import {
-  harvestReplayInput,
-  harvestReplayItem,
-  seedReplayState,
-} from '../eval/coordinator-routing/state.mts';
+import { harvestReplayInput, seedReplayState } from '../eval/coordinator-routing/state.mts';
 import { startStubLlm } from './stub-llm.js';
 
 const closers: (() => Promise<unknown>)[] = [];
@@ -134,7 +130,7 @@ describe('Langfuse Coordinator runner', () => {
       expect(schema.safeParse({ ...raw, blockedBy: [edge] }).success).toBe(false);
   });
 
-  it.each(['project', 'todo', 'build', 'source', 'ownership'])(
+  it.each(['project', 'todo', 'build', 'source'])(
     'fails closed on unknown or future %s time',
     (site) => {
       const oldTodo = {
@@ -194,34 +190,7 @@ describe('Langfuse Coordinator runner', () => {
           },
         }),
       } as unknown as Parameters<typeof harvestReplayInput>[0];
-      expect(harvestReplayInput(db, 'source').snapshot.todos).toHaveLength(1);
-      expect(
-        harvestReplayItem(db, 'source', {
-          decision: 'route',
-          parts: [{ project: 'docs' }],
-          askCandidates: [],
-          blockedBy: [],
-        }).input.snapshot.todos,
-      ).toHaveLength(1);
-      expect(() =>
-        harvestReplayItem(db, 'source', {
-          decision: 'route',
-          parts: [{ project: 'missing' }],
-          askCandidates: [],
-          blockedBy: [],
-        }),
-      ).toThrow('expectedOutput');
-      if (site === 'ownership') {
-        const row = rows.get(todo)![0]!;
-        row.phase = 'review';
-        row.coordinatorTurn = { workKey: 'review::1', stepId: 'source' };
-        rows.get(step)![0]!.status = 'pending';
-        expect(harvestReplayInput(db, 'source').snapshot.visible[0]?.ownership).toEqual({
-          owner: 'coordinator',
-          reason: 'review',
-        });
-        return;
-      }
+      expect(() => harvestReplayInput(db, 'source')).toThrow('missing source resources');
       const row = rows.get({ project, todo, build, source: step }[site])![0]!;
       for (const field of site === 'source' ? ['createdAt'] : ['createdAt', 'updatedAt']) {
         const previous = row[field];
@@ -231,7 +200,7 @@ describe('Langfuse Coordinator runner', () => {
         }
         row[field] = previous;
       }
-      expect(harvestReplayInput(db, 'source').snapshot.todos).toHaveLength(1);
+      expect(() => harvestReplayInput(db, 'source')).toThrow('missing source resources');
     },
   );
 

@@ -199,10 +199,12 @@ export const turnObservations = z
   })
   .strict();
 
+export const replayTools = ['projects', 'create_todo', 'ask_user'];
+
 export function observeTurn(raw: unknown, input: ReplayInput) {
   replayInput.parse(input);
   const observed = turnObservations.parse(raw);
-  const allowed = new Set(['projects', 'create_todo', 'ask_user']);
+  const allowed = new Set(replayTools);
   if (observed.toolCalls.some((name) => !allowed.has(name)))
     throw new Error('Case used uncaptured state');
   const ids = observed.todos.map((t) => t.id);

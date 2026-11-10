@@ -7,19 +7,10 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { startCoordinator } from '../../../apps/server/src/coordinator/index.js';
 import { openDbWithHandle } from '../../../apps/server/src/db/client.js';
-import {
-  chiefMessage,
-  project,
-  routingRule,
-  step,
-  todo,
-} from '../../../apps/server/src/db/schema.js';
+import { chiefMessage, step, todo } from '../../../apps/server/src/db/schema.js';
 import { seed } from '../../../apps/server/src/db/seed.js';
 import { createEphemeralSecretBox } from '../../../apps/server/src/lib/secret-box.js';
-import {
-  buildChiefSystemPrompt,
-  sendChiefMessage,
-} from '../../../apps/server/src/services/chief.js';
+import { buildChiefSystemPrompt } from '../../../apps/server/src/services/chief.js';
 import {
   setCoordinatorInServer,
   setCoordinatorServerContextEnabled,
@@ -27,9 +18,9 @@ import {
 import { TeamStreamHub } from '../../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../../apps/server/src/services/machine-wake-hub.js';
 import { createProvider } from '../../../apps/server/src/services/providers.js';
+import { prepareReplayTurn } from './context.mts';
 import { replayInput } from './contract.mts';
 import { useModelSocket } from './proxy.mts';
-import { seedReplayState } from './state.mts';
 
 const chunks: Buffer[] = [];
 for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
@@ -75,34 +66,8 @@ try {
       },
     },
   );
-  db.insert(routingRule)
-    .values({
-      id: 'eval-route',
-      teamId: team.id,
-      use: 'coordinator',
-      provider: provider.providerId,
-      modelId: 'gpt-6.1-sol',
-      thinkingLevel: thinking,
-      createdAt: 1,
-      updatedAt: 1,
-    })
-    .run();
-  seedReplayState(db, team.id, input);
   const baseline = new Set(input.snapshot.todos.map((t) => t.id));
-  const picked =
-    input.chip === undefined
-      ? undefined
-      : db
-          .select()
-          .from(project)
-          .all()
-          .find((p) => p.name === input.chip)?.id;
-  if (input.chip !== undefined && picked === undefined) throw new Error('Unknown project chip');
-  const sent = sendChiefMessage(deps, team.id, {
-    threadId: null,
-    content: input.request,
-    projectId: picked,
-  });
+  const sent = prepareReplayTurn(deps, team.id, input, provider.providerId, thinking);
   const promptSha256 = createHash('sha256')
     .update(buildChiefSystemPrompt(deps, team.id, sent.thread.id).text)
     .digest('hex');
