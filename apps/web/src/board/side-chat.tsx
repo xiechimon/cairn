@@ -231,6 +231,7 @@ function ThreadBody({
           agent={null}
           onOpenPlan={onOpenPlan}
           spec={todo.spec.trim() !== '' && !chat.hasEarlier ? todo.spec : undefined}
+          request={todo.request}
           hasEarlier={chat.hasEarlier}
           {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
           autoScroll={chat.transcript.length > 0}
