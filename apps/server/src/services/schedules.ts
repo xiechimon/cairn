@@ -469,7 +469,7 @@ export function finishScheduledStep(
     .from(schedule)
     .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
     .get();
-  if (!row) return;
+  if (!row || (row.kind === 'once' && row.lastRunStatus === 'completed')) return;
   if (outcome.status !== 'stopped') {
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
     if (todoRow) {
@@ -483,10 +483,6 @@ export function finishScheduledStep(
   }
   if (outcome.status === 'failed') {
     recordScheduleFailure(deps, row.id, outcome.error);
-    return;
-  }
-  if (outcome.status === 'completed' && row.kind === 'once' && row.enabled) {
-    deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
     return;
   }
   deps.db
