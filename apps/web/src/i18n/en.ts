@@ -151,6 +151,8 @@ export const EN: Record<string, string> = {
   'Coordinator 的电脑': "Coordinator's computer",
   'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。':
     'The Coordinator has no computer of its own yet. One opens the first time it needs one.',
+  '这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。':
+    'This machine has no computer record yet. Desktop control can open here once it comes online.',
   电脑离线: 'Computer offline',
   'Coordinator 在这台': 'Coordinator runs here',
   桌面控制: 'Desktop control',
