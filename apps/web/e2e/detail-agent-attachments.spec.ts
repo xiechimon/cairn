@@ -1,4 +1,4 @@
-import { chiefGetResponseSchema } from '@cairn/shared';
+import { chiefGetResponseSchema, encodeReplyQuote, renderTaskText, type TaskRequest } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
 
 test('a final assistant reply renders two loaded screenshots and opens each in a lightbox', async ({
@@ -6,6 +6,18 @@ test('a final assistant reply renders two loaded screenshots and opens each in a
 }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  const sourceRequest: TaskRequest = {
+    segments: [{
+      source: { kind: 'chat', threadId: 'source-thread', messageId: 'dispatch', span: 'whole' },
+      author: 'owner', sourceRef: null,
+      text: encodeReplyQuote({ sourceMessageId: 'ack', quote: 'The caret issue is recorded.' }, 'Please dispatch.'),
+      context: { incomplete: false, messages: [
+        { threadId: 'source-thread', messageId: 'original', role: 'user', text: 'The caret is misaligned.\n![Original screenshot](attachment:team-1/caret.png)' },
+        { threadId: 'source-thread', messageId: 'ack', role: 'assistant', text: 'The caret issue is recorded.' },
+      ] },
+    }],
+    siblings: [], difficulty: null, titleSource: 'owner', titleSourceRef: null,
+  };
   const chief = chiefGetResponseSchema.parse({
     chief: {
       id: 'chief-user-1-team-1',
@@ -27,7 +39,8 @@ test('a final assistant reply renders two loaded screenshots and opens each in a
     teamId: 'team-1',
     projectId: 'project-1',
     title: 'Continue a completed task',
-    spec: '',
+    spec: renderTaskText(sourceRequest),
+    request: sourceRequest,
     phase: 'done',
     phaseAt: 1,
     seqNum: 43,
@@ -144,6 +157,20 @@ test('a final assistant reply renders two loaded screenshots and opens each in a
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
   });
   await page.goto(`/app/todo/${task.id}`);
+  const context = page.locator('.spec-block');
+  await expect(context.locator('[data-role="owner"]')).toHaveCount(2);
+  await expect(context.locator('[data-role="coordinator"]')).toHaveCount(1);
+  await expect(context).not.toContainText('reply source=');
+  const original = context.getByRole('img', { name: 'Original screenshot', exact: true });
+  await expect.poll(() => original.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await original.click();
+  await expect(page.getByRole('dialog', { name: 'Original screenshot', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await context.getByTestId('reply-quote').getByRole('link').click();
+  await expect(page.locator('[id="request-context-source-thread:ack"]')).toBeInViewport();
+  await page.reload();
+  await expect(context.getByText('Please dispatch.', { exact: true })).toBeVisible();
+  await expect(context.getByRole('img', { name: 'Original screenshot', exact: true })).toBeVisible();
   const bubble = page.getByTestId('agent-text').filter({ hasText: 'Task completed.' });
   const images = bubble.getByRole('img');
   await expect(images).toHaveCount(2);

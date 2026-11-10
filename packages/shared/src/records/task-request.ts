@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { renderAttachmentTokensToLabels } from '../attachment-token.js';
+import { parseReplyQuote } from '../reply-quote.js';
 import { fenceIssueText } from './prompts.js';
 
 export const TASK_REQUEST_DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
@@ -37,11 +39,26 @@ export const taskSegmentSourceSchema = z.discriminatedUnion('kind', [
 ]);
 export type TaskSegmentSource = z.infer<typeof taskSegmentSourceSchema>;
 
+export const taskContextMessageSchema = z.object({
+  threadId: z.string().min(1),
+  messageId: z.string().min(1),
+  role: z.enum(['user', 'assistant']),
+  text: z.string(),
+});
+export type TaskContextMessage = z.infer<typeof taskContextMessageSchema>;
+
+export const taskReplyContextSchema = z.object({
+  messages: z.array(taskContextMessageSchema),
+  incomplete: z.boolean(),
+});
+export type TaskReplyContext = z.infer<typeof taskReplyContextSchema>;
+
 export const taskSegmentSchema = z.object({
   source: taskSegmentSourceSchema,
   author: z.enum(TASK_SEGMENT_AUTHORS),
   sourceRef: z.string().nullable(),
   text: z.string(),
+  context: taskReplyContextSchema.optional(),
 });
 export type TaskSegment = z.infer<typeof taskSegmentSchema>;
 
@@ -73,8 +90,16 @@ const blockquote = (text: string) =>
     .map((line) => `> ${line}`.trimEnd())
     .join('\n');
 
+export function renderReplyText(text: string): string {
+  const reply = parseReplyQuote(text);
+  return reply === null
+    ? text
+    : `${blockquote(renderAttachmentTokensToLabels(reply.quote))}\n\n${reply.body}`.trimEnd();
+}
+
 export function renderTaskText(request: Pick<TaskRequest, 'segments'>): string {
   const parts: string[] = [];
+  const shown = new Set<string>();
   let fence: { ref: string | null; texts: string[] } | null = null;
   const flush = () => {
     if (fence !== null) parts.push(fenceIssueText(fence.ref, fence.texts.join('\n\n')));
@@ -90,7 +115,27 @@ export function renderTaskText(request: Pick<TaskRequest, 'segments'>): string {
       continue;
     }
     flush();
-    parts.push(segment.source.span === 'quote' ? blockquote(segment.text) : segment.text);
+    if (segment.context !== undefined) {
+      const context = segment.context.messages.flatMap((message) => {
+        const key = `${message.threadId}:${message.messageId}`;
+        if (shown.has(key)) return [];
+        shown.add(key);
+        const text =
+          message.role === 'assistant'
+            ? renderAttachmentTokensToLabels(message.text)
+            : renderReplyText(message.text);
+        return [`${message.role === 'user' ? 'Owner' : 'Coordinator'}:\n${text}`];
+      });
+      if (segment.context.incomplete) context.push('Some quoted source context is unavailable.');
+      if (context.length > 0)
+        parts.push(
+          `[Context from Coordinator]\n${context.join('\n\n')}\n[End of Coordinator context]`,
+        );
+    }
+    const text = renderReplyText(segment.text);
+    parts.push(segment.source.span === 'quote' ? blockquote(text) : text);
+    if (segment.source.kind === 'chat')
+      shown.add(`${segment.source.threadId}:${segment.source.messageId}`);
   }
   flush();
   return parts.join('\n\n');
@@ -140,11 +185,18 @@ export function quoteSegments(
     .sort((a, b) => a.index - b.index || a.at - b.at)
     .map(({ index, wanted }) => {
       const from = cited[index] as CitedSegment;
+      const reply = parseReplyQuote(wanted);
       return {
         source: { ...from.quoteSource, span: 'quote' } as TaskSegmentSource,
         author: from.segment.author,
         sourceRef: from.segment.sourceRef,
         text: wanted,
+        ...(from.segment.context !== undefined &&
+        reply !== null &&
+        reply.sourceMessageId !== null &&
+        reply.sourceMessageId === parseReplyQuote(from.segment.text)?.sourceMessageId
+          ? { context: from.segment.context }
+          : {}),
       };
     });
 }

@@ -186,6 +186,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     projectId: w.projectId,
     title: w.title,
     spec: w.spec,
+    ...(w.request !== undefined ? { request: w.request } : {}),
     phase: w.phase,
     phaseAt: w.phaseAt,
     archivedAt: w.archivedAt ?? null,
