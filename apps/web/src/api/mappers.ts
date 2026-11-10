@@ -826,7 +826,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           at: m.createdAt,
           item: {
             kind: 'note',
-            text: todo.verified === true ? STATUS_WORDS.verified : STATUS_WORDS.doneUnverified,
+            text: STATUS_WORDS.done,
             id: m.id,
           },
         });

@@ -68,7 +68,6 @@ import type { VapidKeys } from './push.js';
 import { profileForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
 import { insertGateAnnouncement } from './transcript.js';
-import { buildVerified } from './verified.js';
 import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -190,9 +189,6 @@ export function toTodoRecord(
     owner: ownership?.owner ?? null,
     section: sectionOf(row, ownership, now),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
-    ...((row.phase === 'done' || row.phase === 'closed') && row.latestBuildId !== null
-      ? { verified: buildVerified(db, row.latestBuildId) }
-      : {}),
     quotaWait,
     ...(usage !== undefined && usage.rows > 0
       ? {

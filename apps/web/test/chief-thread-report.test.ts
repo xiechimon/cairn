@@ -52,11 +52,11 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
 
   test('report labels use a Chinese source and an English translation', () => {
     const key = '任务 #{n} {title}：{status}';
-    const vars = { n: 9, title: 'Repair board counts', status: translate('en', EN, '已验证') };
-    expect(translate('zh', EN, key, { ...vars, status: '已验证' })).toBe(
-      '任务 #9 Repair board counts：已验证',
+    const vars = { n: 9, title: 'Repair board counts', status: translate('en', EN, '已完成') };
+    expect(translate('zh', EN, key, { ...vars, status: '已完成' })).toBe(
+      '任务 #9 Repair board counts：已完成',
     );
-    expect(translate('en', EN, key, vars)).toBe('Task #9 Repair board counts: Verified');
+    expect(translate('en', EN, key, vars)).toBe('Task #9 Repair board counts: Done');
   });
 
   test('a timed wake is silent and the next user turn is visible again', () => {
