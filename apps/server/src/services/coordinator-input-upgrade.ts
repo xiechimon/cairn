@@ -36,20 +36,14 @@ export function migrateUnfetchedCoordinatorInputs(db: Db, threadId: string, owne
       .where(eq(coordinatorInput.threadId, threadId))
       .all();
     const waiting = held.filter((row) => !inputs.some((input) => input.id === row.id));
+    const native = db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), isNull(step.machineId)))
+      .all()
+      .filter((target) => !waiting.some((row) => row.id === target.id));
     if (buffer === undefined) {
       if (waiting.length === 0) return 0;
-      const native = db
-        .select()
-        .from(step)
-        .where(
-          and(
-            eq(step.buildId, threadId),
-            eq(step.kind, 'chief'),
-            isNull(step.machineId),
-            inArray(step.status, ['claimed', 'done', 'failed', 'stopped']),
-          ),
-        )
-        .all();
       if (
         native.some(
           (target) =>
@@ -100,7 +94,7 @@ export function migrateUnfetchedCoordinatorInputs(db: Db, threadId: string, owne
       )
         throw new HttpError(409, 'Legacy Coordinator buffer member identity is incomplete');
       if (
-        target.ownerMessageIds?.includes(row.id) ||
+        native.some((target) => target.ownerMessageIds?.includes(row.id)) ||
         inputs.some((input) => input.ownerMessageIds.includes(row.id))
       )
         throw new HttpError(409, 'Legacy Coordinator sent history is unresolved');

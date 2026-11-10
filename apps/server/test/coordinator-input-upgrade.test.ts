@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import { acquireLease } from '../src/coordinator/lease.js';
 import { coordinatorInput, steerPending, step } from '../src/db/schema.js';
 import { sendChiefMessage } from '../src/services/chief.js';
+import { releaseUnconsumedSteer, takeChiefSteer } from '../src/services/chief-turns.js';
 import { migrateUnfetchedCoordinatorInputs } from '../src/services/coordinator-input-upgrade.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 
@@ -100,3 +101,31 @@ test('a successor write failure rolls back the whole attempt and keeps the origi
   H.s.db.run('DROP TRIGGER reject_successor');
   expect(w.migrate()).toBe(2);
 });
+
+test.each(['done', 'failed', 'stopped', 'pending'] as const)(
+  'an earlier %s native target keeps re-steered admission unresolved',
+  (status) => {
+    const w = legacy();
+    takeChiefSteer(H.s.db, H.threadId);
+    releaseUnconsumedSteer(H.s.db, row(w.parent));
+    H.s.db.delete(steerPending).run();
+    H.s.db.update(step).set({ status }).where(eq(step.id, w.parent)).run();
+    H.s.db
+      .insert(step)
+      .values({ ...row(w.parent), id: 'next-target', status: 'claimed', ownerMessageIds: [] })
+      .run();
+    H.s.db.update(step).set({ holdReason: 'steer' }).where(eq(step.id, w.ids[0]!)).run();
+    H.s.db
+      .insert(steerPending)
+      .values({
+        conversationId: H.threadId,
+        stepId: 'next-target',
+        content: row(w.ids[0]!).prompt!,
+        createdAt: 2,
+      })
+      .run();
+    expect(w.migrate).toThrow('history');
+    expect(H.s.db.select().from(coordinatorInput).all()).toEqual([]);
+    expect(H.s.db.select().from(steerPending).get()?.stepId).toBe('next-target');
+  },
+);
