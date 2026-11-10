@@ -9984,6 +9984,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               },
               "type": "array",
             },
+            "osPlatform": {
+              "enum": [
+                "linux",
+                "darwin",
+                "other",
+              ],
+              "type": "string",
+            },
             "ownComputer": {
               "const": true,
               "type": "boolean",

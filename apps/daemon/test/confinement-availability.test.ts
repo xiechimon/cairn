@@ -47,18 +47,25 @@ test('failed Linux preflight keeps presence online and skips probes, recovery an
     claudeCodeAuthProbe: auth,
   });
   expect(api.presenceBodies.at(-1)).toMatchObject({
-    capabilities: { confinement: { state: 'unavailable', reason: 'startup-failed' } },
+    capabilities: {
+      osPlatform: 'linux',
+      confinement: { state: 'unavailable', reason: 'startup-failed' },
+    },
   });
   expect(auth).not.toHaveBeenCalled();
   expect(probeClaudeBin).not.toHaveBeenCalled();
   expect(api.calls).not.toContain('recover');
   expect(api.claimCalls).toBe(0);
+  const generation = (await api.me()).capabilities?.confinement?.generation;
+  expect(generation).toBeDefined();
   await handle.recheckConfinement();
   expect(auth).toHaveBeenCalledOnce();
   expect(probeClaudeBin).toHaveBeenCalledOnce();
   expect(api.calls).toContain('recover');
   expect(api.claimCalls).toBe(1);
-  expect(api.claimBodies[0]).toMatchObject({ confinement: { state: 'ready', generation: 2 } });
+  expect(api.claimBodies[0]).toMatchObject({
+    confinement: { state: 'ready', generation: (generation ?? 0) + 1 },
+  });
   await handle.stop();
 });
 
@@ -113,7 +120,7 @@ test('macOS reports not-applicable without a Linux launch and keeps claiming', a
   });
   expect(launch).not.toHaveBeenCalled();
   expect(api.presenceBodies.at(-1)).toMatchObject({
-    capabilities: { confinement: { state: 'not-applicable' } },
+    capabilities: { osPlatform: 'darwin', confinement: { state: 'not-applicable' } },
   });
   expect(api.claimCalls).toBe(1);
   await handle.stop();

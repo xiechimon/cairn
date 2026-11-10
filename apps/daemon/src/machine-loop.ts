@@ -237,6 +237,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       : undefined);
   const capabilitiesReport = (): MachineCapabilities => ({
     ...capabilitiesProbe(),
+    osPlatform: platform === 'linux' || platform === 'darwin' ? platform : 'other',
     confinement: availability?.observation(),
     codexLogin: readCodexLogin(paths.agentRuntimeDir),
     executor: orbProvider.kind,

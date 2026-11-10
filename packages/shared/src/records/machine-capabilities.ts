@@ -41,11 +41,13 @@ export type ConfinementReport = z.infer<typeof confinementReportSchema>;
 export function confinementDispatchReady(
   capabilities: MachineCapabilities | null | undefined,
 ): boolean {
-  const state = capabilities?.confinement?.state;
-  return state === 'ready' || state === 'not-applicable';
+  return capabilities?.osPlatform !== 'linux' || capabilities.confinement?.state === 'ready';
 }
 
+const machineOsPlatformSchema = z.enum(['linux', 'darwin', 'other']);
+
 export const machineCapabilitiesSchema = z.object({
+  osPlatform: machineOsPlatformSchema.optional(),
   mcpServers: z.array(z.string()),
   skills: z.array(z.string()),
   hardware: machineHardwareSchema.optional(),
@@ -68,12 +70,14 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     })
     .safeParse({ mcpServers: rec.mcpServers, skills: rec.skills });
   if (!base.success) return undefined;
+  const osPlatform = machineOsPlatformSchema.safeParse(rec.osPlatform);
   const confinement = confinementReportSchema.safeParse(rec.confinement);
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
   return {
     ...base.data,
+    ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),

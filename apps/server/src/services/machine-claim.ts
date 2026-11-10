@@ -704,7 +704,7 @@ export async function claimStep(
       !signal?.aborted &&
       readDeployLease(deps.db).status === 'accepting' &&
       confinementDispatchReady(capabilities) &&
-      (report?.state === 'not-applicable' ||
+      (capabilities?.osPlatform !== 'linux' ||
         (report?.generation === body?.confinement?.generation &&
           report?.invocation === body?.confinement?.invocation))
     );

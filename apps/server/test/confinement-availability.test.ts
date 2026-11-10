@@ -9,8 +9,13 @@ const checking = {
   revision: 1,
 };
 
-function eligibility(confinement: unknown) {
-  const capabilities = parseReportedCapabilities({ mcpServers: [], skills: [], confinement });
+function eligibility(confinement: unknown, osPlatform = 'linux') {
+  const capabilities = parseReportedCapabilities({
+    mcpServers: [],
+    skills: [],
+    osPlatform,
+    confinement,
+  });
   const input: EligibilityInput = {
     machine: {
       id: 'machine-one',
@@ -46,7 +51,7 @@ test('uncertain cleanup blocks dispatch', () => {
   ).toEqual({ kind: 'confinement' });
 });
 
-test('missing confinement readiness fails closed for legacy reports', () => {
+test('missing Linux confinement readiness fails closed', () => {
   expect(eligibility(undefined)).toEqual({ kind: 'confinement' });
 });
 
@@ -67,5 +72,15 @@ test('macOS not-applicable preserves dispatch and survives parsing', () => {
   expect(
     parseReportedCapabilities({ mcpServers: [], skills: [], confinement: report })?.confinement,
   ).toEqual(report);
-  expect(eligibility(report)).toBeNull();
+  expect(eligibility(report, 'darwin')).toBeNull();
+});
+
+test('legacy unknown platform and non-Linux reports never gate eligibility', () => {
+  expect(eligibility(undefined, 'legacy')).toBeNull();
+  expect(eligibility(undefined, 'darwin')).toBeNull();
+  expect(eligibility(checking, 'darwin')).toBeNull();
+});
+
+test('Linux cannot use a not-applicable report to bypass readiness', () => {
+  expect(eligibility({ ...checking, state: 'not-applicable' })).toEqual({ kind: 'confinement' });
 });

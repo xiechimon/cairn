@@ -195,12 +195,15 @@ function mergeReportedCapabilities(
   previous: MachineCapabilities | null,
   reported: MachineCapabilities,
 ): MachineCapabilities {
+  if (reported.osPlatform === undefined && previous?.osPlatform !== undefined) {
+    reported = { ...reported, osPlatform: previous.osPlatform };
+  }
   const previousReport = previous?.confinement;
   const report = reported.confinement;
   if (
     report &&
     (report.generation === (previousReport?.generation ?? 0) + 1
-      ? report.state !== 'checking'
+      ? reported.osPlatform === 'linux' && report.state !== 'checking'
       : !previousReport ||
         report.generation !== previousReport.generation ||
         report.invocation !== previousReport.invocation ||
