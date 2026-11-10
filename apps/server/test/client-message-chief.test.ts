@@ -4,8 +4,8 @@ import {
   build,
   chiefMessage,
   clientMessage,
+  coordinatorInput,
   message,
-  steerPending,
   step,
   todo,
 } from '../src/db/schema.js';
@@ -121,11 +121,11 @@ describe('a replay while the original turn is already running', () => {
     const body = { content: 'steer me once', clientMessageId: 'key-1' };
     await post(`/api/teams/${H.teamId}/coordinator/messages`, body);
     expect(signal).toHaveBeenCalledTimes(1);
-    const steered = H.s.db.select().from(steerPending).get();
+    const steered = H.s.db.select().from(coordinatorInput).get();
     expect(steered?.content).toBe('steer me once');
     await post(`/api/teams/${H.teamId}/coordinator/messages`, body);
     expect(signal).toHaveBeenCalledTimes(1);
-    expect(H.s.db.select().from(steerPending).get()?.content).toBe('steer me once');
+    expect(H.s.db.select().from(coordinatorInput).all()).toEqual([steered]);
     expect(chiefSteps()).toHaveLength(2);
   });
 });

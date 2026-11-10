@@ -19,6 +19,7 @@ import { build, machine, message, step, todo } from '../../apps/server/src/db/sc
 import { applyBuildStepAction } from '../../apps/server/src/services/builds.js';
 import { claimStep, finishStep } from '../../apps/server/src/services/machines.js';
 import { bootServer, req, seedSessionRoute } from '../../apps/server/test/helpers.js';
+import { readyMachine } from '../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') {
@@ -48,7 +49,15 @@ async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') 
   await runGitOk(['push', 'origin', 'main'], { cwd: seed });
   s.db
     .insert(machine)
-    .values({ id: 'm1', teamId: s.team.id, name: 'probe', online: true, enabledRuntimes: ['pi'] })
+    .values(
+      readyMachine({
+        id: 'm1',
+        teamId: s.team.id,
+        name: 'probe',
+        online: true,
+        enabledRuntimes: ['pi'],
+      }),
+    )
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: 'm1' });
   s.db

@@ -1,6 +1,7 @@
 import { machineClaimResponseSchema, machineEnrollResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -62,7 +63,7 @@ function makeWorld(): World {
   ] as const) {
     s.db
       .insert(machineTable)
-      .values({ id, teamId, name, online: true, enabledRuntimes: ['pi'] })
+      .values(readyMachine({ id, teamId, name, online: true, enabledRuntimes: ['pi'] }))
       .run();
   }
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: machineBId });
@@ -248,7 +249,7 @@ describe('#1065 route wiring (claim route passes the request signal through)', (
       const res = await s.app.request('/api/machine/enroll', {
         method: 'POST',
         headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
+        body: JSON.stringify(readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' })),
       });
       expect(res.status).toBe(200);
       return machineEnrollResponseSchema.parse(await res.json());

@@ -12,7 +12,7 @@ const batchHeadRe = '^B[0-9]+/';
 const batchSize = { min: 1, max: 4 };
 const batchWait = '0 s';
 const checkRetries = 1;
-const parallelChecks = 5;
+const parallelChecks = 1;
 const scopes = {
   web: ['apps/web/**/*'],
   backend: ['apps/server/**/*', 'apps/daemon/**/*', 'integration/**/*'],
@@ -67,8 +67,8 @@ ${draftChecks.map(passedOrSkipped).join('\n')}
     branch_protection_injection_mode: none
     merge_bot_account: ${mergeBotAccount}`;
   return `queue_rules:
-${rule('default', `-author = ${botAuthor}`, 'squash')}
-${rule('bot', `author = ${botAuthor}`, 'squash')}
+${rule('default', `-author = ${botAuthor}`, 'fast-forward')}
+${rule('bot', `author = ${botAuthor}`, 'fast-forward')}
 merge_protections_settings:
   auto_merge_conditions: true
 commands_restrictions:
@@ -76,7 +76,7 @@ commands_restrictions:
     conditions:
       - sender-permission >= write
 merge_queue:
-  mode: parallel
+  mode: serial
   max_parallel_checks: ${parallelChecks}
   dequeued_label: dequeued
 scopes:

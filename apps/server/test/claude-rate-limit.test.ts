@@ -3,6 +3,7 @@ import { buildReviewStepPrompt, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   claudeSubscription,
   machine as machineTable,
@@ -52,7 +53,7 @@ async function issueKey(s: ReturnType<typeof bootServer>, name: string): Promise
 async function enroll(s: ReturnType<typeof bootServer>, key: string, name: string) {
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
   });
   expect(res.status).toBe(200);
   const { token } = (await res.json()) as { token: string };

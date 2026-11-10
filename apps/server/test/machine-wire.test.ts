@@ -19,6 +19,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { loadConfig } from '../src/config.js';
 import {
   build as buildTable,
@@ -101,7 +102,7 @@ async function setupWorld(
   const sessionRouteId = seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key.plain,
-    body: { teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' }),
   });
 
   expect(enrollRes.status).toBe(200);
@@ -178,7 +179,7 @@ describe('enroll / me / presence / recover (02 §5.2-§5.4)', () => {
       await call(w.s.app, 'GET', '/api/machine/me', { cred: 'deadbeef' }),
       await call(w.s.app, 'POST', '/api/machine/enroll', {
         cred: 'cairn_nope',
-        body: { teamId: w.s.team.id },
+        body: readyMachine({ teamId: w.s.team.id }),
       }),
     ]) {
       expect(res.status).toBe(401);
@@ -191,7 +192,7 @@ describe('enroll / me / presence / recover (02 §5.2-§5.4)', () => {
     const w = await setupWorld();
     const res = await call(w.s.app, 'POST', '/api/machine/enroll', {
       cred: w.apiKey,
-      body: { teamId: w.s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: w.s.team.id, name: 'test-mbp', cliVersion: '0.1.0' }),
     });
     const again = machineEnrollResponseSchema.parse(await res.json());
     expect(again.machineId).toBe(w.machineId);
@@ -585,15 +586,17 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     const claimed = claimedStepSchema.parse(body.step);
     w.s.db
       .insert(machineTable)
-      .values({
-        id: 'machine-other',
-        teamId: w.s.team.id,
-        name: 'other',
-        online: false,
-        tokenHash: createHash('sha256').update('other-token').digest('hex'),
-        apiKeyId: null,
-        latestCliVersion: null,
-      })
+      .values(
+        readyMachine({
+          id: 'machine-other',
+          teamId: w.s.team.id,
+          name: 'other',
+          online: false,
+          tokenHash: createHash('sha256').update('other-token').digest('hex'),
+          apiKeyId: null,
+          latestCliVersion: null,
+        }),
+      )
       .run();
     const res = await call(w.s.app, 'POST', `/api/machine/heartbeat/${claimed.step.id}`, {
       cred: 'other-token',

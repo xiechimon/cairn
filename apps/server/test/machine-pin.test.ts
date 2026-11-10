@@ -12,6 +12,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
@@ -66,7 +67,7 @@ async function enroll(s: TestServer, name: string): Promise<string> {
   const key = await issueApiKey(s);
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
   });
   expect(res.status).toBe(200);
   return ((await res.json()) as { token: string }).token;

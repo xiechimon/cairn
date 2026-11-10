@@ -12,6 +12,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   build as buildTable,
@@ -133,7 +134,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
   });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'review-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'review-mbp', cliVersion: '0.1.0' }),
   });
 
   expect(enrollRes.status).toBe(200);

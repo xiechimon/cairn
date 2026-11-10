@@ -15,7 +15,7 @@ const TASK_SECTIONS: readonly TaskSection[] = [
   'up_next',
 ];
 
-export const ACTIVE_SECTIONS = ['ready_for_review', 'needs_input', 'working', 'resolved'] as const;
+export const ACTIVE_SECTIONS = ['ready_for_review', 'needs_input', 'working'] as const;
 
 export type ActiveSection = (typeof ACTIVE_SECTIONS)[number];
 

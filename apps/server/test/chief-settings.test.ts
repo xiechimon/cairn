@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   agentMemory,
   chiefMessage,
@@ -96,7 +97,9 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     const enroll = await H.s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${plain}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: H.teamId, name: 'chief-override-probe', cliVersion: '0.1.0' }),
+      body: JSON.stringify(
+        readyMachine({ teamId: H.teamId, name: 'chief-override-probe', cliVersion: '0.1.0' }),
+      ),
     });
     expect(enroll.status).toBe(200);
     const { token } = (await enroll.json()) as { token: string };

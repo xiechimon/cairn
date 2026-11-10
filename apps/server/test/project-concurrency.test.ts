@@ -1,6 +1,7 @@
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, machine, step, todo } from '../src/db/schema.js';
 import { enqueueStep } from '../src/services/builds.js';
 import { bootServer, issueApiKey, req, seedSessionRoute, type TestServer } from './helpers.js';
@@ -13,7 +14,7 @@ async function enroll(name: string): Promise<string> {
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' })),
   });
   expect(res.status).toBe(200);
   return ((await res.json()) as { token: string }).token;

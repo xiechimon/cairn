@@ -8,6 +8,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { apiKey as apiKeyTable, githubConnection } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
@@ -57,7 +58,7 @@ async function setupWorld(
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'g2t2-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'g2t2-mbp', cliVersion: '0.1.0' }),
   });
   const machineToken = ((await enrollRes.json()) as { token: string }).token;
   seedSessionRoute(s, { provider: 'p', modelId: 'm' });

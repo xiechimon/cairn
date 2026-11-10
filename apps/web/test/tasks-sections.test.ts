@@ -1,6 +1,7 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
+  ACTIVE_SECTIONS,
   bySection,
   needsYouBadge,
   questionOpenStep,
@@ -137,6 +138,10 @@ describe('rows that do not wait on the owner', () => {
 });
 
 describe('sections and the badge come from the server section, not the phase', () => {
+  test('the active tab lists review, input and working only; resolved and up next have their own tabs', () => {
+    expect(ACTIVE_SECTIONS).toEqual(['ready_for_review', 'needs_input', 'working']);
+  });
+
   test('rows group by their section, newest first, whatever their phase says', () => {
     const groups = bySection([
       { ...entry(1, 'review', 'working'), todo: { ...todo(1, 'review'), phaseAt: 1 } },

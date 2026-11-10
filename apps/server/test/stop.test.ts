@@ -7,6 +7,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -74,7 +75,7 @@ async function setupWorld() {
   async function enroll(name: string, cred: string): Promise<string> {
     const res = await call(s.app, 'POST', '/api/machine/enroll', {
       cred,
-      body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
     });
     expect(res.status).toBe(200);
     return ((await res.json()) as { token: string }).token;

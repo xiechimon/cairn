@@ -9,13 +9,19 @@ import type {
   TranscriptRow,
 } from '@cairn/shared';
 
+import type { InputChannel } from './input-channel.js';
+
 export interface MachineApi {
+  inputs?: InputChannel;
   claim(): Promise<ClaimedStep | null>;
   recover(): Promise<StepRecord[]>;
   token(stepId: string): Promise<MachineTokenResponse>;
   heartbeat(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
-  steer?(stepId: string): Promise<{ content: string; key: string } | null>;
+  steer?(
+    stepId: string,
+    admittedRequestIds?: readonly string[],
+  ): Promise<{ content: string; key: string } | null>;
   ackSteer?(stepId: string): Promise<void>;
   relayTool(
     stepId: string,

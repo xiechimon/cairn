@@ -1,6 +1,7 @@
 import { machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chief as chiefTable,
@@ -61,7 +62,7 @@ async function fetchEnroll(s: TestServer, key: string): Promise<{ token: string 
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'cap-mbp', cliVersion: '0.1.0' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'cap-mbp', cliVersion: '0.1.0' })),
   });
   expect(res.status).toBe(200);
   return (await res.json()) as { token: string };
@@ -214,14 +215,16 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
     const machineBId = `machine-b-${Math.random().toString(36).slice(2)}`;
     w.s.db
       .insert(machineTable)
-      .values({
-        id: machineBId,
-        teamId: w.s.team.id,
-        name: 'cap-mbp-b',
-        online: true,
-        enabledRuntimes: ['pi'],
-        maxConcurrent: 3,
-      })
+      .values(
+        readyMachine({
+          id: machineBId,
+          teamId: w.s.team.id,
+          name: 'cap-mbp-b',
+          online: true,
+          enabledRuntimes: ['pi'],
+          maxConcurrent: 3,
+        }),
+      )
       .run();
     insertPendingBuildStep(w.s, w);
     const lateB = insertPendingBuildStep(w.s, w, { machineId: machineBId });

@@ -56,9 +56,22 @@ function fixture() {
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const data = JSON.parse(fs.readFileSync(process.env.DATA, 'utf8'));
-if (args[1].includes('/pulls/')) { console.log(JSON.stringify(data.pull)); process.exit(0); }
-if (args[1].includes('/commits/')) { console.log(JSON.stringify(data.pulls)); process.exit(0); }
-if (args[1].includes('/timeline')) { console.log(JSON.stringify([data.timeline])); process.exit(0); }
+const url = args[1];
+const tail = url.split('?')[0];
+if (url.includes('/check-runs')) { console.log(JSON.stringify({ check_runs: data.checks ?? [] })); process.exit(0); }
+if (url.includes('/comments')) { console.log(JSON.stringify([data.comments ?? []])); process.exit(0); }
+if (url.includes('/timeline')) { console.log(JSON.stringify([data.timeline ?? []])); process.exit(0); }
+if (tail.endsWith('/pulls') && tail.includes('/commits/')) { console.log(JSON.stringify(data.pulls ?? [])); process.exit(0); }
+if (tail.includes('/commits/') && tail.split('/').pop().length === 40) {
+  const sha = tail.split('/').pop();
+  console.log(JSON.stringify({ commit: { tree: { sha: (data.trees ?? {})[sha] } } }));
+  process.exit(0);
+}
+if (tail.includes('/pulls/')) {
+  const number = Number(tail.split('/').pop());
+  console.log(JSON.stringify((data.drafts ?? {})[number] ?? data.pull));
+  process.exit(0);
+}
 console.error('unexpected ' + args.join(' ')); process.exit(1);
 `,
     { mode: 0o755 },
@@ -97,21 +110,75 @@ test('the command fails on a commit merged outside the queue and passes inside i
   releaseTestTempDir(f.dir);
 });
 
-test('landed is true only when every commit came from a queued pull request', () => {
+const requiredChecks = [
+  'check',
+  'pack-smoke',
+  'e2e-gate',
+  'gates',
+  'dead-class-gate',
+  'ops-backup-test',
+];
+
+function provenLanding(sha, { sameTree = true, checksAt = '2026-11-10T09:30:52Z' } = {}) {
+  const draftSha = 'd'.repeat(40);
+  const tree = 'e'.repeat(40);
+  return {
+    pulls: [{ number: 3892, state: 'closed' }],
+    pull: { number: 3892, merged_at: '2026-11-10T09:31:27Z' },
+    comments: [{ user: { login: 'mergify[bot]' }, body: 'Passed · draft #3894' }],
+    drafts: { 3894: { head: { sha: draftSha } } },
+    trees: { [sha]: tree, [draftSha]: sameTree ? tree : 'f'.repeat(40) },
+    checks: requiredChecks.map((name) => ({
+      name,
+      conclusion: 'success',
+      completed_at: checksAt,
+    })),
+  };
+}
+
+test('landed skips only when the passed draft checked this commit tree', () => {
   const f = fixture();
   const sha = 'a'.repeat(40);
-  const queued = {
-    pulls: [{ number: 3032, state: 'closed' }],
-    pull: { number: 3032, merged_at: '2026-11-05T20:17:24Z' },
-    timeline: [labeled('queued', '2026-11-05T20:11:34Z')],
-  };
+  const other = 'b'.repeat(40);
   for (const [name, shas, data, expected, status] of [
-    ['one queued commit', [sha], queued, 'true', 0],
-    ['two queued commits', [sha, 'b'.repeat(40)], queued, 'true', 0],
-    ['a merge outside the queue', [sha], { ...queued, timeline: [] }, 'false', 0],
-    ['a direct push with no pull request', [sha], { ...queued, pulls: [] }, 'false', 0],
-    ['no commits', [], queued, 'false', 0],
-    ['a malformed sha', ['main'], queued, '', 2],
+    ['a draft that tested this tree', [sha], provenLanding(sha), 'true', 0],
+    [
+      'two commits on the same tested tree',
+      [sha, other],
+      {
+        ...provenLanding(sha),
+        trees: {
+          ...provenLanding(sha).trees,
+          ...provenLanding(other).trees,
+        },
+      },
+      'true',
+      0,
+    ],
+    [
+      'a queued label without a passed draft',
+      [sha],
+      { ...provenLanding(sha), comments: [] },
+      'false',
+      0,
+    ],
+    [
+      'a passed draft whose checks finished after the merge',
+      [sha],
+      provenLanding(sha, { checksAt: '2026-11-10T09:31:28Z' }),
+      'false',
+      0,
+    ],
+    [
+      'a passed draft that tested a different tree',
+      [sha],
+      provenLanding(sha, { sameTree: false }),
+      'false',
+      0,
+    ],
+    ['a direct push with no pull request', [sha], { ...provenLanding(sha), pulls: [] }, 'false', 0],
+    ['no commits', [], provenLanding(sha), 'false', 0],
+    ['a malformed sha', ['main'], provenLanding(sha), '', 2],
   ]) {
     const result = f.landed(shas, data);
     assert.equal(result.status, status, `${name}: ${result.stderr}`);

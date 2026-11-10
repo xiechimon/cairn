@@ -3,6 +3,7 @@ import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   chiefMessage,
   machine as machineTable,
@@ -90,7 +91,7 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
   }
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId, name: 'queue-box', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId, name: 'queue-box', cliVersion: '0.1.0' }),
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = s.db.select().from(machineTable).limit(1).all()[0]!.id;

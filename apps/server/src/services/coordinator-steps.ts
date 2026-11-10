@@ -4,8 +4,14 @@ import {
   formatSkillRouteSection,
   suggestSkillsForMessage,
 } from '@cairn/shared';
-import { and, eq, sql } from 'drizzle-orm';
-import { type chiefThread, chiefTurnUsage, step, tokenUsage } from '../db/schema.js';
+import { and, eq, notInArray, sql } from 'drizzle-orm';
+import {
+  type chiefThread,
+  chiefTurnUsage,
+  coordinatorInput,
+  step,
+  tokenUsage,
+} from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
 import {
@@ -51,7 +57,19 @@ export function claimPendingChiefStep(
       holdReason: null,
       holdUntil: null,
     })
-    .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
+    .where(
+      and(
+        eq(step.id, stepRow.id),
+        eq(step.status, 'pending'),
+        notInArray(
+          step.id,
+          db
+            .select({ id: coordinatorInput.id })
+            .from(coordinatorInput)
+            .where(eq(coordinatorInput.state, 'pending')),
+        ),
+      ),
+    )
     .run();
   return res.changes > 0;
 }

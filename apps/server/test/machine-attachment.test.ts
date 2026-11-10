@@ -1,6 +1,7 @@
 import { machineAttachmentResponseSchema, machineEnrollResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   attachment as attachmentTable,
   message as messageTable,
@@ -35,7 +36,7 @@ async function setupWorld(): Promise<World> {
   const enrollAuth = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ teamId: s.team.id, name: 'att-machine' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'att-machine' })),
   });
   expect(enrollAuth.status).toBe(200);
   const machineJson = machineEnrollResponseSchema.parse(await enrollAuth.json());
@@ -282,7 +283,7 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId} (#730)', () => {
       const enroll2 = await w.s.app.request('/api/machine/enroll', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey2}` },
-        body: JSON.stringify({ teamId: w.s.team.id, name: 'att-machine-2' }),
+        body: JSON.stringify(readyMachine({ teamId: w.s.team.id, name: 'att-machine-2' })),
       });
 
       const m2 = machineEnrollResponseSchema.parse(await enroll2.json());

@@ -1,6 +1,7 @@
 import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   autonomousMergeAdmission,
   build,
@@ -460,13 +461,15 @@ test.each(['pause', 'cap'] as const)(
     const f = await fixture();
     f.s.db
       .insert(machine)
-      .values({
-        id: 'worker',
-        teamId: f.s.team.id,
-        name: 'Worker',
-        online: true,
-        enabledRuntimes: ['pi'],
-      })
+      .values(
+        readyMachine({
+          id: 'worker',
+          teamId: f.s.team.id,
+          name: 'Worker',
+          online: true,
+          enabledRuntimes: ['pi'],
+        }),
+      )
       .run();
     seedSessionRoute(f.s, {
       provider: 'stub-gw',
@@ -514,13 +517,15 @@ for (const brake of ['pause', 'cap'] as const) {
     const f = await fixture();
     f.s.db
       .insert(machine)
-      .values({
-        id: 'worker',
-        teamId: f.s.team.id,
-        name: 'Worker',
-        online: true,
-        enabledRuntimes: ['pi'],
-      })
+      .values(
+        readyMachine({
+          id: 'worker',
+          teamId: f.s.team.id,
+          name: 'Worker',
+          online: true,
+          enabledRuntimes: ['pi'],
+        }),
+      )
       .run();
     seedSessionRoute(f.s, {
       provider: 'stub-gw',
@@ -581,13 +586,15 @@ test('changed local authorization releases the reservation before skipping the c
   await enqueueLocalMerge(f.deps, 'build', 'main');
   f.s.db
     .insert(machine)
-    .values({
-      id: 'worker',
-      teamId: f.s.team.id,
-      name: 'Worker',
-      online: true,
-      enabledRuntimes: ['pi'],
-    })
+    .values(
+      readyMachine({
+        id: 'worker',
+        teamId: f.s.team.id,
+        name: 'Worker',
+        online: true,
+        enabledRuntimes: ['pi'],
+      }),
+    )
     .run();
   f.s.db.update(project).set({ repoKind: 'hosted' }).run();
   await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost');
