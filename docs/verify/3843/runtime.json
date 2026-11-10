@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:15273/app/todo/zezNL2fVvsl0Bpug4XDAo",
+  "url": "http://127.0.0.1:15273/app/todo/WGA_ZtSOKkHYnkZzVayAv",
   "mode": "real server with seeded source conversation and seeded harness answer; no model called",
   "assertions": {
     "sourceOwnerMessages": 2,
@@ -21,6 +21,6 @@
       ]
     }
   },
-  "head": "4f23c07ba207c0cc36df811995c70dcc7d6fc775",
+  "head": "04084f4a1ae6d856640186b9201c8145e7d2c6dd",
   "baselineHead": "a2d6e79c3537c528f54393f00ecd90306e820f43"
 }
