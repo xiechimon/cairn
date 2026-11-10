@@ -92,7 +92,14 @@ test('rejects symlink mount sources before spawning', () => {
 test('refuses rebinding the whole daemon home or an ancestor of secrets', () => {
   const policy = fixture();
   for (const workspace of [policy.daemonHome, policy.home, '/']) {
-    expect(() => confinementArgs({ ...policy, workspace }, 'linux')).toThrow('overlap');
+    for (const grant of [
+      { workspace },
+      { taskTemp: workspace },
+      { gitDirectories: [workspace] },
+      { state: [workspace] },
+      { caches: [workspace] },
+    ])
+      expect(() => confinementArgs({ ...policy, ...grant }, 'linux')).toThrow('overlap');
   }
 });
 

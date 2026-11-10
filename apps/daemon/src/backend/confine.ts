@@ -72,7 +72,9 @@ export function confinementArgs(
   for (const path of writable) {
     if (
       denied.some(
-        (secret) => contains(path, secret) && !(path === secret && policy.state.includes(path)),
+        (secret) =>
+          contains(path, secret) &&
+          !(path === secret && secret !== daemonHome && policy.state.includes(path)),
       )
     )
       throw new Error('Unsafe confinement overlap');
