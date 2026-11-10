@@ -1,7 +1,8 @@
 import { fauxAssistantMessage, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { chiefMessage, coordinatorInput, step } from '../../src/db/schema.js';
+import * as questions from '../../src/services/chief-questions.js';
 import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
 
@@ -21,6 +22,7 @@ async function until(check: () => boolean, ms = 8_000): Promise<void> {
 
 describe('Coordinator steer', () => {
   it('delivers each steered message into the running turn once, even with identical text, and never runs its step', async () => {
+    const questionCalls = vi.spyOn(questions, 'holdForQuestion');
     const w = await world('start the work');
     const { faux } = stub('unused');
     const requests: string[] = [];
@@ -104,6 +106,11 @@ describe('Coordinator steer', () => {
     expect(answered.status).toBe(200);
     await until(() => questionRows().length === 2);
     expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('claimed');
+    await coordinator.close();
+    const restarted = boot(w, faux);
+    restarted.wake(w.threadId);
+    await vi.waitFor(() => expect(questionCalls).toHaveBeenCalledTimes(3));
+    expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('claimed');
     const lateAnswer = await req(
       w.s.app,
       'POST',
@@ -112,8 +119,8 @@ describe('Coordinator steer', () => {
     );
     expect(lateAnswer.status).toBe(200);
     await until(() => w.s.db.select().from(step).get()?.status === 'done');
-    coordinator.wake(w.threadId);
-    await coordinator.idle();
+    restarted.wake(w.threadId);
+    await restarted.idle();
 
     expect(requests).toHaveLength(4);
     expect(requests[1]?.split('switch to the cheaper plan')).toHaveLength(2);

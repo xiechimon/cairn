@@ -171,7 +171,7 @@ export async function runCoordinatorTurn(
         if (
           input.stepId !== stepId ||
           input.kind !== 'steer' ||
-          input.state !== 'pending' ||
+          input.state === 'released' ||
           input.conversationId !== conversationKey
         )
           continue;

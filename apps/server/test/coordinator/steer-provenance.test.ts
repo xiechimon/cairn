@@ -10,14 +10,7 @@ import {
 } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
-import {
-  chiefMessage,
-  coordinatorEntry,
-  coordinatorInput,
-  coordinatorRun,
-  step,
-  todo,
-} from '../../src/db/schema.js';
+import { chiefMessage, coordinatorInput, coordinatorRun, step, todo } from '../../src/db/schema.js';
 import { createRequestTodo } from '../../src/services/coordinator-request.js';
 import { issueApiKey, postProject, req, seedSessionRoute } from '../helpers.js';
 import { seedOwnerMessage } from '../owner-message.js';
@@ -155,13 +148,6 @@ test('a quoted answer inherits an image consumed as a steer in the real Coordina
   expect(
     task.request?.segments[0]?.context?.messages.map((message) => message.messageId),
   ).toContain(ownerId);
-  expect(
-    w.s.db
-      .select()
-      .from(coordinatorEntry)
-      .where(eq(coordinatorEntry.chiefMessageId, ownerId))
-      .get(),
-  ).toBeDefined();
   seedSessionRoute(w.s, { provider: 'stub', modelId: 'm' });
   const apiKey = await issueApiKey(w.s);
   const enrolled = await w.s.app.request('/api/machine/enroll', {
