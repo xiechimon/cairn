@@ -121,7 +121,7 @@ const NAV = [
       ['thread-row', 'Thread row and bulk bar'],
       ['permission', 'Permission and proposal'],
       ['plan', 'Plan approval, usage'],
-      ['thread-usage', 'Thread usage footer'],
+      ['thread-usage', 'Thread usage'],
       ['pr-bar', 'Pull request bar'],
       ['pr-card', 'PR card'],
       ['pr-list', 'PR list'],

@@ -44,11 +44,11 @@ export function ThreadUsageDisclosure({
       aria-controls={open ? contentId : undefined}
       onClick={() => setOpen((previous) => !previous)}
       className={cn(
-        'justify-start gap-1.5 px-1 text-left',
+        'justify-start gap-1.5 px-1 text-left text-content-tertiary',
         state === 'error' ? 'min-w-0 flex-1' : 'w-full',
       )}
     >
-      <ChevronRight data-icon="inline-start" className={cn(open && '-rotate-90')} />
+      <ChevronRight data-icon="inline-start" className={cn(open && 'rotate-90')} />
       <span className="min-w-0 truncate tabular-nums" title={caption}>
         {caption}
       </span>
@@ -59,8 +59,18 @@ export function ThreadUsageDisclosure({
       data-testid="thread-usage"
       data-state={state}
       aria-label={t('thread 用量')}
-      className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col gap-2"
+      className="mt-0.5 flex min-w-0 flex-none flex-col gap-2 pl-5"
     >
+      {state === 'error' ? (
+        <div className="flex items-center gap-1.5">
+          {toggle}
+          <Button variant="outline" size="xs" data-testid="thread-usage-retry" onClick={onRetry}>
+            {t('重试')}
+          </Button>
+        </div>
+      ) : (
+        toggle
+      )}
       {open && (
         <div id={contentId} className="flex min-w-0 flex-col gap-2">
           <div data-testid="thread-usage-stats">
@@ -98,16 +108,6 @@ export function ThreadUsageDisclosure({
             </span>
           )}
         </div>
-      )}
-      {state === 'error' ? (
-        <div className="flex items-center gap-1.5">
-          {toggle}
-          <Button variant="outline" size="xs" data-testid="thread-usage-retry" onClick={onRetry}>
-            {t('重试')}
-          </Button>
-        </div>
-      ) : (
-        toggle
       )}
     </section>
   );
