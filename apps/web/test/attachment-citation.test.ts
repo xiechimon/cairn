@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { inlineSegments } from '../src/api/mappers.js';
+import { isImageAttachmentKey } from '../src/detail/attachment-chip.js';
 import { parseChatMarkdown } from '../src/detail/chat-markdown.js';
 
 const KEY = 'lIH2x-iaJ8NjTCJdW-vcF/hg4lgHMHQLnQBHR3CImra.md';
@@ -39,6 +40,19 @@ describe('attachment citations in displayed markdown', () => {
     expect(inlineSegments('见图 ![截图](attachment:team-1/shot.png) 这里')).toEqual([
       { text: '见图 ' },
       { text: '截图', style: 'attachment', attachmentKey: 'team-1/shot.png' },
+      { text: ' 这里' },
+    ]);
+  });
+
+  test('avif uses the shared image extension list', () => {
+    expect(isImageAttachmentKey('team-1/shot.avif')).toBe(true);
+    expect(isImageAttachmentKey('team-1/report.md')).toBe(false);
+  });
+
+  test('an empty image label falls back to the file name', () => {
+    expect(inlineSegments('见图 ![](attachment:team-1/shot.avif) 这里')).toEqual([
+      { text: '见图 ' },
+      { text: 'shot.avif', style: 'attachment', attachmentKey: 'team-1/shot.avif' },
       { text: ' 这里' },
     ]);
   });

@@ -1,3 +1,4 @@
+import { isImageAttachmentExt } from '@cairn/shared';
 import { createContext } from 'react';
 import { Button } from '../components/ui/button.js';
 
@@ -9,7 +10,9 @@ export function attachmentIdFromKey(key: string): string {
 }
 
 export function isImageAttachmentKey(key: string): boolean {
-  return /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(key);
+  const dot = key.lastIndexOf('.');
+  if (dot < 0 || dot === key.length - 1) return false;
+  return isImageAttachmentExt(key.slice(dot + 1).toLowerCase());
 }
 
 export const SPEC_CHIP =

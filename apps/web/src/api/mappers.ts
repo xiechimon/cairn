@@ -391,7 +391,7 @@ export function pillOf(call: ToolCallRecord): string {
   return primary === '' ? call.name : `${call.name} ${primary}`;
 }
 
-const LINK_LABEL = /\[([^\]\n]+?)\]\(/g;
+const LINK_LABEL = /\[([^\]\n]*)\]\(/g;
 const MENTION_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
 const WEB_TARGET = /^https?:\/\/\S+$/;
 const ATTACHMENT_TARGET = /^attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]{1,8})$/;
@@ -438,6 +438,7 @@ export function inlineSegments(text: string): DocSegment[] {
       const target = frag.slice(m.index + m[0].length, close).replace(/\\([!-/:-@[-`{-~])/g, '$1');
       const mention = MENTION_TARGET.exec(target);
       const attachment = ATTACHMENT_TARGET.exec(target);
+      if (label === '' && attachment === null) continue;
       if (mention === null && attachment === null && !WEB_TARGET.test(target)) continue;
       const bang = attachment !== null && frag[m.index - 1] === '!';
       pushText(frag.slice(cursor, bang ? m.index - 1 : m.index));
