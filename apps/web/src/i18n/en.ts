@@ -117,8 +117,6 @@ export const EN: Record<string, string> = {
   '最新：{line}': 'Latest: {line}',
   '任务 #{n} {title}：{status}': 'Task #{n} {title}: {status}',
   审阅中: 'In review',
-  '已完成，未验证': 'Done, not verified',
-  已验证: 'Verified',
   定时: 'Schedules',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
@@ -1409,8 +1407,6 @@ export const EN: Record<string, string> = {
   '排队等机器。': 'Waiting for a machine.',
   '正在写计划。': 'Writing the plan.',
   '正在动手。': 'Working on it.',
-  '验证通过。': 'Verification passed.',
-  '完成了，还没有验证结论。': 'Done, with no verification result yet.',
   '还没开始。': 'Not started.',
   做个计划: 'Make a plan',
   接一个仓库: 'Add a repo',

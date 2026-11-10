@@ -169,7 +169,7 @@ describe('activitySummary', () => {
     expect(activitySummary(activity as ThreadActivity)).toEqual({
       seqNum: 2,
       messages: 0,
-      status: '已完成，未验证',
+      status: '已完成',
     });
   });
 
