@@ -1,0 +1,62 @@
+{
+  "status": 200,
+  "body": {
+    "messages": [
+      {
+        "id": "owner",
+        "role": "user",
+        "content": "Fix keyboard selection in the question card.",
+        "createdAt": 1794282388294
+      },
+      {
+        "id": "user-failed-wake",
+        "role": "user",
+        "content": "[wake:failed] provenance=watch:other\nCheck an unrelated failure.",
+        "createdAt": 1794282389294
+      },
+      {
+        "id": "wake-reply",
+        "role": "assistant",
+        "content": "Checking an unrelated failure.",
+        "createdAt": 1794282389794
+      },
+      {
+        "id": "created-tool",
+        "role": "assistant",
+        "content": {
+          "kind": "toolcall",
+          "call": {
+            "id": "create",
+            "name": "create_todo",
+            "arguments": {
+              "projectId": "fixture-generated-id"
+            },
+            "result": [
+              {
+                "type": "text",
+                "text": "{\"id\":\"fixture-generated-id\",\"teamId\":\"fixture-generated-id\",\"projectId\":\"fixture-generated-id\",\"title\":\"Repair keyboard selection\",\"spec\":\"Preserve the owner request.\",\"phase\":\"todo\",\"phaseAt\":1794282398279,\"archivedAt\":null,\"snoozedUntil\":null,\"snoozeMode\":null,\"seqNum\":1,\"orderIndex\":0,\"tagIds\":[],\"githubLabelIds\":[],\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":\"fixture-generated-id\",\"ownerId\":\"fixture-generated-id\",\"sourceBuildId\":null,\"sourceKind\":null,\"sourceRef\":null,\"output\":\"code\",\"owner\":null,\"section\":\"up_next\",\"quotaWait\":null}"
+              }
+            ]
+          }
+        },
+        "createdAt": 1794282391294
+      },
+      {
+        "id": "resumed-reply",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Started task 169. Your keyboard fix is underway."
+          }
+        ],
+        "createdAt": 1794282392294
+      }
+    ],
+    "chips": [],
+    "historyEpoch": 0,
+    "steerPending": [],
+    "activeRun": null,
+    "nextCursor": null
+  }
+}
