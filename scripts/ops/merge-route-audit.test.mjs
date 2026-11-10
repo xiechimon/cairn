@@ -7,6 +7,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import { queuedBeforeMerge } from './merge-route-audit.mjs';
 
 const labeled = (name, at) => ({ event: 'labeled', label: { name }, created_at: at });
+const unlabeled = (name, at) => ({ event: 'unlabeled', label: { name }, created_at: at });
 
 test('a queued label before the merge counts as a queue merge', () => {
   assert.equal(
@@ -19,6 +20,25 @@ test('a queued label after the merge does not count', () => {
   assert.equal(
     queuedBeforeMerge('2026-11-05T17:10:09Z', [labeled('queued', '2026-11-05T17:10:15Z')]),
     false,
+  );
+});
+
+test('removing the queued label or marking dequeued before the merge does not count', () => {
+  const mergedAt = '2026-11-10T08:00:00Z';
+  assert.equal(
+    queuedBeforeMerge(mergedAt, [
+      labeled('queued', '2026-11-10T07:40:00Z'),
+      unlabeled('queued', '2026-11-10T07:50:00Z'),
+      labeled('dequeued', '2026-11-10T07:50:01Z'),
+    ]),
+    false,
+  );
+  assert.equal(
+    queuedBeforeMerge(mergedAt, [
+      labeled('queued', '2026-11-10T07:40:00Z'),
+      unlabeled('queued', '2026-11-10T08:00:05Z'),
+    ]),
+    true,
   );
 });
 

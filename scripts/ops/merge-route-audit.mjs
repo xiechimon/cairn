@@ -5,17 +5,35 @@ const shaPattern = /^[a-f0-9]{40}$/;
 const gh = (...args) =>
   execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 
+function eventTime(event) {
+  return typeof event.created_at === 'string' ? Date.parse(event.created_at) : Number.NaN;
+}
+
 export function queuedBeforeMerge(mergedAt, timeline) {
-  const queued = timeline.filter(
-    (event) =>
-      event.event === 'labeled' &&
-      event.label?.name === 'queued' &&
-      typeof event.created_at === 'string',
-  );
-  if (queued.length === 0) return false;
   if (typeof mergedAt !== 'string') return false;
   const mergeTime = Date.parse(mergedAt);
-  return queued.some((event) => Date.parse(event.created_at) < mergeTime);
+  if (Number.isNaN(mergeTime)) return false;
+  const beforeMerge = (event) => {
+    const at = eventTime(event);
+    return !Number.isNaN(at) && at < mergeTime;
+  };
+  if (
+    timeline.some(
+      (event) =>
+        event.event === 'labeled' && event.label?.name === 'dequeued' && beforeMerge(event),
+    )
+  ) {
+    return false;
+  }
+  const queued = timeline.filter(
+    (event) =>
+      (event.event === 'labeled' || event.event === 'unlabeled') &&
+      event.label?.name === 'queued' &&
+      beforeMerge(event),
+  );
+  if (queued.length === 0) return false;
+  queued.sort((a, b) => eventTime(a) - eventTime(b));
+  return queued.at(-1).event === 'labeled';
 }
 
 export function auditPull(repo, number) {
