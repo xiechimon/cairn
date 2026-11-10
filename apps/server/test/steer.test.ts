@@ -388,7 +388,7 @@ describe('the steer server write surface (W3 #278)', () => {
     });
   });
 
-  test('idle building with finished steps accepts a human continuation', async () => {
+  test('idle building with a finished reviewer accepts continuation and resumes the builder', async () => {
     const buildId = await finishBuild(w);
     w.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, w.todoId)).run();
     w.s.db
@@ -396,18 +396,38 @@ describe('the steer server write surface (W3 #278)', () => {
       .set({ prNumber: 3812, prUrl: 'https://github.com/demo-owner/demo-repo/pull/3812' })
       .where(eq(build.id, buildId))
       .run();
+    w.s.db
+      .insert(step)
+      .values({
+        id: 'idle-building-review',
+        buildId,
+        kind: 'review',
+        status: 'done',
+        sessionId: 'review-session',
+        machineId: w.machineId,
+        createdAt: Date.now() + 1,
+      })
+      .run();
     const before = w.s.db.select().from(step).where(eq(step.buildId, buildId)).all();
     expect(before.every((row) => row.status === 'done' || row.status === 'stopped')).toBe(true);
     const res = await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
       content: 'Remove the coordinator-hold and continue',
     });
     expect(res.status).toBe(201);
+    expect(w.s.db.select().from(build).where(eq(build.id, buildId)).get()).toMatchObject({
+      prevPhase: 'building',
+    });
     const steps = w.s.db.select().from(step).where(eq(step.buildId, buildId)).all();
     expect(steps).toHaveLength(before.length + 1);
     expect(steps.find((row) => !before.some((old) => old.id === row.id))).toMatchObject({
       kind: 'session',
       status: 'pending',
       prompt: 'Remove the coordinator-hold and continue',
+    });
+    const claimed = await w.claim();
+    expect(claimed.step?.session).toMatchObject({
+      action: 'continue',
+      sessionId: 'previous-session',
     });
   });
 
