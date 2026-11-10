@@ -13,7 +13,7 @@ import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { ChatMarkdown, MD_LIST, MD_LIST_ITEM } from '../detail/chat-markdown.js';
-import { TodoGlanceContext } from '../detail/segments.js';
+import { type TodoGlance, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type {
   ChiefContent,
   ChiefSegment,
@@ -24,8 +24,10 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
+import { PHASE_UI } from '../phase.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
+import { taskRefsOf } from './chief-task-refs.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
@@ -65,6 +67,8 @@ function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: 
   );
 }
 
+const NO_GLANCES: ReadonlyMap<string, TodoGlance> = new Map();
+
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
 const MSG_COL_CLS =
@@ -102,21 +106,67 @@ function robotText(item: {
   return lines.join('\n');
 }
 
+function TodoSegmentChip({ seq }: { seq: number }) {
+  const glances = useContext(TodoGlanceContext);
+  const known = [...(glances ?? [])].find(([, glance]) => glance.seq === seq);
+  const chip = (
+    <>
+      {known !== undefined ? (
+        <TodoStatus phase={known[1].phase} />
+      ) : (
+        <FileText width={11} height={11} />
+      )}
+      {seq}
+    </>
+  );
+  const cls = `${CHIP_INLINE_CLS} bg-secondary text-content-secondary`;
+  return known === undefined ? (
+    <span data-testid="chief-chip-todo" className={cls}>
+      {chip}
+    </span>
+  ) : (
+    <ThreadLink
+      todoId={known[0]}
+      data-testid="chief-chip-todo"
+      data-phase={known[1].phase}
+      className={`${cls} cursor-pointer`}
+    >
+      {chip}
+    </ThreadLink>
+  );
+}
+
+function TaskRefRows({ source }: { source: Parameters<typeof taskRefsOf>[0] }) {
+  const { t } = useI18n();
+  const glances = useContext(TodoGlanceContext);
+  const refs = taskRefsOf(source, glances ?? NO_GLANCES);
+  if (refs.length === 0) return null;
+  return (
+    <div className="mb-1.5 flex flex-col gap-0.5" data-testid="chief-task-refs">
+      {refs.map((ref) => (
+        <ThreadLink
+          key={ref.todoId}
+          todoId={ref.todoId}
+          data-phase={ref.phase}
+          data-testid="chief-task-ref"
+          className="ml-1 flex w-fit max-w-full cursor-pointer items-center gap-1.5 text-meta font-medium text-(--foreground) no-underline hover:underline"
+        >
+          <TodoStatus phase={ref.phase} />
+          <span className="min-w-0 truncate">{ref.title ?? `#${ref.seq ?? ''}`}</span>
+          <span className="flex-none font-normal text-(--text-tertiary)">
+            {`· ${t(PHASE_UI[ref.phase].chip)}`}
+          </span>
+        </ThreadLink>
+      ))}
+    </div>
+  );
+}
+
 function Segments({ segments }: { segments: ChiefSegment[] }) {
   return (
     <>
       {segments.map((s, i) => {
-        if (s.todo != null)
-          return (
-            <span
-              key={i}
-              data-testid="chief-chip-todo"
-              className={`${CHIP_INLINE_CLS} bg-secondary text-content-secondary`}
-            >
-              <FileText width={11} height={11} />
-              {s.todo}
-            </span>
-          );
+        if (s.todo != null) return <TodoSegmentChip key={i} seq={s.todo} />;
         if (s.agent != null)
           return (
             <span
@@ -485,6 +535,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               cardTestId="chief-turn-tools"
             />
           )}
+          {item.typing !== true && <TaskRefRows source={item} />}
           <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
             <BubbleContent
               className={BUBBLE_ROBOT_CLS}
