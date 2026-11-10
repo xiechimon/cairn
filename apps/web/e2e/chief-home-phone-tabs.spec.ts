@@ -49,11 +49,15 @@ test.describe('at phone width', () => {
     await expect(tabs(page)).toHaveCount(0);
   });
 
-  test('the Tasks plus button closes the sheet and focuses the composer', async ({ page }) => {
+  test('the Tasks plus button adds a task inline, then closes the sheet onto the composer', async ({
+    page,
+  }) => {
     await page.goto(`${HOME}&pane=tasks`);
     await panel(page).getByTestId('tasks-new').click();
+    await panel(page).getByTestId('tasks-add-input').fill('Check the relay probe');
+    await panel(page).getByTestId('tasks-add-input').press('Enter');
     await expect(panel(page)).toHaveCount(0);
-    await expect(composer(page)).toBeFocused();
+    await expect(composer(page)).toHaveValue('Check the relay probe');
     await expect(composer(page)).toBeInViewport();
   });
 
