@@ -2,6 +2,7 @@ import type { Switch as SwitchPrimitive } from '@base-ui/react/switch';
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import { Button } from './ui/button.js';
 import { Switch } from './ui/switch.js';
 
 const TOGGLE_SWITCH_CLS =
@@ -27,9 +28,11 @@ export function ExplainDisabledToggle({
     <span className={cn('relative inline-flex', className)}>
       <span className={explain ? 'pointer-events-none' : undefined}>{children}</span>
       {explain ? (
-        <span
-          aria-hidden
-          className="absolute inset-0 cursor-not-allowed"
+        <Button
+          type="button"
+          variant="ghost"
+          className="absolute inset-0 size-auto h-auto cursor-not-allowed border-0 bg-transparent p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-(--focus-ring) dark:hover:bg-transparent"
+          aria-label={reason}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();

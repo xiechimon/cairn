@@ -193,12 +193,13 @@ test('an offline accept switch stays disabled and explains why on click', async 
   await page.goto('/app/settings/machines');
   const toggle = settings(page).getByTestId('machine-accept-toggle');
   await expect(toggle).toBeDisabled();
-  const box = await toggle.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await expect(page.locator('[data-sonner-toast]')).toContainText(
-    '重新连接 omarchy 后才能修改它的设置。',
-  );
+  const reason = '重新连接 omarchy 后才能修改它的设置。';
+  const explain = settings(page).getByRole('button', { name: reason });
+  await explain.click();
+  await expect(page.locator('[data-sonner-toast]', { hasText: reason })).toBeVisible();
+  await explain.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-sonner-toast]', { hasText: reason }).first()).toBeVisible();
 });
 
 test('scope menu wraps long machine names without clipping or overlapping adjacent options inside a phone viewport', async ({
