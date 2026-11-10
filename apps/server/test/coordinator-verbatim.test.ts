@@ -242,25 +242,37 @@ describe('splitting one request', () => {
 });
 
 describe('update_todo', () => {
-  test('title and spec are refused', async () => {
+  test('spec is refused; a summary title persists without rewriting the request body', async () => {
+    const content =
+      '并且我想让你支持这个md文件的预览功能，最好还能编辑，另外表格也要好看一点才行啊';
     const created = (await relay('create_todo', {
       projectId: H.projectId,
-      messageIds: [ownerMessage('x')],
+      messageIds: [ownerMessage(content)],
     })) as Created;
+    expect(created.title.startsWith('并且我想让你支持这个md文件的预览')).toBe(true);
+    expect(created.title).not.toBe('Markdown 预览与编辑');
     await expect(
       relay('update_todo', { todoId: created.id, spec: 'rewrite' }),
     ).rejects.toMatchObject({
       status: 400,
     });
-    await expect(
-      relay('update_todo', { todoId: created.id, title: 'rewrite' }),
-    ).rejects.toMatchObject({
-      status: 400,
-    });
+    const updated = (await relay('update_todo', {
+      todoId: created.id,
+      title: 'Markdown 预览与编辑',
+    })) as Created;
+    expect(updated.title).toBe('Markdown 预览与编辑');
+    const stored = row(created.id);
+    expect(stored.title).toBe('Markdown 预览与编辑');
+    expect(stored.spec).toBe(content);
+    expect(stored.request?.segments).toHaveLength(1);
+    expect(stored.request?.segments[0]?.text).toBe(content);
+    expect(stored.request?.titleSource).toBe('coordinator');
+    expect(stored.request?.titleSourceRef).toBe(null);
+    expect(fencedTitle(stored.title, stored)).toBe('named by the Coordinator: Markdown 预览与编辑');
   });
 });
 
-describe('static: Coordinator todo writes take no text from tool params', () => {
+describe('static: Coordinator todo writes take no body text from tool params', () => {
   const source = (file: string) =>
     readFileSync(join(import.meta.dirname, '../src/services', file), 'utf8');
 
@@ -273,18 +285,20 @@ describe('static: Coordinator todo writes take no text from tool params', () => 
     },
   );
 
-  test('the create_todo and update_todo cases read no title or spec', () => {
+  test('create_todo reads no title or spec; update_todo may set title only', () => {
     const text = source('chief-tools.ts');
-    for (const name of ['create_todo', 'update_todo']) {
-      const start = text.indexOf(`case '${name}': {`);
-      expect(start).toBeGreaterThan(-1);
-      const block = text.slice(start, text.indexOf("\n    case '", start + 1));
-      expect(block).not.toMatch(/['"](spec|title)['"]|params\.(spec|title)/);
-    }
+    const createStart = text.indexOf(`case 'create_todo': {`);
+    expect(createStart).toBeGreaterThan(-1);
+    const createBlock = text.slice(createStart, text.indexOf("\n    case '", createStart + 1));
+    expect(createBlock).not.toMatch(/['"](spec|title)['"]|params\.(spec|title)/);
+    const updateStart = text.indexOf(`case 'update_todo': {`);
+    expect(updateStart).toBeGreaterThan(-1);
+    const updateBlock = text.slice(updateStart, text.indexOf("\n    case '", updateStart + 1));
+    expect(updateBlock).not.toMatch(/['"]spec['"]|params\.spec/);
   });
 
-  test('the request service takes no spec or title from tool params', () => {
-    expect(source('coordinator-request.ts')).not.toMatch(/params\.(spec|title)\b/);
+  test('the request service takes no spec from tool params', () => {
+    expect(source('coordinator-request.ts')).not.toMatch(/params\.spec\b/);
   });
 });
 

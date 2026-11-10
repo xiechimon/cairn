@@ -446,7 +446,7 @@ export function updateTodo(
   );
 }
 
-export type TodoTextWriter = 'request-service' | { ownerEdit: string };
+export type TodoTextWriter = 'request-service' | 'coordinator-title' | { ownerEdit: string };
 
 export function updateAutonomousTodo(
   deps: TodoDeps,
@@ -515,7 +515,7 @@ export function updateAutonomousTodo(
     sets.spec = patch.spec;
     sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
     const editor = opts.textWriter;
-    if (row.request !== null && editor !== undefined && editor !== 'request-service') {
+    if (row.request !== null && editor !== undefined && typeof editor === 'object') {
       sets.request = {
         ...row.request,
         segments: [
@@ -533,7 +533,7 @@ export function updateAutonomousTodo(
   if (patch.title !== undefined && row.request !== null) {
     sets.request = {
       ...(sets.request ?? row.request),
-      titleSource: 'owner',
+      titleSource: opts.textWriter === 'coordinator-title' ? 'coordinator' : 'owner',
       titleSourceRef: null,
     };
   }

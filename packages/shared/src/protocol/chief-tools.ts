@@ -198,6 +198,7 @@ export type CoordinatorCreateTodoParams = z.infer<typeof coordinatorCreateTodoPa
 export const coordinatorUpdateTodoParamsSchema = z
   .object({
     todoId: z.string().min(1),
+    title: z.string().trim().min(1).max(200).optional(),
     tagIds: todoIdListSchema.optional(),
     projectId: z.string().min(1).optional(),
     addMessageIds: todoIdListSchema.min(1).optional(),
@@ -407,7 +408,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and titles it from them. You add routing only. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         projectId: str('Project id.'),
@@ -439,10 +440,13 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_todo',
     description:
-      "Update a todo's tags, move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds, copied verbatim). A todo's title and text are never rewritten; a running thread gets corrections through message_thread.",
+      "Update a todo's summary title, tags, move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds, copied verbatim). After create_todo, set title to a short summary (≤50 chars) for the Tasks panel; the owner's cited request body stays in the task text and is never rewritten here. A running thread gets body corrections through message_thread.",
     parameters: obj(
       {
         todoId: str('Todo id.'),
+        title: str(
+          'Optional short summary title for the Tasks panel (≤50 chars, plain text). Does not change the owner request body.',
+        ),
         tagIds: idArr('Optional replacement tag ids.'),
         projectId: str(
           'Optional target project id. Only for a todo that has not started; its tags are dropped.',
