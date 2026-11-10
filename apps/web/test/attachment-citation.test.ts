@@ -44,9 +44,12 @@ describe('attachment citations in displayed markdown', () => {
     ]);
   });
 
-  test('avif stays a download chip because the attachment endpoint forces download', () => {
-    expect(isImageAttachmentKey('team-1/shot.avif')).toBe(false);
+  test('only inline-served image types open a preview', () => {
     expect(isImageAttachmentKey('team-1/shot.png')).toBe(true);
+    expect(isImageAttachmentKey('team-1/shot.avif')).toBe(false);
+    expect(isImageAttachmentKey('team-1/icon.svg')).toBe(false);
+    expect(isImageAttachmentKey('team-1/icon.bmp')).toBe(false);
+    expect(isImageAttachmentKey('team-1/icon.ico')).toBe(false);
   });
 
   test('an empty image label falls back to the file name', () => {
