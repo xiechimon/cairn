@@ -33,6 +33,7 @@ import {
   teamStreamEventSchema,
   todoRecordSchema,
 } from '../src/index.js';
+import { REPLY_TASK_172 } from './fixtures/reply-todo-172.js';
 
 describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
   const sample = {
@@ -728,6 +729,10 @@ describe('search response (02 §6.3 [design] self-set wire)', () => {
 });
 
 describe('chiefThreadTitle (#757: attachment token lines never bare paths)', () => {
+  it('uses the reply body for a conversation title', () => {
+    expect(chiefThreadTitle(REPLY_TASK_172.content)).toBe('Please dispa…');
+  });
+
   it('plain-text first sentence truncated as before', () => {
     expect(chiefThreadTitle('帮 r3-lifecycle 写一份构建文档吧')).toBe('帮 r3-lifecyc…');
   });
