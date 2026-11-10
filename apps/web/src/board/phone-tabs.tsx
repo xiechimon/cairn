@@ -44,6 +44,7 @@ export function PhoneTabs({ tasksOpen, badge }: { tasksOpen: boolean; badge: num
   };
   return (
     <nav
+      data-slot="phone-tabs"
       aria-label={t('对话和任务')}
       className="flex flex-none border-t border-border bg-background pb-[env(safe-area-inset-bottom)]"
     >
