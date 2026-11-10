@@ -5,7 +5,7 @@ export const TASK_REQUEST_DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
 export const TASK_REQUEST_PRIORITIES = ['first', 'normal'] as const;
 export const TASK_SEGMENT_AUTHORS = ['owner', 'third-party'] as const;
 export type TaskSegmentAuthor = (typeof TASK_SEGMENT_AUTHORS)[number];
-export type TaskTitleAuthor = TaskSegmentAuthor | 'worker';
+export type TaskTitleAuthor = TaskSegmentAuthor | 'worker' | 'coordinator';
 
 const span = z.enum(['whole', 'quote']);
 
@@ -49,7 +49,7 @@ export const taskRequestSchema = z.object({
   segments: z.array(taskSegmentSchema).min(1),
   siblings: z.array(z.string().min(1)),
   difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).nullable(),
-  titleSource: z.enum(['owner', 'third-party', 'worker']),
+  titleSource: z.enum(['owner', 'third-party', 'worker', 'coordinator']),
   titleSourceRef: z.string().nullable(),
 });
 export type TaskRequest = z.infer<typeof taskRequestSchema>;

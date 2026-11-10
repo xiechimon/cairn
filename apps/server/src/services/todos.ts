@@ -446,7 +446,7 @@ export function updateTodo(
   );
 }
 
-export type TodoTextWriter = 'request-service' | { ownerEdit: string };
+export type TodoTextWriter = 'request-service' | 'coordinator-title' | { ownerEdit: string };
 
 export function updateAutonomousTodo(
   deps: TodoDeps,
@@ -479,6 +479,15 @@ export function updateAutonomousTodo(
     throw new HttpError(
       409,
       `todo ${id} carries the owner's cited words; edit it in the board, or send owner messages through the Coordinator`,
+    );
+  }
+  if (
+    opts.textWriter === 'coordinator-title' &&
+    (patch.title === undefined || row.request === null)
+  ) {
+    throw new HttpError(
+      409,
+      `todo ${id} has no cited request; summary titles are only for Coordinator-created request tasks`,
     );
   }
 
@@ -515,7 +524,7 @@ export function updateAutonomousTodo(
     sets.spec = patch.spec;
     sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
     const editor = opts.textWriter;
-    if (row.request !== null && editor !== undefined && editor !== 'request-service') {
+    if (row.request !== null && editor !== undefined && typeof editor === 'object') {
       sets.request = {
         ...row.request,
         segments: [
@@ -533,7 +542,7 @@ export function updateAutonomousTodo(
   if (patch.title !== undefined && row.request !== null) {
     sets.request = {
       ...(sets.request ?? row.request),
-      titleSource: 'owner',
+      titleSource: opts.textWriter === 'coordinator-title' ? 'coordinator' : 'owner',
       titleSourceRef: null,
     };
   }

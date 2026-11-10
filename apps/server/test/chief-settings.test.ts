@@ -235,6 +235,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).not.toContain('措辞→spec');
     expect(prompt).not.toContain('要求：');
     expect(prompt).toContain('你不写任务正文');
+    expect(prompt).toContain('摘要标题');
     expect(prompt).toContain('quotes');
   });
 
