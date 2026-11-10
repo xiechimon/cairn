@@ -388,6 +388,9 @@ describe('owner answers and appended words', () => {
     })) as Created;
     expect(created.spec).toBe('修一下计数\n\n只改看板页');
     await expect(
+      relay('create_todo', { projectId: H.projectId }, { turnMessageIds: [owner] }),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
       relay('create_todo', {
         projectId: H.projectId,
         messageIds: [answeredQuestion('coordinator')],
