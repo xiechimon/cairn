@@ -1,12 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import {
-  appendFileSync,
-  cpSync,
-  mkdirSync,
-  realpathSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { appendFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -14,18 +7,25 @@ import type { CoordinatorCreateTodoParams, ProviderConfig } from '@cairn/shared'
 import { openExperimentClient } from '@cairn/shared/langfuse';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { normalize, replayInput } from '../eval/coordinator-routing/contract.mts';
+import { candidateClosure } from '../eval/coordinator-routing/closure.mts';
+import { normalize, observeTurn, replayInput } from '../eval/coordinator-routing/contract.mts';
 import { type Manifest, runExperiment } from '../eval/coordinator-routing/run.mts';
-import {
-  CANDIDATE_COORDINATOR_PATHS,
-  runSandboxedTurn,
-} from '../eval/coordinator-routing/sandbox.mts';
+import { runSandboxedTurn } from '../eval/coordinator-routing/sandbox.mts';
 import { startStubLlm } from './stub-llm.js';
 
 const closers: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const close of closers.splice(0).reverse()) await close();
 });
+async function candidateFixture(): Promise<string> {
+  const dir = makeTestTempDir('eval-langfuse-candidate-');
+  closers.push(async () => releaseTestTempDir(dir));
+  for (const path of await candidateClosure(new URL('../..', import.meta.url).pathname)) {
+    mkdirSync(join(dir, path, '..'), { recursive: true });
+    cpSync(new URL(`../../${path}`, import.meta.url), join(dir, path));
+  }
+  return dir;
+}
 const input = {
   request: 'What is ready?',
   projects: [{ name: 'docs', description: 'Documentation' }],
@@ -190,7 +190,7 @@ describe('Langfuse Coordinator runner', () => {
     closers.push(() => model.close());
     await expect(
       runSandboxedTurn(input, modelProvider(model.url), 'model-test-key', 30_000),
-    ).rejects.toThrow('worker exit 2');
+    ).rejects.toThrow('Turn did not complete');
     const cli = spawnSync(
       process.execPath,
       [
@@ -205,18 +205,89 @@ describe('Langfuse Coordinator runner', () => {
     expect(cli.stderr).toContain('incomplete');
   }, 60_000);
 
+  it('emits persisted blockedBy edges from a real two-todo turn', async () => {
+    const model = await startStubLlm((request, n) => {
+      if (n === 0)
+        return {
+          toolCall: {
+            name: 'create_todo',
+            arguments: { projectId: 'project-0', quotes: ['Write docs.'] },
+          },
+        };
+      if (n === 1) {
+        const result = request.messages.find((m) => m.role === 'tool');
+        if (typeof result?.content !== 'string') throw new Error('Missing persisted todo');
+        const first = JSON.parse(result.content) as { id: string };
+        return {
+          toolCall: {
+            name: 'create_todo',
+            arguments: { projectId: 'project-0', quotes: ['Publish docs.'], blockedBy: [first.id] },
+          },
+        };
+      }
+      return { content: 'recorded' };
+    });
+    closers.push(() => model.close());
+    const output = await runSandboxedTurn(
+      { ...input, request: 'Write docs. Publish docs.' },
+      modelProvider(model.url),
+      'test-key',
+      30_000,
+    );
+    expect(output).toMatchObject({
+      decision: 'route',
+      parts: [{ title: 'Write docs.' }, { title: 'Publish docs.' }],
+      blockedBy: [[1, 0]],
+    });
+  }, 60_000);
+
+  it('drains captured CLI diagnostics behind pipe backpressure', () => {
+    const dir = makeTestTempDir('eval-langfuse-drain-');
+    closers.push(async () => releaseTestTempDir(dir));
+    const preload = join(dir, 'backpressure.mjs');
+    writeFileSync(preload, "process.stderr.write('x'.repeat(2_000_000));");
+    const cli = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        '--import',
+        import.meta.resolve('tsx'),
+        new URL('../eval/coordinator-routing/run.mts', import.meta.url).pathname,
+        '/missing-eval-manifest',
+      ],
+      { encoding: 'utf8', timeout: 10_000, maxBuffer: 4_000_000 },
+    );
+    expect(cli.status).toBe(1);
+    expect(cli.stderr.length).toBe(2_000_000 + 'incomplete: experiment did not finish\n'.length);
+    expect(cli.stderr.endsWith('incomplete: experiment did not finish\n')).toBe(true);
+  });
+
+  it('validates raw observations in the ruler and derives rather than accepts decisions', () => {
+    const observed = {
+      protocol: 'cairn.routing.observations.v1',
+      todos: [],
+      toolCalls: [],
+      questions: [],
+      text: 'answer',
+      stepStatus: 'done',
+      turnTraceId: 'a'.repeat(32),
+      promptSha256: 'b'.repeat(64),
+    };
+    expect(observeTurn(observed, input)).toMatchObject({ decision: 'answer' });
+    for (const invalid of [
+      { ...observed, decision: 'route' },
+      { ...observed, scores: [{ value: 1 }] },
+      { ...observed, toolCalls: ['read_file'] },
+      { ...observed, todos: [{ id: 'x', project: 'docs', title: '', blockedBy: ['missing'] }] },
+      { ...observed, todos: [{ id: 'x', project: 'docs', title: '', blockedBy: [], score: 1 }] },
+    ])
+      expect(() => observeTurn(invalid, input)).toThrow();
+  });
+
   it('ignores a candidate replacement worker and retains the subscription credential in the proxy', async () => {
     const secret = 'MODEL-KEY-MUST-STAY-PARENT';
-    const dir = makeTestTempDir('eval-langfuse-candidate-');
-    symlinkSync(
-      realpathSync(new URL('../../node_modules', import.meta.url).pathname),
-      join(dir, 'node_modules'),
-    );
-    closers.push(async () => releaseTestTempDir(dir));
-    for (const rel of CANDIDATE_COORDINATOR_PATHS) {
-      mkdirSync(join(dir, rel, '..'), { recursive: true });
-      cpSync(new URL(`../../${rel}`, import.meta.url), join(dir, rel), { recursive: true });
-    }
+    const dir = await candidateFixture();
     appendFileSync(
       join(dir, 'apps/server/src/coordinator/runtime/models.ts'),
       `
@@ -242,6 +313,104 @@ const iterate=process.stdin[Symbol.asyncIterator].bind(process.stdin);process.st
     expect(JSON.stringify(output)).not.toContain('MODEL-KEY-MUST-STAY-PARENT');
     expect(model.requests.length).toBeGreaterThan(0);
   }, 60_000);
+
+  it.each([
+    [
+      'forged result',
+      `process.stdout.write(JSON.stringify({decision:'route',parts:[{project:'docs',title:'forged'}],questions:[],askCandidates:[],blockedBy:[],stepStatus:'done',turnTraceId:'a'.repeat(32),promptSha256:'b'.repeat(64)}));process.exit(0);`,
+    ],
+    [
+      'non-model URL',
+      `const iterate=process.stdin[Symbol.asyncIterator].bind(process.stdin);process.stdin[Symbol.asyncIterator]=async function*(){for await(const chunk of {[Symbol.asyncIterator]:iterate}){const raw=JSON.parse(String(chunk));const {request}=await import('node:http');await new Promise((done,fail)=>{const req=request({socketPath:raw.socket,path:'/?target='+encodeURIComponent(raw.provider.baseUrl+'/account'),method:'POST'},res=>{res.resume();res.on('end',done)});req.on('error',fail);req.end('{}');});yield chunk;}};`,
+    ],
+  ])(
+    'rejects candidate top-level %s',
+    async (_name, attack) => {
+      const dir = await candidateFixture();
+      appendFileSync(join(dir, 'apps/server/src/coordinator/runtime/models.ts'), `\n${attack}`);
+      const model = await startStubLlm([{ content: 'quiet' }]);
+      closers.push(() => model.close());
+      await expect(
+        runSandboxedTurn(input, modelProvider(model.url), 'secret', 30_000, 'low', dir),
+      ).rejects.toThrow(_name === 'non-model URL' ? /uncaptured=true/ : /protocol|Unrecognized/);
+    },
+    60_000,
+  );
+
+  it.each(['GET', 'POST query'])(
+    'denies a model endpoint with unsupported %s',
+    async (variant) => {
+      const dir = await candidateFixture();
+      const method = variant === 'GET' ? 'GET' : 'POST';
+      const suffix = variant === 'GET' ? '/chat/completions' : '/chat/completions?other=1';
+      appendFileSync(
+        join(dir, 'apps/server/src/coordinator/runtime/models.ts'),
+        `
+const iterate=process.stdin[Symbol.asyncIterator].bind(process.stdin);process.stdin[Symbol.asyncIterator]=async function*(){for await(const chunk of {[Symbol.asyncIterator]:iterate}){const raw=JSON.parse(String(chunk));const {request}=await import('node:http');await new Promise((done,fail)=>{const req=request({socketPath:raw.socket,path:'/?target='+encodeURIComponent(raw.provider.baseUrl+${JSON.stringify(suffix)}),method:${JSON.stringify(method)}},res=>{res.resume();res.on('end',done)});req.on('error',fail);req.end();});yield chunk;}};`,
+      );
+      const model = await startStubLlm([{ content: 'quiet' }]);
+      closers.push(() => model.close());
+      await expect(
+        runSandboxedTurn(input, modelProvider(model.url), 'secret', 30_000, 'low', dir),
+      ).rejects.toThrow(/uncaptured=true/);
+    },
+    60_000,
+  );
+
+  it('follows a candidate import beyond the original source directories', async () => {
+    const dir = await candidateFixture();
+    const path = 'scripts/scrub-git-env.mjs';
+    mkdirSync(join(dir, 'scripts'), { recursive: true });
+    writeFileSync(
+      join(dir, path),
+      readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8') +
+        '\nthrow new Error("Candidate script executed");',
+    );
+    appendFileSync(
+      join(dir, 'apps/server/src/coordinator/runtime/models.ts'),
+      "\nimport '../../../../../scripts/scrub-git-env.mjs';",
+    );
+    const model = await startStubLlm([{ content: 'quiet' }]);
+    closers.push(() => model.close());
+    await expect(
+      runSandboxedTurn(input, modelProvider(model.url), 'secret', 30_000, 'low', dir),
+    ).rejects.toThrow(/worker exit/);
+  }, 60_000);
+
+  it('rejects dependency configuration that the ruler installation cannot execute', async () => {
+    const dir = await candidateFixture();
+    appendFileSync(join(dir, 'packages/shared/package.json'), '\n ');
+    await expect(candidateClosure(dir)).rejects.toThrow(
+      /Unsupported candidate runtime configuration/,
+    );
+  });
+
+  it('rejects an imported candidate file outside the supported mounted graph', async () => {
+    const dir = await candidateFixture();
+    const source = 'apps/server/src/coordinator/runtime';
+    appendFileSync(join(dir, source, 'models.ts'), "\nimport './unsupported.js';");
+    writeFileSync(join(dir, source, 'unsupported.ts'), 'process.exit(0);');
+    await expect(candidateClosure(dir)).rejects.toThrow(/Unsupported candidate dependency/);
+  });
+
+  it.each(['apps/server/src/services/routing-rules.ts', 'apps/server/src/coordinator/index.ts'])(
+    'uses candidate dependency %s outside the former hand list',
+    async (rel) => {
+      const dir = await candidateFixture();
+      mkdirSync(join(dir, rel, '..'), { recursive: true });
+      writeFileSync(
+        join(dir, rel),
+        readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8') +
+          '\nthrow new Error("Candidate dependency executed");',
+      );
+      const model = await startStubLlm([{ content: 'quiet' }]);
+      closers.push(() => model.close());
+      await expect(
+        runSandboxedTurn(input, modelProvider(model.url), 'secret', 30_000, 'low', dir),
+      ).rejects.toThrow(/worker exit/);
+    },
+    60_000,
+  );
 
   it('enforces a real worker deadline without leaving a successful result', async () => {
     await expect(

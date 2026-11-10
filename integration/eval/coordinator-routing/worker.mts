@@ -27,7 +27,7 @@ import {
 import { TeamStreamHub } from '../../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../../apps/server/src/services/machine-wake-hub.js';
 import { createProvider } from '../../../apps/server/src/services/providers.js';
-import { normalize, replayInput } from './contract.mts';
+import { replayInput } from './contract.mts';
 import { useModelSocket } from './proxy.mts';
 
 const chunks: Buffer[] = [];
@@ -137,12 +137,14 @@ try {
       const current = db.select().from(step).where(eq(step.id, sent.message.id)).get();
       if (!current) throw new Error('Missing turn');
       if (questions.length || !['pending', 'claimed'].includes(current.status)) {
-        const parts = db
+        const todos = db
           .select()
           .from(todo)
           .all()
           .filter((t) => t.phase !== 'closed')
           .map((t) => ({
+            id: t.id,
+            blockedBy: t.blockedBy ?? [],
             project: input.projects[Number(t.projectId.slice(8))]?.name ?? '',
             title: t.title,
           }));
@@ -158,30 +160,17 @@ try {
                 : [],
           )
           .join('');
-        const allowed = new Set(['projects', 'todos', 'create_todo', 'open_thread', 'ask_user']);
-        for (const row of rows) {
-          const value = row.content as { kind?: string; call?: { name?: string } };
-          if (value?.kind === 'toolcall' && !allowed.has(value.call?.name ?? ''))
-            throw new Error('Case used uncaptured state');
-        }
-        const decision = normalize(
-          current.status,
-          parts.map((p) => p.project),
-          questions.length > 0,
-          text,
-        );
         process.stdout.write(
           JSON.stringify({
-            decision,
-            parts,
+            protocol: 'cairn.routing.observations.v1',
+            todos,
+            text,
+            toolCalls: rows.flatMap((row) => {
+              const value = row.content as { kind?: string; call?: { name?: string } };
+              return value?.kind === 'toolcall' ? [value.call?.name ?? ''] : [];
+            }),
             questions: questions.flatMap((q) => q.questions),
-            askCandidates: [
-              ...new Set(
-                questions.flatMap((q) => q.questions.flatMap((p) => p.options.map((o) => o.label))),
-              ),
-            ],
             promptSha256,
-            blockedBy: [],
             stepStatus: current.status,
             turnTraceId: otlpTraceIdOfTurn(sent.message.id),
           }),

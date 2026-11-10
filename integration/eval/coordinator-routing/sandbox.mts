@@ -5,15 +5,9 @@ import { Readable } from 'node:stream';
 import type { ProviderConfig } from '@cairn/shared';
 import { spawnOwned } from '../../../scripts/owned-process.mjs';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { decisionOutput, type ReplayInput, replayInput } from './contract.mts';
+import { candidateClosure, candidateSource } from './closure.mts';
+import { observeTurn, type ReplayInput, replayInput } from './contract.mts';
 
-export const CANDIDATE_COORDINATOR_PATHS = [
-  'apps/server/src/coordinator/runtime',
-  'apps/server/src/services/chief.ts',
-  'apps/server/src/services/chief-tools.ts',
-  'apps/server/src/services/chief-router-tools.ts',
-  'packages/shared/src/protocol/chief-tools.ts',
-];
 const ruler = resolve(import.meta.dirname, '../../..');
 
 export async function runSandboxedTurn(
@@ -30,7 +24,14 @@ export async function runSandboxedTurn(
     throw new Error('Invalid turn deadline');
   const dir = makeTestTempDir('eval-langfuse-turn-');
   const socket = join(dir, 'model.sock');
-  const origin = new URL(provider.baseUrl || 'https://chatgpt.com/backend-api').origin;
+  const base = (provider.baseUrl || 'https://chatgpt.com/backend-api').replace(/\/$/, '');
+  const endpoint = new URL(
+    !provider.baseUrl
+      ? 'https://chatgpt.com/backend-api/codex/responses'
+      : provider.api === 'openai-completions'
+        ? `${base}/chat/completions`
+        : `${base}/responses`,
+  );
   let denied = false;
   const controller = new AbortController();
   const proxy = createServer(async (req, res) => {
@@ -38,7 +39,7 @@ export async function runSandboxedTurn(
       const target = new URL(
         new URL(req.url ?? '/', 'http://local').searchParams.get('target') ?? '',
       );
-      if (target.origin !== origin) {
+      if (req.method !== 'POST' || target.href !== endpoint.href) {
         denied = true;
         res.writeHead(403).end();
         return;
@@ -50,10 +51,17 @@ export async function runSandboxedTurn(
         if (size > 8_000_000) throw new Error('Model request too large');
         chunks.push(Buffer.from(chunk));
       }
-      const headers = { ...req.headers };
-      delete headers.host;
-      delete headers['content-length'];
+      const headers: Record<string, string> = {
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+      };
+      if (req.headers['content-encoding'] !== undefined) {
+        if (req.headers['content-encoding'] !== 'zstd')
+          throw new Error('Unsupported model encoding');
+        headers['content-encoding'] = 'zstd';
+      }
       headers.authorization = `Bearer ${key}`;
+      if (!provider.baseUrl) headers['openai-beta'] = 'responses=experimental';
       if (!provider.baseUrl)
         headers['chatgpt-account-id'] = JSON.parse(
           Buffer.from(key.split('.')[1] ?? '', 'base64url').toString(),
@@ -61,7 +69,7 @@ export async function runSandboxedTurn(
       const upstream = await fetch(target, {
         method: req.method,
         headers: headers as Record<string, string>,
-        body: req.method === 'GET' ? undefined : Buffer.concat(chunks),
+        body: Buffer.concat(chunks),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(timeoutMs)]),
         redirect: 'error',
       });
@@ -73,6 +81,7 @@ export async function runSandboxedTurn(
         Readable.fromWeb(upstream.body as import('node:stream/web').ReadableStream).pipe(res);
       else res.end();
     } catch {
+      denied = true;
       res.writeHead(502).end();
     }
   });
@@ -102,10 +111,8 @@ export async function runSandboxedTurn(
         '--die-with-parent',
         '--unshare-all',
         ...paths.flatMap((p) => ['--ro-bind', p, p]),
-        ...CANDIDATE_COORDINATOR_PATHS.flatMap((p) => {
-          const source = realpathSync(join(checkout, p));
-          if (!source.startsWith(`${realpathSync(checkout)}/`))
-            throw new Error('Candidate source escaped checkout');
+        ...(await candidateClosure(checkout)).flatMap((p) => {
+          const source = candidateSource(checkout, p);
           return ['--ro-bind', source, join(ruler, p)];
         }),
         '--proc',
@@ -137,7 +144,8 @@ export async function runSandboxedTurn(
         maxRuntimeSec: Math.ceil(timeoutMs / 1000) + 1,
       },
     );
-    let output = '';
+    const output: Buffer[] = [];
+    let outputBytes = 0;
     let overflow = false;
     let timedOut = false;
     const active = owned;
@@ -146,19 +154,21 @@ export async function runSandboxedTurn(
       void active.stop();
     }, timeoutMs);
     owned.child.stdout.on('data', (chunk: Buffer) => {
-      output += chunk.toString();
-      if (output.length > 262144) {
+      outputBytes += chunk.length;
+      if (outputBytes > 262144) {
         overflow = true;
         void active.stop();
-      }
+      } else output.push(chunk);
     });
     owned.child.stdin.end(JSON.stringify({ input, provider, thinking, socket }));
+    const closed = new Promise<void>((done) => owned?.child.once('close', () => done()));
     const result = await owned.exited;
+    await closed;
     if (timedOut || denied || overflow || result.code !== 0)
       throw new Error(
         `incomplete: worker exit ${result.code ?? result.signal}, timeout=${timedOut}, uncaptured=${denied}`,
       );
-    return decisionOutput.parse(JSON.parse(output));
+    return observeTurn(JSON.parse(Buffer.concat(output).toString()), input);
   } finally {
     clearTimeout(timer);
     controller.abort();

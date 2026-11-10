@@ -193,6 +193,6 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
         process.exitCode = 1;
       });
     clearTimeout(deadline);
-    process.exit(process.exitCode ?? 0);
+    process.exitCode ??= 0;
   }
 }

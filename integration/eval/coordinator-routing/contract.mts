@@ -34,3 +34,55 @@ export const decisionOutput = z.object({
   turnTraceId: z.string().regex(/^[a-f0-9]{32}$/),
   promptSha256: z.string().regex(/^[a-f0-9]{64}$/),
 });
+
+export const turnObservations = z
+  .object({
+    protocol: z.literal('cairn.routing.observations.v1'),
+    todos: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(200),
+            project: z.string().min(1).max(200),
+            title: z.string().max(20_000),
+            blockedBy: z.array(z.string().min(1).max(200)).max(60),
+          })
+          .strict(),
+      )
+      .max(60),
+    toolCalls: z.array(z.string().min(1).max(200)).max(1000),
+    questions: z.array(askUserQuestionSchema).max(60),
+    text: z.string().max(100_000),
+    stepStatus: z.enum(['done', 'claimed', 'failed', 'cancelled']),
+    turnTraceId: z.string().regex(/^[a-f0-9]{32}$/),
+    promptSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+export function observeTurn(raw: unknown, input: ReplayInput) {
+  const observed = turnObservations.parse(raw);
+  const allowed = new Set(['projects', 'todos', 'create_todo', 'open_thread', 'ask_user']);
+  if (observed.toolCalls.some((name) => !allowed.has(name)))
+    throw new Error('Case used uncaptured state');
+  const ids = observed.todos.map((t) => t.id);
+  if (new Set(ids).size !== ids.length) throw new Error('Duplicate todo IDs');
+  const blockedBy = observed.todos.flatMap((t, n) =>
+    t.blockedBy.map((id): [number, number] => {
+      const dependency = ids.indexOf(id);
+      if (dependency < 0 || dependency === n) throw new Error('Invalid persisted dependency');
+      return [n, dependency];
+    }),
+  );
+  if (observed.todos.some((t) => !input.projects.some((p) => p.name === t.project)))
+    throw new Error('Unknown observed project');
+  return decisionOutput.parse({
+    decision: normalize(observed.stepStatus, ids, observed.questions.length > 0, observed.text),
+    parts: observed.todos.map(({ project, title }) => ({ project, title })),
+    questions: observed.questions,
+    askCandidates: [...new Set(observed.questions.flatMap((q) => q.options.map((o) => o.label)))],
+    blockedBy,
+    stepStatus: observed.stepStatus,
+    turnTraceId: observed.turnTraceId,
+    promptSha256: observed.promptSha256,
+  });
+}
