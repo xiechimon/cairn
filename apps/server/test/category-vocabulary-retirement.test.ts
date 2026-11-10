@@ -5,7 +5,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { tag, todo, todoTag } from '../src/db/schema.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { bootServer, postProject, req } from './helpers.js';
-import { insertLegacyCategory } from './legacy-category-fixtures.js';
+import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 test.each(['plain', 'local', 'hosted', 'github'] as const)(
   '%s project creation has no category seeds or vocabulary routes',
@@ -51,10 +51,10 @@ test('retired vocabulary requests preserve legacy correction tasks and associati
     const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       title: 'Existing task',
       spec: 'Keep this body.',
-      tagIds: [category.id],
     });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
+    insertLegacyMembership(s.db, id, [category.id], true);
     const snapshot = () => ({
       categories: s.db.select().from(tag).all(),
       tasks: s.db.select().from(todo).all(),

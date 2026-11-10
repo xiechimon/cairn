@@ -2,6 +2,7 @@ import {
   type CitedSegment,
   type CoordinatorCreateTodoParams,
   type CoordinatorUpdateTodoParams,
+  categoryFreeTaskInputSchema,
   derivePlaceholderTitle,
   isIssueSourcedTask,
   orchestratedTodoIdOf,
@@ -19,7 +20,7 @@ import {
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, parseWith } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
@@ -196,6 +197,7 @@ export function createRequestTodo(
   params: CoordinatorCreateTodoParams,
   provenance: { createdBy: string | null; ownerId: string },
 ): TodoRecord & { uncovered?: string[] } {
+  parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
   const messageIds = params.messageIds ?? ctx.turnMessageIds ?? [];
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
@@ -284,6 +286,7 @@ export function updateRequestTodo(
   ctx: RequestCtx,
   params: CoordinatorUpdateTodoParams,
 ): TodoRecord | null {
+  parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
   const added =
     params.addMessageIds === undefined
@@ -318,7 +321,6 @@ export function updateRequestTodo(
     {
       ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
       ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
-      ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
       ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
     },
     summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},
