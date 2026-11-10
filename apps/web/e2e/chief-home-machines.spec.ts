@@ -9,9 +9,11 @@ test('the computer chip names only the Coordinator machine and its running count
   page,
 }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toContainText('xmonsMac');
-  await expect(chip(page)).toContainText('2 在跑');
-  await expect(chip(page)).not.toContainText('+1');
+  await expect(chip(page)).toHaveAccessibleName(/xmonsMac/);
+  await expect(chip(page)).toHaveAccessibleName(/2\/8 在跑/);
+  await expect(chip(page)).not.toHaveAccessibleName(/\+1/);
+  await expect(chip(page)).toHaveText('');
+  await expect(page.getByTestId('machines-online-dot')).toHaveCount(1);
   await expect(chip(page)).toHaveAttribute('aria-pressed', 'false');
 });
 
@@ -57,9 +59,9 @@ test('the chip opens one card per computer, the Coordinator machine first, with 
   await expect(page).toHaveURL(/\/app\/settings\/machines/);
 });
 
-test('the chip title names the Coordinator machine and its state', async ({ page }) => {
+test('the chip name carries the Coordinator machine and its state', async ({ page }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toHaveAttribute('title', 'xmonsMac · 在线 · 2/8 在跑');
+  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 在线 · 2/8 在跑');
 });
 
 test('with one computer the panel says work runs on the Coordinator machine', async ({ page }) => {
@@ -67,7 +69,7 @@ test('with one computer the panel says work runs on the Coordinator machine', as
   await expect(panel(page)).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
 });
 
-test('at phone width the chip shrinks to its icon and leaves the title whole', async ({ page }) => {
+test('at phone width the chip stays an icon and leaves the title whole', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(HOME);
   const box = await chip(page).boundingBox();
@@ -84,6 +86,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   for (const [name, tip] of [
     ['任务', '任务，3 件等你'],
     ['成果', '成果'],
+    ['电脑', '电脑 · xmonsMac · 在线 · 2/8 在跑'],
   ] as const) {
     const button = page.getByTestId('home-c-pane-buttons').getByRole('button', { name });
     await button.hover();

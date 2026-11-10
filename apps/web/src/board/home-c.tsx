@@ -344,17 +344,11 @@ export function HomeC({
   const paneButtons = (
     <header
       data-testid="home-c-pane-buttons"
-      className="flex h-12 flex-none items-center gap-0.5 pr-3 pl-5 max-[640px]:pl-14"
+      className="flex h-12 flex-none items-center gap-2 pr-3 pl-5 max-[640px]:pl-14"
     >
       <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
         {projectName ?? t('Coordinator')}
       </h1>
-      <MachineChip
-        machines={computers}
-        open={pane === 'machines' && threadId === null}
-        onToggle={() => togglePane('machines')}
-        loading={machinesQuery?.isPending === true}
-      />
       {!narrow && (
         <IconTooltip
           label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
@@ -362,23 +356,26 @@ export function HomeC({
           trigger={
             <Button
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               data-testid="tasks-toggle"
               aria-pressed={pane === 'tasks' && threadId === null}
               onClick={() => togglePane('tasks')}
-              className="h-7.5 gap-1.5 px-2 text-meta font-normal text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+              className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
             />
           }
         >
           <ListChecks aria-hidden="true" />
-          {t('任务')}
           {badge > 0 && (
-            <span
-              data-testid="tasks-badge"
-              className="min-w-5 rounded-full bg-(--card-button) px-1.5 text-center text-caption leading-4 font-semibold tabular-nums text-(--text-on-accent)"
-            >
-              {badge}
-            </span>
+            <>
+              <span
+                aria-hidden="true"
+                data-slot="needs-you-dot"
+                className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
+              />
+              <span data-testid="tasks-badge" className="sr-only">
+                {badge}
+              </span>
+            </>
           )}
         </IconTooltip>
       )}
@@ -397,6 +394,12 @@ export function HomeC({
       >
         <PackageCheck aria-hidden="true" />
       </IconTooltip>
+      <MachineChip
+        machines={computers}
+        open={pane === 'machines' && threadId === null}
+        onToggle={() => togglePane('machines')}
+        loading={machinesQuery?.isPending === true}
+      />
     </header>
   );
 
@@ -420,12 +423,19 @@ export function HomeC({
           if (!narrow) composerRef.current?.focus();
           else showPane(null, { compose: Date.now() } satisfies ComposeState);
         }}
+        onAddTask={(text) => {
+          if (narrow) showPane(null);
+          if (surface.onSend != null) return surface.onSend(text, projectId);
+          setPrefill({ text, key: Date.now() });
+          return undefined;
+        }}
         query={tasksQuery}
       />
     ) : (
       pane !== null && (
         <WorkPanel
           todos={scoped}
+          projectId={projectId}
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}

@@ -12,7 +12,7 @@ test('with a pending question and a task thread open at 1440 the header keeps it
   const column = (await page.getByTestId('home-c').boundingBox())!;
   const title = (await header.getByRole('heading', { level: 1 }).boundingBox())!;
   expect(title.width).toBeGreaterThan(40);
-  for (const name of ['任务', '成果']) {
+  for (const name of ['任务', '成果', '电脑']) {
     const box = (await header.getByRole('button', { name }).boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(column.x);
     expect(box.x + box.width).toBeLessThanOrEqual(column.x + column.width + 1);

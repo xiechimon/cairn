@@ -515,9 +515,10 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
     [{ id: 'm1', name: 'omarchy', online: false, runningSteps: 3 }],
   );
   const chip = page.getByTestId('machines-button');
-  await expect(chip).toContainText('omarchy');
-  await expect(chip).toContainText('离线');
-  await expect(chip).not.toContainText('在跑');
+  await expect(chip).toHaveAccessibleName(/omarchy/);
+  await expect(chip).toHaveAccessibleName(/离线/);
+  await expect(chip).not.toHaveAccessibleName(/在跑/);
+  await expect(page.getByTestId('machines-online-dot')).toHaveCount(0);
   const card = panel.locator('[data-slot="list-card"]').nth(0);
   await expect(card).toContainText('离线');
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
