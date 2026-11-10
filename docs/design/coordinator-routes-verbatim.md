@@ -71,7 +71,7 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
 5. Every Coordinator step records `step.ownerMessageIds` (JSON, nullable, `[]` when absent), written explicitly by the code path that enqueues or extends the turn. `create_todo` without `messageIds` cites exactly this list. The id-prefix, rewind-text and answer-timestamp inference is deleted.
 6. `create_todo` (Coordinator surface) has a strict schema. Unknown keys return 400. Its fields:
    - `projectId`;
-   - `messageIds?`: ids of `chief_message` rows in this thread that are owner messages or owner-answered questions. Default: `step.ownerMessageIds`.
+   - `messageIds?`: ids of `chief_message` rows in this thread that are owner messages or owner-answered questions. Default: `step.ownerMessageIds`. IDs must be unique, as must `update_todo.addMessageIds`; duplicate input returns 400 before writes. The shared Zod schema and service enforce uniqueness; tool descriptions advertise it using the existing daemon schema vocabulary.
    - `sourceTodoId?`: replaces `messageIds`;
    - `quotes?`;
    - `dependsOn?`: writes `blockedBy`;
@@ -150,7 +150,7 @@ The new rules in `chief.ts`:
 2. A segment's `author` never changes after the segment is created, and every copy of it (a quote, a re-split, an append) keeps it.
 3. Third-party text is fenced in every rendering: spec, issue body, task prompt, orchestration prompt and wake prompt. A title cut from third-party text is fenced wherever a model sees it. Owner text is never inside a fence.
 4. Attachment grants come only from owner segments.
-5. A Coordinator turn cites exactly `step.ownerMessageIds` unless `messageIds` or `sourceTodoId` is given. Nothing infers it.
+5. A Coordinator turn cites exactly `step.ownerMessageIds` unless `messageIds` or `sourceTodoId` is given. Nothing infers it. A message already bound in any existing task request cannot be bound again through `messageIds` or `addMessageIds`: return 409 naming that task before any write. Closed and archived tasks still count, across turns and projects. Explicit `quotes` or `sourceTodoId` declares a split and permits reuse. Bindings come from stored request segments; no separate consumption state is written.
 6. No Coordinator tool parameter accepts task text. The only Coordinator free text a worker receives is a `message_thread` note of at most 280 characters, marked as the Coordinator's.
 
 ## Entry points and their tests
@@ -189,7 +189,7 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 3. **A voice transcript.** cairn has no voice input today (measured: grep finds none outside CSS classes). A dictated message is the owner's text as sent, recognition errors included. When the text is unclear, the Coordinator asks with `ask_user`, and the answer becomes another citable segment.
 4. **An attachment.** Token lines are part of the owner segment, and invariant 4 grants them.
 5. **Routing shifts.** Short verbatim text would classify as `easy`, so `difficulty` is routing data that `classifyDifficulty` prefers.
-6. **A wake turn creates a task.** `ownerMessageIds` is `[]`, so `create_todo` without `messageIds` or `sourceTodoId` returns 400.
+6. **A wake turn creates a task.** `ownerMessageIds` is `[]`, so `create_todo` without `messageIds` or `sourceTodoId` returns 400. The omitted-source call followed by one call per pending message (#3842) creates the combined task once and rejects both undeclared reuses with 409. Closing the combined task keeps its binding; explicitly split it with quotes or `sourceTodoId`. A failed call consumes nothing.
 7. **Server-added text in the turn prompt.** Segments copy `chief_message.content`, never `step.prompt`. The orchestration request message is server-composed and is never in `ownerMessageIds`.
 
 ## Migration
