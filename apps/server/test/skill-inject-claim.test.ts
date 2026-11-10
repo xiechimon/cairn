@@ -5,7 +5,13 @@ import { claimedStepSchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { chief as chiefTable, skillAudit, step as stepTable } from '../src/db/schema.js';
+import {
+  chief as chiefTable,
+  machine as machineTable,
+  routingRule,
+  skillAudit,
+  step as stepTable,
+} from '../src/db/schema.js';
 import {
   bootServer,
   issueApiKey,
@@ -354,6 +360,12 @@ describe('#1971 worker claim skill_audit inject rows', () => {
     });
     expect(enroll2.status).toBe(200);
     const token2 = ((await enroll2.json()) as { token: string }).token;
+    const home = w.s.db.select().from(machineTable).where(eq(machineTable.name, 'si-mbp')).get();
+    w.s.db
+      .update(routingRule)
+      .set({ machineId: home!.id })
+      .where(eq(routingRule.id, w.sessionRouteId))
+      .run();
     const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
     await startBuild(w.s, w.projectId, todoId);
     const winner = await claim(w.s.app, w.token);
