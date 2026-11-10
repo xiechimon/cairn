@@ -14,9 +14,8 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
-      issues: read
-      pull-requests: read
     outputs:
       has-code: ${{ steps.classify.outputs.has-code }}
       tested-in-queue: ${{ steps.classify.outputs.tested-in-queue }}
@@ -36,7 +35,6 @@ jobs:
         env:
           PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
           GH_TOKEN: ${{ github.token }}
         run: |
           has_code=true
@@ -48,8 +46,7 @@ jobs:
             has_sidecar=$(node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
             gates_needed=$(node scripts/prepush.mjs --needs-gates) || gates_needed=true
           elif [ "$GITHUB_REF" = refs/heads/main ]; then
-            commits=$(git rev-list "$BEFORE_SHA..$GITHUB_SHA") || commits=
-            tested_in_queue=$(node scripts/ops/merge-route-audit.mjs landed $commits) || tested_in_queue=false
+            tested_in_queue=$(node scripts/ops/merge-route-audit.mjs tested "$GITHUB_SHA") || tested_in_queue=false
             if [ "$tested_in_queue" = true ]; then
               has_code=false
               has_sidecar=false

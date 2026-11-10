@@ -231,7 +231,7 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   assert.match(changes, /elif \[ "\$GITHUB_REF" = refs\/heads\/main \]; then/);
   assert.ok(
     changes.includes(
-      'tested_in_queue=$(node scripts/ops/merge-route-audit.mjs landed $commits) || tested_in_queue=false',
+      'tested_in_queue=$(node scripts/ops/merge-route-audit.mjs tested "$GITHUB_SHA") || tested_in_queue=false',
     ),
   );
   const warm = jobs.get('warm-caches');

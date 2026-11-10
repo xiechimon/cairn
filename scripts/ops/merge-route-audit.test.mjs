@@ -59,6 +59,7 @@ const data = JSON.parse(fs.readFileSync(process.env.DATA, 'utf8'));
 if (args[1].includes('/pulls/')) { console.log(JSON.stringify(data.pull)); process.exit(0); }
 if (args[1].includes('/commits/')) { console.log(JSON.stringify(data.pulls)); process.exit(0); }
 if (args[1].includes('/timeline')) { console.log(JSON.stringify([data.timeline])); process.exit(0); }
+if (args[1].includes('/actions/workflows/ci.yml/runs?')) { console.log(JSON.stringify(data.runs)); process.exit(0); }
 console.error('unexpected ' + args.join(' ')); process.exit(1);
 `,
     { mode: 0o755 },
@@ -73,7 +74,7 @@ console.error('unexpected ' + args.join(' ')); process.exit(1);
   return {
     dir,
     run: (sha, data) => command(['commit', sha], data),
-    landed: (shas, data) => command(['landed', ...shas], data),
+    tested: (shas, data) => command(['tested', ...shas], data),
   };
 }
 
@@ -97,23 +98,43 @@ test('the command fails on a commit merged outside the queue and passes inside i
   releaseTestTempDir(f.dir);
 });
 
-test('landed is true only when every commit came from a queued pull request', () => {
+test('tested is true only for a commit whose own merge-queue ci run passed', () => {
   const f = fixture();
   const sha = 'a'.repeat(40);
-  const queued = {
-    pulls: [{ number: 3032, state: 'closed' }],
-    pull: { number: 3032, merged_at: '2026-11-05T20:17:24Z' },
-    timeline: [labeled('queued', '2026-11-05T20:11:34Z')],
+  const run = {
+    head_sha: sha,
+    conclusion: 'success',
+    head_branch: 'mergify/merge-queue/0123456789',
+    head_repository: { full_name: 'xiechimon/cairn' },
+    actor: { login: 'mergify[bot]' },
   };
+  const runs = (...list) => ({ runs: { workflow_runs: list } });
   for (const [name, shas, data, expected, status] of [
-    ['one queued commit', [sha], queued, 'true', 0],
-    ['two queued commits', [sha, 'b'.repeat(40)], queued, 'true', 0],
-    ['a merge outside the queue', [sha], { ...queued, timeline: [] }, 'false', 0],
-    ['a direct push with no pull request', [sha], { ...queued, pulls: [] }, 'false', 0],
-    ['no commits', [], queued, 'false', 0],
-    ['a malformed sha', ['main'], queued, '', 2],
+    ['a passed queue run on this commit', [sha], runs(run), 'true', 0],
+    ['an ordinary pull request run', [sha], runs({ ...run, head_branch: 'fix/x' }), 'false', 0],
+    ['a run on another commit', [sha], runs({ ...run, head_sha: 'b'.repeat(40) }), 'false', 0],
+    ['a failed queue run', [sha], runs({ ...run, conclusion: 'failure' }), 'false', 0],
+    [
+      'a queue-named branch in a fork',
+      [sha],
+      runs({ ...run, head_repository: { full_name: 'someone/cairn' } }),
+      'false',
+      0,
+    ],
+    [
+      'a queue-named branch another actor pushed',
+      [sha],
+      runs({ ...run, actor: { login: 'xiechimon' } }),
+      'false',
+      0,
+    ],
+    ['a direct push with no run', [sha], runs(), 'false', 0],
+    ['a passed queue run among others', [sha], runs({ ...run, head_branch: 'x' }, run), 'true', 0],
+    ['an unreadable run listing', [sha], { runs: {} }, '', 2],
+    ['a malformed sha', ['main'], runs(run), '', 2],
+    ['no sha', [], runs(run), '', 2],
   ]) {
-    const result = f.landed(shas, data);
+    const result = f.tested(shas, data);
     assert.equal(result.status, status, `${name}: ${result.stderr}`);
     assert.equal(result.stdout.trim(), expected, name);
   }

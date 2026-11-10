@@ -54,13 +54,21 @@ export function pullNumbersForCommit(repo, sha) {
   return pulls.filter((pull) => pull.state === 'closed').map((pull) => pull.number);
 }
 
-export function landedThroughQueue(repo, commits) {
-  return (
-    commits.length > 0 &&
-    commits.every((sha) => {
-      const numbers = pullNumbersForCommit(repo, sha);
-      return numbers.length > 0 && numbers.every((number) => auditPull(repo, number).queued);
-    })
+export function queueRunPassed(repo, sha) {
+  if (!shaPattern.test(sha ?? '')) throw new Error('A full 40-hex commit SHA is required');
+  const { workflow_runs: runs } = JSON.parse(
+    gh(
+      'api',
+      `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&event=pull_request&status=success`,
+    ),
+  );
+  return runs.some(
+    (run) =>
+      run.head_sha === sha &&
+      run.conclusion === 'success' &&
+      run.head_repository?.full_name === repo &&
+      run.actor?.login === 'mergify[bot]' &&
+      run.head_branch?.startsWith('mergify/merge-queue/'),
   );
 }
 
@@ -79,11 +87,12 @@ function main() {
     process.exitCode = results.every((result) => result.queued) ? 0 : 1;
     return;
   }
-  if (command === 'landed') {
-    console.log(landedThroughQueue(repo, args));
+  if (command === 'tested') {
+    if (args.length !== 1) throw new Error('usage: merge-route-audit tested <sha>');
+    console.log(queueRunPassed(repo, args[0]));
     return;
   }
-  throw new Error('usage: merge-route-audit commit <sha> | landed <sha>...');
+  throw new Error('usage: merge-route-audit commit <sha> | tested <sha>');
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
