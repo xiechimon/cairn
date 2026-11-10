@@ -988,6 +988,13 @@
       "when": 1794268721640,
       "tag": "0144_github_label_isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 145,
+      "version": "6",
+      "when": 1794286354580,
+      "tag": "0145_coordinator_turn_snapshot",
+      "breakpoints": true
     }
   ]
 }
