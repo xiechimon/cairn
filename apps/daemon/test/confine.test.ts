@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { type ConfinementPolicy, confinementArgs } from '../src/backend/confine.js';
@@ -91,7 +91,7 @@ test('rejects symlink mount sources before spawning', () => {
 
 test('refuses rebinding the whole daemon home or an ancestor of secrets', () => {
   const policy = fixture();
-  for (const workspace of [policy.daemonHome, policy.home, '/']) {
+  for (const workspace of ['/run', policy.daemonHome, policy.home, '/']) {
     for (const grant of [
       { workspace },
       { taskTemp: workspace },
@@ -147,6 +147,7 @@ test.runIf(linuxProbes)('real bwrap: writable git metadata cannot modify config 
 
 test.runIf(linuxProbes)('real bwrap: only the selected harness state is exposed', () => {
   const policy = fixture();
+  writeFileSync(join(policy.home, '.claude.json'), 'state');
   for (const name of ['.claude', '.codex', '.pi', '.gemini']) {
     const path = join(policy.home, name);
     mkdirSync(path, { recursive: true });
@@ -154,6 +155,12 @@ test.runIf(linuxProbes)('real bwrap: only the selected harness state is exposed'
   }
   for (const name of ['.claude', '.codex', '.pi', '.gemini']) {
     policy.state = [join(policy.home, name)];
+    if (name === '.claude') policy.state.push(join(policy.home, '.claude.json'));
+    const fileResult = run(
+      policy,
+      name === '.claude' ? 'echo state > "$2/.claude.json"' : 'test ! -s "$2/.claude.json"',
+    );
+    expect(fileResult.status, fileResult.stderr).toBe(0);
     const result = run(
       policy,
       `touch "$5/own" && ! cat "$2/${name === '.codex' ? '.claude' : '.codex'}/sentinel"`,
@@ -165,7 +172,7 @@ test.runIf(linuxProbes)('real bwrap: only the selected harness state is exposed'
 test('bwrap argv preserves the fixed namespace policy without shell prefixes or environment overrides', () => {
   const policy = fixture();
   const args = confinementArgs(policy, 'linux');
-  expect(args.slice(0, 15)).toEqual([
+  expect(args.slice(0, 13)).toEqual([
     '--die-with-parent',
     '--new-session',
     '--unshare-pid',
@@ -179,8 +186,6 @@ test('bwrap argv preserves the fixed namespace policy without shell prefixes or 
     '/proc',
     '--tmpfs',
     '/tmp',
-    '--tmpfs',
-    join(policy.home, '.ssh'),
   ]);
   expect(args).not.toContain('--unshare-net');
   expect(args).not.toContain('--setenv');
@@ -209,4 +214,47 @@ test.runIf(linuxProbes)('real bwrap: absent git hooks and config remain unwritab
     '! touch "$4/hooks/unsafe" && ! sh -c \'echo unsafe > "$1/config"\' probe "$4"',
   );
   expect(result.status, result.stderr).toBe(0);
+});
+
+test.runIf(linuxProbes)(
+  'real bwrap: host-created credentials remain hidden after sandbox startup',
+  async () => {
+    const policy = fixture();
+    const directory = join(policy.home, '.aws');
+    const file = join(policy.home, '.git-credentials');
+    const child = spawn('bwrap', [
+      ...confinementArgs(policy),
+      '--',
+      '/bin/sh',
+      '-c',
+      'echo ready; read ack; test "$ack" = check && test ! -e "$1/.aws/sentinel" && test ! -s "$1/.git-credentials" && ! touch /run/manager-control',
+      'probe',
+      policy.home,
+    ]);
+    let stderr = '';
+    child.stderr.on('data', (data) => {
+      stderr += data;
+    });
+    const status = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.stdout.once('data', () => {
+        expect(existsSync(directory)).toBe(false);
+        expect(existsSync(file)).toBe(false);
+        mkdirSync(directory);
+        writeFileSync(join(directory, 'sentinel'), 'late-secret');
+        writeFileSync(file, 'late-secret');
+        child.stdin.end('check\n');
+      });
+      child.once('close', resolve);
+    });
+    expect(status, stderr).toBe(0);
+  },
+);
+
+test.runIf(linuxProbes)('real bwrap: absent credential masks create no host placeholders', () => {
+  const policy = fixture();
+  const result = run(policy, 'true');
+  expect(result.status, result.stderr).toBe(0);
+  for (const path of ['.aws', '.git-credentials', '.config/gh', '.gemini'])
+    expect(existsSync(join(policy.home, path))).toBe(false);
 });

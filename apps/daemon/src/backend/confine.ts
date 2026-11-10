@@ -59,7 +59,11 @@ export function confinementArgs(
   if (platform !== 'linux') throw new Error('Harness confinement requires Linux');
   const home = canonical(policy.home, true);
   const daemonHome = canonical(policy.daemonHome, true);
-  const deniedDirectories = [...DENIED_DIRECTORIES.map((path) => join(home, path)), daemonHome];
+  const deniedDirectories = [
+    '/run',
+    ...DENIED_DIRECTORIES.map((path) => join(home, path)),
+    daemonHome,
+  ];
   const deniedFiles = DENIED_FILES.map((path) => join(home, path));
   const denied = [...deniedDirectories, ...deniedFiles].map((path) => canonical(path));
   const writable = [
@@ -114,22 +118,14 @@ export function confinementArgs(
     '--tmpfs',
     '/tmp',
   ];
-  for (const path of deniedDirectories) {
-    if (existsSync(path)) args.push('--tmpfs', path);
-  }
+  args.push('--overlay-src', home, '--tmp-overlay', home);
+  for (const path of deniedDirectories) args.push('--tmpfs', path);
   for (const path of writable) args.push('--bind', path, path);
   for (const path of deniedDirectories) {
-    if (existsSync(path) && !policy.state.includes(path)) args.push('--remount-ro', path);
+    if (!policy.state.includes(path)) args.push('--remount-ro', path);
   }
-  for (const path of [
-    ...deniedFiles.filter((path) => !policy.state.includes(path)),
-    '/run/dbus/system_bus_socket',
-    '/run/systemd/private',
-    `/run/user/${process.getuid?.()}/systemd/private`,
-    `/run/user/${process.getuid?.()}/bus`,
-  ]) {
-    canonical(path);
-    if (existsSync(path)) args.push('--ro-bind', '/dev/null', path);
+  for (const path of deniedFiles.filter((path) => !policy.state.includes(path))) {
+    args.push('--ro-bind', '/dev/null', path);
   }
   for (const directory of policy.gitDirectories) {
     for (const name of ['config', 'config.worktree', 'hooks']) {
@@ -138,6 +134,7 @@ export function confinementArgs(
       else args.push('--ro-bind', existsSync(path) ? path : '/dev/null', path);
     }
   }
+  args.push('--remount-ro', home);
   args.push('--chdir', policy.workspace);
   return args;
 }
