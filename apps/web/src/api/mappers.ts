@@ -41,6 +41,7 @@ import {
   orchestratePromptHeadOf,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
+  resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
   type SystemRow,
@@ -963,7 +964,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         ? { skills: act.skills }
         : {}),
     });
-  } else if (build && todo.phase === 'building' && !steps.some((s) => s.status === 'stopped')) {
+  } else if (
+    build &&
+    todo.phase === 'building' &&
+    resolvedBuildPrNumber(build) == null &&
+    !steps.some((s) => s.status === 'stopped')
+  ) {
     items.push({ kind: 'streaming', label: '执行中...' });
   }
 

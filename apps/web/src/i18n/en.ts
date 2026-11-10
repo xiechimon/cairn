@@ -1396,6 +1396,7 @@ export const EN: Record<string, string> = {
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
+  等待检查: 'Waiting on checks',
   未配置: 'Not configured',
   空闲: 'Idle',
   项目设置: 'Project settings',

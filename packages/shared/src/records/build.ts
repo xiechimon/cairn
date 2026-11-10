@@ -34,6 +34,20 @@ export const buildRecordSchema = z.object({
 });
 export type BuildRecord = z.infer<typeof buildRecordSchema>;
 
+const PR_NUMBER_IN_URL = /\/pull\/(\d+)(?:[/?#]|$)/;
+
+export function prNumberFromUrl(url: string | null | undefined): number | null {
+  if (url == null || url === '') return null;
+  const match = PR_NUMBER_IN_URL.exec(url);
+  if (match === null) return null;
+  const value = Number(match[1]);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+export function resolvedBuildPrNumber(row: Pick<BuildRecord, 'prNumber' | 'prUrl'>): number | null {
+  return row.prNumber ?? prNumberFromUrl(row.prUrl);
+}
+
 export const buildMergePermissionSchema = z.object({
   permitted: z.boolean(),
   missingTools: z.array(z.string()),
