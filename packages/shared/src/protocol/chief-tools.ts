@@ -307,7 +307,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'usage',
     description:
-      'Token usage accounting per build and model (input/output/cache read/cache write).',
+      'Token usage accounting per build and model (input/output/cache read/cache write), plus the dispatch harness that ran each claimed step. Returns { usage, routes }. usage rows are token_usage (model strings only). routes rows come from step_route: buildId, stepId, kind, harness (claude-code | pi | null), provider, modelId, machineId. openai-codex models run on harness pi; there is no separate codex-cli harness id. harness is null for non-routed providers (for example gemini) and for steps claimed before step_route existed.',
     parameters: obj({ buildId: str('Optional build id filter.') }),
     replaySafe: true,
   },
