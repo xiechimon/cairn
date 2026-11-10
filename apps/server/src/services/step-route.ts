@@ -10,7 +10,7 @@ import {
   routeWork,
   type StepKind,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { machine, step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -20,6 +20,37 @@ import { homeMachineRejectReason, missingCapabilityItems } from './dispatch-elig
 import { mergedCatalogModels } from './model-liveness.js';
 
 type StepRouteRow = typeof stepRoute.$inferSelect;
+
+export type BuildStepRoute = {
+  buildId: string;
+  stepId: string;
+  kind: StepKind;
+  harness: 'claude-code' | 'pi' | null;
+  provider: string | null;
+  modelId: string | null;
+  machineId: string | null;
+};
+
+export function listBuildStepRoutes(
+  db: Pick<Db, 'select'>,
+  buildIds: readonly string[],
+): BuildStepRoute[] {
+  if (buildIds.length === 0) return [];
+  return db
+    .select({
+      buildId: step.buildId,
+      stepId: stepRoute.stepId,
+      kind: stepRoute.kind,
+      harness: stepRoute.harness,
+      provider: stepRoute.provider,
+      modelId: stepRoute.modelId,
+      machineId: stepRoute.machineId,
+    })
+    .from(stepRoute)
+    .innerJoin(step, eq(step.id, stepRoute.stepId))
+    .where(inArray(step.buildId, [...buildIds]))
+    .all();
+}
 type RoutedTodo = Pick<typeof todo.$inferSelect, 'teamId'> &
   Partial<Pick<typeof todo.$inferSelect, 'title' | 'spec' | 'request'>>;
 

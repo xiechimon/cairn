@@ -73,6 +73,7 @@ import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { snoozeTodo } from './snooze.js';
+import { listBuildStepRoutes } from './step-route.js';
 import { seedFixedTags } from './tags.js';
 import { startThreadBuild } from './thread-message.js';
 import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
@@ -511,12 +512,28 @@ export async function executeChiefTool(
         inArray(tokenUsage.buildId, teamBuildIds),
         inArray(tokenUsage.buildId, teamThreadIds),
       );
-      const rows = db
+      const usage = db
         .select()
         .from(tokenUsage)
         .where(buildId ? and(eq(tokenUsage.buildId, buildId), owned) : owned)
         .all();
-      return json(rows);
+      const ownedBuildIds =
+        buildId !== undefined
+          ? db
+              .select({ id: build.id })
+              .from(build)
+              .innerJoin(todo, eq(todo.id, build.todoId))
+              .where(and(eq(build.id, buildId), eq(todo.teamId, ctx.teamId)))
+              .all()
+              .map((row) => row.id)
+          : db
+              .select({ id: build.id })
+              .from(build)
+              .innerJoin(todo, eq(todo.id, build.todoId))
+              .where(eq(todo.teamId, ctx.teamId))
+              .all()
+              .map((row) => row.id);
+      return json({ usage, routes: listBuildStepRoutes(db, ownedBuildIds) });
     }
     case 'issues':
     case 'pull_requests':
