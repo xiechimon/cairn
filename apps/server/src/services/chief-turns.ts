@@ -19,6 +19,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { queueCoordinatorInput } from './coordinator-inputs.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
@@ -257,6 +258,12 @@ export function steerChiefMessage(
   ]
     .filter((part) => part)
     .join('\n\n');
+  if (running.machineId === null) {
+    queueCoordinatorInput(deps.db, running, waiting, content);
+    deps.machineHub?.steerSignal(thread.teamId, running.id);
+    publishStepRow(deps, waiting);
+    return { steered: true };
+  }
   const now = nowMs();
   const prior = deps.db
     .select()
