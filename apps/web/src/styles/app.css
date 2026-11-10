@@ -518,6 +518,10 @@
     padding-left: 52px;
   }
 
+  body:has(.side-panel[data-phone-tab]) .app-menu-trigger {
+    z-index: calc(var(--z-panel-low) + 1);
+  }
+
   [data-testid="page-topbar"] :is(button, a) {
     min-height: 44px;
   }
@@ -530,7 +534,7 @@
     min-height: 44px;
   }
 
-  body:has(.side-panel) .app-menu-trigger {
+  body:has(.side-panel:not([data-phone-tab])) .app-menu-trigger {
     display: none;
   }
 }

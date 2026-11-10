@@ -11,6 +11,7 @@ export interface SidebarProjectRowProps {
   active?: boolean;
   nested?: boolean;
   waiting?: string | null;
+  status?: string | null;
   onClick?: () => void;
   menu?: ReactNode;
 }
@@ -50,9 +51,15 @@ export function SidebarProjectRow({
   active = false,
   nested = false,
   waiting = null,
+  status = null,
   onClick,
   menu,
 }: SidebarProjectRowProps) {
+  const nameText = (
+    <span className="min-w-0 flex-1 truncate text-left" title={name}>
+      {name}
+    </span>
+  );
   const button = (
     <Button
       variant="ghost"
@@ -60,7 +67,8 @@ export function SidebarProjectRow({
       aria-current={active ? 'page' : undefined}
       data-slot="sidebar-project-row"
       className={cn(
-        'h-8 w-full justify-start gap-2.5 px-2 text-ui font-normal pointer-coarse:h-11',
+        'w-full justify-start gap-2.5 px-2 text-ui font-normal',
+        status === null ? 'h-8 pointer-coarse:h-11' : 'h-auto min-h-11 items-start py-1.5',
         active
           ? 'font-semibold text-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover'
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
@@ -70,9 +78,19 @@ export function SidebarProjectRow({
       )}
     >
       <ProjectGlyph icon={icon} />
-      <span className="min-w-0 flex-1 truncate text-left" title={name}>
-        {name}
-      </span>
+      {status === null ? (
+        nameText
+      ) : (
+        <span className="flex min-w-0 flex-1 flex-col">
+          {nameText}
+          <span
+            data-slot="project-status"
+            className="truncate text-left text-meta font-normal text-content-tertiary"
+          >
+            {status}
+          </span>
+        </span>
+      )}
       {waiting != null && (
         <span
           role="img"

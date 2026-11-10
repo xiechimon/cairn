@@ -1,6 +1,6 @@
 import { rm } from 'node:fs/promises';
 import { orchestrationSourceRef, parseOrchestrationSourceRef } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
@@ -9,7 +9,6 @@ import {
   chiefThread,
   routingRule,
   step as stepTable,
-  tag as tagTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
@@ -17,7 +16,7 @@ import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { flushSelfIssueWrites } from '../src/services/todos.js';
+import { flushSelfIssueWrites, updateAutonomousTodo } from '../src/services/todos.js';
 import { bootServer, postProject, req, seedRoute, type TestServer } from './helpers.js';
 import { ownerTodoParams } from './owner-message.js';
 
@@ -261,39 +260,44 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     expect(row?.phase).toBe('todo');
   });
 
-  test('D2 an issue labeled bug -> the orchestration message first demands a verify-cairn reproduction', async () => {
-    const tagId = 'tag-bug-repro';
-    s.db
-      .insert(tagTable)
-      .values({
-        id: tagId,
-        projectId,
-        name: 'bug',
-        color: '#b60205',
-        createdAt: nowMs(),
-        v: 1,
-      })
-      .run();
-    const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-      title: '保存时报错',
-      spec: '打开设置页，点击保存后报错',
-      tagIds: [tagId],
+  test.each([false, true])(
+    'D2 bug routing requires dedicated GitHub labels: %s',
+    async (dedicated) => {
+      s.db.run(sql`INSERT INTO ${sql.identifier(dedicated ? 'github_label' : 'tag')}
+      (id, projectId, name, color) VALUES ('bug-label', ${projectId}, 'BuG', '#b60205')`);
+      const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+        title: 'Save failure',
+        spec: 'Open settings and save.',
+      });
+      expect(res.status).toBe(201);
+      const todoId = ((await res.json()) as { id: string }).id;
+      s.db.run(sql`INSERT INTO ${sql.identifier(dedicated ? 'todo_github_label' : 'todo_tag')}
+      (todoId, ${sql.identifier(dedicated ? 'labelId' : 'tagId')}) VALUES (${todoId}, 'bug-label')`);
+      s.db
+        .update(todoTable)
+        .set({ sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#8' })
+        .where(eq(todoTable.id, todoId))
+        .run();
+      const orchestrated = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
+      expect(orchestrated.status).toBe(201);
+      const body = (await orchestrated.json()) as { message: { content: string } };
+      expect(body.message.content.includes('先完成复现步骤，再开始实现')).toBe(dedicated);
+    },
+  );
+
+  test('Coordinator generic updates cannot replace dedicated correction labels', async () => {
+    const todoId = await makeTodo();
+    s.db.run(sql`INSERT INTO github_label (id, projectId, name, color)
+      VALUES ('correction-label', ${projectId}, 'correction', '#000000')`);
+    updateAutonomousTodo(s.svc, todoId, { githubLabelIds: ['correction-label'] });
+    await expect(relay('update_todo', { todoId, githubLabelIds: [] })).rejects.toMatchObject({
+      status: 400,
     });
-    expect(res.status).toBe(201);
-    const todoId = ((await res.json()) as { id: string }).id;
-    s.db
-      .update(todoTable)
-      .set({
-        sourceKind: 'github-issue',
-        sourceRef: 'github:octo/alpha#8',
-      })
-      .where(eq(todoTable.id, todoId))
-      .run();
-    const orchestrated = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
-    expect(orchestrated.status).toBe(201);
-    const body = (await orchestrated.json()) as { message: { content: string } };
-    expect(body.message.content).toContain('先完成复现步骤，再开始实现');
-    expect(body.message.content).toContain('verify-cairn');
+    const edited = await relay('update_todo', { todoId, tagIds: [] });
+    expect(edited).toMatchObject({ tagIds: [], githubLabelIds: ['correction-label'] });
+    expect(s.db.get(sql`SELECT correctionRequired FROM todo WHERE id = ${todoId}`)).toEqual({
+      correctionRequired: 1,
+    });
   });
 
   test('D3 failed phase -> 201, the message carries re-orchestration context', async () => {

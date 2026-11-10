@@ -61,6 +61,7 @@ import {
   unassignedStepReason,
 } from './dispatch-eligibility.js';
 import { projectOfTodo, projectRepoRef } from './git.js';
+import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import {
   type MachineDeps,
@@ -91,7 +92,6 @@ import {
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { recordStepRoute, routedModelRunsOn } from './step-route.js';
-import { listProjectTagVocab } from './tags.js';
 import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
@@ -581,7 +581,7 @@ async function tryClaim(
       isGithubProject && namesTask && projectRow
         ? {
             titleFinal: cand.todoRow.sourceKind === 'github-issue' || cand.todoRow.request !== null,
-            vocab: listProjectTagVocab(db, projectRow.id),
+            vocab: listProjectGithubLabelVocab(db, projectRow.id),
           }
         : undefined;
     publishStepStatus(deps, cand.stepRow.id);

@@ -36,9 +36,12 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
         await page.evaluate(() => document.fonts.ready);
         const gap = await composer.evaluate((element) => {
           const sheet = element.closest('.board-sheet, .group\\/detail-main');
-          const floor = sheet
-            ? sheet.getBoundingClientRect().bottom - Number.parseFloat(getComputedStyle(sheet).borderBottomWidth)
-            : window.innerHeight;
+          const tabs = sheet?.querySelector('[data-slot="phone-tabs"]');
+          const floor = tabs
+            ? tabs.getBoundingClientRect().top
+            : sheet
+              ? sheet.getBoundingClientRect().bottom - Number.parseFloat(getComputedStyle(sheet).borderBottomWidth)
+              : window.innerHeight;
           return floor - element.getBoundingClientRect().bottom;
         });
         gaps.push(gap);

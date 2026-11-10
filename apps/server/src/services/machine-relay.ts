@@ -26,6 +26,7 @@ import {
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
 import { projectOfTodo } from './git.js';
+import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
@@ -37,7 +38,7 @@ import {
   type RouteProfile,
 } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
-import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
+import { resolveFixedTagId } from './tags.js';
 import { stepNamesTask } from './task-naming.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
 import { updateAutonomousTodo, writebackSelfIssueTitle } from './todos.js';
@@ -331,24 +332,24 @@ async function setTaskMetaGithubForm(
     }
     title = normalizedMetaTitle(params.title);
   }
-  let tagIds: string[] | undefined;
+  let githubLabelIds: string[] | undefined;
   const rawTags = params.tags !== undefined ? params.tags : params.tag;
   if (rawTags !== undefined) {
     const names = typeof rawTags === 'string' ? [rawTags] : rawTags;
     if (!Array.isArray(names) || names.some((n) => typeof n !== 'string' || n === '')) {
       throw new HttpError(400, 'invalid params.tags: expected an array of tag names');
     }
-    const resolved = resolveProjectTagIds(deps.db, todoRow.projectId, names);
+    const resolved = resolveProjectGithubLabelIds(deps.db, todoRow.projectId, names);
     for (const name of names) {
       if (!resolved.has(name)) {
         throw new HttpError(400, `tag ${name} not in project tag set`);
       }
     }
-    tagIds = [...new Set(names.map((n) => resolved.get(n)))].filter(
+    githubLabelIds = [...new Set(names.map((n) => resolved.get(n)))].filter(
       (id): id is string => id !== undefined,
     );
   }
-  if (title === undefined && tagIds === undefined) {
+  if (title === undefined && githubLabelIds === undefined) {
     throw new HttpError(400, 'invalid params: expected at least one of title / tags');
   }
   const todoDeps = {
@@ -364,11 +365,15 @@ async function setTaskMetaGithubForm(
   };
   const record = updateAutonomousTodo(todoDeps, todoRow.id, {
     ...(title !== undefined ? { title } : {}),
-    ...(tagIds !== undefined ? { tagIds } : {}),
+    ...(githubLabelIds !== undefined ? { githubLabelIds } : {}),
   });
   if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
   if (title !== undefined && record.sourceKind === 'github-issue-self') {
     await writebackSelfIssueTitle(todoDeps, todoRow.id, record.title).catch(() => undefined);
   }
-  return JSON.stringify({ todoId: record.id, title: record.title, tagIds: record.tagIds });
+  return JSON.stringify({
+    todoId: record.id,
+    title: record.title,
+    githubLabelIds: record.githubLabelIds,
+  });
 }

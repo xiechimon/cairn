@@ -531,7 +531,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(67);
+    expect(DB_TABLES).toHaveLength(69);
     expect(DB_TABLES).toContain('deploy_lease');
     expect(INTERNAL_ONLY_TABLES).toContain('deploy_lease');
     expect(INTERNAL_ONLY_TABLES).toContain('task_issue_close');
@@ -551,6 +551,9 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(DB_TABLES).toContain('build_feedback');
     expect(DB_TABLES).toContain('build_outcome_backfill');
     expect(DB_TABLES).toContain('todo_tag');
+    expect(DB_TABLES).toContain('github_label');
+    expect(DB_TABLES).toContain('todo_github_label');
+    expect(JOIN_ONLY_TABLES).toEqual(['todo_tag', 'todo_github_label']);
     expect(DB_TABLES).toContain('chief');
     expect(DB_TABLES).toContain('attachment');
     expect(DB_TABLES).toContain('branch_sync');
@@ -595,8 +598,8 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     }
   });
 
-  it('record shapes cover exactly the 20 wire tables (todo_tag join + internal tables have none; skill and mcp_server are projections with no table slot)', () => {
-    expect(Object.keys(RECORD_SCHEMAS)).toHaveLength(20);
+  it('record shapes cover exactly the 21 wire tables (joins and internal tables have none; skill and mcp_server are projections with no table slot)', () => {
+    expect(Object.keys(RECORD_SCHEMAS)).toHaveLength(21);
     expect(Object.keys(RECORD_SCHEMAS)).toEqual(
       DB_TABLES.filter(
         (t) =>

@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { apiKeyRecordSchema } from './api-key.js';
 import { buildRecordSchema } from './build.js';
 import { chiefRecordSchema, chiefThreadSchema } from './chief.js';
+import { githubLabelRecordSchema } from './github-label.js';
 import { machineRecordSchema } from './machine.js';
 import { memoryRecordSchema } from './memory.js';
 import { messageRecordSchema } from './message.js';
@@ -34,6 +35,7 @@ export * from './deploy-status.js';
 export * from './document-diff.js';
 export * from './first-pr-report.js';
 export * from './github.js';
+export * from './github-label.js';
 export * from './harness-profile.js';
 export * from './machine.js';
 export * from './machine-capabilities.js';
@@ -82,6 +84,7 @@ export const RECORD_SCHEMAS = {
   project: projectRecordSchema,
   todo: todoRecordSchema,
   tag: tagRecordSchema,
+  github_label: githubLabelRecordSchema,
   build: buildRecordSchema,
   step: stepRecordSchema,
   message: messageRecordSchema,
