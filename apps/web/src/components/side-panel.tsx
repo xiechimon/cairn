@@ -114,12 +114,14 @@ export function SidePanel({
   label,
   onDismiss,
   scrimTestId,
+  phoneTab = false,
   children,
 }: {
   ref?: Ref<HTMLElement>;
   label: string;
   onDismiss: () => void;
   scrimTestId?: string;
+  phoneTab?: boolean;
   children: ReactNode;
 }) {
   const width = useSidePanelWidth();
@@ -134,6 +136,7 @@ export function SidePanel({
       <aside
         ref={ref}
         aria-label={label}
+        data-phone-tab={phoneTab || undefined}
         style={{ '--side-panel-w': `${width}px` } as CSSProperties}
         className="side-panel relative flex w-(--side-panel-w) min-w-0 flex-none flex-col border-l border-border bg-background max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-(--z-panel-low) max-[1100px]:w-[min(420px,100%)] max-[1100px]:border-l-0 max-[1100px]:shadow-(--floating-shadow) max-[640px]:w-full"
       >

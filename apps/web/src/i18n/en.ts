@@ -1896,4 +1896,7 @@ export const EN: Record<string, string> = {
   'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
   '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
   '失败了，等自动重试': 'Failed; an automatic retry is coming',
+  '{n} 件进行中': '{n} in progress',
+  对话: 'Chat',
+  对话和任务: 'Chat and tasks',
 };

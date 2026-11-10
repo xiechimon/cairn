@@ -6,6 +6,7 @@ import { Link, useSearchParams } from 'react-router';
 import { usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
@@ -275,19 +276,24 @@ export function TasksPanel({
     );
   const body = tab === 'active' ? active : next;
   return (
-    <SidePanel label={t('任务')} onDismiss={onClose}>
+    <SidePanel label={t('任务')} onDismiss={onClose} phoneTab>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
         <SidePanelTitle>{t('任务')}</SidePanelTitle>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('新任务')}
-          data-testid="tasks-new"
-          onClick={onNewTask}
-          className="size-7.5 text-content-tertiary"
+        <IconTooltip
+          label={t('新任务')}
+          side="bottom"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              data-testid="tasks-new"
+              onClick={onNewTask}
+              className="size-7.5 text-content-tertiary"
+            />
+          }
         >
           <Plus aria-hidden className="size-4" strokeWidth={1.75} />
-        </Button>
+        </IconTooltip>
       </SidePanelHead>
       <div className="flex flex-none px-3 pt-3">
         <SegmentedTabs

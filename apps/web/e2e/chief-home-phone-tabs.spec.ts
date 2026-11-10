@@ -1,0 +1,95 @@
+import { expect, type Page, test } from '@playwright/test';
+
+const HOME = '/app?scenario=home-c';
+
+const tabs = (page: Page) => page.getByRole('navigation', { name: '对话和任务' });
+const panel = (page: Page) => page.getByRole('complementary', { name: '任务' });
+const composer = (page: Page) => page.locator('.chief-composer textarea');
+
+test.describe('at phone width', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('Chat and Tasks are bottom tabs, and the header has no Tasks toggle', async ({ page }) => {
+    await page.goto(HOME);
+    await expect(tabs(page)).toBeVisible();
+    await expect(page.getByTestId('tasks-toggle')).toHaveCount(0);
+    const chat = tabs(page).getByRole('link', { name: '对话' });
+    const tasks = tabs(page).getByRole('link', { name: /任务/ });
+    await expect(chat).toHaveAttribute('aria-current', 'page');
+    await expect(tabs(page).getByTestId('tasks-badge')).toHaveText('3');
+    await tasks.click();
+    await expect(panel(page)).toBeVisible();
+    await expect(page).toHaveURL(/[?&]pane=tasks/);
+    await expect(tasks).toHaveAttribute('aria-current', 'page');
+    const bar = await tabs(page).boundingBox();
+    const sheet = await panel(page).boundingBox();
+    expect(bar).not.toBeNull();
+    expect(sheet).not.toBeNull();
+    expect(sheet!.y + sheet!.height).toBeLessThanOrEqual(bar!.y + 1);
+    await chat.click();
+    await expect(panel(page)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/pane=/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
+  });
+
+  test('the drawer button stays on top of the Tasks sheet and opens the drawer', async ({
+    page,
+  }) => {
+    await page.goto(`${HOME}&pane=tasks`);
+    await expect(panel(page)).toBeVisible();
+    await page.getByRole('button', { name: '展开侧边栏' }).click({ trial: true, timeout: 2000 });
+    await page.getByRole('button', { name: '展开侧边栏' }).click();
+    await expect(page.locator('aside.board-sidebar')).toBeVisible();
+  });
+
+  test('an open task thread hides the tabs', async ({ page }) => {
+    await page.goto(`${HOME}&pane=tasks`);
+    await panel(page).getByText('Orb canary round 7').click();
+    await expect(page).toHaveURL(/[?&]thread=home-c-working-c/);
+    await expect(tabs(page)).toHaveCount(0);
+  });
+
+  test('the Tasks plus button closes the sheet and focuses the composer', async ({ page }) => {
+    await page.goto(`${HOME}&pane=tasks`);
+    await panel(page).getByTestId('tasks-new').click();
+    await expect(panel(page)).toHaveCount(0);
+    await expect(composer(page)).toBeFocused();
+    await expect(composer(page)).toBeInViewport();
+  });
+
+  test('the empty Tasks action closes the sheet and focuses the composer', async ({ page }) => {
+    await page.goto('/app?scenario=home-c-empty&pane=tasks');
+    await panel(page).getByRole('button', { name: '给 Coordinator 发消息' }).click();
+    await expect(panel(page)).toHaveCount(0);
+    await expect(composer(page)).toBeFocused();
+  });
+
+  test('drawer project rows carry one status line', async ({ page }) => {
+    await page.goto(HOME);
+    await page.getByRole('button', { name: '展开侧边栏' }).click();
+    const aside = page.locator('aside.board-sidebar');
+    const row = (name: string) =>
+      aside.locator('[data-slot="sidebar-project-row"]').filter({ hasText: name });
+    await expect(row('cairn').locator('[data-slot="project-status"]')).toHaveText(
+      '待回答 · 计划写好了',
+    );
+    await expect(row('Credential relay').locator('[data-slot="project-status"]')).toHaveText(
+      '2 件进行中',
+    );
+  });
+});
+
+test('wide screens keep the header Tasks toggle and draw no tabs or status lines', async ({
+  page,
+}) => {
+  await page.goto(HOME);
+  await expect(page.getByTestId('tasks-toggle')).toBeVisible();
+  await expect(tabs(page)).toHaveCount(0);
+  await expect(page.locator('[data-slot="project-status"]')).toHaveCount(0);
+});
+
+test('the Tasks plus button has a visible tooltip', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByTestId('tasks-new').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('新任务');
+});
