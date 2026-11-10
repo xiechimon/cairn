@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { type ExperimentClient, openExperimentClient } from '@cairn/shared/langfuse';
 import { z } from 'zod';
 import { evalCodexKey } from '../../../apps/daemon/src/backend/eval-auth.js';
-import { decisionOutput, type ReplayInput, replayInput } from './contract.mts';
+import { decisionOutput, expectedOutput, type ReplayInput, replayInput } from './contract.mts';
 import { runSandboxedTurn } from './sandbox.mts';
 
 const itemBudgetMs = 610_000;
@@ -75,10 +75,7 @@ export async function runExperiment(
   )
     throw new Error('incomplete: missing or duplicate harvested provenance');
   for (const item of items) {
-    const expected = decisionOutput
-      .omit({ questions: true, stepStatus: true, turnTraceId: true, promptSha256: true })
-      .strict()
-      .safeParse(item.expectedOutput);
+    const expected = expectedOutput.safeParse(item.expectedOutput);
     if (!expected.success) throw new Error('incomplete: invalid expectedOutput');
   }
   const inputs = items.map((item) => replayInput.parse(item.input));

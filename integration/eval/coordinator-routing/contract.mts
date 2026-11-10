@@ -138,6 +138,16 @@ export function normalize(status: string, placed: readonly string[], asked: bool
   throw new Error('Empty turn');
 }
 
+export const expectedOutput = z
+  .object({
+    decision: z.enum(['route', 'ask', 'answer']),
+    parts: z.array(z.object({ project: z.string().min(1) }).strict()),
+    askCandidates: z.array(z.string()),
+    blockedBy: z.array(z.tuple([z.number().int().min(0), z.number().int().min(0)])),
+    notes: z.string().optional(),
+  })
+  .strict();
+
 export const decisionOutput = z.object({
   decision: z.enum(['route', 'ask', 'answer']),
   parts: z.array(z.object({ project: z.string().min(1), title: z.string() })),

@@ -11,7 +11,19 @@ import {
 } from '../../../apps/server/src/db/schema.js';
 import { blockedNow } from '../../../apps/server/src/services/blockers.js';
 import { ownershipOf } from '../../../apps/server/src/services/owner.js';
-import { type ReplayInput, replayInput, replayThread, replayTodo } from './contract.mts';
+import {
+  expectedOutput,
+  type ReplayInput,
+  replayInput,
+  replayThread,
+  replayTodo,
+} from './contract.mts';
+
+export function harvestReplayItem(db: Db, sourceTurnId: string, expectation: unknown) {
+  const expected = expectedOutput.parse(expectation);
+  const input = harvestReplayInput(db, sourceTurnId);
+  return { input, expectedOutput: expected, sourceTraceId: input.snapshot.sourceTraceId };
+}
 
 export function harvestReplayInput(db: Db, sourceTurnId: string): ReplayInput {
   return db.transaction(() => {

@@ -27,7 +27,11 @@ import { normalize, observeTurn, replayInput } from '../eval/coordinator-routing
 import * as runner from '../eval/coordinator-routing/run.mts';
 import { type Manifest, runExperiment } from '../eval/coordinator-routing/run.mts';
 import { runSandboxedTurn } from '../eval/coordinator-routing/sandbox.mts';
-import { harvestReplayInput, seedReplayState } from '../eval/coordinator-routing/state.mts';
+import {
+  harvestReplayInput,
+  harvestReplayItem,
+  seedReplayState,
+} from '../eval/coordinator-routing/state.mts';
 import { startStubLlm } from './stub-llm.js';
 
 const closers: (() => Promise<unknown>)[] = [];
@@ -127,7 +131,22 @@ describe('Langfuse Coordinator runner', () => {
     },
   );
 
-  it.each([undefined, null, {}, { decision: 'hold' }])(
+  it.each([
+    undefined,
+    null,
+    {},
+    { decision: 'hold' },
+    { decision: 'route', parts: [{ project: 1 }], askCandidates: [], blockedBy: [] },
+    { decision: 'route', parts: [{}], askCandidates: [], blockedBy: [] },
+    {
+      decision: 'route',
+      parts: [{ project: 'docs', title: 'extra' }],
+      askCandidates: [],
+      blockedBy: [],
+    },
+    { decision: 'answer', parts: [], askCandidates: [], blockedBy: [], notes: 1 },
+    { decision: 'route', parts: [{ project: 'docs' }], askCandidates: [], blockedBy: [[1, '0']] },
+  ])(
     'rejects an ACTIVE item with invalid expectedOutput %j before starting the SDK experiment',
     async (expectedOutput) => {
       const execute = vi.fn();
@@ -363,7 +382,20 @@ describe('Langfuse Coordinator runner', () => {
           createdAt: 1,
         })
         .run();
-      const harvested = harvestReplayInput(source.db, 'source-turn');
+      const expectation = {
+        decision: 'route',
+        parts: [{ project: 'docs-site' }],
+        blockedBy: [[1, 0]],
+        askCandidates: [],
+        notes: '...',
+      };
+      const item = harvestReplayItem(source.db, 'source-turn', expectation);
+      expect(item.expectedOutput).toEqual(expectation);
+      expect(item.sourceTraceId).toBe(item.input.snapshot.sourceTraceId);
+      expect(() =>
+        harvestReplayItem(source.db, 'source-turn', { ...expectation, parts: [{}] }),
+      ).toThrow();
+      const harvested = item.input;
       expect(harvested).toMatchObject({
         request: 'The original request',
         chip: 'docs',
@@ -546,7 +578,8 @@ registerHooks({resolve(specifier,context,next){const key=specifier.includes('eva
             input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: `source-${n}` } },
             expectedOutput: {
               decision: 'route',
-              parts: [{ project: 'docs', title: 'ANSWER-SECRET' }],
+              parts: [{ project: 'docs-site' }],
+              notes: 'ANSWER-SECRET',
               askCandidates: [],
               blockedBy: [],
             },
