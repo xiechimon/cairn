@@ -1,0 +1,44 @@
+{
+  "mode": "Isolated real SQLite and SDK storage APIs; Coordinator/provider not invoked",
+  "migration": {
+    "tableBefore": 0,
+    "tableAfter": 1
+  },
+  "nativeStore": {
+    "sameIdentityAfterReopen": true,
+    "newFileHasNewIdentity": true,
+    "reusedConversationId": true
+  },
+  "input": {
+    "sameOwnerFreshRequestId": true,
+    "receipts": [
+      {
+        "conversation": "store_one:1",
+        "state": "consumed",
+        "entryId": "5"
+      },
+      {
+        "conversation": "store_two:1",
+        "state": "consumed",
+        "entryId": "5"
+      }
+    ]
+  },
+  "runs": {
+    "request": "bind(store_one:1, task 7) twice; bind(store_two:1, task 7)",
+    "rows": [
+      {
+        "threadId": "chief-proof",
+        "conversationId": "store_one:1",
+        "taskId": "7",
+        "stepId": "owner"
+      },
+      {
+        "threadId": "chief-proof",
+        "conversationId": "store_two:1",
+        "taskId": "7",
+        "stepId": "owner"
+      }
+    ]
+  }
+}
