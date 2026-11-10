@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
 import { TaskCardContext } from '../chief/chief-message-rows.js';
+import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { questionDockState } from '../chief/question-dock-state.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
@@ -178,6 +179,7 @@ export function HomeC({
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
+  const working = conversation.findLast((item) => item.kind === 'streaming');
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
   const taskById = useMemo(
@@ -509,6 +511,9 @@ export function HomeC({
           className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
         >
           {paneButtons}
+          <ChiefStatusMark
+            status={working === undefined ? null : t(working.label, working.labelVars)}
+          />
           {banner != null && (
             <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
               {banner}
