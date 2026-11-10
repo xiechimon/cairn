@@ -253,13 +253,7 @@ export function consumeCoordinatorInput(
       .run();
     if (batch.kind === 'steer')
       db.delete(step)
-        .where(
-          and(
-            eq(step.id, batch.id),
-            eq(step.status, 'pending'),
-            inArray(step.holdReason, ['steer', 'steer_sent']),
-          ),
-        )
+        .where(and(eq(step.id, batch.id), inArray(step.status, ['pending', 'waiting_quota'])))
         .run();
   });
 }
@@ -278,6 +272,8 @@ export function releaseCoordinatorInput(
     let successorStepId: string | null = null;
     if (batch.kind === 'steer') {
       const waiting = db.select().from(step).where(eq(step.id, batch.id)).get();
+      const waitingForExecution =
+        waiting?.status === 'pending' || waiting?.status === 'waiting_quota';
       const surviving = batch.ownerMessageIds.filter(
         (id) =>
           db
@@ -286,14 +282,15 @@ export function releaseCoordinatorInput(
             .where(and(eq(chiefMessage.id, id), eq(chiefMessage.threadId, batch.threadId)))
             .get() !== undefined,
       );
-      if (waiting?.status === 'pending' && surviving.length > 0) {
+      if (waitingForExecution && surviving.length > 0) {
         successorStepId = newRecordId();
         db.insert(step)
           .values({
             id: successorStepId,
             buildId: batch.threadId,
             kind: 'chief',
-            status: 'pending',
+            status: waiting.status,
+            quotaBlock: waiting.quotaBlock,
             prompt: batch.content,
             ownerMessageIds: surviving,
             scopeProjectId: waiting.scopeProjectId,
@@ -301,7 +298,7 @@ export function releaseCoordinatorInput(
           })
           .run();
       }
-      if (waiting?.status === 'pending') db.delete(step).where(eq(step.id, waiting.id)).run();
+      if (waitingForExecution) db.delete(step).where(eq(step.id, waiting.id)).run();
     }
     db.update(coordinatorInput)
       .set({ state: 'released', successorStepId })

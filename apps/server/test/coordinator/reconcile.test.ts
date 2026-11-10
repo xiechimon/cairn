@@ -119,7 +119,7 @@ describe('Coordinator reconcile at open', () => {
     expect(JSON.stringify(w.s.db.select().from(chiefMessage).all())).toContain('resumed answer');
   });
 
-  it('re-seeds a newly claimed step when the store is ahead of the restored database', async () => {
+  it('recovers proven mirror debt before deciding that the store is ahead of the restored database', async () => {
     const w = await world('before the restore');
     const { faux } = stub('ok');
     const first = boot(w, faux);
@@ -144,7 +144,7 @@ describe('Coordinator reconcile at open', () => {
     second.wake(w.threadId);
     await second.idle();
 
-    expect(outcomes).toEqual(['reseeded-ahead']);
+    expect(outcomes).toEqual(['unchanged']);
   });
 
   it('re-seeds a newly claimed step when the store is behind the mirrored watermark', async () => {

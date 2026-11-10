@@ -8,6 +8,7 @@ import {
   chief,
   chiefMessage,
   chiefThread,
+  coordinatorInput,
   message,
   project,
   queuedMessage,
@@ -157,10 +158,11 @@ describe('Coordinator terminal entry through an MCP client', () => {
     expect(turns[1]!.prompt).toContain('Keep the public API');
   });
 
-  test('steers the running Coordinator only when explicitly requested', async () => {
+  test.each([null, 'daemon'])('MCP steering keeps its target transport (%s)', async (machineId) => {
     const { s, client, threadId } = await world();
-    s.db.update(step).set({ status: 'claimed' }).where(eq(step.buildId, threadId)).run();
+    s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.buildId, threadId)).run();
     await call(client, 'reply_thread', { threadId, content: 'Later' });
+    expect(s.db.select().from(coordinatorInput).all()).toEqual([]);
     expect(s.db.select().from(steerPending).all()).toHaveLength(0);
     const reply = await call(client, 'reply_thread', {
       threadId,
@@ -168,7 +170,18 @@ describe('Coordinator terminal entry through an MCP client', () => {
       mode: 'steer',
     });
     expect(reply.steered).toBe(true);
-    expect(s.db.select().from(steerPending).get()?.content).toContain('Change direction');
+    if (machineId === null) {
+      expect(s.db.select().from(steerPending).all()).toEqual([]);
+      const input = s.db.select().from(coordinatorInput).get()!;
+      expect(input.content).toContain('Change direction');
+      expect(input).toMatchObject({ state: 'pending', entryId: null });
+      expect(
+        s.db.select().from(step).where(eq(step.id, input.stepId)).get()?.ownerMessageIds,
+      ).not.toContain(input.id);
+    } else {
+      expect(s.db.select().from(coordinatorInput).all()).toEqual([]);
+      expect(s.db.select().from(steerPending).get()?.content).toContain('Change direction');
+    }
   });
 
   test('lists pending questions and work gates, answers a question, and omits settled work', async () => {
