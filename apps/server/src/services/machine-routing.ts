@@ -122,6 +122,14 @@ export function soleOnlineMachineId(onlineIds: readonly string[]): string | null
   return onlineIds.length === 1 ? (onlineIds[0] ?? null) : null;
 }
 
+export function soleClaimMachineId(
+  machines: readonly { id: string; online: boolean }[],
+): string | null {
+  const online = soleOnlineMachineId(machines.filter((row) => row.online).map((row) => row.id));
+  if (online !== null) return online;
+  return machines.length === 1 ? (machines[0]?.id ?? null) : null;
+}
+
 export type RouteVerdict = { claim: true } | { claim: false; waitingFor: string | null };
 
 export function routeVerdict(input: {

@@ -336,6 +336,16 @@ describe('a worker step runs only on its named machine', () => {
     expect(statusOf(w, stepId)).toBe('pending');
   });
 
+  test('the only online machine claims an unnamed step while another machine is offline', async () => {
+    const w = await world();
+    const online = await machineOf(w, 'online');
+    await machineOf(w, 'offline', { online: false });
+    routeOf(w, null);
+    const stepId = pendingStep(w);
+    const claimed = await claimOn(w, online);
+    expect(claimed?.step.id).toBe(stepId);
+  });
+
   test('one registered machine is the queue target when the step has no pin', async () => {
     const w = await world();
     const only = await machineOf(w, 'only');

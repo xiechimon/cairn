@@ -19,7 +19,7 @@ import { holdBlockedBuild } from './blockers.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
-import { priorSessionOf, routeTargets, soleOnlineMachineId } from './machine-routing.js';
+import { priorSessionOf, routeTargets, soleClaimMachineId } from './machine-routing.js';
 import { effectiveModel } from './model-fallback.js';
 import { isClaudeModel, machineUsesClaudeSubscription } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
@@ -124,7 +124,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const subscriptionOnly =
     deps.db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage !== 'allow-paid';
   let changed = false;
-  const sole = soleOnlineMachineId(machines.map((row) => row.id));
+  const sole = soleClaimMachineId(machines);
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,

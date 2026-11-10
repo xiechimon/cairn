@@ -15,7 +15,7 @@ import {
   type RouteVerdict,
   routeTargets,
   routeVerdict,
-  soleOnlineMachineId,
+  soleClaimMachineId,
   targetUnavailable,
   type WorkerStepFacts,
   workerIneligibility,
@@ -135,7 +135,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
     const prior = priorSessionOf(db, row, row.buildRow);
-    const sole = soleOnlineMachineId(teamMachines.map((row) => row.id));
+    const sole = soleClaimMachineId(teamMachines);
     const verdict = routeVerdict({
       machineId: null,
       targets: routeTargets(
