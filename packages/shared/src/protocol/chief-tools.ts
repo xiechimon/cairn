@@ -938,14 +938,12 @@ const WORKER_ATTACH_FILE_TOOL: RemoteToolDef = {
 const SET_TASK_META_TOOL: RemoteToolDef = {
   name: 'set_task_meta',
   description:
-    'Set the title and category tag of the task you are currently working on. ' +
+    'Set the title of the task you are currently working on. ' +
     'Call exactly once before starting work: title = a concise summary of the task spec ' +
-    '(50 chars max, plain text, no markdown); tag = one name from the fixed tag vocabulary ' +
-    'listed in your instructions (omit it when none fits).',
+    '(50 chars max, plain text, no markdown).',
   parameters: obj(
     {
       title: str('Task title, 50 chars max.'),
-      tag: str('Optional tag name from the fixed vocabulary.'),
     },
     ['title'],
   ),

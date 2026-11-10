@@ -2,7 +2,7 @@ import { type ClaimedStep, FIXED_TAGS, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { step as stepTable, todo as todoTable } from '../src/db/schema.js';
+import { step as stepTable, todo as todoTable, todoTag } from '../src/db/schema.js';
 import { backfillFixedTags, seedFixedTags } from '../src/services/tags.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
@@ -118,27 +118,29 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
 
   test('the claim payload contains set_task_meta', async () => {
     const { s, step } = await world();
-    expect(step.remoteTools?.map((t) => t.name)).toContain('set_task_meta');
+    const tool = step.remoteTools?.find((t) => t.name === 'set_task_meta');
+    if (!tool) throw new Error('metadata tool missing');
+    expect(tool.parameters).toMatchObject({ required: ['title'], properties: { title: {} } });
+    expect(Object.keys((tool.parameters as { properties: object }).properties)).toEqual(['title']);
     s.dispose();
   });
 
-  test('backfilling title + tags: the todo updates and v increments', async () => {
+  test('backfilling only the title: the todo updates and v increments', async () => {
     const { s, token, step, todoId } = await world();
     const res = await relay(s.app, token, step.step.id, {
       title: '登录页加图形验证码',
-      tag: 'feature',
     });
     expect(res.status).toBe(200);
     const one = todoRecordSchema.parse(
       await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json(),
     );
     expect(one.title).toBe('登录页加图形验证码');
-    expect(one.tagIds).toHaveLength(1);
+    expect(one.tagIds).toEqual([]);
     expect(one.v).toBeGreaterThan(1);
     s.dispose();
   });
 
-  test('tag omitted = only the title backfilled; a tag outside the vocabulary = 400; a blank title = 400', async () => {
+  test('title backfill works; a stale category and a blank title fail', async () => {
     const { s, token, step, todoId } = await world();
     const ok = await relay(s.app, token, step.step.id, { title: '只回填标题' });
     expect(ok.status).toBe(200);
@@ -153,6 +155,75 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
     expect(empty.status).toBe(400);
     s.dispose();
   });
+
+  test.each([false, true])(
+    'sealed owner request = %s: stale categories fail atomically',
+    async (sealed) => {
+      const { s, token, step, todoId, projectId } = await world();
+      try {
+        const category = await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+          body: { name: 'correction', color: '#123456' },
+        });
+        expect(category.status).toBe(201);
+        const { id } = (await category.json()) as { id: string };
+        expect(
+          (await call(s.app, 'PATCH', `/api/todos/${todoId}`, { body: { tagIds: [id] } })).status,
+        ).toBe(200);
+        const taskText = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.spec;
+        if (taskText === undefined) throw new Error('task missing');
+        if (sealed) {
+          s.db
+            .update(todoTable)
+            .set({
+              request: {
+                segments: [
+                  {
+                    source: { kind: 'edit', userId: s.user.id, at: 0, span: 'whole' },
+                    author: 'owner',
+                    sourceRef: null,
+                    text: taskText,
+                  },
+                ],
+                siblings: [],
+                difficulty: null,
+                titleSource: 'owner',
+                titleSourceRef: null,
+              },
+            })
+            .where(eq(todoTable.id, todoId))
+            .run();
+        }
+        const before = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+        const links = s.db.select().from(todoTag).where(eq(todoTag.todoId, todoId)).all();
+        expect(before?.correctionRequired).toBe(true);
+        for (const key of ['tag', 'tags', 'tagIds']) {
+          for (const value of [null, [], 'bug', ['bug']]) {
+            expect(
+              (await relay(s.app, token, step.step.id, { title: 'Must not land', [key]: value }))
+                .status,
+              `${key}=${JSON.stringify(value)}`,
+            ).toBe(400);
+            expect(s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()).toEqual(
+              before,
+            );
+            expect(s.db.select().from(todoTag).where(eq(todoTag.todoId, todoId)).all()).toEqual(
+              links,
+            );
+          }
+        }
+        const ok = await relay(s.app, token, step.step.id, { title: 'Title only' });
+        expect(ok.status).toBe(200);
+        const after = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+        expect(after?.title).toBe(sealed ? before?.title : 'Title only');
+        expect(after?.spec).toBe(before?.spec);
+        expect(after?.request).toEqual(before?.request);
+        expect(after?.correctionRequired).toBe(true);
+        expect(s.db.select().from(todoTag).where(eq(todoTag.todoId, todoId)).all()).toEqual(links);
+      } finally {
+        s.dispose();
+      }
+    },
+  );
 
   function finishFirstStep(s: ReturnType<typeof bootServer>, stepId: string) {
     s.db
