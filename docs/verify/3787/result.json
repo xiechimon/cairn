@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "clauses": 7,
+  "provider": "none",
+  "linuxPreflight": {
+    "state": "unavailable",
+    "invocation": "facd5e83-0064-4869-87b4-ca8a80edb256",
+    "generation": 2,
+    "revision": 3,
+    "reason": "startup-failed"
+  },
+  "rows": {
+    "online": 1,
+    "enabledRuntimes": "[\"pi\"]",
+    "capabilities": "{\"mcpServers\":[],\"skills\":[],\"confinement\":{\"invocation\":\"c335b254-a385-4fd7-b024-6f37bd3c2b21\",\"generation\":3,\"state\":\"not-applicable\",\"revision\":2}}"
+  }
+}

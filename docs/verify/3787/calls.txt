@@ -1,0 +1,57 @@
+Ephemeral fixture record identifiers are redacted for publication.
+
+Segment 3a - isolated live API, real SQLite persistence
+
+Provider: none; harness execution is outside this API probe.
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"checking","invocation":"638e46e0-2dce-4686-bf86-6e047b9b7810","generation":1,"revision":1}}}
+
+200 {"ok":true}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"ready","invocation":"638e46e0-2dce-4686-bf86-6e047b9b7810","generation":1,"revision":2}}}
+
+200 {"ok":true}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"checking","invocation":"638e46e0-2dce-4686-bf86-6e047b9b7810","generation":1,"revision":1}}}
+
+409 {"error":"Stale confinement report"}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"unavailable","invocation":"638e46e0-2dce-4686-bf86-6e047b9b7810","generation":1,"revision":3,"reason":"cleanup-failed"}}}
+
+200 {"ok":true}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"ready"}}}
+
+200 {"ok":true}
+
+GET /api/machine/me
+
+200 {"id":"fixture-machine","name":"availability-live","teamId":"fixture-team","online":true,"lastSeenAt":1794286451479,"latestCliVersion":null,"kind":"remote","enabledRuntimes":["pi"],"maxConcurrent":3,"maxConcurrentOverridden":false,"recommendedConcurrent":3,"concurrencyRange":{"min":1,"max":8},"concurrencySource":"estimate","runningSteps":0,"capabilities":{"mcpServers":[],"skills":[],"confinement":{"invocation":"638e46e0-2dce-4686-bf86-6e047b9b7810","generation":1,"state":"checking","revision":3}}}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"checking","invocation":"facd5e83-0064-4869-87b4-ca8a80edb256","generation":2,"revision":2}}}
+
+200 {"ok":true}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"unavailable","invocation":"facd5e83-0064-4869-87b4-ca8a80edb256","generation":2,"revision":3,"reason":"startup-failed"}}}
+
+200 {"ok":true}
+
+POST /api/machine/tasks/claim {"confinement":{"state":"unavailable","invocation":"facd5e83-0064-4869-87b4-ca8a80edb256","generation":2,"revision":3,"reason":"startup-failed"}}
+
+200 {"step":null}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"checking","invocation":"c335b254-a385-4fd7-b024-6f37bd3c2b21","generation":3,"revision":1}}}
+
+200 {"ok":true}
+
+POST /api/machine/presence {"capabilities":{"mcpServers":[],"skills":[],"confinement":{"state":"not-applicable","invocation":"c335b254-a385-4fd7-b024-6f37bd3c2b21","generation":3,"revision":2}}}
+
+200 {"ok":true}
+
+GET /api/machine/me
+
+200 {"id":"fixture-machine","name":"availability-live","teamId":"fixture-team","online":true,"lastSeenAt":1794286451503,"latestCliVersion":null,"kind":"remote","enabledRuntimes":["pi"],"maxConcurrent":3,"maxConcurrentOverridden":false,"recommendedConcurrent":3,"concurrencyRange":{"min":1,"max":8},"concurrencySource":"estimate","runningSteps":0,"capabilities":{"mcpServers":[],"skills":[],"confinement":{"invocation":"c335b254-a385-4fd7-b024-6f37bd3c2b21","generation":3,"state":"not-applicable","revision":2}}}
+
+SQLite readonly: {"online":1,"enabledRuntimes":"[\"pi\"]","capabilities":"{\"mcpServers\":[],\"skills\":[],\"confinement\":{\"invocation\":\"c335b254-a385-4fd7-b024-6f37bd3c2b21\",\"generation\":3,\"state\":\"not-applicable\",\"revision\":2}}"}
+
+PASS: checking -> ready; stale 409; malformed revocation; real Linux preflight unavailable; macOS not-applicable; presence stays online.
