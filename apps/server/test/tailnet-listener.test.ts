@@ -298,7 +298,7 @@ describe('the identity header is read in exactly one module', () => {
       }
     };
     walk(root);
-    expect(offenders.sort()).toEqual(['config.ts', 'lib/tailnet-listener.ts']);
+    expect(offenders.sort()).toEqual(['lib/tailnet-listener.ts']);
   });
 });
 

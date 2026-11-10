@@ -39,24 +39,9 @@ async function streamUrl(path: string): Promise<string> {
   return `${path}?ticket=${encodeURIComponent(body.ticket)}`;
 }
 
-function connectWhenTicket(
-  path: string,
-  onEvent: (ev: Record<string, unknown>) => void,
-  onResync: () => void,
-  guards: ReturnType<typeof streamGuards>,
-): () => void {
-  let stop = (): void => {
-    disposed = true;
-  };
-  let disposed = false;
-  void streamUrl(path).then((url) => {
-    if (disposed) return;
-    stop = connect(url, onEvent, onResync, guards);
-  });
-  return () => {
-    disposed = true;
-    stop();
-  };
+function withTicket(path: string, ticket: string | null): string {
+  if (ticket === null || ticket === '') return path;
+  return `${path}?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export function useTeamStream(teamId: string | undefined, enabled: boolean): void {
@@ -67,19 +52,36 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
       computerFeedStore.clear();
       return;
     }
-    return startTeamStream(teamId, qc, auth.generation);
+    let stop = (): void => {
+      cancelled = true;
+    };
+    let cancelled = false;
+    void streamUrl(`/api/teams/${teamId}/stream`).then((url) => {
+      if (cancelled) return;
+      const ticket = new URL(url, window.location.origin).searchParams.get('ticket');
+      stop = startTeamStream(teamId, qc, auth.generation, ticket);
+    });
+    return () => {
+      cancelled = true;
+      stop();
+    };
   }, [teamId, enabled, qc, auth]);
 }
 
-export function startTeamStream(teamId: string, qc: QueryClient, generation = 0): () => void {
+export function startTeamStream(
+  teamId: string,
+  qc: QueryClient,
+  generation = 0,
+  ticket: string | null = null,
+): () => void {
   computerFeedStore.clear();
   const resync = () => {
     computerFeedStore.clear();
     void invalidateConverged(qc);
   };
   const guards = streamGuards(qc);
-  const disconnect = connectWhenTicket(
-    `/api/teams/${teamId}/stream`,
+  const disconnect = connect(
+    withTicket(`/api/teams/${teamId}/stream`, ticket),
     (ev) => {
       for (const queryKey of teamEventInvalidations(ev, teamId)) {
         void invalidateConverged(qc, { queryKey });
@@ -204,7 +206,19 @@ export function useConversationStream(
   const auth = useAuth();
   useEffect(() => {
     if (conversationId === undefined || !enabled || auth.gateOpen) return;
-    return startConversationStream(conversationId, qc, { onMessage, onStep });
+    let stop = (): void => {
+      cancelled = true;
+    };
+    let cancelled = false;
+    void streamUrl(`/api/conversations/${conversationId}/stream`).then((url) => {
+      if (cancelled) return;
+      const ticket = new URL(url, window.location.origin).searchParams.get('ticket');
+      stop = startConversationStream(conversationId, qc, { onMessage, onStep }, ticket);
+    });
+    return () => {
+      cancelled = true;
+      stop();
+    };
   }, [conversationId, enabled, qc, onMessage, onStep, auth]);
 }
 
@@ -212,6 +226,7 @@ export function startConversationStream(
   conversationId: string,
   qc: QueryClient,
   handlers: ConversationStreamHandlers,
+  ticket: string | null = null,
 ): () => void {
   const onMessage = handlers.onMessage;
   const onStep = handlers.onStep;
@@ -226,8 +241,8 @@ export function startConversationStream(
     agentTodoStore.clear(conversationId);
     void invalidateConverged(qc);
   };
-  return connectWhenTicket(
-    `/api/conversations/${conversationId}/stream`,
+  return connect(
+    withTicket(`/api/conversations/${conversationId}/stream`, ticket),
     (ev) => {
       switch (ev.type) {
         case 'text_delta':
