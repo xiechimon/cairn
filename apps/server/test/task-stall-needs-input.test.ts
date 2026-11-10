@@ -464,7 +464,6 @@ describe('answer_question answers one request id on the same build', () => {
 
 describe('decisions are stored on the task and survive restarts', () => {
   test('a restart after a ruling claims the unchanged brief with the ruling as a separate decisions field', async () => {
-    const machineId = insertMachine(H.s);
     const { todoId, stepRow } = await askAndPark();
     endStep(stepRow.id);
     await relay('answer_question', {
@@ -494,7 +493,15 @@ describe('decisions are stored on the task and survive restarts', () => {
     });
     const restarted = getTodo(deps(), todoId)!.latestBuildId!;
     H.s.db.delete(step).where(eq(step.kind, 'chief')).run();
-    const claimed = await claimStep(deps() as never, machineId, H.teamId, 0, 'http://localhost');
+    const sessionMachineId = stepRow.machineId;
+    if (sessionMachineId === null) throw new Error('session machine missing');
+    const claimed = await claimStep(
+      deps() as never,
+      sessionMachineId,
+      H.teamId,
+      0,
+      'http://localhost',
+    );
     expect(claimed?.conversationId).toBe(restarted);
     expect(claimed?.todo?.spec).toBe('Copy the onboarding text byte-for-byte.');
     expect(claimed?.todo?.decisions).toEqual([
