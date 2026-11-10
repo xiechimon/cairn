@@ -848,6 +848,7 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
   if (row.sourceKind === 'github-issue-self' && row.sourceRef !== null) {
     queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
   }
+  db.delete(schedule).where(eq(schedule.todoId, id)).run();
   db.delete(todo).where(eq(todo.id, id)).run();
   return true;
 }

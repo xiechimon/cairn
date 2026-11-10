@@ -286,7 +286,8 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'schedules',
-    description: 'List scheduled reruns (kind, next run, bound todo).',
+    description:
+      'List schedules and their retained run history (kind, nextRunAt, lastRunAt, lastRunStatus, bound todo). Completed one-shot schedules are retained; nextRunAt null means no upcoming run even when enabled is true.',
     parameters: obj({}),
     replaySafe: true,
   },

@@ -1,5 +1,6 @@
 import {
   buildReviewStepPrompt,
+  CHIEF_REMOTE_TOOLS,
   type ClaimedStep,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
@@ -625,6 +626,13 @@ describe('worker schedule security', () => {
       s.db.select().from(machine).where(eq(machine.id, s.claimed.step.machineId!)).get()?.online,
     ).toBe(false);
     await expect(scheduler.tick(due + 900_000)).resolves.toBeUndefined();
+  });
+
+  test('team schedules describes completed history and its next-run state', () => {
+    const description = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'schedules')?.description;
+    expect(description).toContain('lastRunStatus');
+    expect(description).toContain('nextRunAt');
+    expect(description).toMatch(/completed.*retained/i);
   });
 
   test('get_schedule describes retained completed one-shots and their status', () => {

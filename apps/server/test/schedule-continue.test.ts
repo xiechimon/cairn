@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { build, message, plan, project, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
@@ -633,6 +634,45 @@ test('explicitly deleting a retained once row still ends snooze and removes it',
   expect(s.stored()).toBeUndefined();
   expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.snoozeMode).toBeNull();
 });
+
+test.each(['task-api', 'coordinator'] as const)(
+  '%s deletion removes retained completed history without a scheduler sweep',
+  async (entry) => {
+    const s = await world('once');
+    await s.scheduler.tick(s.due);
+    const fired = s.db.select().from(step).all().at(-1)!;
+    setTodoPhase(s.svc, s.todoId, 'building');
+    builds.completeStep(s.svc, fired.id);
+    expect(s.stored()?.lastRunStatus).toBe('completed');
+    if (entry === 'task-api') {
+      expect((await req(s.app, 'DELETE', `/api/todos/${s.todoId}`)).status).toBe(204);
+    } else {
+      const deps = {
+        ...s.svc,
+        box: s.secretBox,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        skillsDir: s.skillsDir,
+      };
+      const context = {
+        teamId: s.team.id,
+        userId: s.user.id,
+        chiefId: 'cleanup-chief',
+        threadId: 'cleanup-thread',
+        chiefAgentId: null,
+        conversationId: 'cleanup-thread',
+      };
+      expect(JSON.parse(await executeChiefTool(deps, context, 'schedules', {}))).toMatchObject([
+        { id: s.saved.id, lastRunStatus: 'completed', nextRunAt: null },
+      ]);
+      const result = await executeChiefTool(deps, context, 'delete_todos', { todoIds: [s.todoId] });
+      expect(JSON.parse(result)).toEqual({ deleted: [s.todoId] });
+    }
+    expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()).toBeUndefined();
+    expect(s.stored()).toBeUndefined();
+    expect((await req(s.app, 'GET', '/api/schedules')).status).toBe(200);
+  },
+);
 
 test.each(['once', 'cron'] as const)(
   'an owner %s PhaseTransitionError consumes or advances its refused slot',
