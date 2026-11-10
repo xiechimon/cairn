@@ -15,7 +15,7 @@ import { agentMemory, memorySaveConflict } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
-function validateMemoryText(title: string, content: string): void {
+export function validateMemoryText(title: string, content: string): void {
   if (title.includes(ISSUE_FENCE_OPEN) || content.includes(ISSUE_FENCE_OPEN)) {
     throw new HttpError(
       400,
@@ -136,6 +136,10 @@ export function boundMemoryIndex(content: string): { content: string; omitted: n
   };
 }
 
+export function memoryDocumentVersion(row: MemoryRow) {
+  return `${row.id}:${row.updatedAt}:${row.invalidAt ?? 'live'}:${row.teamId}:${row.projectId ?? 'team'}:${row.agentId}:${row.independent}:${row.layer}:${row.title}`;
+}
+
 export function ensureMemoryIndex(
   db: Db | MemoryTx,
   scope: { agentId: string; teamId: string; projectId: string | null; teamScoped?: boolean },
@@ -198,13 +202,7 @@ export function injectMemoryDocuments(
     let omitted = 0;
     for (const namespace of namespaces.values()) {
       const index = ensureMemoryIndex(tx, namespace);
-      const facts = readIndex(index);
-      const rendered = facts
-        .map(
-          (fact) =>
-            `- ${fact.title.replace(/[\r\n]+/g, ' ')}：${fact.content}${fact.fileId === null ? '' : `（记忆文件：${fact.title.replace(/[\r\n]+/g, ' ')}）`}`,
-        )
-        .join('\n');
+      const rendered = memoryIndexText(index);
       const bounded = boundMemoryIndex(rendered);
       omitted += bounded.omitted;
       memories.push({
@@ -295,6 +293,11 @@ function indexRow(row: Pick<MemoryRow, 'id' | 'layer'>): boolean {
   return row.layer === 'core' && row.id.startsWith(MEMORY_INDEX_ID_PREFIX);
 }
 
+export const MEMORY_MARKDOWN_INDEX_PREFIX = `${MEMORY_INDEX_ID_PREFIX}markdown:`;
+function encodedIndex(row: Pick<MemoryRow, 'id' | 'content'>) {
+  return !row.id.startsWith(MEMORY_MARKDOWN_INDEX_PREFIX) && row.content.startsWith('- {"');
+}
+
 function readIndex(row: Pick<MemoryRow, 'id' | 'content'>): IndexFact[] {
   try {
     const facts =
@@ -312,12 +315,27 @@ function readIndex(row: Pick<MemoryRow, 'id' | 'content'>): IndexFact[] {
   }
 }
 
+export function memoryIndexText(row: MemoryRow): string {
+  if (row.layer !== 'core' || !encodedIndex(row)) return row.content;
+  try {
+    return readIndex(row)
+      .map(
+        (fact) =>
+          `- ${fact.title.replace(/[\r\n]+/g, ' ')}：${fact.content}${fact.fileId === null ? '' : `（记忆文件：${fact.title.replace(/[\r\n]+/g, ' ')}）`}`,
+      )
+      .join('\n');
+  } catch {
+    return row.content;
+  }
+}
+
 function writeIndex(facts: IndexFact[]): string {
   return facts.map((fact) => `- ${JSON.stringify(fact)}`).join('\n');
 }
 
 function indexFacts(db: Db | MemoryTx, row: MemoryRow): MemoryRow[] {
-  if (!indexRow(row)) return [row];
+  if (indexRow(row) && row.content === '') return [];
+  if (!indexRow(row) || !encodedIndex(row)) return [row];
   return readIndex(row).map(({ fileId, ...fact }) => {
     const file =
       fileId === null
@@ -355,7 +373,7 @@ function indexFacts(db: Db | MemoryTx, row: MemoryRow): MemoryRow[] {
 function factRows(db: Db | MemoryTx, rows: MemoryRow[]): MemoryRow[] {
   const files = new Set(
     rows
-      .filter(indexRow)
+      .filter((row) => indexRow(row) && encodedIndex(row))
       .flatMap((row) =>
         readIndex(row).flatMap((fact) => (fact.fileId === null ? [] : [fact.fileId])),
       ),
@@ -377,7 +395,9 @@ function indexedFact(
   scope: Parameters<typeof listStoredMemoryEntries>[1],
   id: string,
 ) {
-  for (const document of listStoredMemoryEntries(db, scope).filter(indexRow)) {
+  for (const document of listStoredMemoryEntries(db, scope).filter(
+    (row) => indexRow(row) && encodedIndex(row),
+  )) {
     const entries = readIndex(document);
     const entry = entries.find((fact) => fact.id === id || fact.fileId === id);
     const row = entry && indexFacts(db, document).find((fact) => fact.id === entry.id);
@@ -546,13 +566,20 @@ export function saveMemoryEntry(
   });
 }
 
-function replaceMemory(tx: MemoryTx, row: MemoryRow, content: string): MemoryRow {
+export function replaceMemory(
+  tx: MemoryTx,
+  row: MemoryRow,
+  content: string,
+  markdown = false,
+): MemoryRow {
   const now = Math.max(nowMs(), row.updatedAt + 1);
   const successor = tx
     .insert(agentMemory)
     .values({
       ...row,
-      id: indexRow(row) ? `${MEMORY_INDEX_ID_PREFIX}${newRecordId()}` : newRecordId(),
+      id: indexRow(row)
+        ? `${markdown ? MEMORY_MARKDOWN_INDEX_PREFIX : MEMORY_INDEX_ID_PREFIX}${newRecordId()}`
+        : newRecordId(),
       content,
       history: [
         ...row.history,
@@ -733,7 +760,7 @@ export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): numbe
       .from(agentMemory)
       .where(and(stillValid, eq(agentMemory.layer, 'core')))
       .all()
-      .filter(indexRow)) {
+      .filter((row) => indexRow(row) && encodedIndex(row))) {
       const facts = readIndex(row);
       const kept = facts.map((fact) => ({ ...fact, history: retainedHistory(fact, cutoff) }));
       if (kept.some((fact, i) => fact.history.length !== facts[i]?.history.length))
@@ -748,6 +775,7 @@ export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): numbe
 
 export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scope?: SQL): void {
   db.transaction((tx) => {
+    const markdownFolds: { id: string; render: () => string }[] = [];
     tx.update(agentMemory)
       .set({ layer: 'searchable' })
       .where(and(scope, eq(agentMemory.layer, 'log' as MemoryLayer)))
@@ -769,16 +797,40 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
       const injectedAt = group.flatMap((row) =>
         row.lastInjectedAt === null ? [] : [row.lastInjectedAt],
       );
-      const entries = group.flatMap((row) =>
-        indexRow(row) ? readIndex(row) : [fileEntry(tx, row)],
+      const existingText = group.some((row) => indexRow(row) && !encodedIndex(row));
+      const parts = group.map((row) =>
+        indexRow(row) ? (encodedIndex(row) ? readIndex(row) : row.content) : [fileEntry(tx, row)],
       );
+      const render = () =>
+        parts
+          .map((part) => {
+            if (typeof part === 'string') return part;
+            const allocated = part.map((fact) => ({
+              ...fact,
+              title:
+                fact.fileId === null
+                  ? fact.title
+                  : (tx.select().from(agentMemory).where(eq(agentMemory.id, fact.fileId)).get()
+                      ?.title ?? fact.title),
+            }));
+            return memoryIndexText({
+              ...head,
+              id: MEMORY_INDEX_ID_PREFIX,
+              content: writeIndex(allocated),
+            });
+          })
+          .filter(Boolean)
+          .join('\n');
+      const content = existingText
+        ? render()
+        : writeIndex(parts.flatMap((part) => (typeof part === 'string' ? [] : part)));
       const index = tx
         .insert(agentMemory)
         .values({
           ...head,
-          id: `${MEMORY_INDEX_ID_PREFIX}${newRecordId()}`,
+          id: `${existingText ? MEMORY_MARKDOWN_INDEX_PREFIX : MEMORY_INDEX_ID_PREFIX}${newRecordId()}`,
           title: MEMORY_INDEX_TITLE,
-          content: writeIndex(entries),
+          content,
           sourceTodoId: null,
           sourceBuildId: null,
           source: null,
@@ -791,6 +843,7 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
         })
         .returning()
         .get();
+      if (existingText) markdownFolds.push({ id: index.id, render });
       tx.update(agentMemory)
         .set({ invalidAt: now, supersededBy: index.id })
         .where(
@@ -800,6 +853,84 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
           ),
         )
         .run();
+    }
+    const files = tx
+      .select()
+      .from(agentMemory)
+      .where(
+        and(
+          scope,
+          notAdoptedDuplicate(),
+          eq(agentMemory.layer, 'searchable'),
+          or(stillValid, isNull(agentMemory.supersededBy)),
+        ),
+      )
+      .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
+      .all();
+    const namespaces = new Map<string, MemoryRow[]>();
+    for (const row of files) {
+      const key = JSON.stringify([row.teamId, row.projectId, row.independent ? row.agentId : null]);
+      namespaces.set(key, [...(namespaces.get(key) ?? []), row]);
+    }
+    for (const files of namespaces.values()) {
+      const reserved = new Set([MEMORY_INDEX_TITLE, ...files.map((row) => row.title)]);
+      const used = new Set([MEMORY_INDEX_TITLE]);
+      const renamed = new Map<string, string>();
+      for (const row of files) {
+        let title = row.title;
+        if (used.has(title)) {
+          const stem = title.endsWith('.md') ? title.slice(0, -3) : title;
+          const suffix = title.endsWith('.md') ? '.md' : '';
+          for (let n = 2; reserved.has(title); n++) title = `${stem} (${n})${suffix}`;
+          tx.update(agentMemory)
+            .set({ title, updatedAt: Math.max(now, row.updatedAt + 1) })
+            .where(eq(agentMemory.id, row.id))
+            .run();
+          renamed.set(row.id, title);
+        }
+        used.add(title);
+        reserved.add(title);
+      }
+      if (renamed.size === 0) continue;
+      const head = files[0];
+      if (head === undefined) continue;
+      const indexes = tx
+        .select()
+        .from(agentMemory)
+        .where(
+          and(
+            ownerWhere({ ...head, teamScoped: !head.independent }),
+            eq(agentMemory.independent, head.independent),
+            head.projectId === null
+              ? isNull(agentMemory.projectId)
+              : eq(agentMemory.projectId, head.projectId),
+            stillValid,
+            eq(agentMemory.layer, 'core'),
+          ),
+        )
+        .all()
+        .filter((row) => indexRow(row) && encodedIndex(row));
+      for (const index of indexes) {
+        const facts = readIndex(index);
+        const allocated = facts.map((fact) => ({
+          ...fact,
+          title: (fact.fileId === null ? undefined : renamed.get(fact.fileId)) ?? fact.title,
+        }));
+        if (allocated.some((fact, i) => fact.title !== facts[i]?.title))
+          tx.update(agentMemory)
+            .set({ content: writeIndex(allocated), updatedAt: Math.max(now, index.updatedAt + 1) })
+            .where(eq(agentMemory.id, index.id))
+            .run();
+      }
+    }
+    for (const { id, render } of markdownFolds) {
+      const index = tx.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
+      const content = render();
+      if (index && index.content !== content)
+        tx.update(agentMemory)
+          .set({ content, updatedAt: Math.max(now, index.updatedAt + 1) })
+          .where(eq(agentMemory.id, id))
+          .run();
     }
   });
 }

@@ -40,3 +40,59 @@ export const MEMORY_UI_COPY = {
   sort: '排序',
   sourceLink: '来源任务',
 } as const;
+
+const memoryScopeParam = z
+  .string()
+  .min(1)
+  .describe(
+    'Scope: "team" or a project id. Workers may select only team or their current project; independent stores stay isolated.',
+  );
+const memoryFileParam = z
+  .string()
+  .min(1)
+  .max(1024)
+  .regex(/^[^\r\n\0]+$/)
+  .describe('Exact memory file name; MEMORY.md is the always-loaded index.');
+const memoryDocumentParams = z.object({ scope: memoryScopeParam, file: memoryFileParam }).strict();
+const memoryMutationParams = memoryDocumentParams.extend({
+  baseVersion: z
+    .string()
+    .min(1)
+    .describe('Current opaque revision from memories or the last successful write.'),
+});
+export const memoryToolParamsSchemas = {
+  save_memory: memoryDocumentParams.extend({ content: z.string().describe('Full file text.') }),
+  update_memory: memoryMutationParams.extend({
+    content: z
+      .string()
+      .optional()
+      .describe('Complete replacement text; empty string clears the index.'),
+    old_str: z.string().min(1).optional().describe('Exact unique text to replace.'),
+    new_str: z.string().optional().describe('Replacement text, including empty string.'),
+    moveTo: memoryScopeParam.optional(),
+    renameTo: memoryFileParam.optional().describe('New file name; MEMORY.md is reserved.'),
+    restoreVersion: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Retained version id from memories versions.'),
+  }),
+  delete_memory: memoryMutationParams,
+  memories: memoryDocumentParams.partial().extend({
+    offset: z
+      .number()
+      .int()
+      .nonnegative()
+      .safe()
+      .optional()
+      .describe('Non-negative offset from nextOffset.'),
+    query: z.string().optional().describe('Space-separated search terms, all must match.'),
+    versions: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        '"list" lists retained earlier versions; a retained version id reads its paged full text with the current baseVersion.',
+      ),
+  }),
+};
