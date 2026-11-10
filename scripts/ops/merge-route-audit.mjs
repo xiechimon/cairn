@@ -5,17 +5,35 @@ const shaPattern = /^[a-f0-9]{40}$/;
 const gh = (...args) =>
   execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 
+function eventTime(event) {
+  return typeof event.created_at === 'string' ? Date.parse(event.created_at) : Number.NaN;
+}
+
 export function queuedBeforeMerge(mergedAt, timeline) {
-  const queued = timeline.filter(
-    (event) =>
-      event.event === 'labeled' &&
-      event.label?.name === 'queued' &&
-      typeof event.created_at === 'string',
-  );
-  if (queued.length === 0) return false;
   if (typeof mergedAt !== 'string') return false;
   const mergeTime = Date.parse(mergedAt);
-  return queued.some((event) => Date.parse(event.created_at) < mergeTime);
+  if (Number.isNaN(mergeTime)) return false;
+  const beforeMerge = (event) => {
+    const at = eventTime(event);
+    return !Number.isNaN(at) && at < mergeTime;
+  };
+  if (
+    timeline.some(
+      (event) =>
+        event.event === 'labeled' && event.label?.name === 'dequeued' && beforeMerge(event),
+    )
+  ) {
+    return false;
+  }
+  const queued = timeline.filter(
+    (event) =>
+      (event.event === 'labeled' || event.event === 'unlabeled') &&
+      event.label?.name === 'queued' &&
+      beforeMerge(event),
+  );
+  if (queued.length === 0) return false;
+  queued.sort((a, b) => eventTime(a) - eventTime(b));
+  return queued.at(-1).event === 'labeled';
 }
 
 export function auditPull(repo, number) {
@@ -36,6 +54,16 @@ export function pullNumbersForCommit(repo, sha) {
   return pulls.filter((pull) => pull.state === 'closed').map((pull) => pull.number);
 }
 
+export function landedThroughQueue(repo, commits) {
+  return (
+    commits.length > 0 &&
+    commits.every((sha) => {
+      const numbers = pullNumbersForCommit(repo, sha);
+      return numbers.length > 0 && numbers.every((number) => auditPull(repo, number).queued);
+    })
+  );
+}
+
 function main() {
   const [command, ...args] = process.argv.slice(2);
   const repo = process.env.GITHUB_REPOSITORY ?? 'xiechimon/cairn';
@@ -51,7 +79,11 @@ function main() {
     process.exitCode = results.every((result) => result.queued) ? 0 : 1;
     return;
   }
-  throw new Error('usage: merge-route-audit commit <sha>');
+  if (command === 'landed') {
+    console.log(landedThroughQueue(repo, args));
+    return;
+  }
+  throw new Error('usage: merge-route-audit commit <sha> | landed <sha>...');
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
