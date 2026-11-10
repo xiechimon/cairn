@@ -243,20 +243,12 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke', 'dead-class-gate']) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
-    assert.match(
-      job,
-      /^ {4}if: needs.changes.outputs.has-code != 'false'$/m,
-      name,
-    );
+    assert.match(job, /^ {4}if: needs.changes.outputs.has-code != 'false'$/m, name);
   }
   for (const name of sidecarJobs) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
-    assert.match(
-      job,
-      /^ {4}if: needs.changes.outputs.has-sidecar != 'false'$/m,
-      name,
-    );
+    assert.match(job, /^ {4}if: needs.changes.outputs.has-sidecar != 'false'$/m, name);
   }
   for (const [name, suite] of [
     ['vitest-light', 'light'],
