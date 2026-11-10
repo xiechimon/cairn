@@ -754,6 +754,38 @@ export function buildHostTools(sources: HostToolSources): SdkMcpToolDefinition[]
   return tools;
 }
 
+export function createHostMcpServer(
+  tools: SdkMcpToolDefinition[],
+): ReturnType<typeof createSdkMcpServer> {
+  const titleOnlyTools = tools.filter(
+    (tool) =>
+      tool.name === 'set_task_meta' &&
+      Object.keys(tool.inputSchema).length === 1 &&
+      'title' in tool.inputSchema,
+  );
+  const server = createSdkMcpServer({
+    name: HOST_MCP_SERVER_NAME,
+    alwaysLoad: true,
+    tools: tools.filter((tool) => !titleOnlyTools.includes(tool)),
+  });
+  for (const tool of titleOnlyTools) {
+    server.instance.registerTool(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema: z
+          .object({
+            title: z.string().describe('Task title, 50 chars max.'),
+          })
+          .passthrough(),
+        _meta: { 'anthropic/alwaysLoad': true },
+      },
+      tool.handler,
+    );
+  }
+  return server;
+}
+
 export function mapMcpEndpoint(endpoint: McpEndpoint): McpServerConfig {
   if (endpoint.transport === 'http') {
     if (typeof endpoint.url !== 'string' || endpoint.url === '') {
@@ -1061,11 +1093,7 @@ export class ClaudeCodeBackend implements AgentBackend {
     });
     const mcpServers: Record<string, McpServerConfig> = {};
     if (hostTools.length > 0) {
-      mcpServers[HOST_MCP_SERVER_NAME] = createSdkMcpServer({
-        name: HOST_MCP_SERVER_NAME,
-        alwaysLoad: true,
-        tools: hostTools,
-      });
+      mcpServers[HOST_MCP_SERVER_NAME] = createHostMcpServer(hostTools);
     }
     for (const endpoint of opts.mcpServers ?? []) {
       if (endpoint.slug === HOST_MCP_SERVER_NAME) {
