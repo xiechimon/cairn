@@ -67,7 +67,7 @@ describe('create_todo copies the owner words verbatim', () => {
     const id = ownerMessage(content);
     const created = (await relay(
       'create_todo',
-      { projectId: H.projectId, messageIds: [id] },
+      { projectId: H.projectId },
       {
         turnMessageIds: [id],
         turnPrompt: `【输入框选定项目：demo（id: ${H.projectId}）】\n${content}`,
@@ -387,6 +387,9 @@ describe('owner answers and appended words', () => {
       messageIds: [ownerMessage('修一下计数'), owner],
     })) as Created;
     expect(created.spec).toBe('修一下计数\n\n只改看板页');
+    await expect(
+      relay('create_todo', { projectId: H.projectId }, { turnMessageIds: [owner] }),
+    ).rejects.toMatchObject({ status: 409 });
     await expect(
       relay('create_todo', {
         projectId: H.projectId,

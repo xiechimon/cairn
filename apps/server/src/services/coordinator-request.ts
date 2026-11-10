@@ -29,6 +29,7 @@ type TodoRow = typeof todo.$inferSelect;
 export interface RequestCtx {
   teamId: string;
   threadId: string;
+  turnMessageIds?: readonly string[];
 }
 
 const NO_OWNER_WORDS =
@@ -182,7 +183,7 @@ export function createRequestTodo(
   provenance: { createdBy: string | null; ownerId: string },
 ): TodoRecord & { uncovered?: string[] } {
   const { db } = deps;
-  const messageIds = params.messageIds ?? [];
+  const messageIds = params.messageIds ?? ctx.turnMessageIds ?? [];
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);
   }

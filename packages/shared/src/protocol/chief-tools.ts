@@ -193,8 +193,8 @@ export const coordinatorCreateTodoParamsSchema = z
     output: todoOutputSchema.optional(),
   })
   .strict()
-  .refine((params) => (params.messageIds === undefined) !== (params.sourceTodoId === undefined), {
-    message: 'pass exactly one of messageIds or sourceTodoId; there is no default source',
+  .refine((params) => params.messageIds === undefined || params.sourceTodoId === undefined, {
+    message: 'pass messageIds or sourceTodoId, not both',
   });
 export type CoordinatorCreateTodoParams = z.infer<typeof coordinatorCreateTodoParamsSchema>;
 
@@ -412,40 +412,34 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (explicit messageIds required) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
-    parameters: {
-      ...obj(
-        {
-          projectId: str('Project id.'),
-          messageIds: {
-            ...idArr(
-              'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Required unless sourceTodoId is supplied; no turn default. Already-bound messages return 409 unless quotes explicitly splits the request.',
-            ),
-            uniqueItems: true,
-          },
-          sourceTodoId: str(
-            'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
-          ),
-          quotes: arr(
-            { type: 'string' },
-            "Optional, only when splitting: the owner's exact sentences this todo covers, each an exact substring of the cited text.",
-          ),
-          dependsOn: idArr('Optional todo ids that must be done before this one starts.'),
-          priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
-          difficulty: str(
-            'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
-          ),
-          output: str(
-            'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
-          ),
-          blockedBy: idArr(
-            'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
-          ),
-        },
-        ['projectId'],
-      ),
-      oneOf: [{ required: ['messageIds'] }, { required: ['sourceTodoId'] }],
-    },
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+    parameters: obj(
+      {
+        projectId: str('Project id.'),
+        messageIds: idArr(
+          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
+        ),
+        sourceTodoId: str(
+          'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
+        ),
+        quotes: arr(
+          { type: 'string' },
+          "Optional, only when splitting: the owner's exact sentences this todo covers, each an exact substring of the cited text.",
+        ),
+        dependsOn: idArr('Optional todo ids that must be done before this one starts.'),
+        priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
+        difficulty: str(
+          'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
+        ),
+        output: str(
+          'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
+        ),
+        blockedBy: idArr(
+          'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
+        ),
+      },
+      ['projectId'],
+    ),
   },
   {
     name: 'update_todo',
@@ -464,12 +458,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         blockedBy: idArr(
           'Optional replacement list of todo ids that must finish first; [] removes every blocker.',
         ),
-        addMessageIds: {
-          ...idArr(
-            'Optional unique ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
-          ),
-          uniqueItems: true,
-        },
+        addMessageIds: idArr(
+          'Optional unique ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
+        ),
       },
       ['todoId'],
     ),

@@ -67,12 +67,9 @@ describe('Coordinator tools that write todo text take no task text', () => {
     );
   });
 
-  it('the tool schema and description require exactly one explicit source', () => {
+  it('the tool schema and description preserve the turn source default', () => {
     const tool = CHIEF_REMOTE_TOOLS.find((entry) => entry.name === 'create_todo');
-    expect(tool?.parameters).toMatchObject({
-      oneOf: [{ required: ['messageIds'] }, { required: ['sourceTodoId'] }],
-    });
-    expect(tool?.description).toContain('explicit messageIds required');
+    expect(tool?.description).toContain('default: the owner messages of this turn');
     expect(
       coordinatorCreateTodoParamsSchema.safeParse({
         projectId: 'p',
@@ -82,13 +79,16 @@ describe('Coordinator tools that write todo text take no task text', () => {
     ).toBe(false);
   });
 
-  it('both source lists reject duplicate IDs in the advertised and execution schemas', () => {
+  it('both source lists advertise uniqueness and reject duplicate IDs', () => {
     for (const [name, field] of [
       ['create_todo', 'messageIds'],
       ['update_todo', 'addMessageIds'],
     ] as const) {
       const tool = CHIEF_REMOTE_TOOLS.find((entry) => entry.name === name);
-      expect(tool?.parameters).toMatchObject({ properties: { [field]: { uniqueItems: true } } });
+      const parameters = tool?.parameters as {
+        properties: Record<string, { description: string }>;
+      };
+      expect(parameters.properties[field]?.description.toLowerCase()).toContain('unique ids');
     }
     expect(
       coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', messageIds: ['m', 'm'] })
@@ -119,7 +119,7 @@ describe('Coordinator tools that write todo text take no task text', () => {
     expect(
       coordinatorUpdateTodoParamsSchema.safeParse({ todoId: 't', title: 'Markdown 预览' }).success,
     ).toBe(true);
-    expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(false);
+    expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(true);
   });
 });
 

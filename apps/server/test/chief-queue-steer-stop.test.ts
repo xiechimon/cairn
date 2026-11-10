@@ -488,16 +488,15 @@ describe('stop (T5)', () => {
 
   test('stop after create_todo names the task in the stop row', async () => {
     const w = await setupWorld();
-    const messageId = await w.send('把看板计数修一下');
+    await w.send('把看板计数修一下');
     const running = await w.claim();
     const created = await w.relay(running!.step.id, 'create_todo', {
       projectId: w.projectId,
-      messageIds: [messageId],
     });
     await w.reportTool(running!.step.id, {
       id: 'call-create',
       name: 'create_todo',
-      arguments: { projectId: w.projectId, messageIds: [messageId] },
+      arguments: { projectId: w.projectId },
       result: JSON.stringify(created),
       startedAt: Date.now(),
       endedAt: Date.now(),

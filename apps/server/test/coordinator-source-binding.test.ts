@@ -33,20 +33,22 @@ describe('Coordinator source bindings', () => {
       outcomes.push(await Promise.allSettled([relay('create_todo', params, turn)]));
     }
     expect(outcomes.flat().map((result) => result.status)).toEqual([
+      'fulfilled',
       'rejected',
-      'fulfilled',
-      'fulfilled',
+      'rejected',
     ]);
     const rows = H.s.db.select().from(todo).all();
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(1);
     expect(rows.map((row) => row.request?.segments.map((segment) => segment.source))).toEqual([
-      [{ kind: 'chat', threadId: H.threadId, messageId: preview, span: 'whole' }],
-      [{ kind: 'chat', threadId: H.threadId, messageId: caret, span: 'whole' }],
+      [
+        { kind: 'chat', threadId: H.threadId, messageId: caret, span: 'whole' },
+        { kind: 'chat', threadId: H.threadId, messageId: preview, span: 'whole' },
+      ],
     ]);
   });
 
-  test('schema requires an explicit source even when a turn has owner messages', () => {
-    expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(false);
+  test('schema preserves the turn source default', () => {
+    expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(true);
     expect(
       coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', messageIds: ['m'] }).success,
     ).toBe(true);
