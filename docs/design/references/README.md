@@ -34,6 +34,19 @@ Mobile (454px wide window), added later:
 
 Not captured: error inside a conversation (a failed send), and a long conversation on mobile.
 
+Layout, status and task parts (Claude Duet desktop app, light, 1878px), added 2026-11-10 by owner decision: the Coordinator chat keeps Claude.ai as the reference for replies and the composer, and takes its shell layout, floating status mark, task references and right-hand panels from these shots. Frames come from a screen recording the owner made; the account name in the sidebar footer, the name in one greeting and one account handle in a reply were painted over.
+
+| File | State | What to compare |
+|---|---|---|
+| `claude-duet-status-pill-typing.jpg` | reply pending | A round mark floats at the top centre with a status pill under it and the stream fades beneath it; three typing dots where the reply will land; message tools and the time beside a hovered message; a centred time divider between turns far apart |
+| `claude-duet-sidebar-groups-undo-toast.jpg` | idle, after an archive | Sidebar with one main row, a group and its channels; three icon-only controls top right; a toast with Undo at the bottom right |
+| `claude-duet-task-thread-working.jpg` | task running, thread open | The thread panel pushes the chat and folds the sidebar; header with a status line; a step list card with a spinner on the current step; `Show in main channel` under the quoted message; a task reference above the reply and inline in its text |
+| `claude-duet-task-thread-ready-for-review.jpg` | task ready for review | Status line `Ready for review · 1 update`, a `Decisions and updates` block on top, every step ticked and one waiting on the user |
+| `claude-duet-tasks-panel.jpg` | tasks panel | Tabs for active, up next, scheduled and resolved; rows with a checkbox and a row menu; an add control in the header |
+| `claude-duet-channel-icon-picker.jpg` | icon picker | Icon and colour choice for a channel. Not adopted: sidebar rows stay neutral (L1, L3) |
+
+Not captured: the sessions and work panels (the frames carried device and account names across most of the panel), dark theme, narrow widths.
+
 ## thread-list-sidebar (t3code and Amp)
 
 | File | Product, state | What to compare |
