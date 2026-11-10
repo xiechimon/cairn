@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { build, machine, step, team, todo } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { openResearchThread } from '../src/services/research-thread.js';
-import { bootServer, postProject, seedSessionRoute } from './helpers.js';
+import { bootServer, insertMachine, postProject, seedSessionRoute } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -12,6 +12,7 @@ afterEach(() => {
 
 async function world() {
   const s = bootServer();
+  insertMachine(s);
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'research');
   return { s, projectId, teamId: s.team.id };
