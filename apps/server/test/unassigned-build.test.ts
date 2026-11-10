@@ -2,6 +2,7 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build as buildTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
@@ -48,7 +49,7 @@ async function setupWorld(): Promise<World> {
   const key = await issueApiKey(s);
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'unassigned-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'unassigned-mbp', cliVersion: '0.1.0' }),
   });
   expect(res.status).toBe(200);
   const token = ((await res.json()) as { token: string }).token;

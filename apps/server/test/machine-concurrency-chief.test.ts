@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chief as chiefTable,
@@ -73,7 +74,9 @@ async function fetchEnroll(s: TestServer, key: string): Promise<{ token: string 
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'chief-cap-mbp', cliVersion: '0.1.0' }),
+    body: JSON.stringify(
+      readyMachine({ teamId: s.team.id, name: 'chief-cap-mbp', cliVersion: '0.1.0' }),
+    ),
   });
   expect(res.status).toBe(200);
   return (await res.json()) as { token: string };
@@ -386,7 +389,9 @@ describe('chief turns never wait behind a worker step another machine owns', () 
     const other = await w.s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: w.s.team.id, name: 'offline-orb', cliVersion: '0.1.0' }),
+      body: JSON.stringify(
+        readyMachine({ teamId: w.s.team.id, name: 'offline-orb', cliVersion: '0.1.0' }),
+      ),
     });
     expect(other.status).toBe(200);
     const otherMachineId = w.s.db
@@ -492,7 +497,9 @@ describe('the late chief claim sees routing changes made while the worker loop a
     await w.s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: w.s.team.id, name: 'other-box', cliVersion: '0.1.0' }),
+      body: JSON.stringify(
+        readyMachine({ teamId: w.s.team.id, name: 'other-box', cliVersion: '0.1.0' }),
+      ),
     });
     const otherId = w.s.db
       .select()

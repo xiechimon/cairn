@@ -7,6 +7,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -78,7 +79,7 @@ async function setupWorld(
   const enroll = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'bh-mbp', cliVersion: '0.1.0' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'bh-mbp', cliVersion: '0.1.0' })),
   });
   const token = ((await enroll.json()) as { token: string }).token;
   seedSessionRoute(s, {

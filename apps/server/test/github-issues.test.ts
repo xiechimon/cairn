@@ -10,6 +10,7 @@ import {
 import { and, eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   githubLabel,
   project as projectTable,
@@ -641,7 +642,7 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
     const plain = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: plain,
-      body: { teamId: s.team.id, name: 'l446', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name: 'l446', cliVersion: '0.1.0' }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedSessionRoute(s, { provider: 'p', modelId: 'm' });

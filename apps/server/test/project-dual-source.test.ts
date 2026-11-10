@@ -3,6 +3,7 @@ import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { project as projectTable } from '../src/db/schema.js';
 import { bootServer, issueApiKey, req, seedSessionRoute, type TestServer } from './helpers.js';
 
@@ -206,7 +207,7 @@ async function claimGithubProject(s2: TestServer, localPath: string | null): Pro
   const key = await issueApiKey(s2);
   const enrollRes = await call(s2.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s2.team.id, name: 'dual-src-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s2.team.id, name: 'dual-src-mbp', cliVersion: '0.1.0' }),
   });
   const machineToken = ((await enrollRes.json()) as { token: string }).token;
   seedSessionRoute(s2, { provider: 'p', modelId: 'm' });

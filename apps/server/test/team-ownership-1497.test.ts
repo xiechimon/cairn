@@ -2,6 +2,7 @@ import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   agentMemory,
   build as buildTable,
@@ -56,7 +57,7 @@ async function world() {
   const plain = await issueApiKey(s);
   const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: plain,
-    body: { teamId: s.team.id, name: 'm-1497', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'm-1497', cliVersion: '0.1.0' }),
   });
   const { token } = (await enroll.json()) as { token: string };
   seedSessionRoute(s, { id: OWNER_ID, provider: 'p', modelId: 'm' });

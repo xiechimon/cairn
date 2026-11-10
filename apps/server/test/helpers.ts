@@ -13,6 +13,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { onTestFinished } from 'vitest';
 import webpush from 'web-push';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
@@ -357,14 +358,16 @@ export function insertMachine(
     : `machine-${Math.random().toString(36).slice(2, 10)}`;
   s.db
     .insert(machineTable)
-    .values({
-      id,
-      teamId: s.team.id,
-      name: opts.name ?? 'test-machine',
-      online: true,
-      enabledRuntimes: opts.enabledRuntimes ?? ['pi', 'claude-code'],
-      claudeCodeReport: opts.claudeCodeReport ?? null,
-    })
+    .values(
+      readyMachine({
+        id,
+        teamId: s.team.id,
+        name: opts.name ?? 'test-machine',
+        online: true,
+        enabledRuntimes: opts.enabledRuntimes ?? ['pi', 'claude-code'],
+        claudeCodeReport: opts.claudeCodeReport ?? null,
+      }),
+    )
     .run();
   return id;
 }
