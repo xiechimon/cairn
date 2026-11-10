@@ -8,6 +8,7 @@ import {
   type GuardCandidate,
   guardCandidateSchema,
   ISSUE_FENCE_OPEN,
+  MEMORY_INDEX_TITLE,
   PROMOTION_MIN_BUILDS,
   SKILL_ENTRY_FILE,
   type SkillDraft,
@@ -76,11 +77,59 @@ function writeJsonlAtomic(path: string, rows: unknown[]) {
   renameSync(temporary, path);
 }
 
+function candidateMemories(db: Db, scope: Parameters<typeof memoriesInScope>[1]) {
+  return db.transaction((tx) => [
+    ...memoriesInScope(tx, scope).flatMap((row) =>
+      row.title === MEMORY_INDEX_TITLE
+        ? row.content
+            .split('\n')
+            .filter((line) => line.trim() && !/^- \[.*\]\([^)]+\)$/.test(line))
+            .map((line) => {
+              const entry = /^- (.*?)：(.*)$/.exec(line);
+              return {
+                id: row.id,
+                title: entry?.[1] ?? '',
+                content: entry?.[2] ?? line.replace(/^- /, ''),
+              };
+            })
+        : [row],
+    ),
+    ...memoriesInScope(tx, { ...scope, layer: 'searchable' }),
+  ]);
+}
+
+function candidateConflicts(
+  memories: ReturnType<typeof candidateMemories>,
+  row: { title: string; content: string },
+) {
+  return [
+    ...new Set(
+      memories
+        .filter(
+          (memory) => overlaps(memory.title, row.title) || overlaps(memory.content, row.content),
+        )
+        .map((memory) => memory.id),
+    ),
+  ];
+}
+
 function promote(
   db: Db,
   row: CandidateRow,
   sourceBuildId: string,
-): { promoted: true; memoryId: string } {
+  force = false,
+): { promoted: true; memoryId: string } | { promoted: false; conflictIds: string[] } {
+  const memories = candidateMemories(db, row);
+  if (memories.some((memory) => memory.content === row.content))
+    throw new HttpError(409, 'memory already exists; use update_memory');
+  const conflictIds = candidateConflicts(memories, row);
+  if (!force && conflictIds.length > 0) {
+    db.update(memoryCandidate)
+      .set({ conflictIds, updatedAt: nowMs() })
+      .where(eq(memoryCandidate.id, row.id))
+      .run();
+    return { promoted: false, conflictIds };
+  }
   const source = db.select().from(build).where(eq(build.id, sourceBuildId)).get();
   const saved = rememberMemoryFile(
     db,
@@ -206,7 +255,7 @@ export function curateCandidates(
         agentId: memoryOwnerOf(tx, scope.teamId, 'build'),
         projectId: placement.projectId,
       };
-      const memories = memoriesInScope(tx, memoryScope);
+      const memories = candidateMemories(tx, memoryScope);
       if (memories.some((memory) => memory.content === candidate.content)) {
         summary.memoryKnown++;
         continue;
@@ -233,6 +282,7 @@ export function curateCandidates(
             content: candidate.content,
             buildIds: merged.buildIds,
             evidence: merged.evidence,
+            conflictIds: candidateConflicts(memories, candidate),
             createdAt: now,
             updatedAt: now,
           })
@@ -271,7 +321,7 @@ export function curateCandidates(
   return summary;
 }
 
-export function confirmCandidate(db: Db, id: string) {
+export function confirmCandidate(db: Db, id: string, force = false) {
   const row = db.select().from(memoryCandidate).where(eq(memoryCandidate.id, id)).get();
   if (row === undefined) throw new CurateError(`Candidate ${id} not found`);
   if (row.status !== 'pending')
@@ -282,11 +332,15 @@ export function confirmCandidate(db: Db, id: string) {
     );
   let result: ReturnType<typeof promote>;
   try {
-    result = promote(db, row, row.buildIds.at(-1) as string);
+    result = promote(db, row, row.buildIds.at(-1) as string, force);
   } catch (error) {
     if (error instanceof HttpError) throw new CurateError(`Candidate ${id}: ${error.message}`);
     throw error;
   }
+  if (!result.promoted)
+    throw new CurateError(
+      `Candidate ${id} overlaps memories ${result.conflictIds.join(', ')}; update those or pass --force`,
+    );
   return result.memoryId;
 }
 

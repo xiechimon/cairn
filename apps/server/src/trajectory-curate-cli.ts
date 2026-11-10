@@ -19,6 +19,7 @@ try {
   const { values } = parseArgs({
     options: {
       in: { type: 'string' },
+      force: { type: 'boolean', default: false },
       confirm: { type: 'string' },
       dismiss: { type: 'string' },
       'out-dir': { type: 'string' },
@@ -31,7 +32,7 @@ try {
   const opened = openDbWithHandle(config.dbPath);
   try {
     if (values.confirm !== undefined) {
-      const memoryId = confirmCandidate(opened.db, values.confirm);
+      const memoryId = confirmCandidate(opened.db, values.confirm, values.force);
       console.log(`promoted=${values.confirm} memory=${memoryId}`);
     } else if (values.dismiss !== undefined) {
       dismissCandidate(opened.db, values.dismiss);
