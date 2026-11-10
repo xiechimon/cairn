@@ -17,7 +17,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from '../components/settings-list.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
+import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -76,11 +76,13 @@ function RuntimeRow({
   machine,
   runtime,
   frozen,
+  blockedReason,
   onToggle,
 }: {
   machine: MachineRow;
   runtime: string;
   frozen: boolean;
+  blockedReason: string | undefined;
   onToggle: (runtime: MachineRuntime, next: boolean) => void;
 }) {
   const { t } = useI18n();
@@ -95,6 +97,12 @@ function RuntimeRow({
       ? []
       : [provider.plan, provider.version].filter((part): part is string => part !== null);
   const login = provider === undefined ? null : LOGIN_STATE[provider.login];
+  const switchDisabled = !toggleable || frozen;
+  const reason = !toggleable
+    ? t('这台机器还不能单独开关 {name}', { name })
+    : frozen
+      ? blockedReason
+      : undefined;
   return (
     <div
       data-testid="provider-row"
@@ -124,16 +132,18 @@ function RuntimeRow({
           {provider === undefined && <span>{enabled ? t('接任务中') : t('未开启')}</span>}
         </span>
       </span>
-      <ToggleSwitch
-        data-testid="provider-toggle"
-        aria-label={t('{name} 接任务', { name })}
-        checked={enabled}
-        disabled={!toggleable || frozen}
-        title={toggleable ? undefined : t('这台机器还不能单独开关 {name}', { name })}
-        onCheckedChange={(next) => {
-          if (toggleable) onToggle(runtime, next);
-        }}
-      />
+      <ExplainDisabledToggle disabled={switchDisabled} reason={reason}>
+        <ToggleSwitch
+          data-testid="provider-toggle"
+          aria-label={t('{name} 接任务', { name })}
+          checked={enabled}
+          disabled={switchDisabled}
+          title={reason}
+          onCheckedChange={(next) => {
+            if (toggleable) onToggle(runtime, next);
+          }}
+        />
+      </ExplainDisabledToggle>
     </div>
   );
 }
@@ -290,6 +300,11 @@ export function MachineDetailPane({
               machine={machine}
               runtime={runtime}
               frozen={pending || !online}
+              blockedReason={
+                online
+                  ? undefined
+                  : t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
+              }
               onToggle={onToggleRuntime}
             />
           ))}
