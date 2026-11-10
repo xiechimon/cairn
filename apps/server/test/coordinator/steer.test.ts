@@ -1,7 +1,7 @@
 import { fauxAssistantMessage, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { chiefMessage, step } from '../../src/db/schema.js';
+import { chiefMessage, coordinatorInput, step } from '../../src/db/schema.js';
 import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
 
@@ -37,18 +37,24 @@ describe('Coordinator steer', () => {
       },
       (c: { messages: unknown[] }) => {
         requests.push(JSON.stringify(c.messages));
+        return fauxAssistantMessage([fauxToolCall('ask_user', QUESTION)], {
+          stopReason: 'toolUse',
+        });
+      },
+      (c: { messages: unknown[] }) => {
+        requests.push(JSON.stringify(c.messages));
         return fauxAssistantMessage('acknowledged');
       },
     ]);
     const coordinator = boot(w, faux);
     coordinator.wake(w.threadId);
-    const questionRow = () =>
+    const questionRows = () =>
       w.s.db
         .select()
         .from(chiefMessage)
         .all()
-        .find((m) => JSON.stringify(m.content).includes('ask_user_question'));
-    await until(() => questionRow() !== undefined);
+        .filter((m) => JSON.stringify(m.content).includes('ask_user_question'));
+    await until(() => questionRows().length === 1);
 
     const steerNew = async () => {
       const sent = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
@@ -67,7 +73,24 @@ describe('Coordinator steer', () => {
         `/api/teams/${w.teamId}/chief/threads/${w.threadId}/messages/${queued?.id}/steer`,
       );
       expect(steered.status).toBe(200);
-      await until(() => w.s.db.select().from(step).all().length === 1);
+      await until(
+        () =>
+          w.s.db
+            .select()
+            .from(coordinatorInput)
+            .where(eq(coordinatorInput.id, queued?.id ?? ''))
+            .get()?.conversationId != null,
+      );
+      expect(
+        w.s.db
+          .select()
+          .from(step)
+          .where(eq(step.id, queued?.id ?? ''))
+          .get()?.holdReason,
+      ).toBe('steer');
+      expect(
+        w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.ownerMessageIds,
+      ).not.toContain(queued?.id);
     };
     await steerNew();
     await steerNew();
@@ -75,15 +98,24 @@ describe('Coordinator steer', () => {
     const answered = await req(
       w.s.app,
       'POST',
-      `/api/teams/${w.teamId}/chief/threads/${w.threadId}/questions/${questionRow()?.id}/answer`,
+      `/api/teams/${w.teamId}/chief/threads/${w.threadId}/questions/${questionRows()[0]?.id}/answer`,
       { answers: [{ header: 'Pick', choices: ['A'] }] },
     );
     expect(answered.status).toBe(200);
+    await until(() => questionRows().length === 2);
+    expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('claimed');
+    const lateAnswer = await req(
+      w.s.app,
+      'POST',
+      `/api/teams/${w.teamId}/chief/threads/${w.threadId}/questions/${questionRows()[1]?.id}/answer`,
+      { answers: [{ header: 'Pick', choices: ['A'] }] },
+    );
+    expect(lateAnswer.status).toBe(200);
     await until(() => w.s.db.select().from(step).get()?.status === 'done');
     coordinator.wake(w.threadId);
     await coordinator.idle();
 
-    expect(requests).toHaveLength(3);
+    expect(requests).toHaveLength(4);
     expect(requests[1]?.split('switch to the cheaper plan')).toHaveLength(2);
     expect(requests[2]?.split('switch to the cheaper plan')).toHaveLength(3);
     expect(w.s.db.select().from(step).all()).toHaveLength(1);

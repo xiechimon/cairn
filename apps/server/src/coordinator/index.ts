@@ -17,12 +17,15 @@ import {
   chiefThread,
   coordinatorConversation,
   coordinatorEntry,
+  coordinatorInput,
   step,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
+import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
+import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
@@ -127,6 +130,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const draining = new Map<string, Promise<void>>();
   const dirty = new Set<string>();
   const freshClaims = new Set<string>();
+  const recoveryThreads = new Set(
+    db
+      .select({ threadId: coordinatorInput.threadId })
+      .from(coordinatorInput)
+      .all()
+      .map((row) => row.threadId),
+  );
 
   const threadTeam = (threadId: string): string | null =>
     db
@@ -157,19 +167,30 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       .get();
     const live = liveSteps(threadId);
     return {
+      storeId: row?.storeId ?? null,
+      adoptStore: (storeId) => {
+        db.update(coordinatorConversation)
+          .set({ storeId })
+          .where(eq(coordinatorConversation.threadId, threadId))
+          .run();
+      },
       conversationId: row?.conversationId ?? null,
       lastMirroredEntryId: row?.lastMirroredEntryId ?? null,
       piVersion: row?.piVersion ?? null,
       hasClaimedStep: live.some(
         (r) => r.status === 'claimed' && r.machineId === null && !freshClaims.has(r.id),
       ),
-      isLive: (requestId) => live.some((r) => r.id === requestId),
+      isLive: (requestId) =>
+        coordinatorInputIsLive(db, requestId) ??
+        liveSteps(threadId).some((r) => r.id === requestId),
       seed: async (summarize) => {
         const teamId = threadTeam(threadId);
         const providers =
           teamId === null ? null : coordinatorProviders({ db, box: machine.box }, teamId);
         const watermark = parseWatermark(row?.lastMirroredEntryId ?? null);
-        const pendingUsers = new Set(live.flatMap((r) => [r.id, transcriptPromptRowId(r.id)]));
+        const pendingUsers = new Set(
+          live.flatMap((r) => [r.id, transcriptPromptRowId(r.id), ...(r.ownerMessageIds ?? [])]),
+        );
         if (watermark?.kind === 'rewind') pendingUsers.add(watermark.anchorMessageId);
         const window = db
           .select({ message: chiefMessage, rowid: sql<number>`rowid` })
@@ -227,7 +248,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           },
         };
       },
-      record: ({ conversationId, piVersion, reseeded }) => {
+      record: ({ storeId, conversationId, piVersion, reseeded }) => {
         const now = nowMs();
         db.transaction(() => {
           if (reseeded) {
@@ -236,6 +257,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           db.insert(coordinatorConversation)
             .values({
               threadId,
+              storeId: storeId ?? null,
               conversationId,
               lastMirroredEntryId: null,
               piVersion,
@@ -245,6 +267,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
               target: coordinatorConversation.threadId,
               set: {
                 conversationId,
+                storeId: storeId ?? null,
                 piVersion,
                 updatedAt: now,
                 ...(reseeded ? { lastMirroredEntryId: null } : {}),
@@ -264,6 +287,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
       ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
       factsFor,
+      onInputError: (threadId, error) =>
+        logger.error(
+          { threadId, error: String(redactSecrets(String(error)).value) },
+          'coordinator input persistence blocked',
+        ),
       memoryFlush: (threadId) => {
         const teamId = threadTeam(threadId);
         if (teamId === null) return null;
@@ -321,6 +349,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const head = liveSteps(threadId)[0];
     if (head === undefined) return null;
     if (head.status === 'claimed') return head.machineId === null ? head : null;
+    if (head.holdReason === 'steer' || head.holdReason === 'steer_sent') return null;
     if (head.holdUntil !== null && head.holdUntil > nowMs()) return null;
     const teamId = threadTeam(threadId);
     if (teamId === null || !serverTakesTurn(db, teamId, head)) return null;
@@ -582,12 +611,30 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (closing) return;
       dirty.delete(threadId);
       if (heldLease(threadId) === null) return;
+      if (!runtime.isOpen(threadId)) migrateUnfetchedCoordinatorInputs(db, threadId, owner);
+      const pending = db
+        .select()
+        .from(coordinatorInput)
+        .where(and(eq(coordinatorInput.threadId, threadId), eq(coordinatorInput.state, 'pending')))
+        .all();
+      if (
+        (recoveryThreads.has(threadId) ||
+          pending.some((input) => coordinatorInputIsLive(db, input.id) === false)) &&
+        !liveSteps(threadId).some((row) => row.status === 'claimed' && row.machineId === null)
+      ) {
+        await runtime.recoverThread(threadId);
+        recoveryThreads.delete(threadId);
+      }
       const row = claimHead(threadId);
       if (row === null) {
         if (!dirty.has(threadId)) return;
         continue;
       }
       await runStep(row);
+      if (recoveryThreads.has(threadId)) {
+        await runtime.recoverThread(threadId);
+        recoveryThreads.delete(threadId);
+      }
     }
   };
 
@@ -625,9 +672,21 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       .from(step)
       .where(and(eq(step.kind, 'chief'), inArray(step.status, ['pending', 'claimed'])))
       .all();
-    return [...new Set(rows.map((r) => r.threadId))].filter(
-      (threadId) => !liveSteps(threadId).every((r) => isChiefDigestStep(r)),
-    );
+    const pending = db
+      .select({ threadId: coordinatorInput.threadId })
+      .from(coordinatorInput)
+      .where(eq(coordinatorInput.state, 'pending'))
+      .all();
+    return [
+      ...new Set([
+        ...rows.map((row) => row.threadId),
+        ...pending.map((row) => row.threadId),
+        ...recoveryThreads,
+      ]),
+    ].filter((threadId) => {
+      const live = liveSteps(threadId);
+      return live.length === 0 || !live.every((row) => isChiefDigestStep(row));
+    });
   };
 
   const tick = (): void => {
@@ -666,9 +725,12 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     close: async () => {
       closing = true;
       clearInterval(timer);
-      await runtime.close();
-      for (const lease of leases.values()) lease.release();
-      leases.clear();
+      try {
+        await runtime.close();
+      } finally {
+        for (const lease of leases.values()) lease.release();
+        leases.clear();
+      }
     },
   };
 }
