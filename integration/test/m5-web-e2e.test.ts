@@ -12,6 +12,7 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { step as stepTable } from '../../apps/server/src/db/schema.js';
 import { readFile } from '../../apps/server/src/services/git.js';
+import { dueSchedules } from '../../apps/server/src/services/schedules.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
@@ -428,7 +429,8 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     }[];
     const spineBefore = todosBefore.find((t) => t.title === 'M5 脊柱探针');
 
-    server.scheduler!.tick((schedules[0]!.nextRunAt ?? Date.now()) + 60_000);
+    const triggeredAt = (schedules[0]!.nextRunAt ?? Date.now()) + 60_000;
+    await server.scheduler!.tick(triggeredAt);
 
     const spine = spineBefore;
     await withDiagnostics('scheduled run phase advances to review', () =>
@@ -445,7 +447,20 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
       .all()
       .filter((s) => s.scheduleId === schedules[0]!.id);
     expect(scheduledSteps.map((s) => s.kind)).toEqual(['session']);
-    expect((await api(server.url, 'GET', '/api/schedules')).body as unknown[]).toHaveLength(0);
+    expect((await api(server.url, 'GET', '/api/schedules')).body).toEqual([
+      expect.objectContaining({
+        id: schedules[0]!.id,
+        kind: 'once',
+        lastRunStatus: 'completed',
+        nextRunAt: null,
+      }),
+    ]);
+    const later = triggeredAt + 86_400_000;
+    expect(dueSchedules(server.svc, later)).toEqual([]);
+    await server.scheduler!.tick(later);
+    expect(
+      server.db.select().from(stepTable).where(eq(stepTable.scheduleId, schedules[0]!.id)).all(),
+    ).toEqual(scheduledSteps);
 
     const spineProject = (await api(server.url, 'GET', `/api/todos/${spine!.id}`)).body as {
       projectId: string;
