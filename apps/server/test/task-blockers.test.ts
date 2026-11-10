@@ -1,6 +1,7 @@
 import { stepKindSchema } from '@cairn/shared';
 import { and, eq, like } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, machine, step, todo } from '../src/db/schema.js';
 import {
   BLOCKED_BY_HOLD,
@@ -267,13 +268,15 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       const machineId = 'blocker-claim-machine';
       H.s.db
         .insert(machine)
-        .values({
-          id: machineId,
-          teamId: H.teamId,
-          name: 'Blocker claim',
-          online: true,
-          enabledRuntimes: ['pi'],
-        })
+        .values(
+          readyMachine({
+            id: machineId,
+            teamId: H.teamId,
+            name: 'Blocker claim',
+            online: true,
+            enabledRuntimes: ['pi'],
+          }),
+        )
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
@@ -355,13 +358,15 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       const machineId = 'blocker-race-machine';
       H.s.db
         .insert(machine)
-        .values({
-          id: machineId,
-          teamId: H.teamId,
-          name: 'Blocker race',
-          online: true,
-          enabledRuntimes: ['pi'],
-        })
+        .values(
+          readyMachine({
+            id: machineId,
+            teamId: H.teamId,
+            name: 'Blocker race',
+            online: true,
+            enabledRuntimes: ['pi'],
+          }),
+        )
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
@@ -420,13 +425,15 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       const machineId = 'unheld-claim-machine';
       H.s.db
         .insert(machine)
-        .values({
-          id: machineId,
-          teamId: H.teamId,
-          name: 'Unheld claim',
-          online: true,
-          enabledRuntimes: ['pi'],
-        })
+        .values(
+          readyMachine({
+            id: machineId,
+            teamId: H.teamId,
+            name: 'Unheld claim',
+            online: true,
+            enabledRuntimes: ['pi'],
+          }),
+        )
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });

@@ -48,10 +48,68 @@ export function auditPull(repo, number) {
   return { number, queued, line };
 }
 
+const requiredDraftChecks = [
+  'check',
+  'pack-smoke',
+  'e2e-gate',
+  'gates',
+  'dead-class-gate',
+  'ops-backup-test',
+];
+
 export function pullNumbersForCommit(repo, sha) {
   if (!shaPattern.test(sha ?? '')) throw new Error('A full 40-hex commit SHA is required');
   const pulls = JSON.parse(gh('api', `repos/${repo}/commits/${sha}/pulls`));
   return pulls.filter((pull) => pull.state === 'closed').map((pull) => pull.number);
+}
+
+function passedDraftNumber(comments) {
+  let draft = null;
+  for (const comment of comments) {
+    if (comment.user?.login !== 'mergify[bot]' || typeof comment.body !== 'string') continue;
+    for (const match of comment.body.matchAll(/Passed · draft #(\d+)/g)) {
+      draft = Number(match[1]);
+    }
+  }
+  return draft;
+}
+
+function commitTree(repo, sha) {
+  const commit = JSON.parse(gh('api', `repos/${repo}/commits/${sha}`));
+  const tree = commit.commit?.tree?.sha;
+  return shaPattern.test(tree ?? '') ? tree : null;
+}
+
+function draftChecksPassedBefore(repo, sha, mergedAt) {
+  const mergeTime = Date.parse(mergedAt);
+  if (Number.isNaN(mergeTime)) return false;
+  const body = JSON.parse(gh('api', `repos/${repo}/commits/${sha}/check-runs?per_page=100`));
+  const runs = body.check_runs ?? [];
+  return requiredDraftChecks.every((name) => {
+    const finished = runs
+      .filter((run) => run.name === name && Date.parse(run.completed_at ?? '') < mergeTime)
+      .sort((a, b) => Date.parse(a.completed_at) - Date.parse(b.completed_at))
+      .at(-1);
+    return finished?.conclusion === 'success' || finished?.conclusion === 'skipped';
+  });
+}
+
+export function testedOnLandedTree(repo, number, landedSha) {
+  if (!shaPattern.test(landedSha ?? '')) return false;
+  const pull = JSON.parse(gh('api', `repos/${repo}/pulls/${number}`));
+  if (typeof pull.merged_at !== 'string') return false;
+  const comments = JSON.parse(
+    gh('api', `repos/${repo}/issues/${number}/comments`, '--paginate', '--slurp'),
+  ).flat();
+  const draft = passedDraftNumber(comments);
+  if (draft === null) return false;
+  const draftPull = JSON.parse(gh('api', `repos/${repo}/pulls/${draft}`));
+  const draftSha = draftPull.head?.sha;
+  if (!shaPattern.test(draftSha ?? '')) return false;
+  const landedTree = commitTree(repo, landedSha);
+  const draftTree = commitTree(repo, draftSha);
+  if (landedTree === null || landedTree !== draftTree) return false;
+  return draftChecksPassedBefore(repo, draftSha, pull.merged_at);
 }
 
 export function landedThroughQueue(repo, commits) {
@@ -59,7 +117,7 @@ export function landedThroughQueue(repo, commits) {
     commits.length > 0 &&
     commits.every((sha) => {
       const numbers = pullNumbersForCommit(repo, sha);
-      return numbers.length > 0 && numbers.every((number) => auditPull(repo, number).queued);
+      return numbers.length > 0 && numbers.every((number) => testedOnLandedTree(repo, number, sha));
     })
   );
 }

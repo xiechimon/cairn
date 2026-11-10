@@ -11,6 +11,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -76,23 +77,27 @@ function makeWorld(opts: WorldOpts = {}): World {
     .run();
   s.db
     .insert(machineTable)
-    .values({
-      id: machineAId,
-      teamId: s.team.id,
-      name: `owner-${suffix}`,
-      online: true,
-      enabledRuntimes: ['pi'],
-    })
+    .values(
+      readyMachine({
+        id: machineAId,
+        teamId: s.team.id,
+        name: `owner-${suffix}`,
+        online: true,
+        enabledRuntimes: ['pi'],
+      }),
+    )
     .run();
   s.db
     .insert(machineTable)
-    .values({
-      id: machineBId,
-      teamId: s.team.id,
-      name: `other-${suffix}`,
-      online: true,
-      enabledRuntimes: ['pi'],
-    })
+    .values(
+      readyMachine({
+        id: machineBId,
+        teamId: s.team.id,
+        name: `other-${suffix}`,
+        online: true,
+        enabledRuntimes: ['pi'],
+      }),
+    )
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: machineAId });
   s.db

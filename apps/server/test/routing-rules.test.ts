@@ -2,6 +2,7 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   machine as machineTable,
   routingRule,
@@ -45,7 +46,9 @@ async function setupWorld(): Promise<World> {
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'route-mbp', cliVersion: '0.1.0' }),
+    body: JSON.stringify(
+      readyMachine({ teamId: s.team.id, name: 'route-mbp', cliVersion: '0.1.0' }),
+    ),
   });
   expect(res.status).toBe(200);
   const machineToken = ((await res.json()) as { token: string }).token;
@@ -185,13 +188,15 @@ describe('profileForStep: the session rule supplies the model and machine', () =
     const spare = newRecordId();
     w.s.db
       .insert(machineTable)
-      .values({
-        id: spare,
-        teamId: w.s.team.id,
-        name: 'route-spare',
-        tokenHash: 'y'.repeat(64),
-        createdAt: 1,
-      } as typeof machineTable.$inferInsert)
+      .values(
+        readyMachine({
+          id: spare,
+          teamId: w.s.team.id,
+          name: 'route-spare',
+          tokenHash: 'y'.repeat(64),
+          createdAt: 1,
+        }) as typeof machineTable.$inferInsert,
+      )
       .run();
     sessionRule(w.s, { machineId: spare });
     const res = await req(w.s.app, 'DELETE', `/api/machines/${spare}`);

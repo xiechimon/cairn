@@ -7,6 +7,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   autonomousMergeAdmission,
   build,
@@ -88,7 +89,7 @@ async function setupWorld(
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' }),
   });
   expect(enrollRes.status).toBe(200);
   const machineJson = (await enrollRes.json()) as { token: string; machineId: string };

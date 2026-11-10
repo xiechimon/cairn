@@ -9,6 +9,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chiefMessage,
@@ -96,7 +97,7 @@ async function setup(opts: { chat?: boolean; tz?: string } = {}): Promise<World>
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId, name: 'report-mbp', cliVersion: CHIEF_DIGEST_MIN_CLI_VERSION },
+    body: readyMachine({ teamId, name: 'report-mbp', cliVersion: CHIEF_DIGEST_MIN_CLI_VERSION }),
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'report-mbp');

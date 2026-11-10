@@ -1,6 +1,7 @@
 import { type ClaimedStep, claimedStepSchema, LOCAL_TOOL_CREATE_TAG } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { machine as machineTable } from '../src/db/schema.js';
 import { bootServer, issueApiKey, postProject, seedRoute, seedSessionRoute } from './helpers.js';
 
@@ -27,7 +28,7 @@ async function claimWith(tools: string[]): Promise<ClaimedStep> {
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'tools-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'tools-mbp', cliVersion: '0.1.0' }),
   });
   expect(enrollRes.status).toBe(200);
   seedSessionRoute(s, {
@@ -84,7 +85,7 @@ describe('chief steps still omit local tools', () => {
     const key = await issueApiKey(s);
     const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: key,
-      body: { teamId: s.team.id, name: 'chief-mbp', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name: 'chief-mbp', cliVersion: '0.1.0' }),
     });
     seedRoute(s, 'coordinator', {
       provider: 'stub-gw',

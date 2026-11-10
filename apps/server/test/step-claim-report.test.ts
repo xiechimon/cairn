@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   apiKey as apiKeyTable,
   build as buildTable,
@@ -50,7 +51,9 @@ function makeWorld(opts: WorldOpts = {}) {
     .run();
   s.db
     .insert(machineTable)
-    .values({ id: MACHINE, teamId, name: 'm1', online: true, enabledRuntimes: ['pi'] })
+    .values(
+      readyMachine({ id: MACHINE, teamId, name: 'm1', online: true, enabledRuntimes: ['pi'] }),
+    )
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: MACHINE });
   s.db
@@ -174,7 +177,9 @@ describe('#1473 a report counts only for the current claim', () => {
     w.s.db.insert(teamTable).values({ id: 'team-other', name: 'other', createdAt: nowMs() }).run();
     w.s.db
       .insert(machineTable)
-      .values({ id: 'machine-other-team', teamId: 'team-other', name: 'x', online: true })
+      .values(
+        readyMachine({ id: 'machine-other-team', teamId: 'team-other', name: 'x', online: true }),
+      )
       .run();
     await expect(
       finishStep(w.deps, 'machine-other-team', STEP, { status: 'failed', errorMessage: 'x' }),

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeEach } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { chief as chiefTable, chiefThread, machine as machineTable } from '../src/db/schema.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
@@ -70,7 +71,9 @@ export function seedMachineReport(
 ): void {
   H.s.db
     .insert(machineTable)
-    .values({ id: `machine-${name}`, teamId: H.teamId, name, claudeCodeReport: report })
+    .values(
+      readyMachine({ id: `machine-${name}`, teamId: H.teamId, name, claudeCodeReport: report }),
+    )
     .run();
 }
 

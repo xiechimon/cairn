@@ -2,6 +2,7 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   claudeSubscription,
   machine as machineTable,
@@ -107,7 +108,9 @@ async function setupWorld(): Promise<World> {
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'route-box', cliVersion: '0.1.0' }),
+    body: JSON.stringify(
+      readyMachine({ teamId: s.team.id, name: 'route-box', cliVersion: '0.1.0' }),
+    ),
   });
   expect(res.status).toBe(200);
   const machineToken = ((await res.json()) as { token: string }).token;
@@ -331,12 +334,14 @@ describe('a routed model only runs on a machine that can host it', () => {
     const other = 'claude-only-box';
     w.s.db
       .insert(machineTable)
-      .values({
-        ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
-        id: other,
-        name: other,
-        tokenHash: 'other-token-hash',
-      })
+      .values(
+        readyMachine({
+          ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
+          id: other,
+          name: other,
+          tokenHash: 'other-token-hash',
+        }),
+      )
       .run();
     w.s.db
       .update(machineTable)
@@ -424,11 +429,13 @@ describe('the router respects where the step can actually run', () => {
     const other = 'other-machine';
     w.s.db
       .insert(machineTable)
-      .values({
-        ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
-        id: other,
-        name: 'codex-box',
-      })
+      .values(
+        readyMachine({
+          ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
+          id: other,
+          name: 'codex-box',
+        }),
+      )
       .run();
     w.s.db
       .update(machineTable)

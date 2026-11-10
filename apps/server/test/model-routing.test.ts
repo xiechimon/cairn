@@ -1,6 +1,7 @@
 import type { RoutingConnection, RoutingEdge, RoutingQuota } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, chief, chiefThread, machine, project, step, team, todo } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
@@ -478,7 +479,7 @@ test.each([
     const enrolled = await s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: s.team.id, name: 'codex-machine' }),
+      body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'codex-machine' })),
     });
     expect(enrolled.status).toBe(200);
     const { machineId: id, token } = (await enrolled.json()) as {

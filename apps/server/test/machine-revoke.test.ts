@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import pino from 'pino';
 import { describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   machine as machineTable,
   provider as providerTable,
@@ -57,7 +58,7 @@ async function enroll(
 ): Promise<{ machineId: string; token: string }> {
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: apiKey,
-    body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
   });
   expect(res.status).toBe(200);
   return machineEnrollResponseSchema.parse(await res.json());
@@ -468,14 +469,16 @@ describe('machine token revocation (#2494)', () => {
         .run();
       w.s.db
         .insert(machineTable)
-        .values({
-          id: 'machine-foreign',
-          teamId: 'team-other',
-          name: 'foreign',
-          online: true,
-          tokenHash: createHash('sha256').update('foreign-token').digest('hex'),
-          enabledRuntimes: ['pi'],
-        })
+        .values(
+          readyMachine({
+            id: 'machine-foreign',
+            teamId: 'team-other',
+            name: 'foreign',
+            online: true,
+            tokenHash: createHash('sha256').update('foreign-token').digest('hex'),
+            enabledRuntimes: ['pi'],
+          }),
+        )
         .run();
       const res = await call(w.s.app, 'POST', '/api/machines/machine-foreign/revoke');
       expect(res.status).toBe(404);

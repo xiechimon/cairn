@@ -8,6 +8,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   agentMemory,
   chiefMessage,
@@ -95,7 +96,7 @@ async function setup(cliVersion = CHIEF_DIGEST_MIN_CLI_VERSION): Promise<World> 
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId, name: 'digest-mbp', cliVersion },
+    body: readyMachine({ teamId, name: 'digest-mbp', cliVersion }),
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'digest-mbp');

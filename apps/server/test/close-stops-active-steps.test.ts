@@ -1,6 +1,7 @@
 import { type MachineDoneBody, STOP_MESSAGE } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -60,14 +61,16 @@ function makeWorld(opts: {
     .run();
   s.db
     .insert(machineTable)
-    .values({
-      id: machineId,
-      teamId,
-      name: machineId,
-      online: opts.machineOnline ?? true,
-      maxConcurrent: 8,
-      enabledRuntimes: ['pi'],
-    })
+    .values(
+      readyMachine({
+        id: machineId,
+        teamId,
+        name: machineId,
+        online: opts.machineOnline ?? true,
+        maxConcurrent: 8,
+        enabledRuntimes: ['pi'],
+      }),
+    )
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   s.db

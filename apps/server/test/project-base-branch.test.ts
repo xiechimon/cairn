@@ -1,6 +1,7 @@
 import { claimedStepSchema, conversationBranch } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, message, project, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { requestMerge } from '../src/services/builds.js';
@@ -35,7 +36,7 @@ test('the next claimed build carries the configured base branch through the wire
   const enrolled = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'branch-builder' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'branch-builder' })),
   });
   const { token } = (await enrolled.json()) as { token: string };
   seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });

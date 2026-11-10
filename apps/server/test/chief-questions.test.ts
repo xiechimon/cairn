@@ -3,6 +3,7 @@ import { type AskUserQuestion, type MachineAskResponse, SESSION_FILE_NAME } from
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   chiefMessage,
   machine as machineTable,
@@ -74,7 +75,7 @@ async function makeWorld(): Promise<World> {
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId, name: 'ask-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId, name: 'ask-mbp', cliVersion: '0.1.0' }),
   });
   const { token } = (await enrollRes.json()) as { token: string };
   seedRoute(s, 'coordinator', {

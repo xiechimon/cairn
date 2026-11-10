@@ -27,6 +27,8 @@ export interface ReconcileSeed {
 }
 
 export interface ReconcileFacts {
+  storeId?: string | null;
+  adoptStore?(storeId: string): void;
   conversationId: string | null;
   lastMirroredEntryId: string | null;
   piVersion: string | null;
@@ -34,13 +36,19 @@ export interface ReconcileFacts {
   forceReseed?: boolean;
   isLive(requestId: string): boolean;
   seed(summarize: Summarize | null): Promise<ReconcileSeed>;
-  record(state: { conversationId: string; piVersion: string; reseeded: boolean }): void;
+  record(state: {
+    storeId?: string;
+    conversationId: string;
+    piVersion: string;
+    reseeded: boolean;
+  }): void;
 }
 
 export type ReconcileOutcome =
   | 'seeded'
   | 'adopted-store'
   | 'reseeded-missing-conversation'
+  | 'reseeded-replaced-store'
   | 'reseeded-ahead'
   | 'reseeded-behind'
   | 'reseeded-rewound'
@@ -50,6 +58,9 @@ export interface ReconcileOptions {
   extensions?: readonly Extension[];
   settings?: () => HarnessSettings;
   summarize?: () => Summarize | null;
+  beforeReconcile?: (harness: Harness, storeId?: string) => Promise<void>;
+  storeIdentity?: (harness: Harness) => Promise<string>;
+  refreshFacts?: () => ReconcileFacts;
 }
 
 const STORE_SIDE_FILES = ['', '-wal', '-shm'];
@@ -99,6 +110,14 @@ export async function openReconciledHarness(
   const open = () =>
     openCoordinatorHarness(storagePath, models, context, { ...options, resume: false });
   let harness = await open();
+  let storeId = await options.storeIdentity?.(harness);
+  if (facts.storeId == null && storeId !== undefined) facts.adoptStore?.(storeId);
+  await options.beforeReconcile?.(harness, storeId);
+  const refreshed = options.refreshFacts?.() ?? facts;
+  facts =
+    facts.forceReseed === true
+      ? { ...refreshed, forceReseed: true, hasClaimedStep: false }
+      : refreshed;
   const root = await harness.root(context);
   const rootNewest = await newestEntryId(root, context);
   const recorded =
@@ -110,6 +129,8 @@ export async function openReconciledHarness(
   let reseed: ReconcileOutcome | null = null;
   if (rootNewest === undefined) {
     reseed = 'seeded';
+  } else if (storeId !== undefined && facts.storeId != null && facts.storeId !== storeId) {
+    reseed = 'reseeded-replaced-store';
   } else if (facts.forceReseed === true) {
     reseed = 'reseeded-rewound';
   } else if (facts.conversationId === null) {
@@ -133,6 +154,8 @@ export async function openReconciledHarness(
       await harness.close(context);
       setAside(storagePath, `stale-${Date.now()}`);
       harness = await open();
+      storeId = await options.storeIdentity?.(harness);
+      await options.beforeReconcile?.(harness, storeId);
     }
     const seed = await facts.seed(options.summarize?.() ?? null);
     await seedCoordinator(harness, seed.summary, seed.rows, seed.model, context);
@@ -141,6 +164,7 @@ export async function openReconciledHarness(
   const settled = await settleStaleSubmissions(harness, context, facts.isLive);
   const active = reseed === null && recorded !== undefined ? recorded : await harness.root(context);
   facts.record({
+    ...(storeId === undefined ? {} : { storeId }),
     conversationId: String(active.id),
     piVersion: PI_VERSION,
     reseeded: reseed !== null && rootNewest !== undefined,

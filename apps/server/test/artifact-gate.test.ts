@@ -10,6 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   message as messageTable,
@@ -71,7 +72,7 @@ async function setupWorld() {
   seedRoute(s, 'review', { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'ag-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'ag-mbp', cliVersion: '0.1.0' }),
   });
 
   const { token } = (await enrollRes.json()) as { token: string };

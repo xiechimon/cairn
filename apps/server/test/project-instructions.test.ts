@@ -1,7 +1,8 @@
 import { BRIEF_MARKER_END, claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
+import { chief as chiefTable, coordinatorInput, project, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { saveMemoryEntry } from '../src/services/memory.js';
 import {
@@ -29,7 +30,7 @@ async function enroll(name: string): Promise<string> {
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' })),
   });
   expect(res.status).toBe(200);
   return ((await res.json()) as { token: string }).token;
@@ -246,7 +247,7 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
       .where(eq(step.id, runningId))
       .run();
     await sendToCoordinator('plan the release', id);
-    const pending = s.db.select().from(steerPending).get();
+    const pending = s.db.select().from(coordinatorInput).get();
     expect(pending?.stepId).toBe(runningId);
     expect(pending?.content).toContain('plan the release');
     expect(pending?.content).toContain(RULES);
@@ -262,7 +263,7 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
       .where(eq(step.id, runningId))
       .run();
     await sendToCoordinator('and the changelog', id);
-    const pending = s.db.select().from(steerPending).get();
+    const pending = s.db.select().from(coordinatorInput).get();
     expect(pending?.content).toContain('and the changelog');
     expect(pending?.content).not.toContain(RULES);
   });

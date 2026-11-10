@@ -2,7 +2,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { chiefMessage, chiefThread, step as stepTable } from '../src/db/schema.js';
+import {
+  chiefMessage,
+  chiefThread,
+  coordinatorConversation,
+  step as stepTable,
+} from '../src/db/schema.js';
 import {
   answerChiefQuestion,
   rewindChiefThread,
@@ -15,6 +20,10 @@ import {
   holdForQuestion,
 } from '../src/services/chief-questions.js';
 import { takeChiefSteer } from '../src/services/chief-turns.js';
+import {
+  consumeCoordinatorInput,
+  pullCoordinatorInput,
+} from '../src/services/coordinator-inputs.js';
 import { createTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
@@ -64,7 +73,7 @@ describe('step.ownerMessageIds is written by every turn kind', () => {
     expect(owners(id)).toEqual([id]);
   });
 
-  test('T2 a steered owner message is added to the running turn when the steer is taken', () => {
+  test('T2 native steering attributes the owner only after its exact durable receipt', () => {
     const first = send('修登录页');
     claim(first);
     const second = sendChiefMessageFromComposer(deps(), H.teamId, {
@@ -72,6 +81,19 @@ describe('step.ownerMessageIds is written by every turn kind', () => {
       content: '只改 Safari',
     }).result.message.id;
     takeChiefSteer(H.s.db, H.threadId);
+    expect(owners(first)).toEqual([first]);
+    H.s.db
+      .insert(coordinatorConversation)
+      .values({
+        threadId: H.threadId,
+        storeId: 'test',
+        conversationId: '2',
+        piVersion: '1.5.0',
+        updatedAt: 1,
+      })
+      .run();
+    expect(pullCoordinatorInput(H.s.db, first, 'test:2')?.id).toBe(second);
+    consumeCoordinatorInput(H.s.db, second, 'test:2', '4');
     expect(owners(first)).toEqual([first, second]);
   });
 

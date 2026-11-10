@@ -22,7 +22,7 @@ jobs:
       tested-in-queue: ${{ steps.classify.outputs.tested-in-queue }}
       has-sidecar: ${{ steps.classify.outputs.has-sidecar }}
       gates-needed: ${{ steps.classify.outputs.gates-needed }}
-      e2e-tier: ${{ (github.event_name == 'push' || (github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/'))) && 'full' || 'affected' }}
+      e2e-tier: ${{ (github.event_name == 'push' || (github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/'))) && 'full' || 'none' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -173,7 +173,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -329,6 +329,11 @@ jobs:
           case "${{ needs.changes.outputs.e2e-tier }}" in
             full) ran="${{ needs.e2e.result }}" idle="${{ needs.e2e-affected.result }}" ;;
             affected) ran="${{ needs.e2e-affected.result }}" idle="${{ needs.e2e.result }}" ;;
+            none)
+              [ "${{ needs.e2e.result }}" = "skipped" ]
+              [ "${{ needs.e2e-affected.result }}" = "skipped" ]
+              exit 0
+              ;;
             *) exit 1 ;;
           esac
           [ "$idle" = "skipped" ]

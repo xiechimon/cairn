@@ -9,6 +9,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -82,7 +83,7 @@ function makeWorld(opts: WorldOpts = {}): World {
   ] as const) {
     s.db
       .insert(machineTable)
-      .values({ id, teamId: s.team.id, name, online: true, enabledRuntimes: ['pi'] })
+      .values(readyMachine({ id, teamId: s.team.id, name, online: true, enabledRuntimes: ['pi'] }))
       .run();
   }
   seedSessionRoute(s, {

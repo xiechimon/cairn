@@ -1,5 +1,7 @@
 import {
   orchestratedTodoIdOf,
+  parseCoordinatorConversationKey,
+  parseCoordinatorTextSourceId,
   parseReplyQuote,
   renderAttachmentTokensToLabels,
   type TaskContextMessage,
@@ -8,7 +10,7 @@ import {
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefMessage, coordinatorEntry, step } from '../db/schema.js';
+import { chiefMessage, coordinatorEntry, coordinatorInput, step } from '../db/schema.js';
 import { extractText } from './chief.js';
 
 export function resolveTaskReplyContext(
@@ -50,7 +52,8 @@ export function resolveTaskReplyContext(
       const nested = parseReplyQuote(body);
       if (nested !== null) visit(nested.sourceMessageId);
     } else {
-      const producerId = /^(.+)-e\d+$/.exec(id)?.[1];
+      const sourceIdentity = parseCoordinatorTextSourceId(id);
+      const producerId = sourceIdentity?.stepId;
       const producer =
         producerId === undefined
           ? undefined
@@ -70,37 +73,79 @@ export function resolveTaskReplyContext(
             and(eq(coordinatorEntry.chiefMessageId, id), eq(coordinatorEntry.threadId, threadId)),
           )
           .get();
-        const ownerIds = producer.ownerMessageIds ?? [producer.id];
-        if (ownerIds.length === 0) incomplete = true;
-        for (const ownerId of new Set(ownerIds)) {
-          const owner = db
-            .select()
-            .from(chiefMessage)
-            .where(and(eq(chiefMessage.id, ownerId), eq(chiefMessage.threadId, threadId)))
-            .get();
-          if (owner?.role !== 'user') {
-            incomplete = true;
-            continue;
-          }
-          const ownerEntry = db
-            .select()
-            .from(coordinatorEntry)
-            .where(
-              and(
-                eq(coordinatorEntry.chiefMessageId, ownerId),
-                eq(coordinatorEntry.threadId, threadId),
-              ),
-            )
-            .get();
+        const nativeInputs = db
+          .select()
+          .from(coordinatorInput)
+          .where(
+            and(eq(coordinatorInput.stepId, producer.id), eq(coordinatorInput.threadId, threadId)),
+          )
+          .all();
+        if (nativeInputs.length > 0 || sourceIdentity?.storeId != null) {
           if (
-            sourceEntry !== undefined &&
-            ownerEntry?.conversationId === sourceEntry.conversationId &&
-            Number.isSafeInteger(Number(ownerEntry.entryId)) &&
-            Number.isSafeInteger(Number(sourceEntry.entryId))
+            sourceEntry === undefined ||
+            !Number.isSafeInteger(Number(sourceEntry.entryId)) ||
+            (sourceIdentity?.storeId != null &&
+              parseCoordinatorConversationKey(sourceEntry.conversationId)?.storeId !==
+                sourceIdentity.storeId)
           ) {
-            if (Number(ownerEntry.entryId) < Number(sourceEntry.entryId)) visit(ownerId);
-          } else if (ownerId === producer.id) visit(ownerId);
-          else incomplete = true;
+            incomplete = true;
+          } else {
+            const eligible = nativeInputs
+              .filter(
+                (input) =>
+                  input.state === 'consumed' &&
+                  input.conversationId === sourceEntry.conversationId &&
+                  input.entryId !== null &&
+                  Number.isSafeInteger(Number(input.entryId)) &&
+                  Number(input.entryId) < Number(sourceEntry.entryId),
+              )
+              .sort((a, b) => Number(a.entryId) - Number(b.entryId));
+            if (eligible.length === 0) incomplete = true;
+            const ownerIds = new Set(eligible.flatMap((input) => input.ownerMessageIds));
+            if (ownerIds.size === 0) incomplete = true;
+            for (const ownerId of ownerIds) {
+              const owner = db
+                .select()
+                .from(chiefMessage)
+                .where(and(eq(chiefMessage.id, ownerId), eq(chiefMessage.threadId, threadId)))
+                .get();
+              if (owner?.role === 'user') visit(ownerId);
+              else incomplete = true;
+            }
+          }
+        } else {
+          const ownerIds = producer.ownerMessageIds ?? [producer.id];
+          if (ownerIds.length === 0) incomplete = true;
+          for (const ownerId of new Set(ownerIds)) {
+            const owner = db
+              .select()
+              .from(chiefMessage)
+              .where(and(eq(chiefMessage.id, ownerId), eq(chiefMessage.threadId, threadId)))
+              .get();
+            if (owner?.role !== 'user') {
+              incomplete = true;
+              continue;
+            }
+            const ownerEntry = db
+              .select()
+              .from(coordinatorEntry)
+              .where(
+                and(
+                  eq(coordinatorEntry.chiefMessageId, ownerId),
+                  eq(coordinatorEntry.threadId, threadId),
+                ),
+              )
+              .get();
+            if (
+              sourceEntry !== undefined &&
+              ownerEntry?.conversationId === sourceEntry.conversationId &&
+              Number.isSafeInteger(Number(ownerEntry.entryId)) &&
+              Number.isSafeInteger(Number(sourceEntry.entryId))
+            ) {
+              if (Number(ownerEntry.entryId) < Number(sourceEntry.entryId)) visit(ownerId);
+            } else if (ownerId === producer.id) visit(ownerId);
+            else incomplete = true;
+          }
         }
       }
     }
