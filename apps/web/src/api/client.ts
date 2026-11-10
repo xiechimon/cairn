@@ -1,11 +1,12 @@
 import { parsePairFragment } from '@cairn/shared';
-import { blockDemoWrite } from '../demo/demo-gate.js';
+import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import {
   awaitGate,
   bootstrapLoopback,
   consumePairFragment,
   demandGate,
   isLoopbackPage,
+  readStoredToken,
 } from './auth.js';
 
 export class ApiError extends Error {
@@ -23,6 +24,8 @@ export class ApiError extends Error {
 function send(path: string, init?: { method?: string; body?: unknown }): Promise<Response> {
   const headers: Record<string, string> = {};
   if (init?.body !== undefined) headers['content-type'] = 'application/json';
+  const token = typeof window === 'undefined' ? null : readStoredToken();
+  if (token !== null) headers.authorization = `Bearer ${token}`;
   return fetch(path, {
     method: init?.method ?? 'GET',
     headers,
@@ -34,7 +37,7 @@ function send(path: string, init?: { method?: string; body?: unknown }): Promise
 let bootstrapped = false;
 
 async function ensureLoopbackSession(): Promise<void> {
-  if (bootstrapped || typeof window === 'undefined' || !isLoopbackPage()) return;
+  if (DEMO_MODE || bootstrapped || typeof window === 'undefined' || !isLoopbackPage()) return;
   bootstrapped = true;
   await bootstrapLoopback();
 }

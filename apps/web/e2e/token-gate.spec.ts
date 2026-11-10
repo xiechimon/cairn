@@ -1,4 +1,3 @@
-import { ENV_VARS } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { bootLiveServer, type LiveServer } from './live-server';
 
@@ -33,7 +32,7 @@ let authed: LiveServer;
 let openServer: LiveServer;
 
 test.beforeAll(async () => {
-  authed = await bootLiveServer(GATE_TOKEN, { [ENV_VARS.requireToken]: '1' });
+  authed = await bootLiveServer(GATE_TOKEN);
   openServer = await bootLiveServer(null);
 });
 
