@@ -29,6 +29,7 @@ import { MachineWakeHub } from '../../../apps/server/src/services/machine-wake-h
 import { createProvider } from '../../../apps/server/src/services/providers.js';
 import { replayInput } from './contract.mts';
 import { useModelSocket } from './proxy.mts';
+import { seedReplayState } from './state.mts';
 
 const chunks: Buffer[] = [];
 for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
@@ -86,11 +87,8 @@ try {
       updatedAt: 1,
     })
     .run();
-  for (const [n, p] of input.projects.entries()) {
-    db.insert(project)
-      .values({ id: `project-${n}`, teamId: team.id, ...p })
-      .run();
-  }
+  seedReplayState(db, team.id, input);
+  const baseline = new Set(input.snapshot.todos.map((t) => t.id));
   const picked =
     input.chip === undefined
       ? undefined
@@ -141,11 +139,11 @@ try {
           .select()
           .from(todo)
           .all()
-          .filter((t) => t.phase !== 'closed')
+          .filter((t) => t.phase !== 'closed' && !baseline.has(t.id))
           .map((t) => ({
             id: t.id,
             blockedBy: t.blockedBy ?? [],
-            project: input.projects[Number(t.projectId.slice(8))]?.name ?? '',
+            project: input.projects.find((p) => p.id === t.projectId)?.name ?? '',
             title: t.title,
           }));
         const text = rows

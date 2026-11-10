@@ -9,6 +9,10 @@ import { evalCodexKey } from '../../../apps/daemon/src/backend/eval-auth.js';
 import { decisionOutput, type ReplayInput, replayInput } from './contract.mts';
 import { runSandboxedTurn } from './sandbox.mts';
 
+const itemBudgetMs = 610_000;
+const recordingMarginMs = 30_000;
+const cleanupMarginMs = 15_000;
+
 const manifestSchema = z
   .object({
     dataset: z.string().min(1),
@@ -70,7 +74,16 @@ export async function runExperiment(
     new Set(items.map((item) => item.sourceTraceId)).size !== items.length
   )
     throw new Error('incomplete: missing or duplicate harvested provenance');
+  for (const item of items) {
+    const expected = decisionOutput
+      .omit({ questions: true, stepStatus: true, turnTraceId: true, promptSha256: true })
+      .strict()
+      .safeParse(item.expectedOutput);
+    if (!expected.success) throw new Error('incomplete: invalid expectedOutput');
+  }
   const inputs = items.map((item) => replayInput.parse(item.input));
+  if (items.some((item, n) => item.sourceTraceId !== inputs[n]?.snapshot.sourceTraceId))
+    throw new Error('incomplete: snapshot provenance mismatch');
   const hash = fingerprint({
     ...manifest,
     model: 'openai-codex/gpt-6.1-sol',
@@ -94,7 +107,7 @@ export async function runExperiment(
           if (!('id' in item) || !items.some((i) => i.id === item.id) || completed.has(item.id))
             throw new Error('Unexpected experiment item');
           const output = decisionOutput.parse(
-            await within(execute(replayInput.parse(item.input)), 610_000),
+            await within(execute(replayInput.parse(item.input)), itemBudgetMs),
           );
           completed.add(item.id);
           return output;
@@ -104,18 +117,29 @@ export async function runExperiment(
         }
       },
     }),
-    items.length * 610_000 + 30_000,
+    items.length * itemBudgetMs + recordingMarginMs,
   );
   if (failed || completed.size !== items.length || result.itemResults.length !== items.length)
     throw new Error('incomplete: experiment lost or failed items');
   return result;
 }
 
+export async function runExperimentWithCleanup(
+  client: ExperimentClient,
+  manifest: Manifest,
+  execute: (input: ReplayInput) => Promise<unknown>,
+  close: () => Promise<void>,
+) {
+  try {
+    return await runExperiment(client, manifest, execute);
+  } finally {
+    await within(close(), cleanupMarginMs);
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   process.env.CAIRN_TEST_TEMP_ROOT ??= join(homedir(), '.cache/codex-scratch/eval-langfuse');
   mkdirSync(process.env.CAIRN_TEST_TEMP_ROOT, { recursive: true });
-  const deadline = setTimeout(() => process.exit(124), 3_600_000);
-  let sdk: ReturnType<typeof openExperimentClient> | undefined;
   try {
     const manifest = manifestSchema.parse(JSON.parse(readFileSync(process.argv[2] ?? '', 'utf8')));
     const checkout = resolve(process.argv[3] ?? '.');
@@ -156,27 +180,30 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       ),
       30_000,
     );
-    sdk = openExperimentClient({
+    const sdk = openExperimentClient({
       baseUrl: process.env.LANGFUSE_BASE_URL ?? '',
       publicKey: process.env.LANGFUSE_PUBLIC_KEY ?? '',
       secretKey: process.env.LANGFUSE_SECRET_KEY ?? '',
     });
-    const result = await runExperiment(sdk.client, manifest, (input) =>
-      runSandboxedTurn(
-        input,
-        {
-          kind: 'http',
-          providerId: 'openai-codex',
-          api: 'openai-responses',
-          models: [{ id: 'gpt-6.1-sol', name: 'Codex' }],
-        },
-        key,
-        600_000,
-        manifest.thinking,
-        checkout,
-      ),
+    const result = await runExperimentWithCleanup(
+      sdk.client,
+      manifest,
+      (input) =>
+        runSandboxedTurn(
+          input,
+          {
+            kind: 'http',
+            providerId: 'openai-codex',
+            api: 'openai-responses',
+            models: [{ id: 'gpt-6.1-sol', name: 'Codex' }],
+          },
+          key,
+          600_000,
+          manifest.thinking,
+          checkout,
+        ),
+      () => sdk.close(),
     );
-    await within(sdk.close(), 15_000);
     console.log(
       JSON.stringify({
         runName: result.runName,
@@ -188,11 +215,6 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     console.error('incomplete: experiment did not finish');
     process.exitCode = 1;
   } finally {
-    if (sdk)
-      await within(sdk.close(), 15_000).catch(() => {
-        process.exitCode = 1;
-      });
-    clearTimeout(deadline);
     process.exitCode ??= 0;
   }
 }

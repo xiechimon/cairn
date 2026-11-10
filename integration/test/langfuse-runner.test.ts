@@ -1,16 +1,33 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { appendFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import type { CoordinatorCreateTodoParams, ProviderConfig } from '@cairn/shared';
+import {
+  ASK_USER_QUESTION_KIND,
+  type CoordinatorCreateTodoParams,
+  type ProviderConfig,
+} from '@cairn/shared';
 import { openExperimentClient } from '@cairn/shared/langfuse';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { openDbWithHandle } from '../../apps/server/src/db/client.js';
+import {
+  build,
+  chiefMessage,
+  chiefThread,
+  message,
+  step,
+  todo,
+} from '../../apps/server/src/db/schema.js';
+import { seed } from '../../apps/server/src/db/seed.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { candidateClosure } from '../eval/coordinator-routing/closure.mts';
 import { normalize, observeTurn, replayInput } from '../eval/coordinator-routing/contract.mts';
+import * as runner from '../eval/coordinator-routing/run.mts';
 import { type Manifest, runExperiment } from '../eval/coordinator-routing/run.mts';
 import { runSandboxedTurn } from '../eval/coordinator-routing/sandbox.mts';
+import { harvestReplayInput, seedReplayState } from '../eval/coordinator-routing/state.mts';
 import { startStubLlm } from './stub-llm.js';
 
 const closers: (() => Promise<unknown>)[] = [];
@@ -28,7 +45,23 @@ async function candidateFixture(): Promise<string> {
 }
 const input = {
   request: 'What is ready?',
-  projects: [{ name: 'docs', description: 'Documentation' }],
+  projects: [
+    {
+      id: 'project-0',
+      name: 'docs',
+      description: 'Documentation',
+      repoKind: null,
+      archivedAt: null,
+    },
+  ],
+  snapshot: {
+    source: 'harvest-db' as const,
+    sourceTraceId: 'source-1',
+    capturedAt: 1,
+    todos: [],
+    threads: [],
+    visible: [],
+  },
 };
 function modelProvider(url: string): ProviderConfig {
   return {
@@ -68,6 +101,422 @@ describe('Langfuse Coordinator runner', () => {
     ).toThrow();
   });
 
+  it('rejects a harvested case without a visible-state snapshot', () => {
+    const { snapshot: _snapshot, ...missing } = input;
+    expect(() => replayInput.parse(missing)).toThrow();
+  });
+
+  it.each(['todos', 'open_thread'])(
+    'rejects %s until its complete read closure is captured',
+    (name) => {
+      expect(() =>
+        observeTurn(
+          {
+            protocol: 'cairn.routing.observations.v1',
+            todos: [],
+            toolCalls: [name],
+            questions: [],
+            text: 'answer',
+            stepStatus: 'done',
+            turnTraceId: 'a'.repeat(32),
+            promptSha256: 'b'.repeat(64),
+          },
+          input,
+        ),
+      ).toThrow('uncaptured state');
+    },
+  );
+
+  it.each([undefined, null, {}, { decision: 'hold' }])(
+    'rejects an ACTIVE item with invalid expectedOutput %j before starting the SDK experiment',
+    async (expectedOutput) => {
+      const execute = vi.fn();
+      const experiment = vi.fn(async () => ({ itemResults: [] }));
+      const client = {
+        dataset: {
+          get: async () => ({
+            items: [
+              {
+                id: '1',
+                datasetId: 'd',
+                sourceTraceId: 't1',
+                status: 'ACTIVE',
+                input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: 't1' } },
+                expectedOutput: { decision: 'answer', parts: [], askCandidates: [], blockedBy: [] },
+              },
+              {
+                id: '2',
+                datasetId: 'd',
+                sourceTraceId: 't2',
+                status: 'ACTIVE',
+                input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: 't2' } },
+                expectedOutput,
+              },
+            ],
+          }),
+        },
+        experiment: { run: experiment },
+      };
+      await expect(
+        runExperiment(client as unknown as Parameters<typeof runExperiment>[0], manifest, execute),
+      ).rejects.toThrow('expectedOutput');
+      expect(experiment).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+    },
+  );
+
+  it('lets six near-budget turns finish and always cleans up on a deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const close = vi.fn(async () => {});
+      const output = {
+        decision: 'answer',
+        parts: [],
+        questions: [],
+        askCandidates: [],
+        blockedBy: [],
+        stepStatus: 'done',
+        turnTraceId: 'a'.repeat(32),
+        promptSha256: 'b'.repeat(64),
+      };
+      const items = Array.from({ length: 6 }, (_, n) => ({
+        id: String(n),
+        datasetId: 'd',
+        sourceTraceId: String(n),
+        status: 'ACTIVE',
+        input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: String(n) } },
+        expectedOutput: { decision: 'answer', parts: [], askCandidates: [], blockedBy: [] },
+      }));
+      const client = {
+        dataset: { get: async () => ({ items }) },
+        experiment: {
+          run: async ({ task }: { task: (item: unknown) => Promise<unknown> }) => {
+            const itemResults = [];
+            for (const item of items) itemResults.push(await task(item));
+            return { itemResults };
+          },
+        },
+      } as unknown as Parameters<typeof runExperiment>[0];
+      const work = runner.runExperimentWithCleanup(
+        client,
+        manifest,
+        async () => {
+          await new Promise((r) => setTimeout(r, 609_000));
+          return output;
+        },
+        close,
+      );
+      const assertion = expect(work).resolves.toMatchObject({ itemResults: expect.any(Array) });
+      await vi.advanceTimersByTimeAsync(6 * 609_000);
+      await assertion;
+      expect(close).toHaveBeenCalledOnce();
+      close.mockClear();
+      const failed = runner.runExperimentWithCleanup(
+        client,
+        manifest,
+        () => new Promise(() => {}),
+        close,
+      );
+      const rejected = expect(failed).rejects.toThrow('incomplete');
+      await vi.advanceTimersByTimeAsync(610_000);
+      await rejected;
+      expect(close).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('seeds harvested todos for projects and sourceTodoId without counting old tasks as new routes', async () => {
+    const world = {
+      ...input,
+      projects: [
+        {
+          id: 'project-0',
+          name: 'docs',
+          description: 'Documentation',
+          repoKind: null,
+          archivedAt: null,
+        },
+      ],
+      snapshot: {
+        source: 'harvest-db' as const,
+        sourceTraceId: 'source-1',
+        capturedAt: 1,
+        todos: [
+          {
+            id: 'existing',
+            projectId: 'project-0',
+            title: 'Existing docs',
+            spec: 'Repair the reference.',
+            phase: 'todo' as const,
+            phaseAt: 1,
+            archivedAt: null,
+            seqNum: 7,
+            orderIndex: 3,
+            blockedBy: null,
+            latestBuildId: null,
+            sourceKind: null,
+            sourceRef: null,
+            request: null,
+            output: 'info' as const,
+          },
+        ],
+        threads: [],
+        visible: [{ id: 'existing', ownership: null, blocks: true }],
+      },
+    };
+    const model = await startStubLlm([
+      { toolCall: { name: 'projects', arguments: {} } },
+      { content: 'one task' },
+    ]);
+    closers.push(() => model.close());
+    expect(
+      await runSandboxedTurn(world, modelProvider(model.url), 'test-key', 30_000),
+    ).toMatchObject({ decision: 'answer', parts: [] });
+    const projectResult = model.requests.at(-1)?.messages.find((m) => m.role === 'tool')?.content;
+    expect(JSON.parse(String(projectResult))).toEqual([
+      { id: 'project-0', name: 'docs', repoKind: null, todoCount: 1 },
+    ]);
+    const route = await startStubLlm([
+      {
+        toolCall: {
+          name: 'create_todo',
+          arguments: { projectId: 'project-0', sourceTodoId: 'existing' },
+        },
+      },
+      { content: 'recorded' },
+    ]);
+    closers.push(() => route.close());
+    expect(
+      await runSandboxedTurn(world, modelProvider(route.url), 'test-key', 30_000),
+    ).toMatchObject({
+      decision: 'route',
+      parts: [{ project: 'docs', title: 'Repair the reference.' }],
+    });
+  }, 90_000);
+
+  it('harvests the source turn with its DB todo/thread snapshot and seeds a fresh DB', async () => {
+    const source = openDbWithHandle(':memory:');
+    const target = openDbWithHandle(':memory:');
+    try {
+      const { user, team } = seed(source.db);
+      const destination = seed(target.db);
+      seedReplayState(source.db, team.id, input);
+      source.db
+        .insert(todo)
+        .values({
+          id: 'old',
+          teamId: team.id,
+          projectId: 'project-0',
+          title: 'Old',
+          spec: 'Original words',
+          phase: 'building',
+          phaseAt: 10,
+          seqNum: 4,
+          latestBuildId: 'old-build',
+        })
+        .run();
+      source.db
+        .insert(build)
+        .values({
+          id: 'old-build',
+          todoId: 'old',
+          withPlan: true,
+          prevPhase: 'todo',
+          triggerSource: 'user',
+          createdAt: 10,
+        })
+        .run();
+      source.db
+        .insert(chiefThread)
+        .values({
+          id: 'source-thread',
+          chiefId: 'source-chief',
+          userId: user.id,
+          teamId: team.id,
+          title: 'Source',
+          createdAt: 1,
+          updatedAt: 1,
+          sessionId: 'source-session',
+          sessionOpenedAt: 1,
+        })
+        .run();
+      source.db
+        .insert(chiefMessage)
+        .values({
+          id: 'source-turn',
+          threadId: 'source-thread',
+          role: 'user',
+          content: 'The original request',
+          projectId: 'project-0',
+          createdAt: 1,
+        })
+        .run();
+      source.db
+        .insert(step)
+        .values({
+          id: 'source-turn',
+          buildId: 'source-thread',
+          kind: 'chief',
+          status: 'done',
+          createdAt: 1,
+        })
+        .run();
+      const harvested = harvestReplayInput(source.db, 'source-turn');
+      expect(harvested).toMatchObject({
+        request: 'The original request',
+        chip: 'docs',
+        snapshot: {
+          source: 'harvest-db',
+          sourceTraceId: expect.stringMatching(/^[a-f0-9]{32}$/),
+          todos: [{ id: 'old', latestBuildId: 'old-build', spec: 'Original words' }],
+          threads: [{ id: 'old-build', todoId: 'old' }],
+        },
+      });
+      seedReplayState(target.db, destination.team.id, harvested);
+      expect(target.db.select().from(todo).all()).toMatchObject([
+        {
+          id: 'old',
+          latestBuildId: 'old-build',
+          spec: 'Original words',
+          teamId: destination.team.id,
+        },
+      ]);
+      expect(target.db.select().from(build).all()).toMatchObject([
+        { id: 'old-build', todoId: 'old' },
+      ]);
+      source.db
+        .insert(message)
+        .values({
+          id: 'pending-question',
+          conversationId: 'old-build',
+          role: 'assistant',
+          content: { kind: ASK_USER_QUESTION_KIND, status: 'pending' },
+          createdAt: 20,
+        })
+        .run();
+      const waiting = harvestReplayInput(source.db, 'source-turn');
+      expect(waiting.snapshot.visible).toEqual([
+        { id: 'old', ownership: { owner: 'coordinator', reason: 'question' }, blocks: true },
+      ]);
+      const model = await startStubLlm([{ content: 'quiet' }]);
+      closers.push(() => model.close());
+      await expect(
+        runSandboxedTurn(waiting, modelProvider(model.url), 'test-key', 30_000),
+      ).rejects.toThrow('worker exit 2');
+      expect(model.requests).toHaveLength(0);
+      const unsupported = openDbWithHandle(':memory:');
+      try {
+        const fresh = seed(unsupported.db);
+        expect(() => seedReplayState(unsupported.db, fresh.team.id, waiting)).toThrow(
+          'uncaptured visible thread state',
+        );
+      } finally {
+        unsupported.close();
+      }
+      expect(() => harvestReplayInput(source.db, 'missing')).toThrow('Missing harvest source');
+      expect(() =>
+        replayInput.parse({
+          ...harvested,
+          snapshot: {
+            ...harvested.snapshot,
+            todos: harvested.snapshot.todos.map((t) => ({ ...t, surprise: true })),
+          },
+        }),
+      ).toThrow();
+      expect(() =>
+        replayInput.parse({
+          ...harvested,
+          snapshot: {
+            ...harvested.snapshot,
+            todos: harvested.snapshot.todos.map((t) => ({ ...t, phase: 'invented' })),
+          },
+        }),
+      ).toThrow();
+      for (const snapshot of [
+        undefined,
+        { ...harvested.snapshot, surprise: true },
+        { ...harvested.snapshot, threads: [] },
+        {
+          ...harvested.snapshot,
+          todos: [...harvested.snapshot.todos, ...harvested.snapshot.todos],
+        },
+      ])
+        expect(() => replayInput.parse({ ...harvested, snapshot })).toThrow();
+    } finally {
+      source.close();
+      target.close();
+    }
+  });
+
+  it('runs the actual CLI beyond its former hour budget and flushes SDK cleanup', () => {
+    const dir = makeTestTempDir('eval-langfuse-cli-budget-');
+    closers.push(async () => releaseTestTempDir(dir));
+    const fixture = join(dir, 'items.json');
+    writeFileSync(
+      fixture,
+      JSON.stringify(
+        Array.from({ length: 6 }, (_, n) => ({
+          id: String(n),
+          datasetId: 'd',
+          sourceTraceId: String(n),
+          status: 'ACTIVE',
+          input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: String(n) } },
+          expectedOutput: { decision: 'answer', parts: [], askCandidates: [], blockedBy: [] },
+        })),
+      ),
+    );
+    const preload = join(dir, 'cli-fixtures.mjs');
+    writeFileSync(
+      preload,
+      `
+import childProcess from 'node:child_process';
+import {registerHooks, syncBuiltinESMExports} from 'node:module';
+const fixture = ${JSON.stringify(fixture)};
+const originalSetTimeout = globalThis.setTimeout;
+globalThis.setTimeout = (fn, ms, ...args) => originalSetTimeout(fn, ms >= 15000 ? ms / 1000 : ms, ...args);
+childProcess.execFileSync = (_command, args) => args[0] === 'rev-parse' ? 'a'.repeat(40) : '';
+syncBuiltinESMExports();
+const modules = {
+  '@cairn/shared/langfuse': \`import {readFileSync} from 'node:fs';export function openExperimentClient(){return {client:{dataset:{get:async()=>({items:JSON.parse(readFileSync(\${JSON.stringify(fixture)},'utf8'))})},experiment:{run:async({task,data})=>{const itemResults=[];for(const item of data)itemResults.push(await task(item));return {itemResults,runName:'fixture',experimentId:'fixture'};}}},close:async()=>{console.log('SDK-CLEANUP');}}}\`,
+  'eval-auth.js': \`export async function evalCodexKey(){return 'test-key';}\`,
+  './sandbox.mts': \`export async function runSandboxedTurn(){await new Promise(r=>setTimeout(r,609000));return {decision:'answer',parts:[],questions:[],askCandidates:[],blockedBy:[],stepStatus:'done',turnTraceId:'a'.repeat(32),promptSha256:'b'.repeat(64)};}\`,
+};
+registerHooks({resolve(specifier,context,next){const key=specifier.includes('eval-auth.')?'eval-auth.js':(specifier==='./sandbox.mts'||specifier.includes('coordinator-routing/sandbox.mts'))?'./sandbox.mts':(specifier==='@cairn/shared/langfuse'||specifier.includes('packages/shared/src/langfuse.'))?'@cairn/shared/langfuse':undefined;return key?{url:'data:text/javascript,'+encodeURIComponent(modules[key]),shortCircuit:true}:next(specifier,context);}});
+`,
+    );
+    const path = join(dir, 'manifest.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        ...manifest,
+        runnerSha: manifest.candidateSha,
+        promptSha: createHash('sha256')
+          .update(readFileSync(new URL('../../apps/server/src/services/chief.ts', import.meta.url)))
+          .digest('hex'),
+      }),
+    );
+    const cli = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        '--import',
+        import.meta.resolve('tsx'),
+        new URL('../eval/coordinator-routing/run.mts', import.meta.url).pathname,
+        path,
+      ],
+      { encoding: 'utf8', timeout: 15_000, env: { ...process.env, PI_CODING_AGENT_DIR: dir } },
+    );
+    expect({ status: cli.status, stderr: cli.stderr, stdout: cli.stdout }).toMatchObject({
+      status: 0,
+      stderr: '',
+    });
+    expect(cli.stdout).toContain('SDK-CLEANUP');
+    expect(cli.stdout).toContain('"items":6');
+  }, 20_000);
+
   it('runs the real disposable Coordinator through SDK experiment.run and exports its item span', async () => {
     const model = await startStubLlm([{ content: 'all quiet' }]);
     closers.push(() => model.close());
@@ -94,8 +543,13 @@ describe('Langfuse Coordinator runner', () => {
             id: String(n),
             datasetId: 'dataset',
             status: 'ACTIVE',
-            input,
-            expectedOutput: { hidden: 'ANSWER-SECRET' },
+            input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: `source-${n}` } },
+            expectedOutput: {
+              decision: 'route',
+              parts: [{ project: 'docs', title: 'ANSWER-SECRET' }],
+              askCandidates: [],
+              blockedBy: [],
+            },
             sourceTraceId: duplicateSource ? 'same-source' : `source-${n}`,
           })),
           meta: { totalPages: 1 },
