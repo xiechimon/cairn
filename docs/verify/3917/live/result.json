@@ -1,0 +1,19 @@
+{
+  "head": "f08f90176f9b826e4b88426859f26f3ad28247ac",
+  "sourceOwnerMessages": 3,
+  "sourceCoordinatorMessages": 1,
+  "images": 1,
+  "startupBubbles": 0,
+  "imageLoaded": true,
+  "rawMarkerVisible": false,
+  "correctAnswerVisible": 1,
+  "errors": [],
+  "previewOpened": true,
+  "reloadRetained": true,
+  "providerMode": "real",
+  "admittedBeforeAnswer": true,
+  "consumedBeforeAck": true,
+  "backendReadImageDigits": true,
+  "answerNotInTaskText": true,
+  "expectedHead": "f08f90176f9b826e4b88426859f26f3ad28247ac"
+}
