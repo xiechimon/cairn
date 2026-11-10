@@ -1559,8 +1559,9 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
-          "purpose": "A new task has no title or tag inputs, its title comes from the first line of the body, the project has the 6 seeded fixed tags (API and SQLite), and detail renders no chips row when a task has no tags."
+          "status": "stale",
+          "purpose": "Historical fixed-vocabulary, untitled-task and category-chip browser recipe.",
+          "note": "Targets retired board filters/chips. Ordinary worker metadata is title-only; current claim, relay and prompt regressions are listed in features/tags.md."
         }
       }
     },
