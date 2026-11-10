@@ -10,6 +10,7 @@ const config = readFileSync(configPath, 'utf8');
 
 test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge-checks.mjs', () => {
   assert.equal(config, mergifyConfig(prGate, gatePaths), 'run node scripts/mergify-config.mjs');
+  assert.match(config, /^ {2}max_parallel_checks: 5$/m);
 });
 
 test('negative control: a limit changed in merge-gate-paths.json changes .mergify.yml', () => {
