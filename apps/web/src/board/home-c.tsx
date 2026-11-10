@@ -423,6 +423,11 @@ export function HomeC({
           if (!narrow) composerRef.current?.focus();
           else showPane(null, { compose: Date.now() } satisfies ComposeState);
         }}
+        onAddTask={async (text) => {
+          if (surface.onSend == null) setPrefill({ text, key: Date.now() });
+          else await surface.onSend(text, projectId);
+          if (narrow) showPane(null);
+        }}
         query={tasksQuery}
       />
     ) : (

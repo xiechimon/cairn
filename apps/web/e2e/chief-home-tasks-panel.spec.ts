@@ -17,16 +17,15 @@ test('the Tasks toggle carries the needs-you count and opens sections in Duet or
   await expect(panel(page)).toBeVisible();
   await expect(page).toHaveURL(/[?&]pane=tasks/);
   const sections = panel(page).getByTestId('tasks-section');
-  await expect(sections).toHaveCount(4);
+  await expect(sections).toHaveCount(3);
   await expect(sections.nth(0)).toHaveAttribute('data-section', 'ready_for_review');
   await expect(sections.nth(1)).toHaveAttribute('data-section', 'needs_input');
   await expect(sections.nth(2)).toHaveAttribute('data-section', 'working');
-  await expect(sections.nth(3)).toHaveAttribute('data-section', 'resolved');
   await expect(sections.nth(0)).toContainText('Fold finished turns into purpose and duration');
   await expect(sections.nth(1)).toContainText('Connect a Claude subscription token');
   await expect(sections.nth(2)).toContainText('Orb canary round 7');
   await expect(sections.nth(2)).toContainText('Rerun the relay probe');
-  await expect(sections.nth(3).locator('[data-slot="task-row"]')).toHaveCount(0);
+  await expect(panel(page).getByRole('tab')).toHaveText([/进行中/, /接下来/, /定时/, /已完成/]);
   await expect(panel(page)).not.toContainText('Sidebar status groups');
 
   await page.reload();
@@ -60,16 +59,29 @@ test('every row waiting on the owner says what is waiting and where to act', asy
   await expect(working.locator('[data-slot="task-row-running"]')).toHaveCount(3);
 });
 
-test('Resolved opens on demand and Up next lists tasks not started', async ({ page }) => {
+test('Up next, Scheduled and Done tabs list their own entries', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
-  await panel(page).getByRole('button', { name: /^已解决/ }).click();
-  await expect(panel(page).locator('[data-section="resolved"]')).toContainText(
-    'Unread dot on threads',
-  );
-  await panel(page).getByRole('tab', { name: /待开始/ }).click();
+  await panel(page).getByRole('tab', { name: /接下来/ }).click();
   const next = panel(page).locator('[data-section="up_next"] [data-slot="task-row"]');
   await expect(next).toHaveCount(1);
   await expect(next).toContainText('Sidebar status groups');
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(3);
+  await expect(panel(page).getByRole('link', { name: '管理定时' })).toBeVisible();
+  await panel(page).getByRole('tab', { name: '已完成' }).click();
+  await expect(panel(page).locator('[data-section="resolved"]')).toContainText(
+    'Unread dot on threads',
+  );
+  await expect(panel(page).getByRole('link', { name: '管理定时' })).toHaveCount(0);
+  await panel(page).getByRole('tab', { name: '进行中' }).click();
+  await expect(panel(page).getByRole('link', { name: '管理定时' })).toHaveCount(0);
+});
+
+test('a schedule row opens the schedule detail', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  await panel(page).locator('[data-slot="schedule-row"]').first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
 });
 
 test('a row opens its thread in the side chat', async ({ page }) => {
@@ -79,14 +91,56 @@ test('a row opens its thread in the side chat', async ({ page }) => {
   await expect(page.getByTestId('side-chat')).toContainText('Orb canary round 7');
 });
 
-test('the plus button focuses the Coordinator composer', async ({ page }) => {
+test('the plus button opens an inline add input; Escape closes it; submit hands the text to the composer', async ({
+  page,
+}) => {
   await page.goto(`${HOME}&pane=tasks`);
+  const input = panel(page).getByTestId('tasks-add-input');
+  await expect(input).toHaveCount(0);
   await panel(page).getByTestId('tasks-new').click();
-  await expect(page.locator('.chief-composer textarea')).toBeFocused();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveAttribute('placeholder', '添加任务…');
+  await page.keyboard.press('Escape');
+  await expect(input).toHaveCount(0);
+  await panel(page).getByTestId('tasks-new').click();
+  await input.fill('Audit the relay probe retries');
+  await input.press('Enter');
+  await expect(input).toHaveCount(0);
+  await expect(page.locator('.chief-composer textarea')).toHaveValue(
+    'Audit the relay probe retries',
+  );
+});
+
+test('a scheduled row menu offers run, pause and delete; delete asks first', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  const rows = panel(page).locator('[data-slot="schedule-row-frame"]');
+  await expect(rows).toHaveCount(3);
+  const menuSlot = rows.first().locator('[data-slot="schedule-row-menu"]');
+  await expect(menuSlot).toHaveCSS('opacity', '0');
+  await rows.first().hover();
+  await expect(menuSlot).toHaveCSS('opacity', '1');
+  await rows.first().getByTestId('schedule-row-menu-button').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('更多');
+  await rows.first().getByTestId('schedule-row-menu-button').click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem')).toHaveText([/立即运行/, /暂停定时/, /删除/]);
+  await menu.getByRole('menuitem', { name: /删除/ }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+});
+
+test('a schedule whose task is running cannot be run again from the menu', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  const row = panel(page).locator('[data-slot="schedule-row-frame"]').filter({ hasText: 'Orb canary round 7' });
+  await row.hover();
+  await row.getByTestId('schedule-row-menu-button').click();
+  await expect(page.getByRole('menuitem', { name: /立即运行/ })).toHaveAttribute('data-disabled', '');
 });
 
 test('Manage schedules links to the schedules page', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: '定时' }).click();
   await panel(page).getByRole('link', { name: '管理定时' }).click();
   await expect(page).toHaveURL(/\/app\/schedules/);
 });
