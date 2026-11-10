@@ -56,7 +56,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-    merge_method: squash
+    merge_method: fast-forward
     batch_size:
       min: 1
       max: 4
@@ -121,7 +121,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-    merge_method: squash
+    merge_method: fast-forward
     batch_size:
       min: 1
       max: 4
@@ -136,8 +136,8 @@ commands_restrictions:
     conditions:
       - sender-permission >= write
 merge_queue:
-  mode: parallel
-  max_parallel_checks: 5
+  mode: serial
+  max_parallel_checks: 1
   dequeued_label: dequeued
 scopes:
   source:
