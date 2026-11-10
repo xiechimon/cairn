@@ -7,7 +7,14 @@ import { runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { statePaths } from '../../apps/daemon/src/state.js';
 import { step } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, daemonLogLines, seedWorld, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
+  daemonLogLines,
+  seedWorld,
+  waitFor,
+} from './helpers.js';
 import { startStubLlm } from './stub-llm.js';
 
 test('message_todo reaches a running daemon and logs the delivered step', async () => {
@@ -35,6 +42,8 @@ test('message_todo reaches a running daemon and logs the delivered step', async 
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   try {
     await waitFor(
