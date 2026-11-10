@@ -1,0 +1,35 @@
+{
+  "mode": "Isolated real host SQLite; direct compatibility APIs, no production activation",
+  "beforeReceipt": [
+    "initial",
+    "native-store:producer-e5"
+  ],
+  "afterReceiptAndLaterIndexOverwrite": [
+    "initial",
+    "steer",
+    "native-store:producer-e5"
+  ],
+  "heldNativeClaim": false,
+  "heldDaemonClaim": false,
+  "migrated": 2,
+  "repeatedMigration": 0,
+  "successors": [
+    {
+      "state": "released",
+      "freshId": true,
+      "content": "legacy-first",
+      "owners": [
+        "legacy-first"
+      ]
+    },
+    {
+      "state": "released",
+      "freshId": true,
+      "content": "legacy-second",
+      "owners": [
+        "legacy-second"
+      ]
+    }
+  ],
+  "coverage": "No provider, image bytes, public HTTP authentication or production transport exercised."
+}
