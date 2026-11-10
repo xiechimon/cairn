@@ -44,9 +44,7 @@ export const MEMORY_UI_COPY = {
 const memoryScopeParam = z
   .string()
   .min(1)
-  .describe(
-    'Scope: "team" or a project id. Workers may select only team or their current project; independent stores stay isolated.',
-  );
+  .describe('"team" or a project id; workers may select only team/current project.');
 const memoryFileParam = z
   .string()
   .min(1)
@@ -55,27 +53,17 @@ const memoryFileParam = z
   .describe('Exact memory file name; MEMORY.md is the always-loaded index.');
 const memoryDocumentParams = z.object({ scope: memoryScopeParam, file: memoryFileParam }).strict();
 const memoryMutationParams = memoryDocumentParams.extend({
-  baseVersion: z
-    .string()
-    .min(1)
-    .describe('Current opaque revision from memories or the last successful write.'),
+  baseVersion: z.string().min(1).describe('Current document revision.'),
 });
 export const memoryToolParamsSchemas = {
   save_memory: memoryDocumentParams.extend({ content: z.string().describe('Full file text.') }),
   update_memory: memoryMutationParams.extend({
-    content: z
-      .string()
-      .optional()
-      .describe('Complete replacement text; empty string clears the index.'),
+    content: z.string().optional().describe('Full text; empty clears the index.'),
     old_str: z.string().min(1).optional().describe('Exact unique text to replace.'),
     new_str: z.string().optional().describe('Replacement text, including empty string.'),
     moveTo: memoryScopeParam.optional(),
     renameTo: memoryFileParam.optional().describe('New file name; MEMORY.md is reserved.'),
-    restoreVersion: z
-      .string()
-      .min(1)
-      .optional()
-      .describe('Retained version id from memories versions.'),
+    restoreVersion: z.string().min(1).optional().describe('Retained version id.'),
   }),
   delete_memory: memoryMutationParams,
   memories: memoryDocumentParams.partial().extend({

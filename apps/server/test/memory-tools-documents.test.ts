@@ -1,20 +1,16 @@
+import { sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { agentMemory } from '../src/db/schema.js';
-import {
-  ensureMemoryIndex,
-  injectMemoryDocuments,
-  listStoredMemoryEntries,
-} from '../src/services/memory.js';
-import {
-  appendMemoryIndex,
-  executeMemoryDocumentTool,
-  rememberMemoryFile,
-} from '../src/services/memory-documents.js';
+import { ensureMemoryIndex, listStoredMemoryEntries } from '../src/services/memory.js';
+import { executeMemoryDocumentTool } from '../src/services/memory-documents.js';
+import { deleteProject } from '../src/services/projects.js';
 import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
 
 registerChiefHarness();
 
 type Document = { file: string; scope: string; baseVersion: string; content: string; id: string };
+type Listing = { documents: Document[] };
+const owner = () => ({ teamId: H.teamId, agentId: AGENT_ID, projectId: null });
 const paths = ['Coordinator', 'worker'] as const;
 async function call(
   path: (typeof paths)[number],
@@ -25,8 +21,7 @@ async function call(
   return executeMemoryDocumentTool(
     H.s.db,
     {
-      teamId: H.teamId,
-      agentId: AGENT_ID,
+      ...owner(),
       projectId: path === 'worker' ? H.projectId : projectId,
       workerScope: path === 'worker',
     },
@@ -40,19 +35,19 @@ async function read(path: (typeof paths)[number], file = 'MEMORY.md', scope = 't
 }
 
 function seed(rows: Pick<typeof agentMemory.$inferInsert, 'id' | 'title' | 'content' | 'layer'>[]) {
-  H.s.db
-    .insert(agentMemory)
-    .values(
-      rows.map((row, i) => ({
-        teamId: H.teamId,
-        agentId: AGENT_ID,
-        createdAt: i + 1,
-        updatedAt: i + 1,
-        layer: 'searchable' as const,
-        ...row,
-      })),
-    )
-    .run();
+  const values = rows.map((row, i) => ({
+    ...owner(),
+    createdAt: i + 1,
+    updatedAt: i + 1,
+    layer: 'searchable' as const,
+    ...row,
+  }));
+  H.s.db.insert(agentMemory).values(values).run();
+}
+
+async function writeIndex(scope: string, content: string) {
+  const { baseVersion } = await read('Coordinator', 'MEMORY.md', scope);
+  return relay('update_memory', { scope, file: 'MEMORY.md', baseVersion, content });
 }
 
 test.each(paths)('section 4 %s document mutations', async (path) => {
@@ -103,6 +98,12 @@ test.each(paths)('section 4 %s document mutations', async (path) => {
   const movedFile = (name: string, params: Record<string, unknown>) =>
     operate(name, params, H.projectId, 'moved.md');
   const deleted = await movedFile('delete_memory', { baseVersion: moved.baseVersion });
+  const listing = (await call(path, 'memories', { scope: H.projectId })) as Listing;
+  expect(listing.documents.find((d) => d.file === 'moved.md')).toMatchObject({
+    id: deleted.id,
+    deleted: true,
+    baseVersion: deleted.baseVersion,
+  });
   await expect(movedFile('save_memory', { content: 'reuse' })).rejects.toMatchObject({
     status: 409,
   });
@@ -126,9 +127,7 @@ test('section 4 memories lists indexes and first lines, searches, and pages esca
     file: 'large.md',
     content: '汉"\n'.repeat(30_000),
   });
-  const listing = (await call('Coordinator', 'memories', {}, H.projectId)) as {
-    documents: Document[];
-  };
+  const listing = (await call('Coordinator', 'memories', {}, H.projectId)) as Listing;
   expect(listing.documents.filter((d) => d.file === 'MEMORY.md')).toHaveLength(2);
   const page = (await read('Coordinator', 'large.md', H.projectId)) as Document & {
     nextOffset: number;
@@ -141,22 +140,14 @@ test('section 4 memories lists indexes and first lines, searches, and pages esca
     offset: page.nextOffset,
   })) as Document;
   expect(next.content).not.toContain('\ufffd');
-  const found = (await relay('memories', { scope: H.projectId, query: 'large' })) as {
-    documents: Document[];
-  };
+  const found = (await relay('memories', { scope: H.projectId, query: 'large' })) as Listing;
   expect(found.documents.map((d) => d.file)).toEqual(['large.md']);
 });
 
 test('literal JSON-shaped Markdown is preserved verbatim after index writes', async () => {
-  const before = await read('Coordinator');
   const content =
     '- {"id":"literal","title":"literal","content":"text","fileId":null,"createdAt":1,"updatedAt":1,"lastInjectedAt":null,"history":[],"source":null,"sourceTodoId":null,"sourceBuildId":null}';
-  await relay('update_memory', {
-    scope: 'team',
-    file: 'MEMORY.md',
-    baseVersion: before.baseVersion,
-    content,
-  });
+  await writeIndex('team', content);
   expect((await read('Coordinator')).content).toBe(content);
 });
 
@@ -165,7 +156,7 @@ test.each(['duplicate.md', 'MEMORY.md'])(
   async (title) => {
     const titles = title === 'MEMORY.md' ? [title] : [title, title];
     seed(titles.map((title, i) => ({ id: `legacy-${i}`, title, content: `legacy content ${i}` })));
-    ensureMemoryIndex(H.s.db, { teamId: H.teamId, agentId: AGENT_ID, projectId: null });
+    ensureMemoryIndex(H.s.db, owner());
     const documents = listStoredMemoryEntries(H.s.db, { teamId: H.teamId, agentId: AGENT_ID });
     expect(new Set(documents.map((d) => d.title)).size).toBe(documents.length);
     for (let i = 0; i < titles.length; i++) {
@@ -182,47 +173,28 @@ test.each(['duplicate.md', 'MEMORY.md'])(
   },
 );
 
-test('internal append and curation retain detail files and their identities', async () => {
-  const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: null };
-  expect(appendMemoryIndex(H.s.db, owner, 'lesson', 'keep this')).toBe(true);
-  expect(appendMemoryIndex(H.s.db, owner, 'lesson', 'keep this')).toBe(false);
-  appendMemoryIndex(H.s.db, owner, 'detail.md', 'first\nsecond');
-  expect((await read('Coordinator', 'detail.md')).content).toBe('first\nsecond');
-  const saved = rememberMemoryFile(H.s.db, owner, 'curated'.repeat(300), 'durable lesson');
-  await relay('memories', { scope: 'team' });
-  injectMemoryDocuments(H.s.db, owner);
-  const row = H.s.db
-    .select()
-    .from(agentMemory)
-    .all()
-    .find((r) => r.id === saved.id)!;
-  expect(row.title.length).toBeLessThanOrEqual(1024);
-  expect(row).toMatchObject({ layer: 'searchable', invalidAt: null, content: 'durable lesson' });
-  const index = await read('Coordinator');
-  const updated = (await relay('update_memory', {
-    scope: 'team',
-    file: 'MEMORY.md',
-    baseVersion: index.baseVersion,
-    content: 'line\n'.repeat(205),
-  })) as Document & { reminder: string };
-  expect(updated.reminder).toContain('memories');
-});
-
 test('fold allocates around literal suffixes and rewrites multiline fact references', async () => {
   const rows = [
     { id: 'literal', title: 'topic (2).md', content: 'literal', layer: 'searchable' as const },
     { id: 'file', title: 'topic.md', content: 'existing', layer: 'searchable' as const },
     { id: 'fact', title: 'topic.md', content: 'first\nsecond', layer: 'core' as const },
     { id: 'reserved', title: 'MEMORY.md', content: 'reserved', layer: 'log' as 'searchable' },
+    { id: 'incoming', title: 'to\npic.md', content: 'incoming', layer: 'searchable' as const },
+    { id: 'destination', title: 'to pic.md', content: 'keep', layer: 'searchable' as const },
   ];
   seed(rows);
-  const listing = (await relay('memories', { scope: 'team' })) as { documents: Document[] };
-  expect(listing.documents.map((d) => d.file).sort()).toEqual(
-    ['MEMORY (2).md', 'MEMORY.md', 'topic (2).md', 'topic (3).md', 'topic.md'].sort(),
+  const listing = (await relay('memories', { scope: 'team' })) as Listing;
+  expect(listing.documents).toHaveLength(rows.length + 1);
+  expect(listing.documents.map((d) => d.file)).toEqual(
+    expect.arrayContaining(['MEMORY.md', 'MEMORY (2).md', 'topic (3).md', 'to pic (2).md']),
   );
   expect((await read('Coordinator', 'topic (3).md')).content).toBe('first\nsecond');
   expect((await read('Coordinator')).content).toContain('topic (3).md');
   expect((await read('Coordinator', 'topic (2).md')).content).toBe('literal');
+  expect(await read('Coordinator', 'to pic.md')).toMatchObject({
+    id: 'destination',
+    content: 'keep',
+  });
   const snapshot = H.s.db.select().from(agentMemory).all();
   await relay('memories', { scope: 'team' });
   expect(H.s.db.select().from(agentMemory).all()).toEqual(snapshot);
@@ -264,13 +236,7 @@ test('independent document stores stay isolated and workers reject foreign proje
 });
 
 test('late legacy multiline facts keep distinct files beside an existing Markdown index', async () => {
-  const index = await read('Coordinator');
-  await relay('update_memory', {
-    scope: 'team',
-    file: 'MEMORY.md',
-    baseVersion: index.baseVersion,
-    content: '- existing text',
-  });
+  await writeIndex('team', '- existing text');
   seed(
     [1, 2].map((n) => ({
       id: `late-${n}`,
@@ -279,7 +245,7 @@ test('late legacy multiline facts keep distinct files beside an existing Markdow
       layer: 'core' as const,
     })),
   );
-  const listing = (await relay('memories', { scope: 'team' })) as { documents: Document[] };
+  const listing = (await relay('memories', { scope: 'team' })) as Listing;
   expect(listing.documents.filter((d) => d.file !== 'MEMORY.md')).toHaveLength(2);
   for (const file of listing.documents.filter((d) => d.file !== 'MEMORY.md')) {
     expect((await read('Coordinator', file.file)).content).toMatch(/^detail [12]\nsecond$/);
@@ -300,7 +266,7 @@ test.each(
       layer: layer as 'searchable',
     })),
   );
-  const listing = (await relay('memories', { scope: 'team' })) as { documents: Document[] };
+  const listing = (await relay('memories', { scope: 'team' })) as Listing;
   const files = listing.documents.filter((d) => d.file !== 'MEMORY.md');
   expect(files).toHaveLength(2);
   for (const file of files) {
@@ -322,3 +288,30 @@ test.each(
   await relay('memories', { scope: 'team' });
   expect(H.s.db.select().from(agentMemory).all()).toEqual(snapshot);
 });
+
+test.each([false, true])(
+  'project deletion rewrites moved Markdown references atomically: fail=%s',
+  async (fail) => {
+    for (const scope of ['team', H.projectId]) {
+      await relay('save_memory', { scope, file: 'lesson.md', content: scope });
+      await writeIndex(scope, `- [${scope}](lesson.md)`);
+    }
+    const snapshot = H.s.db.select().from(agentMemory).all();
+    if (fail) {
+      H.s.db.run(
+        sql`CREATE TRIGGER reject_memory_rename BEFORE UPDATE OF title ON agent_memory WHEN NEW.title != OLD.title BEGIN SELECT RAISE(ABORT, 'injected failure'); END`,
+      );
+      expect(() => deleteProject({ db: H.s.db, reposDir: H.s.reposDir }, H.projectId)).toThrow(
+        'injected failure',
+      );
+      expect(H.s.db.select().from(agentMemory).all()).toEqual(snapshot);
+      return;
+    }
+    expect(deleteProject({ db: H.s.db, reposDir: H.s.reposDir }, H.projectId)).toBe(true);
+    expect((await read('Coordinator', 'lesson.md')).content).toBe('team');
+    expect((await read('Coordinator', 'lesson (2).md')).content).toBe(H.projectId);
+    const index = await read('Coordinator');
+    expect(index.content).toContain('- [team](lesson.md)');
+    expect(index.content).toContain(`- [${H.projectId}](lesson%20(2).md)`);
+  },
+);

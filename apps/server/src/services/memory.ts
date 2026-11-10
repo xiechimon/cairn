@@ -796,6 +796,7 @@ export function allocateMemoryFileName(title: string, reserved: ReadonlySet<stri
 export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scope?: SQL): void {
   db.transaction((tx) => {
     const markdownFolds: { id: string; render: () => string }[] = [];
+    const allocatedNames = new Map<string, string>();
     tx.update(agentMemory)
       .set({ layer: 'searchable' })
       .where(and(scope, eq(agentMemory.layer, 'log' as MemoryLayer)))
@@ -827,11 +828,7 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
             if (typeof part === 'string') return part;
             const allocated = part.map((fact) => ({
               ...fact,
-              fileName:
-                fact.fileId === null
-                  ? fact.fileName
-                  : (tx.select().from(agentMemory).where(eq(agentMemory.id, fact.fileId)).get()
-                      ?.title ?? fact.fileName),
+              fileName: allocatedNames.get(fact.fileId ?? '') ?? fact.fileName,
             }));
             return memoryIndexText({
               ...head,
@@ -897,19 +894,22 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
         MEMORY_INDEX_TITLE,
         ...files.map((row) => normalizeMemoryFileName(row.title)),
       ]);
+      const literals = new Set(files.map((row) => row.title));
       const used = new Set([MEMORY_INDEX_TITLE]);
       const renamed = new Map<string, string>();
       for (const row of files) {
         const normalized = normalizeMemoryFileName(row.title);
-        const title = used.has(normalized)
-          ? allocateMemoryFileName(normalized, reserved)
-          : normalized;
+        const title =
+          used.has(normalized) || (normalized !== row.title && literals.has(normalized))
+            ? allocateMemoryFileName(normalized, reserved)
+            : normalized;
         if (title !== row.title) {
           tx.update(agentMemory)
             .set({ title, updatedAt: Math.max(now, row.updatedAt + 1) })
             .where(eq(agentMemory.id, row.id))
             .run();
           renamed.set(row.id, title);
+          allocatedNames.set(row.id, title);
         }
         used.add(title);
         reserved.add(title);
@@ -955,6 +955,91 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
           .where(eq(agentMemory.id, id))
           .run();
     }
+  });
+}
+
+export function moveProjectMemoriesToTeam(db: Db | MemoryTx, projectId: string): void {
+  db.transaction((tx) => {
+    foldMemoryIndexes(tx);
+    const incoming = tx
+      .select()
+      .from(agentMemory)
+      .where(and(eq(agentMemory.projectId, projectId), notAdoptedDuplicate()))
+      .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
+      .all();
+    const owners = new Map(
+      incoming.map((row) => [
+        row.independent ? row.agentId : null,
+        { ...row, teamScoped: !row.independent },
+      ]),
+    );
+    for (const owner of owners.values()) {
+      const files = incoming.filter(
+        (row) =>
+          row.layer === 'searchable' &&
+          row.supersededBy === null &&
+          row.independent === owner.independent &&
+          (!row.independent || row.agentId === owner.agentId),
+      );
+      const taken = new Set(
+        listStoredMemoryEntries(tx, { ...owner, threadId: undefined }, true)
+          .filter(
+            (row) =>
+              row.projectId === null &&
+              row.independent === owner.independent &&
+              row.adoptedFrom === null &&
+              row.layer === 'searchable' &&
+              row.supersededBy === null,
+          )
+          .map((row) => row.title),
+      );
+      const reserved = new Set([...taken, ...files.map((row) => row.title), MEMORY_INDEX_TITLE]);
+      const renamed = new Map<string, string>();
+      for (const file of files) {
+        const title = taken.has(file.title)
+          ? allocateMemoryFileName(file.title, reserved)
+          : file.title;
+        taken.add(title);
+        reserved.add(title);
+        if (title === file.title) continue;
+        renamed.set(file.title, title);
+        tx.update(agentMemory)
+          .set({ title, updatedAt: Math.max(nowMs(), file.updatedAt + 1) })
+          .where(eq(agentMemory.id, file.id))
+          .run();
+      }
+      const index = incoming.find(
+        (row) =>
+          row.layer === 'core' &&
+          row.invalidAt === null &&
+          row.independent === owner.independent &&
+          (!row.independent || row.agentId === owner.agentId),
+      );
+      if (!index) continue;
+      let content = index.content;
+      if (encodedIndex(index))
+        content = writeIndex(
+          readIndex(index).map((fact) => ({
+            ...fact,
+            fileName: renamed.get(fact.fileName ?? fact.title) ?? fact.fileName,
+          })),
+        );
+      else
+        for (const [from, to] of renamed)
+          content = content
+            .replaceAll(`](${encodeURIComponent(from)})`, `](${encodeURIComponent(to)})`)
+            .replaceAll(`（记忆文件：${from}）`, `（记忆文件：${to}）`);
+      if (content !== index.content)
+        tx.update(agentMemory)
+          .set({ content, updatedAt: Math.max(nowMs(), index.updatedAt + 1) })
+          .where(eq(agentMemory.id, index.id))
+          .run();
+    }
+    tx.update(agentMemory)
+      .set({ projectId: null })
+      .where(eq(agentMemory.projectId, projectId))
+      .run();
+    foldMemoryIndexes(tx);
   });
 }
 
