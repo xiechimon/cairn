@@ -11,6 +11,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { REPLY_TASK_172 } from '../../../packages/shared/test/fixtures/reply-todo-172.js';
 import { chiefMessage, todo as todoTable } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { wakeFacts } from '../src/services/chief.js';
@@ -40,6 +41,20 @@ const fenceOpens = (text: string) =>
     .length;
 
 describe('create_todo copies the owner words verbatim', () => {
+  test('a reply has a body title while spec, segments and splits preserve its cited context', async () => {
+    const id = ownerMessage(REPLY_TASK_172.content);
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [id],
+    })) as Created;
+    expect(created.title).toBe(REPLY_TASK_172.title);
+    expect(created.spec).toBe(REPLY_TASK_172.content);
+    expect(row(created.id).request?.segments[0]?.text).toBe(REPLY_TASK_172.content);
+    const split = unstartedRequest({ sourceTodoId: created.id });
+    expect(split.title).toBe(REPLY_TASK_172.title);
+    expect(split.spec).toBe(REPLY_TASK_172.content);
+  });
+
   test('a spec or title argument is refused', async () => {
     await expect(
       relay('create_todo', { projectId: H.projectId, title: 'x', spec: 'paraphrase' }),
