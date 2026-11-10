@@ -58,7 +58,6 @@ import type {
   SetSecretBody,
   SkillRecord,
   StepJournalRow,
-  TagRecord,
   TeamMember,
   TeamRecord,
   ThreadMessageResult,
@@ -148,39 +147,6 @@ function useDebouncedValue(value: string, delayMs: number): string {
     return () => clearTimeout(timer);
   }, [value, delayMs]);
   return debounced;
-}
-
-export const useTags = (projectId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['tags', projectId],
-    queryFn: () => api.get<TagRecord[]>(`/api/projects/${projectId}/tags`),
-    enabled: enabled && projectId !== undefined,
-  });
-
-export function useProjectTags(projectIds: string[], enabled: boolean) {
-  const queries = useQueries({
-    queries: projectIds.map((id) => ({
-      queryKey: ['tags', id],
-      queryFn: () => api.get<TagRecord[]>(`/api/projects/${id}/tags`),
-      enabled,
-    })),
-  });
-  return useMemo(() => {
-    const tagById = new Map<string, Pick<TagRecord, 'id' | 'name' | 'color'>>();
-    const nameById = new Map<string, string>();
-    const ordered: Pick<TagRecord, 'id' | 'name' | 'color'>[] = [];
-    const seen = new Set<string>();
-    for (const q of queries) {
-      for (const tag of q.data ?? []) {
-        if (seen.has(tag.id)) continue;
-        seen.add(tag.id);
-        ordered.push({ id: tag.id, name: tag.name, color: tag.color });
-        tagById.set(tag.id, { id: tag.id, name: tag.name, color: tag.color });
-        nameById.set(tag.id, tag.name);
-      }
-    }
-    return { tagById, nameById, ordered, ready: queries.every((q) => !q.isPending) };
-  }, [queries]);
 }
 
 export const useTodos = (teamId: string | undefined, enabled: boolean) =>
@@ -673,7 +639,6 @@ export function useApiMutations(teamId: string | undefined) {
           spec?: string;
           phase?: string;
           orderIndex?: number;
-          tagIds?: string[];
           projectId?: string;
           routeOverride?: {
             machineId?: string;
