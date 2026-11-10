@@ -145,19 +145,20 @@ describe('container mode: CAIRN_REQUIRE_TOKEN', () => {
       cli.on('error', fail);
       cli.on('close', (code) => (code === 0 ? done(stdout) : fail(new Error('token CLI failed'))));
     });
-    const link = output.match(/http:\/\/[^\s]+\/app#token=[^\s]+/)?.[0];
-    expect(link !== undefined).toBe(true);
-    const url = new URL(link ?? 'http://invalid');
-    const token = new URLSearchParams(url.hash.slice(1)).get('token');
-    expect(token === TOKEN).toBe(true);
+    expect(output).toContain(TOKEN);
+    expect(output).not.toContain('#token=');
+    expect(output).toContain('pairing code');
     expect(
-      (await fetch(`${url.origin}/api/user/me`, { headers: { authorization: `Bearer ${token}` } }))
-        .status,
+      (
+        await fetch(`http://127.0.0.1:${booted.port}/api/user/me`, {
+          headers: { authorization: `Bearer ${TOKEN}` },
+        })
+      ).status,
     ).toBe(200);
     expect(booted.output().includes(TOKEN)).toBe(false);
     expect(booted.output().includes('#token=')).toBe(false);
     expect(booted.output()).toContain(
-      'token auth enabled — run `cairn token` on this machine to print a login link',
+      'token auth enabled — run `cairn token` on this machine to print the owner token; other devices use a pairing code',
     );
   });
 
@@ -191,9 +192,20 @@ describe('#2057 safe bare-server defaults on a real process', () => {
     await untilOnline(booted);
     const base = `http://127.0.0.1:${booted.port}`;
     expect((await fetch(`${base}/api/user/me`, RELAYED)).status).toBe(401);
-    expect((await fetch(`${base}/api/user/me`)).status).toBe(
-      process.platform === 'linux' ? 200 : 401,
-    );
+    expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
+    const bootstrapped = await fetch(`${base}/api/auth/bootstrap`, { method: 'POST' });
+    expect(bootstrapped.status).toBe(process.platform === 'linux' ? 200 : 401);
+    const authCookie = (bootstrapped.headers.getSetCookie?.() ?? [])
+      .map((value) => value.split(';')[0] ?? '')
+      .find((value) => value.startsWith('cairn_auth='));
+    expect(authCookie !== undefined).toBe(process.platform === 'linux');
+    expect(
+      (
+        await fetch(`${base}/api/user/me`, {
+          headers: authCookie === undefined ? {} : { cookie: authCookie },
+        })
+      ).status,
+    ).toBe(process.platform === 'linux' ? 200 : 401);
     const tokenPath = join(booted.home, ACCESS_TOKEN_FILE_NAME);
     expect(statSync(tokenPath).mode & 0o777).toBe(0o600);
     const token = storedToken(booted.home);
@@ -292,7 +304,15 @@ describe('#2057 safe bare-server defaults on a real process', () => {
     const teamId = teams[0]?.id;
     expect(teamId).toBeTruthy();
     const controller = new AbortController();
-    const stream = await fetch(`${base}/api/teams/${teamId}/stream?token=${token}`, {
+    const ticket = (
+      (await (
+        await fetch(`${base}/api/auth/stream-ticket`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        })
+      ).json()) as { ticket: string }
+    ).ticket;
+    const stream = await fetch(`${base}/api/teams/${teamId}/stream?ticket=${ticket}`, {
       signal: controller.signal,
     });
     expect(stream.status).toBe(200);

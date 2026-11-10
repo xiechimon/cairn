@@ -20,7 +20,7 @@ CAIRN_TSNET=socket npx @xiechimon/cairn
 
 For a service, set `CAIRN_TSNET=socket` in its environment and restart it. This opens `<CAIRN_HOME>/tsnet/tailnet.sock` with mode `0600` in a private directory, without spawning the tsnet sidecar. The default `CAIRN_HOME` is `$HOME/.cairn`.
 
-Owner identity is resolved from LocalAPI status: the profile in `User` matching `Self.UserID`, only when the backend is running and `Self` is untagged. The server refreshes that status every 30 seconds. If the owner is unavailable, an explicit comma-separated `CAIRN_TAILSCALE_USERS` allowlist applies on this socket only; otherwise the token gate remains. For a tagged server, only the explicit allowlist applies. A known untagged owner takes priority over the allowlist.
+Tailscale Serve only makes the server reachable. It does not sign the browser in. `CAIRN_TAILSCALE_USERS` is ignored and does not grant access. Another device signs in with a one-time pairing code from Remote access. A browser on the server machine exchanges a loopback bootstrap for an HttpOnly session and does not paste the owner token.
 
 On Linux, LocalAPI is read through `/var/run/tailscale/tailscaled.sock`; on macOS, `/var/run/tailscaled.socket`. Failure to read status grants no implicit identity access. The macOS App Store variant and a real Mac-to-Unix-Serve browser path remain unverified.
 
