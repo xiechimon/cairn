@@ -18,6 +18,7 @@ const retiredUser = {
   name: 'Cairnwright',
   email: '348051526+cairnwright@users.noreply.github.com',
 };
+const cloud = { name: 'Claude', email: 'noreply@anthropic.com' };
 const session = { name: 'Session', email: 'kigv1zSwiHPke_Cl5Ci6D@cairn.local' };
 const agentEnv = { AI_AGENT: 'claude-code_agent' };
 const cleanEnv = Object.fromEntries(
@@ -90,6 +91,8 @@ const ciCases = [
   ],
   ['a cairn task commit the App made with git', bot, bot, 'xiechimon/cairn', 0],
   ['ian committing by hand', owner, owner, 'xiechimon/cairn', 0],
+  ['a cloud session commit made with git', cloud, cloud, 'xiechimon/cairn', 0],
+  ['the cloud session identity forged in a fork', cloud, cloud, 'stranger/cairn', 1],
   ['the App identity forged in a fork', bot, bot, 'stranger/cairn', 1],
   ['the owner identity forged in a fork', owner, owner, 'stranger/cairn', 1],
   ['source 2: the retired Cairnwright user', retiredUser, bot, 'xiechimon/cairn', 1],
@@ -169,6 +172,34 @@ test('pre-commit: an agent session committing as the App, and ian by hand, are a
     0,
   );
   assert.equal(r.git(['commit', '-q', '--allow-empty', '-m', 'ian'], owner).status, 0);
+});
+
+test('pre-commit: an agent session committing as the cloud identity is accepted', (t) => {
+  const r = repo(t);
+  installHook(r, 'pre-commit');
+  assert.equal(
+    r.git(['commit', '-q', '--allow-empty', '-m', 'cloud'], cloud, cloud, agentEnv).status,
+    0,
+  );
+  assert.equal(
+    r.git(['commit', '-q', '--allow-empty', '-m', 'mixed'], cloud, owner, agentEnv).status,
+    1,
+  );
+});
+
+test('pre-push: an agent pushes commits a cloud session authored', (t) => {
+  const r = repo(t);
+  const remote = makeTestTempDir('commit-identity-remote-');
+  t.after(() => releaseTestTempDir(remote));
+  spawnSync('git', ['init', '-q', '--bare', remote]);
+  r.ok(['remote', 'add', 'origin', remote]);
+  r.ok(['push', '-q', 'origin', 'main']);
+  installHook(r, 'pre-push');
+  r.ok(['commit', '-q', '--allow-empty', '-m', 'as a cloud session'], cloud);
+  assert.equal(
+    r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], cloud, cloud, agentEnv).status,
+    0,
+  );
 });
 
 for (const identity of [retiredUser, session])
