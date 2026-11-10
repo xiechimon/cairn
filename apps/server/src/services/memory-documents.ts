@@ -11,6 +11,7 @@ import {
   memoryDocumentVersion,
   memoryIndexText,
   replaceMemory,
+  rewriteMemoryReferences,
   searchMemoryEntries,
   validateMemoryText,
 } from './memory.js';
@@ -351,6 +352,8 @@ export function executeMemoryDocumentTool(
       .set({ invalidAt: now, supersededBy: successor.id })
       .where(eq(agentMemory.id, row.id))
       .run();
+    if (row.layer !== 'core')
+      rewriteMemoryReferences(tx, row, [{ before: row, after: successor }], now);
     return result(successor);
   });
 }

@@ -793,10 +793,86 @@ export function allocateMemoryFileName(title: string, reserved: ReadonlySet<stri
   }
 }
 
+type MemoryFileChange = {
+  before: Pick<MemoryRow, 'id' | 'title'>;
+  after: Pick<MemoryRow, 'id' | 'title'>;
+};
+
+function rewrittenMemoryIndex(
+  index: Pick<MemoryRow, 'id' | 'content'>,
+  changes: MemoryFileChange[],
+) {
+  if (encodedIndex(index)) {
+    return writeIndex(
+      readIndex(index).map((fact) => {
+        const change = changes.find(({ before }) => before.id === fact.fileId);
+        return change ? { ...fact, fileId: change.after.id, fileName: change.after.title } : fact;
+      }),
+    );
+  }
+  const replacements = new Map<string, string>();
+  for (const { before, after } of changes) {
+    if (before.title === after.title) continue;
+    const pairs = [
+      [`](${encodeURIComponent(before.title)})`, `](${encodeURIComponent(after.title)})`],
+      [`（记忆文件：${before.title}）`, `（记忆文件：${after.title}）`],
+      [`（记忆文件：${before.title.replace(/[\r\n]+/g, ' ')}）`, `（记忆文件：${after.title}）`],
+    ];
+    for (const [from, to] of pairs)
+      if (from !== undefined && to !== undefined && !replacements.has(from))
+        replacements.set(from, to);
+  }
+  if (replacements.size === 0) return index.content;
+  const pattern = [...replacements.keys()]
+    .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+  return index.content.replace(
+    new RegExp(pattern, 'g'),
+    (token) => replacements.get(token) ?? token,
+  );
+}
+
+export function rewriteMemoryReferences(
+  tx: MemoryTx,
+  owner: Pick<MemoryRow, 'agentId' | 'teamId' | 'projectId' | 'independent'>,
+  changes: MemoryFileChange[],
+  now = nowMs(),
+): void {
+  if (changes.length === 0) return;
+  const indexes = tx
+    .select()
+    .from(agentMemory)
+    .where(
+      and(
+        ownerWhere({ ...owner, teamScoped: !owner.independent }),
+        eq(agentMemory.independent, owner.independent),
+        owner.projectId === null
+          ? isNull(agentMemory.projectId)
+          : eq(agentMemory.projectId, owner.projectId),
+        stillValid,
+        eq(agentMemory.layer, 'core'),
+      ),
+    )
+    .all()
+    .filter(indexRow);
+  for (const index of indexes) {
+    const content = rewrittenMemoryIndex(index, changes);
+    if (content !== index.content)
+      tx.update(agentMemory)
+        .set({ content, updatedAt: Math.max(now, index.updatedAt + 1) })
+        .where(eq(agentMemory.id, index.id))
+        .run();
+  }
+}
+
 export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scope?: SQL): void {
   db.transaction((tx) => {
-    const markdownFolds: { id: string; render: () => string }[] = [];
-    const allocatedNames = new Map<string, string>();
+    const markdownFolds: {
+      id: string;
+      render: (changes: MemoryFileChange[]) => string;
+      key: string;
+    }[] = [];
+    const namespaceChanges = new Map<string, MemoryFileChange[]>();
     tx.update(agentMemory)
       .set({ layer: 'searchable' })
       .where(and(scope, eq(agentMemory.layer, 'log' as MemoryLayer)))
@@ -822,18 +898,21 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
       const parts = group.map((row) =>
         indexRow(row) ? (encodedIndex(row) ? readIndex(row) : row.content) : [fileEntry(tx, row)],
       );
-      const render = () =>
+      const render = (changes: MemoryFileChange[] = []) =>
         parts
           .map((part) => {
-            if (typeof part === 'string') return part;
-            const allocated = part.map((fact) => ({
-              ...fact,
-              fileName: allocatedNames.get(fact.fileId ?? '') ?? fact.fileName,
-            }));
+            if (typeof part === 'string')
+              return rewrittenMemoryIndex(
+                { id: MEMORY_MARKDOWN_INDEX_PREFIX, content: part },
+                changes,
+              );
             return memoryIndexText({
               ...head,
               id: MEMORY_INDEX_ID_PREFIX,
-              content: writeIndex(allocated),
+              content: rewrittenMemoryIndex(
+                { id: MEMORY_INDEX_ID_PREFIX, content: writeIndex(part) },
+                changes,
+              ),
             });
           })
           .filter(Boolean)
@@ -860,7 +939,16 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
         })
         .returning()
         .get();
-      if (existingText) markdownFolds.push({ id: index.id, render });
+      if (existingText)
+        markdownFolds.push({
+          id: index.id,
+          render,
+          key: JSON.stringify([
+            head.teamId,
+            head.projectId,
+            head.independent ? head.agentId : null,
+          ]),
+        });
       tx.update(agentMemory)
         .set({ invalidAt: now, supersededBy: index.id })
         .where(
@@ -889,14 +977,14 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
       const key = JSON.stringify([row.teamId, row.projectId, row.independent ? row.agentId : null]);
       namespaces.set(key, [...(namespaces.get(key) ?? []), row]);
     }
-    for (const files of namespaces.values()) {
+    for (const [key, files] of namespaces) {
       const reserved = new Set([
         MEMORY_INDEX_TITLE,
         ...files.map((row) => normalizeMemoryFileName(row.title)),
       ]);
       const literals = new Set(files.map((row) => row.title));
       const used = new Set([MEMORY_INDEX_TITLE]);
-      const renamed = new Map<string, string>();
+      const changes: MemoryFileChange[] = [];
       for (const row of files) {
         const normalized = normalizeMemoryFileName(row.title);
         const title =
@@ -908,47 +996,18 @@ export function foldMemoryIndexes(db: Db | MemoryTx, now: number = nowMs(), scop
             .set({ title, updatedAt: Math.max(now, row.updatedAt + 1) })
             .where(eq(agentMemory.id, row.id))
             .run();
-          renamed.set(row.id, title);
-          allocatedNames.set(row.id, title);
+          changes.push({ before: row, after: { ...row, title } });
         }
         used.add(title);
         reserved.add(title);
       }
-      if (renamed.size === 0) continue;
+      namespaceChanges.set(key, changes);
       const head = files[0];
-      if (head === undefined) continue;
-      const indexes = tx
-        .select()
-        .from(agentMemory)
-        .where(
-          and(
-            ownerWhere({ ...head, teamScoped: !head.independent }),
-            eq(agentMemory.independent, head.independent),
-            head.projectId === null
-              ? isNull(agentMemory.projectId)
-              : eq(agentMemory.projectId, head.projectId),
-            stillValid,
-            eq(agentMemory.layer, 'core'),
-          ),
-        )
-        .all()
-        .filter((row) => indexRow(row) && encodedIndex(row));
-      for (const index of indexes) {
-        const facts = readIndex(index);
-        const allocated = facts.map((fact) => ({
-          ...fact,
-          fileName: (fact.fileId === null ? undefined : renamed.get(fact.fileId)) ?? fact.fileName,
-        }));
-        if (allocated.some((fact, i) => fact.fileName !== facts[i]?.fileName))
-          tx.update(agentMemory)
-            .set({ content: writeIndex(allocated), updatedAt: Math.max(now, index.updatedAt + 1) })
-            .where(eq(agentMemory.id, index.id))
-            .run();
-      }
+      if (head) rewriteMemoryReferences(tx, head, changes, now);
     }
-    for (const { id, render } of markdownFolds) {
+    for (const { id, render, key } of markdownFolds) {
       const index = tx.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
-      const content = render();
+      const content = render(namespaceChanges.get(key) ?? []);
       if (index && index.content !== content)
         tx.update(agentMemory)
           .set({ content, updatedAt: Math.max(now, index.updatedAt + 1) })
@@ -994,7 +1053,7 @@ export function moveProjectMemoriesToTeam(db: Db | MemoryTx, projectId: string):
           .map((row) => row.title),
       );
       const reserved = new Set([...taken, ...files.map((row) => row.title), MEMORY_INDEX_TITLE]);
-      const renamed = new Map<string, string>();
+      const changes: MemoryFileChange[] = [];
       for (const file of files) {
         const title = taken.has(file.title)
           ? allocateMemoryFileName(file.title, reserved)
@@ -1002,38 +1061,13 @@ export function moveProjectMemoriesToTeam(db: Db | MemoryTx, projectId: string):
         taken.add(title);
         reserved.add(title);
         if (title === file.title) continue;
-        renamed.set(file.title, title);
+        changes.push({ before: file, after: { ...file, title } });
         tx.update(agentMemory)
           .set({ title, updatedAt: Math.max(nowMs(), file.updatedAt + 1) })
           .where(eq(agentMemory.id, file.id))
           .run();
       }
-      const index = incoming.find(
-        (row) =>
-          row.layer === 'core' &&
-          row.invalidAt === null &&
-          row.independent === owner.independent &&
-          (!row.independent || row.agentId === owner.agentId),
-      );
-      if (!index) continue;
-      let content = index.content;
-      if (encodedIndex(index))
-        content = writeIndex(
-          readIndex(index).map((fact) => ({
-            ...fact,
-            fileName: renamed.get(fact.fileName ?? fact.title) ?? fact.fileName,
-          })),
-        );
-      else
-        for (const [from, to] of renamed)
-          content = content
-            .replaceAll(`](${encodeURIComponent(from)})`, `](${encodeURIComponent(to)})`)
-            .replaceAll(`（记忆文件：${from}）`, `（记忆文件：${to}）`);
-      if (content !== index.content)
-        tx.update(agentMemory)
-          .set({ content, updatedAt: Math.max(nowMs(), index.updatedAt + 1) })
-          .where(eq(agentMemory.id, index.id))
-          .run();
+      rewriteMemoryReferences(tx, owner, changes);
     }
     tx.update(agentMemory)
       .set({ projectId: null })

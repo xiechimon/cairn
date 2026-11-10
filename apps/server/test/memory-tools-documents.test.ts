@@ -315,3 +315,124 @@ test.each([false, true])(
     expect(index.content).toContain(`- [${H.projectId}](lesson%20(2).md)`);
   },
 );
+
+test.each(
+  ['MEMORY.md', 'line\r\nbreak.md'].flatMap((title) =>
+    ['searchable', 'log', 'core'].map((layer) => ({ title, layer })),
+  ),
+)('existing Markdown references follow $layer allocation of $title', async ({ title, layer }) => {
+  await writeIndex('team', `- [legacy](${encodeURIComponent(title)})（记忆文件：${title}）`);
+  seed([
+    { id: 'referenced-legacy', title, content: 'legacy\ndetail', layer: layer as 'searchable' },
+  ]);
+  const listing = (await relay('memories', { scope: 'team' })) as Listing;
+  const file = listing.documents.find((d) => d.file !== 'MEMORY.md')!;
+  expect((await read('Coordinator')).content).toContain(
+    `- [legacy](${encodeURIComponent(file.file)})（记忆文件：${file.file}）`,
+  );
+  expect((await read('Coordinator', file.file)).content).toBe('legacy\ndetail');
+  const snapshot = H.s.db.select().from(agentMemory).all();
+  await read('Coordinator');
+  expect(H.s.db.select().from(agentMemory).all()).toEqual(snapshot);
+});
+
+test.each(['rename', 'move', 'restore'])(
+  'document %s rewrites references atomically',
+  async (operation) => {
+    const created = (await relay('save_memory', {
+      scope: 'team',
+      file: 'before.md',
+      content: 'detail',
+    })) as Document;
+    await writeIndex('team', '- [file](before.md)（记忆文件：before.md）');
+    const base =
+      operation === 'restore'
+        ? ((await relay('delete_memory', {
+            scope: 'team',
+            file: 'before.md',
+            baseVersion: created.baseVersion,
+          })) as Document)
+        : created;
+    const updated = (await relay('update_memory', {
+      scope: 'team',
+      file: 'before.md',
+      baseVersion: base.baseVersion,
+      renameTo: 'after.md',
+      ...(operation === 'move' ? { moveTo: H.projectId } : {}),
+      ...(operation === 'restore' ? { restoreVersion: created.id } : {}),
+    })) as Document;
+    expect((await read('Coordinator')).content).toBe('- [file](after.md)（记忆文件：after.md）');
+    expect((await read('Coordinator', updated.file, updated.scope)).content).toBe('detail');
+  },
+);
+
+test('reference rewrite failure rolls back startup allocation', async () => {
+  await writeIndex('team', '- [legacy](MEMORY.md)');
+  seed([{ id: 'rollback-file', title: 'MEMORY.md', content: 'detail' }]);
+  const snapshot = H.s.db.select().from(agentMemory).all();
+  H.s.db.run(sql`CREATE TRIGGER reject_reference BEFORE UPDATE OF content ON agent_memory
+    WHEN NEW.content != OLD.content BEGIN SELECT RAISE(ABORT, 'reference failure'); END`);
+  await expect(read('Coordinator')).rejects.toThrow('reference failure');
+  expect(H.s.db.select().from(agentMemory).all()).toEqual(snapshot);
+});
+
+test.each(['rename', 'move', 'restore'])(
+  'reference failure rolls back document %s',
+  async (operation) => {
+    const created = (await relay('save_memory', {
+      scope: 'team',
+      file: 'before.md',
+      content: 'detail',
+    })) as Document;
+    await writeIndex('team', '- [file](before.md)');
+    if (operation === 'move') await read('Coordinator', 'MEMORY.md', H.projectId);
+    const base =
+      operation === 'restore'
+        ? ((await relay('delete_memory', {
+            scope: 'team',
+            file: 'before.md',
+            baseVersion: created.baseVersion,
+          })) as Document)
+        : created;
+    const snapshot = H.s.db.select().from(agentMemory).all();
+    H.s.db.run(sql`CREATE TRIGGER reject_reference BEFORE UPDATE OF content ON agent_memory
+    WHEN NEW.content != OLD.content BEGIN SELECT RAISE(ABORT, 'reference failure'); END`);
+    await expect(
+      relay('update_memory', {
+        scope: 'team',
+        file: 'before.md',
+        baseVersion: base.baseVersion,
+        renameTo: 'after.md',
+        ...(operation === 'move' ? { moveTo: H.projectId } : {}),
+        ...(operation === 'restore' ? { restoreVersion: created.id } : {}),
+      }),
+    ).rejects.toThrow('reference failure');
+    expect(H.s.db.select().from(agentMemory).all()).toEqual(snapshot);
+  },
+);
+
+test('startup reference rewrites preserve independent and project indexes', async () => {
+  const content = '- [legacy](MEMORY.md)';
+  const independentOwner = { ...owner(), teamScoped: false };
+  const index = executeMemoryDocumentTool(H.s.db, independentOwner, 'memories', {
+    scope: 'team',
+    file: 'MEMORY.md',
+  }) as Document;
+  executeMemoryDocumentTool(H.s.db, independentOwner, 'update_memory', {
+    scope: 'team',
+    file: 'MEMORY.md',
+    baseVersion: index.baseVersion,
+    content,
+  });
+  await writeIndex(H.projectId, content);
+  await writeIndex('team', content);
+  seed([{ id: 'shared-legacy', title: 'MEMORY.md', content: 'detail' }]);
+  expect((await read('Coordinator')).content).toBe('- [legacy](MEMORY%20(2).md)');
+  expect((await read('Coordinator', 'MEMORY.md', H.projectId)).content).toBe(content);
+  expect(
+    executeMemoryDocumentTool(H.s.db, independentOwner, 'memories', {
+      scope: 'team',
+      file: 'MEMORY.md',
+    }),
+  ).toMatchObject({ content });
+});
