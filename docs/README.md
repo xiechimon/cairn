@@ -7,6 +7,7 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 | Directory / file | Content |
 |---|---|
 | `spec/` | Numbered specs (test layering, PR process, etc.); the canonical text of the engineering rules |
+| `cairn-plan.md` | Owner decision table (`D…` rows). Git-tracked public source of truth; no secrets. Ticket plans stay in `plans/` |
 | `getting-started.md` | Run the server, enroll a machine, Docker, deploy publicly, build from source |
 | `configuration.md` | Every server and daemon environment variable |
 | `privacy.md` | What Cairn sends (nothing) and what the optional first-PR discussion prompt does and does not carry |
