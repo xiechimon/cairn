@@ -135,6 +135,7 @@ describe('worker thread schedule tools', () => {
         cadence: `at ${new Date(now + 900_000).toISOString()}`,
         nextRunAt: now + 900_000,
         lastRunAt: null,
+        lastRunStatus: null,
         enabled: true,
       });
       await s.run('schedule_create', { cadence: '*/30 * * * *', prompt: 'Replacement' });
@@ -626,10 +627,42 @@ describe('worker schedule security', () => {
     await expect(scheduler.tick(due + 900_000)).resolves.toBeUndefined();
   });
 
-  test('the get_schedule description discloses one-shot removal', () => {
-    expect(WORKER_REMOTE_TOOLS.find((tool) => tool.name === 'get_schedule')?.description).toMatch(
-      /one-shot.*removed/i,
-    );
+  test('get_schedule describes retained completed one-shots and their status', () => {
+    for (const tools of [WORKER_REMOTE_TOOLS, WORKER_REMOTE_TOOLS_GITHUB]) {
+      const description = tools.find((tool) => tool.name === 'get_schedule')?.description;
+      expect(description).toContain('lastRunStatus');
+      expect(description).toMatch(/completed.*retained/i);
+      expect(description).not.toMatch(/one-shot.*removed/i);
+    }
+  });
+
+  test('a later worker turn reads completed one-shot history before creating its follow-up', async () => {
+    const s = await world();
+    await s.run('schedule_create', { cadence: 'in 15 minutes', prompt: 'First follow-up' });
+    const due = s.stored().nextRunAt!;
+    completeStep(s.svc, s.claimed.step.id);
+    setTodoPhase(s.svc, s.todoId, 'done');
+    await createScheduler(s.svc, { tickMs: 60_000 }).tick(due);
+    const fired = await s.claim();
+    completeStep(s.svc, fired.step.id);
+    await messageTodo(s.svc, s.team.id, s.todoId, 'Schedule another follow-up');
+    const later = await s.claim();
+    expect(await s.run('get_schedule', {}, later.step.id)).toMatchObject({
+      lastRunStatus: 'completed',
+      nextRunAt: null,
+      lastRunAt: due,
+      enabled: true,
+    });
+    expect(
+      await s.run(
+        'schedule_create',
+        {
+          cadence: 'in 30 minutes',
+          prompt: 'Second follow-up',
+        },
+        later.step.id,
+      ),
+    ).toMatchObject({ lastRunStatus: null, nextRunAt: expect.any(Number) });
   });
 });
 
