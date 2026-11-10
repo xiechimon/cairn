@@ -10,7 +10,7 @@ const config = readFileSync(configPath, 'utf8');
 
 test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge-checks.mjs', () => {
   assert.equal(config, mergifyConfig(prGate, gatePaths), 'run node scripts/mergify-config.mjs');
-  assert.match(config, /^ {2}max_parallel_checks: 5$/m);
+  assert.match(config, /^ {2}max_parallel_checks: 1$/m);
 });
 
 test('negative control: a limit changed in merge-gate-paths.json changes .mergify.yml', () => {
@@ -45,8 +45,8 @@ const rules = Object.fromEntries(
 );
 
 for (const [name, author, method] of [
-  ['default', '- -author = cairnwright[bot]', 'squash'],
-  ['bot', '- author = cairnwright[bot]', 'squash'],
+  ['default', '- -author = cairnwright[bot]', 'fast-forward'],
+  ['bot', '- author = cairnwright[bot]', 'fast-forward'],
 ])
   test(`the ${name} rule requires the review-gate check from GitHub Actions and keeps PR-only gates off the draft`, () => {
     const [queue, merge] = rules[name].split('    merge_conditions:\n');
@@ -66,14 +66,14 @@ for (const [name, author, method] of [
     assert.match(merge, /max_checks_retries: 1$/m);
   });
 
-test('neither queue caps commit count, and both squash so the PR opener authors the main commit', () => {
-  assert.doesNotMatch(readFileSync(configPath, 'utf8'), /merge_method: rebase/);
+test('neither queue caps commit count, and both fast-forward the tested draft commit', () => {
+  assert.doesNotMatch(readFileSync(configPath, 'utf8'), /merge_method: (rebase|squash)/);
   assert.doesNotMatch(rules.bot, /#commits/);
   assert.doesNotMatch(rules.default, /#commits/);
 });
 
 test('web and backend are separate scopes and shared packages touch both', () => {
-  assert.match(config, /merge_queue:\n {2}mode: parallel\n/);
+  assert.match(config, /merge_queue:\n {2}mode: serial\n/);
   assert.match(config, / {6}web:\n {8}include:\n {10}- apps\/web\/\*\*\/\*\n/);
   assert.match(config, / {6}backend:\n {8}include:\n {10}- apps\/server\/\*\*\/\*\n/);
   assert.match(config, / {2}barrier_files:\n {4}include:\n {6}- packages\/\*\*\/\*\n/);
