@@ -568,7 +568,7 @@ test('without a computer row the machine keeps the waiting placeholder and disab
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
-  const desktopReason = '未开启桌面控制，开启后这里显示屏幕';
+  const desktopReason = 'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。';
   await card.getByRole('button', { name: desktopReason }).click();
   await expect(page.locator('[data-sonner-toast]', { hasText: desktopReason })).toBeVisible();
   const browserReason = '这台机器还不支持浏览器。';

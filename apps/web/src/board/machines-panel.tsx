@@ -216,7 +216,9 @@ function MachineCard({
   const desktopBlockedReason = !online
     ? t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
     : computer === null
-      ? t('未开启桌面控制，开启后这里显示屏幕')
+      ? coordinator
+        ? t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')
+        : t('这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。')
       : undefined;
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
