@@ -1053,9 +1053,9 @@ Reach:
 
 ### thread-tags
 
-**Thread tags** (shipped, centrality 4). Legacy category APIs retained during staged retirement; ordinary worker metadata is title-only.
+**Thread tags** (shipped, centrality 4). Category vocabulary routes and seeding are retired; legacy assignment inputs remain during staged retirement.
 
-States: No category settings tab or ordinary worker category input. Legacy assignment APIs and read-only membership remain until their retirement segments; GitHub labels are separate.
+States: Vocabulary GET/POST return 404; project creation and startup seed no categories. Existing category assignments and read-only membership remain temporarily; ordinary metadata is title-only and GitHub labels are separate.
 
 Reach:
 
@@ -1068,4 +1068,4 @@ Reach:
 - Research: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
 - Backend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
-- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`
+- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/category-vocabulary-retirement.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`

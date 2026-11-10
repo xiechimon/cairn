@@ -11,10 +11,4 @@ export const tagRecordSchema = z.object({
 });
 export type TagRecord = z.infer<typeof tagRecordSchema>;
 
-export const createTagBodySchema = z.object({
-  name: z.string().min(1),
-  color: z.string(),
-});
-export type CreateTagBody = z.infer<typeof createTagBodySchema>;
-
 export const TAG_DEFAULT_COLOR = '#6366f1';

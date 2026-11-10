@@ -1561,7 +1561,7 @@
           ],
           "status": "stale",
           "purpose": "Historical fixed-vocabulary, untitled-task and category-chip browser recipe.",
-          "note": "Targets retired board filters/chips. Ordinary worker metadata is title-only; current claim, relay and prompt regressions are listed in features/tags.md."
+          "note": "Targets retired filters/chips and removed vocabulary/seeding endpoints. Ordinary metadata is title-only; vocabulary, claim, relay and prompt regressions are listed in features/tags.md."
         }
       }
     },

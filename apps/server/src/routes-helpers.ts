@@ -6,13 +6,12 @@ import {
   type MemoryRecord,
   phaseSchema,
   routeOverrideSchema,
-  type TagRecord,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { type agentMemory, apiKey, project, type tag } from './db/schema.js';
+import { type agentMemory, apiKey, project } from './db/schema.js';
 import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
@@ -39,17 +38,6 @@ export const githubIssuesQuerySchema = z.object({
   state: githubIssueStateSchema,
   page: z.coerce.number().int().min(1),
 });
-
-export function toTagRecord(row: typeof tag.$inferSelect): TagRecord {
-  return {
-    id: row.id,
-    projectId: row.projectId,
-    name: row.name,
-    color: row.color,
-    createdAt: row.createdAt,
-    v: row.v,
-  };
-}
 
 export const patchTodoBodySchema = z.object({
   title: z.string().optional(),

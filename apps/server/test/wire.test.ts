@@ -2,15 +2,12 @@ import {
   buildRecordSchema,
   buildStepActionBodySchema,
   conversationMessagesResponseSchema,
-  createTagBodySchema,
   createTodoBodySchema,
-  FIXED_TAGS,
   mergeAcceptedResponseSchema,
   notificationsResponseSchema,
   projectRecordSchema,
   startBuildsBodySchema,
   stepRecordSchema,
-  tagRecordSchema,
   teamMemberSchema,
   teamRecordSchema,
   todoRecordSchema,
@@ -23,6 +20,7 @@ import { plan as planTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, req, startLegacyBuild } from './helpers.js';
+import { insertLegacyCategory } from './legacy-category-fixtures.js';
 
 const INFERRED_ROUTES = [
   'GET /api/server/deploy/lease',
@@ -131,7 +129,6 @@ const CORE_ROUTES = [
   'GET /api/projects',
   'GET /api/projects/{id}/todos',
   'GET /api/projects/{id}/builds',
-  'GET /api/projects/{id}/tags',
   'GET /api/projects/{id}/branches',
   'GET /api/todos',
   'GET /api/todos/{id}',
@@ -408,68 +405,17 @@ describe('todo CRUD (the demo surface: curl create/read/update/delete)', () => {
   });
 });
 
-describe('the tag surface (#309, the r9 §3.4 wire comparison)', () => {
+describe('legacy category assignment during staged retirement', () => {
   async function setup() {
     const s = bootServer();
     const projectId = await postProject(s.app);
     return { ...s, projectId };
   }
 
-  test('POST /api/projects/{id}/tags {name,color} -> 201 TagRecord (the r9 §3.4 measured shape)', async () => {
-    const s = await setup();
-    const body: unknown = { name: 'r9probe', color: '#6366f1' };
-    expect(createTagBodySchema.safeParse(body).success).toBe(true);
-    const res = await req(s.app, 'POST', `/api/projects/${s.projectId}/tags`, body);
-    expect(res.status).toBe(201);
-    const record = await res.json();
-    expect(tagRecordSchema.safeParse(record).success).toBe(true);
-    const created = tagRecordSchema.parse(record);
-    expect(created.projectId).toBe(s.projectId);
-    expect(created.name).toBe('r9probe');
-    expect(created.color).toBe('#6366f1');
-    expect(created.v).toBe(1);
-    expect(typeof created.createdAt).toBe('number');
-    const list = (await (
-      await req(s.app, 'GET', `/api/projects/${s.projectId}/tags`)
-    ).json()) as unknown[];
-    expect(list).toHaveLength(7);
-    const found = list.find((r) => tagRecordSchema.parse(r).id === created.id);
-    expect(tagRecordSchema.parse(found)).toEqual(created);
-  });
-
-  test('POST tags with a bad body -> 400; an unknown project -> 404 (the single {error} shape)', async () => {
-    const s = await setup();
-    await expectErrorShape(
-      await req(s.app, 'POST', `/api/projects/${s.projectId}/tags`, { color: '#6366f1' }),
-      400,
-    );
-    await expectErrorShape(
-      await req(s.app, 'POST', `/api/projects/${s.projectId}/tags`, { name: '', color: '#6366f1' }),
-      400,
-    );
-    await expectErrorShape(
-      await req(s.app, 'POST', `/api/projects/${s.projectId}/tags`, null),
-      400,
-    );
-    await expectErrorShape(
-      await req(s.app, 'POST', '/api/projects/nope/tags', { name: 'x', color: '#6366f1' }),
-      404,
-    );
-  });
-
   test('POST todos carrying tagIds -> record.tagIds round-trips (the r9 §3.4 carry slot; the join truth)', async () => {
     const s = await setup();
-    const post = async (name: string) =>
-      tagRecordSchema.parse(
-        await (
-          await req(s.app, 'POST', `/api/projects/${s.projectId}/tags`, {
-            name,
-            color: '#6366f1',
-          })
-        ).json(),
-      );
-    const a = await post('a');
-    const b = await post('b');
+    const a = insertLegacyCategory(s.db, s.projectId, 'a', '#6366f1');
+    const b = insertLegacyCategory(s.db, s.projectId, 'b', '#6366f1');
     const body: unknown = { title: '带标签任务', spec: '', tagIds: [a.id, b.id] };
     expect(createTodoBodySchema.safeParse(body).success).toBe(true);
     const res = await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, body);
@@ -492,11 +438,7 @@ describe('the tag surface (#309, the r9 §3.4 wire comparison)', () => {
     const s = bootServer();
     const projectA = await postProject(s.app, 'a');
     const projectB = await postProject(s.app, 'b');
-    const foreign = tagRecordSchema.parse(
-      await (
-        await req(s.app, 'POST', `/api/projects/${projectB}/tags`, { name: 'x', color: '#6366f1' })
-      ).json(),
-    );
+    const foreign = insertLegacyCategory(s.db, projectB, 'x', '#6366f1');
     await expectErrorShape(
       await req(s.app, 'POST', `/api/projects/${projectA}/todos`, {
         title: 't',
@@ -672,9 +614,6 @@ describe('every response shape re-verified with zod (fields are the contract, 02
     expect(todoRecordSchema.safeParse(created).success).toBe(true);
     const list = await (await req(s.app, 'GET', `/api/todos?teamId=${s.team.id}`)).json();
     expect(z.array(todoRecordSchema).safeParse(list).success).toBe(true);
-    const tags = await (await req(s.app, 'GET', `/api/projects/${projectId}/tags`)).json();
-    expect(z.array(tagRecordSchema).safeParse(tags).success).toBe(true);
-    expect((tags as unknown[]).length).toBe(FIXED_TAGS.length);
     const one = await (await req(s.app, 'GET', `/api/todos/${created.id}`)).json();
     expect(todoRecordSchema.safeParse(one).success).toBe(true);
   });

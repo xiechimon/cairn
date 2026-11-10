@@ -8,6 +8,7 @@ import { MIGRATIONS_FOLDER, openDbWithHandle } from '../src/db/client.js';
 import { runAgentLayerDataMigration } from '../src/legacy/agent-layer/data-migration.js';
 import { isCorrectionTask } from '../src/services/correction.js';
 import { bootServer, postProject, req } from './helpers.js';
+import { insertLegacyCategory } from './legacy-category-fixtures.js';
 import { migrateUpTo } from './migrate-helpers.js';
 
 type MigrationSnapshot = {
@@ -60,12 +61,7 @@ async function createProjectTag(
   projectId: string,
   name: string,
 ): Promise<string> {
-  const response = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-    name,
-    color: '#000000',
-  });
-  expect(response.status).toBe(201);
-  return ((await response.json()) as { id: string }).id;
+  return insertLegacyCategory(s.db, projectId, name, '#000000').id;
 }
 
 async function correctionWorld(classified = false) {
@@ -164,12 +160,7 @@ describe('internal correction classification', () => {
   test('transitional create, replacement and project move keep category classification synchronized', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
-    const labelResponse = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      name: 'CoRrEcTiOn',
-      color: '#000000',
-    });
-    expect(labelResponse.status).toBe(201);
-    const label = (await labelResponse.json()) as { id: string };
+    const label = insertLegacyCategory(s.db, projectId, 'CoRrEcTiOn', '#000000');
     const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       title: 'Transitional correction',
       spec: 'Preserve classification until the generic feature is retired.',

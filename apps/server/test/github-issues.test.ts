@@ -1,7 +1,6 @@
 import {
   buildTaskPromptText,
   type ClaimedStep,
-  FIXED_TAGS,
   githubIssuesResponseSchema,
   issueFenceQuotedLines,
   parseAttachmentTokenLines,
@@ -31,6 +30,7 @@ import {
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
+import { insertLegacyCategory } from './legacy-category-fixtures.js';
 
 const TOKEN = 'ghp_issue_face_token';
 const REPO = 'octo/alpha';
@@ -299,7 +299,7 @@ describe('GET /api/projects/{id}/github/issues (B4-B11)', () => {
 });
 
 describe('github project label vocabulary = repo label mirror (C12-C16)', () => {
-  test('C16 github project creation does not seed the 6 words; plain/local project seeding unchanged', async () => {
+  test('GitHub and ordinary project creation do not seed category vocabulary', async () => {
     const s = bootServer();
     const ghId = await postGithubProject(s.app);
     expect(projectLabels(s, ghId)).toHaveLength(0);
@@ -311,7 +311,7 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
         .where(eq(tagTable.projectId, plainId))
         .all()
         .map((t) => t.name),
-    ).toEqual(FIXED_TAGS.map((t) => t.name));
+    ).toEqual([]);
     s.dispose();
   });
 
@@ -354,9 +354,7 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     syncGithubLabels(s.db, projectId, [{ name: 'bug', color: '6366f1' }]);
-    await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      body: { name: 'bug', color: '#6366f1' },
-    });
+    insertLegacyCategory(s.db, projectId, 'bug', '#6366f1');
     await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
       body: { number: 9 },
     });
@@ -659,10 +657,7 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
       });
       todoId = ((await todoRes.json()) as { id: string }).id;
     }
-    if (kind === 'github')
-      await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-        body: { name: 'generic-only', color: '#000000' },
-      });
+    if (kind === 'github') insertLegacyCategory(s.db, projectId, 'generic-only', '#000000');
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       body: { todoIds: [todoId] },
     });
@@ -776,9 +771,7 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
 
   test('ordinary relay rejects both fixed and custom category names', async () => {
     const { s, token, step, projectId } = await world('plain', false);
-    await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-      body: { name: 'urgent', color: '#ef4444' },
-    });
+    insertLegacyCategory(s.db, projectId, 'urgent', '#ef4444');
     const bad = await relay(s.app, token, step.step.id, { title: 'x', tag: 'urgent' });
     expect(bad.status).toBe(400);
     const fixed = await relay(s.app, token, step.step.id, { title: 'x', tag: 'feature' });
