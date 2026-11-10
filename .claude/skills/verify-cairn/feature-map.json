@@ -2465,6 +2465,7 @@
         "apps/server/test/task-meta.test.ts",
         "apps/server/test/category-vocabulary-retirement.test.ts",
         "apps/server/test/category-assignment-retirement.test.ts",
+        "packages/shared/test/task-request.test.ts",
         "apps/server/test/correction-classification.test.ts",
         "apps/daemon/test/task-meta-prompt.test.ts",
         "apps/daemon/test/worker-meta-sdk.test.ts"

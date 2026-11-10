@@ -18,12 +18,14 @@ Dispatch an ordinary task. Its authenticated machine claims the first implementa
 
 Preconditions: use an isolated server, an enrolled test machine and a first implementation step. No real model or GitHub account is needed for this contract.
 
-1. Run `apps/server/test/category-assignment-retirement.test.ts`: shared schemas, twelve task-write entry paths, real MCP SDK and in-server Pi validation, complete-state rejection and unrelated-key compatibility. Run daemon `worker-meta-sdk.test.ts` and `acp-tools.test.ts` for the remaining real transport boundaries.
+1. Run `apps/server/test/category-assignment-retirement.test.ts`: shared schemas, twelve task-write entry paths, real MCP SDK and in-server Pi validation, complete-state rejection and unrelated-key compatibility. Also run `packages/shared/test/task-request.test.ts`, `chief-tools.test.ts` and `memory-tools.test.ts` for direct schema-catalog consumers and the frozen routing allowlist. Run daemon `worker-meta-sdk.test.ts` and `acp-tools.test.ts` for the remaining real transport boundaries.
 2. Run `apps/server/test/category-vocabulary-retirement.test.ts`: four REST project kinds, both supported Coordinator creation shapes, absent vocabulary routes and preservation of existing correction rows/links. Exercise production startup/restart on an isolated database for the no-backfill observation.
 3. Run `apps/server/test/task-meta.test.ts`: claim, naming, stale arguments and full-state atomicity for ordinary and sealed-owner tasks.
 4. Run `apps/daemon/test/task-meta-prompt.test.ts` and `worker-meta-sdk.test.ts`: title-only prompt/schema and real SDK argument forwarding to canonical validation.
 5. Run `apps/server/test/github-issues.test.ts` and `github-writeback.test.ts`: dedicated label selection and imported-title finality remain intact.
 6. Run `apps/daemon/test/tag-tool.test.ts` and `runner-create-tag.test.ts` for the unrelated Git release tool.
+
+For a complete scoped run, pass the named files explicitly without `--changed`. For the changed subset, put `--changed` last: `vitest run <files> --changed`; otherwise its optional since-ref can consume the first filename. Confirm a non-empty reported test count before calling either run green.
 
 These are automated regressions. Live acceptance additionally drives authenticated claim/metadata HTTP endpoints and real SDK `tools/call` against the isolated server, reading SQLite before/after; record provider mode and limits alongside evidence.
 
