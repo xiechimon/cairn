@@ -12,6 +12,7 @@ const batchHeadRe = '^B[0-9]+/';
 const batchSize = { min: 1, max: 4 };
 const batchWait = '0 s';
 const checkRetries = 1;
+const parallelChecks = 5;
 const scopes = {
   web: ['apps/web/**/*'],
   backend: ['apps/server/**/*', 'apps/daemon/**/*', 'integration/**/*'],
@@ -76,7 +77,7 @@ commands_restrictions:
       - sender-permission >= write
 merge_queue:
   mode: parallel
-  max_parallel_checks: 3
+  max_parallel_checks: ${parallelChecks}
   dequeued_label: dequeued
 scopes:
   source:
