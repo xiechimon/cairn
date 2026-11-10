@@ -4,6 +4,7 @@ import { inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
+import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import {
   Collapsible,
@@ -277,8 +278,8 @@ function Row({
       return (
         <>
           <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
-            <span
-              className={`chat-bubble min-w-0 bubble-gradient max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground) ${
+            <UserMessageBubble
+              className={`chat-bubble max-w-[min(85%,42rem)] break-words ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -287,7 +288,7 @@ function Row({
               {...(item.markdown != null ? { 'data-md': 'true' } : {})}
             >
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
-            </span>
+            </UserMessageBubble>
           </div>
           {item.seq != null && item.title != null && (
             <div className="mt-1.5 flex items-center justify-end" data-testid="taskline">

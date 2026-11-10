@@ -19,6 +19,7 @@ import {
   type SkillFact,
   type StepPromptOrigin,
   type TagRecord,
+  type TaskRequest,
   type ThreadMessageContent,
   type ThreadReportContent,
   type TodoOutputKind,
@@ -52,6 +53,7 @@ export interface TodoRecord {
   projectId: string;
   title: string;
   spec: string;
+  request?: TaskRequest | null;
   phase: Phase;
   phaseAt: number;
   archivedAt?: number | null;
