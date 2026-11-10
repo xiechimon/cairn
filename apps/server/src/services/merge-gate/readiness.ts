@@ -498,6 +498,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
 
   if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered'))
     block('verify-tampered');
+  if (i.evidenceStore === null) block('verify-missing', 'Build evidence snapshot unavailable');
   const perspectives = i.round?.perspectives ?? i.availability.reviewerPerspectives;
   if (D !== null) {
     const at = (kind: GateVerdictView['kind'], perspective?: string) =>

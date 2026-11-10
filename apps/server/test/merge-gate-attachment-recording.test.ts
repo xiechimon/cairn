@@ -374,3 +374,31 @@ test('pure recording readiness binds attachments to a passing current digest and
   inputs.evidence = [];
   expect(missing()).toBe(true);
 });
+
+test('a null build snapshot blocks a bound verify verdict even when no recording is required', async () => {
+  const w = await world(null);
+  try {
+    const files = FILES.map((file) => ({ ...file, patch: '@@ -0,0 +1 @@\n+copy' }));
+    const patchDigest = computePatchDigest(compareFilesFromResponse({ files }) ?? []).patchDigest;
+    w.s.db
+      .update(gateVerdict)
+      .set({ patchDigest })
+      .where(eq(gateVerdict.stepId, 'verify-recording'))
+      .run();
+    w.port.compare = async () =>
+      ok({
+        total_commits: 1,
+        behind_by: 0,
+        commits: [{ sha: HEAD, parents: [{ sha: BASE }] }],
+        files,
+      });
+    const readiness = await evaluateMergeGate(
+      { ...w.s.svc, attachmentsDir: w.s.attachmentsDir },
+      'build-recording',
+      { port: w.port },
+    );
+    expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('verify-missing');
+  } finally {
+    w.s.dispose();
+  }
+});
