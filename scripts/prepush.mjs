@@ -77,6 +77,12 @@ export function hasCode(paths) {
   return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
 }
 
+const SIDECAR_INPUTS = ['apps/tsnet-sidecar/', '.github/workflows/ci.yml'];
+
+export function hasSidecar(paths) {
+  return paths.some((path) => SIDECAR_INPUTS.some((input) => path.startsWith(input)));
+}
+
 export function needsGates(paths, testsRead) {
   return hasCode(paths) || paths.some((path) => !path.startsWith('docs/') || testsRead(path));
 }
@@ -272,21 +278,25 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
-  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code', '--needs-gates'];
+  const classifiers = {
+    '--has-code': hasCode,
+    '--has-sidecar': hasSidecar,
+    '--needs-gates': (paths) => needsGates(paths, testsRead),
+  };
+  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', ...Object.keys(classifiers)];
   if (
     args.length > 0 &&
     (!modes.includes(args[0]) || args.length !== (args[0] === '--e2e-shard' ? 2 : 1))
   ) {
     console.error(
-      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code | --needs-gates]',
+      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code | --has-sidecar | --needs-gates]',
     );
     process.exit(2);
   }
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
-  if (args[0] === '--has-code' || args[0] === '--needs-gates') {
+  if (args[0] in classifiers) {
     try {
-      const paths = changedPaths();
-      console.log(args[0] === '--has-code' ? hasCode(paths) : needsGates(paths, testsRead));
+      console.log(classifiers[args[0]](changedPaths()));
     } catch {
       console.log(true);
     }
