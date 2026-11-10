@@ -50,6 +50,7 @@ import {
   parseReviewPromptMeta,
   parseVerifyPromptMeta,
   planVerificationItems,
+  prNumberFromUrl,
   projectMergeConfigSchema,
   REVIEW_ANNOUNCEMENT,
   REVIEW_VERDICT_KIND,
@@ -342,7 +343,7 @@ export async function sendBuildSteer(
   const { db } = deps;
   const replay = findClientMessage<BuildSteerResult>(db, conversationId, body.clientMessageId);
   if (replay !== undefined) return replay;
-  const buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
+  let buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
   if ((continuationOptions.human ?? deps.steerOptions?.human) !== true)
     assertAutomaticRetryAllowed(deps, buildRow.todoId);
@@ -365,6 +366,7 @@ export async function sendBuildSteer(
   }
   if (!running) {
     todoRow = continuationTodo(deps, buildRow, continuationOptions);
+    buildRow = ensureBuildPrNumber(deps, buildRow);
     if (projectOfTodo(db, todoRow)?.repoKind === 'local') {
       const admission = db
         .select()
@@ -1937,6 +1939,17 @@ function githubPrOf(
   if (prNumber === null) return null;
   const repoRef = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
   return repoRef === null ? null : { repoRef, prNumber };
+}
+
+function ensureBuildPrNumber(deps: BuildDeps, row: BuildRow): BuildRow {
+  if (row.prNumber !== null) return row;
+  const parsed = prNumberFromUrl(row.prUrl);
+  if (parsed === null) return row;
+  deps.db.update(build).set({ prNumber: parsed }).where(eq(build.id, row.id)).run();
+  const updated = deps.db.select().from(build).where(eq(build.id, row.id)).get();
+  if (updated === undefined) return row;
+  publishBuild(deps, updated);
+  return updated;
 }
 
 export function buildMergePermission(deps: BuildDeps, buildId: string): BuildMergePermission {

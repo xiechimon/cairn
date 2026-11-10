@@ -431,6 +431,43 @@ describe('the steer server write surface (W3 #278)', () => {
     });
   });
 
+  test('idle building with a legacy url-only PR backfills the number and rejects a merged delivery', async () => {
+    const githubFetch: FetchLike = async () =>
+      Response.json({
+        state: 'closed',
+        merged: true,
+      });
+    w = await setupWorld({ githubFetch });
+    const buildId = await finishBuild(w);
+    const task = w.s.db.select().from(todo).where(eq(todo.id, w.todoId)).get()!;
+    w.s.db
+      .update(project)
+      .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
+      .where(eq(project.id, task.projectId))
+      .run();
+    w.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, w.todoId)).run();
+    w.s.db
+      .update(build)
+      .set({
+        prNumber: null,
+        prUrl: 'https://github.com/demo-owner/demo-repo/pull/43',
+      })
+      .where(eq(build.id, buildId))
+      .run();
+    const response = await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
+      content: 'Continue on the old delivery',
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringMatching(/merged.*new task/i),
+    });
+    expect(w.s.db.select().from(build).where(eq(build.id, buildId)).get()).toMatchObject({
+      prNumber: 43,
+      prUrl: 'https://github.com/demo-owner/demo-repo/pull/43',
+    });
+    expect(w.s.db.select().from(step).where(eq(step.buildId, buildId)).all()).toHaveLength(1);
+  });
+
   test('done thread continues on the same build with one step and moves through queued to building', async () => {
     const buildId = await finishBuild(w);
     const before = w.s.db.select().from(step).where(eq(step.buildId, buildId)).all();

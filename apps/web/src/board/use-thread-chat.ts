@@ -1,5 +1,6 @@
 import {
   isBuildStepKind,
+  resolvedBuildPrNumber,
   STOP_MESSAGE,
   type StepKind,
   type TodoRecord as WireTodo,
@@ -357,7 +358,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     waitingOnChecks:
       todo?.phase === 'building' &&
       !running &&
-      (buildQ.data?.prNumber != null || buildQ.data?.prUrl != null),
+      buildQ.data != null &&
+      resolvedBuildPrNumber(buildQ.data) != null,
     workingFor:
       running && streamingItem?.kind === 'streaming'
         ? { startedAt: streamingItem.startedAt, seconds: streamingItem.seconds }

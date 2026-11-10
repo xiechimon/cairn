@@ -83,6 +83,19 @@ describe('mapTranscript quiescent live tail (#471)', () => {
     expect(streamingRows(items)).toEqual([]);
   });
 
+  test('legacy URL-only PR waiting also hangs no fake 执行中 tail', () => {
+    const items = render({
+      todo: todo(9, 'building'),
+      steps: [step('done')],
+      build: {
+        ...BUILD,
+        prNumber: null,
+        prUrl: 'https://github.com/demo-owner/demo-repo/pull/3812',
+      },
+    });
+    expect(streamingRows(items)).toEqual([]);
+  });
+
   test('F9: an active step keeps exactly one streaming tail (`处理中...`, with seconds)', () => {
     const items = render({ todo: todo(9, 'building'), steps: [step('done'), step('claimed')] });
     const rows = streamingRows(items);
