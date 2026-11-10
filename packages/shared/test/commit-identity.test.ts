@@ -28,6 +28,7 @@ const retiredUser = {
   name: 'Cairnwright',
   email: '348051526+cairnwright@users.noreply.github.com',
 };
+const cloud = { name: 'Claude', email: 'noreply@anthropic.com' };
 const synthetic = { name: 'Session', email: 'kigv1zSwiHPke_Cl5Ci6D@cairn.local' };
 const mergify = { name: 'Mergify', email: '37929162+mergify[bot]@users.noreply.github.com' };
 const mergifySigner = { name: 'Mergify', email: 'commit-signer@mergify.com' };
@@ -91,6 +92,10 @@ describe('the CI allowlist', () => {
     ['ian through his noreply email', facts(ownerNoreply, ownerNoreply)],
     ['a squash of an ian-opened PR', facts({ ...owner, name: 'Xmon Dai' }, web)],
     ['a Mergify queue merge', facts(mergify, mergifySigner, 2)],
+    ['a cloud session commit made with git', facts(cloud, cloud)],
+    ['a cloud session merging main into its branch', facts(cloud, cloud, 2)],
+    ['a cloud session commit GitHub rewrote', facts(cloud, web)],
+    ['an App commit a cloud session rebased', facts(bot, cloud)],
   ])('accepts %s on a branch of this repository', (_name, commit) => {
     expect(commitIdentityViolation(policy, commit, false)).toBeNull();
   });
@@ -98,6 +103,7 @@ describe('the CI allowlist', () => {
   test.each([
     ['the App', facts(bot, bot)],
     ['ian', facts(owner, owner)],
+    ['a cloud session', facts(cloud, cloud)],
   ])('rejects %s claimed from a fork', (_name, commit) => {
     expect(commitIdentityViolation(policy, commit, true)).toMatch(/fork/);
   });
@@ -113,6 +119,9 @@ describe('the CI allowlist', () => {
     ['a Mergify non-merge commit', facts(mergify, mergifySigner, 1)],
     ['an unknown bot', facts({ name: 'x[bot]', email: '1+x[bot]@users.noreply.github.com' }, web)],
     ['ian authored but committed by someone else', facts(owner, synthetic)],
+    ['the cloud name on a forged email', facts({ ...cloud, email: 'noreply@evil.test' }, web)],
+    ['the cloud email under another name', facts({ ...cloud, name: 'xiechimon' }, web)],
+    ['a cloud session authored but committed by someone else', facts(cloud, synthetic)],
     ['the App authored but committed by someone else', facts(bot, synthetic)],
   ])('rejects %s', (_name, commit) => {
     expect(commitIdentityViolation(policy, commit, false)).toMatch(/./);
@@ -138,6 +147,17 @@ describe('the local hooks', () => {
     expect(localCommitViolation(policy, bot, bot, agent)).toBeNull();
   });
 
+  test('a cloud session committing as itself is accepted, in an agent runtime and outside one', () => {
+    expect(localCommitViolation(policy, cloud, cloud, agent)).toBeNull();
+    expect(localCommitViolation(policy, cloud, cloud, human)).toBeNull();
+  });
+
+  test('an agent mixing the cloud identity with another one is rejected', () => {
+    expect(localCommitViolation(policy, cloud, owner, agent)).toMatch(/as-bot\.sh git commit/);
+    expect(localCommitViolation(policy, owner, cloud, agent)).toMatch(/as-bot\.sh git commit/);
+    expect(localCommitViolation(policy, cloud, bot, agent)).toMatch(/as-bot\.sh git commit/);
+  });
+
   test('ian committing by hand is accepted', () => {
     expect(localCommitViolation(policy, owner, owner, human)).toBeNull();
   });
@@ -158,6 +178,8 @@ describe('the local hooks', () => {
   test('an agent pushes only App-authored commits; ian pushes his own too', () => {
     expect(pushViolation(policy, [facts(bot, bot)], agent)).toBeNull();
     expect(pushViolation(policy, [facts(bot, web)], agent)).toBeNull();
+    expect(pushViolation(policy, [facts(cloud, cloud)], agent)).toBeNull();
+    expect(pushViolation(policy, [facts(cloud, cloud)], human)).toBeNull();
     expect(pushViolation(policy, [facts(owner, owner)], agent)).toMatch(/as-bot\.sh git commit/);
     expect(pushViolation(policy, [facts(owner, owner)], human)).toBeNull();
     expect(pushViolation(policy, [facts(synthetic, synthetic)], human)).toMatch(/./);
