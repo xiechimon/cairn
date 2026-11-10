@@ -2,17 +2,17 @@ import { timingSafeEqual } from 'node:crypto';
 import {
   apiKeyRecordSchema,
   BRAND,
+  categoryFreeTaskInputSchema,
   githubIssueStateSchema,
   type MemoryRecord,
   phaseSchema,
   routeOverrideSchema,
-  type TagRecord,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { type agentMemory, apiKey, project, type tag } from './db/schema.js';
+import { type agentMemory, apiKey, project } from './db/schema.js';
 import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
@@ -40,27 +40,17 @@ export const githubIssuesQuerySchema = z.object({
   page: z.coerce.number().int().min(1),
 });
 
-export function toTagRecord(row: typeof tag.$inferSelect): TagRecord {
-  return {
-    id: row.id,
-    projectId: row.projectId,
-    name: row.name,
-    color: row.color,
-    createdAt: row.createdAt,
-    v: row.v,
-  };
-}
-
-export const patchTodoBodySchema = z.object({
-  title: z.string().optional(),
-  spec: z.string().optional(),
-  phase: phaseSchema.optional(),
-  tagIds: z.array(z.string()).optional(),
-  orderIndex: z.number().optional(),
-  projectId: z.string().min(1).optional(),
-  assignment: z.unknown().optional(),
-  routeOverride: routeOverrideSchema.nullable().optional(),
-});
+export const patchTodoBodySchema = categoryFreeTaskInputSchema.pipe(
+  z.object({
+    title: z.string().optional(),
+    spec: z.string().optional(),
+    phase: phaseSchema.optional(),
+    orderIndex: z.number().optional(),
+    projectId: z.string().min(1).optional(),
+    assignment: z.unknown().optional(),
+    routeOverride: routeOverrideSchema.nullable().optional(),
+  }),
+);
 
 export const patchSecretBodySchema = z.object({
   name: z.string().optional(),

@@ -5,17 +5,35 @@ const shaPattern = /^[a-f0-9]{40}$/;
 const gh = (...args) =>
   execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 
+function eventTime(event) {
+  return typeof event.created_at === 'string' ? Date.parse(event.created_at) : Number.NaN;
+}
+
 export function queuedBeforeMerge(mergedAt, timeline) {
-  const queued = timeline.filter(
-    (event) =>
-      event.event === 'labeled' &&
-      event.label?.name === 'queued' &&
-      typeof event.created_at === 'string',
-  );
-  if (queued.length === 0) return false;
   if (typeof mergedAt !== 'string') return false;
   const mergeTime = Date.parse(mergedAt);
-  return queued.some((event) => Date.parse(event.created_at) < mergeTime);
+  if (Number.isNaN(mergeTime)) return false;
+  const beforeMerge = (event) => {
+    const at = eventTime(event);
+    return !Number.isNaN(at) && at < mergeTime;
+  };
+  if (
+    timeline.some(
+      (event) =>
+        event.event === 'labeled' && event.label?.name === 'dequeued' && beforeMerge(event),
+    )
+  ) {
+    return false;
+  }
+  const queued = timeline.filter(
+    (event) =>
+      (event.event === 'labeled' || event.event === 'unlabeled') &&
+      event.label?.name === 'queued' &&
+      beforeMerge(event),
+  );
+  if (queued.length === 0) return false;
+  queued.sort((a, b) => eventTime(a) - eventTime(b));
+  return queued.at(-1).event === 'labeled';
 }
 
 export function auditPull(repo, number) {
@@ -30,10 +48,78 @@ export function auditPull(repo, number) {
   return { number, queued, line };
 }
 
+const requiredDraftChecks = [
+  'check',
+  'pack-smoke',
+  'e2e-gate',
+  'gates',
+  'dead-class-gate',
+  'ops-backup-test',
+];
+
 export function pullNumbersForCommit(repo, sha) {
   if (!shaPattern.test(sha ?? '')) throw new Error('A full 40-hex commit SHA is required');
   const pulls = JSON.parse(gh('api', `repos/${repo}/commits/${sha}/pulls`));
   return pulls.filter((pull) => pull.state === 'closed').map((pull) => pull.number);
+}
+
+function passedDraftNumber(comments) {
+  let draft = null;
+  for (const comment of comments) {
+    if (comment.user?.login !== 'mergify[bot]' || typeof comment.body !== 'string') continue;
+    for (const match of comment.body.matchAll(/Passed · draft #(\d+)/g)) {
+      draft = Number(match[1]);
+    }
+  }
+  return draft;
+}
+
+function commitTree(repo, sha) {
+  const commit = JSON.parse(gh('api', `repos/${repo}/commits/${sha}`));
+  const tree = commit.commit?.tree?.sha;
+  return shaPattern.test(tree ?? '') ? tree : null;
+}
+
+function draftChecksPassedBefore(repo, sha, mergedAt) {
+  const mergeTime = Date.parse(mergedAt);
+  if (Number.isNaN(mergeTime)) return false;
+  const body = JSON.parse(gh('api', `repos/${repo}/commits/${sha}/check-runs?per_page=100`));
+  const runs = body.check_runs ?? [];
+  return requiredDraftChecks.every((name) => {
+    const finished = runs
+      .filter((run) => run.name === name && Date.parse(run.completed_at ?? '') < mergeTime)
+      .sort((a, b) => Date.parse(a.completed_at) - Date.parse(b.completed_at))
+      .at(-1);
+    return finished?.conclusion === 'success' || finished?.conclusion === 'skipped';
+  });
+}
+
+export function testedOnLandedTree(repo, number, landedSha) {
+  if (!shaPattern.test(landedSha ?? '')) return false;
+  const pull = JSON.parse(gh('api', `repos/${repo}/pulls/${number}`));
+  if (typeof pull.merged_at !== 'string') return false;
+  const comments = JSON.parse(
+    gh('api', `repos/${repo}/issues/${number}/comments`, '--paginate', '--slurp'),
+  ).flat();
+  const draft = passedDraftNumber(comments);
+  if (draft === null) return false;
+  const draftPull = JSON.parse(gh('api', `repos/${repo}/pulls/${draft}`));
+  const draftSha = draftPull.head?.sha;
+  if (!shaPattern.test(draftSha ?? '')) return false;
+  const landedTree = commitTree(repo, landedSha);
+  const draftTree = commitTree(repo, draftSha);
+  if (landedTree === null || landedTree !== draftTree) return false;
+  return draftChecksPassedBefore(repo, draftSha, pull.merged_at);
+}
+
+export function landedThroughQueue(repo, commits) {
+  return (
+    commits.length > 0 &&
+    commits.every((sha) => {
+      const numbers = pullNumbersForCommit(repo, sha);
+      return numbers.length > 0 && numbers.every((number) => testedOnLandedTree(repo, number, sha));
+    })
+  );
 }
 
 function main() {
@@ -51,7 +137,11 @@ function main() {
     process.exitCode = results.every((result) => result.queued) ? 0 : 1;
     return;
   }
-  throw new Error('usage: merge-route-audit commit <sha>');
+  if (command === 'landed') {
+    console.log(landedThroughQueue(repo, args));
+    return;
+  }
+  throw new Error('usage: merge-route-audit commit <sha> | landed <sha>...');
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {

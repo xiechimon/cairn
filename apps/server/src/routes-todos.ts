@@ -101,7 +101,6 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       projectId: row.id,
       title: body.title,
       spec: body.spec,
-      ...(body.tagIds !== undefined ? { tagIds: body.tagIds } : {}),
       ...(body.output !== undefined ? { output: body.output } : {}),
       createdBy: ctx.user.id,
       ownerId: ctx.user.id,

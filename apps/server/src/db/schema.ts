@@ -949,6 +949,7 @@ export const chiefTurnUsage = sqliteTable(
 );
 
 export const coordinatorConversation = sqliteTable('coordinator_conversation', {
+  storeId: text('storeId'),
   threadId: text('threadId').primaryKey(),
   conversationId: text('conversationId').notNull(),
   lastMirroredEntryId: text('lastMirroredEntryId'),
@@ -1026,6 +1027,48 @@ export const chiefThread = sqliteTable(
       .on(t.chiefId)
       .where(sql`${t.archivedAt} is null and ${t.id} not like 'chief-digest-%'`),
   ],
+);
+
+export const coordinatorInput = sqliteTable(
+  'coordinator_input',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('threadId')
+      .notNull()
+      .references(() => chiefThread.id, { onDelete: 'cascade' }),
+    stepId: text('stepId').notNull(),
+    kind: text('kind').$type<'initial' | 'steer'>().notNull(),
+    ownerMessageIds: json<string[]>('ownerMessageIds').notNull(),
+    content: text('content').notNull(),
+    conversationId: text('conversationId'),
+    state: text('state').$type<'pending' | 'consumed' | 'released'>().notNull().default('pending'),
+    entryId: text('entryId'),
+    successorStepId: text('successorStepId'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('coordinator_input_initial_unique')
+      .on(t.stepId, t.conversationId)
+      .where(sql`${t.kind} = 'initial'`),
+    index('coordinator_input_thread_state_idx').on(t.threadId, t.state, t.stepId),
+    check(
+      'coordinator_input_receipt',
+      sql`(${t.state} = 'consumed' AND ${t.entryId} IS NOT NULL) OR (${t.state} IN ('pending', 'released') AND ${t.entryId} IS NULL)`,
+    ),
+  ],
+);
+
+export const coordinatorRun = sqliteTable(
+  'coordinator_run',
+  {
+    threadId: text('threadId')
+      .notNull()
+      .references(() => chiefThread.id, { onDelete: 'cascade' }),
+    conversationId: text('conversationId').notNull(),
+    taskId: text('taskId').notNull(),
+    stepId: text('stepId').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.threadId, t.conversationId, t.taskId] })],
 );
 
 export const chiefMessage = sqliteTable('chief_message', {
@@ -1340,4 +1383,50 @@ export const deployLease = sqliteTable(
     expiresAt: epochMs('expiresAt').notNull(),
   },
   (t) => [check('deploy_lease_status', sql`${t.status} in ('accepting', 'draining')`)],
+);
+
+export const coordinatorTurnSnapshot = sqliteTable(
+  'coordinator_turn_snapshot',
+  {
+    turnId: text('turnId').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    sourceTraceId: text('sourceTraceId').notNull(),
+    schemaVersion: integer('schemaVersion').notNull(),
+    outcome: text('outcome').$type<'success' | 'failed' | 'stopped'>().notNull(),
+    capturedAt: epochMs('capturedAt').notNull(),
+    expiresAt: epochMs('expiresAt').notNull(),
+    status: text('status').$type<'sealed' | 'unusable'>().notNull(),
+    reason: text('reason'),
+    redactionCount: integer('redactionCount').notNull(),
+    payloadBytes: integer('payloadBytes').notNull(),
+    digest: text('digest'),
+    payload: text('payload'),
+  },
+  (t) => [
+    uniqueIndex('coordinator_turn_snapshot_trace_idx').on(t.sourceTraceId),
+    index('coordinator_turn_snapshot_expiry_idx').on(t.expiresAt),
+    index('coordinator_turn_snapshot_team_age_idx').on(t.teamId, t.capturedAt, t.turnId),
+    check('coordinator_turn_snapshot_version', sql`${t.schemaVersion} > 0`),
+    check(
+      'coordinator_turn_snapshot_outcome',
+      sql`${t.outcome} in ('success', 'failed', 'stopped')`,
+    ),
+    check('coordinator_turn_snapshot_expiry', sql`${t.expiresAt} = ${t.capturedAt} + 2592000000`),
+    check('coordinator_turn_snapshot_redactions', sql`${t.redactionCount} >= 0`),
+    check(
+      'coordinator_turn_snapshot_payload',
+      sql`
+      (${t.status} = 'sealed' AND ${t.reason} IS NULL AND ${t.redactionCount} = 0
+       AND ${t.payload} IS NOT NULL AND json_valid(${t.payload})
+       AND ${t.payloadBytes} = length(cast(${t.payload} AS blob))
+       AND ${t.payloadBytes} <= 2097152
+       AND ${t.digest} IS NOT NULL AND length(${t.digest}) = 64
+       AND ${t.digest} NOT GLOB '*[^0-9a-f]*')
+      OR (${t.status} = 'unusable' AND ${t.payload} IS NULL AND ${t.payloadBytes} = 0
+       AND ${t.digest} IS NULL AND ${t.reason} IS NOT NULL
+       AND length(${t.reason}) BETWEEN 1 AND 128)`,
+    ),
+  ],
 );

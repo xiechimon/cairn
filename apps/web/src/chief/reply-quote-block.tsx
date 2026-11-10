@@ -8,14 +8,33 @@ const QUOTE_CLS =
 const REMOVE_CLS =
   "size-6 flex-none cursor-pointer rounded-(--radius-control) text-content-tertiary transition-none hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
 
-export function ReplyQuoteBlock({ quote, onRemove }: { quote: string; onRemove?: () => void }) {
+export function ReplyQuoteBlock({
+  quote,
+  onRemove,
+  sourceHref,
+}: {
+  quote: string;
+  onRemove?: () => void;
+  sourceHref?: string;
+}) {
   const { t } = useI18n();
   return (
     <div
       data-testid={onRemove === undefined ? 'reply-quote' : 'composer-reply-quote'}
       className={onRemove === undefined ? 'mb-2 flex' : 'mb-2 flex items-start gap-2'}
     >
-      <blockquote className={QUOTE_CLS}>{quote}</blockquote>
+      <blockquote className={QUOTE_CLS}>
+        {sourceHref === undefined ? (
+          quote
+        ) : (
+          <a
+            href={sourceHref}
+            className="text-inherit no-underline focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            {quote}
+          </a>
+        )}
+      </blockquote>
       {onRemove !== undefined && (
         <IconTooltip
           label={t('移除引用')}

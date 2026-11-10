@@ -11,6 +11,7 @@ export interface GithubAccount {
 export interface CommitIdentityPolicy {
   bot: GithubAccount;
   owner: GithubAccount & { emails: string[] };
+  cloudAgents: GitIdentity[];
   platformCommitters: GitIdentity[];
   platformMergeAuthors: GitIdentity[];
   agentEnv: string[];
@@ -72,6 +73,9 @@ const isOwner = (policy: CommitIdentityPolicy, identity: GitIdentity) =>
 const isPlatformCommitter = (policy: CommitIdentityPolicy, identity: GitIdentity) =>
   policy.platformCommitters.some((committer) => sameIdentity(committer, identity));
 
+const isCloudAgent = (policy: CommitIdentityPolicy, identity: GitIdentity) =>
+  policy.cloudAgents.some((agent) => sameIdentity(agent, identity));
+
 const describe = (identity: GitIdentity) => `${identity.name} <${identity.email}>`;
 
 export function commitIdentityViolation(
@@ -80,12 +84,17 @@ export function commitIdentityViolation(
   fromFork: boolean,
 ): string | null {
   const bot = policyBotIdentity(policy);
-  if (sameIdentity(commit.author, bot) || isOwner(policy, commit.author)) {
+  if (
+    sameIdentity(commit.author, bot) ||
+    isOwner(policy, commit.author) ||
+    isCloudAgent(policy, commit.author)
+  ) {
     if (fromFork)
-      return `${commit.sha} claims ${describe(commit.author)} but comes from a fork; only branches of this repository carry the App's or ${policy.owner.login}'s identity`;
+      return `${commit.sha} claims ${describe(commit.author)} but comes from a fork; only branches of this repository carry the App's, a cloud session's or ${policy.owner.login}'s identity`;
     if (
       sameIdentity(commit.committer, bot) ||
       isOwner(policy, commit.committer) ||
+      isCloudAgent(policy, commit.committer) ||
       isPlatformCommitter(policy, commit.committer)
     )
       return null;
@@ -97,7 +106,7 @@ export function commitIdentityViolation(
     isPlatformCommitter(policy, commit.committer)
   )
     return null;
-  return `${commit.sha} is authored by ${describe(commit.author)}; software commits are authored by ${bot.name} and only ${policy.owner.login}'s own commits carry his identity`;
+  return `${commit.sha} is authored by ${describe(commit.author)}; software commits are authored by ${bot.name} or a cloud session and only ${policy.owner.login}'s own commits carry his identity`;
 }
 
 export function isAgentEnvironment(
@@ -121,10 +130,15 @@ export function localCommitViolation(
     return `${describe(local)} is the identity of a cairn server without a GitHub App identity: set CAIRN_GITHUB_APP_SLUG and CAIRN_GITHUB_APP_BOT_ID on the server, or commit as ${bot.name} with ${COMMIT_HELPER}`;
   if (isAgentEnvironment(policy, env)) {
     if (sameIdentity(author, bot) && sameIdentity(committer, bot)) return null;
+    if (isCloudAgent(policy, author) && isCloudAgent(policy, committer)) return null;
     return `agent sessions commit as ${bot.name}, not ${describe(author)}: run ${COMMIT_HELPER} ...`;
   }
   for (const identity of [author, committer])
-    if (!sameIdentity(identity, bot) && !isOwner(policy, identity))
+    if (
+      !sameIdentity(identity, bot) &&
+      !isOwner(policy, identity) &&
+      !isCloudAgent(policy, identity)
+    )
       return `${describe(identity)} is not an allowed commit identity: commit as ${policy.owner.login} by hand, or as ${bot.name} with ${COMMIT_HELPER}`;
   return null;
 }
@@ -137,7 +151,7 @@ export function pushViolation(
   const bot = policyBotIdentity(policy);
   const agent = isAgentEnvironment(policy, env);
   for (const commit of commits) {
-    if (sameIdentity(commit.author, bot)) continue;
+    if (sameIdentity(commit.author, bot) || isCloudAgent(policy, commit.author)) continue;
     if (!agent && isOwner(policy, commit.author)) continue;
     return `${commit.sha} by ${describe(commit.author)} is not authored by ${bot.name}: commit with ${COMMIT_HELPER}`;
   }

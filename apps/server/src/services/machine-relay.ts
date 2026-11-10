@@ -5,12 +5,12 @@ import {
   AGENT_TOOL_SKILL_UPDATE,
   createSkillBodySchema,
   derivePlaceholderTitle,
-  FIXED_TAGS,
   isBuildStepKind,
   isComputerBrowserTool,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { attachWorkerFile } from './agent-attachments.js';
@@ -38,7 +38,6 @@ import {
   type RouteProfile,
 } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
-import { resolveFixedTagId } from './tags.js';
 import { stepNamesTask } from './task-naming.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
 import { updateAutonomousTodo, writebackSelfIssueTitle } from './todos.js';
@@ -279,20 +278,18 @@ async function setTaskMeta(
   const projectRow = projectOfTodo(deps.db, todoRow);
   if (!projectRow) throw new HttpError(404, `project ${todoRow.projectId}`);
   if (projectRow.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
+  parseWith(
+    z
+      .object({
+        tag: z.never().optional(),
+        tags: z.never().optional(),
+        tagIds: z.never().optional(),
+      })
+      .passthrough(),
+    params,
+    'params',
+  );
   const title = todoRow.request !== null ? undefined : normalizedMetaTitle(params.title);
-  let tagIds: string[] | undefined;
-  if (params.tag !== undefined) {
-    const tagName = params.tag;
-    if (typeof tagName !== 'string' || !FIXED_TAGS.some((t) => t.name === tagName)) {
-      throw new HttpError(
-        400,
-        `invalid params.tag: expected one of ${FIXED_TAGS.map((t) => t.name).join(', ')}`,
-      );
-    }
-    const tagId = resolveFixedTagId(deps.db, todoRow.projectId, tagName);
-    if (tagId === null) throw new HttpError(400, `tag ${tagName} not seeded in project`);
-    tagIds = [tagId];
-  }
   const record = updateAutonomousTodo(
     {
       db: deps.db,
@@ -304,7 +301,6 @@ async function setTaskMeta(
     todoRow.id,
     {
       ...(title !== undefined ? { title } : {}),
-      ...(tagIds !== undefined ? { tagIds } : {}),
     },
   );
   if (!record) throw new NotFoundError(`todo ${todoRow.id}`);

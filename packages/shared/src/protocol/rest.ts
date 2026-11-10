@@ -119,7 +119,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/projects', query: ['teamId'] },
   { method: 'GET', path: '/api/projects/{id}/todos' },
   { method: 'GET', path: '/api/projects/{id}/branches' },
-  { method: 'GET', path: '/api/projects/{id}/tags' },
   { method: 'GET', path: '/api/projects/{id}/builds' },
   {
     method: 'GET',
@@ -168,12 +167,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'POST',
     path: '/api/projects/{id}/todos',
-    note: 'body {title,spec}（r3 §3.1）+ 可选 tagIds[]（r9 §3.4 实测携带位）',
-  },
-  {
-    method: 'POST',
-    path: '/api/projects/{id}/tags',
-    note: 'body {name,color} → 201 tag record 全形（r9 §3.4 实测；#309）',
+    note: 'body {title,spec,output?}; retired category assignments are rejected before writes',
   },
   {
     method: 'POST',

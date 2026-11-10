@@ -515,9 +515,10 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
     [{ id: 'm1', name: 'omarchy', online: false, runningSteps: 3 }],
   );
   const chip = page.getByTestId('machines-button');
-  await expect(chip).toContainText('omarchy');
-  await expect(chip).toContainText('离线');
-  await expect(chip).not.toContainText('在跑');
+  await expect(chip).toHaveAccessibleName(/omarchy/);
+  await expect(chip).toHaveAccessibleName(/离线/);
+  await expect(chip).not.toHaveAccessibleName(/在跑/);
+  await expect(page.getByTestId('machines-online-dot')).toHaveCount(0);
   const card = panel.locator('[data-slot="list-card"]').nth(0);
   await expect(card).toContainText('离线');
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
@@ -568,6 +569,13 @@ test('without a computer row the machine keeps the waiting placeholder and disab
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
+  const desktopReason = 'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。';
+  await card.getByRole('button', { name: desktopReason }).click();
+  await expect(page.locator('[data-sonner-toast]', { hasText: desktopReason })).toBeVisible();
+  const browserReason = '这台机器还不支持浏览器。';
+  await card.getByRole('button', { name: browserReason }).focus();
+  await page.keyboard.press(' ');
+  await expect(page.locator('[data-sonner-toast]', { hasText: browserReason })).toBeVisible();
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);

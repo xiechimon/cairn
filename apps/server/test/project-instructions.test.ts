@@ -2,7 +2,7 @@ import { BRIEF_MARKER_END, claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
+import { chief as chiefTable, coordinatorInput, project, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { saveMemoryEntry } from '../src/services/memory.js';
 import {
@@ -247,7 +247,7 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
       .where(eq(step.id, runningId))
       .run();
     await sendToCoordinator('plan the release', id);
-    const pending = s.db.select().from(steerPending).get();
+    const pending = s.db.select().from(coordinatorInput).get();
     expect(pending?.stepId).toBe(runningId);
     expect(pending?.content).toContain('plan the release');
     expect(pending?.content).toContain(RULES);
@@ -263,7 +263,7 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
       .where(eq(step.id, runningId))
       .run();
     await sendToCoordinator('and the changelog', id);
-    const pending = s.db.select().from(steerPending).get();
+    const pending = s.db.select().from(coordinatorInput).get();
     expect(pending?.content).toContain('and the changelog');
     expect(pending?.content).not.toContain(RULES);
   });

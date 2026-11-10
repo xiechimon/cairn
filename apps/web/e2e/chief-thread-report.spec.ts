@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 const STATUS = {
-  done: '已完成，未验证',
-  verified: '已验证',
+  done: '已完成',
+  verified: '已完成',
   failed: '失败',
   review: '审阅中',
 } as const;
@@ -61,6 +61,80 @@ for (const [label, phase, verified] of [
     await expect(stream).not.toContainText(`The worker has reported ${phase}.`);
   });
 }
+
+test('a prose attachment citation in a notice renders as a chip', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  const reportKey = 'team-1/hg4lgHMHQLnQBHR3CImra.md';
+  const at = Date.now();
+  await mockLive(
+    page,
+    {
+      threads: [THREAD],
+      todos: [{ ...TASK, id: 'todo-173', seqNum: 173, phase: 'done', title: 'Markdown preview' }],
+      messages: [
+        {
+          id: 'notice',
+          role: 'system',
+          content: JSON.stringify({
+            kind: 'chief_notice',
+            message: `[#173](todo:todo-173) 调研与方案已验收，尚未实现。建议：点击 Markdown 附件。\n[完整报告](attachment:${reportKey})`,
+            provenance: 'watch:todo-173',
+          }),
+          createdAt: at,
+        },
+        {
+          id: 'unchanged',
+          role: 'assistant',
+          content:
+            '仍是链接 [docs](https://example.com/docs)。别点 [click](javascript:alert(1))。\n![shot](attachment:team-1/shot.png)',
+          createdAt: at,
+        },
+      ],
+    },
+    (path, route) => {
+      if (!path.startsWith('/api/attachments/')) return undefined;
+      return route.fulfill({
+        contentType: 'image/png',
+        body: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAGAAAAAwCAIAAABhdOiYAAAAZElEQVR4nO3QMQ0AIADAMNQhB2GoxAGc7GgyAUvHXFuXxveDeIAAAQIEKBwgQIAAAQoHCBAgQIDCAQIECBCgcIAAAQIEKBwgQIAAAQoHCBAgQIDCAQIECBCgcIAAAQIEKBygRwfhbp1pnik9bgAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      });
+    },
+  );
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  const notice = stream.getByTestId('chief-msg').first();
+  const report = notice.getByRole('link', { name: '完整报告' });
+  await expect(report).toHaveAttribute('href', '/api/attachments/hg4lgHMHQLnQBHR3CImra');
+  await expect(notice).not.toContainText('attachment:');
+  await expect(notice.getByRole('link', { name: '#173' })).toBeVisible();
+  const unchanged = stream.getByTestId('chief-msg').nth(1);
+  await expect(unchanged.getByRole('link', { name: 'docs' })).toHaveAttribute(
+    'href',
+    'https://example.com/docs',
+  );
+  await expect(unchanged).toContainText('[click](javascript:alert(1))');
+  await expect(unchanged.getByRole('img', { name: 'shot' })).toBeVisible();
+  const shotDir = process.env.ATTACHMENT_SHOT_DIR;
+  if (shotDir !== undefined) {
+    const padded = async (locator: typeof notice, name: string) => {
+      const box = await locator.boundingBox();
+      if (box === null) return;
+      await page.screenshot({
+        path: `${shotDir}/${name}.png`,
+        clip: {
+          x: Math.max(0, box.x - 12),
+          y: Math.max(0, box.y - 12),
+          width: box.width + 24,
+          height: box.height + 24,
+        },
+      });
+    };
+    await padded(notice, 'after');
+    await padded(unchanged, 'unchanged');
+  }
+});
 
 test('a notify_user notice from an event turn shows in the conversation', async ({ page }) => {
   await mockLive(page, {

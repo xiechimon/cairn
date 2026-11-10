@@ -645,6 +645,52 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                     ],
                     "type": "string",
                   },
+                  "context": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "incomplete": {
+                        "type": "boolean",
+                      },
+                      "messages": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "messageId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "role": {
+                              "enum": [
+                                "user",
+                                "assistant",
+                              ],
+                              "type": "string",
+                            },
+                            "text": {
+                              "type": "string",
+                            },
+                            "threadId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "threadId",
+                            "messageId",
+                            "role",
+                            "text",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                    },
+                    "required": [
+                      "messages",
+                      "incomplete",
+                    ],
+                    "type": "object",
+                  },
                   "source": {
                     "oneOf": [
                       {
@@ -1567,6 +1613,52 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                               "third-party",
                             ],
                             "type": "string",
+                          },
+                          "context": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "incomplete": {
+                                "type": "boolean",
+                              },
+                              "messages": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "messageId": {
+                                      "minLength": 1,
+                                      "type": "string",
+                                    },
+                                    "role": {
+                                      "enum": [
+                                        "user",
+                                        "assistant",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                    },
+                                    "threadId": {
+                                      "minLength": 1,
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "threadId",
+                                    "messageId",
+                                    "role",
+                                    "text",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                            },
+                            "required": [
+                              "messages",
+                              "incomplete",
+                            ],
+                            "type": "object",
                           },
                           "source": {
                             "oneOf": [
@@ -5295,12 +5387,6 @@ exports[`body/envelope schema snapshots > createTodoBody > createTodoBody.json 1
     "spec": {
       "type": "string",
     },
-    "tagIds": {
-      "items": {
-        "type": "string",
-      },
-      "type": "array",
-    },
     "title": {
       "type": "string",
     },
@@ -6712,6 +6798,52 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                               "third-party",
                             ],
                             "type": "string",
+                          },
+                          "context": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "incomplete": {
+                                "type": "boolean",
+                              },
+                              "messages": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "messageId": {
+                                      "minLength": 1,
+                                      "type": "string",
+                                    },
+                                    "role": {
+                                      "enum": [
+                                        "user",
+                                        "assistant",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                    },
+                                    "threadId": {
+                                      "minLength": 1,
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "threadId",
+                                    "messageId",
+                                    "role",
+                                    "text",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                            },
+                            "required": [
+                              "messages",
+                              "incomplete",
+                            ],
+                            "type": "object",
                           },
                           "source": {
                             "oneOf": [
@@ -8420,7 +8552,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "thread_pr",
   "coordinator_conversation",
   "coordinator_entry",
+  "coordinator_input",
+  "coordinator_run",
   "coordinator_lease",
+  "coordinator_turn_snapshot",
   "data_migration",
   "task_issue_close",
   "deploy_lease",
@@ -8623,10 +8758,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
-    "path": "/api/projects/{id}/tags",
-  },
-  {
-    "method": "GET",
     "path": "/api/projects/{id}/builds",
   },
   {
@@ -8733,13 +8864,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {title,spec}（r3 §3.1）+ 可选 tagIds[]（r9 §3.4 实测携带位）",
+    "note": "body {title,spec,output?}; retired category assignments are rejected before writes",
     "path": "/api/projects/{id}/todos",
-  },
-  {
-    "method": "POST",
-    "note": "body {name,color} → 201 tag record 全形（r9 §3.4 实测；#309）",
-    "path": "/api/projects/{id}/tags",
   },
   {
     "method": "POST",
@@ -11148,6 +11274,52 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                       "third-party",
                     ],
                     "type": "string",
+                  },
+                  "context": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "incomplete": {
+                        "type": "boolean",
+                      },
+                      "messages": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "messageId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "role": {
+                              "enum": [
+                                "user",
+                                "assistant",
+                              ],
+                              "type": "string",
+                            },
+                            "text": {
+                              "type": "string",
+                            },
+                            "threadId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "threadId",
+                            "messageId",
+                            "role",
+                            "text",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                    },
+                    "required": [
+                      "messages",
+                      "incomplete",
+                    ],
+                    "type": "object",
                   },
                   "source": {
                     "oneOf": [

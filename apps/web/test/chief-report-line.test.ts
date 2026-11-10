@@ -79,7 +79,7 @@ describe('thread report rows with the session line', () => {
 
   test('done and failed reports carry the same line next to their status', () => {
     const done = render({ ...REPORT, phase: 'done', id: 'r4', line: 'Shipped the export' });
-    expect(plain(done)).toContain('Task #3 Export: Done, not verified');
+    expect(plain(done)).toContain('Task #3 Export: Done');
     expect(done).toContain('Shipped the export');
     const failed = render({ ...REPORT, phase: 'failed', id: 'r5', line: 'Tests would not pass' });
     expect(plain(failed)).toContain('Task #3 Export: Failed');

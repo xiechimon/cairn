@@ -1,5 +1,6 @@
 import {
   isBuildStepKind,
+  resolvedBuildPrNumber,
   STOP_MESSAGE,
   type StepKind,
   type TodoRecord as WireTodo,
@@ -62,6 +63,7 @@ export interface ThreadChat {
   started: boolean;
   locked: boolean;
   running: boolean;
+  waitingOnChecks: boolean;
   workingFor: { startedAt?: number; seconds?: number } | undefined;
   machineName: string | null;
   stopped: boolean;
@@ -353,6 +355,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     started,
     locked: !open,
     running,
+    waitingOnChecks:
+      todo?.phase === 'building' &&
+      !running &&
+      buildQ.data != null &&
+      resolvedBuildPrNumber(buildQ.data) != null,
     workingFor:
       running && streamingItem?.kind === 'streaming'
         ? { startedAt: streamingItem.startedAt, seconds: streamingItem.seconds }

@@ -40,7 +40,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`
+- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`, `machines-online-dot`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
@@ -1019,6 +1019,25 @@ Reach:
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
 - Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
 
+### git-release-tags
+
+**Git release tags** (shipped, centrality 4). The existing daemon-local create_tag tool creates and pushes annotated Git tags, independently of task categories.
+
+States: Repository-bound invocation, successful tag push, invalid input or Git failure; no product page.
+
+Reach:
+
+1. `open /app`
+2. `type a repository task whose worker claim enables create_tag`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: none
+- Research: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
+- Frontend design: n/a: an existing daemon-local repository tool with no UI
+- Backend design: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
+- Evidence: `apps/daemon/test/tag-tool.test.ts`, `apps/daemon/test/runner-create-tag.test.ts`
+
 ### ios-app
 
 **iOS app** (planned, centrality 4). D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.
@@ -1034,9 +1053,9 @@ Reach:
 
 ### thread-tags
 
-**Thread tags** (shipped, centrality 4). The fixed tag vocabulary on threads, set by agents and users.
+**Thread tags** (shipped, centrality 4). Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.
 
-States: Tags from the fixed vocabulary appear on thread rows.
+States: Vocabulary GET/POST return 404; no category seeding or assignment writers remain. Retired tagIds fail before writes across REST/Coordinator/MCP and canonical services, including SDK transports. Existing read-only membership and classification remain until final data removal; GitHub labels are separate.
 
 Reach:
 
@@ -1046,7 +1065,7 @@ Reach:
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/tags.md](features/tags.md)
-- Research: **gap**: no note on whether tags still earn their place after D58
+- Research: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
 - Backend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
-- Evidence: `apps/daemon/test/tag-tool.test.ts`, `apps/daemon/test/runner-create-tag.test.ts`
+- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/category-vocabulary-retirement.test.ts`, `apps/server/test/category-assignment-retirement.test.ts`, `packages/shared/test/task-request.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`

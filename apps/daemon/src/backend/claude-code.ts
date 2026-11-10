@@ -712,11 +712,13 @@ export interface HostToolSources {
   localTools: readonly LocalToolDef[];
 }
 
-export function buildHostTools(sources: HostToolSources): SdkMcpToolDefinition[] {
+type HostMcpTool = SdkMcpToolDefinition<Record<string, z.ZodType>>;
+
+export function buildHostTools(sources: HostToolSources): HostMcpTool[] {
   if (sources.remoteTools.length > 0 && !sources.relay) {
     throw new Error('claude-code backend: remoteTools require executeRemoteTool (fail-closed)');
   }
-  const tools: SdkMcpToolDefinition[] = [];
+  const tools: HostMcpTool[] = [];
   for (const def of sources.remoteTools) {
     const shape = parametersToShape(def.parameters, def.name);
     tools.push(
@@ -752,6 +754,34 @@ export function buildHostTools(sources: HostToolSources): SdkMcpToolDefinition[]
     );
   }
   return tools;
+}
+
+export function createHostMcpServer(tools: HostMcpTool[]): ReturnType<typeof createSdkMcpServer> {
+  const canonicalTaskTools = tools.filter(
+    (tool) =>
+      tool.name === 'create_todo' ||
+      tool.name === 'update_todo' ||
+      (tool.name === 'set_task_meta' &&
+        Object.keys(tool.inputSchema).length === 1 &&
+        'title' in tool.inputSchema),
+  );
+  const server = createSdkMcpServer({
+    name: HOST_MCP_SERVER_NAME,
+    alwaysLoad: true,
+    tools: tools.filter((tool) => !canonicalTaskTools.includes(tool)),
+  });
+  for (const tool of canonicalTaskTools) {
+    server.instance.registerTool(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema: z.object(tool.inputSchema).passthrough(),
+        _meta: { 'anthropic/alwaysLoad': true },
+      },
+      tool.handler,
+    );
+  }
+  return server;
 }
 
 export function mapMcpEndpoint(endpoint: McpEndpoint): McpServerConfig {
@@ -1061,11 +1091,7 @@ export class ClaudeCodeBackend implements AgentBackend {
     });
     const mcpServers: Record<string, McpServerConfig> = {};
     if (hostTools.length > 0) {
-      mcpServers[HOST_MCP_SERVER_NAME] = createSdkMcpServer({
-        name: HOST_MCP_SERVER_NAME,
-        alwaysLoad: true,
-        tools: hostTools,
-      });
+      mcpServers[HOST_MCP_SERVER_NAME] = createHostMcpServer(hostTools);
     }
     for (const endpoint of opts.mcpServers ?? []) {
       if (endpoint.slug === HOST_MCP_SERVER_NAME) {

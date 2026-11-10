@@ -176,11 +176,14 @@ export const githubReadToolParamsSchemas = {
 } as const;
 
 const todoIdListSchema = z.array(z.string().min(1)).max(50);
+const ownerMessageIdListSchema = todoIdListSchema
+  .min(1)
+  .refine((ids) => new Set(ids).size === ids.length, { message: 'message IDs must be unique' });
 
 export const coordinatorCreateTodoParamsSchema = z
   .object({
     projectId: z.string().min(1),
-    messageIds: todoIdListSchema.min(1).optional(),
+    messageIds: ownerMessageIdListSchema.optional(),
     sourceTodoId: z.string().min(1).optional(),
     quotes: z.array(z.string().trim().min(1)).min(1).max(50).optional(),
     dependsOn: todoIdListSchema.optional(),
@@ -199,9 +202,8 @@ export const coordinatorUpdateTodoParamsSchema = z
   .object({
     todoId: z.string().min(1),
     title: z.string().trim().min(1).max(200).optional(),
-    tagIds: todoIdListSchema.optional(),
     projectId: z.string().min(1).optional(),
-    addMessageIds: todoIdListSchema.min(1).optional(),
+    addMessageIds: ownerMessageIdListSchema.optional(),
     blockedBy: todoIdListSchema.optional(),
   })
   .strict();
@@ -409,15 +411,15 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         projectId: str('Project id.'),
         messageIds: idArr(
-          'Optional ids of owner messages in this Coordinator thread to cite. Default: the owner messages of this turn. Required in event turns ([wake:…]).',
+          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
         ),
         sourceTodoId: str(
-          'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds.',
+          'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
         ),
         quotes: arr(
           { type: 'string' },
@@ -441,22 +443,19 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_todo',
     description:
-      "Update a todo's summary title (Coordinator create_todo request tasks only), tags, move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds, copied verbatim). After create_todo, set title to a short summary (≤50 chars) for the Tasks panel; the owner's cited request body stays in the task text and is never rewritten here. Board tasks and imported GitHub issues keep their titles. A running thread gets body corrections through message_thread.",
+      "Update a todo's summary title (Coordinator create_todo request tasks only), move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds, copied verbatim; already-bound messages return 409 before any routing changes). After create_todo, set title to a short summary (≤50 chars) for the Tasks panel; the owner's cited request body stays in the task text and is never rewritten here. Board tasks and imported GitHub issues keep their titles. A running thread gets body corrections through message_thread.",
     parameters: obj(
       {
         todoId: str('Todo id.'),
         title: str(
           'Optional short summary title for a Coordinator-created request task (≤50 chars, plain text). Refused when the todo has no cited request. Does not change the owner request body.',
         ),
-        tagIds: idArr('Optional replacement tag ids.'),
-        projectId: str(
-          'Optional target project id. Only for a todo that has not started; its tags are dropped.',
-        ),
+        projectId: str('Optional target project id. Only for a todo that has not started.'),
         blockedBy: idArr(
           'Optional replacement list of todo ids that must finish first; [] removes every blocker.',
         ),
         addMessageIds: idArr(
-          'Optional ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
+          'Optional unique ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
         ),
       },
       ['todoId'],
@@ -935,14 +934,12 @@ const WORKER_ATTACH_FILE_TOOL: RemoteToolDef = {
 const SET_TASK_META_TOOL: RemoteToolDef = {
   name: 'set_task_meta',
   description:
-    'Set the title and category tag of the task you are currently working on. ' +
+    'Set the title of the task you are currently working on. ' +
     'Call exactly once before starting work: title = a concise summary of the task spec ' +
-    '(50 chars max, plain text, no markdown); tag = one name from the fixed tag vocabulary ' +
-    'listed in your instructions (omit it when none fits).',
+    '(50 chars max, plain text, no markdown).',
   parameters: obj(
     {
       title: str('Task title, 50 chars max.'),
-      tag: str('Optional tag name from the fixed vocabulary.'),
     },
     ['title'],
   ),

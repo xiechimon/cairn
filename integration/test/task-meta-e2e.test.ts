@@ -2,7 +2,6 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FIXED_TAGS, type TagRecord } from '@cairn/shared';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -46,19 +45,19 @@ afterAll(async () => {
   await server?.close();
 });
 
-describe('spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wire → SQLite)', () => {
-  test('project creation seeds the fixed 6-tag vocabulary (REST shape + SQLite rows)', async () => {
-    const tags = (await api(server.url, 'GET', `/api/projects/${projectId}/tags`))
-      .body as TagRecord[];
-    expect(tags.map((t) => t.name)).toEqual(FIXED_TAGS.map((t) => t.name));
-    expect(tags.map((t) => t.color)).toEqual(FIXED_TAGS.map((t) => t.color));
-    for (const row of tags) {
-      expect(row.projectId).toBe(projectId);
-      expect(row.v).toBe(1);
-      expect(row.createdAt).toBeGreaterThan(0);
-    }
+describe('spec 15 untitled tasks without category vocabulary (live UI → wire → SQLite)', () => {
+  test('project creation seeds no categories and the vocabulary endpoints are retired', async () => {
     const rows = server.db.select().from(tagTable).where(eq(tagTable.projectId, projectId)).all();
-    expect(rows).toHaveLength(FIXED_TAGS.length);
+    expect(rows).toEqual([]);
+    for (const method of ['GET', 'POST']) {
+      const response = await api(
+        server.url,
+        method,
+        `/api/projects/${projectId}/tags`,
+        method === 'POST' ? { name: 'retired', color: '#123456' } : undefined,
+      );
+      expect(response.status).toBe(404);
+    }
   });
 
   test('a draft takes its first body line as the placeholder title; detail page has no tag add surface', async () => {

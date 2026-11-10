@@ -233,7 +233,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['GET', '/api/projects'],
       ['GET', '/api/projects/{id}/todos'],
       ['GET', '/api/projects/{id}/branches'],
-      ['GET', '/api/projects/{id}/tags'],
       ['GET', '/api/projects/{id}/builds'],
       ['GET', '/api/projects/{id}/preview-token'],
       ['GET', '/api/todos'],
@@ -259,6 +258,13 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
   ])('does not register retired project browser route %s', (path) => {
     expect(has('GET', path)).toBe(false);
   });
+
+  it.each(['GET', 'POST'])(
+    'does not register the retired category vocabulary %s route',
+    (method) => {
+      expect(has(method, '/api/projects/{id}/tags')).toBe(false);
+    },
+  );
 
   it('covers the observed POST/PATCH list', () => {
     for (const [method, path] of [
@@ -540,7 +546,13 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(69);
+    expect(DB_TABLES).toHaveLength(72);
+    expect(DB_TABLES).toContain('coordinator_run');
+    expect(INTERNAL_ONLY_TABLES).toContain('coordinator_run');
+    expect(DB_TABLES).toContain('coordinator_input');
+    expect(INTERNAL_ONLY_TABLES).toContain('coordinator_input');
+    expect(DB_TABLES).toContain('coordinator_turn_snapshot');
+    expect(INTERNAL_ONLY_TABLES).toContain('coordinator_turn_snapshot');
     expect(DB_TABLES).toContain('deploy_lease');
     expect(INTERNAL_ONLY_TABLES).toContain('deploy_lease');
     expect(INTERNAL_ONLY_TABLES).toContain('task_issue_close');

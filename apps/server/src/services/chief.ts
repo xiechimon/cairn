@@ -96,7 +96,6 @@ import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
 import { insertMessageRow } from './transcript.js';
-import { buildVerified } from './verified.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 export interface ChiefDeps {
@@ -1010,7 +1009,6 @@ function insertThreadReport(
   phase: ThreadReportContent['phase'],
   options: { wakeStepId?: string; line?: string } = {},
 ): void {
-  const buildId = todoRecord.latestBuildId;
   const line = options.line ?? reportLineOf(deps, todoRecord);
   const content = {
     kind: 'thread-report',
@@ -1019,7 +1017,6 @@ function insertThreadReport(
     seqNum: todoRecord.seqNum,
     title: todoRecord.title,
     ...(options.wakeStepId !== undefined ? { wakeStepId: options.wakeStepId } : {}),
-    ...(phase === 'done' ? { verified: buildId !== null && buildVerified(deps.db, buildId) } : {}),
     ...(line !== null ? { line } : {}),
   } satisfies ThreadReportContent;
   const report = {

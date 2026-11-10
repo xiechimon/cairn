@@ -7,6 +7,7 @@ import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
+import { AttachmentChip, AttachmentPreviewHandler } from './attachment-chip.js';
 
 const CODE_SKIN: Record<string, string> = {
   'chat-code':
@@ -60,11 +61,19 @@ function MentionChip({ seg }: { seg: DocSegment }) {
 }
 
 export function Segments({ segments, codeClassName }: SegmentsProps) {
+  const onPreview = useContext(AttachmentPreviewHandler);
   return (
     <>
       {segments.map((seg, j) =>
         seg.style === 'mention' ? (
           <MentionChip key={j} seg={seg} />
+        ) : seg.style === 'attachment' && seg.attachmentKey != null ? (
+          <AttachmentChip
+            key={j}
+            name={seg.text}
+            attachmentKey={seg.attachmentKey}
+            {...(onPreview !== undefined ? { onPreview } : {})}
+          />
         ) : seg.style === 'anchor' ? (
           <a
             key={j}

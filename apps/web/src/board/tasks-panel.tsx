@@ -1,8 +1,8 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
-import { CalendarClock, ChevronDown, ListChecks, Plus } from 'lucide-react';
+import { ListChecks, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -17,6 +17,8 @@ import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { ACCENT_INK } from '../phase.js';
 import { relativeTime } from './rel-time.js';
+import { TasksAddInput } from './tasks-add-input.js';
+import { TasksScheduleList } from './tasks-schedule-list.js';
 import {
   ACTIVE_SECTIONS,
   type ActiveSection,
@@ -35,56 +37,23 @@ import {
 } from './tasks-sections.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 
-export type TasksTab = 'active' | 'next';
+export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
 
-function SectionHeader({
-  section,
-  count,
-  folded,
-  onToggle,
-}: {
-  section: TaskSection;
-  count: number;
-  folded?: boolean;
-  onToggle?: () => void;
-}) {
+function SectionHeader({ section, count }: { section: TaskSection; count: number }) {
   const { t } = useI18n();
   const accent = isWaiting(section);
-  const body = (
-    <>
+  return (
+    <h3
+      className={cn(
+        'm-0 flex h-8 items-center gap-1.5 px-2.5 text-meta font-medium',
+        accent ? 'text-foreground' : 'text-content-tertiary',
+      )}
+    >
       {t(SECTION_LABEL[section])}
       <span className={cn('tabular-nums', accent ? ACCENT_INK : 'text-content-tertiary')}>
         {count}
       </span>
-      {folded !== undefined && (
-        <ChevronDown
-          aria-hidden
-          className={cn(
-            'size-3.5 text-content-dim transition-transform duration-(--dur-fast)',
-            folded && '-rotate-90',
-          )}
-          strokeWidth={1.75}
-        />
-      )}
-    </>
-  );
-  const cls = cn(
-    'flex h-8 items-center gap-1.5 px-2.5 text-meta font-medium',
-    accent ? 'text-foreground' : 'text-content-tertiary',
-  );
-  if (onToggle === undefined) return <h3 className={cn('m-0', cls)}>{body}</h3>;
-  return (
-    <Button
-      variant="ghost"
-      aria-expanded={!folded}
-      onClick={onToggle}
-      className={cn(
-        cls,
-        'justify-start self-start hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent dark:hover:bg-transparent',
-      )}
-    >
-      {body}
-    </Button>
+    </h3>
   );
 }
 
@@ -145,6 +114,7 @@ interface TasksPanelProps {
   onOpenThread: (id: string) => void;
   onOpenQuestion: (question: QuestionTarget) => void;
   onNewTask: () => void;
+  onAddTask: (text: string) => void | Promise<void>;
   query?: QueryLike;
 }
 
@@ -157,11 +127,12 @@ export function TasksPanel({
   onOpenThread,
   onOpenQuestion,
   onNewTask,
+  onAddTask,
   query,
 }: TasksPanelProps) {
   const { t } = useI18n();
   const [tab, setTab] = useState<TasksTab>('active');
-  const [resolvedOpen, setResolvedOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const groups = bySection(entries);
   const { live: connected, teamId } = useLiveData();
   const prsQuery = usePrs(teamId, undefined, connected);
@@ -218,13 +189,19 @@ export function TasksPanel({
         className="mt-6"
       />
     ) : null;
+  const activeCount = ACTIVE_SECTIONS.reduce((sum, section) => sum + count(section), 0);
+  const quiet = (text: string) => (
+    <p data-testid="tasks-quiet" className="m-0 px-2.5 py-2 text-meta text-content-tertiary">
+      {text}
+    </p>
+  );
   const active = (
     <div className="flex flex-col gap-2">
       {empty}
+      {empty === null && activeCount === 0 && quiet(t('现在没有进行中的任务'))}
       {ACTIVE_SECTIONS.map((section) => {
         const n = count(section);
         if (n === 0) return null;
-        const folded = section === 'resolved' ? !resolvedOpen : undefined;
         return (
           <section
             key={section}
@@ -232,18 +209,9 @@ export function TasksPanel({
             data-section={section}
             className="flex flex-col"
           >
-            <SectionHeader
-              section={section}
-              count={n}
-              folded={folded}
-              onToggle={section === 'resolved' ? () => setResolvedOpen((v) => !v) : undefined}
-            />
-            {folded !== true && (
-              <>
-                {section === 'needs_input' && questionRows}
-                {groups[section].map(row)}
-              </>
-            )}
+            <SectionHeader section={section} count={n} />
+            {section === 'needs_input' && questionRows}
+            {groups[section].map(row)}
           </section>
         );
       })}
@@ -255,26 +223,22 @@ export function TasksPanel({
           onOpenThread={onOpenThread}
         />
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mt-1 gap-1.5 self-start text-meta text-content-secondary"
-        render={<Link to="/app/schedules" />}
-      >
-        <CalendarClock aria-hidden className="size-3.5" strokeWidth={1.75} />
-        {t('管理定时')}
-      </Button>
     </div>
   );
-  const next =
-    groups.up_next.length === 0 ? (
-      <p className="m-0 px-2.5 py-2 text-meta text-content-tertiary">{t('没有待开始的任务')}</p>
+  const listOf = (section: 'up_next' | 'resolved', emptyText: string) =>
+    groups[section].length === 0 ? (
+      quiet(emptyText)
     ) : (
-      <section data-testid="tasks-section" data-section="up_next" className="flex flex-col">
-        {groups.up_next.map(row)}
+      <section data-testid="tasks-section" data-section={section} className="flex flex-col">
+        {groups[section].map(row)}
       </section>
     );
-  const body = tab === 'active' ? active : next;
+  const body =
+    tab === 'active'
+      ? active
+      : tab === 'next'
+        ? listOf('up_next', t('接下来没有安排'))
+        : listOf('resolved', t('还没有完成的任务'));
   return (
     <SidePanel label={t('任务')} onDismiss={onClose} phoneTab>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
@@ -287,40 +251,56 @@ export function TasksPanel({
               variant="ghost"
               size="icon"
               data-testid="tasks-new"
-              onClick={onNewTask}
-              className="size-7.5 text-content-tertiary"
+              aria-pressed={adding}
+              onClick={() => setAdding((v) => !v)}
+              className="size-7.5 text-content-tertiary aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
             />
           }
         >
           <Plus aria-hidden className="size-4" strokeWidth={1.75} />
         </IconTooltip>
       </SidePanelHead>
+      {adding && (
+        <TasksAddInput
+          onClose={() => setAdding(false)}
+          onSubmit={async (text) => {
+            await onAddTask(text);
+            setAdding(false);
+          }}
+        />
+      )}
       <div className="flex flex-none px-3 pt-3">
         <SegmentedTabs
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'active', label: t('当前') },
+            { value: 'active', label: t('进行中') },
             {
               value: 'next',
               label:
                 groups.up_next.length > 0
-                  ? t('待开始 {n}', { n: groups.up_next.length })
-                  : t('待开始'),
+                  ? t('接下来 {n}', { n: groups.up_next.length })
+                  : t('接下来'),
             },
+            { value: 'scheduled', label: t('定时') },
+            { value: 'resolved', label: t('已完成') },
           ]}
         />
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
-        <QueryBoundary
-          query={query}
-          isEmpty={empty !== null}
-          loadingLabel={t('正在加载任务')}
-          errorTitle={t('任务没能加载')}
-          empty={body}
-        >
-          {body}
-        </QueryBoundary>
+        {tab === 'scheduled' ? (
+          <TasksScheduleList projectId={projectId} now={now} />
+        ) : (
+          <QueryBoundary
+            query={query}
+            isEmpty={empty !== null}
+            loadingLabel={t('正在加载任务')}
+            errorTitle={t('任务没能加载')}
+            empty={body}
+          >
+            {body}
+          </QueryBoundary>
+        )}
       </div>
     </SidePanel>
   );

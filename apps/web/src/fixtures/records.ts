@@ -19,6 +19,7 @@ import {
   type SkillFact,
   type StepPromptOrigin,
   type TagRecord,
+  type TaskRequest,
   type ThreadMessageContent,
   type ThreadReportContent,
   type TodoOutputKind,
@@ -52,6 +53,7 @@ export interface TodoRecord {
   projectId: string;
   title: string;
   spec: string;
+  request?: TaskRequest | null;
   phase: Phase;
   phaseAt: number;
   archivedAt?: number | null;
@@ -306,8 +308,9 @@ export interface ResourcesContent {
 
 export interface DocSegment {
   text: string;
-  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor';
+  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment';
   href?: string;
+  attachmentKey?: string;
   strong?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;

@@ -12,10 +12,13 @@ import {
 } from './compaction.js';
 import { reportCompactionFailure } from './failure-report.js';
 import { generationTelemetryExtension } from './generation-telemetry.js';
+import { createInputReceipts, type InputReceipts } from './input-receipts.js';
+import { replayCoordinatorInputs } from './input-replay.js';
 import type { MachineApi } from './machine-api.js';
 import { type CoordinatorModels, createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
 import { syncToRewind } from './rewind-sync.js';
+import { coordinatorStoreId } from './store-identity.js';
 import { threadStorePath } from './thread-harnesses.js';
 import {
   type ConversationGate,
@@ -38,6 +41,7 @@ export interface ServerRuntimeConfig {
   factsFor(threadId: string): ReconcileFacts;
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   memoryFlush?(threadId: string): MemoryFlush | null;
+  onInputError?(threadId: string, error: unknown): void;
   onReconciled?(threadId: string, outcome: ReconcileOutcome, stale: string[]): void;
 }
 
@@ -59,6 +63,7 @@ export interface ServerTurn {
 interface ThreadState {
   harness: Promise<Harness>;
   models: CoordinatorModels;
+  inputs: InputReceipts | undefined;
   gate: ConversationGate;
   volatile: VolatileContext;
   summary: { ref: ModelRef | null };
@@ -85,12 +90,28 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     const facts = config.factsFor(threadId);
     const models = createCoordinatorModels(config.fixedProviders);
     const gate = createConversationGate();
+    const inputs =
+      api.inputs === undefined
+        ? undefined
+        : createInputReceipts(threadId, api.inputs, context, (error) =>
+            config.onInputError?.(threadId, error),
+          );
     const volatile = createVolatileContext();
     const summary: ThreadState['summary'] = { ref: null };
     const extensions = [
       coordinatorToolsExtension(api, gate, {
         routerTools: config.routerTools,
         shuttingDown: () => shuttingDown,
+        ...(inputs === undefined
+          ? {}
+          : {
+              storeId: inputs.storeId,
+              beforeTool: async (signal?: AbortSignal, conversationId?: string) => {
+                await inputs.barrier(signal);
+                if (conversationId !== undefined)
+                  await api.inputs?.assertConversation(threadId, inputs.key(conversationId));
+              },
+            }),
       }),
       volatileContextExtension(volatile),
       coordinatorCompactionExtension(
@@ -115,13 +136,27 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       threadStorePath(config.storageDir, threadId),
       models.models,
       context,
-      { extensions, settings: settings(models), summarize },
+      {
+        extensions,
+        settings: settings(models),
+        summarize,
+        storeIdentity: (harness) => coordinatorStoreId(harness, context),
+        refreshFacts: () => config.factsFor(threadId),
+        beforeReconcile: async (harness, storeId) => {
+          if (storeId === undefined)
+            throw new Error('Coordinator durable store identity is missing');
+          inputs?.attach(harness, storeId);
+          await inputs?.recover(harness);
+          if (api.inputs !== undefined)
+            await replayCoordinatorInputs(harness, api.inputs, api, threadId, storeId, context);
+        },
+      },
       forceReseed ? { ...facts, forceReseed: true, hasClaimedStep: false } : facts,
     ).then((result) => {
       config.onReconciled?.(threadId, result.outcome, result.stale);
       return result.harness;
     });
-    const state = { harness, models, gate, volatile, summary };
+    const state = { harness, models, gate, volatile, summary, inputs };
     open.set(threadId, state);
     harness.catch(() => open.delete(threadId));
     return state;
@@ -144,7 +179,9 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     lastUsed.delete(threadId);
     const shutdown = (async () => {
       const harness = await state.harness.catch(() => null);
+      state.inputs?.stop();
       await harness?.close(context);
+      await state.inputs?.close();
     })();
     closing.set(
       threadId,
@@ -159,6 +196,14 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
 
   return {
     openThread,
+    recoverThread: async (threadId: string) => {
+      const harness = await openThread(threadId);
+      const inputs = open.get(threadId)?.inputs;
+      await inputs?.recover(harness);
+      const storeId = inputs?.storeId();
+      if (api.inputs !== undefined && storeId !== undefined)
+        await replayCoordinatorInputs(harness, api.inputs, api, threadId, storeId, context);
+    },
     closeThread,
     isOpen: (threadId: string) => open.has(threadId),
     runTurn: async (turn: ServerTurn): Promise<MachineDoneBody> => {
@@ -193,6 +238,23 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         return await runCoordinatorTurn(
           {
             harness: await current.harness,
+            ...(current.inputs === undefined
+              ? {}
+              : {
+                  inputs: current.inputs,
+                  afterMirror: async () => {
+                    const storeId = current.inputs?.storeId();
+                    if (api.inputs !== undefined && storeId !== undefined)
+                      await replayCoordinatorInputs(
+                        await current.harness,
+                        api.inputs,
+                        api,
+                        threadId,
+                        storeId,
+                        context,
+                      );
+                  },
+                }),
             conversationId: config.factsFor(threadId).conversationId,
             models: current.models,
             api,
@@ -226,7 +288,11 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     },
     close: async (): Promise<void> => {
       shuttingDown = true;
-      for (const threadId of [...open.keys()]) await closeThread(threadId);
+      const results = await Promise.allSettled([...open.keys()].map(closeThread));
+      const failures = results.flatMap((result) =>
+        result.status === 'rejected' ? [result.reason] : [],
+      );
+      if (failures.length > 0) throw new AggregateError(failures, failures.map(String).join('; '));
     },
   };
 }

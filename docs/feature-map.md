@@ -15,12 +15,12 @@
 
 | Item | Count |
 |---|---|
-| Features | 52 |
-| status shipped | 43 |
+| Features | 53 |
+| status shipped | 44 |
 | status partial | 7 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 19 |
-| Research gaps | 16 |
+| research, frontend design and backend design all present or not applicable | 21 |
+| Research gaps | 15 |
 | Frontend design gaps | 20 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
@@ -79,8 +79,9 @@
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
 | [Sidebar](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
+| [Git release tags](#git-release-tags) | 4 | shipped | yes | n/a | yes |  |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
-| [Thread tags](#thread-tags) | 4 | shipped | gap | yes | yes | B11 |
+| [Thread tags](#thread-tags) | 4 | shipped | yes | yes | yes |  |
 
 ## Gaps by batch
 
@@ -186,7 +187,6 @@ Small surfaces that work today without research or design: the Coordinator MCP f
 | [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository |
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
 | [Server backup and deploy status](#server-status) | 3 | Frontend design: the banners have no design |
-| [Thread tags](#thread-tags) | 4 | Research: no note on whether tags still earn their place after D58 |
 
 ### B12 · Phase 3: iOS app
 
@@ -598,6 +598,14 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](spec/14-skills-execution-surface-injection.md)
 
+### git-release-tags
+
+**Git release tags** (shipped). The existing daemon-local create_tag tool creates and pushes annotated Git tags, independently of task categories.
+
+- Research: [docs/research/thread-category-runtime-cutover-3481.md](research/thread-category-runtime-cutover-3481.md)
+- Frontend design: n/a: an existing daemon-local repository tool with no UI
+- Backend design: [docs/research/thread-category-runtime-cutover-3481.md](research/thread-category-runtime-cutover-3481.md)
+
 ### ios-app
 
 **iOS app** (planned). D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.
@@ -608,9 +616,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### thread-tags
 
-**Thread tags** (shipped). The fixed tag vocabulary on threads, set by agents and users.
+**Thread tags** (shipped). Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.
 
-- Research: **gap**: no note on whether tags still earn their place after D58
+- Research: [docs/research/thread-category-runtime-cutover-3481.md](research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
 - Backend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
 

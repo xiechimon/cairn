@@ -15,10 +15,11 @@ import { useConnected } from '../api/connection-state.js';
 import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { ListCard } from '../components/list-card.js';
 import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
+import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -68,38 +69,39 @@ export function MachineChip({
   const connected = useConnected();
   const host = coordinatorMachine(machines);
   const hostOnline = connected && host?.online === true;
-  const running = hostOnline ? (host?.runningSteps ?? 0) : 0;
+  const label =
+    host === null
+      ? t('电脑')
+      : `${t('电脑')} · ${host.name} · ${connected ? machineStateLabel(host, t) : t('连接断开，正在重连…')}`;
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      aria-pressed={open}
-      onClick={onToggle}
-      data-testid="machines-button"
-      title={
-        host === null
-          ? undefined
-          : `${host.name} · ${connected ? machineStateLabel(host, t) : t('连接断开，正在重连…')}`
+    <IconTooltip
+      label={label}
+      side="bottom"
+      trigger={
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-pressed={open}
+          onClick={onToggle}
+          data-testid="machines-button"
+          data-connected={connected}
+          className="relative text-content-tertiary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+        />
       }
-      data-connected={connected}
-      className="mr-1 h-7 gap-1.5 rounded-full px-2.5 text-meta font-normal text-content-secondary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
     >
-      <Laptop aria-hidden="true" className="size-3.5" />
-      <span className="max-w-32 truncate max-[640px]:sr-only">{host?.name ?? t('电脑')}</span>
+      <Laptop aria-hidden="true" />
       {loading ? (
-        <Skeleton className="size-1.5 animate-none rounded-full" />
+        <Skeleton className="absolute top-1 right-1 size-1.5 animate-none rounded-full" />
       ) : (
-        <OnlineDot online={hostOnline} />
+        hostOnline && (
+          <span
+            aria-hidden="true"
+            data-testid="machines-online-dot"
+            className="absolute top-1 right-1 size-1.5 rounded-full bg-running"
+          />
+        )
       )}
-      {!loading && host != null && connected && !hostOnline && (
-        <span className="text-content-tertiary max-[640px]:hidden">{t('离线')}</span>
-      )}
-      {running > 0 && (
-        <span className="text-content-tertiary tabular-nums max-[640px]:hidden">
-          {t('{n} 在跑', { n: running })}
-        </span>
-      )}
-    </Button>
+    </IconTooltip>
   );
 }
 
@@ -109,6 +111,7 @@ function CapabilityRow({
   hint,
   checked,
   disabled,
+  disabledReason,
   onCheckedChange,
 }: {
   icon: ReactNode;
@@ -116,8 +119,10 @@ function CapabilityRow({
   hint: string;
   checked: boolean;
   disabled: boolean;
+  disabledReason?: string;
   onCheckedChange?: (checked: boolean) => void;
 }) {
+  const reason = disabled ? (disabledReason ?? hint) : undefined;
   return (
     <div className="flex items-center gap-3 px-3.5 py-2.5">
       <span className="flex-none text-content-tertiary">{icon}</span>
@@ -125,12 +130,15 @@ function CapabilityRow({
         <span className="text-ui text-foreground">{label}</span>
         <span className="text-meta text-content-tertiary">{hint}</span>
       </span>
-      <ToggleSwitch
-        checked={checked}
-        disabled={disabled}
-        aria-label={label}
-        onCheckedChange={onCheckedChange}
-      />
+      <ExplainDisabledToggle disabled={disabled} reason={reason}>
+        <ToggleSwitch
+          checked={checked}
+          disabled={disabled}
+          aria-label={label}
+          title={reason}
+          onCheckedChange={onCheckedChange}
+        />
+      </ExplainDisabledToggle>
     </div>
   );
 }
@@ -207,6 +215,13 @@ function MachineCard({
       : browserEnabled
         ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
         : t('这台机器还不支持浏览器。');
+  const desktopBlockedReason = !online
+    ? t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
+    : computer === null
+      ? coordinator
+        ? t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')
+        : t('这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。')
+      : undefined;
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -421,6 +436,7 @@ function MachineCard({
         hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
         checked={desktopInstalled && controlHeld}
         disabled={!canToggleDesktop}
+        disabledReason={desktopBlockedReason}
         onCheckedChange={canToggleDesktop ? onDesktopToggle : undefined}
       />
       <CapabilityRow
@@ -429,6 +445,7 @@ function MachineCard({
         hint={browserHint}
         checked={browserEnabled}
         disabled={!canToggleBrowser}
+        disabledReason={browserHint}
         onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
       />
     </ListCard>

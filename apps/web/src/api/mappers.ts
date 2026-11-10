@@ -41,6 +41,7 @@ import {
   orchestratePromptHeadOf,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
+  resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
   type SystemRow,
@@ -186,6 +187,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     projectId: w.projectId,
     title: w.title,
     spec: w.spec,
+    ...(w.request !== undefined ? { request: w.request } : {}),
     phase: w.phase,
     phaseAt: w.phaseAt,
     archivedAt: w.archivedAt ?? null,
@@ -391,9 +393,10 @@ export function pillOf(call: ToolCallRecord): string {
   return primary === '' ? call.name : `${call.name} ${primary}`;
 }
 
-const LINK_LABEL = /\[([^\]\n]+?)\]\(/g;
+const LINK_LABEL = /\[([^\]\n]*)\]\(/g;
 const MENTION_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
 const WEB_TARGET = /^https?:\/\/\S+$/;
+const ATTACHMENT_TARGET = /^attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]{1,8})$/;
 
 function linkDestinationEnd(text: string, from: number): number {
   let depth = 0;
@@ -436,8 +439,12 @@ export function inlineSegments(text: string): DocSegment[] {
       const label = m[1] ?? '';
       const target = frag.slice(m.index + m[0].length, close).replace(/\\([!-/:-@[-`{-~])/g, '$1');
       const mention = MENTION_TARGET.exec(target);
-      if (mention === null && !WEB_TARGET.test(target)) continue;
-      pushText(frag.slice(cursor, m.index));
+      const attachment = ATTACHMENT_TARGET.exec(target);
+      if (label === '' && attachment === null) continue;
+      if (mention === null && attachment === null && !WEB_TARGET.test(target)) continue;
+      const bang = attachment !== null && frag[m.index - 1] === '!';
+      pushText(frag.slice(cursor, bang ? m.index - 1 : m.index));
+      const key = attachment?.[1] ?? '';
       out.push(
         mention !== null
           ? {
@@ -446,7 +453,14 @@ export function inlineSegments(text: string): DocSegment[] {
               mentionKind: mention[1] as 'agent' | 'skill' | 'project' | 'machine' | 'todo',
               mentionId: mention[2],
             }
-          : { text: label, style: 'anchor', href: target, ...(strong ? { strong: true } : {}) },
+          : attachment !== null
+            ? {
+                text: label !== '' ? label : key.slice(key.lastIndexOf('/') + 1),
+                style: 'attachment',
+                attachmentKey: key,
+                ...(strong ? { strong: true } : {}),
+              }
+            : { text: label, style: 'anchor', href: target, ...(strong ? { strong: true } : {}) },
       );
       cursor = close + 1;
       LINK_LABEL.lastIndex = cursor;
@@ -677,6 +691,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       s.promptOrigin !== undefined ? [[transcriptPromptRowId(s.id), s.promptOrigin] as const] : [],
     ),
   );
+  const stepPromptIds = new Set(steps.map((step) => transcriptPromptRowId(step.id)));
   const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
@@ -730,6 +745,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         });
         continue;
       }
+      if (stepPromptIds.has(m.id)) continue;
       if (GATE_ANNOUNCEMENTS.includes(text)) {
         entries.push({
           at: m.createdAt,
@@ -810,7 +826,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           at: m.createdAt,
           item: {
             kind: 'note',
-            text: todo.verified === true ? STATUS_WORDS.verified : STATUS_WORDS.doneUnverified,
+            text: STATUS_WORDS.done,
             id: m.id,
           },
         });
@@ -962,7 +978,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         ? { skills: act.skills }
         : {}),
     });
-  } else if (build && todo.phase === 'building' && !steps.some((s) => s.status === 'stopped')) {
+  } else if (
+    build &&
+    todo.phase === 'building' &&
+    resolvedBuildPrNumber(build) == null &&
+    !steps.some((s) => s.status === 'stopped')
+  ) {
     items.push({ kind: 'streaming', label: '执行中...' });
   }
 

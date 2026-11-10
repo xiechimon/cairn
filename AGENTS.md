@@ -5,7 +5,7 @@
 - This repository is public: never commit secrets, credentials, internal addresses, personal information or quota details.
 - Never force push, use `--no-verify`, bypass hooks with `core.hooksPath`, or run `git reset --hard`, `git clean`, `git stash` or `git checkout .`.
 - Stage only your own changes with explicit paths; never use `git add -A` or `git add .`.
-- Agent sessions commit and push only as the App: `~/.cairn/tools/app-token/as-bot.sh git commit ...` and `as-bot.sh git push origin HEAD:<branch>`, and open PRs with `as-bot.sh gh pr create`. Only commits ian types himself carry his identity; the hooks and the `commit-author` check enforce `packages/shared/commit-identity.json`.
+- Agent sessions on a host with the App key commit and push only as the App: `~/.cairn/tools/app-token/as-bot.sh git commit ...` and `as-bot.sh git push origin HEAD:<branch>`, and open PRs with `as-bot.sh gh pr create`. A Claude Code cloud session has no App key and commits with plain git as its own identity, `Claude <noreply@anthropic.com>` (`cloudAgents` in `packages/shared/commit-identity.json`, ian 2026-11-10). Only commits ian types himself carry his identity; the hooks and the `commit-author` check enforce that file.
 - Confirm lockfile changes with ian before committing `pnpm-lock.yaml`; authorized changes require `CAIRN_ALLOW_LOCKFILE_CHANGE=1`.
 - Do not run postinstall scripts without explicit user authorization; install dependencies with scripts disabled unless authorized.
 - Seam discipline: read the comments in `biome.json` before changing locked imports (`@earendil-works/*`, `@modelcontextprotocol/sdk`, `simple-git`, `isomorphic-git`, `cron-parser`); consume them through thin bridges.
@@ -73,7 +73,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - After the third review round with findings still open, stop pushing fixes. cairn stops auto-fix wakes, posts the finding classes on the PR and asks Codex for one focused pass over the whole diff; hand the PR to the coordinator, who splits it, accepts the answers or allows one final push.
 - Never post Mergify commands (`@mergifyio queue`, `@mergifyio dequeue` or any other); the queue conditions drive the queue. A green PR enters the queue by itself; if it has not within 10 minutes, read the `Mergify Merge Queue` check run, fix the unmet condition it lists, and report it.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
-- Decisions are recorded in the owner's plan decision table, not as ADRs.
+- Decisions are recorded in the owner's plan decision table (`docs/cairn-plan.md`), not as ADRs. The table is git-tracked in this public repository; keep it free of secrets, credentials, internal addresses, personal information and quota details.
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR when it already covers the request.
 - Write PR bodies per `.claude/skills/pr-cairn/SKILL.md`: Proof first, then What, with Review and Risk collapsed; visible prose is capped at 600 characters.
 - Commit format: `<scope>(<ticket>): <subject>`, in English. Put `closes #N` in the commit message for the closing segment, never only in the PR body; do not close a parent ticket from an intermediate segment.

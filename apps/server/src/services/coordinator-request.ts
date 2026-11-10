@@ -2,6 +2,7 @@ import {
   type CitedSegment,
   type CoordinatorCreateTodoParams,
   type CoordinatorUpdateTodoParams,
+  categoryFreeTaskInputSchema,
   derivePlaceholderTitle,
   isIssueSourcedTask,
   orchestratedTodoIdOf,
@@ -19,9 +20,10 @@ import {
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, parseWith } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
+import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -36,6 +38,9 @@ const NO_OWNER_WORDS =
   "create_todo needs the owner's words: cite owner messages of this thread with messageIds, or a todo with sourceTodoId. Ask the owner with ask_user when there is nothing to cite.";
 
 function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): CitedSegment[] {
+  if (new Set(messageIds).size !== messageIds.length) {
+    throw new HttpError(400, 'message IDs must be unique');
+  }
   const rows = db
     .select()
     .from(chiefMessage)
@@ -77,8 +82,15 @@ function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): 
       messageId: id,
       span: 'whole' as const,
     };
+    const context = resolveTaskReplyContext(db, ctx.threadId, id, row.content);
     return {
-      segment: { source, author: 'owner', sourceRef: null, text: row.content },
+      segment: {
+        source,
+        author: 'owner',
+        sourceRef: null,
+        text: row.content,
+        ...(context === undefined ? {} : { context }),
+      },
       quoteSource: source,
     };
   });
@@ -126,7 +138,13 @@ function ownerGrants(segments: readonly TaskSegment[], teamId: string): string[]
     ...new Set(
       segments
         .filter((segment) => segment.author === 'owner')
-        .flatMap((segment) => attachmentIdsInUserText(segment.text, teamId)),
+        .flatMap((segment) => [
+          segment.text,
+          ...(segment.context?.messages ?? [])
+            .filter((message) => message.role === 'user')
+            .map((message) => message.text),
+        ])
+        .flatMap((text) => attachmentIdsInUserText(text, teamId)),
     ),
   ];
 }
@@ -155,12 +173,31 @@ function requireTeamTodos(db: Db, teamId: string, ids: readonly string[]): void 
   if (missing !== undefined) throw new HttpError(404, `todo ${missing}`);
 }
 
+function requireUnboundMessages(db: Db, ctx: RequestCtx, segments: readonly TaskSegment[]): void {
+  const keys = new Set(segments.map((segment) => segmentKey(segment.source)));
+  const existing = db
+    .select({ id: todo.id, request: todo.request })
+    .from(todo)
+    .where(and(eq(todo.teamId, ctx.teamId), isNotNull(todo.request)))
+    .all();
+  for (const row of existing) {
+    const bound = row.request?.segments.find((segment) => keys.has(segmentKey(segment.source)));
+    if (bound !== undefined) {
+      throw new HttpError(
+        409,
+        `source ${segmentKey(bound.source)} is already bound to todo ${row.id}; use that todo, or explicitly split with quotes or sourceTodoId`,
+      );
+    }
+  }
+}
+
 export function createRequestTodo(
   deps: TodoDeps,
   ctx: RequestCtx,
   params: CoordinatorCreateTodoParams,
   provenance: { createdBy: string | null; ownerId: string },
 ): TodoRecord & { uncovered?: string[] } {
+  parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
   const messageIds = params.messageIds ?? ctx.turnMessageIds ?? [];
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
@@ -172,6 +209,9 @@ export function createRequestTodo(
       : citedMessages(db, ctx, messageIds);
   const segments =
     params.quotes === undefined ? cited.map((c) => c.segment) : quoted(cited, params.quotes);
+  if (params.quotes === undefined && params.sourceTodoId === undefined) {
+    requireUnboundMessages(db, ctx, segments);
+  }
   requireTeamTodos(db, ctx.teamId, params.dependsOn ?? []);
   const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
   const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
@@ -185,7 +225,12 @@ export function createRequestTodo(
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,
     projectId: params.projectId,
-    title: derivePlaceholderTitle(segments[0]?.text ?? '') || PLACEHOLDER_TITLE_FALLBACK,
+    title:
+      derivePlaceholderTitle(
+        segments[0]?.context?.messages.find((message) => message.role === 'user')?.text ??
+          segments[0]?.text ??
+          '',
+      ) || PLACEHOLDER_TITLE_FALLBACK,
     spec: renderTaskText(request),
     createdBy: provenance.createdBy,
     ownerId: provenance.ownerId,
@@ -241,12 +286,16 @@ export function updateRequestTodo(
   ctx: RequestCtx,
   params: CoordinatorUpdateTodoParams,
 ): TodoRecord | null {
+  parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
   const added =
     params.addMessageIds === undefined
       ? null
       : citedMessages(db, ctx, params.addMessageIds).map((c) => c.segment);
-  if (added !== null) appendableRow(db, ctx, params.todoId);
+  if (added !== null) {
+    appendableRow(db, ctx, params.todoId);
+    requireUnboundMessages(db, ctx, added);
+  }
   const summaryTitle =
     params.title === undefined ? undefined : derivePlaceholderTitle(params.title);
   if (params.title !== undefined && summaryTitle === '') {
@@ -272,7 +321,6 @@ export function updateRequestTodo(
     {
       ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
       ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
-      ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
       ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
     },
     summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},

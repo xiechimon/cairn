@@ -41,18 +41,24 @@ const fenceOpens = (text: string) =>
     .length;
 
 describe('create_todo copies the owner words verbatim', () => {
-  test('a reply has a body title while spec, segments and splits preserve its cited context', async () => {
+  test('a reply retains its source binding in raw segments while rendered briefs and copies omit metadata', async () => {
     const id = ownerMessage(REPLY_TASK_172.content);
     const created = (await relay('create_todo', {
       projectId: H.projectId,
       messageIds: [id],
     })) as Created;
     expect(created.title).toBe(REPLY_TASK_172.title);
-    expect(created.spec).toBe(REPLY_TASK_172.content);
+    expect(created.spec).toContain('> Previous task context (redacted).');
+    expect(created.spec).toContain('Please dispatch.');
+    expect(created.spec).not.toContain('<!-- reply');
     expect(row(created.id).request?.segments[0]?.text).toBe(REPLY_TASK_172.content);
+    expect(row(created.id).request?.segments[0]?.context).toEqual({
+      messages: [],
+      incomplete: true,
+    });
     const split = unstartedRequest({ sourceTodoId: created.id });
     expect(split.title).toBe(REPLY_TASK_172.title);
-    expect(split.spec).toBe(REPLY_TASK_172.content);
+    expect(split.spec).toBe(created.spec);
   });
 
   test('a spec or title argument is refused', async () => {
@@ -387,6 +393,9 @@ describe('owner answers and appended words', () => {
       messageIds: [ownerMessage('修一下计数'), owner],
     })) as Created;
     expect(created.spec).toBe('修一下计数\n\n只改看板页');
+    await expect(
+      relay('create_todo', { projectId: H.projectId }, { turnMessageIds: [owner] }),
+    ).rejects.toMatchObject({ status: 409 });
     await expect(
       relay('create_todo', {
         projectId: H.projectId,

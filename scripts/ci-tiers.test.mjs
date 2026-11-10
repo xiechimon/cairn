@@ -153,20 +153,27 @@ test('the full 4-shard e2e runs exactly on merge-queue drafts and pushes', () =>
   for (const [name, github] of Object.entries(events)) {
     const full = fullTier.has(name);
     const { tier, e2e, 'e2e-affected': affected } = plan(github, 'true');
-    assert.equal(tier, full ? 'full' : 'affected', name);
+    assert.equal(tier, full ? 'full' : 'none', name);
     assert.equal(e2e, full, `${name}: e2e`);
-    assert.equal(affected, !full, `${name}: e2e-affected`);
-  }
-});
-
-test('a docs-only pull request skips both e2e tiers, a push never does', () => {
-  for (const [name, github] of Object.entries(events)) {
-    const { e2e, 'e2e-affected': affected } = plan(github, 'false');
-    const push = github['github.event_name'] === 'push';
-    assert.equal(e2e, push, `${name}: e2e`);
     assert.equal(affected, false, `${name}: e2e-affected`);
   }
 });
+
+test('no e2e tier runs when the classifier found nothing left to test', () => {
+  for (const [name, github] of Object.entries(events)) {
+    const { e2e, 'e2e-affected': affected } = plan(github, 'false');
+    assert.equal(e2e, false, `${name}: e2e`);
+    assert.equal(affected, false, `${name}: e2e-affected`);
+  }
+});
+
+function expectedGate(tier, hasCode, e2e, affected) {
+  if (tier === 'none') return e2e === 'skipped' && affected === 'skipped';
+  if (tier !== 'full' && tier !== 'affected') return false;
+  const ran = tier === 'full' ? e2e : affected;
+  const idle = tier === 'full' ? affected : e2e;
+  return idle === 'skipped' && (ran === 'success' || (hasCode === 'false' && ran === 'skipped'));
+}
 
 test('e2e-gate passes only when the tier it picked ran and succeeded', () => {
   assert.match(job('e2e-gate'), /^ {4}needs: \[changes, e2e, e2e-affected\]$/m);
@@ -183,9 +190,7 @@ test('e2e-gate passes only when the tier it picked ran and succeeded', () => {
             name,
             results: { changes: 'success', e2e, 'e2e-affected': affected },
             outputs: { 'has-code': hasCode, 'e2e-tier': ran.tier },
-            expected:
-              ![e2e, affected].some((result) => result === 'failure' || result === 'cancelled') &&
-              (hasCode === 'false' || e2e === 'success' || affected === 'success'),
+            expected: expectedGate(ran.tier, hasCode, e2e, affected),
           });
     }
   gatePasses(scenarios).forEach((passed, index) => {
@@ -212,14 +217,12 @@ test('e2e-gate never turns a failed, cancelled or wrong-tier input into a pass',
     if (!passed) return;
     const { results, outputs } = scenarios[index];
     const label = JSON.stringify({ ...results, ...outputs });
-    const full = outputs['e2e-tier'] === 'full';
-    const [ran, idle] = full
-      ? [results.e2e, results['e2e-affected']]
-      : [results['e2e-affected'], results.e2e];
     assert.equal(results.changes, 'success', label);
-    assert.ok(full || outputs['e2e-tier'] === 'affected', label);
-    assert.equal(idle, 'skipped', label);
-    assert.ok(ran === 'success' || (outputs['has-code'] === 'false' && ran === 'skipped'), label);
+    assert.equal(
+      expectedGate(outputs['e2e-tier'], outputs['has-code'], results.e2e, results['e2e-affected']),
+      true,
+      label,
+    );
   });
 });
 

@@ -293,7 +293,10 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     await expect(relay('update_todo', { todoId, githubLabelIds: [] })).rejects.toMatchObject({
       status: 400,
     });
-    const edited = await relay('update_todo', { todoId, tagIds: [] });
+    await expect(relay('update_todo', { todoId, tagIds: [] })).rejects.toMatchObject({
+      status: 400,
+    });
+    const edited = await relay('update_todo', { todoId, blockedBy: [] });
     expect(edited).toMatchObject({ tagIds: [], githubLabelIds: ['correction-label'] });
     expect(s.db.get(sql`SELECT correctionRequired FROM todo WHERE id = ${todoId}`)).toEqual({
       correctionRequired: 1,

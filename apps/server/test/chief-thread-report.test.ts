@@ -5,6 +5,7 @@ import { build, gateState, gateVerdict, step, todo } from '../src/db/schema.js';
 import { addChiefWatch, sendChiefMessage } from '../src/services/chief.js';
 import { upsertChiefRow } from '../src/services/machine-deps.js';
 import { createAutonomousTodo, getTodo, setTodoPhase } from '../src/services/todos.js';
+import { buildVerified } from '../src/services/verified.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
@@ -82,7 +83,6 @@ describe('worker reports in the chief conversation', () => {
         seqNum: 1,
         title: 'Repair board counts',
         wakeStepId: wake.id,
-        ...(phase === 'done' ? { verified: false } : {}),
       });
       expect(publish).toHaveBeenCalledWith(H.threadId, expect.objectContaining(report));
       expect(wake.prompt).toMatch(/^\[wake:settle\]/);
@@ -107,7 +107,7 @@ describe('worker reports in the chief conversation', () => {
     ['pass', 'head-0', null, false],
     ['block', 'head-1', 'patch-1', false],
   ] as const)(
-    'a done report records verified only for a passing verify verdict on the judged head or patch (%s, %s, %s)',
+    'a done report omits verified while the gate helper still matches the judged head or patch (%s, %s, %s)',
     async (outcome, verdictHead, verdictDigest, verified) => {
       const { deps, todoId } = await seedTask(true);
       H.s.db
@@ -148,49 +148,58 @@ describe('worker reports in the chief conversation', () => {
         .run();
       setTodoPhase(deps, todoId, 'done');
       const [report] = await messages();
-      expect(JSON.parse(report!.content as string)).toMatchObject({ phase: 'done', verified });
+      const parsed = JSON.parse(report!.content as string) as { phase: string };
+      expect(parsed).toMatchObject({ phase: 'done' });
+      expect(parsed).not.toHaveProperty('verified');
+      expect(buildVerified(deps.db, 'build-v')).toBe(verified);
     },
   );
 
   test.each([
     ['no gate state', undefined],
     ['a gate state with no judged head', null],
-  ] as const)('a passing verify verdict with %s is not verified', async (_label, judgedHead) => {
-    const { deps, todoId } = await seedTask(true);
-    H.s.db
-      .insert(build)
-      .values({ id: 'build-u', todoId, triggerSource: 'chief', withPlan: false, createdAt: 1 })
-      .run();
-    H.s.db.update(todo).set({ latestBuildId: 'build-u' }).where(eq(todo.id, todoId)).run();
-    if (judgedHead !== undefined)
+  ] as const)(
+    'a passing verify verdict with %s does not mark the report verified',
+    async (_label, judgedHead) => {
+      const { deps, todoId } = await seedTask(true);
       H.s.db
-        .insert(gateState)
+        .insert(build)
+        .values({ id: 'build-u', todoId, triggerSource: 'chief', withPlan: false, createdAt: 1 })
+        .run();
+      H.s.db.update(todo).set({ latestBuildId: 'build-u' }).where(eq(todo.id, todoId)).run();
+      if (judgedHead !== undefined)
+        H.s.db
+          .insert(gateState)
+          .values({
+            buildId: 'build-u',
+            ready: true,
+            policy: 'autonomous',
+            headSha: judgedHead,
+            patchDigest: null,
+            blockers: [],
+            evaluatedAt: 2,
+          })
+          .run();
+      H.s.db
+        .insert(gateVerdict)
         .values({
+          stepId: 'verify-unbound',
           buildId: 'build-u',
-          ready: true,
-          policy: 'autonomous',
-          headSha: judgedHead,
-          patchDigest: null,
-          blockers: [],
-          evaluatedAt: 2,
+          kind: 'verify',
+          outcome: 'pass',
+          headSha: 'head-1',
+          expectedHeadSha: 'head-1',
+          createdAt: 2,
         })
         .run();
-    H.s.db
-      .insert(gateVerdict)
-      .values({
-        stepId: 'verify-unbound',
-        buildId: 'build-u',
-        kind: 'verify',
-        outcome: 'pass',
-        headSha: 'head-1',
-        expectedHeadSha: 'head-1',
-        createdAt: 2,
-      })
-      .run();
-    setTodoPhase(deps, todoId, 'done');
-    const [report] = await messages();
-    expect(JSON.parse(report!.content as string)).toMatchObject({ phase: 'done', verified: false });
-  });
+      setTodoPhase(deps, todoId, 'done');
+      const [report] = await messages();
+      const parsed = JSON.parse(report!.content as string) as { phase: string };
+      expect(parsed).toMatchObject({ phase: 'done' });
+      expect(parsed).not.toHaveProperty('verified');
+      expect(buildVerified(deps.db, 'build-u')).toBe(false);
+    },
+  );
 
   test('two reports queued behind a busy chief identify distinct wake steps', async () => {
     const { deps, todoId: firstId } = await seedTask(true);
