@@ -15,7 +15,6 @@ import {
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  agentMemory,
   build,
   chief,
   chiefThread,
@@ -34,7 +33,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
-import { foldMemoryIndexes } from './memory.js';
+import { moveProjectMemoriesToTeam } from './memory.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -138,8 +137,7 @@ export function deleteProject(deps: ProjectDeps, id: string): boolean {
         tx.update(chief).set({ watches: next }).where(eq(chief.id, chiefRow.id)).run();
       }
     }
-    tx.update(agentMemory).set({ projectId: null }).where(eq(agentMemory.projectId, id)).run();
-    foldMemoryIndexes(tx);
+    moveProjectMemoriesToTeam(tx, id);
     tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
     tx.delete(project).where(eq(project.id, id)).run();
   });
