@@ -197,9 +197,11 @@ test('an offline accept switch stays disabled and explains why on click', async 
   const explain = settings(page).getByRole('button', { name: reason });
   const box = await explain.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.width).toBeGreaterThanOrEqual(24);
+  expect(box!.width).toBeGreaterThanOrEqual(36);
   expect(box!.height).toBeGreaterThanOrEqual(24);
-  await explain.click();
+  const toggleBox = await toggle.boundingBox();
+  expect(toggleBox).not.toBeNull();
+  await page.mouse.click(toggleBox!.x + 2, toggleBox!.y + toggleBox!.height / 2);
   await expect(page.locator('[data-sonner-toast]', { hasText: reason })).toBeVisible();
   await explain.focus();
   await page.keyboard.press('Enter');

@@ -31,7 +31,7 @@ export function ExplainDisabledToggle({
         <Button
           type="button"
           variant="ghost"
-          className="absolute top-1/2 left-1/2 size-auto h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed border-0 bg-transparent p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-(--focus-ring) pointer-coarse:h-11 pointer-coarse:w-11 dark:hover:bg-transparent"
+          className="absolute top-1/2 left-1/2 size-auto h-6 w-9 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed border-0 bg-transparent p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-(--focus-ring) pointer-coarse:h-11 pointer-coarse:min-w-11 dark:hover:bg-transparent"
           aria-label={reason}
           onClick={(event) => {
             event.preventDefault();
