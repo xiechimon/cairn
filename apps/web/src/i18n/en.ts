@@ -952,8 +952,8 @@ export const EN: Record<string, string> = {
   查看完整指令: 'View full instruction',
   完整指令: 'Full instruction',
   // #1285 失败行指引按分类分族
-  '请将其重新上线，或重新运行任务以改派其他机器。':
-    'Reconnect the machine, or rerun the task to assign another machine.',
+  '请将这台机器重新上线。这一步不会改派到其他机器。':
+    'Bring this machine back online. This step is not reassigned.',
   '模型额度已用尽，请等待额度恢复后重试。':
     'Model quota exhausted — wait for it to recover, then retry.',
   '请求被限流，请稍后重试。': 'Rate limited — retry later.',

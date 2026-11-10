@@ -1082,7 +1082,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
     case 'network':
-      return '请将其重新上线，或重新运行任务以改派其他机器。';
+      return '请将这台机器重新上线。这一步不会改派到其他机器。';
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':
