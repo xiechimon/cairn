@@ -14,7 +14,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { pairedDevice, pushSubscription } from '../src/db/schema.js';
+import { pairedDevice, pairingGrant, pushSubscription } from '../src/db/schema.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from '../src/lib/environment-id.js';
 import { listenOnTailnetSocket } from '../src/lib/tailnet-listener.js';
 import type { SidecarStatus } from '../src/lib/tsnet-sidecar.js';
@@ -59,6 +59,43 @@ function readyStatus(overrides: Partial<SidecarStatus> = {}): SidecarStatus {
     ...overrides,
   };
 }
+
+test('issuing a pairing code deletes expired, redeemed and revoked grants', async () => {
+  const s = bootServer({ authToken: OWNER });
+  const now = Date.now();
+  s.db
+    .insert(pairingGrant)
+    .values([
+      { id: 'expired-grant', codeHash: 'a'.repeat(64), expiresAt: now - 1, createdAt: now - 1 },
+      {
+        id: 'redeemed-grant',
+        codeHash: 'b'.repeat(64),
+        expiresAt: now + 60_000,
+        createdAt: now,
+        redeemedAt: now,
+      },
+      {
+        id: 'revoked-grant',
+        codeHash: 'c'.repeat(64),
+        expiresAt: now + 60_000,
+        createdAt: now,
+        revokedAt: now,
+      },
+    ])
+    .run();
+  expect((await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders })).status).toBe(
+    201,
+  );
+  const ids = s.db
+    .select()
+    .from(pairingGrant)
+    .all()
+    .map((row) => row.id);
+  expect(ids).toHaveLength(1);
+  expect(ids).not.toContain('expired-grant');
+  expect(ids).not.toContain('redeemed-grant');
+  expect(ids).not.toContain('revoked-grant');
+});
 
 async function issueCode(s: TestServer): Promise<string> {
   const res = await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders });

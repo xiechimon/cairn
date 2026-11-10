@@ -7,7 +7,7 @@ import {
   PAIRING_CODE_TTL_MS,
   type PairedDevice,
 } from '@cairn/shared';
-import { and, asc, count, eq, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -169,6 +169,15 @@ export interface PairingGrantView {
 }
 
 export function issuePairingGrant(db: Db, now = nowMs()): IssuedPairingGrant {
+  db.delete(pairingGrant)
+    .where(
+      or(
+        isNotNull(pairingGrant.revokedAt),
+        isNotNull(pairingGrant.redeemedAt),
+        lte(pairingGrant.expiresAt, now),
+      ),
+    )
+    .run();
   const active = db
     .select()
     .from(pairingGrant)
