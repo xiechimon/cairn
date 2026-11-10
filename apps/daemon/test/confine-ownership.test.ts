@@ -200,3 +200,40 @@ test.runIf(live)('real systemd: cancel after spawn but before capturing the cgro
     listener.mockRestore();
   }
 });
+
+test.runIf(live)(
+  'real systemd: stop racing successful unit collection still proves cleanup',
+  async () => {
+    const handle = await liveLaunch(['/bin/cat']);
+    const directory = testTempDir('confine-stop-race-');
+    writeFileSync(
+      join(directory, 'systemctl'),
+      `#!${process.execPath}
+const {spawnSync} = require('node:child_process');
+const args = process.argv.slice(2);
+if (args[1] === 'stop') {
+  const until = Date.now() + 5000;
+  let collected = false;
+  while (Date.now() < until) {
+    const result = spawnSync('/usr/bin/systemctl', ['--user', 'show', args[2], '-p', 'LoadState', '--value'], {encoding:'utf8',timeout:1000});
+    if (result.stdout.trim() === 'not-found') { collected = true; break; }
+  }
+  if (!collected) process.exit(127);
+}
+process.exit(spawnSync('/usr/bin/systemctl', args, {stdio:'inherit'}).status ?? 127);
+`,
+      { mode: 0o755 },
+    );
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${directory}:${previousPath}`;
+    try {
+      const stopping = handle.stop();
+      handle.process.stdin.end();
+      await stopping;
+      await handle.completed;
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
+  },
+);

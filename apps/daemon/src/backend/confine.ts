@@ -2,6 +2,7 @@ import { type ChildProcessWithoutNullStreams, execFile, spawn } from 'node:child
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
 
 export interface ConfinementPolicy {
@@ -268,7 +269,17 @@ export async function launchConfined(options: {
   let naturalTerminal = false;
   const stop = () => {
     cleaning ??= (async () => {
-      if (!naturalTerminal) await control('stop', unit);
+      if (!naturalTerminal) {
+        try {
+          await control('stop', unit);
+        } catch (error) {
+          if (
+            !(error instanceof Error && 'code' in error && error.code === 5) ||
+            (await Promise.race([exited, waitTimeout(timeout, undefined, { ref: false })])) !== 0
+          )
+            throw error;
+        }
+      }
       assertConfinementCleanup(true, () => readFileSync(eventsPath, 'utf8'), 'path');
     })();
     return cleaning;
