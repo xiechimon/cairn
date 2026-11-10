@@ -204,15 +204,20 @@ describe('#1470 MCP conversation: cross-team and nonexistent are both 404', () =
 
 describe('#1470 chief usage: only own-team builds and own-team chief turns are returned', () => {
   test('U4 full listing: no other-team builds / other-team chief turns', async () => {
-    const rows = (await relay('usage', {})) as { buildId: string }[];
-    expect(rows.map((r) => r.buildId).sort()).toEqual([OWN_BUILD, H.threadId].sort());
+    const body = (await relay('usage', {})) as { usage: { buildId: string }[]; routes: unknown[] };
+    expect(body.usage.map((r) => r.buildId).sort()).toEqual([OWN_BUILD, H.threadId].sort());
+    expect(Array.isArray(body.routes)).toBe(true);
   });
 
   test('U4 by buildId: another team build returns [], an own-team build returns as usual', async () => {
-    expect(await relay('usage', { buildId: BUILD_B })).toEqual([]);
-    expect(await relay('usage', { buildId: THREAD_B })).toEqual([]);
-    const own = (await relay('usage', { buildId: OWN_BUILD })) as { input: number }[];
-    expect(own.map((r) => r.input)).toEqual([1]);
+    expect(await relay('usage', { buildId: BUILD_B })).toEqual({ usage: [], routes: [] });
+    expect(await relay('usage', { buildId: THREAD_B })).toEqual({ usage: [], routes: [] });
+    const own = (await relay('usage', { buildId: OWN_BUILD })) as {
+      usage: { input: number }[];
+      routes: unknown[];
+    };
+    expect(own.usage.map((r) => r.input)).toEqual([1]);
+    expect(own.routes).toEqual([]);
   });
 });
 
