@@ -37,6 +37,7 @@ export * from './skill-injection-check.js';
 export * from './skill-route.js';
 export * from './tables.js';
 export * from './task-failure.js';
+export * from './task-input.js';
 export * from './task-meta.js';
 export * from './token-estimate.js';
 export * from './tool-result.js';

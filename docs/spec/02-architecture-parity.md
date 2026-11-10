@@ -249,7 +249,7 @@ Protocol paths/field names (`/api/machine/tasks/claim` etc.) **do not change sha
 The DELETE surface was not captured item by item by r3 (the actual verbs for deleting machines/skills/keys **[inferred]** as same-name REST DELETEs); they are filled in per the UI-behavior checklist (r2 §6 deletion flows), with no new paths invented.
 The 13 machine-surface endpoints see §5. `whats-new` and `analytics/*`: **shape kept, content self-selected** (the "what's new / core features" guide popover belongs to assets; tracking may be a no-op).
 
-Category vocabulary update (#3481): `GET` and `POST /api/projects/{id}/tags` are retired (404). Project creation and startup no longer seed fixed categories. Existing category assignments and read-only record representation remain temporarily under the [approved staged cutover](../research/thread-category-runtime-cutover-3481.md); GitHub labels and Git release tags are independent.
+Category vocabulary update (#3481): `GET` and `POST /api/projects/{id}/tags` are retired (404). Project creation and startup no longer seed fixed categories. Generic `tagIds` assignments are rejected before writes across REST/Coordinator/MCP and canonical task services. Existing read-only category representation remains temporarily under the [approved staged cutover](../research/thread-category-runtime-cutover-3481.md); GitHub labels and Git release tags are independent.
 
 ### 6.2 Record shapes (r3 §8.3 measured as-is; fields are the contract)
 

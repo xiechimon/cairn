@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { categoryFreeTaskInputSchema } from '../task-input.js';
 import { CHIEF_THREAD_ID_PREFIX } from './chief.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { parseGithubRepoRef } from './project.js';
@@ -141,10 +142,11 @@ export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoOwner = TodoRecord['owner'];
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
 
-export const createTodoBodySchema = z.object({
-  title: z.string(),
-  spec: z.string(),
-  tagIds: z.array(recordId).optional(),
-  output: todoOutputSchema.optional(),
-});
+export const createTodoBodySchema = categoryFreeTaskInputSchema.pipe(
+  z.object({
+    title: z.string(),
+    spec: z.string(),
+    output: todoOutputSchema.optional(),
+  }),
+);
 export type CreateTodoBody = z.infer<typeof createTodoBodySchema>;
