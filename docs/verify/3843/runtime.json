@@ -1,0 +1,26 @@
+{
+  "url": "http://127.0.0.1:15273/app/todo/zezNL2fVvsl0Bpug4XDAo",
+  "mode": "real server with seeded source conversation and seeded harness answer; no model called",
+  "assertions": {
+    "sourceOwnerMessages": 2,
+    "sourceCoordinatorMessages": 1,
+    "rawMarkerVisible": false,
+    "imageLoaded": true,
+    "quoteHref": "#request-context-chief-reply-proof%3Aproof-owner-e10",
+    "errors": [],
+    "partialCitation": {
+      "imageCount": 1,
+      "promptImageIds": [
+        "caret-proof"
+      ]
+    },
+    "reverseCitation": {
+      "imageCount": 1,
+      "promptImageIds": [
+        "caret-proof"
+      ]
+    }
+  },
+  "head": "4f23c07ba207c0cc36df811995c70dcc7d6fc775",
+  "baselineHead": "a2d6e79c3537c528f54393f00ecd90306e820f43"
+}
