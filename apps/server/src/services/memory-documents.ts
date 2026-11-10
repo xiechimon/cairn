@@ -359,6 +359,20 @@ export function executeMemoryDocumentTool(
   });
 }
 
+function memoryFileReference(title: string, file: string) {
+  const reference = `- [${title.replace(/[\r\n\0]+/g, ' ')}](${encodeURIComponent(file)})`;
+  return boundMemoryIndex(reference).omitted > 0
+    ? `- [${file}](${encodeURIComponent(file)})`
+    : reference;
+}
+
+function indexWithReference(content: string, reference: string) {
+  const appended = [content, reference].filter(Boolean).join('\n');
+  return boundMemoryIndex(appended).omitted > 0
+    ? [reference, content].filter(Boolean).join('\n')
+    : appended;
+}
+
 export function appendMemoryIndex(
   db: Db,
   owner: MemoryDocumentOwner,
@@ -382,7 +396,7 @@ export function appendMemoryIndex(
             title,
             new Set([MEMORY_INDEX_TITLE, ...files.map((row) => row.title)]),
           );
-        const reference = `- [${label}](${encodeURIComponent(file)})`;
+        const reference = memoryFileReference(title, file);
         if (currentText.split('\n').includes(line) || currentText.split('\n').includes(reference))
           return false;
         const content = [currentText, line].filter(Boolean).join('\n');
@@ -397,7 +411,7 @@ export function appendMemoryIndex(
           scope: owner.projectId ?? 'team',
           file: MEMORY_INDEX_TITLE,
           baseVersion: memoryDocumentVersion(index),
-          content: spill ? [currentText, reference].filter(Boolean).join('\n') : content,
+          content: spill ? indexWithReference(currentText, reference) : content,
         });
         return true;
       });
@@ -438,12 +452,7 @@ export function rememberMemoryFile(
       scope: owner.projectId ?? 'team',
       file: MEMORY_INDEX_TITLE,
       baseVersion: memoryDocumentVersion(index),
-      content: [
-        memoryIndexText(index),
-        `- [${title.replace(/[\r\n\0]+/g, ' ')}](${encodeURIComponent(file)})`,
-      ]
-        .filter(Boolean)
-        .join('\n'),
+      content: indexWithReference(memoryIndexText(index), memoryFileReference(title, file)),
     });
     return saved;
   });

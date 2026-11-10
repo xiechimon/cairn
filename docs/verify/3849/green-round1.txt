@@ -1,0 +1,9 @@
+[heavy-slots] acquired slot 2/2
+
+ RUN  v5.0.1 <worktree>
+
+
+ Test Files  5 passed (5)
+      Tests  104 passed (104)
+   Start at  21:00:42
+   Duration  6.69s (tests 53%, transform 24%, import 22%, setup 1%)

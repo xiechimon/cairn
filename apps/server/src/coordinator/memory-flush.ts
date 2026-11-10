@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { ensureMemoryIndex, memoryIndexText } from '../services/memory.js';
+import { ensureMemoryIndex, listStoredMemoryEntries, memoryIndexText } from '../services/memory.js';
 import { appendMemoryIndex, memoryDocumentVersion } from '../services/memory-documents.js';
 import { coordinatorProfile } from '../services/routing-rules.js';
 import type { MemoryFlush } from './runtime/compaction.js';
@@ -92,17 +92,17 @@ export function applyFlush(
 function existingLines(db: Db, scope: { teamId: string; threadId: string }): string {
   const agentId = coordinatorProfile(db, scope.teamId)?.id;
   if (agentId === undefined) return '(none)';
-  const owner = { agentId, teamId: scope.teamId, projectId: null };
-  const index = ensureMemoryIndex(db, owner);
-  const lines = [`team | MEMORY.md | ${memoryDocumentVersion(index)}\n${memoryIndexText(index)}`];
-  const kept: string[] = [];
-  let used = 0;
-  for (const line of lines) {
-    if (used + line.length > EXISTING_MAX_CHARS) break;
-    kept.push(line);
-    used += line.length + 1;
-  }
-  return kept.length > 0 ? kept.join('\n') : '(none)';
+  const owner = { agentId, teamId: scope.teamId };
+  const scopes = new Set([null, ...listStoredMemoryEntries(db, owner).map((row) => row.projectId)]);
+  const indexes = [...scopes].map((projectId) => ensureMemoryIndex(db, { ...owner, projectId }));
+  const headers = indexes.map(
+    (index) => `${index.projectId ?? 'team'} | MEMORY.md | ${memoryDocumentVersion(index)}`,
+  );
+  const remaining = Math.max(0, EXISTING_MAX_CHARS - headers.join('\n\n').length - indexes.length);
+  const perIndex = Math.floor(remaining / indexes.length);
+  return indexes
+    .map((index, i) => `${headers[i]}\n${memoryIndexText(index).slice(0, perIndex)}`)
+    .join('\n\n');
 }
 
 export function flushPrompt(

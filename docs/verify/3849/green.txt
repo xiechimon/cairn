@@ -54,4 +54,3 @@ finished (0 running)
      Import  |@xiechimon/cairn| 458 modules were evaluated 7807 times · 20.77s total, 32% of tracked time
              ~4.12s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
              learn more: https://vitest.dev/guide/improving-performance#test-isolation
-

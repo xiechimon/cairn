@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { applyFlush } from '../src/coordinator/memory-flush.js';
+import { applyFlush, flushPrompt } from '../src/coordinator/memory-flush.js';
 import { agentMemory, memoryCandidate } from '../src/db/schema.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { injectMemoryDocuments } from '../src/services/memory.js';
@@ -242,4 +242,53 @@ test('curation returns a file id that survives document reads and injection fold
   expect(row.layer).toBe('searchable');
   expect(row.invalidAt).toBeNull();
   expect(row.content).toBe('durable curated lesson');
+});
+
+test.each(['append', 'remember'] as const)(
+  'spilled references stay injected for %s at either load bound',
+  async (path) => {
+    const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: null };
+    for (const content of [Array(200).fill('existing').join('\n'), 'x'.repeat(25 * 1024)]) {
+      const index = await read('Coordinator');
+      await relay('update_memory', {
+        scope: 'team',
+        file: 'MEMORY.md',
+        baseVersion: index.baseVersion,
+        content,
+      });
+      const title = `new-${content.length}.md`;
+      if (path === 'append') appendMemoryIndex(H.s.db, owner, title, `detail-${content.length}`);
+      else rememberMemoryFile(H.s.db, owner, title, `detail-${content.length}`);
+      const injected = injectMemoryDocuments(H.s.db, owner).memories[0]!;
+      expect(injected.content).toContain(`](${title})`);
+      const current = await read('Coordinator');
+      const stored = H.s.db
+        .select()
+        .from(agentMemory)
+        .all()
+        .find((row) => row.id === current.id)!;
+      expect(stored.content).toContain(content);
+      expect(await read('Coordinator', title)).toMatchObject({
+        content: `detail-${content.length}`,
+      });
+    }
+  },
+);
+
+test('flush prompt retains project scopes and a prefix of an oversized team index', async () => {
+  for (const scope of ['team', H.projectId]) {
+    const index = await read('Coordinator', 'MEMORY.md', scope);
+    await relay('update_memory', {
+      scope,
+      file: 'MEMORY.md',
+      baseVersion: index.baseVersion,
+      content: scope === 'team' ? `TEAM-PREFIX\n${'x'.repeat(9000)}` : 'PROJECT-COVERED-FACT',
+    });
+  }
+  const prompt = flushPrompt(H.s.db, { teamId: H.teamId, threadId: H.threadId }, 'transcript');
+  const existing = prompt.split('Existing memories:\n')[1]!.split('\n\nProjects:')[0]!;
+  expect(existing).toContain('TEAM-PREFIX');
+  expect(existing).toContain('PROJECT-COVERED-FACT');
+  expect(existing).toContain(`${H.projectId} | MEMORY.md`);
+  expect(existing.length).toBeLessThanOrEqual(8000);
 });
