@@ -7,7 +7,12 @@ import type {
   SessionOpts,
   TranscriptUpload,
 } from '@cairn/shared';
-import { formatAttachmentToken } from '@cairn/shared';
+import {
+  encodeReplyQuote,
+  formatAttachmentToken,
+  renderTaskText,
+  type TaskRequest,
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -17,7 +22,10 @@ import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { testTempDir } from './test-temp-dir.js';
 
-const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGP48OHDfxBmgDEAiNQPPZGgNrYAAAAASUVORK5CYII=',
+  'base64',
+);
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -186,6 +194,76 @@ async function setup(claim: ClaimedStep, client: FakeClient) {
 }
 
 describe('runner image attachment wiring (#730)', () => {
+  test.each(['none', 'partial-first', 'whole-first', 'partial-last', 'whole-last'] as const)(
+    'quoted dispatch delivers the inherited owner image once with citation order %s',
+    async (order) => {
+      const client = new FakeClient();
+      client.attachments.id1 = {
+        fileName: 'caret.png',
+        mimeType: 'image/png',
+        sizeBytes: PNG.byteLength,
+        contentBase64: PNG.toString('base64'),
+      };
+      const request: TaskRequest = {
+        segments: [
+          {
+            source: { kind: 'chat', threadId: 'chief', messageId: 'dispatch', span: 'whole' },
+            author: 'owner',
+            sourceRef: null,
+            text: encodeReplyQuote(
+              { sourceMessageId: 'ack', quote: 'Recorded.' },
+              'Please dispatch.',
+            ),
+            context: {
+              incomplete: false,
+              messages: [
+                {
+                  threadId: 'chief',
+                  messageId: 'original',
+                  role: 'user',
+                  text: `The caret is misaligned.\n${formatAttachmentToken('caret.png', 't1/id1.png')}`,
+                },
+                { threadId: 'chief', messageId: 'ack', role: 'assistant', text: 'Recorded.' },
+              ],
+            },
+          },
+        ],
+        siblings: [],
+        difficulty: null,
+        titleSource: 'owner',
+        titleSourceRef: null,
+      };
+      if (order !== 'none') {
+        const source = {
+          source: {
+            kind: 'chat' as const,
+            threadId: 'chief',
+            messageId: 'original',
+            span: order.startsWith('partial') ? ('quote' as const) : ('whole' as const),
+          },
+          author: 'owner' as const,
+          sourceRef: null,
+          text: order.startsWith('partial')
+            ? 'The caret is misaligned.'
+            : `The caret is misaligned.\n${formatAttachmentToken('caret.png', 't1/id1.png')}`,
+        };
+        if (order.endsWith('first')) request.segments.unshift(source);
+        else request.segments.push(source);
+      }
+      const claim = claimed(renderTaskText(request));
+      claim.todo!.request = request;
+      const { seen } = await setup(claim, client);
+      expect(seen[0]!.promptImages).toEqual([
+        { data: PNG.toString('base64'), mimeType: 'image/png' },
+      ]);
+      expect(seen[0]!.prompt).toContain('The caret is misaligned.');
+      expect(seen[0]!.prompt).toContain('Coordinator:\nRecorded.');
+      expect(seen[0]!.prompt).toContain('Please dispatch.');
+      expect(seen[0]!.prompt).not.toContain('reply source=');
+      expect(client.attachmentCalls).toEqual(['s1:id1']);
+    },
+  );
+
   test('failure mode 1: full-line png token in the spec → backend receives expanded text + images; transcript keeps the original token', async () => {
     const client = new FakeClient();
     client.attachments.id1 = {

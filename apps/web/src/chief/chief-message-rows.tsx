@@ -6,6 +6,7 @@ import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
+import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
@@ -79,8 +80,6 @@ const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
-const BUBBLE_USER_CLS =
-  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bubble-gradient px-3 py-2 text-card-title [overflow-wrap:anywhere] text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 voice-response text-card-title';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
@@ -361,15 +360,15 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             className="relative max-w-[min(85%,42rem)] flex-none items-end gap-0"
             data-testid="chief-msg-col"
           >
-            <div
+            <UserMessageBubble
               data-testid="chief-bubble"
               data-md={shown != null ? '' : undefined}
               {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-              className={`${BUBBLE_USER_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
+              className={`w-fit max-w-full [overflow-wrap:anywhere] ${shown != null ? BUBBLE_MD_CLS : ''}`}
             >
               {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
               {shown != null ? <ChatMarkdown text={shown} conversational /> : item.text}
-            </div>
+            </UserMessageBubble>
             <div
               className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-tools"

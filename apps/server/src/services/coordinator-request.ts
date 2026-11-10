@@ -22,6 +22,7 @@ import { chiefMessage, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
+import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -80,8 +81,15 @@ function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): 
       messageId: id,
       span: 'whole' as const,
     };
+    const context = resolveTaskReplyContext(db, ctx.threadId, id, row.content);
     return {
-      segment: { source, author: 'owner', sourceRef: null, text: row.content },
+      segment: {
+        source,
+        author: 'owner',
+        sourceRef: null,
+        text: row.content,
+        ...(context === undefined ? {} : { context }),
+      },
       quoteSource: source,
     };
   });
@@ -129,7 +137,13 @@ function ownerGrants(segments: readonly TaskSegment[], teamId: string): string[]
     ...new Set(
       segments
         .filter((segment) => segment.author === 'owner')
-        .flatMap((segment) => attachmentIdsInUserText(segment.text, teamId)),
+        .flatMap((segment) => [
+          segment.text,
+          ...(segment.context?.messages ?? [])
+            .filter((message) => message.role === 'user')
+            .map((message) => message.text),
+        ])
+        .flatMap((text) => attachmentIdsInUserText(text, teamId)),
     ),
   ];
 }
@@ -209,7 +223,12 @@ export function createRequestTodo(
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,
     projectId: params.projectId,
-    title: derivePlaceholderTitle(segments[0]?.text ?? '') || PLACEHOLDER_TITLE_FALLBACK,
+    title:
+      derivePlaceholderTitle(
+        segments[0]?.context?.messages.find((message) => message.role === 'user')?.text ??
+          segments[0]?.text ??
+          '',
+      ) || PLACEHOLDER_TITLE_FALLBACK,
     spec: renderTaskText(request),
     createdBy: provenance.createdBy,
     ownerId: provenance.ownerId,

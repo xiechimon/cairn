@@ -1,3 +1,4 @@
+import type { TaskRequest } from '@cairn/shared';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
@@ -30,6 +31,7 @@ interface TranscriptColumnProps {
   agent: { displayName: string; avatarUrl: string | null } | null;
   onOpenPlan?: () => void;
   spec?: string;
+  request?: TaskRequest | null;
   autoScroll: boolean;
   running?: boolean;
   settled?: boolean;
@@ -58,6 +60,7 @@ function TranscriptColumnInner({
   agent,
   onOpenPlan,
   spec,
+  request,
   running,
   settled = true,
   threadKey,
@@ -94,7 +97,7 @@ function TranscriptColumnInner({
         className={VIEWPORT_CLS}
       >
         <MessageScrollerContent className={CONTENT_CLS}>
-          {spec != null && <SpecBlock spec={spec} />}
+          {spec != null && <SpecBlock spec={spec} request={request} />}
           <Transcript
             transcript={transcript}
             liveStep={liveStep}
