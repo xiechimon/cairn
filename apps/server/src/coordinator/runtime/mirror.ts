@@ -21,10 +21,6 @@ export interface EntryRow {
   entryId: string;
 }
 
-export function entryRows(stepId: string, entries: readonly EntryRecord[]): TranscriptRow[] {
-  return entryRowSources(stepId, entries).map((source) => source.row);
-}
-
 export function entryRowSources(stepId: string, entries: readonly EntryRecord[]): EntryRow[] {
   const results = new Map<string, ToolResultMessage>();
   for (const entry of entries) {

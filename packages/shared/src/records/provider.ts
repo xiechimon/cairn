@@ -133,13 +133,6 @@ export const providerPresetSchema = z.object({
 });
 export type ProviderPreset = z.infer<typeof providerPresetSchema>;
 
-export const PROVIDER_FORM_COPY = {
-  apiKeyOptional: '无密钥网关可留空',
-  probeModels: '探测模型',
-  validateBeforeSave: '保存前验证',
-  encryptedNotice: '密钥将加密存储，保存后无法再次查看。',
-} as const;
-
 export interface OAuthFamily {
   presetId: string;
   providerLabel: string;

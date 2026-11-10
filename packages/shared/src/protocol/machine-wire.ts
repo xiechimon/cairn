@@ -33,9 +33,6 @@ import { computerPresenceListSchema } from './computer-presence.js';
 import { computerScreenRequestSchema } from './computer-screen.js';
 import { machineJsonSchema } from './executor.js';
 
-export const MACHINE_AUTH_HEADER = 'authorization';
-export const MACHINE_AUTH_SCHEME = 'Bearer';
-
 export const machineEnrollBodySchema = z.object({
   teamId: recordId,
   name: z.string().optional(),
@@ -65,7 +62,6 @@ export const machineEnrollPollResponseSchema = z.union([
 ]);
 
 export const machineEnrollConfirmBodySchema = z.object({ enrollId: z.string() });
-export const machineEnrollConfirmResponseSchema = z.object({ machine: machineJsonSchema });
 
 export const machineMeResponseSchema = machineRecordSchema;
 

@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { shortEvent } from '@cairn/shared';
-import { BACKGROUND_CONTEXT, type Context } from '@earendil-works/chord/context';
+import type { Context } from '@earendil-works/chord/context';
 import type { Message } from '@earendil-works/pi-ai';
 import {
   AssistantEntry,
@@ -8,8 +8,6 @@ import {
   type Harness,
   UserEntry,
 } from '@earendil-works/pi-durable';
-import { openCoordinatorHarness } from './harness.js';
-import { createCoordinatorModels } from './models.js';
 
 export const SEED_MAX_ROWS = 100;
 export const SEED_ROW_MAX_CHARS = 8_000;
@@ -161,22 +159,4 @@ export async function seedCoordinator(
     });
   }, context);
   return { messages: messages.length };
-}
-
-export async function seedCoordinatorStore(
-  storePath: string,
-  summary: string,
-  rows: readonly SeedRow[],
-  model: { provider: string; modelId: string },
-): Promise<{ messages: number }> {
-  const harness = await openCoordinatorHarness(
-    storePath,
-    createCoordinatorModels().models,
-    BACKGROUND_CONTEXT,
-  );
-  try {
-    return await seedCoordinator(harness, summary, rows, model, BACKGROUND_CONTEXT);
-  } finally {
-    await harness.close(BACKGROUND_CONTEXT);
-  }
 }

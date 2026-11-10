@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { recordId } from './common.js';
 
-export const TOKEN_USAGE_PARTS = ['输入', '输出', '缓存读取', '缓存写入'] as const;
-
 export const tokenUsageSchema = z.object({
   buildId: recordId,
   model: z.string(),

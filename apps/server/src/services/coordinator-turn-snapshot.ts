@@ -1,7 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 
-export const COORDINATOR_SNAPSHOT_RETENTION_MS = 30 * 86_400_000;
 export const COORDINATOR_SNAPSHOT_CLEANUP_INTERVAL_MS = 86_400_000;
 export const COORDINATOR_SNAPSHOT_TEAM_BYTES = 256 * 1024 * 1024;
 export const COORDINATOR_SNAPSHOT_CLEANUP_BATCH = 1000;

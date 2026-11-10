@@ -16,5 +16,3 @@ export const createTagBodySchema = z.object({
   color: z.string(),
 });
 export type CreateTagBody = z.infer<typeof createTagBodySchema>;
-
-export const TAG_DEFAULT_COLOR = '#6366f1';

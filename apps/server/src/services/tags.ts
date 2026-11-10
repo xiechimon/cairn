@@ -1,5 +1,5 @@
 import { FIXED_TAGS } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, tag } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -37,13 +37,4 @@ export function backfillFixedTags(db: Db): void {
     if (row.repoKind === 'github') continue;
     seedFixedTags(db, row.id);
   }
-}
-
-export function resolveFixedTagId(db: Db, projectId: string, name: string): string | null {
-  const row = db
-    .select({ id: tag.id })
-    .from(tag)
-    .where(and(eq(tag.projectId, projectId), eq(tag.name, name)))
-    .get();
-  return row?.id ?? null;
 }

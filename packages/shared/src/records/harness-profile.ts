@@ -19,8 +19,6 @@ export const HARNESS_PROFILE_TARGETS = ['pi', 'claude-code', 'codex'] as const;
 export type HarnessProfileTarget = (typeof HARNESS_PROFILE_TARGETS)[number];
 export const harnessProfileTargetSchema = z.enum(HARNESS_PROFILE_TARGETS);
 
-export const INDEPENDENT_HARNESS_PROFILE_MODE: HarnessProfileMode = 'independent';
-
 export const harnessProfileRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
