@@ -240,8 +240,8 @@ test('CI classifies before heavy work and always runs push coverage', () => {
 test('the chromium action installs cached system packages and falls back to apt', () => {
   const action = readFileSync('.github/actions/playwright-chromium/action.yml', 'utf8');
   assert.match(action, /uses: actions\/cache@[0-9a-f]{40} # v\d+\.\d+\.\d+\n/);
-  assert.ok(action.includes('key: ${{ steps.key.outputs.key }}'));
-  for (const part of ['${ImageOS:-unknown}', '${ImageVersion:-unknown}', 'playwright --version'])
+  assert.ok(action.includes(`key: \${{ steps.key.outputs.key }}`));
+  for (const part of [`\${ImageOS:-unknown}`, `\${ImageVersion:-unknown}`, 'playwright --version'])
     assert.ok(action.includes(part), part);
   const install = action.split('- name: Install chromium and its system packages')[1];
   const cached = install.indexOf('sudo dpkg -i "$debs"/*.deb');
