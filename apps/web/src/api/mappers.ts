@@ -50,6 +50,8 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
   threadReportContentSchema,
+  toolResultText,
+  toolResultValue,
   transcriptPromptRowId,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
@@ -192,6 +194,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     seqNum: w.seqNum,
     orderIndex: w.orderIndex,
     tagIds: w.tagIds,
+    githubLabelIds: w.githubLabelIds ?? [],
     assignment: null,
     agent: null,
     latestBuildId: w.latestBuildId,
@@ -657,7 +660,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   for (const m of messages) {
     const paired = toolCallOfContent(m.content);
     if (paired === null) continue;
-    const pairedText = resultToText(paired.result)?.trim();
+    const pairedText = toolResultText(paired.result)?.trim();
     if (pairedText !== undefined && pairedText !== '')
       toolNameByResult.set(pairedText, paired.name);
   }
@@ -1093,7 +1096,7 @@ function workCall(
     /^\/(?:home|Users)\/[^/]+\/\.(?:pacman-chief|cairn)\/(?:workspaces|plans)\/[^/]+\//,
     '',
   );
-  const output = resultToText(call.result);
+  const output = toolResultText(call.result);
   const seconds =
     call.startedAt !== undefined && call.endedAt !== undefined
       ? Math.max(0, (call.endedAt - call.startedAt) / 1000)
@@ -1162,29 +1165,6 @@ function workCall(
     };
   }
   return { ...base, action: 'tool', target: call.name.replace(/^mcp__/, '').replace(/__/g, ' · ') };
-}
-
-function resultToText(result: unknown): string | null {
-  if (result == null) return null;
-  if (typeof result === 'string') return result === '' ? null : result;
-  if (Array.isArray(result)) {
-    const joined = result
-      .map(resultToText)
-      .filter((s): s is string => s != null && s !== '')
-      .join('\n');
-    return joined === '' ? null : joined;
-  }
-  if (typeof result === 'object') {
-    const o = result as Record<string, unknown>;
-    if (typeof o.text === 'string') return o.text === '' ? null : o.text;
-    for (const key of ['content', 'output', 'stdout', 'result'] as const) {
-      if (o[key] !== undefined) {
-        const nested = resultToText(o[key]);
-        if (nested != null && nested !== '') return nested;
-      }
-    }
-  }
-  return null;
 }
 
 function isJsonPlumbing(text: string): boolean {
@@ -1473,14 +1453,7 @@ function createdTodoOf(call: ToolCallRecord): {
 } | null {
   if (call.name !== 'create_todo' || call.result === undefined || call.isError === true)
     return null;
-  let result: unknown = call.result;
-  if (typeof result === 'string') {
-    try {
-      result = JSON.parse(result);
-    } catch {
-      return null;
-    }
-  }
+  const result = toolResultValue(call.result);
   const record = result as { id?: unknown; seqNum?: unknown; title?: unknown } | null;
   const todoId = record?.id;
   if (typeof todoId !== 'string' || todoId === '') return null;

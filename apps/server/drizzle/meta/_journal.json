@@ -981,6 +981,13 @@
       "when": 1794262262264,
       "tag": "0143_blocked_by_hold",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "6",
+      "when": 1794268721640,
+      "tag": "0144_github_label_isolation",
+      "breakpoints": true
     }
   ]
 }

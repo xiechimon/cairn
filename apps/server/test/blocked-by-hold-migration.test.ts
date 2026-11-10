@@ -29,7 +29,7 @@ test('blocked-by migration upgrades main without changing schema or unrelated ho
     insert.run('pending', 'build', 'session', 'pending', 1, 'research-before-plan', 100);
     insert.run('quota-waiting', 'build', 'plan', 'waiting_quota', 1, 'research-before-plan', 200);
     insert.run('unrelated', 'build', 'session', 'pending', 1, 'quota', 300);
-    migrateAll(sqlite);
+    migrateUpTo(sqlite, directory, migration.tag);
     expect(sqlite.prepare('SELECT sql FROM sqlite_master ORDER BY name').all()).toEqual(schema);
     expect(
       sqlite.prepare('SELECT id, status, holdReason, holdUntil FROM step ORDER BY id').all(),

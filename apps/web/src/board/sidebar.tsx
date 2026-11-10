@@ -33,7 +33,7 @@ import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
 import { coordinatorSearch } from './open-composer.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
-import { sidebarProjects } from './sidebar-projects.js';
+import { type ProjectStatus, sidebarProjects } from './sidebar-projects.js';
 
 export type SidebarSelected =
   | 'board'
@@ -68,6 +68,7 @@ interface BoardSidebarProps {
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   waiting?: ReadonlySet<string>;
+  statuses?: ReadonlyMap<string, ProjectStatus>;
   onArchiveProject?: (id: string) => void;
   onMoveProject?: (id: string, group: string | null) => void;
   projectsState?: 'loading' | 'error';
@@ -80,6 +81,7 @@ export const GROUP_STORAGE_KEYS = {
 } as const;
 
 const NOTHING_WAITING: ReadonlySet<string> = new Set();
+const NO_STATUSES: ReadonlyMap<string, ProjectStatus> = new Map();
 
 function readProjectsCollapsed(storage: Storage | null): boolean {
   try {
@@ -161,6 +163,7 @@ export function BoardSidebar({
   selected = 'board',
   projects,
   waiting = NOTHING_WAITING,
+  statuses = NO_STATUSES,
   onArchiveProject,
   onMoveProject,
   projectsState,
@@ -193,6 +196,12 @@ export function BoardSidebar({
     ? projectParam
     : null;
   const waitingLabel = t('有任务在等你');
+  const statusText = (status: ProjectStatus | undefined) =>
+    status === undefined
+      ? null
+      : status.kind === 'working'
+        ? t('{n} 件进行中', { n: status.count })
+        : `${t(status.word)} · ${t(status.what.key, status.what.params)}`;
   const projectMenu = (row: SidebarProject) =>
     onArchiveProject === undefined || onMoveProject === undefined ? undefined : (
       <SidebarProjectMenu
@@ -210,6 +219,7 @@ export function BoardSidebar({
       icon={row.icon}
       nested={nested}
       waiting={waiting.has(row.id) ? waitingLabel : null}
+      status={statusText(statuses.get(row.id))}
       active={activeProject === row.id}
       onClick={() => navigate(projectHref(row.id))}
       menu={projectMenu(row)}

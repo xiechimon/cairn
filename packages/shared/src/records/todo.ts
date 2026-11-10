@@ -104,6 +104,7 @@ export const todoRecordSchema = z.object({
   seqNum: z.number().int(),
   orderIndex: z.number(),
   tagIds: z.array(recordId),
+  githubLabelIds: z.array(recordId).optional(),
   latestBuildId: recordId.nullable(),
   lastRunAt: epochMs.nullable(),
   hasChanges: z.boolean(),

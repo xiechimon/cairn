@@ -53,6 +53,7 @@ This is a one-way data deletion for ordinary thread categories. Rollback require
 | Decision | Owner | Outcome |
 | --- | --- | --- |
 | Migration boundary | Orchestrator, direct task session | Approved: dedicated GitHub-label storage, an internal preserved correction flag, then generic thread-tag retirement. |
+| GitHub-label cutover | Coordinator, [#3767 review](https://github.com/xiechimon/cairn/pull/3767#issuecomment-6751469789) | Approved: atomically move eligible associations into dedicated storage, retain legacy vocabulary until generic retirement, abort ambiguous provenance and use a pre-migration backup for rollback. |
 | Review size | Implementation lane | Deliver independent ordered PRs, each based on main after the preceding PR merges. First isolate correction classification so later label-data deletion cannot bypass its guard; then isolate GitHub labels; then retire generic runtime paths and their remaining documentation/registry consumers. |
 
 The first segment keeps the existing category assignment paths synchronized with the internal correction flag until their replacement lands. It removes the guard's dependency on the generic join, snapshots existing membership in a transaction, and sets the flag for newly imported correction issues. It does not close #3481; only the final segment does.
