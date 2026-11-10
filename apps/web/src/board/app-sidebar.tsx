@@ -1,5 +1,5 @@
 import { PanelLeft } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   useApiMutations,
@@ -23,8 +23,9 @@ import { recordOutsideLocation } from '../settings/settings-href.js';
 import { useAttentionTitle } from './attention-title.js';
 import { fleetStatus } from './fleet-status.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
-import { waitingProjectIds } from './sidebar-projects.js';
+import { projectStatuses, waitingProjectIds } from './sidebar-projects.js';
 import { needsYouBadge } from './tasks-sections.js';
+import { useNarrow } from './use-narrow.js';
 import { useTasksView } from './use-tasks-view.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
@@ -36,8 +37,6 @@ function readCollapsed(storage: Storage | null): boolean {
     return false;
   }
 }
-
-const NARROW_QUERY = '(max-width: 640px)';
 
 export interface AppSidebarProps {
   fixture: FixtureSet;
@@ -85,14 +84,7 @@ export function AppSidebar({
   const search = useSearchState(false, '');
   const searchResults = useSearchResults(search.query, live && search.open);
   const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));
-  const narrow = useSyncExternalStore(
-    (onStoreChange) => {
-      const mql = window.matchMedia(NARROW_QUERY);
-      mql.addEventListener('change', onStoreChange);
-      return () => mql.removeEventListener('change', onStoreChange);
-    },
-    () => window.matchMedia(NARROW_QUERY).matches,
-  );
+  const narrow = useNarrow();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const location = useLocation();
@@ -113,6 +105,7 @@ export function AppSidebar({
   );
   const tasks = useTasksView(fixture);
   const waiting = useMemo(() => waitingProjectIds(tasks), [tasks]);
+  const statuses = useMemo(() => projectStatuses(tasks), [tasks]);
   useAttentionTitle(needsYouBadge(tasks.entries, tasks.questions));
   const fixtureMachines = fixture.resources?.machines;
   const fleet = fleetStatus(live ? (machinesQ.data ?? []) : (fixtureMachines ?? []));
@@ -187,6 +180,7 @@ export function AppSidebar({
               <BoardSidebar
                 {...sidebarProps}
                 collapsed={false}
+                statuses={statuses}
                 onToggle={closeDrawer}
                 onSearch={() => {
                   closeDrawer();

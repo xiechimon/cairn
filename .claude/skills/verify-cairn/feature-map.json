@@ -1502,12 +1502,13 @@
       "id": "mobile-web",
       "name": "Mobile web and PWA",
       "summary": "The web app installed on a phone: narrow layouts, the service worker and the home-screen app.",
-      "states": "At phone width the sidebar becomes a drawer and settings collapse to a list; the app can be installed to the home screen.",
+      "states": "At phone width the Coordinator home has bottom tabs for chat and Tasks, the sidebar becomes a drawer whose project rows carry one status line, and settings collapse to a list; the app can be installed to the home screen.",
       "centrality": 2,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/pwa/register.tsx"
+          "apps/web/src/pwa/register.tsx",
+          "apps/web/src/board/phone-tabs.tsx"
         ]
       },
       "reach": [
@@ -1517,6 +1518,7 @@
         "gap": "no note on how Amp, t3code and Claude handle mobile web and PWA install"
       },
       "frontendDesign": [
+        "docs/design/duet-shaped-clients.md",
         "docs/design/references/coordinator-chat",
         "docs/design/claude-ai-spec.md"
       ],
@@ -1525,6 +1527,7 @@
       },
       "evidence": [
         "apps/web/e2e/mobile-narrow.spec.ts",
+        "apps/web/e2e/chief-home-phone-tabs.spec.ts",
         "apps/web/test/pwa.test.ts"
       ],
       "batch": "B6"

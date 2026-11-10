@@ -403,7 +403,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 **Mobile web and PWA** (shipped). The web app installed on a phone: narrow layouts, the service worker and the home-screen app.
 
 - Research: **gap**: no note on how Amp, t3code and Claude handle mobile web and PWA install
-- Frontend design: [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
+- Frontend design: [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: n/a: served by the same server; push is its own feature
 
 ### own-key-sandboxes
