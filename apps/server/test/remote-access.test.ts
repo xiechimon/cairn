@@ -311,6 +311,19 @@ describe('F-P1 pairing: code to per-device token', () => {
     expect(stream.status).toBe(401);
   });
 
+  test('a ticket minted before revoke cannot open a stream after the device is gone', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const paired = await pairDevice(s);
+    const issued = await call(s, 'POST', '/api/auth/stream-ticket', {
+      headers: { authorization: `Bearer ${paired.token}` },
+    });
+    expect(issued.status).toBe(200);
+    const ticket = ((await issued.json()) as { ticket: string }).ticket;
+    await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: ownerHeaders });
+    const stream = await call(s, 'GET', `/api/teams/${s.team.id}/stream?ticket=${ticket}`);
+    expect(stream.status).toBe(401);
+  });
+
   test('revoking one device leaves the others working', async () => {
     const s = bootServer({ authToken: OWNER });
     const first = await pairDevice(s, 'first');

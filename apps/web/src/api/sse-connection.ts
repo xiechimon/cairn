@@ -22,6 +22,16 @@ export function connect(
   let bizTimer: ReturnType<typeof setTimeout> | null = null;
   let bizWindow = SSE_BIZ_SILENCE_BASE_MS;
   let lastSeq = 0;
+  let retryDelay = 1_000;
+
+  const scheduleRetry = (): void => {
+    if (disposed) return;
+    const delay = retryDelay;
+    retryDelay = Math.min(retryDelay * 2, 30_000);
+    setTimeout(() => {
+      if (!disposed) open();
+    }, delay);
+  };
 
   const armWatchdog = (): void => {
     if (watchdog !== null) clearTimeout(watchdog);
@@ -55,9 +65,14 @@ export function connect(
     if (disposed) return;
     const resolved = typeof path === 'function' ? path() : path;
     if (typeof resolved !== 'string') {
-      void resolved.then((url) => {
-        if (!disposed) attach(url);
-      });
+      void resolved.then(
+        (url) => {
+          if (disposed) return;
+          retryDelay = 1_000;
+          attach(url);
+        },
+        () => scheduleRetry(),
+      );
       return;
     }
     attach(resolved);
@@ -69,7 +84,8 @@ export function connect(
     es = new EventSource(url);
     es.onerror = () => {
       es?.close();
-      open();
+      if (typeof path === 'function') scheduleRetry();
+      else open();
     };
     es.onopen = () => {
       if (openedOnce) onResync();
