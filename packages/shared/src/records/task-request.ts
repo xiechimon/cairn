@@ -115,6 +115,10 @@ export function renderTaskText(request: Pick<TaskRequest, 'segments'>): string {
       continue;
     }
     flush();
+    const wholeChatKey =
+      segment.source.kind === 'chat' && segment.source.span === 'whole'
+        ? `${segment.source.threadId}:${segment.source.messageId}`
+        : null;
     if (segment.context !== undefined) {
       const context = segment.context.messages.flatMap((message) => {
         const key = `${message.threadId}:${message.messageId}`;
@@ -132,10 +136,10 @@ export function renderTaskText(request: Pick<TaskRequest, 'segments'>): string {
           `[Context from Coordinator]\n${context.join('\n\n')}\n[End of Coordinator context]`,
         );
     }
+    if (wholeChatKey !== null && shown.has(wholeChatKey)) continue;
     const text = renderReplyText(segment.text);
     parts.push(segment.source.span === 'quote' ? blockquote(text) : text);
-    if (segment.source.kind === 'chat' && segment.source.span === 'whole')
-      shown.add(`${segment.source.threadId}:${segment.source.messageId}`);
+    if (wholeChatKey !== null) shown.add(wholeChatKey);
   }
   flush();
   return parts.join('\n\n');

@@ -194,9 +194,9 @@ async function setup(claim: ClaimedStep, client: FakeClient) {
 }
 
 describe('runner image attachment wiring (#730)', () => {
-  test.each([false, true])(
-    'quoted dispatch delivers the inherited owner image with an earlier partial citation=%s',
-    async (partial) => {
+  test.each(['none', 'partial-first', 'whole-first', 'partial-last', 'whole-last'] as const)(
+    'quoted dispatch delivers the inherited owner image once with citation order %s',
+    async (order) => {
       const client = new FakeClient();
       client.attachments.id1 = {
         fileName: 'caret.png',
@@ -233,20 +233,30 @@ describe('runner image attachment wiring (#730)', () => {
         titleSource: 'owner',
         titleSourceRef: null,
       };
-      if (partial)
-        request.segments.unshift({
-          source: { kind: 'chat', threadId: 'chief', messageId: 'original', span: 'quote' },
-          author: 'owner',
+      if (order !== 'none') {
+        const source = {
+          source: {
+            kind: 'chat' as const,
+            threadId: 'chief',
+            messageId: 'original',
+            span: order.startsWith('partial') ? ('quote' as const) : ('whole' as const),
+          },
+          author: 'owner' as const,
           sourceRef: null,
-          text: 'The caret is misaligned.',
-        });
+          text: order.startsWith('partial')
+            ? 'The caret is misaligned.'
+            : `The caret is misaligned.\n${formatAttachmentToken('caret.png', 't1/id1.png')}`,
+        };
+        if (order.endsWith('first')) request.segments.unshift(source);
+        else request.segments.push(source);
+      }
       const claim = claimed(renderTaskText(request));
       claim.todo!.request = request;
       const { seen } = await setup(claim, client);
       expect(seen[0]!.promptImages).toEqual([
         { data: PNG.toString('base64'), mimeType: 'image/png' },
       ]);
-      expect(seen[0]!.prompt).toContain('Owner:\nThe caret is misaligned.');
+      expect(seen[0]!.prompt).toContain('The caret is misaligned.');
       expect(seen[0]!.prompt).toContain('Coordinator:\nRecorded.');
       expect(seen[0]!.prompt).toContain('Please dispatch.');
       expect(seen[0]!.prompt).not.toContain('reply source=');
