@@ -995,6 +995,13 @@
       "when": 1794286354580,
       "tag": "0145_coordinator_turn_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "6",
+      "when": 1794297000000,
+      "tag": "0146_browser_session",
+      "breakpoints": true
     }
   ]
 }

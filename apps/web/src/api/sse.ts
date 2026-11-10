@@ -19,7 +19,7 @@ import { translate } from '../i18n/translate.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
-import { readStoredToken, useAuth } from './auth.js';
+import { useAuth } from './auth.js';
 import { computerFeedStore } from './computer-feed.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { invalidateConverged } from './invalidate.js';
@@ -31,9 +31,32 @@ import { connect } from './sse-connection.js';
 import { streamGuards } from './sse-guards.js';
 import { teamEventInvalidations } from './sse-team-events.js';
 
-function streamUrl(path: string): string {
-  const token = readStoredToken();
-  return token === null ? path : `${path}?token=${encodeURIComponent(token)}`;
+async function streamUrl(path: string): Promise<string> {
+  const res = await fetch('/api/auth/stream-ticket', { method: 'POST' });
+  if (!res.ok) return path;
+  const body = (await res.json()) as { ticket?: string };
+  if (body.ticket === undefined || body.ticket === '') return path;
+  return `${path}?ticket=${encodeURIComponent(body.ticket)}`;
+}
+
+function connectWhenTicket(
+  path: string,
+  onEvent: (ev: Record<string, unknown>) => void,
+  onResync: () => void,
+  guards: ReturnType<typeof streamGuards>,
+): () => void {
+  let stop = (): void => {
+    disposed = true;
+  };
+  let disposed = false;
+  void streamUrl(path).then((url) => {
+    if (disposed) return;
+    stop = connect(url, onEvent, onResync, guards);
+  });
+  return () => {
+    disposed = true;
+    stop();
+  };
 }
 
 export function useTeamStream(teamId: string | undefined, enabled: boolean): void {
@@ -55,8 +78,8 @@ export function startTeamStream(teamId: string, qc: QueryClient, generation = 0)
     void invalidateConverged(qc);
   };
   const guards = streamGuards(qc);
-  const disconnect = connect(
-    streamUrl(`/api/teams/${teamId}/stream`),
+  const disconnect = connectWhenTicket(
+    `/api/teams/${teamId}/stream`,
     (ev) => {
       for (const queryKey of teamEventInvalidations(ev, teamId)) {
         void invalidateConverged(qc, { queryKey });
@@ -203,8 +226,8 @@ export function startConversationStream(
     agentTodoStore.clear(conversationId);
     void invalidateConverged(qc);
   };
-  return connect(
-    streamUrl(`/api/conversations/${conversationId}/stream`),
+  return connectWhenTicket(
+    `/api/conversations/${conversationId}/stream`,
     (ev) => {
       switch (ev.type) {
         case 'text_delta':

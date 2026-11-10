@@ -491,13 +491,27 @@ export function useRemoteMutations() {
   return {
     createPairingCode: useMutation({
       mutationFn: () => api.post<PairingCodeResponse>('/api/remote/pairing', {}),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
     }),
     revokeDevice: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/remote/devices/${encodeURIComponent(id)}`),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['remoteDevices'] }),
     }),
+    revokePairingCode: useMutation({
+      mutationFn: (id: string) => api.del<void>(`/api/remote/pairing/${encodeURIComponent(id)}`),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
+    }),
   };
 }
+
+export const usePairingGrants = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['pairingGrants'],
+    queryFn: () =>
+      api.get<Array<{ id: string; expiresAt: number; createdAt: number }>>('/api/remote/pairing'),
+    enabled,
+    refetchInterval: DEVICES_POLL_MS,
+  });
 
 export const useMcpServers = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
