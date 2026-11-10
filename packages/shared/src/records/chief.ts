@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ATTACHMENT_TOKEN_LINE, renderAttachmentTokensToLabels } from '../attachment-token.js';
+import { replyQuoteText } from '../reply-quote.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
@@ -232,7 +233,7 @@ export type ChiefWakeKind = (typeof CHIEF_WAKE_KINDS)[number];
 
 export function chiefThreadTitle(firstMessage: string): string {
   let fallback = '';
-  for (const raw of firstMessage.split('\n')) {
+  for (const raw of replyQuoteText(firstMessage).split('\n')) {
     const line = raw.trim();
     if (line === '') continue;
     const token = ATTACHMENT_TOKEN_LINE.exec(line);
