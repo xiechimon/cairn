@@ -1,4 +1,4 @@
-import type { Phase } from '@cairn/shared';
+import type { EvidenceStore, Phase } from '@cairn/shared';
 import {
   CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
@@ -21,6 +21,7 @@ import { codexReviewDetail, isCodexReviewModel } from './model-identity.js';
 import { classifyPaths, touchesHarness } from './paths.js';
 
 export interface GateVerdictView {
+  recordingAttached?: boolean;
   kind: 'review' | 'verify' | 'decision';
   headSha?: string | null;
   reviewerId?: string | null;
@@ -57,6 +58,7 @@ export interface GateCompareCommit {
 }
 
 export interface GateInputs {
+  evidenceStore?: EvidenceStore | null;
   correction?: boolean;
   author?: { id: string; model: string } | null;
   policy: {
@@ -458,25 +460,45 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
 
   if (i.issueNumber === null) block('issue-ref-missing');
   if (!isLocal && pr !== null && head !== null && compare !== null) {
-    const args = { owner: i.repo.owner, repo: i.repo.name, ticketRef: i.ticketRef };
-    const qualifying = qualifyingEvidenceLinks(pr.body, args, compare);
-    const presence = qualifying.map((l): boolean | null => {
-      const e = i.evidence.find((x) => x.sha === l.sha && x.path === l.path);
-      return e === undefined ? false : e.present;
-    });
-    if (
-      compare.files.some((f) => f.recordingRequired) &&
-      !qualifying.some((l, index) => RECORDING_EXTENSION.test(l.path) && presence[index] === true)
-    ) {
-      block(
-        'recording-missing',
-        'Link a present .gif, .webm or .mp4 of at most 5 MiB under this ticket evidence directory',
-      );
+    if (i.evidenceStore === 'attachments' || i.evidenceStore === null) {
+      if (
+        compare.files.some((f) => f.recordingRequired) &&
+        !(
+          i.evidenceStore === 'attachments' &&
+          D !== null &&
+          i.verdicts.some(
+            (v) =>
+              v.kind === 'verify' &&
+              v.outcome === 'pass' &&
+              v.patchDigest === D &&
+              v.recordingAttached === true,
+          )
+        )
+      ) {
+        block('recording-missing', 'Attach a GIF of at most 5 MiB from the passing verify step');
+      }
+    } else {
+      const args = { owner: i.repo.owner, repo: i.repo.name, ticketRef: i.ticketRef };
+      const qualifying = qualifyingEvidenceLinks(pr.body, args, compare);
+      const presence = qualifying.map((l): boolean | null => {
+        const e = i.evidence.find((x) => x.sha === l.sha && x.path === l.path);
+        return e === undefined ? false : e.present;
+      });
+      if (
+        compare.files.some((f) => f.recordingRequired) &&
+        !qualifying.some((l, index) => RECORDING_EXTENSION.test(l.path) && presence[index] === true)
+      ) {
+        block(
+          'recording-missing',
+          'Link a present .gif, .webm or .mp4 of at most 5 MiB under this ticket evidence directory',
+        );
+      }
     }
   }
 
   if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered'))
     block('verify-tampered');
+  if (i.evidenceStore === null) block('verify-missing', 'Build evidence snapshot unavailable');
   const perspectives = i.round?.perspectives ?? i.availability.reviewerPerspectives;
   if (D !== null) {
     const at = (kind: GateVerdictView['kind'], perspective?: string) =>

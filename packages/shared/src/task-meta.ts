@@ -1,5 +1,4 @@
 import { ATTACHMENT_TOKEN_LINE, renderAttachmentTokensToLabels } from './attachment-token.js';
-
 import { replyQuoteText } from './reply-quote.js';
 
 export const PLACEHOLDER_TITLE_FALLBACK = '未命名任务';

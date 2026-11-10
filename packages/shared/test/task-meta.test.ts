@@ -81,6 +81,24 @@ describe('derivePlaceholderTitle', () => {
     const result = derivePlaceholderTitle(`![${label}](attachment:t/i.png)`);
     expect(result).toBe(`${label.slice(0, 50)}…`);
   });
+
+  it('selection-reply wire uses the owner body, not the reply marker', () => {
+    expect(
+      derivePlaceholderTitle(
+        '<!-- reply source=msg_1 -->\n> earlier ask\n\n并且我想让你支持这个md文件的预览',
+      ),
+    ).toBe('并且我想让你支持这个md文件的预览');
+  });
+
+  it('orphan reply marker without quote lines is skipped', () => {
+    expect(derivePlaceholderTitle('<!-- reply source=m -->\n补完记得跑一下 e2e')).toBe(
+      '补完记得跑一下 e2e',
+    );
+  });
+
+  it('reply marker alone falls through to empty for the caller fallback', () => {
+    expect(derivePlaceholderTitle('<!-- reply source=m -->')).toBe('');
+  });
 });
 
 describe('FIXED_TAGS', () => {
