@@ -1028,6 +1028,32 @@ export const chiefThread = sqliteTable(
   ],
 );
 
+export const coordinatorInput = sqliteTable(
+  'coordinator_input',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('threadId')
+      .notNull()
+      .references(() => chiefThread.id, { onDelete: 'cascade' }),
+    stepId: text('stepId').notNull(),
+    kind: text('kind').$type<'initial' | 'steer'>().notNull(),
+    ownerMessageIds: json<string[]>('ownerMessageIds').notNull(),
+    content: text('content').notNull(),
+    conversationId: text('conversationId'),
+    state: text('state').$type<'pending' | 'consumed' | 'released'>().notNull().default('pending'),
+    entryId: text('entryId'),
+    successorStepId: text('successorStepId'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('coordinator_input_thread_state_idx').on(t.threadId, t.state, t.stepId),
+    check(
+      'coordinator_input_receipt',
+      sql`(${t.state} = 'consumed' AND ${t.entryId} IS NOT NULL) OR (${t.state} IN ('pending', 'released') AND ${t.entryId} IS NULL)`,
+    ),
+  ],
+);
+
 export const chiefMessage = sqliteTable('chief_message', {
   id: text('id').primaryKey(),
   threadId: text('threadId')
