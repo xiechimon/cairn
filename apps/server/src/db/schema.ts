@@ -1341,3 +1341,49 @@ export const deployLease = sqliteTable(
   },
   (t) => [check('deploy_lease_status', sql`${t.status} in ('accepting', 'draining')`)],
 );
+
+export const coordinatorTurnSnapshot = sqliteTable(
+  'coordinator_turn_snapshot',
+  {
+    turnId: text('turnId').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    sourceTraceId: text('sourceTraceId').notNull(),
+    schemaVersion: integer('schemaVersion').notNull(),
+    outcome: text('outcome').$type<'success' | 'failed' | 'stopped'>().notNull(),
+    capturedAt: epochMs('capturedAt').notNull(),
+    expiresAt: epochMs('expiresAt').notNull(),
+    status: text('status').$type<'sealed' | 'unusable'>().notNull(),
+    reason: text('reason'),
+    redactionCount: integer('redactionCount').notNull(),
+    payloadBytes: integer('payloadBytes').notNull(),
+    digest: text('digest'),
+    payload: text('payload'),
+  },
+  (t) => [
+    uniqueIndex('coordinator_turn_snapshot_trace_idx').on(t.sourceTraceId),
+    index('coordinator_turn_snapshot_expiry_idx').on(t.expiresAt),
+    index('coordinator_turn_snapshot_team_age_idx').on(t.teamId, t.capturedAt, t.turnId),
+    check('coordinator_turn_snapshot_version', sql`${t.schemaVersion} > 0`),
+    check(
+      'coordinator_turn_snapshot_outcome',
+      sql`${t.outcome} in ('success', 'failed', 'stopped')`,
+    ),
+    check('coordinator_turn_snapshot_expiry', sql`${t.expiresAt} = ${t.capturedAt} + 2592000000`),
+    check('coordinator_turn_snapshot_redactions', sql`${t.redactionCount} >= 0`),
+    check(
+      'coordinator_turn_snapshot_payload',
+      sql`
+      (${t.status} = 'sealed' AND ${t.reason} IS NULL AND ${t.redactionCount} = 0
+       AND ${t.payload} IS NOT NULL AND json_valid(${t.payload})
+       AND ${t.payloadBytes} = length(cast(${t.payload} AS blob))
+       AND ${t.payloadBytes} <= 2097152
+       AND ${t.digest} IS NOT NULL AND length(${t.digest}) = 64
+       AND ${t.digest} NOT GLOB '*[^0-9a-f]*')
+      OR (${t.status} = 'unusable' AND ${t.payload} IS NULL AND ${t.payloadBytes} = 0
+       AND ${t.digest} IS NULL AND ${t.reason} IS NOT NULL
+       AND length(${t.reason}) BETWEEN 1 AND 128)`,
+    ),
+  ],
+);
