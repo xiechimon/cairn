@@ -423,19 +423,12 @@ export function HomeC({
           if (!narrow) composerRef.current?.focus();
           else showPane(null, { compose: Date.now() } satisfies ComposeState);
         }}
-        onAddTask={(text) => {
-          if (narrow) showPane(null);
-          if (surface.onSend != null) return surface.onSend(text, projectId);
-          setPrefill({ text, key: Date.now() });
-          return undefined;
-        }}
         query={tasksQuery}
       />
     ) : (
       pane !== null && (
         <WorkPanel
           todos={scoped}
-          projectId={projectId}
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}
