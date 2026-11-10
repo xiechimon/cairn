@@ -192,7 +192,9 @@ export function createRequestTodo(
     orchestration: { threadId: ctx.threadId },
     request,
     userSpecAttachmentIds: ownerGrants(segments, ctx.teamId),
-    ...(params.dependsOn !== undefined ? { blockedBy: params.dependsOn } : {}),
+    ...(params.dependsOn !== undefined || params.blockedBy !== undefined
+      ? { blockedBy: [...(params.dependsOn ?? []), ...(params.blockedBy ?? [])] }
+      : {}),
     ...(params.priority === 'first' ? { orderFirst: true } : {}),
     ...(params.output !== undefined ? { output: params.output } : {}),
   });
@@ -240,12 +242,13 @@ export function updateRequestTodo(
   params: CoordinatorUpdateTodoParams,
 ): TodoRecord | null {
   const { db } = deps;
-  if (params.addMessageIds !== undefined) appendableRow(db, ctx, params.todoId);
   const added =
     params.addMessageIds === undefined
       ? null
       : citedMessages(db, ctx, params.addMessageIds).map((c) => c.segment);
+  if (added !== null) appendableRow(db, ctx, params.todoId);
   const routed = updateAutonomousTodo(deps, params.todoId, {
+    ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
     ...(params.tagIds !== undefined ? { tagIds: params.tagIds } : {}),
     ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
   });

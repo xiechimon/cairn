@@ -546,7 +546,7 @@ describe('archived projects stay read-only for the Coordinator', () => {
       relay('update_todo', { todoId: otherTodo.id, projectId: H.projectId }),
     ).rejects.toThrow(/archived/);
     const row = H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get();
-    expect([row?.title, row?.phase]).toEqual(['kept', 'todo']);
+    expect([row?.title, row?.phase]).toEqual(['kept', 'queued']);
     const listed = (await relay('todos', { projectId: H.projectId })) as unknown;
     expect(JSON.stringify(listed)).toContain(created.id);
   });

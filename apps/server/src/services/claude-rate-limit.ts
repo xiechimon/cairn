@@ -15,6 +15,7 @@ import { and, eq, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, type QuotaWaitRow, step, team, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { holdBlockedBuild } from './blockers.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
@@ -98,6 +99,14 @@ function writeClaudeQuota(
     )
     .run();
   if (res.changes === 0) return false;
+  if (todoId !== null) {
+    const changed = deps.db
+      .select({ buildId: step.buildId })
+      .from(step)
+      .where(eq(step.id, stepId))
+      .get();
+    if (changed !== undefined) holdBlockedBuild(deps.db, changed.buildId);
+  }
   const fresh = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (fresh !== undefined) publishStepRow(deps, fresh);
   if (todoId !== null) {

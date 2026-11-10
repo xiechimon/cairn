@@ -184,6 +184,7 @@ export const coordinatorCreateTodoParamsSchema = z
     sourceTodoId: z.string().min(1).optional(),
     quotes: z.array(z.string().trim().min(1)).min(1).max(50).optional(),
     dependsOn: todoIdListSchema.optional(),
+    blockedBy: todoIdListSchema.optional(),
     priority: z.enum(TASK_REQUEST_PRIORITIES).optional(),
     difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
     output: todoOutputSchema.optional(),
@@ -200,6 +201,7 @@ export const coordinatorUpdateTodoParamsSchema = z
     tagIds: todoIdListSchema.optional(),
     projectId: z.string().min(1).optional(),
     addMessageIds: todoIdListSchema.min(1).optional(),
+    blockedBy: todoIdListSchema.optional(),
   })
   .strict();
 export type CoordinatorUpdateTodoParams = z.infer<typeof coordinatorUpdateTodoParamsSchema>;
@@ -405,7 +407,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project. You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and titles it from them. You add routing only. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and titles it from them. You add routing only. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         projectId: str('Project id.'),
@@ -427,6 +429,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         output: str(
           'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
         ),
+        blockedBy: idArr(
+          'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
+        ),
       },
       ['projectId'],
     ),
@@ -441,6 +446,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         tagIds: idArr('Optional replacement tag ids.'),
         projectId: str(
           'Optional target project id. Only for a todo that has not started; its tags are dropped.',
+        ),
+        blockedBy: idArr(
+          'Optional replacement list of todo ids that must finish first; [] removes every blocker.',
         ),
         addMessageIds: idArr(
           'Optional ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
@@ -468,7 +476,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'reopen_todos',
-    description: 'Reopen closed todos (phase closed → todo).',
+    description: 'Reopen closed todos and start a new thread on each (phase closed → queued).',
     parameters: obj({ todoIds: idArr('Todo ids to reopen.') }, ['todoIds']),
   },
   {
@@ -770,7 +778,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'open_thread',
     description:
-      'Open a thread on a todo that has not started: one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from create_todo or todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
+      'Open a thread on a todo the user created that has not started (create_todo and reopen_todos already start theirs): one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
     parameters: obj({ todoId: str('Id of the todo to open a thread on.') }, ['todoId']),
   },
   {

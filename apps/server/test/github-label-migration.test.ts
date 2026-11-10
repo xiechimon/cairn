@@ -20,7 +20,7 @@ function legacyDatabase() {
     sqlite.pragma('foreign_keys = ON');
     migrateUpTo(sqlite, directory, '0119_agent_layer_backup');
     runAgentLayerDataMigration(sqlite);
-    migrateUpTo(sqlite, directory, '0142_step_owner_messages');
+    migrateUpTo(sqlite, directory, '0143_blocked_by_hold');
     sqlite.exec(`
       INSERT INTO team (id, name, createdAt) VALUES ('team', 'Team', 1);
       INSERT INTO project (id, teamId, name, repoKind, githubRepo)

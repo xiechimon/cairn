@@ -29,15 +29,12 @@ describe('create_todo provenance', () => {
 });
 
 describe('open_thread dispatch', () => {
-  test('open_thread starts one session step triggered by the chief and queues the todo (#903)', async () => {
-    const todoRec = (await relay('create_todo', ownerTodo('写文档'))) as {
+  test('create_todo starts one session step triggered by the chief and queues the todo (#903, task stall class 3)', async () => {
+    const out = (await relay('create_todo', ownerTodo('写文档'))) as {
       id: string;
-    };
-    const out = (await relay('open_thread', { todoId: todoRec.id })) as {
-      todoId: string;
       buildId: string;
     };
-    expect(out.todoId).toBe(todoRec.id);
+    const todoRec = { id: out.id };
     const row = H.s.db.select().from(todoTable).where(eq(todoTable.id, todoRec.id)).get()!;
     expect(row.phase).toBe('queued');
     expect(row.latestBuildId).toBe(out.buildId);

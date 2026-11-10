@@ -148,15 +148,18 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
 
     const created = (await w.relay(stepId, 'create_todo', {
       projectId: w.projectId,
-    })) as { id: string; createdBy: string | null; sourceBuildId: string | null };
+    })) as {
+      id: string;
+      createdBy: string | null;
+      sourceBuildId: string | null;
+      buildId: string;
+    };
     expect(created.createdBy).toBe(w.s.user.id);
     expect(created.sourceBuildId).toBe(`chief-${w.s.user.id}-${w.teamId}`);
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!;
     expect(todoRow.spec).toBe('帮 m4a-proj 写一份 CONTRIBUTING.md 贡献指南。');
 
-    const opened = (await w.relay(stepId, 'open_thread', { todoId: created.id })) as {
-      buildId: string;
-    };
+    const opened = created;
     expect(
       w.s.db.select().from(buildTable).where(eq(buildTable.id, opened.buildId)).get(),
     ).toMatchObject({
@@ -332,13 +335,14 @@ describe('Coordinator router tools over the machine protocol (D60)', () => {
     const stepId = claimed.step.id;
     const created = (await w.relay(stepId, 'create_todo', {
       projectId: w.projectId,
-    })) as { id: string };
+    })) as { id: string; buildId: string };
     await expect(w.relay(stepId, 'run_builds', { todoIds: [created.id] })).rejects.toThrow(
       /run_builds was removed under D60/,
     );
-    const opened = (await w.relay(stepId, 'open_thread', { todoId: created.id })) as {
-      buildId: string;
-    };
+    await expect(w.relay(stepId, 'open_thread', { todoId: created.id })).rejects.toThrow(
+      /already open/,
+    );
+    const opened = created;
     const steps = w.s.db
       .select()
       .from(stepTable)

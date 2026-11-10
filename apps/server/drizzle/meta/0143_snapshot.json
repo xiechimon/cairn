@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "70b619a9-c956-4454-8254-34329835500b",
+  "id": "69b5c8c3-067f-4f56-84f9-9dc26026df03",
   "prevId": "b2232e95-df50-4c40-b8c9-0b4476d55c87",
   "tables": {
     "agent_memory": {
@@ -2970,75 +2970,6 @@
           "tableTo": "team",
           "columnsFrom": [
             "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "github_label": {
-      "name": "github_label",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "projectId": {
-          "name": "projectId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "color": {
-          "name": "color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'#6366f1'"
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "v": {
-          "name": "v",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "github_label_projectId_project_id_fk": {
-          "name": "github_label_projectId_project_id_fk",
-          "tableFrom": "github_label",
-          "tableTo": "project",
-          "columnsFrom": [
-            "projectId"
           ],
           "columnsTo": [
             "id"
@@ -6425,65 +6356,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todo_github_label": {
-      "name": "todo_github_label",
-      "columns": {
-        "todoId": {
-          "name": "todoId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "labelId": {
-          "name": "labelId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "todo_github_label_todoId_todo_id_fk": {
-          "name": "todo_github_label_todoId_todo_id_fk",
-          "tableFrom": "todo_github_label",
-          "tableTo": "todo",
-          "columnsFrom": [
-            "todoId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "todo_github_label_labelId_github_label_id_fk": {
-          "name": "todo_github_label_labelId_github_label_id_fk",
-          "tableFrom": "todo_github_label",
-          "tableTo": "github_label",
-          "columnsFrom": [
-            "labelId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "todo_github_label_todoId_labelId_pk": {
-          "columns": [
-            "todoId",
-            "labelId"
-          ],
-          "name": "todo_github_label_todoId_labelId_pk"
-        }
-      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
