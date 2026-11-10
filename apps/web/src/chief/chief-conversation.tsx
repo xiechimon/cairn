@@ -8,6 +8,7 @@ import {
 } from '@cairn/shared';
 import { TriangleAlert } from 'lucide-react';
 import {
+  Fragment,
   type ReactNode,
   useCallback,
   useEffect,
@@ -35,12 +36,14 @@ import {
 import {
   MessageScroller,
   MessageScrollerContent,
+  MessageScrollerItem,
   MessageScrollerProvider,
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
+import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
@@ -64,6 +67,7 @@ import { awaitingStream } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
+import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
@@ -151,7 +155,7 @@ export function ChiefConversation({
   showBindGate = true,
 }: ChiefConversationProps) {
   const questionAttached = useQuestionDockVisible();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const composerPlaceholder =
     targetPlaceholder ??
     (chief.outage != null
@@ -417,9 +421,33 @@ export function ChiefConversation({
       />
     </>
   );
-  const streamRow = ({ item, i }: GroupedRow) => (
+  const clock = useMinuteClock();
+  const dividerClock = { previousAt: null as number | null };
+  const streamRow = ({ item, i }: GroupedRow) => {
+    const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
+    const divider =
+      at !== null && needsTimeDivider(dividerClock.previousAt, at) ? (
+        <MessageScrollerItem key={`divider-${chiefStreamRowKey(item, i)}`}>
+          <div
+            data-testid="chief-time-divider"
+            className="mt-6 text-center text-caption text-(--text-tertiary)"
+          >
+            <time dateTime={new Date(at).toISOString()}>
+              {timeDividerLabel(at, clock, locale, t)}
+            </time>
+          </div>
+        </MessageScrollerItem>
+      ) : null;
+    if (at !== null) dividerClock.previousAt = at;
+    return (
+      <Fragment key={chiefStreamRowKey(item, i)}>
+        {divider}
+        {row(item, i)}
+      </Fragment>
+    );
+  };
+  const row = (item: GroupedRow['item'], i: number) => (
     <ChiefStreamRow
-      key={chiefStreamRowKey(item, i)}
       item={item}
       index={i}
       latest={i === latestMessage?.i}

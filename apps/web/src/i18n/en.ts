@@ -299,6 +299,8 @@ export const EN: Record<string, string> = {
   '{n} 分钟前': '{n}m ago',
   '{n} 小时前': '{n}h ago',
   昨天: 'yesterday',
+  '今天 {time}': 'Today {time}',
+  '昨天 {time}': 'Yesterday {time}',
   '{n} 天前': '{n}d ago',
 
   // —— todo detail (r7 §3.3–§3.6) ——
