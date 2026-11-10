@@ -14,7 +14,7 @@ const slideInDone = (page: Page) =>
     .locator('.side-panel')
     .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 
-test('a task row opens its thread beside the Coordinator, and closing it returns to the list', async ({
+test('a task row opens its thread beside the Coordinator, and going back returns to the list', async ({
   page,
 }) => {
   await page.goto(`${HOME}&pane=tasks`);
@@ -29,7 +29,7 @@ test('a task row opens its thread beside the Coordinator, and closing it returns
   await expect(tasksPanel(page)).toHaveCount(0);
   expect(await panelWidth(page)).toBe(420);
 
-  await sideChat(page).getByRole('button', { name: '关闭' }).click();
+  await sideChat(page).getByRole('button', { name: '返回' }).click();
   await expect(sideChat(page)).toHaveCount(0);
   await expect(page).not.toHaveURL(/thread=/);
   await expect(tasksPanel(page)).toBeVisible();

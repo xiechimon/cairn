@@ -46,9 +46,17 @@ const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }>
   unarchive: { reason: '已归档。', primary: '取消归档' },
 };
 
+export interface ThreadQuickReply {
+  id: 'finish' | 'approve';
+  label: string;
+  run: () => void;
+  disabled: boolean;
+}
+
 export interface ThreadActions {
   card: ReactNode;
   menu: ReactNode;
+  quickReplies: ThreadQuickReply[];
 }
 
 export function useThreadActions({
@@ -271,5 +279,13 @@ export function useThreadActions({
     </>
   );
 
-  return { card, menu };
+  const quickReplies: ThreadQuickReply[] = archived
+    ? []
+    : phase === 'review'
+      ? [{ id: 'finish', label: '标记完成', run: openAccept, disabled: pending }]
+      : phase === 'confirm'
+        ? [{ id: 'approve', label: '批准计划', run: approve, disabled: pending }]
+        : [];
+
+  return { card, menu, quickReplies };
 }

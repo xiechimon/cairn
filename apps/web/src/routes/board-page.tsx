@@ -261,6 +261,7 @@ export function BoardPage() {
               (!live && todos.length === 1 ? todos[0] : undefined)
             }
             now={live ? Date.now() : fixture.now}
+            chatStream={{ items: chiefData.stream ?? [], at: chiefData.streamAt ?? [] }}
             onClose={closeThread}
           />
         )}

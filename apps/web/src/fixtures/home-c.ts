@@ -39,6 +39,27 @@ function homeTodo(
   };
 }
 
+function askedIn(todo: TodoRecord, messageId: string, spec: string): TodoRecord {
+  return {
+    ...todo,
+    spec,
+    request: {
+      segments: [
+        {
+          source: { kind: 'chat', threadId: 'chief-global', messageId, span: 'whole' },
+          author: 'owner',
+          sourceRef: null,
+          text: spec,
+        },
+      ],
+      siblings: [],
+      difficulty: null,
+      titleSource: 'owner',
+      titleSourceRef: null,
+    },
+  };
+}
+
 const conversation: ChiefContent = {
   ...chiefDefault,
   view: 'none',
@@ -138,16 +159,24 @@ export const homeC: FixtureSet = {
   todos: [
     homeTodo('home-c-confirm', 2301, 'Connect a Claude subscription token', 'confirm', PROJECT_ID),
     homeTodo('home-c-failed', 74, 'Rerun the relay probe', 'failed', HOME_C_CRED),
-    homeTodo(
-      'home-c-review',
-      2271,
-      'Fold finished turns into purpose and duration',
-      'review',
-      PROJECT_ID,
+    askedIn(
+      homeTodo(
+        'home-c-review',
+        2271,
+        'Fold finished turns into purpose and duration',
+        'review',
+        PROJECT_ID,
+      ),
+      'home-c-ask-fold',
+      'Fold finished turns before review.',
     ),
     homeTodo('home-c-working-a', 2302, 'Push for finished threads', 'building', PROJECT_ID),
     homeTodo('home-c-working-b', 2303, 'Serif greeting fix', 'planning', PROJECT_ID),
-    homeTodo('home-c-working-c', 75, 'Orb canary round 7', 'building', HOME_C_CRED),
+    askedIn(
+      homeTodo('home-c-working-c', 75, 'Orb canary round 7', 'building', HOME_C_CRED),
+      'home-c-ask-orb',
+      'Run the orb canary until it passes, then send the first real ticket through cairn.',
+    ),
     homeTodo('home-c-idle', 2240, 'Sidebar status groups', 'todo', PROJECT_ID),
     homeTodo('home-c-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID),
   ],

@@ -6,6 +6,7 @@ import { ACCENT_INK } from '../phase.js';
 import { relativeTime } from './rel-time.js';
 import type { TaskCardFacts } from './task-card-facts.js';
 import { glyphOf, type TaskEntry, taskRowCopy } from './tasks-sections.js';
+import { useThreadUnread } from './use-thread-unread.js';
 
 export function TaskCard({
   entry,
@@ -22,6 +23,7 @@ export function TaskCard({
   const copy = taskRowCopy(entry);
   const glyph = glyphOf(entry);
   const latest = facts.latest ?? t(copy.what.key, copy.what.params);
+  const unread = useThreadUnread(entry.todo.id);
   return (
     <Button
       variant="ghost"
@@ -41,6 +43,14 @@ export function TaskCard({
         >
           {entry.todo.title}
         </span>
+        {unread && (
+          <span
+            role="img"
+            aria-label={t('有新动态')}
+            data-slot="task-card-unread"
+            className="size-1.5 flex-none rounded-full bg-(--card-button)"
+          />
+        )}
         <span
           data-slot="task-card-status"
           className="flex flex-none items-center gap-1.5 text-meta text-content-tertiary tabular-nums"

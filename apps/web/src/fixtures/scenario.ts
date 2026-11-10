@@ -147,6 +147,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'activity-many': activityManyFixture,
       'activity-empty': { ...homeC, todos: [] },
       'home-c-empty': homeCEmpty,
+      'home-c-unread': { ...homeC, unreadThreadIds: ['home-c-working-c'] },
       'home-c-made': homeCMade,
       'sidebar-thread-statuses': sidebarThreadStatuses,
       'board-inbox': boardInbox,

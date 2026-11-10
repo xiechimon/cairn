@@ -1946,4 +1946,12 @@ export const EN: Record<string, string> = {
   '{n} 件进行中': '{n} in progress',
   对话: 'Chat',
   对话和任务: 'Chat and tasks',
+  决定与更新: 'Decisions and updates',
+  '{time} 更新': 'Updated {time}',
+  '{n} 条更新': '{n#1 update|# updates}',
+  来自主对话: 'From the main chat',
+  '来自主对话 · {time}': 'From the main chat · {time}',
+  在主对话中查看: 'View in the main chat',
+  主对话里没有加载这条消息: 'That message is not loaded in the main chat.',
+  有新动态: 'New activity',
 };

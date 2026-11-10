@@ -1,12 +1,13 @@
 import { cn } from 'cn';
-import { FileDiff, X } from 'lucide-react';
+import { ArrowLeft, FileDiff, X } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { REPLY_SOURCE_ATTR } from '../chief/selection-reply-model.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
-import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -17,17 +18,29 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { ACCENT_INK } from '../phase.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
-import { threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
+import { THREAD_PARAM, threadCopy, threadStatus, VIEW_PARAM } from './thread-copy.js';
+import { ThreadOriginLine } from './thread-origin-line.js';
+import {
+  type ThreadChatStream,
+  type ThreadOrigin,
+  type ThreadUpdates,
+  threadOrigin,
+  threadPurpose,
+  threadUpdates,
+} from './thread-panel-model.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
+import { ThreadUpdatesBlock } from './thread-updates-block.js';
 import { ThreadUsageFooter } from './thread-usage-footer.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
+import { PANE_PARAM } from './work-panel.js';
 
 const OVERLAY_QUERY = '(max-width: 1100px)';
 
@@ -38,20 +51,34 @@ function StatusLine({
   machineName,
   now,
   waitingOnChecks,
+  updates,
 }: {
   todo: TodoRecord;
   machineName: string | null;
   now: number;
   waitingOnChecks: boolean;
+  updates: ThreadUpdates | null;
 }) {
   const { t } = useI18n();
-  const meta = joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
+  const needsYou = threadStatus(todo) === 'needs-you';
+  const purpose = threadPurpose(todo);
+  const meta =
+    needsYou && updates !== null
+      ? t('{n} 条更新', { n: updates.lines.length })
+      : purpose !== ''
+        ? purpose
+        : joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
-      className="m-0 flex min-w-0 items-center gap-1.5 pl-5 text-meta text-content-tertiary"
+      className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary"
     >
-      <span className="flex-none font-medium text-content-secondary">
+      <span
+        className={cn(
+          'flex-none font-medium',
+          needsYou && todo.quotaWait == null ? ACCENT_INK : 'text-content-secondary',
+        )}
+      >
         {todo.quotaWait != null
           ? t('等额度')
           : waitingOnChecks
@@ -205,6 +232,9 @@ function ThreadBody({
   actions,
   view,
   now,
+  updates,
+  origin,
+  onJumpToOrigin,
   onOpenPlan,
   onClose,
 }: {
@@ -213,6 +243,9 @@ function ThreadBody({
   actions: ThreadActions;
   view: ThreadView;
   now: number;
+  updates: ThreadUpdates | null;
+  origin: ThreadOrigin | null;
+  onJumpToOrigin: () => void;
   onOpenPlan: (() => void) | undefined;
   onClose: () => void;
 }) {
@@ -229,6 +262,10 @@ function ThreadBody({
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
+      {view === 'chat' && updates !== null && <ThreadUpdatesBlock updates={updates} />}
+      {view === 'chat' && origin !== null && (
+        <ThreadOriginLine origin={origin} onJump={onJumpToOrigin} />
+      )}
       {view === 'changes' ? (
         <ChangesView chat={chat} now={now} />
       ) : (
@@ -269,6 +306,26 @@ function ThreadBody({
           />
         </div>
       )}
+      {actions.quickReplies.length > 0 && (
+        <div
+          data-testid="side-chat-quick"
+          className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap gap-1.5"
+        >
+          {actions.quickReplies.map((reply) => (
+            <Button
+              key={reply.id}
+              size="sm"
+              variant="secondary"
+              data-quick={reply.id}
+              disabled={reply.disabled}
+              onClick={reply.run}
+              className="h-7 rounded-full px-3 font-medium"
+            >
+              {t(reply.label)}
+            </Button>
+          ))}
+        </div>
+      )}
       <Composer
         placeholder={
           archived
@@ -306,17 +363,30 @@ export function SideChat({
   todoId,
   listed,
   now,
+  chatStream,
   onClose,
 }: {
   todoId: string;
   listed: TodoRecord | undefined;
   now: number;
+  chatStream?: ThreadChatStream;
   onClose: () => void;
 }) {
   const { t } = useI18n();
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const closeAll = () =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(THREAD_PARAM);
+        params.delete(VIEW_PARAM);
+        params.delete(PANE_PARAM);
+        return params;
+      },
+      { replace: true },
+    );
   const [chosenView, setView] = useState<ThreadView>(
     searchParams.get(VIEW_PARAM) === 'changes' ? 'changes' : 'chat',
   );
@@ -363,11 +433,13 @@ export function SideChat({
           now={now}
           view={view}
           onView={setView}
+          chatStream={chatStream}
           onClose={onClose}
+          onCloseAll={closeAll}
         />
       ) : (
         <>
-          <Head todoId={todoId} todo={null} onClose={onClose} />
+          <Head todoId={todoId} todo={null} onBack={onClose} onClose={closeAll} />
           <Unavailable chat={chat} />
         </>
       )}
@@ -381,14 +453,18 @@ function ReadyThread({
   now,
   view,
   onView,
+  chatStream,
   onClose,
+  onCloseAll,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   now: number;
   view: ThreadView;
   onView: (view: ThreadView) => void;
+  chatStream: ThreadChatStream | undefined;
   onClose: () => void;
+  onCloseAll: () => void;
 }) {
   const { t } = useI18n();
   const [planOpen, setPlanOpen] = useState(false);
@@ -397,12 +473,27 @@ function ReadyThread({
   const { live, teamId } = useLiveData();
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
+  const updates = threadUpdates(todo, chat.transcript);
+  const origin = threadOrigin(todo.request, chatStream);
+  const jumpToOrigin = () => {
+    if (origin === null) return;
+    const selector = `[data-testid="home-c"] [${REPLY_SOURCE_ATTR}="${CSS.escape(origin.messageId)}"]`;
+    if (window.matchMedia(OVERLAY_QUERY).matches) onClose();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const target = document.querySelector(selector);
+        if (target === null) toastError(t('主对话里没有加载这条消息'), null);
+        else target.scrollIntoView({ block: 'center' });
+      }),
+    );
+  };
   return (
     <>
       <Head
         todoId={todo.id}
         todo={todo}
-        onClose={onClose}
+        onBack={onClose}
+        onClose={onCloseAll}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
         {...(chat.changes.status !== 'none'
@@ -422,6 +513,7 @@ function ReadyThread({
           machineName={chat.machineName}
           now={now}
           waitingOnChecks={chat.waitingOnChecks}
+          updates={updates}
         />
         <ThreadUsageFooter key={todo.id} todo={todo} />
       </Head>
@@ -437,6 +529,9 @@ function ReadyThread({
         actions={actions}
         view={view}
         now={now}
+        updates={updates}
+        origin={origin}
+        onJumpToOrigin={jumpToOrigin}
         onOpenPlan={openPlan}
         onClose={onClose}
       />
@@ -465,6 +560,7 @@ function ReadyThread({
 function Head({
   todoId,
   todo,
+  onBack,
   onClose,
   menu,
   changesButton,
@@ -473,6 +569,7 @@ function Head({
 }: {
   todoId: string;
   todo: TodoRecord | null;
+  onBack: () => void;
   onClose: () => void;
   menu?: ReactNode;
   changesButton?: ReactNode;
@@ -485,11 +582,25 @@ function Head({
       data-testid="side-chat"
       data-todo-id={todoId}
       data-phase={todo?.phase}
-      className="flex flex-none flex-col gap-0.5 border-b border-border pt-2.5 pr-2.5 pb-2.5 pl-4"
+      className="flex flex-none items-start gap-1 border-b border-border py-2.5 pr-2.5 pl-2.5"
     >
-      <div className="flex min-w-0 items-center gap-1">
-        {todo != null && <ToneGlyph tone={threadTone(todo)} className="size-3.5 flex-none" />}
-        <div className="ml-0.5 flex min-w-0 flex-1 items-center gap-1">
+      <IconTooltip
+        label={t('返回')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            data-testid="side-chat-back"
+            onClick={onBack}
+            className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
+          />
+        }
+      >
+        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="size-4" />
+      </IconTooltip>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5 pl-1">
+        <div className="flex min-w-0 items-center gap-1">
           <h2 className="m-0 min-w-0 truncate text-ui font-semibold text-foreground">
             {todo != null ? (
               <>
@@ -504,19 +615,24 @@ function Head({
           </h2>
           {titleExtra}
         </div>
-        {changesButton}
-        {menu}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('关闭')}
-          onClick={onClose}
-          className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
-        >
-          <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
-        </Button>
+        {children}
       </div>
-      {children}
+      {changesButton}
+      {menu}
+      <IconTooltip
+        label={t('关闭')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
+          />
+        }
+      >
+        <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
+      </IconTooltip>
     </header>
   );
 }
