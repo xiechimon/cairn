@@ -203,10 +203,16 @@ test('CI classifies before heavy work and always runs push coverage', () => {
     );
     assert.match(job, /pnpm install --frozen-lockfile/);
   }
-  assert.ok(
-    jobs.get('vitest-integration').includes('pnpm exec playwright install chromium --with-deps'),
-  );
-  assert.ok(!jobs.get('vitest-light').includes('playwright install'));
+  for (const name of ['vitest-integration', 'e2e', 'e2e-affected']) {
+    const job = jobs.get(name);
+    assert.ok(job.includes('uses: ./.github/actions/playwright-chromium\n'), name);
+    assert.ok(
+      job.indexOf('pnpm install --frozen-lockfile') < job.indexOf('playwright-chromium'),
+      name,
+    );
+    assert.ok(!job.includes('playwright install'), name);
+  }
+  assert.ok(!jobs.get('vitest-light').includes('playwright'));
   const check = jobs.get('check');
   assert.ok(!check.includes('VITEST_PROJECT_SET='));
   assert.ok(!check.includes('playwright install'));
@@ -229,6 +235,20 @@ test('CI classifies before heavy work and always runs push coverage', () => {
     );
   assert.ok(core.includes(`PREPUSH_FORCE_FULL: \${{ github.event_name == 'push' }}`));
   assert.doesNotMatch(core, /0{40}/);
+});
+
+test('the chromium action installs cached system packages and falls back to apt', () => {
+  const action = readFileSync('.github/actions/playwright-chromium/action.yml', 'utf8');
+  assert.match(action, /uses: actions\/cache@[0-9a-f]{40} # v\d+\.\d+\.\d+\n/);
+  assert.ok(action.includes('key: ${{ steps.key.outputs.key }}'));
+  for (const part of ['${ImageOS:-unknown}', '${ImageVersion:-unknown}', 'playwright --version'])
+    assert.ok(action.includes(part), part);
+  const install = action.split('- name: Install chromium and its system packages')[1];
+  const cached = install.indexOf('sudo dpkg -i "$debs"/*.deb');
+  const fallback = install.indexOf('pnpm exec playwright install chromium --with-deps');
+  assert.ok(cached > 0 && cached < fallback);
+  assert.ok(install.indexOf('sudo apt-get clean') < fallback);
+  assert.ok(fallback < install.indexOf('cp /var/cache/apt/archives/*.deb "$debs"/'));
 });
 
 test('required aggregates only accept skipped work after a successful docs-only classification', () => {
