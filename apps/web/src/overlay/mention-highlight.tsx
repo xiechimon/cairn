@@ -11,6 +11,7 @@ const MIRRORED = [
   'fontSize',
   'fontWeight',
   'fontStyle',
+  'fontVariantNumeric',
   'letterSpacing',
   'lineHeight',
   'paddingTop',
