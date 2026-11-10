@@ -306,8 +306,9 @@ export interface ResourcesContent {
 
 export interface DocSegment {
   text: string;
-  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor';
+  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment';
   href?: string;
+  attachmentKey?: string;
   strong?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;
