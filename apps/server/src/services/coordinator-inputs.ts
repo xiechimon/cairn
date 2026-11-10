@@ -1,5 +1,5 @@
 import { coordinatorConversationKey } from '@cairn/shared';
-import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, notInArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   chiefMessage,
@@ -253,13 +253,7 @@ export function consumeCoordinatorInput(
       .run();
     if (batch.kind === 'steer')
       db.delete(step)
-        .where(
-          and(
-            eq(step.id, batch.id),
-            eq(step.status, 'pending'),
-            inArray(step.holdReason, ['steer', 'steer_sent']),
-          ),
-        )
+        .where(and(eq(step.id, batch.id), eq(step.status, 'pending')))
         .run();
   });
 }
