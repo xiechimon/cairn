@@ -44,15 +44,15 @@ describe('attachment citations in displayed markdown', () => {
     ]);
   });
 
-  test('avif uses the shared image extension list', () => {
-    expect(isImageAttachmentKey('team-1/shot.avif')).toBe(true);
-    expect(isImageAttachmentKey('team-1/report.md')).toBe(false);
+  test('avif stays a download chip because the attachment endpoint forces download', () => {
+    expect(isImageAttachmentKey('team-1/shot.avif')).toBe(false);
+    expect(isImageAttachmentKey('team-1/shot.png')).toBe(true);
   });
 
   test('an empty image label falls back to the file name', () => {
-    expect(inlineSegments('见图 ![](attachment:team-1/shot.avif) 这里')).toEqual([
+    expect(inlineSegments('见图 ![](attachment:team-1/shot.png) 这里')).toEqual([
       { text: '见图 ' },
-      { text: 'shot.avif', style: 'attachment', attachmentKey: 'team-1/shot.avif' },
+      { text: 'shot.png', style: 'attachment', attachmentKey: 'team-1/shot.png' },
       { text: ' 这里' },
     ]);
   });

@@ -2,6 +2,8 @@ import { isImageAttachmentExt } from '@cairn/shared';
 import { createContext } from 'react';
 import { Button } from '../components/ui/button.js';
 
+const DOWNLOAD_ONLY_IMAGE_EXTS = new Set(['avif']);
+
 export function attachmentIdFromKey(key: string): string {
   const lastSlash = key.lastIndexOf('/');
   const tail = lastSlash >= 0 ? key.slice(lastSlash + 1) : key;
@@ -12,7 +14,8 @@ export function attachmentIdFromKey(key: string): string {
 export function isImageAttachmentKey(key: string): boolean {
   const dot = key.lastIndexOf('.');
   if (dot < 0 || dot === key.length - 1) return false;
-  return isImageAttachmentExt(key.slice(dot + 1).toLowerCase());
+  const ext = key.slice(dot + 1).toLowerCase();
+  return isImageAttachmentExt(ext) && !DOWNLOAD_ONLY_IMAGE_EXTS.has(ext);
 }
 
 export const SPEC_CHIP =
