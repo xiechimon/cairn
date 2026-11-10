@@ -1,5 +1,11 @@
 import { isArchivedProject } from './project-archive.js';
-import { isWaiting, type TasksView } from './tasks-sections.js';
+import {
+  isWaiting,
+  type Phrase,
+  questionRowCopy,
+  type TasksView,
+  taskRowCopy,
+} from './tasks-sections.js';
 
 export interface GroupableProject {
   id: string;
@@ -47,4 +53,36 @@ export function waitingProjectIds(view: TasksView): Set<string> {
     if (question.projectId !== null) ids.add(question.projectId);
   }
   return ids;
+}
+
+export type ProjectStatus =
+  | { kind: 'waiting'; word: string; what: Phrase }
+  | { kind: 'working'; count: number };
+
+export function projectStatuses(view: TasksView): Map<string, ProjectStatus> {
+  const newest = new Map<string, { at: number; status: ProjectStatus }>();
+  const offer = (projectId: string, at: number, status: ProjectStatus) => {
+    const seen = newest.get(projectId);
+    if (seen === undefined || at > seen.at) newest.set(projectId, { at, status });
+  };
+  const working = new Map<string, number>();
+  for (const entry of view.entries) {
+    const projectId = entry.todo.projectId;
+    if (projectId == null) continue;
+    if (isWaiting(entry.section)) {
+      const { word, what } = taskRowCopy(entry);
+      offer(projectId, entry.todo.phaseAt, { kind: 'waiting', word, what });
+    } else if (entry.section === 'working') {
+      working.set(projectId, (working.get(projectId) ?? 0) + 1);
+    }
+  }
+  for (const question of view.questions) {
+    if (question.projectId === null) continue;
+    const { word, what } = questionRowCopy();
+    offer(question.projectId, question.createdAt, { kind: 'waiting', word, what });
+  }
+  const statuses = new Map<string, ProjectStatus>();
+  for (const [projectId, count] of working) statuses.set(projectId, { kind: 'working', count });
+  for (const [projectId, { status }] of newest) statuses.set(projectId, status);
+  return statuses;
 }

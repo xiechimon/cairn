@@ -28,7 +28,8 @@ import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { composeRequest } from './open-composer.js';
+import { type ComposeState, composeRequest } from './open-composer.js';
+import { PhoneTabs } from './phone-tabs.js';
 import { TaskCard } from './task-card.js';
 import { taskCardFacts } from './task-card-facts.js';
 import { TasksPanel } from './tasks-panel.js';
@@ -42,6 +43,7 @@ import {
 } from './tasks-sections.js';
 import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
+import { useNarrow } from './use-narrow.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
 const CHIEF_PARAM = 'chief';
@@ -139,13 +141,14 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
-  const showPane = (next: WorkPane | null) => {
+  const narrow = useNarrow();
+  const showPane = (next: WorkPane | null, state: unknown = location.state) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
-    setSearchParams(params, { replace: true, state: location.state });
+    setSearchParams(params, { replace: true, state });
   };
   const togglePane = (next: WorkPane) => {
     showPane(pane === next && threadId === null ? null : next);
@@ -352,31 +355,33 @@ export function HomeC({
         onToggle={() => togglePane('machines')}
         loading={machinesQuery?.isPending === true}
       />
-      <IconTooltip
-        label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
-        side="bottom"
-        trigger={
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="tasks-toggle"
-            aria-pressed={pane === 'tasks' && threadId === null}
-            onClick={() => togglePane('tasks')}
-            className="h-7.5 gap-1.5 px-2 text-meta font-normal text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
-          />
-        }
-      >
-        <ListChecks aria-hidden="true" />
-        {t('任务')}
-        {badge > 0 && (
-          <span
-            data-testid="tasks-badge"
-            className="min-w-5 rounded-full bg-(--card-button) px-1.5 text-center text-caption leading-4 font-semibold tabular-nums text-(--text-on-accent)"
-          >
-            {badge}
-          </span>
-        )}
-      </IconTooltip>
+      {!narrow && (
+        <IconTooltip
+          label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
+          side="bottom"
+          trigger={
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="tasks-toggle"
+              aria-pressed={pane === 'tasks' && threadId === null}
+              onClick={() => togglePane('tasks')}
+              className="h-7.5 gap-1.5 px-2 text-meta font-normal text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+            />
+          }
+        >
+          <ListChecks aria-hidden="true" />
+          {t('任务')}
+          {badge > 0 && (
+            <span
+              data-testid="tasks-badge"
+              className="min-w-5 rounded-full bg-(--card-button) px-1.5 text-center text-caption leading-4 font-semibold tabular-nums text-(--text-on-accent)"
+            >
+              {badge}
+            </span>
+          )}
+        </IconTooltip>
+      )}
       <IconTooltip
         label={t('成果')}
         side="bottom"
@@ -395,6 +400,10 @@ export function HomeC({
     </header>
   );
 
+  const phoneTabs = narrow && threadId === null && (
+    <PhoneTabs tasksOpen={pane === 'tasks'} badge={badge} />
+  );
+
   const workPanel =
     threadId !== null ? null : pane === 'machines' ? (
       <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
@@ -407,7 +416,10 @@ export function HomeC({
         onClose={() => showPane(null)}
         onOpenThread={openThread}
         onOpenQuestion={openQuestion}
-        onNewTask={() => composerRef.current?.focus()}
+        onNewTask={() => {
+          if (!narrow) composerRef.current?.focus();
+          else showPane(null, { compose: Date.now() } satisfies ComposeState);
+        }}
         query={tasksQuery}
       />
     ) : (
@@ -440,109 +452,116 @@ export function HomeC({
   }, [handedOver, loadingDraft]);
   if (load !== 'ready') {
     return (
-      <div className="relative flex min-h-0 min-w-0 flex-1">
-        <section
-          data-testid="home-c"
-          className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
-        >
-          {paneButtons}
-          {load === 'loading' ? (
-            <>
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <ConversationSkeleton />
-              </div>
-              <LoadingComposer
-                draft={loadingDraft}
-                onDraftChange={setLoadingDraft}
-                placeholder={composerPlaceholder}
-              />
-            </>
-          ) : (
-            <>
-              <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
-                {projectLinks}
-              </div>
-              <EmptyState
-                testId="home-c-error"
-                icon={MessageSquareWarning}
-                title={t('对话加载失败')}
-                description={t('对话记录还在，重试一下。')}
-                action={{
-                  label: t('重试'),
-                  onClick: teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
-                }}
-                className="mt-[12vh]"
-              />
-            </>
-          )}
-        </section>
-        {workPanel}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+          <section
+            data-testid="home-c"
+            className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
+          >
+            {paneButtons}
+            {load === 'loading' ? (
+              <>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <ConversationSkeleton />
+                </div>
+                <LoadingComposer
+                  draft={loadingDraft}
+                  onDraftChange={setLoadingDraft}
+                  placeholder={composerPlaceholder}
+                />
+              </>
+            ) : (
+              <>
+                <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
+                  {projectLinks}
+                </div>
+                <EmptyState
+                  testId="home-c-error"
+                  icon={MessageSquareWarning}
+                  title={t('对话加载失败')}
+                  description={t('对话记录还在，重试一下。')}
+                  action={{
+                    label: t('重试'),
+                    onClick:
+                      teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
+                  }}
+                  className="mt-[12vh]"
+                />
+              </>
+            )}
+          </section>
+          {workPanel}
+        </div>
+        {phoneTabs}
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1">
-      <section
-        data-testid="home-c"
-        aria-label={t('与 Coordinator 的对话')}
-        className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
-      >
-        {paneButtons}
-        {banner != null && (
-          <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
-            {banner}
-          </div>
-        )}
-        <TaskCardContext.Provider value={renderTaskCard}>
-          <ChiefScrollProvider>
-            <ChiefConversation
-              chief={{ ...chiefData, stream: conversation }}
-              onSend={
-                thread.picked !== null
-                  ? thread.send
-                  : surface.onSend != null
-                    ? (text: string) => surface.onSend?.(text, projectId)
-                    : live
-                      ? undefined
-                      : () => Promise.resolve()
-              }
-              onRewind={surface.onRewind}
-              onWithdraw={surface.onWithdraw}
-              onSteer={surface.onSteer}
-              onStop={surface.onStop}
-              earlier={surface.earlier}
-              onSettings={() => surface.setChiefView('settings')}
-              showBindGate={!live}
-              hero={hero}
-              lead={lead}
-              prefill={prefill}
-              placeholder={
-                projectName != null
-                  ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                  : t('跟 Coordinator 说点什么，或描述一个新任务…')
-              }
-              composerError={thread.error}
-              targetPlaceholder={thread.placeholder}
-              composerTools={
-                <>
-                  <ComposerThreadTarget
-                    targets={thread.targets}
-                    picked={thread.picked}
-                    composerRef={composerRef}
-                    onPick={thread.pick}
-                  />
-                  <ComposerSetupHint />
-                </>
-              }
-              composerRef={(node) => {
-                composerRef.current = node;
-              }}
-            />
-          </ChiefScrollProvider>
-        </TaskCardContext.Provider>
-      </section>
-      {workPanel}
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 min-w-0 flex-1">
+        <section
+          data-testid="home-c"
+          aria-label={t('与 Coordinator 的对话')}
+          className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
+        >
+          {paneButtons}
+          {banner != null && (
+            <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
+              {banner}
+            </div>
+          )}
+          <TaskCardContext.Provider value={renderTaskCard}>
+            <ChiefScrollProvider>
+              <ChiefConversation
+                chief={{ ...chiefData, stream: conversation }}
+                onSend={
+                  thread.picked !== null
+                    ? thread.send
+                    : surface.onSend != null
+                      ? (text: string) => surface.onSend?.(text, projectId)
+                      : live
+                        ? undefined
+                        : () => Promise.resolve()
+                }
+                onRewind={surface.onRewind}
+                onWithdraw={surface.onWithdraw}
+                onSteer={surface.onSteer}
+                onStop={surface.onStop}
+                earlier={surface.earlier}
+                onSettings={() => surface.setChiefView('settings')}
+                showBindGate={!live}
+                hero={hero}
+                lead={lead}
+                prefill={prefill}
+                placeholder={
+                  projectName != null
+                    ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+                    : t('跟 Coordinator 说点什么，或描述一个新任务…')
+                }
+                composerError={thread.error}
+                targetPlaceholder={thread.placeholder}
+                composerTools={
+                  <>
+                    <ComposerThreadTarget
+                      targets={thread.targets}
+                      picked={thread.picked}
+                      composerRef={composerRef}
+                      onPick={thread.pick}
+                    />
+                    <ComposerSetupHint />
+                  </>
+                }
+                composerRef={(node) => {
+                  composerRef.current = node;
+                }}
+              />
+            </ChiefScrollProvider>
+          </TaskCardContext.Provider>
+        </section>
+        {workPanel}
+      </div>
+      {phoneTabs}
     </div>
   );
 }
