@@ -3,6 +3,7 @@ import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_REMOTE_TOOLS,
+  coordinatorToolSourceId,
   type MachineAskBody,
   type RemoteToolDef,
 } from '@cairn/shared';
@@ -122,6 +123,8 @@ export function coordinatorTool(
   channel: ToolChannel,
   gate: StepResolver,
   shuttingDown: () => boolean = () => false,
+  beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>,
+  storeId?: () => string | undefined,
 ): ToolRegistration {
   return defineTool({
     name: def.name,
@@ -131,12 +134,15 @@ export function coordinatorTool(
     outputLimits: { maxBytes: COORDINATOR_TOOL_OUTPUT_MAX_BYTES, retain: 'head' },
     execute: async (args, api, context) => {
       const stepId = await gate.stepFor(String(api.conversationId));
+      await beforeTool?.(context.abortSignal, String(api.conversationId));
+      const store = storeId?.();
+      const callId = store === undefined ? api.callId : coordinatorToolSourceId(store, api.callId);
       const params = args as Record<string, unknown>;
       if (def.name === 'ask_user') {
         const text = await askThroughChannel(
           channel,
           stepId,
-          api.callId,
+          callId,
           params,
           context.abortSignal,
           shuttingDown,
@@ -144,13 +150,7 @@ export function coordinatorTool(
         return { output: [{ type: 'text', text }] };
       }
       try {
-        const text = await channel.relayTool(
-          stepId,
-          def.name,
-          params,
-          api.callId,
-          context.abortSignal,
-        );
+        const text = await channel.relayTool(stepId, def.name, params, callId, context.abortSignal);
         if (def.name === 'attachment') {
           const attachment = JSON.parse(text) as {
             mimeType: string;
@@ -176,7 +176,12 @@ export function coordinatorTool(
 export function coordinatorToolsExtension(
   channel: ToolChannel,
   gate: StepResolver,
-  options: { routerTools?: boolean; shuttingDown?: () => boolean } = {},
+  options: {
+    routerTools?: boolean;
+    shuttingDown?: () => boolean;
+    beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
+    storeId?: () => string | undefined;
+  } = {},
 ) {
   const defs =
     options.routerTools === false
@@ -186,9 +191,21 @@ export function coordinatorToolsExtension(
     name: 'cairn-coordinator-tools',
     hooks: [
       hook(GenerationTask, {
-        beforeRequest: ({ messages }) => ({ messages: boundCoordinatorImages(messages) }),
+        beforeRequest: async ({ messages }, _api, context) => {
+          await options.beforeTool?.(context.abortSignal, String(_api.conversationId));
+          return { messages: boundCoordinatorImages(messages) };
+        },
       }),
     ],
-    tools: defs.map((def) => coordinatorTool(def, channel, gate, options.shuttingDown)),
+    tools: defs.map((def) =>
+      coordinatorTool(
+        def,
+        channel,
+        gate,
+        options.shuttingDown,
+        options.beforeTool,
+        options.storeId,
+      ),
+    ),
   });
 }
