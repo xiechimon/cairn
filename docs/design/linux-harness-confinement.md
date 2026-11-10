@@ -55,14 +55,7 @@ Implementation touches `machine-loop.ts`, shared machine capabilities, server pr
 
 ### Ownership segment contract
 
-`launchConfined` is the backend launch seam; harness adapters migrate in the later integration segment. The caller reserves paths until `completed` or `stop()` succeeds; rejection means unavailable and reserved. `completed` proves cleanup, while the returned process carries the harness exit status. Resume paused stdout after attaching the consumer. Only three standard streams cross systemd; extra credential FDs are not yet supported. The manager establishes ownership before bwrap; the trusted shell init reads exactly one nonce line without buffering harness input. Clear the environment inside bwrap and pass only the caller's explicit allowlist.
-
-| Reader / writer | Expected behavior and test |
-| --- | --- |
-| Owner check / acknowledgement | Require this process's active owner cgroup and invocation, recheck before releasing the nonce; EOF, malformed or stale nonce starts nothing. |
-| Start / cancel | Unique task unit; cancelled or failed starts reconcile via a synchronous manager stop; unprovable cleanup rejects. |
-| Completion / stop | Successful terminal wait or synchronous stop job, then independent emptiness/removal proof; active, unexpected errors, timeout and populated leftovers reject. |
-| Escaped process / manager | `ExitType=cgroup` keeps the unit alive for survivors; `KillMode=control-group` kills even session-changing or externally joined processes. |
+`launchConfined` is the backend launch seam; harness adapters migrate in the later integration segment. The caller reserves paths until cleanup is proven; failed cleanup means unavailable and reserved, while verified pre-ack cancellation preserves the abort reason and releases paths. `completed` proves cleanup, while the returned process carries the harness exit status. Resume paused stdout after attaching the consumer. Only three standard streams cross systemd; extra credential FDs are not yet supported. The manager establishes ownership before bwrap; the trusted Node init reads one bounded JSON line containing the nonce and explicit environment, byte by byte without buffering harness input. Clear the environment inside bwrap; pass credential values only through that private stdin frame, never argv or unit metadata. The init uses Node process APIs rather than implementing exec or environment encoding. Pin tasks to `app.slice` under the observed manager root so pre-ack cancellation can verify the exact cgroup path without relying on a held FD.
 
 ## Pi protocol and state ownership
 

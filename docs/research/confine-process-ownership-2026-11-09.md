@@ -5,7 +5,7 @@ Status: research for PR #3656's design correction; no runtime change or live-ser
 
 ## Evidence and comparison
 
-This supplements [the original harness research](user-computer-model-2026-11-08.md#42-mode-b-one-cairn-owned-sandbox-around-every-harness). Observed means primary material read first-hand, inferred means derived from it, and proposed means not yet implemented or verified. Sources were read on 2026-11-09 through agent-reach's GitHub CLI route or installed systemd man pages. No subprocess-lifetime probe was run.
+This supplements [the original harness research](user-computer-model-2026-11-08.md#42-mode-b-one-cairn-owned-sandbox-around-every-harness). Observed means primary material read first-hand, inferred means derived from it, and proposed means not yet implemented or verified. Sources were read on 2026-11-09 through agent-reach's GitHub CLI route or installed systemd man pages. Initial research ran no subprocess-lifetime probe; the follow-up host probe below validates collection.
 
 | Mechanism | Primary evidence | Consequence |
 | --- | --- | --- |
@@ -13,6 +13,8 @@ This supplements [the original harness research](user-computer-model-2026-11-08.
 | bwrap `--block-fd` alone | **Observed:** [v0.13.1 source](https://github.com/containers/bubblewrap/blob/v0.13.1/bubblewrap.c#L3431-L3436) discards the result of the blocking read, so EOF also releases the block. | **Inferred:** a closed parent pipe is not a valid launch authorization. A trusted initialization gate must require a positive, launch-specific acknowledgement and reject EOF. |
 | systemd-owned task cgroup | **Observed:** installed systemd 262.1's [systemd.kill](https://www.freedesktop.org/software/systemd/man/262/systemd.kill.html#KillMode=) specifies whole-cgroup termination for `KillMode=control-group` and final SIGKILL for survivors. [systemd.unit](https://www.freedesktop.org/software/systemd/man/262/systemd.unit.html#BindsTo=) specifies that `BindsTo=` with `After=` stops a bound unit when its owner becomes inactive, including unexpected exits. | **Inferred:** manager ownership established before task execution avoids relying on a daemon finally-handler, process-group membership or inherited parent-death signals. |
 | Manager state plus cgroup emptiness | **Observed:** [systemd.service](https://www.freedesktop.org/software/systemd/man/262/systemd.service.html#ExitType=) distinguishes main-process exit from cgroup lifetime. | **Inferred:** receiving an exit event is not proof that every descendant has exited; task-path release must additionally require an empty task cgroup, including descendants that changed session/process group. |
+| Removed cgroup after terminal confirmation | **Observed:** [kernel cgroup-v2 documentation](https://docs.kernel.org/admin-guide/cgroup-v2.html#organizing-processes-and-threads) permits removal only without live processes or children; [kernel implementation](https://github.com/torvalds/linux/blob/v6.18/kernel/cgroup/cgroup.c#L6155-L6178) returns `EBUSY` for a populated cgroup. The host probe `cgroup-cleanup-probe.log` read `populated=1` before exit and held-FD `ENODEV` after successful terminal wait. | **Inferred:** requiring a readable zero rejects normal systemd collection; removal plus terminal confirmation is sufficient. Disappearance while active is insufficient. |
+| This segment | **Proposed:** use systemd-run's standard-stream forwarding and successful terminal wait, or synchronous systemctl stop job completion, followed by independent cgroup proof. | Thin CLI bridge to systemd and bwrap; no lifecycle engine or process-group fallback. |
 
 ## Recommended design correction
 
@@ -27,10 +29,3 @@ The systemd manager, owning daemon unit and cgroup controls are mandatory prereq
 **Observed:** [ian's design approval](https://github.com/xiechimon/cairn/pull/3656#issuecomment-6742184723) requires startup preflight to report broken bwrap/namespaces as a machine-level unavailable state on the machines page and one notification, not N failed tasks.
 
 **Proposed:** start unavailable-for-dispatch until preflight has successfully created, exercised and cleaned up the same launch boundary. Continue enrollment/presence to report a scrubbed reason. Both claim/scheduling and local launch gates require confirmed readiness. Persist one outage identity per machine until successful recovery; repeated heartbeats and daemon restarts cannot generate duplicate outage notifications. Rechecking after repair must prove cleanup as well as startup before dispatch resumes. The companion [design](../design/linux-harness-confinement.md) lists the readers, writers and failure-first tests.
-
-## Removed-cgroup correction (2026-11-09)
-
-| Mechanism | Primary evidence | Consequence |
-| --- | --- | --- |
-| Removed cgroup after terminal confirmation | **Observed:** [kernel cgroup-v2 documentation](https://docs.kernel.org/admin-guide/cgroup-v2.html#organizing-processes-and-threads) permits removal only without live processes or children; [kernel implementation](https://github.com/torvalds/linux/blob/v6.18/kernel/cgroup/cgroup.c#L6155-L6178) returns `EBUSY` for a populated cgroup. The host probe `cgroup-cleanup-probe.log` read `populated=1` before exit and held-FD `ENODEV` after successful terminal wait. | **Inferred:** requiring a readable zero rejects normal systemd collection; removal plus terminal confirmation is sufficient. Disappearance while active is insufficient. |
-| This segment | **Proposed:** use systemd-run's standard-stream forwarding and successful terminal wait, or synchronous systemctl stop job completion, followed by independent cgroup proof. | Thin CLI bridge to systemd and bwrap; no lifecycle engine or process-group fallback. |

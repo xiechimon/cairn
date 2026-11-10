@@ -1,14 +1,6 @@
 import { type ChildProcessWithoutNullStreams, execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import {
-  closeSync,
-  existsSync,
-  lstatSync,
-  openSync,
-  readFileSync,
-  readSync,
-  realpathSync,
-} from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -164,46 +156,25 @@ export function assertConfinementCleanup(
   }
 }
 
-export const confinementGate =
-  'printf "ready:%s\\n" "$1"; IFS= read -r ack && [ "$ack" = "$1" ] || exit 125; shift; exec "$@"';
-
-export function ownedConfinementArgs(
-  unit: string,
-  owner: string,
-  mounts: string[],
-  nonce: string,
-  command: string[],
-): string[] {
-  if (![unit, owner].every((name) => /^[a-zA-Z0-9_-]+\.service$/.test(name)))
-    throw new Error('Invalid confinement unit');
-  return [
-    '--user',
-    '--pipe',
-    '--wait',
-    '--quiet',
-    `--unit=${unit}`,
-    '--service-type=exec',
-    '--expand-environment=no',
-    `--property=BindsTo=${owner}`,
-    `--property=After=${owner}`,
-    '--property=Restart=no',
-    '--property=KillMode=control-group',
-    '--property=SendSIGKILL=yes',
-    '--property=TimeoutStopSec=5s',
-    '--property=ExitType=cgroup',
-    '--property=Delegate=no',
-    '--property=ProtectControlGroups=yes',
-    'bwrap',
-    ...mounts,
-    '--',
-    '/bin/sh',
-    '-c',
-    confinementGate,
-    'confine-init',
-    nonce,
-    ...command,
-  ];
-}
+export const confinementGate = `
+const { readSync, writeSync } = require('node:fs');
+const { spawnSync } = require('node:child_process');
+try {
+  writeSync(1, 'ready:' + process.argv[1] + '\\n');
+  const buffer = Buffer.alloc(65537);
+  let length = 0;
+  while (length < buffer.length && readSync(0, buffer, length, 1, null) === 1) {
+    if (buffer[length++] === 10) break;
+  }
+  if (length > 65536 || buffer[length - 1] !== 10) process.exit(125);
+  const frame = JSON.parse(buffer.toString('utf8', 0, length));
+  if (Object.keys(frame).length !== 2 || frame.nonce !== process.argv[1] || !frame.environment || Array.isArray(frame.environment) || typeof frame.environment !== 'object') process.exit(125);
+  for (const [key, value] of Object.entries(frame.environment)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== 'string' || value.includes('\\0')) process.exit(125);
+  }
+  process.exit(spawnSync(process.argv[2], process.argv.slice(3), { stdio: 'inherit', env: frame.environment }).status ?? 125);
+} catch { process.exit(125); }
+`;
 
 const exec = promisify(execFile);
 const ownerProperties = ['-p', 'ActiveState', '-p', 'InvocationID', '-p', 'ControlGroup'];
@@ -221,6 +192,8 @@ export async function launchConfined(options: {
   completed: Promise<void>;
   stop: () => Promise<void>;
 }> {
+  if (!/^[a-zA-Z0-9_-]+\.service$/.test(options.owner))
+    throw new Error('Invalid confinement owner');
   const timeout = options.timeoutMs ?? 10000;
   const control = async (...args: string[]) =>
     (await exec('systemctl', ['--user', ...args], { timeout })).stdout;
@@ -244,14 +217,45 @@ export async function launchConfined(options: {
   const unit = `cairn-confine-${randomUUID()}.service`;
   const nonce = `${fields.InvocationID}:${randomUUID()}`;
   const mounts = [...confinementArgs(options.policy), '--clearenv'];
-  for (const [key, value] of Object.entries(options.environment)) {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error('Invalid confinement environment');
-    mounts.push('--setenv', key, value);
-  }
+  const frame = `${JSON.stringify({ nonce, environment: options.environment })}\n`;
+  if (Buffer.byteLength(frame) > 65536) throw new Error('Confinement environment is too large');
+  const managerGroup = (
+    await control('show', '-p', 'ControlGroup', '--value', '--', '-.slice')
+  ).trim();
+  if (!managerGroup.startsWith('/user.slice/') || managerGroup.includes('..'))
+    throw new Error('Invalid manager cgroup');
+  const group = `${managerGroup}/app.slice/${unit}`;
+  const eventsPath = `/sys/fs/cgroup${group}/cgroup.events`;
   if (!options.command.length) throw new Error('Missing confined command');
   const child = spawn(
     'systemd-run',
-    ownedConfinementArgs(unit, options.owner, mounts, nonce, options.command),
+    [
+      '--user',
+      '--pipe',
+      '--wait',
+      '--quiet',
+      `--unit=${unit}`,
+      '--service-type=exec',
+      '--expand-environment=no',
+      `--property=BindsTo=${options.owner}`,
+      `--property=After=${options.owner}`,
+      '--property=Restart=no',
+      '--property=KillMode=control-group',
+      '--property=SendSIGKILL=yes',
+      '--property=TimeoutStopSec=5s',
+      '--property=ExitType=cgroup',
+      '--property=Slice=app.slice',
+      '--property=Delegate=no',
+      '--property=ProtectControlGroups=yes',
+      'bwrap',
+      ...mounts,
+      '--',
+      process.execPath,
+      '-e',
+      confinementGate,
+      nonce,
+      ...options.command,
+    ],
     { stdio: 'pipe' },
   );
   const exited = new Promise<number | null>((resolve, reject) => {
@@ -260,23 +264,12 @@ export async function launchConfined(options: {
   });
   void exited.catch(() => {});
   child.stdin.on('error', () => {});
-  let events: number | undefined;
   let cleaning: Promise<void> | undefined;
   let naturalTerminal = false;
   const stop = () => {
     cleaning ??= (async () => {
       if (!naturalTerminal) await control('stop', unit);
-      if (events === undefined)
-        throw new Error('Confinement cgroup was not captured; keep paths reserved');
-      try {
-        assertConfinementCleanup(true, () => {
-          const buffer = Buffer.alloc(4096);
-          const length = readSync(events as number, buffer, 0, buffer.length, 0);
-          return buffer.toString('utf8', 0, length);
-        });
-      } finally {
-        closeSync(events);
-      }
+      assertConfinementCleanup(true, () => readFileSync(eventsPath, 'utf8'), 'path');
     })();
     return cleaning;
   };
@@ -310,16 +303,15 @@ export async function launchConfined(options: {
         (error: Error) => finish(error),
       );
     });
-    const group = (await control('show', unit, '-p', 'ControlGroup', '--value')).trim();
-    if (!group.startsWith('/user.slice/') || group.includes('..'))
-      throw new Error('Invalid confinement cgroup');
-    events = openSync(`/sys/fs/cgroup${group}/cgroup.events`, 'r');
+    if ((await control('show', unit, '-p', 'ControlGroup', '--value')).trim() !== group)
+      throw new Error('Unexpected confinement cgroup');
+    readFileSync(eventsPath, 'utf8');
     options.signal?.throwIfAborted();
     const current = await control('show', options.owner, ...ownerProperties);
     if (current !== owner) throw new Error('Confinement owner changed before acknowledgement');
     options.signal?.throwIfAborted();
     acknowledged = true;
-    child.stdin.write(`${nonce}\n`);
+    child.stdin.write(frame);
     const completed = exited
       .then(async (code) => {
         naturalTerminal = code === 0;
@@ -332,6 +324,7 @@ export async function launchConfined(options: {
     child.stdin.end();
     options.signal?.removeEventListener('abort', abort);
     await stop();
+    options.signal?.throwIfAborted();
     throw error;
   }
 }

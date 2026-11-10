@@ -9,12 +9,11 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import {
   assertConfinementCleanup,
   confinementGate,
   launchConfined,
-  ownedConfinementArgs,
 } from '../src/backend/confine.js';
 
 import { testTempDir } from './test-temp-dir.js';
@@ -48,12 +47,21 @@ for (const [terminal, events, code, source, accepted] of [
   });
 }
 
-for (const ack of ['', 'stale\n', 'current extra\n', 'current']) {
-  test(`gate refuses EOF or malformed acknowledgement ${JSON.stringify(ack)}`, () => {
+for (const input of [
+  '',
+  '{"nonce":"stale","environment":{}}\n',
+  '{"nonce":"current","environment":{}}',
+  'invalid JSON\n',
+  '{"nonce":"current","environment":{},"extra":true}\n',
+  '{"nonce":"current","environment":{"BAD":0}}\n',
+  `${JSON.stringify({ nonce: 'current', environment: { BAD: '\0' } })}\n`,
+  `${'x'.repeat(65537)}\n`,
+]) {
+  test(`gate refuses malformed acknowledgement ${JSON.stringify(input.slice(0, 50))}`, () => {
     const result = spawnSync(
-      '/bin/sh',
-      ['-c', confinementGate, 'gate', 'current', '/bin/echo', 'EXECUTED'],
-      { input: ack, encoding: 'utf8' },
+      process.execPath,
+      ['-e', confinementGate, 'current', '/bin/echo', 'EXECUTED'],
+      { input, encoding: 'utf8' },
     );
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe('ready:current\n');
@@ -61,25 +69,12 @@ for (const ack of ['', 'stale\n', 'current extra\n', 'current']) {
 }
 
 test('gate preserves subsequent harness input after an exact acknowledgement', () => {
-  const result = spawnSync('/bin/sh', ['-c', confinementGate, 'gate', 'current', '/bin/cat'], {
-    input: 'current\npayload\n',
+  const result = spawnSync(process.execPath, ['-e', confinementGate, 'current', '/bin/cat'], {
+    input: `${JSON.stringify({ nonce: 'current', environment: {} })}\npayload\n`,
     encoding: 'utf8',
   });
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('ready:current\npayload\n');
-});
-
-test('manager owns bwrap before the gate and follows the daemon lifetime', () => {
-  const args = ownedConfinementArgs('task.service', 'daemon.service', ['--unshare-pid'], 'nonce', [
-    '/bin/true',
-  ]);
-  expect(args).toContain('--property=BindsTo=daemon.service');
-  expect(args).toContain('--property=After=daemon.service');
-  expect(args).toContain('--property=KillMode=control-group');
-  expect(args).toContain('--property=ExitType=cgroup');
-  expect(args).toContain('--property=Delegate=no');
-  expect(args.indexOf('bwrap')).toBeLessThan(args.indexOf(confinementGate));
-  expect(() => ownedConfinementArgs('task.service', 'bad\nunit', [], 'nonce', [])).toThrow();
 });
 
 const live = process.env.CAIRN_CONFINE_SYSTEMD_PROBES === '1';
@@ -105,7 +100,7 @@ async function liveLaunch(command: string[], signal?: AbortSignal) {
     },
     owner: process.env.CAIRN_CONFINE_TEST_OWNER ?? '',
     command,
-    environment: {},
+    environment: { CONFINE_SENTINEL: 'credential-sentinel' },
     signal,
   });
 }
@@ -113,7 +108,19 @@ async function liveLaunch(command: string[], signal?: AbortSignal) {
 test.runIf(live)(
   'real systemd: gate, stdio, terminal wait and removed cgroup cleanup',
   async () => {
-    const handle = await liveLaunch(['/bin/cat']);
+    const handle = await liveLaunch(['/bin/sh', '-c', 'printf "%s\\n" "$CONFINE_SENTINEL"; cat']);
+    const metadata = spawnSync(
+      'systemctl',
+      ['--user', 'show', handle.unit, '-p', 'ExecStart,BindsTo,KillMode,ExitType,Delegate'],
+      {
+        encoding: 'utf8',
+      },
+    );
+    expect(metadata.stdout).not.toContain('credential-sentinel');
+    expect(metadata.stdout).toContain(`BindsTo=${process.env.CAIRN_CONFINE_TEST_OWNER}`);
+    expect(metadata.stdout).toContain('KillMode=control-group');
+    expect(metadata.stdout).toContain('ExitType=cgroup');
+    expect(metadata.stdout).toContain('Delegate=no');
     const group = taskGroup(handle.unit);
     const path = `/sys/fs/cgroup${group}/cgroup.events`;
     const fd = openSync(path, 'r');
@@ -124,7 +131,7 @@ test.runIf(live)(
     handle.process.stdout.resume();
     handle.process.stdin.end('harness-input\n');
     await handle.completed;
-    expect(output).toBe('harness-input\n');
+    expect(output).toBe('credential-sentinel\nharness-input\n');
     try {
       expect(() => readFileSync(path)).toThrow(expect.objectContaining({ code: 'ENOENT' }));
       expect(() => readSync(fd, Buffer.alloc(4096), 0, 4096, 0)).toThrow(
@@ -136,7 +143,6 @@ test.runIf(live)(
     } finally {
       closeSync(fd);
     }
-    console.log('real systemd: terminal --wait + held cgroup FD cleanup accepted');
   },
 );
 
@@ -148,7 +154,10 @@ test.runIf(live)('real systemd: a process escaping into the unit blocks removal'
   try {
     expect(escaped.pid).toBeTypeOf('number');
     writeFileSync(join(directory, 'cgroup.procs'), String(escaped.pid));
-    expect(readFileSync(join(directory, 'cgroup.procs'), 'utf8')).toContain(String(escaped.pid));
+    handle.process.stdin.end();
+    await expect
+      .poll(() => readFileSync(join(directory, 'cgroup.procs'), 'utf8').trim())
+      .toBe(String(escaped.pid));
     expect(() => rmdirSync(directory)).toThrow(expect.objectContaining({ code: 'EBUSY' }));
     expect(() =>
       assertConfinementCleanup(true, () => readFileSync(join(directory, 'cgroup.events'), 'utf8')),
@@ -173,4 +182,21 @@ test.runIf(live)('real systemd: abort before startup creates no harness', async 
   const abort = new AbortController();
   abort.abort();
   await expect(liveLaunch(['/bin/false'], abort.signal)).rejects.toThrow();
+});
+
+test.runIf(live)('real systemd: cancel after spawn but before capturing the cgroup', async () => {
+  const abort = new AbortController();
+  const subscribe = abort.signal.addEventListener.bind(abort.signal);
+  const listener = vi.spyOn(abort.signal, 'addEventListener').mockImplementation((...args) => {
+    subscribe(...args);
+    abort.abort();
+  });
+  try {
+    await expect(liveLaunch(['/bin/false'], abort.signal)).rejects.toHaveProperty(
+      'name',
+      'AbortError',
+    );
+  } finally {
+    listener.mockRestore();
+  }
 });
