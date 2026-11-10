@@ -15,6 +15,7 @@ import { useConnected } from '../api/connection-state.js';
 import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { ListCard } from '../components/list-card.js';
 import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
@@ -68,38 +69,39 @@ export function MachineChip({
   const connected = useConnected();
   const host = coordinatorMachine(machines);
   const hostOnline = connected && host?.online === true;
-  const running = hostOnline ? (host?.runningSteps ?? 0) : 0;
+  const label =
+    host === null
+      ? t('电脑')
+      : `${t('电脑')} · ${host.name} · ${connected ? machineStateLabel(host, t) : t('连接断开，正在重连…')}`;
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      aria-pressed={open}
-      onClick={onToggle}
-      data-testid="machines-button"
-      title={
-        host === null
-          ? undefined
-          : `${host.name} · ${connected ? machineStateLabel(host, t) : t('连接断开，正在重连…')}`
+    <IconTooltip
+      label={label}
+      side="bottom"
+      trigger={
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-pressed={open}
+          onClick={onToggle}
+          data-testid="machines-button"
+          data-connected={connected}
+          className="relative text-content-tertiary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+        />
       }
-      data-connected={connected}
-      className="mr-1 h-7 gap-1.5 rounded-full px-2.5 text-meta font-normal text-content-secondary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
     >
-      <Laptop aria-hidden="true" className="size-3.5" />
-      <span className="max-w-32 truncate max-[640px]:sr-only">{host?.name ?? t('电脑')}</span>
+      <Laptop aria-hidden="true" />
       {loading ? (
-        <Skeleton className="size-1.5 animate-none rounded-full" />
+        <Skeleton className="absolute top-1 right-1 size-1.5 animate-none rounded-full" />
       ) : (
-        <OnlineDot online={hostOnline} />
+        hostOnline && (
+          <span
+            aria-hidden="true"
+            data-testid="machines-online-dot"
+            className="absolute top-1 right-1 size-1.5 rounded-full bg-running"
+          />
+        )
       )}
-      {!loading && host != null && connected && !hostOnline && (
-        <span className="text-content-tertiary max-[640px]:hidden">{t('离线')}</span>
-      )}
-      {running > 0 && (
-        <span className="text-content-tertiary tabular-nums max-[640px]:hidden">
-          {t('{n} 在跑', { n: running })}
-        </span>
-      )}
-    </Button>
+    </IconTooltip>
   );
 }
 

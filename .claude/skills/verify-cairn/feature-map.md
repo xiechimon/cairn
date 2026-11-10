@@ -40,7 +40,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`
+- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`, `machines-online-dot`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
