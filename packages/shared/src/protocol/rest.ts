@@ -167,7 +167,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'POST',
     path: '/api/projects/{id}/todos',
-    note: 'body {title,spec}（r3 §3.1）+ 可选 tagIds[]（r9 §3.4 实测携带位）',
+    note: 'body {title,spec,output?}; retired category assignments are rejected before writes',
   },
   {
     method: 'POST',

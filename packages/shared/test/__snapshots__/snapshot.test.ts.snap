@@ -5387,12 +5387,6 @@ exports[`body/envelope schema snapshots > createTodoBody > createTodoBody.json 1
     "spec": {
       "type": "string",
     },
-    "tagIds": {
-      "items": {
-        "type": "string",
-      },
-      "type": "array",
-    },
     "title": {
       "type": "string",
     },
@@ -8868,7 +8862,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {title,spec}（r3 §3.1）+ 可选 tagIds[]（r9 §3.4 实测携带位）",
+    "note": "body {title,spec,output?}; retired category assignments are rejected before writes",
     "path": "/api/projects/{id}/todos",
   },
   {

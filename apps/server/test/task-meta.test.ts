@@ -4,7 +4,7 @@ import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { step as stepTable, todo as todoTable, todoTag } from '../src/db/schema.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
-import { insertLegacyCategory } from './legacy-category-fixtures.js';
+import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 async function call(
   app: Hono,
@@ -140,9 +140,7 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
       const { s, token, step, todoId, projectId } = await world();
       try {
         const { id } = insertLegacyCategory(s.db, projectId, 'correction');
-        expect(
-          (await call(s.app, 'PATCH', `/api/todos/${todoId}`, { body: { tagIds: [id] } })).status,
-        ).toBe(200);
+        insertLegacyMembership(s.db, todoId, [id], true);
         const taskText = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.spec;
         if (taskText === undefined) throw new Error('task missing');
         if (sealed) {

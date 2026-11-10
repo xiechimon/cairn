@@ -1,6 +1,7 @@
 import {
   BRAND,
   CHIEF_REMOTE_TOOLS,
+  categoryFreeTaskInputSchema,
   githubReadToolParamsSchemas,
   MCP_TOOL_REGISTRY,
   MERGE_HUMAN_ONLY_COPY,
@@ -12,7 +13,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, project, schedule, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, parseWith } from '../lib/errors.js';
 import { verifyApiKey } from './api-keys.js';
 import { readAttachmentMeta } from './attachments.js';
 import { cancelBuild, messageTodo } from './builds.js';
@@ -52,7 +53,7 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   pull_requests: githubReadToolParamsSchemas.pull_requests.shape,
   workflow_runs: githubReadToolParamsSchemas.workflow_runs.shape,
   create_todo: { projectId: s, title: s, spec: s },
-  update_todo: { todoId: s, title: s.optional(), spec: s.optional(), tagIds: sArr.optional() },
+  update_todo: { todoId: s, title: s.optional(), spec: s.optional() },
   message_todo: { todoId: s, content: s },
   confirm_builds: { buildIds: sArr },
   merge_builds: { buildIds: sArr },
@@ -224,6 +225,7 @@ export async function executeMcpTool(
       return json(await executeGithubReadTool(deps, ctx.teamId, name, args));
 
     case 'create_todo': {
+      parseWith(categoryFreeTaskInputSchema, args, 'arguments');
       const projectId = str(args, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
       return json(
@@ -238,12 +240,12 @@ export async function executeMcpTool(
       );
     }
     case 'update_todo': {
+      parseWith(categoryFreeTaskInputSchema, args, 'arguments');
       const todoId = str(args, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
       const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(args, 'title') !== undefined ? { title: optStr(args, 'title') } : {}),
         ...(optStr(args, 'spec') !== undefined ? { spec: optStr(args, 'spec') } : {}),
-        ...(args.tagIds !== undefined ? { tagIds: strArrOf(args, 'tagIds') } : {}),
       });
       if (!record) throw new HttpError(404, `todo ${todoId}`);
       return json(record);
@@ -317,6 +319,7 @@ export function buildMcpFaceServer(deps: ChiefToolDeps, ctx: McpCallerCtx): McpS
   );
   for (const entry of MCP_TOOL_REGISTRY) {
     if (!ctx.grants.has(entry.grant)) continue;
+    const shape = TOOL_SCHEMAS[entry.name] ?? {};
     server.registerTool(
       entry.name,
       {
@@ -325,11 +328,14 @@ export function buildMcpFaceServer(deps: ChiefToolDeps, ctx: McpCallerCtx): McpS
           THREAD_TOOL_DESCRIPTIONS[entry.name as keyof typeof THREAD_TOOL_DESCRIPTIONS] ??
           CHIEF_DESCRIPTIONS.get(entry.name) ??
           entry.grant,
-        inputSchema: TOOL_SCHEMAS[entry.name] ?? {},
+        inputSchema:
+          entry.name === 'create_todo' || entry.name === 'update_todo'
+            ? z.object(shape).passthrough()
+            : shape,
       },
-      async (rawArgs) => {
+      async (rawArgs: Args) => {
         try {
-          const text = await executeMcpTool(deps, ctx, entry.name, (rawArgs ?? {}) as Args);
+          const text = await executeMcpTool(deps, ctx, entry.name, rawArgs ?? {});
           return { content: [{ type: 'text' as const, text }] };
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
