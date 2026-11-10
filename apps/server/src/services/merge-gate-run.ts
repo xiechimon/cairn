@@ -53,6 +53,7 @@ import { reconcileOwners } from './owner.js';
 import { projectMergeConfigOf } from './projects.js';
 import { coordinatorProfile, profileForStep, routeForStep } from './routing-rules.js';
 import { insertMessageRow } from './transcript.js';
+import { hasVerifyRecording } from './verify-recording.js';
 
 export const MERGE_GATE_RUN_KIND = 'merge_gate_run';
 export const MERGE_GATE_MISMATCH_KIND = 'merge_gate_mismatch_filed';
@@ -144,6 +145,7 @@ export async function evaluateMergeGate(
       repo: repo.repo,
       prNumber: buildRow.prNumber,
       ticketRef,
+      evidenceStore: buildRow.evidenceStore,
       now: opts.now ?? nowMs(),
       harnessEval: {
         coordinator: createHarnessEvalCoordinator({
@@ -247,6 +249,19 @@ export async function evaluateMergeGate(
       outcome: row.outcome,
       patchDigest: row.patchDigest,
       headSha: row.headSha,
+      recordingAttached:
+        buildRow.evidenceStore === 'attachments' &&
+        row.kind === 'verify' &&
+        row.headSha === row.expectedHeadSha &&
+        row.outcome === 'pass' &&
+        row.patchDigest !== null &&
+        row.patchDigest === digest?.patchDigest &&
+        reviewStep?.kind === 'verify' &&
+        hasVerifyRecording(deps, {
+          stepId: row.stepId,
+          todoId: todoRow.id,
+          teamId: todoRow.teamId,
+        }),
       reviewerId,
       reviewerModel: reviewStep?.kind === 'review' ? reviewModelOf(reviewStep) : null,
       gateLoosening: answer?.gateLoosening ?? null,
@@ -274,6 +289,7 @@ export async function evaluateMergeGate(
     opts.now ?? nowMs(),
   );
   const readiness = mergeReadiness({
+    evidenceStore: buildRow.evidenceStore,
     correction: isCorrectionTask(deps.db, todoRow.id),
     author:
       authorAgent !== null && authorStep !== undefined

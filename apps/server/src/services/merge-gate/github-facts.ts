@@ -32,6 +32,7 @@ const EVIDENCE_PROBES = 5;
 const DIRECTORY_CAP = 1000;
 
 export interface GateReadRequest {
+  evidenceStore?: GateInputs['evidenceStore'];
   owner: string;
   repo: string;
   prNumber: number;
@@ -647,7 +648,9 @@ export async function readGateGithubFacts(
   if (facts.checks === null) facts.notes.push('checks unreadable');
 
   if (typeof facts.compare !== 'string') {
-    facts.evidence = await probeEvidence(r, req, pr, facts.compare);
+    if (req.evidenceStore === 'repository' || req.evidenceStore === undefined) {
+      facts.evidence = await probeEvidence(r, req, pr, facts.compare);
+    }
     if (touchesHarness(facts.compare.files)) {
       const harnessPath = `${EVIDENCE_PREFIX}${req.ticketRef}/${HARNESS_REGRESSION_RESULT_NAME}`;
       const res = await send(r, () => r.port.contents(harnessPath, head));
