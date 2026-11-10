@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  ACTIVE_STEP_STATUSES,
   buildReviewFindingsPrompt,
   isBuildStepKind,
   neutralizeIssueAttachmentTokens,
@@ -130,12 +131,7 @@ function roundRunning(deps: BuildDeps, buildId: string): boolean {
     deps.db
       .select({ id: step.id })
       .from(step)
-      .where(
-        and(
-          eq(step.buildId, buildId),
-          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-        ),
-      )
+      .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
       .get() !== undefined
   );
 }
@@ -260,10 +256,7 @@ export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
           .select({ id: step.id })
           .from(step)
           .where(
-            and(
-              eq(step.buildId, row.buildId),
-              inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-            ),
+            and(eq(step.buildId, row.buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])),
           )
           .get() !== undefined
       )
@@ -529,12 +522,7 @@ export function createPrWakes(deps: BuildDeps) {
       const active = deps.db
         .select()
         .from(step)
-        .where(
-          and(
-            eq(step.buildId, row.buildId),
-            inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-          ),
-        )
+        .where(and(eq(step.buildId, row.buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
         .all();
       if (active.some((s) => !isBuildStepKind(s.kind) && s.kind !== 'plan')) return;
       if (ledger.wakes >= 10) notices.push('Total wake cap (10) reached. Auto-fix disabled.');

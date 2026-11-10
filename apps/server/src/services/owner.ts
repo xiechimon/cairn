@@ -3,6 +3,7 @@ import {
   type NeedsYouReason,
   type TodoOwner,
   type TodoSection,
+  UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -33,7 +34,6 @@ export type Ownership =
 export const COORDINATOR_TURN_DEADLINE_MS = 30 * 60 * 1000;
 
 const ENDED_STEP = new Set(['done', 'failed', 'stopped']);
-const UNSTARTED_STEP = ['pending', 'waiting_quota'] as const;
 
 export interface OwnerDeps extends ChiefDeps {
   vapidKeys?: VapidKeys | null;
@@ -245,7 +245,12 @@ function cancelUnstartedWake(deps: OwnerDeps, row: TodoRow): void {
   const [stopped] = deps.db
     .update(step)
     .set({ status: 'stopped', finishedAt: nowMs() })
-    .where(and(eq(step.id, row.coordinatorTurn.stepId), inArray(step.status, [...UNSTARTED_STEP])))
+    .where(
+      and(
+        eq(step.id, row.coordinatorTurn.stepId),
+        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
+      ),
+    )
     .returning()
     .all();
   if (stopped === undefined) return;

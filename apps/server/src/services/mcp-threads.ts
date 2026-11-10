@@ -2,6 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import {
   askUserAnswerBodySchema,
   IN_PROGRESS_PHASES,
+  isActiveStepStatus,
   isChiefConversationId,
   isChiefDigestThreadId,
   orchestrationSourceRef,
@@ -152,7 +153,7 @@ function coordinatorSummary(
     .where(and(eq(step.buildId, row.id), eq(step.kind, 'chief')))
     .orderBy(desc(step.createdAt), sql`rowid desc`)
     .all();
-  const live = turns.some((turn) => ['pending', 'claimed', 'waiting_quota'].includes(turn.status));
+  const live = turns.some((turn) => isActiveStepStatus(turn.status));
   return {
     id: row.id,
     coordinatorId: row.chiefId,

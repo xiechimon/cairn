@@ -3,6 +3,7 @@ import {
   isSessionStepKind,
   quoteIssueLines,
   stepKindSchema,
+  UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -88,7 +89,7 @@ export function holdBlockedBuild(db: Db, buildId: string): void {
     .where(
       and(
         eq(step.buildId, buildId),
-        inArray(step.status, ['pending', 'waiting_quota']),
+        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
         inArray(step.kind, BLOCKED_STEP_KINDS),
       ),
     )

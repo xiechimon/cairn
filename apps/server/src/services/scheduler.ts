@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { ENV_VARS, type Scheduler, WAITING_PHASES } from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, ENV_VARS, type Scheduler, WAITING_PHASES } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { ServerConfig } from '../config.js';
 import { build, chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
@@ -354,7 +354,7 @@ export function createScheduler(
         .where(
           and(
             eq(step.buildId, todoRow.latestBuildId),
-            inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+            inArray(step.status, [...ACTIVE_STEP_STATUSES]),
           ),
         )
         .get();

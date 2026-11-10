@@ -1,4 +1,4 @@
-import { CAIRN_REVIEW_HOLD_LABEL, type PrReviewFinding } from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, CAIRN_REVIEW_HOLD_LABEL, type PrReviewFinding } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { message, step, type threadPr } from '../db/schema.js';
@@ -64,12 +64,7 @@ export async function reconcilePrReviewFindings(
       deps.db
         .select({ id: step.id })
         .from(step)
-        .where(
-          and(
-            eq(step.buildId, row.buildId),
-            inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-          ),
-        )
+        .where(and(eq(step.buildId, row.buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
         .get() !== undefined,
   });
   if (action !== null) {

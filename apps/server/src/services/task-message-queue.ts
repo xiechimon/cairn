@@ -1,3 +1,4 @@
+import { ACTIVE_STEP_STATUSES } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, queuedMessage, step, todo } from '../db/schema.js';
@@ -27,12 +28,7 @@ function activeStep(db: Db, conversationId: string) {
   return db
     .select()
     .from(step)
-    .where(
-      and(
-        eq(step.buildId, conversationId),
-        inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-      ),
-    )
+    .where(and(eq(step.buildId, conversationId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .get();
 }
 
