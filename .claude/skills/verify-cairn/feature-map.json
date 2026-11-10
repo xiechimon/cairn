@@ -531,6 +531,8 @@
           "/api/todos/:id/snooze",
           "/api/todos/:id/unsnooze",
           "/api/todos/:id/reset",
+          "/api/todos/:id/stop-and-done",
+          "/api/builds/:id/merge",
           "/api/projects/:id/todos",
           "/api/teams/:id/progress",
           "/api/tasks"

@@ -297,7 +297,7 @@ test('a task row in the Tasks panel links its PR beside the row', async ({ page 
   const row = page.locator('[data-slot="task-row-frame"]').filter({ hasText: REVIEW_TASK.title });
   await expect(row.getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
   await evidencePanelShot(page, 'tasks-row-pr-link-light.png', page.locator('.side-panel'));
-  await row.getByRole('button').click();
+  await row.locator('[data-slot="task-row"]').click();
   await expect(page).toHaveURL(/[?&]thread=todo-1/);
 });
 

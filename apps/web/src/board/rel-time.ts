@@ -9,7 +9,7 @@ const DAY = 86_400_000;
 const CLOCK_SKEW = 5 * MINUTE;
 const TZ_OFFSET = 8 * HOUR;
 
-function dayIndex(ts: number): number {
+export function dayIndex(ts: number): number {
   return Math.floor((ts + TZ_OFFSET) / DAY);
 }
 

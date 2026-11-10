@@ -17,6 +17,7 @@ import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { ACCENT_INK } from '../phase.js';
 import { relativeTime } from './rel-time.js';
+import { TaskRowMenu } from './task-row-menu.js';
 import { TasksAddInput } from './tasks-add-input.js';
 import { TasksScheduleList } from './tasks-schedule-list.js';
 import {
@@ -36,6 +37,7 @@ import {
   taskRowCopy,
 } from './tasks-sections.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
+import { canMarkDone, useMarkDone } from './use-mark-done.js';
 
 export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
 
@@ -105,6 +107,47 @@ function TasksPrList({
   );
 }
 
+function PanelTaskRow({
+  entry,
+  pr,
+  now,
+  onOpenThread,
+}: {
+  entry: TaskEntry;
+  pr: PrPanelRow | undefined;
+  now: number;
+  onOpenThread: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const { markDone, dialogs } = useMarkDone(entry.todo);
+  const copy: TaskRowCopy = taskRowCopy(entry, pr);
+  const open = () => onOpenThread(entry.todo.id);
+  return (
+    <>
+      <TaskRow
+        {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
+        title={entry.todo.title}
+        glyph={glyphOf(entry)}
+        word={t(copy.word)}
+        what={t(copy.what.key, copy.what.params)}
+        where={copy.where === null ? null : t(copy.where)}
+        age={relativeTime(entry.todo.phaseAt, now, t)}
+        waiting={copy.waiting}
+        running={copy.running}
+        muted={entry.section === 'resolved'}
+        check={
+          canMarkDone(entry.todo)
+            ? { label: t('标记完成：{title}', { title: entry.todo.title }), onCheck: markDone }
+            : 'none'
+        }
+        menu={<TaskRowMenu todo={entry.todo} onOpen={open} onMarkDone={markDone} />}
+        onOpen={open}
+      />
+      {dialogs}
+    </>
+  );
+}
+
 interface TasksPanelProps {
   entries: readonly TaskEntry[];
   questions: readonly StandaloneQuestion[];
@@ -141,26 +184,15 @@ export function TasksPanel({
   );
   const prOf = prByThread(prs);
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
-  const row = (entry: TaskEntry) => {
-    const pr = prOf.get(entry.todo.id);
-    const copy: TaskRowCopy = taskRowCopy(entry, pr);
-    return (
-      <TaskRow
-        key={entry.todo.id}
-        {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
-        title={entry.todo.title}
-        glyph={glyphOf(entry)}
-        word={t(copy.word)}
-        what={say(copy.what)}
-        where={copy.where === null ? null : t(copy.where)}
-        age={relativeTime(entry.todo.phaseAt, now, t)}
-        waiting={copy.waiting}
-        running={copy.running}
-        muted={entry.section === 'resolved'}
-        onOpen={() => onOpenThread(entry.todo.id)}
-      />
-    );
-  };
+  const row = (entry: TaskEntry) => (
+    <PanelTaskRow
+      key={entry.todo.id}
+      entry={entry}
+      pr={prOf.get(entry.todo.id)}
+      now={now}
+      onOpenThread={onOpenThread}
+    />
+  );
   const questionCopy = questionRowCopy();
   const questionRows = questions.map((question) => (
     <TaskRow
@@ -173,6 +205,7 @@ export function TasksPanel({
       age={relativeTime(question.createdAt, now, t)}
       waiting
       running={false}
+      check="none"
       onOpen={() => onOpenQuestion(question)}
     />
   ));

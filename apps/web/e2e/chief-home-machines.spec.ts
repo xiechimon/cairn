@@ -17,7 +17,7 @@ test('the computer chip names only the Coordinator machine and its running count
   await expect(chip(page)).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('the chip opens one card per computer, the Coordinator machine first, with placeholder capabilities', async ({
+test('the chip opens a list with one row per computer, the Coordinator machine first, and no new-session button', async ({
   page,
 }) => {
   await page.goto(HOME);
@@ -26,37 +26,57 @@ test('the chip opens one card per computer, the Coordinator machine first, with 
   await expect(page).toHaveURL(/[?&]pane=machines/);
   await expect(chip(page)).toHaveAttribute('aria-pressed', 'true');
 
-  const cards = panel(page).locator('[data-slot="list-card"]');
-  await expect(cards).toHaveCount(2);
-  await expect(cards.nth(0)).toContainText('xmonsMac');
-  await expect(cards.nth(0)).toContainText('Coordinator 在这台');
-  await expect(cards.nth(0)).toContainText('在线 · 2/8 在跑');
-  await expect(cards.nth(1)).toContainText('omarchy');
-  await expect(cards.nth(1)).toContainText('离线');
-  await expect(cards.nth(1).getByTestId('machine-screen')).toHaveCount(0);
-  await expect(cards.nth(1).getByTestId('machine-screen-hint')).toHaveCount(0);
-  await expect(cards.nth(0).getByTestId('machine-screen')).toHaveCount(0);
-  await expect(cards.nth(0).getByTestId('machine-screen-hint')).toHaveText(
-    '未开启桌面控制，开启后这里显示屏幕',
-  );
-  expect((await cards.nth(0).getByTestId('machine-screen-hint').boundingBox())!.height).toBeLessThan(
-    48,
-  );
-
-  for (const name of ['桌面控制', '浏览器']) {
-    const toggles = panel(page).getByRole('switch', { name });
-    await expect(toggles).toHaveCount(2);
-    for (const toggle of await toggles.all()) {
-      await expect(toggle).toBeDisabled();
-      await expect(toggle).not.toBeChecked();
-    }
-  }
-  await expect(panel(page).getByText('已安装')).toHaveCount(0);
-  await expect(panel(page).getByText('未安装')).toHaveCount(0);
-  await expect(panel(page)).toContainText('辅助功能');
+  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toBeVisible();
+  const rows = panel(page).getByRole('button', { name: /xmonsMac|omarchy/ });
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('xmonsMac');
+  await expect(rows.nth(0)).toContainText('在线 · 2/8 在跑 · Coordinator 在这台');
+  await expect(rows.nth(1)).toContainText('omarchy');
+  await expect(rows.nth(1)).toContainText('离线');
+  await expect(panel(page).getByRole('switch')).toHaveCount(0);
+  await expect(panel(page).getByRole('button', { name: /新会话|新任务|新建/ })).toHaveCount(0);
+  await expect(panel(page)).toContainText('检查过');
+  await expect(panel(page).getByRole('button', { name: '再检查一次' })).toBeEnabled();
 
   await panel(page).getByRole('link', { name: '添加电脑' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/machines/);
+});
+
+test('a row opens that computer in the same panel and the back controls return to the list', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=machines`);
+  await panel(page).getByRole('button', { name: /xmonsMac/ }).click();
+  await expect(page).toHaveURL(/[?&]pane=machines/);
+  await expect(panel(page).getByRole('heading', { name: 'xmonsMac' })).toBeVisible();
+  await expect(panel(page)).toContainText('在线 · 2/8 在跑 · Coordinator 在这台');
+  await expect(panel(page).getByRole('heading', { name: '能力' })).toBeVisible();
+  await expect(panel(page).getByText('辅助功能')).toBeVisible();
+  for (const name of ['桌面控制', '浏览器']) {
+    const toggle = panel(page).getByRole('switch', { name });
+    await expect(toggle).toBeDisabled();
+    await expect(toggle).not.toBeChecked();
+  }
+  await expect(panel(page).getByText('已安装')).toHaveCount(0);
+  await expect(panel(page).getByText('未安装')).toHaveCount(0);
+  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toHaveCount(0);
+
+  await panel(page).getByRole('button', { name: '所有电脑' }).first().click();
+  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toBeVisible();
+
+  await panel(page).getByRole('button', { name: /omarchy/ }).click();
+  await expect(panel(page).getByRole('heading', { name: 'omarchy' })).toBeVisible();
+  await expect(panel(page)).toContainText('离线');
+  await expect(panel(page).getByTestId('machine-screen-hint')).toHaveCount(0);
+  await panel(page).getByRole('button', { name: '所有电脑' }).first().click();
+  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toBeVisible();
+});
+
+test('re-checking refreshes the checked time without leaving the list', async ({ page }) => {
+  await page.goto(`${HOME}&pane=machines`);
+  await panel(page).getByRole('button', { name: '再检查一次' }).click();
+  await expect(panel(page).getByRole('button', { name: '再检查一次' })).toBeEnabled();
+  await expect(panel(page)).toContainText(/\d\d:\d\d 检查过/);
 });
 
 test('the chip name carries the Coordinator machine and its state', async ({ page }) => {

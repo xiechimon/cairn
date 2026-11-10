@@ -1,6 +1,6 @@
 import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
-import { PROJECT_ID, probeTodo, r7 } from './core.js';
+import { at, PROJECT_ID, probeTodo, r7 } from './core.js';
 import { detailBuilding, detailConfirm, detailReview } from './detail.js';
 import type { ChiefContent, FixtureSet, TodoRecord } from './records.js';
 import { scheduleOnce } from './schedules.js';
@@ -184,4 +184,37 @@ export const homeCEmpty: FixtureSet = {
   todos: [],
   chief: { ...conversation, stream: [], streamAt: [], hasEarlier: false },
   now: r7(9, 0),
+};
+
+const MADE_DAY = '2026-09-24';
+
+function madeTodo(
+  id: string,
+  seqNum: number,
+  title: string,
+  projectId: string,
+  phaseAt: number,
+  archivedAt: number | null = null,
+): TodoRecord {
+  return { ...homeTodo(id, seqNum, title, 'done', projectId), phaseAt, archivedAt };
+}
+
+export const homeCMade: FixtureSet = {
+  ...homeC,
+  todos: [
+    ...(homeC.todos ?? []),
+    madeTodo('made-today', 2310, 'Contributing guide', PROJECT_ID, at(MADE_DAY, 19, 40)),
+    madeTodo('made-yesterday', 2309, 'Repository overview', PROJECT_ID, at('2026-09-23', 15, 5)),
+    madeTodo('made-credential', 78, 'Relay probe report', HOME_C_CRED, at('2026-09-22', 11, 0)),
+    madeTodo('made-earlier', 2150, 'Snake web game', HOME_C_CRED, at('2026-09-12', 9, 30)),
+    madeTodo(
+      'made-archived',
+      2101,
+      'Retired onboarding checklist',
+      PROJECT_ID,
+      at('2026-09-02', 10, 0),
+      at('2026-09-10', 10, 0),
+    ),
+  ],
+  now: at(MADE_DAY, 20, 30),
 };

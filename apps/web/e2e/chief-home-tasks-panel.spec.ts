@@ -111,6 +111,55 @@ test('the plus button opens an inline add input; Escape closes it; submit hands 
   );
 });
 
+test('a row menu offers open, mark done, rename, archive and delete; delete asks first', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const row = panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: 'Orb canary round 7' });
+  await row.hover();
+  await row.getByTestId('task-row-menu-button').click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem')).toHaveText([/打开任务/, /标记完成/, /重命名/, /归档/, /删除/]);
+  await menu.getByRole('menuitem', { name: /删除/ }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+});
+
+test('an up-next row menu offers Move to project and Mark done with the current project marked', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: /接下来/ }).click();
+  const row = panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: 'Sidebar status groups' });
+  await row.hover();
+  await row.getByTestId('task-row-menu-button').click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    /打开任务/,
+    /移到项目/,
+    /标记完成/,
+    /重命名/,
+    /归档/,
+    /删除/,
+  ]);
+  await menu.getByRole('menuitem', { name: /移到项目/ }).click();
+  const projects = page.getByTestId('task-move-projects');
+  await expect(projects.getByRole('menuitemradio')).toHaveText(['cairn', 'Credential relay']);
+  await expect(projects.getByRole('menuitemradio', { name: 'cairn' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect(projects.getByRole('menuitemradio', { name: 'Credential relay' })).toHaveAttribute(
+    'aria-checked',
+    'false',
+  );
+});
+
+test('a started task cannot be moved to another project', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const row = panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: 'Orb canary round 7' });
+  await row.hover();
+  await row.getByTestId('task-row-menu-button').click();
+  await expect(page.getByRole('menuitem', { name: /移到项目/ })).toHaveCount(0);
+});
+
 test('a scheduled row menu offers run, pause and delete; delete asks first', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   await panel(page).getByRole('tab', { name: '定时' }).click();
@@ -136,6 +185,85 @@ test('a schedule whose task is running cannot be run again from the menu', async
   await row.hover();
   await row.getByTestId('schedule-row-menu-button').click();
   await expect(page.getByRole('menuitem', { name: /立即运行/ })).toHaveAttribute('data-disabled', '');
+});
+
+test('rename opens a dialog prefilled with the title', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const row = panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: 'Orb canary round 7' });
+  await row.hover();
+  await row.getByTestId('task-row-menu-button').click();
+  await page.getByRole('menuitem', { name: /重命名/ }).click();
+  await expect(page.getByTestId('task-rename-input')).toHaveValue('Orb canary round 7');
+});
+
+test('every open task has a checkbox, failed and done rows do not, and it does not open the row', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const checks = panel(page).getByRole('checkbox');
+  await expect(checks).toHaveCount(5);
+  const rowOf = (title: string) =>
+    panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: title });
+  await expect(rowOf('Fold finished turns').getByRole('checkbox')).toHaveAccessibleName(
+    /^标记完成：Fold finished turns/,
+  );
+  await expect(rowOf('Connect a Claude subscription token').getByRole('checkbox')).toHaveCount(1);
+  await expect(rowOf('Orb canary round 7').getByRole('checkbox')).toHaveCount(1);
+  await expect(rowOf('Rerun the relay probe').getByRole('checkbox')).toHaveCount(0);
+  await panel(page).getByRole('tab', { name: /接下来/ }).click();
+  await expect(panel(page).getByRole('checkbox')).toHaveCount(1);
+  await panel(page).getByRole('tab', { name: '已完成' }).click();
+  await expect(panel(page).getByRole('checkbox')).toHaveCount(0);
+  await panel(page).getByRole('tab', { name: '进行中' }).click();
+  await rowOf('Fold finished turns').getByRole('checkbox').click();
+  await expect(page).not.toHaveURL(/[?&]thread=/);
+});
+
+test('the checkbox on a running task asks before stopping it', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page)
+    .locator('[data-slot="task-row-frame"]')
+    .filter({ hasText: 'Orb canary round 7' })
+    .getByRole('checkbox')
+    .click();
+  const confirm = page.getByRole('alertdialog', { name: '停止并标记完成' });
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toContainText('停止并标记完成？');
+  await expect(confirm).toContainText('正在运行的工作会被停止');
+  await confirm.getByRole('button', { name: '取消' }).click();
+  await expect(confirm).toHaveCount(0);
+});
+
+test('the checkbox on a task ready for review opens the accept dialog with the merge choice', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page)
+    .locator('[data-slot="task-row-frame"]')
+    .filter({ hasText: 'Fold finished turns' })
+    .getByRole('checkbox')
+    .click();
+  const dialog = page.getByRole('dialog', { name: '完成任务' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('checkbox')).toBeVisible();
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test('the menu offers Mark done on open tasks only and follows the checkbox', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const frame = (title: string) =>
+    panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: title });
+  const openMenu = async (title: string) => {
+    await frame(title).hover();
+    await frame(title).getByTestId('task-row-menu-button').click();
+  };
+  await openMenu('Rerun the relay probe');
+  await expect(page.getByRole('menuitem', { name: /标记完成/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await openMenu('Serif greeting fix');
+  await page.getByRole('menuitem', { name: /标记完成/ }).click();
+  await expect(page.getByRole('alertdialog', { name: '停止并标记完成' })).toBeVisible();
 });
 
 test('Manage schedules links to the schedules page', async ({ page }) => {
@@ -166,6 +294,75 @@ test('the Made button swaps the panel to finished work', async ({ page }) => {
 test('Made shows an empty state when nothing has finished', async ({ page }) => {
   await page.goto('/app?scenario=home-c-empty&pane=made');
   await expect(madePanel(page).getByTestId('made-empty')).toBeVisible();
+});
+
+const MADE = '/app?scenario=home-c-made&pane=made';
+
+test('Made groups finished work by day, newest first, with the project name on each row', async ({
+  page,
+}) => {
+  await page.goto(MADE);
+  const groups = madePanel(page).getByTestId('made-group');
+  await expect(groups).toHaveCount(4);
+  await expect(groups.nth(0)).toContainText('今天');
+  await expect(groups.nth(1)).toContainText('昨天');
+  await expect(groups.nth(2)).toContainText('本周');
+  await expect(groups.nth(3)).toContainText('更早');
+  await expect(groups.nth(0).locator('[data-slot="thread-row"]')).toHaveCount(1);
+  await expect(groups.nth(2).locator('[data-slot="thread-row"]')).toHaveCount(2);
+  await expect(groups.nth(0)).toContainText('Contributing guide');
+  await expect(groups.nth(0)).toContainText('cairn');
+  await expect(groups.nth(3)).toContainText('Credential relay');
+  await expect(madePanel(page)).not.toContainText('Retired onboarding checklist');
+  await expect(madePanel(page).getByTestId('made-archived-note')).toHaveCount(0);
+});
+
+test('Made search filters by title and project, and Escape clears and closes it', async ({
+  page,
+}) => {
+  await page.goto(MADE);
+  const rows = madePanel(page).locator('[data-slot="thread-row"]');
+  await expect(rows).toHaveCount(5);
+  await expect(madePanel(page).getByTestId('made-search')).toHaveCount(0);
+  await madePanel(page).getByRole('button', { name: '搜索成果' }).click();
+  const input = madePanel(page).getByTestId('made-search');
+  await expect(input).toBeFocused();
+  await input.fill('CONTRIB');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Contributing guide');
+  await input.fill('credential');
+  await expect(rows).toHaveCount(2);
+  await input.fill('zzz-nothing');
+  await expect(madePanel(page).getByTestId('made-no-match')).toContainText('没有匹配的成果');
+  await expect(madePanel(page).getByTestId('made-empty')).toHaveCount(0);
+  await input.press('Escape');
+  await expect(input).toHaveCount(0);
+  await expect(rows).toHaveCount(5);
+  await expect(madePanel(page)).toBeVisible();
+});
+
+test('Made archived tab lists archived finished work and keeps the retention note', async ({
+  page,
+}) => {
+  await page.goto(MADE);
+  const tabs = madePanel(page).getByTestId('made-tabs');
+  await expect(tabs).toBeVisible();
+  await madePanel(page).getByRole('tab', { name: '已归档' }).click();
+  const rows = madePanel(page).locator('[data-slot="thread-row"]');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Retired onboarding checklist');
+  await expect(madePanel(page).getByTestId('made-archived-note')).toHaveText(
+    '已归档的成果会一直保留，直到你删除它或它所在的项目。',
+  );
+  await madePanel(page).getByRole('tab', { name: '全部' }).click();
+  await expect(madePanel(page)).not.toContainText('Retired onboarding checklist');
+});
+
+test('Made archived tab says so when nothing is archived', async ({ page }) => {
+  await page.goto(`${HOME}&pane=made`);
+  await madePanel(page).getByRole('tab', { name: '已归档' }).click();
+  await expect(madePanel(page).getByTestId('made-archived-empty')).toBeVisible();
+  await expect(madePanel(page).getByTestId('made-empty')).toHaveCount(0);
 });
 
 test('the composer has no in-progress pill above it', async ({ page }) => {

@@ -434,6 +434,7 @@ export function HomeC({
       pane !== null && (
         <WorkPanel
           todos={scoped}
+          projectId={projectId}
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}

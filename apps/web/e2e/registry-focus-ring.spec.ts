@@ -6,7 +6,7 @@ const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks';
 const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
-const BADGES = '/app?scenario=home-c&pane=machines';
+const BADGES = '/design.html';
 const SCHEDULES = '/app/schedules?scenario=r3-92';
 
 interface FocusInfo {

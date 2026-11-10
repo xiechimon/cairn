@@ -1,7 +1,7 @@
 import { canOrchestrate } from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useBuildGate, useChiefThreads, usePrs } from '../api/hooks.js';
+import { useApiMutations, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
@@ -9,14 +9,13 @@ import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import { AcceptDialog } from '../detail/accept-dialog.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
-import { mergePreselected, mergeRejectCopy } from '../detail/merge-gate.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
+import { AcceptTaskDialog } from './accept-task-dialog.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
@@ -68,15 +67,12 @@ export function useThreadActions({
   const mutations = useApiMutations(teamId);
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
-  const pr = usePrs(teamId, todo.id, live).data?.[0];
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<'accept' | 'delete' | 'stop' | 'route-override' | null>(
     null,
   );
-  const [acceptError, setAcceptError] = useState<string | null>(null);
   const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
-  const gate = useBuildGate(buildId, live && dialog === 'accept' && pr !== undefined).data?.state;
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
 
@@ -113,35 +109,7 @@ export function useThreadActions({
     });
   const openAccept = () => {
     setMenuOpen(false);
-    setAcceptError(null);
     setDialog('accept');
-  };
-  const confirmAccept = (merge: boolean) => {
-    if (buildId == null) {
-      setAcceptError(t('任务数据未就绪，完成请求未送出。请刷新页面后重试。'));
-      return;
-    }
-    if (!merge) {
-      mutations.patchTodo.mutate(
-        { id: todo.id, body: { phase: 'done' } },
-        {
-          onSuccess: () => {
-            setDialog(null);
-            toastSuccess(t('任务已完成，改动保留在会话分支。'));
-          },
-          onError: (error) =>
-            setAcceptError(mergeRejectCopy(error, t, t('完成请求未送出，请重试。'))),
-        },
-      );
-      return;
-    }
-    mutations.mergeBuild.mutate(buildId, {
-      onSuccess: () => {
-        setDialog(null);
-        toastSuccess(t('已发起合并，合并完成后任务进入已完成。'));
-      },
-      onError: (error) => setAcceptError(mergeRejectCopy(error, t)),
-    });
   };
   const closeTask = guard(() => {
     setMenuOpen(false);
@@ -285,19 +253,14 @@ export function useThreadActions({
         onClose={() => setDialog(null)}
         onConfirm={stop}
       />
-      <AcceptDialog
+      <AcceptTaskDialog
+        todo={todo}
+        buildId={buildId}
         open={dialog === 'accept'}
         onClose={() => setDialog(null)}
-        rejectReason={acceptError}
-        substantiveChanges={
-          live ? substantiveChangesOf(chat.changes.reported, chat.changes.settled) : null
-        }
+        substantiveChanges={substantiveChangesOf(chat.changes.reported, chat.changes.settled)}
         mergeLocked={phase === 'failed'}
-        mergeByDefault={!live || mergePreselected({ hasPr: pr !== undefined, gate: gate ?? null })}
         infoOutput={chat.infoOutput}
-        {...(pr !== undefined ? { pr: { number: pr.number, url: pr.url } } : {})}
-        confirming={mutations.mergeBuild.isPending || mutations.patchTodo.isPending}
-        {...(live ? { onConfirm: confirmAccept } : {})}
       />
       <RouteOverrideDialog
         open={dialog === 'route-override'}
