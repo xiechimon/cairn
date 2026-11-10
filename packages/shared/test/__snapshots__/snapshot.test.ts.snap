@@ -5387,12 +5387,6 @@ exports[`body/envelope schema snapshots > createTodoBody > createTodoBody.json 1
     "spec": {
       "type": "string",
     },
-    "tagIds": {
-      "items": {
-        "type": "string",
-      },
-      "type": "array",
-    },
     "title": {
       "type": "string",
     },
@@ -8558,6 +8552,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "thread_pr",
   "coordinator_conversation",
   "coordinator_entry",
+  "coordinator_input",
+  "coordinator_run",
   "coordinator_lease",
   "coordinator_turn_snapshot",
   "data_migration",
@@ -8762,10 +8758,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
-    "path": "/api/projects/{id}/tags",
-  },
-  {
-    "method": "GET",
     "path": "/api/projects/{id}/builds",
   },
   {
@@ -8872,13 +8864,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {title,spec}（r3 §3.1）+ 可选 tagIds[]（r9 §3.4 实测携带位）",
+    "note": "body {title,spec,output?}; retired category assignments are rejected before writes",
     "path": "/api/projects/{id}/todos",
-  },
-  {
-    "method": "POST",
-    "note": "body {name,color} → 201 tag record 全形（r9 §3.4 实测；#309）",
-    "path": "/api/projects/{id}/tags",
   },
   {
     "method": "POST",

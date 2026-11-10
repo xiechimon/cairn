@@ -10,9 +10,3 @@ export const tagRecordSchema = z.object({
   v: z.number().int(),
 });
 export type TagRecord = z.infer<typeof tagRecordSchema>;
-
-export const createTagBodySchema = z.object({
-  name: z.string().min(1),
-  color: z.string(),
-});
-export type CreateTagBody = z.infer<typeof createTagBodySchema>;

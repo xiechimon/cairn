@@ -12,6 +12,8 @@ import {
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   buildTaskPromptText,
+  SESSION_BRIEF,
+  transcriptPromptRowId,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
@@ -80,6 +82,38 @@ function noteItems(items: TranscriptItem[]) {
 }
 
 describe('mapTranscript synthesized-prompt filtering (#612)', () => {
+  test('a recorded session prompt stays synthetic after task metadata changes', () => {
+    const step: StepJournalRow = {
+      id: 'recorded-session',
+      buildId: BUILD.id,
+      kind: 'session',
+      machineId: null,
+      createdAt: NOW - 50_000,
+      status: 'done',
+      checkpointCommit: null,
+      skillInjection: null,
+    };
+    const prompt = `${buildTaskPromptText('Original title', 'Original image request')}\n\n${SESSION_BRIEF}`;
+    const items = render({
+      steps: [step],
+      messages: [
+        { ...msg('user', prompt, NOW - 50_000), id: transcriptPromptRowId(step.id) },
+        msg('user', 'Keep the original screenshot', NOW - 30_000),
+        msg('assistant', [{ type: 'text', text: 'Image received' }], NOW - 20_000),
+      ],
+    });
+    expect(userItems(items).map((item) => item.text)).toEqual(['Keep the original screenshot']);
+    expect(items.some((item) => item.kind === 'robot' && item.markdown === 'Image received')).toBe(true);
+  });
+
+  test('an unmatched prompt-shaped id does not hide user history', () => {
+    const text = 'Original title\n\nOriginal image request';
+    const items = render({
+      messages: [{ ...msg('user', text, NOW - 50_000), id: transcriptPromptRowId('missing-step') }],
+    });
+    expect(userItems(items).map((item) => item.text)).toEqual([text]);
+  });
+
   test('F1 synthesized task text rows no longer render as user bubbles (the description area is the single source)', () => {
     const items = render({
       messages: [

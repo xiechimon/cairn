@@ -949,6 +949,7 @@ export const chiefTurnUsage = sqliteTable(
 );
 
 export const coordinatorConversation = sqliteTable('coordinator_conversation', {
+  storeId: text('storeId'),
   threadId: text('threadId').primaryKey(),
   conversationId: text('conversationId').notNull(),
   lastMirroredEntryId: text('lastMirroredEntryId'),
@@ -1026,6 +1027,48 @@ export const chiefThread = sqliteTable(
       .on(t.chiefId)
       .where(sql`${t.archivedAt} is null and ${t.id} not like 'chief-digest-%'`),
   ],
+);
+
+export const coordinatorInput = sqliteTable(
+  'coordinator_input',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('threadId')
+      .notNull()
+      .references(() => chiefThread.id, { onDelete: 'cascade' }),
+    stepId: text('stepId').notNull(),
+    kind: text('kind').$type<'initial' | 'steer'>().notNull(),
+    ownerMessageIds: json<string[]>('ownerMessageIds').notNull(),
+    content: text('content').notNull(),
+    conversationId: text('conversationId'),
+    state: text('state').$type<'pending' | 'consumed' | 'released'>().notNull().default('pending'),
+    entryId: text('entryId'),
+    successorStepId: text('successorStepId'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('coordinator_input_initial_unique')
+      .on(t.stepId, t.conversationId)
+      .where(sql`${t.kind} = 'initial'`),
+    index('coordinator_input_thread_state_idx').on(t.threadId, t.state, t.stepId),
+    check(
+      'coordinator_input_receipt',
+      sql`(${t.state} = 'consumed' AND ${t.entryId} IS NOT NULL) OR (${t.state} IN ('pending', 'released') AND ${t.entryId} IS NULL)`,
+    ),
+  ],
+);
+
+export const coordinatorRun = sqliteTable(
+  'coordinator_run',
+  {
+    threadId: text('threadId')
+      .notNull()
+      .references(() => chiefThread.id, { onDelete: 'cascade' }),
+    conversationId: text('conversationId').notNull(),
+    taskId: text('taskId').notNull(),
+    stepId: text('stepId').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.threadId, t.conversationId, t.taskId] })],
 );
 
 export const chiefMessage = sqliteTable('chief_message', {

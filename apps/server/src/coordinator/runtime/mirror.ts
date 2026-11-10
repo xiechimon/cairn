@@ -1,4 +1,8 @@
-import type { TranscriptRow } from '@cairn/shared';
+import {
+  coordinatorTextSourceId,
+  coordinatorToolSourceId,
+  type TranscriptRow,
+} from '@cairn/shared';
 import type { AssistantMessage, ToolResultMessage } from '@earendil-works/pi-ai';
 import {
   AssistantEntry,
@@ -21,7 +25,11 @@ export interface EntryRow {
   entryId: string;
 }
 
-export function entryRowSources(stepId: string, entries: readonly EntryRecord[]): EntryRow[] {
+export function entryRowSources(
+  stepId: string,
+  entries: readonly EntryRecord[],
+  storeId?: string,
+): EntryRow[] {
   const results = new Map<string, ToolResultMessage>();
   for (const entry of entries) {
     const message = entry.model?.[0];
@@ -44,7 +52,7 @@ export function entryRowSources(stepId: string, entries: readonly EntryRecord[])
       rows.push({
         entryId: String(entry.id),
         row: {
-          id: `${stepId}-e${entry.id}`,
+          id: coordinatorTextSourceId(stepId, String(entry.id), storeId),
           role: 'assistant',
           content: [{ type: 'text', text }],
           createdAt: message.timestamp,
@@ -57,12 +65,12 @@ export function entryRowSources(stepId: string, entries: readonly EntryRecord[])
       rows.push({
         entryId: String(entry.id),
         row: {
-          id: block.id,
+          id: storeId === undefined ? block.id : coordinatorToolSourceId(storeId, block.id),
           role: 'assistant',
           content: {
             kind: 'toolcall',
             call: {
-              id: block.id,
+              id: storeId === undefined ? block.id : coordinatorToolSourceId(storeId, block.id),
               name: block.name,
               arguments: block.arguments,
               startedAt: message.timestamp,
@@ -94,11 +102,12 @@ export function createTurnMirror(
   api: MachineApi,
   stepId: string,
   afterEntryId: EntryId | undefined,
+  storeId?: string,
 ): TurnMirror {
   const posted = new Map<string, string>();
   let streamed = '';
   const post = async (entries: readonly EntryRecord[]) => {
-    for (const { row, entryId } of entryRowSources(stepId, entries)) {
+    for (const { row, entryId } of entryRowSources(stepId, entries, storeId)) {
       const body = JSON.stringify(row.content);
       if (posted.get(row.id) === body) continue;
       await api.transcriptRow(stepId, row, entryId);

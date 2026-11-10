@@ -40,7 +40,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`
+- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`, `machines-online-dot`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
@@ -1053,9 +1053,9 @@ Reach:
 
 ### thread-tags
 
-**Thread tags** (shipped, centrality 4). Legacy category APIs retained during staged retirement; ordinary worker metadata is title-only.
+**Thread tags** (shipped, centrality 4). Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.
 
-States: No category settings tab or ordinary worker category input. Legacy assignment APIs and read-only membership remain until their retirement segments; GitHub labels are separate.
+States: Vocabulary GET/POST return 404; no category seeding or assignment writers remain. Retired tagIds fail before writes across REST/Coordinator/MCP and canonical services, including SDK transports. Existing read-only membership and classification remain until final data removal; GitHub labels are separate.
 
 Reach:
 
@@ -1068,4 +1068,4 @@ Reach:
 - Research: [docs/research/thread-category-runtime-cutover-3481.md](../../../docs/research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
 - Backend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](../../../docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)
-- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`
+- Evidence: `apps/server/test/task-meta.test.ts`, `apps/server/test/category-vocabulary-retirement.test.ts`, `apps/server/test/category-assignment-retirement.test.ts`, `packages/shared/test/task-request.test.ts`, `apps/server/test/correction-classification.test.ts`, `apps/daemon/test/task-meta-prompt.test.ts`, `apps/daemon/test/worker-meta-sdk.test.ts`

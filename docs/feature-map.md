@@ -616,7 +616,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### thread-tags
 
-**Thread tags** (shipped). Legacy category APIs retained during staged retirement; ordinary worker metadata is title-only.
+**Thread tags** (shipped). Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.
 
 - Research: [docs/research/thread-category-runtime-cutover-3481.md](research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)

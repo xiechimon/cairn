@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 const STATUS = {
-  done: '已完成，未验证',
-  verified: '已验证',
+  done: '已完成',
+  verified: '已完成',
   failed: '失败',
   review: '审阅中',
 } as const;

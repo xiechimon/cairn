@@ -1,10 +1,10 @@
-import { type ClaimedStep, FIXED_TAGS, todoRecordSchema } from '@cairn/shared';
+import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { step as stepTable, todo as todoTable, todoTag } from '../src/db/schema.js';
-import { backfillFixedTags, seedFixedTags } from '../src/services/tags.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
+import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 async function call(
   app: Hono,
@@ -56,28 +56,6 @@ describe('placeholder title derivation (ADR 0002 D2: blank title -> the first no
     });
     const record = todoRecordSchema.parse(await res.json());
     expect(record.title).toBe('显式标题');
-    s.dispose();
-  });
-});
-
-describe('fixed-vocabulary seeding (ADR 0002 D4)', () => {
-  test('project creation ships the 6 fixed tags (name/color fully compared)', async () => {
-    const s = bootServer();
-    const projectId = await postProject(s.app);
-    const res = await call(s.app, 'GET', `/api/projects/${projectId}/tags`);
-    const tags = (await res.json()) as { name: string; color: string }[];
-    expect(tags.map((t) => t.name)).toEqual(FIXED_TAGS.map((t) => t.name));
-    expect(tags.map((t) => t.color)).toEqual(FIXED_TAGS.map((t) => t.color));
-    s.dispose();
-  });
-
-  test('seed/startup backfill is idempotent: repeated calls insert nothing', async () => {
-    const s = bootServer();
-    const projectId = await postProject(s.app);
-    expect(seedFixedTags(s.db, projectId)).toBe(0);
-    backfillFixedTags(s.db);
-    const res = await call(s.app, 'GET', `/api/projects/${projectId}/tags`);
-    expect(((await res.json()) as unknown[]).length).toBe(FIXED_TAGS.length);
     s.dispose();
   });
 });
@@ -161,14 +139,8 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
     async (sealed) => {
       const { s, token, step, todoId, projectId } = await world();
       try {
-        const category = await call(s.app, 'POST', `/api/projects/${projectId}/tags`, {
-          body: { name: 'correction', color: '#123456' },
-        });
-        expect(category.status).toBe(201);
-        const { id } = (await category.json()) as { id: string };
-        expect(
-          (await call(s.app, 'PATCH', `/api/todos/${todoId}`, { body: { tagIds: [id] } })).status,
-        ).toBe(200);
+        const { id } = insertLegacyCategory(s.db, projectId, 'correction');
+        insertLegacyMembership(s.db, todoId, [id], true);
         const taskText = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.spec;
         if (taskText === undefined) throw new Error('task missing');
         if (sealed) {
