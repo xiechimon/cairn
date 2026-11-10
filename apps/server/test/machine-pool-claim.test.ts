@@ -337,6 +337,31 @@ describe('a worker step runs only on its named machine', () => {
     expect(statusOf(w, stepId)).toBe('pending');
   });
 
+  test('the only online machine claims an unnamed step while another machine is offline', async () => {
+    const w = await world();
+    const online = await machineOf(w, 'online');
+    await machineOf(w, 'offline', { online: false });
+    routeOf(w, null);
+    const stepId = pendingStep(w);
+    const claimed = await claimOn(w, online);
+    expect(claimed?.step.id).toBe(stepId);
+  });
+
+  test('one registered machine is the queue target when the step has no pin', async () => {
+    const w = await world();
+    const only = await machineOf(w, 'only');
+    routeOf(w, null);
+    const stepId = pendingStep(w);
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    const queue = stepQueueProjector(w.s.db, w.s.team.id).project({
+      id: stepId,
+      createdAt: row.createdAt,
+      homeMachineId: null,
+    });
+    expect(queue?.waitingFor?.machineId).toBe(only);
+    expect(queue?.blocked).toBeUndefined();
+  });
+
   test('the queue keeps waiting for the named machine when it is offline', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });

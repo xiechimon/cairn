@@ -19,6 +19,7 @@ import { holdBlockedBuild } from './blockers.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
+import { priorSessionOf, routeTargets, soleClaimMachineId } from './machine-routing.js';
 import { effectiveModel } from './model-fallback.js';
 import { isClaudeModel, machineUsesClaudeSubscription } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
@@ -123,21 +124,33 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const subscriptionOnly =
     deps.db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage !== 'allow-paid';
   let changed = false;
+  const sole = soleClaimMachineId(machines);
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,
     todoRow: typeof todo.$inferSelect | null,
+    buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'> | null,
   ) => {
     const localMerge =
       stepRow.kind === 'merge' && parseLocalMergeInstruction(stepRow.prompt) !== null;
     const model = effectiveModel(agentRow, stepRow);
-    const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
+    const prior =
+      buildRow === null
+        ? { priorSessionId: null, priorMachineId: null, freshSession: true }
+        : priorSessionOf(deps.db, stepRow, buildRow);
+    const homeId =
+      routeTargets(
+        !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null,
+        agentRow.machineId,
+        sole,
+      )[0]?.machineId ?? null;
+    const owner = homeId ? byId.get(homeId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
     const claimants = machines.filter(
       (row) =>
         row.online &&
-        agentRow.machineId !== null &&
-        row.id === agentRow.machineId &&
+        homeId !== null &&
+        row.id === homeId &&
         runtimeGatePasses(row, model.provider) &&
         capabilityGatePasses(row, agentRow) &&
         claudeRateBlock(row.claudeRateLimits ?? [], now) === null,
@@ -229,7 +242,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     }
   };
   const workers = deps.db
-    .select({ step, todo })
+    .select({ step, todo, build })
     .from(step)
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
@@ -242,7 +255,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     .all();
   for (const row of workers) {
     const agentRow = profileForStep(deps.db, row.todo, row.step.kind, row.step.id);
-    if (agentRow) consider(row.step, agentRow, row.todo);
+    if (agentRow) consider(row.step, agentRow, row.todo, row.build);
   }
   const coordinator = coordinatorProfile(deps.db, teamId);
   const chiefs = deps.db
@@ -257,7 +270,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       ),
     )
     .all();
-  if (coordinator !== null) for (const row of chiefs) consider(row.step, coordinator, null);
+  if (coordinator !== null) for (const row of chiefs) consider(row.step, coordinator, null, null);
   if (changed) deps.machineHub.wake(teamId);
 }
 
