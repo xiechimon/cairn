@@ -1,9 +1,9 @@
 {
-  "head": "61b811c6b00802b167b4b77cef92e7833435656d",
+  "head": "8a6fee8951273b672ac4dbab6494aec17e7087db",
   "mode": "Real local app and Coordinator, controlled provider, no task backend execution",
   "providerRequests": 5,
   "allRequestsBound": true,
-  "originalImageSha256": "9823bfd3adbac070eba0bbcf8fde7629d10efc116b79d9656428b8543b8ed040",
+  "originalImageSha256": "ea8ffc18fd16061f6bc1d1c97952d7c5a98343d6f7462f9efb2996ef1a48fbc3",
   "providerReceivedOriginalBytes": true,
   "pendingBeforeAnswer": [
     {
