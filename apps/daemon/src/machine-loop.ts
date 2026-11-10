@@ -14,6 +14,7 @@ import {
   CLAIM_POLL_INTERVAL_MS,
   type ClaudeLogin,
   classifyClaudeCodeLogin,
+  ENV_VARS,
   isBackendRuntimeId,
   MACHINE_ORB_CONVERSATIONS_LIMIT,
   ORPHAN_WORKTREE_TTL_MS,
@@ -161,7 +162,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
 
   let backend: AgentBackend | undefined = opts.backend;
-  const platform = opts.confinementPlatform ?? process.platform;
+  const platformOverride =
+    opts.capEnv?.[ENV_VARS.confinementPlatform] ?? process.env[ENV_VARS.confinementPlatform];
+  const platform = opts.confinementPlatform ?? platformOverride ?? process.platform;
   let claudeBin: ClaudeBinInfo | null = platform === 'darwin' ? await probeClaudeBin() : null;
   let availability: ConfinementAvailability | undefined;
   let claudeAuth: ClaudeCodeAuthProbe | null = null;
@@ -402,7 +405,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
   availability = new ConfinementAvailability({
     home: paths.home,
-    platform: opts.confinementPlatform,
+    platform,
     launch: opts.confinementPreflight,
     me: () => client.me(),
     send: () => presenceReporter.send(),
