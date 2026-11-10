@@ -79,7 +79,7 @@ export function TokenGate() {
             onChange={(event) => setValue(event.target.value)}
           />
           {auth.rejected && (
-            <p className="token-gate-error text-xs text-destructive" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {t('配对码无效，请重试。')}
             </p>
           )}
