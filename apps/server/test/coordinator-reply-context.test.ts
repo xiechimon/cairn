@@ -103,68 +103,73 @@ describe('quoted Coordinator context at dispatch', () => {
     expect(task.spec).not.toContain(`attachment:${H.teamId}/invented.png`);
   });
 
-  test('the claimed machine downloads inherited image bytes through the authenticated attachment route', async () => {
-    const source = sourceTurn();
-    const bytes = Buffer.from('89504e470d0a1a0a', 'hex');
-    const grantResponse = await req(H.s.app, 'POST', '/api/uploads/grant', {
-      kind: 'attachment',
-      fileName: 'caret.png',
-      mimeType: 'image/png',
-      size: bytes.length,
-      scope: 'spec',
-    });
-    expect(grantResponse.status).toBe(200);
-    const grant = (await grantResponse.json()) as { grant: string; attachmentId: string };
-    const form = new FormData();
-    form.set('grant', grant.grant);
-    form.set('file', new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'caret.png');
-    expect(
-      (await H.s.app.request('/api/uploads/upload', { method: 'POST', body: form })).status,
-    ).toBe(201);
-    H.s.db
-      .update(chiefMessage)
-      .set({
-        content: `The caret is misaligned.\n![caret.png](attachment:${H.teamId}/${grant.attachmentId}.png)`,
-      })
-      .where(eq(chiefMessage.id, source.ownerId))
-      .run();
-    const task = dispatch(source.reply);
-    const apiKey = await issueApiKey(H.s);
-    const enrolled = await H.s.app.request('/api/machine/enroll', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ teamId: H.teamId, name: 'reply-context-machine' }),
-    });
-    expect(enrolled.status).toBe(200);
-    const machine = machineEnrollResponseSchema.parse(await enrolled.json());
-    const built = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/builds`, {
-      todoIds: [task.id],
-      withPlan: false,
-    });
-    expect(built.status).toBe(201);
-    const claimed = await H.s.app.request('/api/machine/tasks/claim', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${machine.token}` },
-      body: '{}',
-    });
-    expect(claimed.status).toBe(200);
-    const claim = (await claimed.json()) as {
-      step: { step: { id: string }; todo: { request: unknown } } | null;
-    };
-    expect(claim.step).not.toBeNull();
-    expect(claim.step?.todo.request).toEqual(task.request);
-    const image = await H.s.app.request(
-      `/api/machine/attachment/${claim.step!.step.id}/${grant.attachmentId}?teamId=${H.teamId}`,
-      { headers: { authorization: `Bearer ${machine.token}` } },
-    );
-    expect(image.status).toBe(200);
-    expect(
-      Buffer.from(
-        machineAttachmentResponseSchema.parse(await image.json()).contentBase64,
-        'base64',
-      ),
-    ).toEqual(bytes);
-  });
+  test.each(['0.2.3', '0.2.4'])(
+    'machine %s downloads inherited image bytes through the authenticated attachment route',
+    async (cliVersion) => {
+      const source = sourceTurn();
+      const bytes = Buffer.from('89504e470d0a1a0a', 'hex');
+      const grantResponse = await req(H.s.app, 'POST', '/api/uploads/grant', {
+        kind: 'attachment',
+        fileName: 'caret.png',
+        mimeType: 'image/png',
+        size: bytes.length,
+        scope: 'spec',
+      });
+      expect(grantResponse.status).toBe(200);
+      const grant = (await grantResponse.json()) as { grant: string; attachmentId: string };
+      const form = new FormData();
+      form.set('grant', grant.grant);
+      form.set('file', new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'caret.png');
+      expect(
+        (await H.s.app.request('/api/uploads/upload', { method: 'POST', body: form })).status,
+      ).toBe(201);
+      H.s.db
+        .update(chiefMessage)
+        .set({
+          content: `The caret is misaligned.\n![caret.png](attachment:${H.teamId}/${grant.attachmentId}.png)`,
+        })
+        .where(eq(chiefMessage.id, source.ownerId))
+        .run();
+      const task = dispatch(source.reply);
+      const apiKey = await issueApiKey(H.s);
+      const enrolled = await H.s.app.request('/api/machine/enroll', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ teamId: H.teamId, name: 'reply-context-machine', cliVersion }),
+      });
+      expect(enrolled.status).toBe(200);
+      const machine = machineEnrollResponseSchema.parse(await enrolled.json());
+      const built = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/builds`, {
+        todoIds: [task.id],
+        withPlan: false,
+      });
+      expect(built.status).toBe(201);
+      const claimed = await H.s.app.request('/api/machine/tasks/claim', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${machine.token}` },
+        body: '{}',
+      });
+      expect(claimed.status).toBe(200);
+      const claim = (await claimed.json()) as {
+        step: { step: { id: string }; todo: { request?: unknown; spec: string } } | null;
+      };
+      expect(claim.step).not.toBeNull();
+      expect(claim.step?.todo.request).toEqual(cliVersion === '0.2.4' ? task.request : undefined);
+      expect(claim.step?.todo.spec).toContain(`attachment:${H.teamId}/${grant.attachmentId}.png`);
+      expect(claim.step?.todo.spec).not.toContain('reply source=');
+      const image = await H.s.app.request(
+        `/api/machine/attachment/${claim.step!.step.id}/${grant.attachmentId}?teamId=${H.teamId}`,
+        { headers: { authorization: `Bearer ${machine.token}` } },
+      );
+      expect(image.status).toBe(200);
+      expect(
+        Buffer.from(
+          machineAttachmentResponseSchema.parse(await image.json()).contentBase64,
+          'base64',
+        ),
+      ).toEqual(bytes);
+    },
+  );
 
   test('does not inherit later steers from the producing step', () => {
     const source = sourceTurn();
