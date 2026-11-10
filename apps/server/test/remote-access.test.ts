@@ -402,12 +402,15 @@ describe('F-P1 pairing: code to per-device token', () => {
 });
 
 describe('F-P2 pairing authority stays with the owner token', () => {
-  test('a device token cannot mint codes, list devices, revoke devices or confirm machine enrollment', async () => {
+  test('a device token can see paired devices but cannot mint codes, revoke devices or confirm machine enrollment', async () => {
     const s = bootServer({ authToken: OWNER });
     const paired = await pairDevice(s);
     const device = { authorization: `Bearer ${paired.token}` };
     expect((await call(s, 'POST', '/api/remote/pairing', { headers: device })).status).toBe(403);
-    expect((await call(s, 'GET', '/api/remote/devices', { headers: device })).status).toBe(403);
+    const listed = await call(s, 'GET', '/api/remote/devices', { headers: device });
+    expect(listed.status).toBe(200);
+    const rows = (await listed.json()) as { id: string }[];
+    expect(rows.some((row) => row.id === paired.deviceId)).toBe(true);
     expect(
       (await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: device }))
         .status,
@@ -804,7 +807,6 @@ describe('F-C1 credentials and grants are owner-only', () => {
     ['POST', '/api/machines/any/revoke', {}],
     ['POST', '/api/machines/any/evacuate', {}],
     ['POST', '/api/remote/pairing', {}],
-    ['GET', '/api/remote/devices', undefined],
     ['DELETE', '/api/remote/devices/any', undefined],
   ];
 

@@ -107,7 +107,9 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.get('/api/remote/devices', (c) => {
-    requireOwner(c);
+    if (ctx.authToken === null) {
+      throw new HttpError(409, 'pairing needs token auth, which is turned off');
+    }
     return c.json(listPairedDevices(ctx.db, ctx.team.id));
   });
 
