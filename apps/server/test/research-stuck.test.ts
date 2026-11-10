@@ -26,6 +26,7 @@ import {
 import { retryLessonsOf } from '../src/services/retry-lessons.js';
 import {
   bootServer,
+  insertMachine,
   postProject,
   req,
   seedRoute,
@@ -40,6 +41,7 @@ afterEach(() => {
 
 async function world(opts: { withSessionRoute?: boolean } = {}) {
   const s = bootServer();
+  insertMachine(s);
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'stuck');
   if (opts.withSessionRoute !== false) seedSessionRoute(s);

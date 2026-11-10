@@ -1148,8 +1148,7 @@ function namedMachineForStart(
   if (registered.length === 1 && onlyRegistered !== undefined) {
     return { machineId: onlyRegistered.id, pin: true };
   }
-  if (registered.length > 1) throw new HttpError(409, 'Name a machine before starting this task');
-  return null;
+  throw new HttpError(409, 'Name a machine before starting this task');
 }
 
 export function startBuilds(
@@ -1184,7 +1183,6 @@ export function startBuilds(
     ) {
       throw new NotFoundError(`machine ${overrideMachine}`);
     }
-    namedMachineForStart(deps, todoRecord, input.routeOverride);
     const previous =
       todoRecord.latestBuildId === null
         ? undefined
@@ -1196,6 +1194,7 @@ export function startBuilds(
     if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
     if (triggerSource !== 'user') assertAutomaticRetryAllowed(deps, todoId);
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
+    namedMachineForStart(deps, todoRecord, input.routeOverride);
   }
   const created: BuildRecord[] = [];
   for (const todoId of input.todoIds) {

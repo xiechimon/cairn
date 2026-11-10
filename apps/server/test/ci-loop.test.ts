@@ -38,6 +38,7 @@ import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   bootServer,
+  insertMachine,
   seedRoute,
   seedSessionRoute,
   type TestServer,
@@ -183,6 +184,7 @@ interface PrWorld {
 
 function makePrWorld(opts: WorldOpts = {}): PrWorld {
   const s = bootServer();
+  insertMachine(s);
   disposables.push(() => s.dispose());
   const rnd = Math.random().toString(36).slice(2, 8);
   const base = Date.now();

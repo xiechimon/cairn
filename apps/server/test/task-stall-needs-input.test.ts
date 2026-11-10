@@ -1,7 +1,7 @@
 import { ANSWERS_CONTINUE_PROMPT } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, message, project, steerPending, step, todo } from '../src/db/schema.js';
+import { build, machine, message, project, steerPending, step, todo } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
 import { ackSteer, claimStep, fetchSteer } from '../src/services/machines.js';
@@ -68,16 +68,15 @@ function seedTodo(projectId = H.projectId) {
 }
 
 function startSession(projectId = H.projectId) {
+  const machineId =
+    H.s.db.select({ id: machine.id }).from(machine).where(eq(machine.teamId, H.s.team.id)).get()
+      ?.id ?? insertMachine(H.s);
   const todoId = seedTodo(projectId);
   const [started] = startBuilds(deps(), { projectId, todoIds: [todoId] });
   const buildId = started!.id;
   const first = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
   H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
-  H.s.db
-    .update(step)
-    .set({ status: 'claimed', machineId: insertMachine(H.s) })
-    .where(eq(step.id, first.id))
-    .run();
+  H.s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, first.id)).run();
   return {
     todoId,
     buildId,

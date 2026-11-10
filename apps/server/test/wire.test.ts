@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { plan as planTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req, startLegacyBuild } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, startLegacyBuild } from './helpers.js';
 import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 const INFERRED_ROUTES = [
@@ -469,6 +469,7 @@ describe('legacy categories are read-only during staged retirement', () => {
 describe('the build surface + the nine-value phase transitions (the server-side spine of the 02 §4.2 main timeline)', () => {
   async function withTodo() {
     const s = bootServer();
+    insertMachine(s);
     const projectId = await postProject(s.app);
     const todoDoc = todoRecordSchema.parse(
       await (
@@ -477,6 +478,21 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     );
     return { ...s, projectId, todoDoc };
   }
+
+  test('POST builds with no registered machine is refused', async () => {
+    const s = bootServer();
+    const projectId = await postProject(s.app);
+    const todoDoc = todoRecordSchema.parse(
+      await (
+        await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'run', spec: '' })
+      ).json(),
+    );
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
+      todoIds: [todoDoc.id],
+    });
+    expect(res.status).toBe(409);
+    s.dispose();
+  });
 
   test('POST builds body = startBuildsBodySchema (the r5 §3.4 captured shape)', async () => {
     const s = await withTodo();

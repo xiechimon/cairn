@@ -12,13 +12,21 @@ import { completeStep, listSteps } from '../src/services/builds.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { pauseSchedule, serverTimezone, wallClockParts } from '../src/services/schedules.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  postProject,
+  req,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const TZ = 'Asia/Shanghai';
 
 const servers: TestServer[] = [];
 function boot() {
   const s = bootServer();
+  insertMachine(s);
   servers.push(s);
   return s;
 }

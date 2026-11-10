@@ -5,11 +5,12 @@ import {
   todoDocEventSchema,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { bootServer, openStream, req, seedSessionRoute } from './helpers.js';
+import { bootServer, insertMachine, openStream, req, seedSessionRoute } from './helpers.js';
 
 describe('the SSE team stream (the r5 §7.2 document event shape)', () => {
   test('the first frame on connect is a ping; todo/build changes push full document events, seq increasing within the connection', async () => {
     const s = bootServer({ pingIntervalMs: 50 });
+    insertMachine(s);
     seedSessionRoute(s);
     const stream = await openStream(s.app, s.team.id);
     try {

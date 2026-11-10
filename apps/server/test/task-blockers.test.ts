@@ -34,6 +34,10 @@ function row(id: string) {
   return H.s.db.select().from(todo).where(eq(todo.id, id)).get()!;
 }
 
+function retarget(id: string, machineId: string) {
+  H.s.db.update(todo).set({ routeOverride: { machineId } }).where(eq(todo.id, id)).run();
+}
+
 function sessions(id: string) {
   const latest = row(id).latestBuildId;
   if (latest === null) return [];
@@ -273,6 +277,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      retarget(id, machineId);
       const [session] = sessions(id);
       H.s.db.update(step).set({ kind }).where(eq(step.id, session!.id)).run();
       applyQuotaWaitStep(toolDeps(), sessions(id)[0]!, {
@@ -322,6 +327,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       .where(eq(step.id, session!.id))
       .run();
     await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+    H.s.db.update(todo).set({ routeOverride: null }).where(eq(todo.id, id)).run();
     refreshClaudeRateParks(
       {
         ...H.s.svc,
@@ -359,6 +365,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      retarget(id, machineId);
       H.s.db
         .update(step)
         .set({ kind })
@@ -423,6 +430,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      retarget(id, machineId);
       const pending = sessions(id)[0]!;
       H.s.db
         .update(step)
