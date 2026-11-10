@@ -307,7 +307,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
 
   const onSend = live
     ? (text: string, projectId: string | null) => {
-        const sessionMachineId = routingQ.data?.rules.find(
+        const sessionMachineId = routingQ.data?.rules?.find(
           (rule) => rule.use === 'session',
         )?.machineId;
         if (activeThread == null && needsMachineName(machinesQ.data, sessionMachineId)) {

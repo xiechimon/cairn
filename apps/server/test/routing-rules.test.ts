@@ -135,11 +135,14 @@ describe('profileForStep: the session rule supplies the model and machine', () =
     expect(profileForStep(w.s.db, todoRow, 'merge')?.id).toBe(ruleId);
   });
 
-  test('a rule without a machine leaves the step unpinned', async () => {
+  test('a rule without a machine still names the only registered machine', async () => {
     const w = await setupWorld();
-    sessionRule(w.s);
+    const ruleId = sessionRule(w.s);
     const todoRow = await buildTodo(w);
-    expect(profileForStep(w.s.db, todoRow, 'build')?.machineId).toBeNull();
+    expect(profileForStep(w.s.db, todoRow, 'build')?.machineId).toBe(w.machineId);
+    expect(
+      w.s.db.select().from(routingRule).where(eq(routingRule.id, ruleId)).get()?.machineId,
+    ).toBe(null);
   });
 
   test('review steps use the review rule, never the session rule; other teams are not routed', async () => {

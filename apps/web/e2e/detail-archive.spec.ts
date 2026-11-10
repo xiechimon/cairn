@@ -143,6 +143,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/skills': [],
       '/api/teams/team-archive/members': [],
       '/api/teams/team-archive/machines': [],
+      '/api/teams/team-archive/routing-settings': { enabled: false, rules: [], policies: [] },
       '/api/teams/team-archive/chief/threads': [],
       '/api/teams/team-archive/chief': {
         chief: { id: 'chief-archive', teamId: 'team-archive', agent: null },

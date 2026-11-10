@@ -31,7 +31,7 @@ export function useOrchestrateStart(): OrchestrateStart {
   const orchestrate = useCallback(
     (todo: { id: string; seqNum: number }, opts?: { savedTitle?: string }) => {
       if (!live || inFlight.current) return;
-      const sessionMachineId = routingQ.data?.rules.find(
+      const sessionMachineId = routingQ.data?.rules?.find(
         (rule) => rule.use === 'session',
       )?.machineId;
       if (needsMachineName(machinesQ.data, sessionMachineId)) {

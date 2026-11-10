@@ -175,7 +175,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     if (claimed != null) return claimed;
     const pinned =
       listed?.routeOverride?.machineId ??
-      routingQ.data?.rules.find((rule) => rule.use === 'session')?.machineId ??
+      routingQ.data?.rules?.find((rule) => rule.use === 'session')?.machineId ??
       null;
     return machinesQ.data?.find((m) => m.id === pinned)?.name ?? null;
   }, [machinesQ.data, steps, listed?.routeOverride?.machineId, routingQ.data]);

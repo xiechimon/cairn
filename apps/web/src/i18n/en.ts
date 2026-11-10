@@ -1261,6 +1261,7 @@ export const EN: Record<string, string> = {
   查看会话: 'View session',
   未能开始编排: 'Could not start orchestration',
   先选择机器: 'Choose a machine first',
+  选择机器: 'Choose a machine',
   '多台机器在线时，开工前要在规则里点名一台。':
     'Name a machine in routing rules before starting, while several are online.',
   去选择: 'Choose',
