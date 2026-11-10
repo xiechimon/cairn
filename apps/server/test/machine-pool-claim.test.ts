@@ -235,13 +235,12 @@ describe('a worker step runs only on its named machine', () => {
     expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('no preferred machine: no machine takes it', async () => {
+  test('no preferred machine and one machine: that machine takes it', async () => {
     const w = await world();
     const mac = await machineOf(w, 'mac');
     routeOf(w, null);
     const stepId = pendingStep(w);
-    expect(await claimOn(w, mac)).toBeNull();
-    expect(statusOf(w, stepId)).toBe('pending');
+    expect((await claimOn(w, mac))?.step.id).toBe(stepId);
   });
 
   test('an Orb-required route waits for an Orb executor and never falls back to a host', async () => {

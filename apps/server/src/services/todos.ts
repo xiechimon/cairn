@@ -60,6 +60,7 @@ import {
   correctionFromGithubLabels,
   todoGithubLabelIds,
 } from './github-labels.js';
+import { priorSessionOf, soleOnlineMachineId } from './machine-routing.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -229,17 +230,25 @@ function waitingOnOf(
     .from(machine)
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
+  const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  const sole = soleOnlineMachineId(online.map((m) => m.id));
   for (const s of pendingSteps) {
     const agentRow = profileForStep(deps.db, row, s.kind, s.id);
     if (agentRow === null) continue;
+    const prior =
+      buildRow === undefined
+        ? { priorSessionId: null, priorMachineId: null, freshSession: true }
+        : priorSessionOf(deps.db, s, buildRow);
+    const named =
+      !prior.freshSession && prior.priorSessionId !== null
+        ? prior.priorMachineId
+        : (agentRow.machineId ?? sole);
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
     const runnable =
-      agentRow.machineId !== null &&
+      named !== null &&
       online.some(
         (m) =>
-          m.id === agentRow.machineId &&
-          runtimeGatePasses(m, provider) &&
-          capabilityGatePasses(m, agentRow),
+          m.id === named && runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
       );
     if (!runnable) return { on: 'machine', retryAt: null };
   }

@@ -73,6 +73,7 @@ import {
   priorSessionOf,
   routeTargets,
   routeVerdict,
+  soleOnlineMachineId,
   type WorkerStepFacts,
   workerIneligibility,
 } from './machine-routing.js';
@@ -335,7 +336,16 @@ function claimChiefTurn(
     }
     const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
-    if (cand.agentRow.machineId !== machineId) continue;
+    const sole = soleOnlineMachineId(
+      db
+        .select({ id: machine.id })
+        .from(machine)
+        .where(eq(machine.teamId, teamId))
+        .all()
+        .map((row) => row.id),
+    );
+    const chiefMachine = cand.agentRow.machineId ?? sole;
+    if (chiefMachine !== machineId) continue;
     const claimed = buildChiefClaim(
       deps,
       machineId,
@@ -442,11 +452,20 @@ async function tryClaim(
     );
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
+    const sole = soleOnlineMachineId(
+      db
+        .select({ id: machine.id })
+        .from(machine)
+        .where(eq(machine.teamId, teamId))
+        .all()
+        .map((row) => row.id),
+    );
     const allowed = routeVerdict({
       machineId,
       targets: routeTargets(
         !freshSession && priorSessionId !== null ? priorMachineId : null,
         agentRow.machineId,
+        sole,
       ),
     }).claim;
     if (!allowed) continue;

@@ -112,9 +112,14 @@ export interface RouteTarget {
 export function routeTargets(
   sessionMachineId: string | null,
   preferredMachineId: string | null,
+  soleOnlineMachineId: string | null = null,
 ): RouteTarget[] {
-  const machineId = sessionMachineId ?? preferredMachineId;
+  const machineId = sessionMachineId ?? preferredMachineId ?? soleOnlineMachineId;
   return machineId === null ? [] : [{ machineId }];
+}
+
+export function soleOnlineMachineId(onlineIds: readonly string[]): string | null {
+  return onlineIds.length === 1 ? (onlineIds[0] ?? null) : null;
 }
 
 export type RouteVerdict = { claim: true } | { claim: false; waitingFor: string | null };
