@@ -1,6 +1,6 @@
 import { buildOrchestratePrompt, canOrchestrate } from '@cairn/shared';
 import { inArray } from 'drizzle-orm';
-import { tag } from '../db/schema.js';
+import { githubLabel } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { sendChiefMessage } from './chief.js';
 import { isCorrectionTask } from './correction.js';
@@ -22,11 +22,11 @@ export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
     throw conflict(`orchestrate 仅适用于 待开始/失败 相位（当前 ${record.phase}）`);
   }
   const bugLabel =
-    record.sourceKind === 'github-issue' && record.tagIds.length > 0
+    record.sourceKind === 'github-issue' && (record.githubLabelIds?.length ?? 0) > 0
       ? deps.db
-          .select({ name: tag.name })
-          .from(tag)
-          .where(inArray(tag.id, record.tagIds))
+          .select({ name: githubLabel.name })
+          .from(githubLabel)
+          .where(inArray(githubLabel.id, record.githubLabelIds ?? []))
           .all()
           .some((row) => row.name.toLowerCase() === 'bug')
       : false;

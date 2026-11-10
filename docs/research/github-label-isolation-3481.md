@@ -1,6 +1,6 @@
 # GitHub-label isolation: ordered cutover design
 
-Status: pending coordinator review of the transitional cutover. The overall separation is approved in [the retirement design](thread-tags-retirement-3481.md); correction independence shipped in [#3727](https://github.com/xiechimon/cairn/pull/3727).
+Status: [approved by the coordinator](https://github.com/xiechimon/cairn/pull/3767#issuecomment-6751469789). The overall separation is approved in [the retirement design](thread-tags-retirement-3481.md); correction independence shipped in [#3727](https://github.com/xiechimon/cairn/pull/3727).
 
 ## Primary-source audit
 
@@ -21,7 +21,7 @@ Before: `tag` / `todo_tag` contain both categories and GitHub labels. After this
 
 The migration creates `github_label` with the existing vocabulary fields and project foreign key, plus `todo_github_label` with a composite task/label key and cascading foreign keys. It selects every vocabulary row owned by a GitHub project, plus every row associated with a GitHub-origin task (`github-issue` or `github-issue-self`) regardless of current project binding. It copies associations only when the vocabulary owner is a GitHub project or the associated task has either GitHub-origin source kind; it copies the vocabulary those associations need. A local vocabulary row shared with an ordinary task is copied, but that ordinary task's unrelated association stays generic. There is no name-based deduplication or ownership reassignment.
 
-The coordinator review requested here is the staged-cutover detail: remove the copied associations from `todo_tag` in that same transaction, but retain old vocabulary rows until generic retirement. Otherwise a stale copied correction association could keep the guard enabled after the GitHub label is removed, or require a dual-write bridge. All label data remains in the dedicated tables; unrelated generic associations and complete task/build rows stay unchanged. This is earlier movement of associations than the final blanket table drop, not deletion of GitHub metadata.
+The approved staged-cutover detail is: remove the copied associations from `todo_tag` in that same transaction, but retain old vocabulary rows until generic retirement. Otherwise a stale copied correction association could keep the guard enabled after the GitHub label is removed, or require a dual-write bridge. All label data remains in the dedicated tables; unrelated generic associations and complete task/build rows stay unchanged. This is earlier movement of associations than the final blanket table drop, not deletion of GitHub metadata.
 
 The public task record gains read-only `githubLabelIds`; generic `tagIds` remains temporarily for ordinary categories. No new public label-assignment parameter or route is proposed. Existing generic mutations must not edit dedicated labels. GitHub worker metadata keeps its names-based input and switches its result to the named label ids. The issue-list label chips still use GitHub issue-list data; no UI layout or new user-facing surface is introduced.
 
@@ -48,4 +48,4 @@ A failed label sync/import/mutation publishes no successful task update; invalid
 
 Deploy the server, daemon contract and shared task representation together. A code-only downgrade cannot restore old association reads after cutover: use a pre-migration backup or a separately verified reverse-copy migration. Do not drop generic tables, remove generic mutation schemas, delete the settings tab or close #3481 in this segment.
 
-The migration number is main's highest plus one at implementation time, not a reserved slot; its generated timestamp must exceed all of main's entries. Regenerate its snapshot from the current predecessor, and retain the evidence-store predecessor regression. Keep `coordinator-hold` while this cutover review is pending and through protected-path implementation review.
+The migration number is main's highest plus one at implementation time, not a reserved slot; its generated timestamp must exceed all of main's entries. Regenerate its snapshot from the current predecessor, and retain the evidence-store predecessor regression. Keep `coordinator-hold` through protected-path implementation review.
