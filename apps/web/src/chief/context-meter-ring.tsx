@@ -109,7 +109,7 @@ export function ContextMeterRing({
         />
       }
     >
-      <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-5.5">
+      <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-4">
         <circle
           cx={CX}
           cy={CY}
