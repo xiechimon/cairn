@@ -1,0 +1,39 @@
+{
+  "head": "61b811c6b00802b167b4b77cef92e7833435656d",
+  "mode": "Real local app and Coordinator, controlled provider, no task backend execution",
+  "providerRequests": 5,
+  "allRequestsBound": true,
+  "originalImageSha256": "9823bfd3adbac070eba0bbcf8fde7629d10efc116b79d9656428b8543b8ed040",
+  "providerReceivedOriginalBytes": true,
+  "pendingBeforeAnswer": [
+    {
+      "kind": "initial",
+      "state": "consumed",
+      "entryId": "8"
+    },
+    {
+      "kind": "steer",
+      "state": "pending",
+      "entryId": null
+    }
+  ],
+  "consumedInputs": [
+    {
+      "kind": "initial",
+      "state": "consumed",
+      "entryId": "8"
+    },
+    {
+      "kind": "steer",
+      "state": "consumed",
+      "entryId": "16"
+    },
+    {
+      "kind": "initial",
+      "state": "consumed",
+      "entryId": "23"
+    }
+  ],
+  "taskCount": 1,
+  "inheritedImageCount": 1
+}
