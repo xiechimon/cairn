@@ -37,7 +37,6 @@ import { PageShell, TabGroup } from './shell.js';
 const TABS = [
   { id: 'basic', label: '基本信息' },
   { id: 'repo', label: '仓库' },
-  { id: 'tags', label: '标签' },
   { id: 'memory', label: '记忆' },
 ];
 
