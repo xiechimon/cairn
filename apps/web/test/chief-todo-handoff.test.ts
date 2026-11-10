@@ -26,14 +26,14 @@ function call(id: string, name: string, args: unknown, result?: unknown, isError
 describe('a follow-up routed into a running task', () => {
   test('a finished message_todo call becomes a handoff row for that todo', () => {
     const items = mapChiefStream([
-      call('m1', 'message_todo', { todoId: 'todo-7', content: '再加个暗色' }, { ok: true }),
+      call('m1', 'message_todo', { todoId: 'todo-7', content: '再加个暗色' }, [{ type: 'text', text: '{"ok":true}' }]),
     ]);
     expect(items).toContainEqual({ kind: 'handoff', todoId: 'todo-7', id: 'm1:handoff' });
   });
 
   test('the handoff keeps a key distinct from its tool row', () => {
     const items = mapChiefStream([
-      call('m1', 'message_todo', { todoId: 'todo-7', content: 'x' }, { ok: true }),
+      call('m1', 'message_todo', { todoId: 'todo-7', content: 'x' }, [{ type: 'text', text: '{"ok":true}' }]),
     ]);
     const ids = items.map((item) => ('id' in item ? item.id : undefined));
     expect(new Set(ids).size).toBe(ids.length);
