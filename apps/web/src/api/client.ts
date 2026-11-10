@@ -1,6 +1,12 @@
 import { parsePairFragment } from '@cairn/shared';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import { awaitGate, bootstrapLoopback, consumePairFragment, demandGate } from './auth.js';
+import {
+  awaitGate,
+  bootstrapLoopback,
+  consumePairFragment,
+  demandGate,
+  isLoopbackPage,
+} from './auth.js';
 
 export class ApiError extends Error {
   constructor(
@@ -23,6 +29,14 @@ function send(path: string, init?: { method?: string; body?: unknown }): Promise
     credentials: 'same-origin',
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
+}
+
+let bootstrapped = false;
+
+async function ensureLoopbackSession(): Promise<void> {
+  if (bootstrapped || typeof window === 'undefined' || !isLoopbackPage()) return;
+  bootstrapped = true;
+  await bootstrapLoopback();
 }
 
 let establishing: Promise<boolean> | null = null;
@@ -61,6 +75,7 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   if (init?.method != null && init.method !== 'GET' && blockDemoWrite()) {
     return new Promise<T>(() => {});
   }
+  await ensureLoopbackSession();
   const first = await send(path, init);
   if (first.status !== 401) return settle<T>(first);
   if (await establishSession()) {

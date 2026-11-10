@@ -1,3 +1,4 @@
+import { ENV_VARS } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { bootLiveServer, type LiveServer } from './live-server';
 
