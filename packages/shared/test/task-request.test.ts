@@ -69,11 +69,11 @@ describe('Coordinator tools that write todo text take no task text', () => {
 
   it('update_todo parameters equal the routing allowlist', () => {
     expect(paramNames('update_todo')).toEqual(
-      ['todoId', 'tagIds', 'projectId', 'addMessageIds', 'blockedBy'].sort(),
+      ['todoId', 'title', 'tagIds', 'projectId', 'addMessageIds', 'blockedBy'].sort(),
     );
   });
 
-  it('the strict param schemas refuse spec and title', () => {
+  it('the strict param schemas refuse task body text; update_todo may take a summary title', () => {
     expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', spec: 'x' }).success).toBe(
       false,
     );
@@ -83,6 +83,9 @@ describe('Coordinator tools that write todo text take no task text', () => {
     expect(coordinatorUpdateTodoParamsSchema.safeParse({ todoId: 't', spec: 'x' }).success).toBe(
       false,
     );
+    expect(
+      coordinatorUpdateTodoParamsSchema.safeParse({ todoId: 't', title: 'Markdown 预览' }).success,
+    ).toBe(true);
     expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(true);
   });
 });
@@ -167,8 +170,24 @@ describe('prompt readers render from segments', () => {
   it('titleAuthor follows independent title provenance or the legacy task source', () => {
     expect(titleAuthor(child)).toBe('third-party');
     expect(titleAuthor({ request: { ...corrected, titleSource: 'worker' } })).toBe('worker');
+    expect(titleAuthor({ request: { ...corrected, titleSource: 'coordinator' } })).toBe(
+      'coordinator',
+    );
     expect(titleAuthor({ request: request([chat('m', 'x').segment]) })).toBe('owner');
     expect(titleAuthor({ sourceKind: 'github-issue' })).toBe('third-party');
+  });
+
+  it('marks Coordinator and worker titles in the task prompt without fencing them', () => {
+    expect(
+      buildTaskPromptText('Markdown 预览', 'body', {
+        request: { ...corrected, titleSource: 'coordinator', titleSourceRef: null },
+      }),
+    ).toMatch(/^named by the Coordinator: Markdown 预览\n\n/);
+    expect(
+      buildTaskPromptText('Markdown 预览', 'body', {
+        request: { ...corrected, titleSource: 'worker', titleSourceRef: null },
+      }),
+    ).toMatch(/^named by the worker: Markdown 预览\n\n/);
   });
 });
 

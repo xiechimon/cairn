@@ -81,9 +81,14 @@ export function titleAuthor(source: TaskSource | undefined): TaskTitleAuthor {
 }
 
 export function fencedTitle(title: string, source: TaskSource | undefined): string {
-  if (titleAuthor(source) !== 'third-party') return title;
-  const ref = source?.request != null ? source.request.titleSourceRef : source?.sourceRef;
-  return fenceIssueText(ref, title);
+  const author = titleAuthor(source);
+  if (author === 'third-party') {
+    const ref = source?.request != null ? source.request.titleSourceRef : source?.sourceRef;
+    return fenceIssueText(ref, title);
+  }
+  if (author === 'coordinator') return `named by the Coordinator: ${title}`;
+  if (author === 'worker') return `named by the worker: ${title}`;
+  return title;
 }
 
 export function buildTaskPromptText(title: string, spec: string, source?: TaskSource): string {
