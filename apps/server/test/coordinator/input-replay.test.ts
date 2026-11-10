@@ -100,7 +100,12 @@ async function fixture(reversePublications = false) {
     agent: { model: { provider: 'stub', modelId: 'm' } },
   });
   const storeId = await coordinatorStoreId(harness, context);
-  const key = coordinatorConversationKey(storeId, String(root.id));
+  const pairing = {
+    storeId,
+    conversationId: String(root.id),
+    lastMirroredEntryId: null,
+  } satisfies NonNullable<Awaited<ReturnType<InputChannel['position']>>>;
+  const key = coordinatorConversationKey(pairing.storeId, pairing.conversationId);
   H.s.db
     .insert(chiefMessage)
     .values({
@@ -127,7 +132,7 @@ async function fixture(reversePublications = false) {
     .insert(coordinatorConversation)
     .values({
       threadId: H.threadId,
-      conversationId: String(root.id),
+      ...pairing,
       piVersion: '1.5.0',
       updatedAt: 1,
     })
