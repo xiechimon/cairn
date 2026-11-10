@@ -11,9 +11,6 @@ import {
 } from './dispatch-eligibility.js';
 import type { RouteProfile } from './routing-rules.js';
 
-export const SESSION_GRACE_MS = 5 * 60_000;
-export const OVERFLOW_AFTER_MS = 10 * 60_000;
-
 type MachineRow = typeof machine.$inferSelect;
 
 export interface WorkerStepFacts {
@@ -110,45 +107,39 @@ export function priorSessionOf(
 
 export interface RouteTarget {
   machineId: string;
-  session: boolean;
 }
 
 export function routeTargets(
   sessionMachineId: string | null,
   preferredMachineId: string | null,
+  soleOnlineMachineId: string | null = null,
 ): RouteTarget[] {
-  const targets: RouteTarget[] = [];
-  if (sessionMachineId !== null) targets.push({ machineId: sessionMachineId, session: true });
-  if (preferredMachineId !== null && preferredMachineId !== sessionMachineId) {
-    targets.push({ machineId: preferredMachineId, session: false });
-  }
-  return targets;
+  const machineId = sessionMachineId ?? preferredMachineId ?? soleOnlineMachineId;
+  return machineId === null ? [] : [{ machineId }];
 }
 
-export type RouteVerdict =
-  | { claim: true }
-  | { claim: false; waitingFor: string; fallbackAt: number };
+export function soleOnlineMachineId(onlineIds: readonly string[]): string | null {
+  return onlineIds.length === 1 ? (onlineIds[0] ?? null) : null;
+}
+
+export function soleClaimMachineId(
+  machines: readonly { id: string; online: boolean }[],
+): string | null {
+  const online = soleOnlineMachineId(machines.filter((row) => row.online).map((row) => row.id));
+  if (online !== null) return online;
+  return machines.length === 1 ? (machines[0]?.id ?? null) : null;
+}
+
+export type RouteVerdict = { claim: true } | { claim: false; waitingFor: string | null };
 
 export function routeVerdict(input: {
   machineId: string | null;
   targets: readonly RouteTarget[];
-  unavailable: (machineId: string) => boolean;
-  waitingSince: number;
-  now: number;
 }): RouteVerdict {
-  for (const target of input.targets) {
-    if (target.machineId === input.machineId) return { claim: true };
-    const wait = input.unavailable(target.machineId)
-      ? target.session
-        ? SESSION_GRACE_MS
-        : 0
-      : OVERFLOW_AFTER_MS;
-    const fallbackAt = input.waitingSince + wait;
-    if (input.now < fallbackAt) {
-      return { claim: false, waitingFor: target.machineId, fallbackAt };
-    }
-  }
-  return { claim: true };
+  const target = input.targets[0];
+  if (target === undefined) return { claim: false, waitingFor: null };
+  if (target.machineId === input.machineId) return { claim: true };
+  return { claim: false, waitingFor: target.machineId };
 }
 
 export function waitingSince(stepRow: { createdAt: number; holdUntil: number | null }): number {

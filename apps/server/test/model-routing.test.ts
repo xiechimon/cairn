@@ -385,10 +385,14 @@ test.each([
       mode === 'takeover' ? 'pending' : 'waiting_quota',
     );
     await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, { claudeUsage: 'allow-paid' });
-    expect(await claimStep(deps, claimant, s.team.id, 0, 'http://localhost')).toMatchObject({
-      step: { id: 'pending' },
-      agent: { provider: mode === 'native' || mode === 'takeover' ? 'claude-code' : 'anthropic' },
-    });
+    if (mode === 'takeover') {
+      expect(await claimStep(deps, claimant, s.team.id, 0, 'http://localhost')).toBeNull();
+    } else {
+      expect(await claimStep(deps, claimant, s.team.id, 0, 'http://localhost')).toMatchObject({
+        step: { id: 'pending' },
+        agent: { provider: mode === 'native' ? 'claude-code' : 'anthropic' },
+      });
+    }
     expect(s.db.select().from(team).get()).toMatchObject({ claudeUsage: 'allow-paid' });
   },
 );

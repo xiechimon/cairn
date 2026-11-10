@@ -10,7 +10,6 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
-import { OVERFLOW_AFTER_MS, SESSION_GRACE_MS } from '../src/services/machine-routing.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
@@ -197,14 +196,15 @@ function occupy(w: World, machineId: string, n: number): void {
   w.s.db.delete(stepTable).where(eq(stepTable.id, filler)).run();
 }
 
-describe('D71 worker steps route by a capability pool plus a preferred machine', () => {
-  test('preferred machine offline: another eligible machine takes a step without a session at once', async () => {
+describe('a worker step runs only on its named machine', () => {
+  test('preferred machine offline: another eligible machine does not take the step', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
     const stepId = pendingStep(w);
-    expect((await claimOn(w, mac))?.step.id).toBe(stepId);
+    expect(await claimOn(w, mac)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
   });
 
   test('preferred machine online and free: another machine leaves the step to it', async () => {
@@ -217,29 +217,28 @@ describe('D71 worker steps route by a capability pool plus a preferred machine',
     expect((await claimOn(w, omarchy))?.step.id).toBe(stepId);
   });
 
-  test('preferred machine only busy: another machine overflows after 10 minutes, not before', async () => {
+  test('preferred machine only busy: another machine never takes the step', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { maxConcurrent: 1 });
     const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
     occupy(w, omarchy, 1);
-    const fresh = pendingStep(w, { ageMs: OVERFLOW_AFTER_MS - 60_000 });
+    const stepId = pendingStep(w, { ageMs: 60 * 60_000 });
     expect(await claimOn(w, mac)).toBeNull();
-    expect(statusOf(w, fresh)).toBe('pending');
-    const old = pendingStep(w, { ageMs: OVERFLOW_AFTER_MS + 1_000 });
-    expect((await claimOn(w, mac))?.step.id).toBe(old);
+    expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('preferred machine missing the runtime: another machine takes it at once', async () => {
+  test('preferred machine missing the runtime: another machine does not take it', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { runtimes: [] });
     const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
     const stepId = pendingStep(w);
-    expect((await claimOn(w, mac))?.step.id).toBe(stepId);
+    expect(await claimOn(w, mac)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('no preferred machine: any eligible machine takes it', async () => {
+  test('no preferred machine and one machine: that machine takes it', async () => {
     const w = await world();
     const mac = await machineOf(w, 'mac');
     routeOf(w, null);
@@ -252,18 +251,19 @@ describe('D71 worker steps route by a capability pool plus a preferred machine',
     const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
     const mac = await machineOf(w, 'mac');
     routeOf(w, orb, { executor: 'orb' });
-    const stepId = pendingStep(w, { ageMs: OVERFLOW_AFTER_MS * 6 });
+    const stepId = pendingStep(w, { ageMs: 60 * 60_000 });
     expect(await claimOn(w, mac)).toBeNull();
     expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('an Orb-required route may move to another Orb executor when its preferred one is offline', async () => {
+  test('an Orb-required route does not move to another Orb executor when its preferred one is offline', async () => {
     const w = await world();
     const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
     const macOrb = await machineOf(w, 'mac-orb', { executor: 'orb' });
     routeOf(w, orb, { executor: 'orb' });
     const stepId = pendingStep(w);
-    expect((await claimOn(w, macOrb))?.step.id).toBe(stepId);
+    expect(await claimOn(w, macOrb)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
   });
 
   test('a local-path project never leaves its preferred machine', async () => {
@@ -276,33 +276,22 @@ describe('D71 worker steps route by a capability pool plus a preferred machine',
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
-    const stepId = pendingStep(w, { ageMs: OVERFLOW_AFTER_MS * 2 });
+    const stepId = pendingStep(w, { ageMs: 60 * 60_000 });
     expect(await claimOn(w, mac)).toBeNull();
     expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('a session step waits 5 minutes for its offline session machine, then hops with the hand-off note', async () => {
+  test('a session step stays on its offline session machine and does not hop', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
-    const early = pendingStep(w, {
-      ageMs: SESSION_GRACE_MS - 60_000,
-      priorSession: { machineId: omarchy, sessionId: 'sess-early' },
-    });
-    expect(await claimOn(w, mac)).toBeNull();
-    expect(statusOf(w, early)).toBe('pending');
-    const late = pendingStep(w, {
-      ageMs: SESSION_GRACE_MS + 1_000,
+    const stepId = pendingStep(w, {
+      ageMs: 60 * 60_000,
       priorSession: { machineId: omarchy, sessionId: 'sess-late' },
     });
-    const claimed = await claimOn(w, mac);
-    expect(claimed?.step.id).toBe(late);
-    expect(claimed?.session).toEqual({
-      action: 'continue',
-      sessionId: 'sess-late',
-      priorMachineId: omarchy,
-    });
+    expect(await claimOn(w, mac)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
   });
 
   test('a session step goes back to its session machine before the preferred machine', async () => {
@@ -332,20 +321,47 @@ describe('D71 worker steps route by a capability pool plus a preferred machine',
       homeMachineId: omarchy,
     });
     expect(queue?.waitingFor?.machineId).toBe(omarchy);
-    expect(queue?.waitingFor?.fallbackAt).toBe(row.createdAt + OVERFLOW_AFTER_MS);
+    expect(queue?.waitingFor).not.toHaveProperty('fallbackAt');
   });
 
-  test('two machines racing for one pooled step: exactly one wins', async () => {
+  test('two machines racing for an unnamed step: neither wins', async () => {
     const w = await world();
     const a = await machineOf(w, 'a');
     const b = await machineOf(w, 'b');
     routeOf(w, null);
     const stepId = pendingStep(w);
     const [ra, rb] = await Promise.all([claimOn(w, a), claimOn(w, b)]);
-    expect([ra?.step.id, rb?.step.id].filter((id) => id === stepId)).toHaveLength(1);
+    expect(ra).toBeNull();
+    expect(rb).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('the queue waits for any free machine once the route has released the step', async () => {
+  test('the only online machine claims an unnamed step while another machine is offline', async () => {
+    const w = await world();
+    const online = await machineOf(w, 'online');
+    await machineOf(w, 'offline', { online: false });
+    routeOf(w, null);
+    const stepId = pendingStep(w);
+    const claimed = await claimOn(w, online);
+    expect(claimed?.step.id).toBe(stepId);
+  });
+
+  test('one registered machine is the queue target when the step has no pin', async () => {
+    const w = await world();
+    const only = await machineOf(w, 'only');
+    routeOf(w, null);
+    const stepId = pendingStep(w);
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    const queue = stepQueueProjector(w.s.db, w.s.team.id).project({
+      id: stepId,
+      createdAt: row.createdAt,
+      homeMachineId: null,
+    });
+    expect(queue?.waitingFor?.machineId).toBe(only);
+    expect(queue?.blocked).toBeUndefined();
+  });
+
+  test('the queue keeps waiting for the named machine when it is offline', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac', { maxConcurrent: 1 });
@@ -358,8 +374,8 @@ describe('D71 worker steps route by a capability pool plus a preferred machine',
       createdAt: row.createdAt,
       homeMachineId: omarchy,
     });
-    expect(queue?.waitingFor).toBeNull();
-    expect(queue?.blocked).toBeUndefined();
+    expect(queue?.waitingFor?.machineId).toBe(omarchy);
+    expect(queue?.blocked).toEqual({ kind: 'machine-offline', missing: [] });
   });
 
   test('a thread override cannot drop the rule Orb requirement, even by sending empty constraints', async () => {
@@ -367,7 +383,7 @@ describe('D71 worker steps route by a capability pool plus a preferred machine',
     const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
     const mac = await machineOf(w, 'mac');
     routeOf(w, orb, { executor: 'orb' });
-    const stepId = pendingStep(w, { ageMs: OVERFLOW_AFTER_MS * 2 });
+    const stepId = pendingStep(w);
     setOverride(w, stepId, { machineId: mac, requiredCapabilities: {} });
     expect(await claimOn(w, mac)).toBeNull();
     expect(statusOf(w, stepId)).toBe('pending');

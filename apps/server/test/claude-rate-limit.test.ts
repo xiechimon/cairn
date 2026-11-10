@@ -309,7 +309,40 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
-  test('another online machine takes the step and the session rule stays bound to its owner', async () => {
+  test('a continuing session on A is not parked for a rate-blocked rule machine B', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const session = await enroll(s, await issueKey(s, 'session-key'), 'session-host');
+    const rule = await enroll(s, await issueKey(s, 'rule-key'), 'rule-host');
+    useSessionRoute(s, rule.machineId, 'claude-code');
+    const buildId = await startBuild(s);
+    const pending = stepOfBuild(s, buildId);
+    s.db
+      .insert(stepTable)
+      .values({
+        id: `prior-${pending.id}`,
+        buildId,
+        kind: 'session',
+        machineId: session.machineId,
+        status: 'done',
+        prompt: null,
+        freshSession: false,
+        sessionId: 'sess-a',
+        createdAt: pending.createdAt - 1,
+      })
+      .run();
+    await report(s, rule.token, rule.machineId, {
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      resetsAt: Date.now() + 2 * HOUR,
+    });
+    expect(s.db.select().from(stepTable).where(eq(stepTable.id, pending.id)).get()?.status).toBe(
+      'pending',
+    );
+    expect((await claim(s, session.token))?.step.buildId).toBe(buildId);
+    s.dispose();
+  });
+
+  test('another online machine does not take a rate-blocked owner step', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const owner = await enroll(s, await issueKey(s, 'owner-key'), 'omarchy');
     const other = await enroll(s, await issueKey(s, 'spare-key'), 'spare');
@@ -320,18 +353,16 @@ describe('claude rate limit (#1852)', () => {
       rateLimitType: 'five_hour',
       resetsAt: Date.now() + 2 * HOUR,
     });
-    expect(stepOfBuild(s, buildId).status).toBe('pending');
-    const claimed = await claim(s, other.token);
-    expect(claimed?.step.buildId).toBe(buildId);
-    expect(claimed?.step.machineId).toBe(other.machineId);
+    expect(await claim(s, other.token)).toBeNull();
+    expect(stepOfBuild(s, buildId).machineId).toBeNull();
+    expect(stepOfBuild(s, buildId).status).not.toBe('claimed');
     expect(
       s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get()?.machineId,
     ).toBe(owner.machineId);
-    expect(await claim(s, owner.token)).toBeNull();
     s.dispose();
   });
 
-  test('subscription-only lets an OAuth spare take over while an API-key spare cannot', async () => {
+  test('subscription-only does not let an OAuth or API-key spare take a rate-blocked owner step', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     try {
       const owner = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
@@ -370,13 +401,11 @@ describe('claude rate limit (#1852)', () => {
           })
         ).status,
       ).toBe(200);
-      expect(stepOfBuild(s, buildId)).toMatchObject({ status: 'pending', quotaBlock: null });
+      expect(stepOfBuild(s, buildId).status).toBe('waiting_quota');
       expect(await claim(s, paid.token)).toBeNull();
-      expect(stepOfBuild(s, buildId)).toMatchObject({ status: 'pending', quotaBlock: null });
-      const claimed = await claim(s, oauth.token);
-      expect(claimed?.step.buildId).toBe(buildId);
-      expect(claimed?.step.machineId).toBe(oauth.machineId);
-      expect(stepOfBuild(s, buildId).status).toBe('claimed');
+      expect(await claim(s, oauth.token)).toBeNull();
+      expect(stepOfBuild(s, buildId).status).toBe('waiting_quota');
+      expect(stepOfBuild(s, buildId).machineId).toBeNull();
       expect(
         s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get()?.machineId,
       ).toBe(owner.machineId);
@@ -386,7 +415,7 @@ describe('claude rate limit (#1852)', () => {
   });
 
   test.each(['oauth_token', 'api_key'] as const)(
-    'allow-paid lets a %s spare take over in a mixed pool',
+    'allow-paid does not let a %s spare take a rate-blocked owner step',
     async (method) => {
       const s = bootServer({ claimHoldMs: 50 });
       try {
@@ -429,8 +458,10 @@ describe('claude rate limit (#1852)', () => {
           ).status,
         ).toBe(200);
         const claimant = method === 'oauth_token' ? oauth : paid;
-        expect(await claim(s, claimant.token)).toMatchObject({
-          step: { buildId, machineId: claimant.machineId },
+        expect(await claim(s, claimant.token)).toBeNull();
+        expect(stepOfBuild(s, buildId)).toMatchObject({
+          status: 'waiting_quota',
+          machineId: null,
         });
         expect(
           s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get()?.machineId,

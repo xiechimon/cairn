@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
+  machine as machineTable,
   notification as notificationTable,
   provider as providerTable,
   step as stepTable,
@@ -19,6 +20,7 @@ import {
 import {
   bootServer,
   issueApiKey,
+  pinSessionRoute,
   postProject,
   seedSessionRoute,
   startLegacyBuild,
@@ -80,6 +82,8 @@ async function setupWorld() {
   }
   const token = await enroll('stop-mbp', key);
   const otherToken = await enroll('other-mbp', await issueApiKey(s));
+  const home = s.db.select().from(machineTable).where(eq(machineTable.name, 'stop-mbp')).get();
+  pinSessionRoute(s, home!.id);
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '停止探针', spec: '写一行停止探针到 README.md' },

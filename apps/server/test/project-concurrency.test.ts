@@ -2,7 +2,7 @@ import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { build, step, todo } from '../src/db/schema.js';
+import { build, machine, step, todo } from '../src/db/schema.js';
 import { enqueueStep } from '../src/services/builds.js';
 import { bootServer, issueApiKey, req, seedSessionRoute, type TestServer } from './helpers.js';
 
@@ -135,6 +135,19 @@ describe('project concurrency (D74 P4)', () => {
     const serial = await createProject('serial', 1);
     await startBuild(serial, 'first');
     await startBuild(serial, 'second');
+    const home = s.db.select().from(machine).where(eq(machine.name, 'cc-builder')).get();
+    const other = s.db.select().from(machine).where(eq(machine.name, 'cc-builder-2')).get();
+    const tasks = s.db.select().from(todo).where(eq(todo.projectId, serial)).all();
+    s.db
+      .update(todo)
+      .set({ routeOverride: { machineId: home!.id } })
+      .where(eq(todo.id, tasks[0]!.id))
+      .run();
+    s.db
+      .update(todo)
+      .set({ routeOverride: { machineId: other!.id } })
+      .where(eq(todo.id, tasks[1]!.id))
+      .run();
     const results = await Promise.all([claim(), claim(otherToken)]);
     expect(results.filter((r) => r !== null)).toHaveLength(1);
     expect(
