@@ -1,19 +1,18 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { createModels } from '@earendil-works/pi-ai/models';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 import { coordinatorStoreId } from '../../src/coordinator/runtime/store-identity.js';
 
 const paths: string[] = [];
 afterEach(() => {
-  for (const path of paths.splice(0)) rmSync(path, { recursive: true, force: true });
+  for (const path of paths.splice(0)) releaseTestTempDir(path);
 });
 
 test('store identity survives reopening but distinguishes new files with reused native IDs', async () => {
-  const path = mkdtempSync(join(tmpdir(), 'coordinator-store-identity-'));
+  const path = makeTestTempDir('coordinator-store-identity-');
   paths.push(path);
   const context = BACKGROUND_CONTEXT;
   const open = (name: string) =>
