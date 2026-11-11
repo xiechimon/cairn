@@ -10131,6 +10131,35 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "running": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string",
+          },
+          "startedAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "threadId": {
+            "type": "string",
+          },
+          "title": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "threadId",
+          "title",
+          "projectId",
+          "startedAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "runningSteps": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,

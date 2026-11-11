@@ -7,6 +7,7 @@ import {
   evacuateMachineBodySchema,
   githubReposResponseSchema,
   importSkillBodySchema,
+  type MachineRunningThread,
   PHASE_VALUES,
   patchMachineBodySchema,
   patchProviderBodySchema,
@@ -18,10 +19,11 @@ import {
   THINKING_LEVELS,
   testProviderBodySchema,
 } from '@cairn/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { machine, provider, routingRule, todo } from './db/schema.js';
+import type { Db } from './db/client.js';
+import { build, machine, provider, routingRule, step, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -166,7 +168,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const rows = ctx.db.select().from(machine).where(eq(machine.teamId, id)).all();
-    return c.json(rows.map((r) => toMachineRecord(r, machineRunningCount(ctx.db, r.id))));
+    const running = runningThreadsByMachine(ctx.db, id);
+    return c.json(
+      rows.map((r) => ({
+        ...toMachineRecord(r, machineRunningCount(ctx.db, r.id)),
+        running: running.get(r.id) ?? [],
+      })),
+    );
   });
 
   app.patch('/api/machines/:id', async (c) => {
@@ -675,4 +683,48 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     });
     return c.json(created, 201);
   });
+}
+
+function runningThreadsByMachine(db: Db, teamId: string): Map<string, MachineRunningThread[]> {
+  const rows = db
+    .select({
+      machineId: machine.id,
+      threadId: todo.id,
+      title: todo.title,
+      projectId: todo.projectId,
+      claimedAt: step.claimedAt,
+      createdAt: step.createdAt,
+    })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .innerJoin(machine, eq(step.machineId, machine.id))
+    .where(
+      and(
+        eq(step.status, 'claimed'),
+        ne(step.kind, 'chief'),
+        eq(machine.teamId, teamId),
+        eq(todo.teamId, teamId),
+      ),
+    )
+    .all();
+  const grouped = new Map<string, MachineRunningThread[]>();
+  for (const row of rows) {
+    const startedAt = row.claimedAt ?? row.createdAt;
+    const threads = grouped.get(row.machineId) ?? [];
+    const listed = threads.find((thread) => thread.threadId === row.threadId);
+    if (listed === undefined) {
+      threads.push({
+        threadId: row.threadId,
+        title: row.title,
+        projectId: row.projectId,
+        startedAt,
+      });
+      grouped.set(row.machineId, threads);
+    } else if (startedAt < listed.startedAt) {
+      listed.startedAt = startedAt;
+    }
+  }
+  for (const threads of grouped.values()) threads.sort((a, b) => a.startedAt - b.startedAt);
+  return grouped;
 }
