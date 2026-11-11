@@ -346,11 +346,27 @@ async function refreshAccess(
     if (Date.now() < latestSecret.expires) return latestSecret.access;
     return refreshAccess(deps, teamId, providerId, latestSecret);
   }
-  deps.db
+  const written = deps.db
     .update(provider)
     .set({ apiKeyCipher: deps.box.seal(sealed), updatedAt: nowMs() })
     .where(and(eq(provider.id, row.id), eq(provider.apiKeyCipher, row.apiKeyCipher)))
     .run();
+  if (written.changes === 0) {
+    const again = deps.db
+      .select({ apiKeyCipher: provider.apiKeyCipher })
+      .from(provider)
+      .where(eq(provider.id, row.id))
+      .get();
+    const againRaw = again?.apiKeyCipher == null ? null : deps.box.open(again.apiKeyCipher);
+    if (againRaw == null) throw new HttpError(502, 'xAI subscription token refresh failed');
+    const againSecret = secretOf(againRaw);
+    if (againSecret == null) return againRaw;
+    if (Date.now() < againSecret.expires) return againSecret.access;
+    if (againSecret.refresh === secret.refresh) {
+      throw new HttpError(502, 'xAI subscription token refresh failed');
+    }
+    return refreshAccess(deps, teamId, providerId, againSecret);
+  }
   return tokens.access;
 }
 

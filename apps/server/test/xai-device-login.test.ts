@@ -269,4 +269,66 @@ describe('xAI SuperGrok device login', () => {
       'console-key',
     );
   });
+
+  it('returns the replacement when the refresh write loses the compare-and-set', async () => {
+    const { s, mock } = boot([
+      { json: { access_token: 'stale-access', refresh_token: 'stale-refresh', expires_in: 3600 } },
+    ]);
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.user.id,
+        body: {
+          providerId: 'xai',
+          label: 'xAI',
+          baseUrl: 'https://api.x.ai/v1',
+          api: 'openai-responses',
+          apiKey: JSON.stringify({
+            kind: 'xai-oauth',
+            refresh: REFRESH,
+            access: ACCESS,
+            expires: Date.now() - 1_000,
+          }),
+        },
+      },
+    );
+    const opened = openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai');
+    if (!opened?.apiKey) throw new Error('stored secret missing');
+    const db = s.db as unknown as {
+      update: (...args: unknown[]) => {
+        set: (...setArgs: unknown[]) => {
+          where: (...whereArgs: unknown[]) => unknown;
+        };
+      };
+    };
+    const realUpdate = db.update.bind(s.db);
+    db.update = (...args: unknown[]) => {
+      const query = realUpdate(...args);
+      const realSet = query.set.bind(query);
+      query.set = (...setArgs: unknown[]) => {
+        const afterSet = realSet(...setArgs);
+        const realWhere = afterSet.where.bind(afterSet);
+        afterSet.where = (...whereArgs: unknown[]) => {
+          db.update = realUpdate;
+          updateProvider({ db: s.db, box: s.secretBox }, s.team.id, opened.row.id, {
+            apiKey: 'console-key',
+          });
+          return realWhere(...whereArgs);
+        };
+        return afterSet;
+      };
+      return query;
+    };
+    const access = await materializeXaiAccessToken(
+      { db: s.db, box: s.secretBox, fetch: mock.fetchImpl, states: s.xaiDeviceStates },
+      s.team.id,
+      'xai',
+      opened.apiKey,
+    );
+    expect(access).toBe('console-key');
+    expect(openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai')?.apiKey).toBe(
+      'console-key',
+    );
+  });
 });
