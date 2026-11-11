@@ -290,7 +290,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
   await expect(input).not.toHaveValue(/attachment:/);
 
   await expect(placeholder).toHaveCount(0);
-  const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
+  const chip = strip.getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await expect(chip).toBeVisible();
   const chipImg = strip.getByRole('img', { name: 'pasted-image-1.png' });
   await expect
@@ -331,7 +331,7 @@ test('detail face: clicking the settled chip opens the image preview; Esc closes
   await expect(input).not.toHaveValue(/attachment:/);
 
   // FM4: preview opens on the settled chip, paints the image, Esc closes.
-  const chip = page.getByTestId('composer-attachments').getByRole('button', { name: 'pasted-image-1.png' });
+  const chip = page.getByTestId('composer-attachments').getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await chip.click();
   const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });
   await expect(preview).toBeVisible();
@@ -383,7 +383,7 @@ test('detail face: clicking the in-flight placeholder previews the local bytes',
   await expect(page.locator(COMPOSER)).toHaveValue('');
 });
 
-test('detail face: a failed upload clears the placeholder, toasts, keeps the draft', async ({
+test('detail face: a failed upload keeps an error tile, toasts, keeps the draft', async ({
   page,
 }) => {
   await stubBoot(page, { b64: PNG_1PX });
@@ -407,7 +407,6 @@ test('detail face: a failed upload clears the placeholder, toasts, keeps the dra
   const strip = page.getByTestId('composer-attachments');
   await expect(strip.getByTestId('attachment-pending')).toBeVisible();
 
-  // …then FM3: the grant fails — toast names it, the card leaves, draft whole.
   await expect.poll(() => held.length).toBe(1);
   for (const route of held.splice(0)) {
     await route.fulfill({ status: 500, json: { error: 'grant boom' } });
@@ -415,6 +414,12 @@ test('detail face: a failed upload clears the placeholder, toasts, keeps the dra
   const toast = page.locator('[data-sonner-toast]');
   await expect(toast).toBeVisible();
   await expect(toast).toContainText('附件上传失败');
+  const failed = strip.getByTestId('attachment-pending');
+  await expect(failed).toHaveAttribute('data-state', 'error');
+  await expect(failed).toContainText('上传失败');
+  await expect(input).toHaveValue('words that must survive');
+  await failed.getByRole('button', { name: /^移除附件/ }).focus();
+  await page.keyboard.press('Enter');
   await expect(strip).toHaveCount(0);
   await expect(input).toHaveValue('words that must survive');
 });
@@ -438,8 +443,9 @@ test('detail face: a picked file shows an uploading tile, then a file tile whose
   await expect(pending).toContainText('error.log');
   await expect(pending).toContainText('上传中');
   const box = await pending.boundingBox();
-  expect(box?.width).toBe(112);
-  expect(box?.height).toBe(112);
+  expect(box?.width).toBe(122);
+  expect(box?.height).toBe(122);
+  await expect(pending).not.toContainText('KB');
   await evidenceShot(page, 'tile-file-uploading.png');
 
   await expect.poll(() => deferred.held.length).toBe(1);
@@ -509,7 +515,7 @@ test('chief face: placeholder → settled chip → preview', async ({ page }) =>
   await expect(input).toHaveValue('');
   await expect(input).not.toHaveValue(/attachment:/);
 
-  const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
+  const chip = strip.getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await expect(chip).toBeVisible();
   await chip.click();
   const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });

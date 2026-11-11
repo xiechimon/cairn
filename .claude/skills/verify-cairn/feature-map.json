@@ -1865,14 +1865,19 @@
     {
       "id": "attachments",
       "name": "Attachments",
-      "summary": "Files pasted or attached to messages and files agents attach to threads, uploaded by grant and reclaimed later.",
-      "states": "Pending upload, attached card with preview, and agent attachments in the thread transcript.",
+      "summary": "Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message that opens in the right-hand file preview panel.",
+      "states": "Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card; file preview panel for text with line numbers, an empty file, an image, an unsupported type, loading and a load error; agent attachments in the thread transcript.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/overlay/composer-attachments.tsx",
-          "apps/web/src/overlay/attachment-card.tsx"
+          "apps/web/src/overlay/attachment-card.tsx",
+          "apps/web/src/components/composer-attachment-tile.tsx",
+          "apps/web/src/overlay/file-drop.ts",
+          "apps/web/src/chief/sent-attachments.tsx",
+          "apps/web/src/board/file-preview-panel.tsx",
+          "apps/web/src/board/file-pane.ts"
         ],
         "server": [
           "apps/server/src/routes-uploads.ts",
@@ -1889,26 +1894,29 @@
       },
       "reach": [
         "open /app",
-        "click label:添加附件"
+        "click testid:chief-sent-attachment"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/attachments.md"
       ],
-      "research": {
-        "gap": "no note on attachment handling in reference products"
-      },
-      "frontendDesign": {
-        "gap": "attachment cards and previews have no design"
-      },
+      "research": [
+        "docs/research/file-preview-reference-2026-11-11.md"
+      ],
+      "frontendDesign": [
+        "docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg",
+        "docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg",
+        "docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg"
+      ],
       "backendDesign": [
-        "docs/spec/20-attachment-reclaim-strategy.md"
+        "docs/spec/20-attachment-reclaim-strategy.md",
+        "docs/design/side-panels-backend-gaps.md"
       ],
       "evidence": [
         "apps/web/e2e/attachment-strip.spec.ts",
+        "apps/web/e2e/chief-files.spec.ts",
         "apps/web/e2e/detail-agent-attachments.spec.ts",
         "apps/server/test/attachments.test.ts"
-      ],
-      "batch": "B8"
+      ]
     },
     {
       "id": "skills",

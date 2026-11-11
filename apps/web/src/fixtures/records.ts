@@ -250,6 +250,7 @@ export interface FixtureSet {
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
   machinesOpen?: string;
+  attachments?: Record<string, { text?: string; src?: string }>;
 }
 
 export interface GithubFixture {
@@ -686,4 +687,10 @@ export interface ChiefContent {
   hasEarlier?: boolean;
   quickReplies?: string[];
   context?: ChiefContextUsage;
+  composerFiles?: ComposerFileSeed[];
+}
+
+export interface ComposerFileSeed {
+  name: string;
+  state: 'ready' | 'uploading' | 'error';
 }

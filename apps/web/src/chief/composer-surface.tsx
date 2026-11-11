@@ -1,7 +1,14 @@
 import { ATTACHMENT_ACCEPT } from '@cairn/shared';
 import { cn } from 'cn';
 import { CornerDownLeft } from 'lucide-react';
-import { type ReactNode, type Ref, useCallback, useImperativeHandle } from 'react';
+import {
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
@@ -14,7 +21,7 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import type { ChiefContextUsage } from '../fixtures/records.js';
+import type { ChiefContextUsage, ComposerFileSeed } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Paperclip, Plus } from '../icons/index.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
@@ -53,6 +60,7 @@ const FREE_COMPOSER_CLS =
 
 export interface ComposerSurfaceHandle {
   focus: (options?: FocusOptions) => void;
+  attach: (files: File[]) => void;
 }
 
 export interface ComposerSurfaceProps {
@@ -81,6 +89,8 @@ export interface ComposerSurfaceProps {
   context?: ChiefContextUsage | null | undefined;
   threadId?: string | null;
   handleRef?: Ref<ComposerSurfaceHandle>;
+  dropActive?: boolean;
+  seededFiles?: ComposerFileSeed[] | undefined;
 }
 
 export function ComposerSurface({
@@ -109,6 +119,8 @@ export function ComposerSurface({
   context = null,
   threadId = null,
   handleRef,
+  dropActive = false,
+  seededFiles,
 }: ComposerSurfaceProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -163,9 +175,15 @@ export function ComposerSurface({
     helpSkillCount,
     textareaRef,
   } = wire;
+  const [seeded, setSeeded] = useState(seededFiles ?? []);
+  const attachRef = useRef(wire.attachFiles);
+  attachRef.current = wire.attachFiles;
   useImperativeHandle(
     handleRef,
-    () => ({ focus: (options) => textareaRef.current?.focus(options) }),
+    () => ({
+      focus: (options) => textareaRef.current?.focus(options),
+      attach: (files) => attachRef.current(files),
+    }),
     [textareaRef],
   );
   const attachComposer = useCallback(
@@ -186,13 +204,17 @@ export function ComposerSurface({
     >
       <div
         data-invalid={invalid ? '' : undefined}
-        className={`${active ? 'chief-composer ' : ''}${attached ? ATTACHED_COMPOSER_CLS : FREE_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-background px-3.5 py-2`}
+        data-drop-target={dropActive && active ? '' : undefined}
+        className={`${active ? 'chief-composer ' : ''}${attached ? ATTACHED_COMPOSER_CLS : FREE_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive data-drop-target:ring-2 data-drop-target:ring-(--focus-ring) rounded-b-(--radius-composer) border-0 bg-background px-3.5 py-2`}
       >
         {above}
         <ComposerAttachments
           tokens={wire.tokens}
           pending={pendingAttachments}
           onRemove={wire.removeToken}
+          onDismissPending={wire.dismissPending}
+          seeded={seeded}
+          onDismissSeeded={(index) => setSeeded((current) => current.filter((_, i) => i !== index))}
         />
         <div className="flex items-end gap-2">
           <div className="relative min-w-0 flex-1">
@@ -268,7 +290,7 @@ export function ComposerSurface({
                 data-testid={active ? 'chief-composer-placeholder' : undefined}
                 className="pointer-events-none absolute inset-x-0 top-0 truncate px-0.5 py-1 font-sans text-ui leading-5 tabular-nums text-(--text-tertiary)"
               >
-                {placeholder}
+                {dropActive ? t('松开即可添加附件') : placeholder}
               </span>
             )}
             <MentionHighlight
@@ -320,7 +342,9 @@ export function ComposerSurface({
                 aria-label={t('发送')}
                 className={cn(
                   SEND_BTN_CLS,
-                  (wire.draft !== '' || wire.tokens.length > 0 || pendingAttachments.length > 0) &&
+                  (wire.draft !== '' ||
+                    wire.tokens.length > 0 ||
+                    pendingAttachments.some((entry) => !entry.failed)) &&
                     SEND_ON_CLS,
                 )}
                 onClick={wire.send}

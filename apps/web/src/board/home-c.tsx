@@ -36,6 +36,15 @@ import {
   ComposerThreadTargetMenu,
   useComposerThreadTarget,
 } from './composer-thread-target.js';
+import {
+  FILE_NAME_PARAM,
+  FILE_PARAM,
+  type FileTarget,
+  fileTargetOf,
+  OpenFileContext,
+  withoutFileTarget,
+} from './file-pane.js';
+import { FilePreviewPanel } from './file-preview-panel.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { composeRequest } from './open-composer.js';
@@ -155,13 +164,27 @@ export function HomeC({
   const threadId = searchParams.get(THREAD_PARAM);
   const narrow = useNarrow();
   const showPane = (next: WorkPane | null, state: unknown = location.state) => {
-    const params = new URLSearchParams(searchParams);
+    const params = withoutFileTarget(new URLSearchParams(searchParams));
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state });
   };
+  const fileTarget = pane === 'file' ? fileTargetOf(searchParams) : null;
+  const openFile = useCallback(
+    (target: FileTarget) =>
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(THREAD_PARAM);
+        params.delete(VIEW_PARAM);
+        params.set(PANE_PARAM, 'file');
+        params.set(FILE_PARAM, target.key);
+        params.set(FILE_NAME_PARAM, target.name);
+        return params;
+      }),
+    [setSearchParams],
+  );
   const togglePane = (next: WorkPane) => {
     showPane(pane === next && threadId === null ? null : next);
   };
@@ -423,7 +446,11 @@ export function HomeC({
   );
 
   const workPanel =
-    threadId !== null ? null : pane === 'machines' ? (
+    threadId !== null ? null : pane === 'file' ? (
+      fileTarget !== null && (
+        <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={() => showPane(null)} />
+      )
+    ) : pane === 'machines' ? (
       <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
     ) : pane === 'tasks' ? (
       <TasksPanel
@@ -545,62 +572,64 @@ export function HomeC({
             </div>
           )}
           <TaskCardContext.Provider value={renderTaskCard}>
-            <ChiefScrollProvider>
-              <ChiefConversation
-                chief={{ ...chiefData, stream: conversation }}
-                onSend={
-                  archived !== null
-                    ? undefined
-                    : thread.picked !== null
-                      ? thread.send
-                      : surface.onSend != null
-                        ? (text: string) => surface.onSend?.(text, projectId)
-                        : live
-                          ? undefined
-                          : () => Promise.resolve()
-                }
-                onRewind={archived === null ? surface.onRewind : undefined}
-                onWithdraw={archived === null ? surface.onWithdraw : undefined}
-                onSteer={archived === null ? surface.onSteer : undefined}
-                onStop={archived === null ? surface.onStop : undefined}
-                composerReplacement={archivedBar}
-                earlier={surface.earlier}
-                onSettings={() => surface.setChiefView('settings')}
-                showBindGate={!live}
-                hero={hero}
-                lead={lead}
-                todoGlances={todoGlances}
-                prefill={prefill}
-                placeholder={
-                  projectName != null
-                    ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                    : t('给 Coordinator 发消息')
-                }
-                composerError={thread.error}
-                targetPlaceholder={thread.placeholder}
-                composerMenu={
-                  <ComposerThreadTargetMenu
-                    targets={thread.targets}
-                    picked={thread.picked}
-                    onPick={thread.pick}
-                  />
-                }
-                composerTools={
-                  <>
-                    <ComposerThreadTarget
+            <OpenFileContext.Provider value={openFile}>
+              <ChiefScrollProvider>
+                <ChiefConversation
+                  chief={{ ...chiefData, stream: conversation }}
+                  onSend={
+                    archived !== null
+                      ? undefined
+                      : thread.picked !== null
+                        ? thread.send
+                        : surface.onSend != null
+                          ? (text: string) => surface.onSend?.(text, projectId)
+                          : live
+                            ? undefined
+                            : () => Promise.resolve()
+                  }
+                  onRewind={archived === null ? surface.onRewind : undefined}
+                  onWithdraw={archived === null ? surface.onWithdraw : undefined}
+                  onSteer={archived === null ? surface.onSteer : undefined}
+                  onStop={archived === null ? surface.onStop : undefined}
+                  composerReplacement={archivedBar}
+                  earlier={surface.earlier}
+                  onSettings={() => surface.setChiefView('settings')}
+                  showBindGate={!live}
+                  hero={hero}
+                  lead={lead}
+                  todoGlances={todoGlances}
+                  prefill={prefill}
+                  placeholder={
+                    projectName != null
+                      ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+                      : t('给 Coordinator 发消息')
+                  }
+                  composerError={thread.error}
+                  targetPlaceholder={thread.placeholder}
+                  composerMenu={
+                    <ComposerThreadTargetMenu
                       targets={thread.targets}
                       picked={thread.picked}
-                      composerRef={composerRef}
                       onPick={thread.pick}
                     />
-                    <ComposerSetupHint />
-                  </>
-                }
-                composerRef={(node) => {
-                  composerRef.current = node;
-                }}
-              />
-            </ChiefScrollProvider>
+                  }
+                  composerTools={
+                    <>
+                      <ComposerThreadTarget
+                        targets={thread.targets}
+                        picked={thread.picked}
+                        composerRef={composerRef}
+                        onPick={thread.pick}
+                      />
+                      <ComposerSetupHint />
+                    </>
+                  }
+                  composerRef={(node) => {
+                    composerRef.current = node;
+                  }}
+                />
+              </ChiefScrollProvider>
+            </OpenFileContext.Provider>
           </TaskCardContext.Provider>
         </section>
         {workPanel}

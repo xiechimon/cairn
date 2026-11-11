@@ -48,6 +48,7 @@ import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
+import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { AnswerComposer } from './answer-composer.js';
@@ -263,6 +264,11 @@ export function ChiefConversation({
   const surfaceRef = useRef<ComposerSurfaceHandle | null>(null);
   const answerSurfaceRef = useRef<ComposerSurfaceHandle | null>(null);
   const activeComposer = answerActive ? answerKey : THREAD_COMPOSER;
+  const drop = useFileDrop(
+    onAttachment === undefined || composerReplacement != null
+      ? undefined
+      : (files) => (answerActive ? answerSurfaceRef : surfaceRef).current?.attach(files),
+  );
   const focusedComposerRef = useRef<string | null>(null);
   const leaveComposer = useCallback(() => {
     focusedComposerRef.current = null;
@@ -528,6 +534,7 @@ export function ChiefConversation({
       {heroLayout ? (
         <div
           ref={heroScrollRef}
+          {...drop.bind}
           data-testid="chief-home-scroll"
           className="scroll-fade min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
         >
@@ -538,7 +545,7 @@ export function ChiefConversation({
       ) : (
         <>
           {intro}
-          <MessageScroller className={SCROLLER_ROOT_CLS}>
+          <MessageScroller className={SCROLLER_ROOT_CLS} {...drop.bind}>
             <FadeScrollerViewport
               reserveEnd
               ref={viewportRef}
@@ -595,6 +602,7 @@ export function ChiefConversation({
         )
       )}
       <div
+        {...drop.bind}
         data-testid="chief-composer-block"
         className="group/composer flex max-h-[65%] min-h-0 flex-none flex-col"
       >
@@ -641,6 +649,8 @@ export function ChiefConversation({
               onStop={stopTurn}
               context={chief.context}
               threadId={chief.threadId ?? null}
+              dropActive={drop.active}
+              seededFiles={live ? undefined : chief.composerFiles}
             />
             {answerKey !== null && (
               <AnswerComposer
@@ -661,6 +671,7 @@ export function ChiefConversation({
                 menu={answerActive ? composerMenu : null}
                 context={chief.context}
                 threadId={chief.threadId ?? null}
+                dropActive={drop.active}
               />
             )}
           </>

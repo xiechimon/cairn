@@ -20,12 +20,14 @@ import { MadeSearch } from './made-search.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { threadStatus } from './thread-copy.js';
 
-export type WorkPane = 'tasks' | 'made' | 'machines';
+export type WorkPane = 'tasks' | 'made' | 'machines' | 'file';
 
 export const PANE_PARAM = 'pane';
 
 export function paneOf(value: string | null): WorkPane | null {
-  return value === 'tasks' || value === 'made' || value === 'machines' ? value : null;
+  return value === 'tasks' || value === 'made' || value === 'machines' || value === 'file'
+    ? value
+    : null;
 }
 
 type MadeTab = 'all' | 'archived';

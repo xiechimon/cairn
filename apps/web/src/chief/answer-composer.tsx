@@ -31,6 +31,7 @@ export interface AnswerComposerProps {
   threadId?: string | null;
   onFocusEnter: () => void;
   onFocusLeave: () => void;
+  dropActive?: boolean;
 }
 
 export function AnswerComposer({
@@ -48,6 +49,7 @@ export function AnswerComposer({
   threadId = null,
   onFocusEnter,
   onFocusLeave,
+  dropActive = false,
 }: AnswerComposerProps) {
   const { t } = useI18n();
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
@@ -109,6 +111,7 @@ export function AnswerComposer({
       canStop={false}
       context={context}
       threadId={threadId}
+      dropActive={dropActive}
     />
   );
 }

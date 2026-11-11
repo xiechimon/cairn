@@ -38,6 +38,7 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
+import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
@@ -52,6 +53,7 @@ import {
 } from './reply-source-highlight.js';
 import type { ReplyQuoteDraft } from './selection-reply.js';
 import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
+import { SentAttachments } from './sent-attachments.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
@@ -479,6 +481,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'user') {
     const reply = parseReplyQuote(item.text);
     const shown = reply?.body ?? item.markdown;
+    const split = splitDraft(shown ?? item.text);
+    const sentFiles = parseAttachmentTokens(split.tokens.join('\n'));
+    const bubbleText = sentFiles.length > 0 ? split.text.trim() : split.text;
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message
@@ -486,19 +491,22 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           data-testid="chief-msg"
         >
           <MessageContent
-            className="relative max-w-[min(85%,42rem)] flex-none items-end gap-0"
+            className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
             data-testid="chief-msg-col"
           >
-            <UserMessageBubble
-              data-testid="chief-bubble"
-              data-md={shown != null ? '' : undefined}
-              {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-              {...highlight(item.id)}
-              className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
-            >
-              {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
-              {shown != null ? <ChatMarkdown text={shown} conversational /> : item.text}
-            </UserMessageBubble>
+            {sentFiles.length > 0 && <SentAttachments files={sentFiles} />}
+            {(bubbleText !== '' || reply != null || sentFiles.length === 0) && (
+              <UserMessageBubble
+                data-testid="chief-bubble"
+                data-md={shown != null ? '' : undefined}
+                {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+                {...highlight(item.id)}
+                className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
+              >
+                {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
+                {shown != null ? <ChatMarkdown text={bubbleText} conversational /> : bubbleText}
+              </UserMessageBubble>
+            )}
             <div
               className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${MESSAGE_TOOLS_REVEAL}`}
               data-testid="chief-msg-tools"

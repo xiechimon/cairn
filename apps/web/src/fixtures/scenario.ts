@@ -1,6 +1,7 @@
 import { accountsDefault, accountsEmpty } from './accounts.js';
 import { activityFixture, activityManyFixture } from './activity.js';
 import { chiefDraft, sidebarRef } from './chief-draft.js';
+import { CHIEF_FILES_SCENARIOS } from './chief-files.js';
 import { CHIEF_MARK_SCENARIOS } from './chief-mark.js';
 import { chiefQuickReplies } from './chief-quick-replies.js';
 import { demoFixture } from './demo.js';
@@ -394,6 +395,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'fab-avatar': chiefFabAvatar,
       'fab-avatar-override': chiefFabAvatarOverride,
       ...CHIEF_MARK_SCENARIOS,
+      ...CHIEF_FILES_SCENARIOS,
     } as Record<string, FixtureSet>)
   : {};
 

@@ -89,6 +89,8 @@ export interface ComposerWire {
   textareaRef: MutableRefObject<HTMLTextAreaElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   openFilePicker: () => void;
+  attachFiles: (files: File[]) => void;
+  dismissPending: (uid: string) => void;
   attaching: boolean;
   pendingAttachments: PendingAttachment[];
   onPickFiles: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -184,6 +186,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     pending: pendingAttachments,
     track: trackPending,
     untrack: untrackPending,
+    fail: failPending,
+    clearFailed: clearFailedPending,
   } = usePendingAttachments();
 
   const [inlineRange, setInlineRange] = useState<CompletionRange | null>(null);
@@ -338,6 +342,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       sending.current = true;
       void result
         .then(() => {
+          clearFailedPending();
           if (fullDraftRef.current === fullDraft) writeFull('');
         })
         .catch(() => {})
@@ -345,6 +350,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
           sending.current = false;
         });
     } else {
+      clearFailedPending();
       writeFull('');
     }
   };
@@ -361,23 +367,31 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     attachInFlightRef.current += 1;
     setAttaching(true);
     const pendingUids = trackPending(files);
-    void Promise.resolve(onAttachment(files))
-      .then((tokens) => {
-        if (tokens.length === 0) return;
-        const base =
-          readDraft === undefined ? undefined : splitDraft(toDisplay(readDraft(), registry));
-        writeFull(
-          joinDraft(
-            [...(base?.tokens ?? tokensRef.current), ...tokens],
-            base?.text ?? draftRef.current,
-          ),
-        );
-      })
-      .catch((err) => {
+    const uploadOne = async (file: File, uid: string) => {
+      const tokens = await Promise.resolve(onAttachment([file])).catch((err: unknown) => {
         console.error('attachment delegate failed', err);
-      })
+        return [] as string[];
+      });
+      if (tokens.length === 0) {
+        failPending(uid);
+        return;
+      }
+      const base =
+        readDraft === undefined ? undefined : splitDraft(toDisplay(readDraft(), registry));
+      writeFull(
+        joinDraft(
+          [...(base?.tokens ?? tokensRef.current), ...tokens],
+          base?.text ?? draftRef.current,
+        ),
+      );
+      untrackPending([uid]);
+    };
+    void files
+      .reduce(
+        (chain, file, index) => chain.then(() => uploadOne(file, pendingUids[index] ?? '')),
+        Promise.resolve(),
+      )
       .finally(() => {
-        untrackPending(pendingUids);
         attachInFlightRef.current = Math.max(0, attachInFlightRef.current - 1);
         if (attachInFlightRef.current === 0) setAttaching(false);
         also?.();
@@ -718,6 +732,10 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     textareaRef,
     fileInputRef,
     openFilePicker,
+    attachFiles: (files: File[]) => {
+      if (files.length > 0) runAttachment(files);
+    },
+    dismissPending: (uid: string) => untrackPending([uid]),
     attaching,
     pendingAttachments,
     onPickFiles,

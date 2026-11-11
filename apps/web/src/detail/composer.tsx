@@ -17,6 +17,7 @@ import { useI18n } from '../i18n/provider.js';
 import { Lock, Paperclip, Plus, SearchPlus } from '../icons/index.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
+import { useFileDrop } from '../overlay/file-drop.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
@@ -97,6 +98,8 @@ export function Composer({
     textareaRef,
     fileInputRef,
     openFilePicker,
+    attachFiles,
+    dismissPending,
     attaching,
     pendingAttachments,
     onPickFiles,
@@ -143,7 +146,9 @@ export function Composer({
     growCap: 384,
   });
 
-  const hasContent = draft.trim() !== '' || tokens.length > 0 || pendingAttachments.length > 0;
+  const hasContent =
+    draft.trim() !== '' || tokens.length > 0 || pendingAttachments.some((entry) => !entry.failed);
+  const drop = useFileDrop(editable && onAttachment !== undefined ? attachFiles : undefined);
 
   const plusMenu = !readOnly && (
     <DropdownMenu>
@@ -192,7 +197,9 @@ export function Composer({
 
   return (
     <div
-      className={`${COMPOSER_CARD} ${readOnly ? COMPOSER_CARD_READ_ONLY : COMPOSER_CARD_EDITABLE}`}
+      {...drop.bind}
+      className={`${COMPOSER_CARD} ${readOnly ? COMPOSER_CARD_READ_ONLY : COMPOSER_CARD_EDITABLE} data-drop-target:ring-2 data-drop-target:ring-(--focus-ring)`}
+      data-drop-target={drop.active ? '' : undefined}
       data-testid="composer-card"
     >
       {editable && (
@@ -210,6 +217,7 @@ export function Composer({
             tokens={tokens}
             pending={pendingAttachments}
             onRemove={removeToken}
+            onDismissPending={dismissPending}
           />
         </>
       )}

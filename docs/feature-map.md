@@ -19,9 +19,9 @@
 | status shipped | 44 |
 | status partial | 7 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 21 |
-| Research gaps | 15 |
-| Frontend design gaps | 20 |
+| research, frontend design and backend design all present or not applicable | 22 |
+| Research gaps | 14 |
+| Frontend design gaps | 19 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
 
@@ -63,7 +63,7 @@
 | [API keys](#api-keys) | 3 | shipped | gap | gap | gap | B10 |
 | [App shell and settings window](#app-shell) | 3 | shipped | yes (not on main) | yes | n/a |  |
 | [Appearance and visual system](#appearance) | 3 | shipped | yes (not on main) | yes | n/a |  |
-| [Attachments](#attachments) | 3 | shipped | gap | gap | yes | B8 |
+| [Attachments](#attachments) | 3 | shipped | yes | yes | yes |  |
 | [Composer](#composer) | 3 | shipped | gap | yes | gap | B8 |
 | [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | yes | B11 |
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
@@ -154,7 +154,6 @@ Everything typed or attached before a message is sent: mentions, slash commands,
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Attachments](#attachments) | 3 | Research: no note on attachment handling in reference products<br>Frontend design: attachment cards and previews have no design |
 | [Composer](#composer) | 3 | Research: no note comparing composers in claude.ai, Amp and t3code<br>Backend design: no design for server drafts (D110) and named prompts |
 
 ### B9 · Execution settings: skills, MCP, harness profile, quota wait
@@ -472,11 +471,11 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### attachments
 
-**Attachments** (shipped). Files pasted or attached to messages and files agents attach to threads, uploaded by grant and reclaimed later.
+**Attachments** (shipped). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message that opens in the right-hand file preview panel.
 
-- Research: **gap**: no note on attachment handling in reference products
-- Frontend design: **gap**: attachment cards and previews have no design
-- Backend design: [docs/spec/20-attachment-reclaim-strategy.md](spec/20-attachment-reclaim-strategy.md)
+- Research: [docs/research/file-preview-reference-2026-11-11.md](research/file-preview-reference-2026-11-11.md)
+- Frontend design: [docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg](design/references/coordinator-chat/claude-duet-composer-attachment.jpg), [docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg](design/references/coordinator-chat/claude-duet-file-preview-panel.jpg), [docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg](design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg)
+- Backend design: [docs/spec/20-attachment-reclaim-strategy.md](spec/20-attachment-reclaim-strategy.md), [docs/design/side-panels-backend-gaps.md](design/side-panels-backend-gaps.md)
 
 ### composer
 
