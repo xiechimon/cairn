@@ -5,10 +5,10 @@ import {
   Archive,
   ChartColumn,
   ChevronLeft,
+  Monitor,
   PanelLeft,
   Plus,
   Search,
-  Server,
   Settings,
 } from 'lucide-react';
 import { type ReactElement, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
@@ -201,6 +201,43 @@ function DeleteAllButton({ count, onDelete }: { count: number; onDelete: () => v
   return empty ? <SidebarTip label={t('没有可删除的已归档项目')}>{button}</SidebarTip> : button;
 }
 
+function FleetChip({
+  tone,
+  online,
+  className,
+}: {
+  tone: 'online' | 'offline';
+  online: number;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      data-slot="fleet-chip"
+      className={cn(
+        'relative grid size-6 flex-none place-items-center rounded-full bg-(--sidebar-press) text-foreground',
+        className,
+      )}
+    >
+      <Monitor className="size-4" strokeWidth={STROKE} />
+      <span
+        data-slot="fleet-badge"
+        className={cn(
+          'absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-(--sidebar-surface)',
+          online === 0
+            ? cn(
+                'rounded-full border bg-(--sidebar-surface)',
+                tone === 'offline' ? 'border-destructive' : 'border-content-tertiary',
+              )
+            : tone === 'offline'
+              ? 'bg-destructive'
+              : 'bg-running',
+        )}
+      />
+    </span>
+  );
+}
+
 function FooterIcon({
   label,
   to,
@@ -218,7 +255,7 @@ function FooterIcon({
         to={to}
         aria-label={label}
         data-testid={testId}
-        className={`grid size-7 flex-none place-items-center rounded-(--cds-radius-md) text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground active:bg-(--sidebar-active) ${FOCUS}`}
+        className={`grid size-7 flex-none place-items-center rounded-(--cds-radius-md) text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground active:bg-(--sidebar-active) pointer-coarse:size-11 ${FOCUS}`}
       >
         {children}
       </Link>
@@ -379,6 +416,8 @@ export function BoardSidebar({
     { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
     t,
   );
+  const [fleetMain = '', ...fleetTail] = (fleet?.label ?? '').split(' · ');
+  const fleetRest = fleetTail.join(' · ');
 
   if (collapsed) {
     const railLink = (
@@ -459,17 +498,7 @@ export function BoardSidebar({
           {fleet != null && (
             <RailTip
               label={fleet.title}
-              icon={
-                <>
-                  <Server className={ICON} strokeWidth={STROKE} />
-                  <span
-                    className={cn(
-                      'absolute top-1 right-1 size-1.5 rounded-full',
-                      fleet.tone === 'offline' ? 'bg-destructive' : 'bg-running',
-                    )}
-                  />
-                </>
-              }
+              icon={<FleetChip tone={fleet.tone} online={machinesOnline} />}
             >
               <Link
                 {...railLink(machinesTarget, false, fleet.title)}
@@ -689,7 +718,7 @@ export function BoardSidebar({
 
       <div
         data-testid="sidebar-footer"
-        className="flex h-13.5 flex-none items-center gap-1 border-t border-border pr-1.5 pl-2"
+        className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
         {fleet == null ? (
           <span className="flex-1" />
@@ -700,16 +729,13 @@ export function BoardSidebar({
             to={machinesTarget}
             title={fleet.title}
             aria-label={fleet.title}
-            className={`flex h-9.5 min-w-0 flex-1 items-center gap-3 rounded-(--cds-radius-lg) pr-2 pl-1.5 text-ui whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) ${FOCUS}`}
+            className={`flex h-9.5 min-w-0 flex-1 items-center gap-2 rounded-(--cds-radius-lg) pr-2 pl-1.5 text-ui whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) pointer-coarse:h-11 ${FOCUS}`}
           >
-            <span
-              aria-hidden
-              className={cn(
-                'mx-1.25 size-1.5 flex-none rounded-full',
-                fleet.tone === 'offline' ? 'bg-destructive' : 'bg-running',
-              )}
-            />
-            <span className="min-w-0 truncate">{fleet.label}</span>
+            <FleetChip tone={fleet.tone} online={machinesOnline} />
+            <span className="min-w-0 truncate">
+              {fleetMain}
+              {fleetRest !== '' && <span className="text-content-tertiary"> · {fleetRest}</span>}
+            </span>
           </Link>
         )}
         {usageNav && (

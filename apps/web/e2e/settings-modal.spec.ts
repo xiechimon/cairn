@@ -105,7 +105,7 @@ test('sidebar footer: a green dot and the online count', async ({ page }) => {
   const status = page.getByTestId('sidebar-footer').getByTestId('sidebar-attention');
   await expect(status).toContainText(/\d+ 台在线/);
   await expect(status).toHaveAttribute('data-fleet', 'online');
-  const dot = await status.locator('span').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  const dot = await status.locator('[data-slot="fleet-badge"]').evaluate((el) => getComputedStyle(el).backgroundColor);
   const [r, g, b] = dot.match(/\d+/g)?.map(Number) ?? [];
   expect(g).toBeGreaterThan(r ?? 0);
   expect(g).toBeGreaterThan(b ?? 0);
