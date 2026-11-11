@@ -19,11 +19,20 @@ export function TaskRefRow({ taskRef }: { taskRef: TaskRef }) {
           />
         }
       >
-        <span
+        <svg
           aria-hidden="true"
           data-slot="task-ref-elbow"
-          className="pointer-events-none absolute top-1/2 -left-3.5 size-4 rounded-tl-lg border-t-[1.5px] border-l-[1.5px] border-(--tree-line)"
-        />
+          viewBox="0 0 12 16"
+          className="pointer-events-none absolute top-2.25 -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
+        >
+          <path
+            d="M1 14.25V7A6 6 0 0 1 7 1H10.75"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
         <TodoStatusTile phase={taskRef.phase} />
         <span className="min-w-0 truncate">{taskRef.title ?? `#${taskRef.seq ?? ''}`}</span>
         <span className="sr-only">{`，${t(PHASE_UI[taskRef.phase].chip)}`}</span>

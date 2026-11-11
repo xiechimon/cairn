@@ -272,6 +272,7 @@
   --bubble-fill: #33290f;
   --reply-bubble-fill: #292929;
   --chat-link: #7aa5e0;
+  --task-ref-line: #6b6b6b;
   --task-chip-fill: #353535;
   --task-wait-tint: #24402a;
   --task-wait-ink: #8fd18a;
@@ -413,6 +414,7 @@
   --bubble-fill: #f3ead6;
   --reply-bubble-fill: #f2f2f2;
   --chat-link: #2f56b0;
+  --task-ref-line: #a9a9a9;
   --task-chip-fill: #dddddd;
   --task-wait-tint: #d2ebcc;
   --task-wait-ink: #2f6b2a;

@@ -51,7 +51,7 @@ test('rows are one quiet line; a row waiting on the owner adds what waits, and e
     .locator('[data-section="needs_input"] [data-slot="task-row"]')
     .first();
   await expect(question).toContainText('Credential relay · #74');
-  await expect(question).toHaveAccessibleDescription(/在问题卡里选/);
+  await expect(question).toHaveAccessibleDescription(/在对话里回答/);
   await expect(
     panel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Connect a Claude' }),
   ).toHaveAccessibleDescription(/到任务里批准计划/);

@@ -1,6 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { cn } from 'cn';
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check } from 'lucide-react';
 import {
   Fragment,
   type ReactNode,
@@ -13,7 +13,6 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
-import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { toastSuccess } from '../components/ui/toaster.js';
@@ -42,16 +41,7 @@ export interface QuestionChipsProps {
   onCancel?: (requestId: string) => void;
   numberKeys?: boolean;
   draftKey?: string;
-  pager?: QuestionPager;
   bound?: boolean;
-}
-
-export interface QuestionPager {
-  label: string;
-  canPrev: boolean;
-  canNext: boolean;
-  onPrev: () => void;
-  onNext: () => void;
 }
 
 const PICKED_CHIP_CLS =
@@ -119,7 +109,6 @@ export function QuestionChips({
   onCancel,
   numberKeys = false,
   draftKey,
-  pager,
   bound = false,
 }: QuestionChipsProps) {
   const { t } = useI18n();
@@ -303,17 +292,6 @@ export function QuestionChips({
   if (question === undefined || item.status !== 'pending') return null;
 
   const multi = question.multiSelect === true;
-  const shownPager: QuestionPager | undefined =
-    pager ??
-    (total > 1
-      ? {
-          label: t('{n} / {total}', { n: step + 1, total }),
-          canPrev: step > 0,
-          canNext: !last && stepComplete,
-          onPrev: () => commit(drafts, Math.max(0, step - 1)),
-          onNext: () => commit(drafts, Math.min(lastStep, step + 1)),
-        }
-      : undefined);
   const dismiss = () =>
     questionDockState.dismissWithUndo(
       item.requestId,
@@ -326,9 +304,6 @@ export function QuestionChips({
       () => {},
     );
   };
-  const taskRef = /#\d+/.exec(question.header)?.[0];
-  const showHeader =
-    shownPager !== undefined || (taskRef !== undefined && !question.question.includes(taskRef));
   const showSubmitChip = multi || (question.options.length === 0 && !bound);
 
   return (
@@ -339,62 +314,19 @@ export function QuestionChips({
       data-request-id={item.requestId}
       className="flex min-w-0 flex-col items-start gap-1"
     >
-      {showHeader && (
-        <div className="flex max-w-full min-w-0 items-center gap-1 text-caption text-(--text-tertiary)">
-          <span data-testid="chief-question-header" className="min-w-0 truncate">
-            {question.header}
-          </span>
-          {shownPager !== undefined && (
-            <span
-              className="flex flex-none items-center"
-              title={blockedByUpload ? t('附件上传中') : undefined}
-            >
-              <IconTooltip
-                label={t('上一步')}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    data-testid="chief-question-prev"
-                    disabled={!pending || !shownPager.canPrev}
-                    onClick={shownPager.onPrev}
-                  />
-                }
-              >
-                <ChevronLeft aria-hidden className="size-4" />
-              </IconTooltip>
-              <span data-testid="chief-question-position" className="tabular-nums">
-                {shownPager.label}
-              </span>
-              <IconTooltip
-                label={t('下一步')}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    data-testid="chief-question-next"
-                    disabled={!pending || !shownPager.canNext}
-                    onClick={shownPager.onNext}
-                  />
-                }
-              >
-                <ChevronRight aria-hidden className="size-4" />
-              </IconTooltip>
-            </span>
-          )}
-        </div>
-      )}
       <div
         data-tools-root=""
         className="group/message flex max-w-full min-w-0 flex-col items-start"
       >
         <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
-          <div
-            data-testid="chief-question-text"
-            className={cn(REPLY_BUBBLE_CLS, 'text-ui leading-5 break-words')}
-          >
-            {question.question}
-          </div>
+          <ChipTip tip={question.header === '' ? null : question.header}>
+            <div
+              data-testid="chief-question-text"
+              className={cn(REPLY_BUBBLE_CLS, 'text-ui leading-5 break-words')}
+            >
+              {question.question}
+            </div>
+          </ChipTip>
           <MessageToolbar
             placement="right"
             testId="chief-question-tools"

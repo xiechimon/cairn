@@ -60,7 +60,7 @@ export const questionDockState = {
     return focusIndex;
   },
   setFocus(next: number): void {
-    if (next === focusIndex) return;
+    if (next === focusIndex || uploads > 0) return;
     focusIndex = next;
     emit();
   },

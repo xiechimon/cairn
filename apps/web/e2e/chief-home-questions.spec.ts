@@ -1,4 +1,4 @@
-import { expect, type Route, test } from '@playwright/test';
+import { expect, type Page, type Route, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 function question(requestId: string, header: string, text: string, options: unknown[]) {
@@ -61,6 +61,17 @@ function answerRoute(state: typeof TWO, answered: { path: string; body: unknown 
 }
 
 const ONE = { ...TWO, messages: TWO.messages.slice(0, 2) };
+
+const A = 'Model · #74';
+const B = 'Merge · #2271';
+const shown = (page: Page) => page.getByTestId('chief-question').getByTestId('chief-question-text');
+
+async function focusQuestion(page: Page, header: string) {
+  const panel = page.getByRole('complementary', { name: '任务' });
+  if (!(await panel.isVisible()))
+    await page.getByTestId('home-c').getByRole('button', { name: /^任务/ }).first().click();
+  await panel.locator('[data-section="needs_input"] [data-slot="task-row"]').filter({ hasText: header }).click();
+}
 const NONE = { ...TWO, messages: TWO.messages.slice(0, 1) };
 
 test('a pending question is its text and outlined chips at the end of the conversation, with nothing docked above the composer (D119)', async ({
@@ -77,7 +88,12 @@ test('a pending question is its text and outlined chips at the end of the conver
   await expect(question.getByTestId('chief-question-text')).toHaveText(
     'relay-186 cannot run glm-5.3-flash. Which model?',
   );
-  await expect(question.getByTestId('chief-question-header')).toHaveText('Model · #74');
+  await expect(question.getByTestId('chief-question-header')).toHaveCount(0);
+  await expect(question.getByText('Model · #74')).toBeHidden();
+  await expect(question).toHaveAccessibleDescription('Model · #74');
+  await question.getByTestId('chief-question-text').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('Model · #74');
+  await page.mouse.move(0, 0);
   await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
@@ -130,7 +146,8 @@ test('a chip answers at once and the badge drops; the next question takes its pl
   await mockLive(page, state, answerRoute(state, answered));
   await page.goto('/app');
   const question = page.getByTestId('chief-question');
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
+  await expect(shown(page)).toContainText('Which model?');
+  await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
   await expect(page).toHaveTitle('(2) Cairn');
   await question.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(1);
@@ -184,10 +201,10 @@ test('the tab title counts pending questions and the Coordinator row opens the q
   await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await expect(page.getByTestId('chief-question').getByTestId('chief-question-chips')).toBeInViewport();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
+  await expect(shown(page)).toContainText('Which model?');
 });
 
-test('stepping keeps a typed draft, and a failed submit keeps it too', async ({ page }) => {
+test('moving between questions from the tasks panel keeps a typed draft, and a failed submit keeps it too', async ({ page }) => {
   let fail = true;
   await mockLive(page, structuredClone(TWO), (path, route, json) => {
     if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
@@ -200,14 +217,15 @@ test('stepping keeps a typed draft, and a failed submit keeps it too', async ({ 
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   await composer.fill('Keep this text');
-  await page.getByTestId('chief-question-next').click();
+  await focusQuestion(page, B);
+  await expect(shown(page)).toContainText('Who merges it?');
   await expect(composer).toHaveValue('');
-  await page.getByTestId('chief-question-prev').click();
+  await focusQuestion(page, A);
   await expect(composer).toHaveValue('Keep this text');
   await page.getByTestId('chief-question-primary').click();
   await expect(page.getByTestId('chief-question-error')).toBeVisible();
   await expect(composer).toHaveValue('Keep this text');
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
+  await expect(shown(page)).toContainText('Which model?');
 });
 
 test('at 375px the question and its chips sit at the end of the conversation above the composer', async ({
@@ -336,27 +354,68 @@ const MIXED = {
   todos: [],
 };
 
-test('one pager over the question counts every question across requests, and a chip on an early step moves on', async ({
+test('one question at a time, the oldest first, with nothing above the bubble; a chip on an early step moves on; the tasks panel focuses another request', async ({
   page,
 }) => {
   await mockLive(page, structuredClone(MIXED));
   await page.goto('/app');
   const block = page.getByTestId('chief-question');
-  await expect(block.getByTestId('chief-question-position')).toHaveCount(1);
-  await expect(block.getByTestId('chief-question-position')).toHaveText('1 / 3');
-  await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
-  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
+  await expect(block.getByTestId('chief-question-text')).toHaveCount(1);
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which theme?');
+  await expect(block.getByTestId('chief-question-position')).toHaveCount(0);
+  await expect(block.getByTestId('chief-question-prev')).toHaveCount(0);
+  await expect(block.getByTestId('chief-question-next')).toHaveCount(0);
+  const bubble = (await block.getByTestId('chief-question-text').boundingBox())!;
+  const section = (await block.boundingBox())!;
+  expect(bubble.y - section.y).toBeLessThanOrEqual(1);
   await block.getByTestId('chief-question-option-0-0').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 3');
   await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
-  await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('3 / 3');
+  await focusQuestion(page, 'Merge · #2271');
   await expect(block.getByTestId('chief-question-text')).toContainText('Who merges it?');
-  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
-  await page.getByTestId('chief-question-prev').click();
-  await page.getByTestId('chief-question-prev').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 3');
-  await expect(block.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'true');
+  await focusQuestion(page, 'Theme');
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
+});
+
+test('a multi-question request sends nothing and starts no turn until its last question is answered; one submit carries every answer', async ({
+  page,
+}) => {
+  const posts: { path: string; body: unknown }[] = [];
+  const answered: { path: string; body: unknown }[] = [];
+  const state = structuredClone(MIXED);
+  const answer = answerRoute(state, answered);
+  await mockLive(page, state, (path, route, json) => {
+    if (route.request().method() === 'POST' && !path.startsWith('/api/auth/'))
+      posts.push({ path, body: route.request().postDataJSON() });
+    return answer(path, route, json);
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('chief-stream');
+  const block = page.getByTestId('chief-question');
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which theme?');
+  const bubblesBefore = await stream.getByTestId('chief-bubble').count();
+  expect(bubblesBefore).toBe(1);
+  await block.getByTestId('chief-question-option-0-1').click();
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
+  await block.getByTestId('chief-question-option-1-1').click();
+  await expect(block.getByTestId('chief-question-option-1-1')).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(500);
+  expect(posts.map((post) => post.path)).toEqual([]);
+  await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
+  await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
+  await page.getByTestId('chief-question-submit').click();
+  await expect.poll(() => posts.length).toBe(1);
+  expect(posts[0]?.path).toContain('/questions/ask-0000000a/answer');
+  expect(posts[0]?.body).toEqual({
+    answers: [
+      { header: 'Theme', choices: ['Dark'] },
+      { header: 'Sections', choices: ['Details'] },
+    ],
+  });
+  const line = stream.getByTestId('chief-question-line');
+  await expect(line).toHaveCount(1);
+  await expect(line).toHaveText('已回答：Dark；Details');
+  await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
+  await page.screenshot({ path: test.info().outputPath('answered-request.png') });
 });
 
 test('question chips look like suggested-reply chips: outlined 28px pills with regular ink and no fill', async ({
@@ -442,7 +501,7 @@ test('a multi-step request: a chip moves on with the composer cleared, multi-sel
   await expect(primary).toHaveAttribute('aria-label', '下一步');
   await expect(primary).toBeDisabled();
   await page.getByTestId('chief-question-option-0-0').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 3');
+  await expect(shown(page)).toContainText('Which sections?');
   await expect(composer).toHaveValue('');
   await expect(primary).toBeDisabled();
   await expect(primary).toHaveAttribute('aria-label', '提交回答');
@@ -631,15 +690,15 @@ test('each pending request keeps its own composer draft when moving A, B, A, B',
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   await composer.fill('draft for A');
-  await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+  await focusQuestion(page, B);
+  await expect(shown(page)).toContainText('Who merges it?');
   await expect(composer).toHaveValue('');
   await composer.fill('draft for B');
-  await page.getByTestId('chief-question-prev').click();
+  await focusQuestion(page, A);
   await expect(composer).toHaveValue('draft for A');
-  await page.getByTestId('chief-question-next').click();
+  await focusQuestion(page, B);
   await expect(composer).toHaveValue('draft for B');
-  await page.getByTestId('chief-question-prev').click();
+  await focusQuestion(page, A);
   await expect(composer).toHaveValue('draft for A');
 });
 
@@ -702,10 +761,10 @@ test('with a thread targeted, digits type, page switches and a chip answer leave
   await page.keyboard.type('1abc');
   await expect(composer).toHaveValue('1abc');
   await expect(page.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'false');
-  await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+  await focusQuestion(page, B);
+  await expect(shown(page)).toContainText('Who merges it?');
   await expect(composer).toHaveValue('1abc');
-  await page.getByTestId('chief-question-prev').click();
+  await focusQuestion(page, A);
   await expect(composer).toHaveValue('1abc');
   await page.getByTestId('chief-question-option-0-1').click();
   await expect.poll(() => answered.length).toBe(1);
@@ -717,7 +776,7 @@ test('with a thread targeted, digits type, page switches and a chip answer leave
   expect(answered).toHaveLength(1);
 });
 
-test('an answer upload in flight still blocks a chip answer and paging after a withdraw switches to the thread composer', async ({
+test('an answer upload in flight still blocks a chip answer and moving to another question after a withdraw switches to the thread composer', async ({
   page,
 }) => {
   const answered: { path: string; body: unknown }[] = [];
@@ -759,7 +818,9 @@ test('an answer upload in flight still blocks a chip answer and paging after a w
   await expect(composer).toHaveValue('queued note');
   const chip = dock.getByTestId('chief-question-option-0-0');
   await expect(chip).toBeDisabled();
-  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
+  await focusQuestion(page, B);
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '附件上传中' })).toBeVisible();
+  await expect(shown(page)).toContainText('Which model?');
   await expect(async () => {
     let n = 0;
     for (const route of held.splice(0)) {
@@ -770,10 +831,12 @@ test('an answer upload in flight still blocks a chip answer and paging after a w
         });
       else await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 4 } });
     }
-    await expect(page.getByTestId('chief-question-next')).toBeEnabled({ timeout: 500 });
+    await expect(chip).toBeEnabled({ timeout: 500 });
   }).toPass();
-  await expect(chip).toBeEnabled();
-  await expect(page.getByTestId('chief-question-next')).toBeEnabled();
+  await focusQuestion(page, B);
+  await expect(shown(page)).toContainText('Who merges it?');
+  await focusQuestion(page, A);
+  await expect(shown(page)).toContainText('Which model?');
   expect(answered).toEqual([]);
   await composer.fill('');
   await expect(composer).toHaveValue('typed answer');
@@ -953,13 +1016,13 @@ test('answer drafts per request and the thread draft stay separate through every
       },
     },
     {
-      name: 'switch page to B while the thread is targeted',
-      run: () => page.getByTestId('chief-question-next').click(),
+      name: 'focus B from the tasks panel while the thread is targeted',
+      run: () => focusQuestion(page, B),
       composer: 'noteX1',
     },
     {
       name: 'back to A while the thread is targeted',
-      run: () => page.getByTestId('chief-question-prev').click(),
+      run: () => focusQuestion(page, A),
       composer: 'noteX1',
     },
     { name: 'target the Coordinator: the option replaced A custom text', run: toCoordinator, composer: '' },
@@ -972,8 +1035,8 @@ test('answer drafts per request and the thread draft stay separate through every
       },
     },
     {
-      name: 'switch page to B: empty',
-      run: () => page.getByTestId('chief-question-next').click(),
+      name: 'focus B: empty',
+      run: () => focusQuestion(page, B),
       composer: '',
     },
     { name: 'type the answer for B', run: () => composer.fill('ansB'), composer: 'ansB' },
@@ -994,12 +1057,11 @@ test('answer drafts per request and the thread draft stay separate through every
           expect(uploadsDone).toBeGreaterThan(before);
         }).toPass();
         await goInApp('/app');
-        await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+        await expect(shown(page)).toContainText('Who merges it?');
       },
       composer: 'ansB',
       extra: async () => {
         await expect(activeComposer.getByTestId('composer-attachments')).toContainText('away.log');
-        await expect(page.getByTestId('chief-question-prev')).toBeEnabled();
       },
     },
     {
@@ -1015,9 +1077,10 @@ test('answer drafts per request and the thread draft stay separate through every
       composer: 'ansB',
     },
     {
-      name: 'Previous and the destination switch are blocked while it uploads',
+      name: 'moving to A and the destination switch are blocked while it uploads',
       run: async () => {
-        await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
+        await focusQuestion(page, A);
+        await expect(page.locator('[data-sonner-toast]').filter({ hasText: '附件上传中' }).first()).toBeVisible();
         await page.locator('[data-testid="composer-plus"]:visible').click();
         await expect(page.getByRole('menuitem', { name: '对某个 thread 说' })).toBeDisabled();
         await expect(page.getByTitle('附件上传中').first()).toBeVisible();
@@ -1026,7 +1089,7 @@ test('answer drafts per request and the thread draft stay separate through every
       },
       composer: 'ansB',
       extra: async () => {
-        await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+        await expect(shown(page)).toContainText('Who merges it?');
       },
     },
     {
@@ -1040,12 +1103,11 @@ test('answer drafts per request and the thread draft stay separate through every
       composer: 'ansB',
       extra: async () => {
         await expect(page.getByTestId('composer-attachments')).toContainText('notes.log');
-        await expect(page.getByTestId('chief-question-prev')).toBeEnabled();
       },
     },
     {
       name: 'A is unchanged after the upload on B',
-      run: () => page.getByTestId('chief-question-prev').click(),
+      run: () => focusQuestion(page, A),
       composer: 'ansA2',
       extra: async () => {
         await expect(page.getByTestId('composer-attachments')).toHaveCount(0);
@@ -1053,7 +1115,7 @@ test('answer drafts per request and the thread draft stay separate through every
     },
     {
       name: 'B kept its attachment',
-      run: () => page.getByTestId('chief-question-next').click(),
+      run: () => focusQuestion(page, B),
       composer: 'ansB',
       extra: async () => {
         await expect(page.getByTestId('composer-attachments')).toContainText('notes.log');
@@ -1061,7 +1123,7 @@ test('answer drafts per request and the thread draft stay separate through every
     },
     {
       name: 'back to A: its answer is intact',
-      run: () => page.getByTestId('chief-question-prev').click(),
+      run: () => focusQuestion(page, A),
       composer: 'ansA2',
     },
     {
@@ -1078,7 +1140,7 @@ test('answer drafts per request and the thread draft stay separate through every
     },
     {
       name: 'forward to B: its answer is intact',
-      run: () => page.getByTestId('chief-question-next').click(),
+      run: () => focusQuestion(page, B),
       composer: 'ansB',
     },
     { name: 'target the thread again: its draft is intact', run: toThread, composer: 'noteX1' },

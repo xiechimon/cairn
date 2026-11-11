@@ -1375,8 +1375,6 @@ export const EN: Record<string, string> = {
   '输入你自己的回答…': 'Type your own answer…',
   回答选项: 'Answer options',
   提交: 'Submit',
-  '{n} / {total}': '{n} of {total}',
-  上一步: 'Back',
   下一步: 'Next',
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
@@ -1942,7 +1940,7 @@ export const EN: Record<string, string> = {
   到任务里回答: 'Answer in the task',
   'Coordinator 在跟进': 'Coordinator is on it',
   'Coordinator 建任务前先问你': 'Coordinator asks before creating a task',
-  在问题卡里选: 'Choose on the question card',
+  在对话里回答: 'Answer in the conversation',
   还没开始: 'Not started',
   现在没有任务: 'No tasks right now',
   '跟 Coordinator 说一件事，它会在这里出现。':

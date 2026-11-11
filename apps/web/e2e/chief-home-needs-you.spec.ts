@@ -58,7 +58,7 @@ test('two pending decisions are answered one at a time above the composer; the r
   });
   await page.goto('/app');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
+  await expect(page.getByTestId('chief-question-text')).toContainText('Which model?');
   const panel = page.getByTestId('chief-question');
   const card = panel.getByTestId('chief-question-chips');
   await expect(panel).toHaveAccessibleName('待回答的提问');
@@ -107,7 +107,7 @@ test('own words: the composer text is the answer', async ({ page }) => {
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
 });
 
-test('the question pager steps between pending questions', async ({ page }) => {
+test('pending questions show one at a time and the tasks panel rows move between them', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -125,11 +125,13 @@ test('the question pager steps between pending questions', async ({ page }) => {
   await page.goto('/app');
   const dock = page.getByTestId('chief-question');
   await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
-  await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
-  await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+  await expect(dock.getByTestId('chief-question-text')).toHaveCount(1);
+  await page.getByTestId('home-c').getByRole('button', { name: /^任务/ }).first().click();
+  const rows = page
+    .getByRole('complementary', { name: '任务' })
+    .locator('[data-section="needs_input"] [data-slot="task-row"]');
+  await rows.filter({ hasText: 'Merge · #2271' }).click();
   await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
-  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
-  await page.getByTestId('chief-question-prev').click();
+  await rows.filter({ hasText: 'Model · #74' }).click();
   await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
 });

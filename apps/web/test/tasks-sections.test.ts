@@ -89,7 +89,7 @@ describe('a needs-you row says what is waiting and where to act', () => {
   });
 
   test('a standalone Coordinator question points at the question card', () => {
-    expect(questionRowCopy()).toMatchObject({ waiting: true, where: '在问题卡里选' });
+    expect(questionRowCopy()).toMatchObject({ waiting: true, where: '在对话里回答' });
   });
 
   test('no row says the old "ready, waiting for your review" line', () => {

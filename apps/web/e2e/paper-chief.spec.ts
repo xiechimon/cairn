@@ -145,7 +145,7 @@ for (const theme of ['light', 'dark'] as const) {
     const pending = win.locator('[data-testid="chief-question-chips"][data-status="pending"]');
     await pending.scrollIntoViewIfNeeded();
     await expect(pending.getByTestId('chief-question-text'), 'Q1').toHaveCSS('background-color', fill);
-    await expect(pending.getByTestId('chief-question-header'), 'Q1').toHaveCSS('color', ink3);
+    await expect(pending.getByTestId('chief-question-header'), 'Q1').toHaveCount(0);
     await expect(pending.getByTestId('chief-question-option-0-0'), 'Q1').toHaveCSS(
       'background-color',
       'rgba(0, 0, 0, 0)',
@@ -157,10 +157,6 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(done, 'Q1').toHaveCSS('color', ink3);
 
     await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
-    await expect(pending.getByTestId('chief-question-position'), 'Q2').toHaveCSS(
-      'font-size',
-      '12px',
-    );
     await expect(pending.getByTestId('chief-question-option-0-0'), 'Q2').toHaveCSS(
       'font-size',
       '14px',

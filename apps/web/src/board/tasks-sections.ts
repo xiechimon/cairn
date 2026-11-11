@@ -129,7 +129,7 @@ export function questionRowCopy(): TaskRowCopy {
   return {
     word: '待回答',
     what: { key: 'Coordinator 建任务前先问你' },
-    where: '在问题卡里选',
+    where: '在对话里回答',
     waiting: true,
     running: false,
   };

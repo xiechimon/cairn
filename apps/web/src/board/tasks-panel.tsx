@@ -3,8 +3,10 @@ import { cn } from 'cn';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { toast } from 'sonner';
 import { usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { questionDockState } from '../chief/question-dock-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -208,7 +210,13 @@ export function TasksPanel({
       waiting
       running={false}
       check="none"
-      onOpen={() => onOpenQuestion(question)}
+      onOpen={() => {
+        if (questionDockState.uploading()) {
+          toast(t('附件上传中'));
+          return;
+        }
+        onOpenQuestion(question);
+      }}
     />
   ));
   const count = (section: ActiveSection) =>

@@ -142,7 +142,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('the reference row sits like the reference: indented tile, elbow hooked from the bubble edge, regular title', async ({
+test('the reference row sits like the reference: indented tile, a rounded elbow clear of the bubble and the tile, regular title', async ({
   page,
 }) => {
   await mockLive(page, {
@@ -166,20 +166,28 @@ test('the reference row sits like the reference: indented tile, elbow hooked fro
     const msg = row.closest('[data-testid="chief-msg"]')!;
     const bubble = box(msg.querySelector('[data-testid="chief-reply-bubble"]')!);
     const tile = box(row.querySelector('span.grid')!);
-    const elbow = row.querySelector('[data-slot="task-ref-elbow"]')!;
-    const e = box(elbow);
+    const path = row.querySelector('[data-slot="task-ref-elbow"] path')!;
+    const line = box(path);
+    const cs = getComputedStyle(path);
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--task-ref-line)';
+    document.body.append(probe);
+    const token = getComputedStyle(probe).color;
+    probe.remove();
     const title = row.querySelector('span.truncate')!;
-    const cs = getComputedStyle(elbow);
     return {
       tileLeft: tile.left - bubble.left,
       tileSize: [tile.width, tile.height],
       tileToBubble: bubble.top - tile.bottom,
-      elbowLeft: e.left - bubble.left,
-      elbowTop: e.top - (tile.top + tile.height / 2),
-      elbowToBubble: bubble.top - e.bottom,
-      elbowRight: e.right - tile.left,
-      stroke: cs.borderLeftWidth,
-      radius: cs.borderTopLeftRadius,
+      lineX: line.left - bubble.left,
+      lineTop: line.top - (tile.top + tile.height / 2),
+      gapToTile: tile.left - (line.right + 0.75),
+      gapToBubble: bubble.top - (line.bottom + 0.75),
+      d: path.getAttribute('d'),
+      stroke: cs.stroke,
+      token,
+      width: cs.strokeWidth,
+      cap: cs.strokeLinecap,
       titleGap: box(title).left - tile.right,
       weight: getComputedStyle(title).fontWeight,
       size: getComputedStyle(title).fontSize,
@@ -188,12 +196,14 @@ test('the reference row sits like the reference: indented tile, elbow hooked fro
   expect(g.tileLeft).toBe(32);
   expect(g.tileSize).toEqual([20, 20]);
   expect(g.tileToBubble).toBe(8);
-  expect(g.elbowLeft).toBe(18);
-  expect(g.elbowTop).toBe(0);
-  expect(g.elbowToBubble).toBe(2);
-  expect(g.elbowRight).toBeGreaterThanOrEqual(0);
-  expect(g.stroke).toMatch(/^1(\.5)?px$/);
-  expect(g.radius).toBe('8px');
+  expect(g.lineX).toBeCloseTo(18, 0);
+  expect(Math.abs(g.lineTop)).toBeLessThanOrEqual(0.5);
+  expect(g.gapToTile).toBeGreaterThanOrEqual(3);
+  expect(g.gapToBubble).toBeGreaterThanOrEqual(3.5);
+  expect(g.d).toContain('A6 6');
+  expect(g.stroke).toBe(g.token);
+  expect(g.width).toBe('1.5px');
+  expect(g.cap).toBe('round');
   expect(g.titleGap).toBe(6);
   expect(g.weight).toBe('400');
   expect(g.size).toBe('14px');
