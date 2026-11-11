@@ -1,9 +1,11 @@
 import type { SecretBox, SecretRecord } from '@cairn/shared';
+import { isMailSecretName } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, secret } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
+import { linkedMailSecretIds } from './mail.js';
 
 export interface SecretDeps {
   db: Db;
@@ -159,13 +161,14 @@ export function openSecretValues(
             ),
           )
           .all();
+  const linked = linkedMailSecretIds(deps.db, teamId);
   const values: Record<string, string> = {};
   for (const row of [
     ...granted.filter((r) => r.projectId === null),
     ...projectRows,
     ...granted.filter((r) => r.projectId !== null),
   ]) {
-    if (row.valueCipher === null) continue;
+    if (row.valueCipher === null || isMailSecretName(row.name) || linked.has(row.id)) continue;
     values[row.name] = deps.box.open(row.valueCipher);
   }
   return values;

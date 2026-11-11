@@ -62,6 +62,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { refuseMailTurnTool } from './mail.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import {
   deleteMemoryEntry,
@@ -301,6 +302,7 @@ export async function executeChiefTool(
   name: string,
   params: Params,
 ): Promise<string> {
+  refuseMailTurnTool(ctx.turnPrompt ?? null, name);
   const { db } = deps;
   const svc = {
     db,

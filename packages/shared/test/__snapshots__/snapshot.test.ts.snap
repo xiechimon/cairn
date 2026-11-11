@@ -8574,6 +8574,9 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "data_migration",
   "task_issue_close",
   "deploy_lease",
+  "mail_account",
+  "mail_event",
+  "mail_rule",
 ]
 `;
 
