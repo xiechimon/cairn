@@ -2,7 +2,7 @@ import type { MailAccountStatus, MailEventStatus, MailRank, UserRecord } from '@
 import { fenceMailText } from '@cairn/shared';
 import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { mailAccount, mailEvent, mailRule, step } from '../db/schema.js';
+import { mailAccount, mailEvent, mailRule, pushDelivery, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { coordinatorThreadRow, enqueueChiefStep, ensureChief, turnProvenance } from './chief.js';
@@ -93,6 +93,7 @@ export function deliverMailEvent(
     if (!event) throw new HttpError(404, `mail event ${eventId}`);
     if (event.status === 'delivered' || event.status === 'dropped') {
       status = event.status;
+      pending.push = queuedMailPush(deps.db, event.id);
       return;
     }
     if (event.status !== 'ranked' || event.rank === null) {
@@ -161,11 +162,10 @@ export function deliverMailEvent(
         ownerMessageIds: [],
         scopeProjectId: null,
       });
-      pending.push = {
-        teamId: account.teamId,
-        msg: { ...notice, href: chiefHref(thread.id), tag: event.id },
-      };
     }
+    const msg = { ...notice, href: chiefHref(thread.id), tag: event.id };
+    queueMailPush(deps.db, event.id, deps.user.id, account.teamId, msg);
+    pending.push = { teamId: account.teamId, msg };
     status = 'delivered';
   });
   if (pending.push !== null) {
@@ -177,6 +177,11 @@ export function deliverMailEvent(
       pending.push.msg,
       pending.push.msg.tag,
     );
+    deps.db
+      .update(pushDelivery)
+      .set({ pushStatus: deps.vapidKeys === null ? 'skipped' : 'handed-off' })
+      .where(eq(pushDelivery.id, pending.push.msg.tag))
+      .run();
   }
   return { status, pushId: pending.push?.msg.tag ?? null };
 }
@@ -201,6 +206,37 @@ export function linkedMailSecretIds(db: Db, teamId: string): Set<string> {
 
 function chiefHref(threadId: string): string {
   return `/app?chief=${encodeURIComponent(threadId)}`;
+}
+
+function queueMailPush(
+  db: Db,
+  eventId: string,
+  userId: string,
+  teamId: string,
+  msg: PushMessage,
+): void {
+  const existing = db
+    .select({ id: pushDelivery.id })
+    .from(pushDelivery)
+    .where(eq(pushDelivery.id, eventId))
+    .get();
+  if (existing) return;
+  db.insert(pushDelivery)
+    .values({
+      id: eventId,
+      userId,
+      teamId,
+      message: msg,
+      createdAt: nowMs(),
+      pushStatus: 'queued',
+    })
+    .run();
+}
+
+function queuedMailPush(db: Db, eventId: string): { teamId: string; msg: PushMessage } | null {
+  const row = db.select().from(pushDelivery).where(eq(pushDelivery.id, eventId)).get();
+  if (row?.pushStatus !== 'queued' || row.message === null) return null;
+  return { teamId: row.teamId, msg: row.message };
 }
 
 function clip(text: string): string {

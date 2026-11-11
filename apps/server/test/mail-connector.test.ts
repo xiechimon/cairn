@@ -24,7 +24,7 @@ import {
 import { validateMemoryText } from '../src/services/memory.js';
 import { pushToUserSafely } from '../src/services/push.js';
 import { createSecret, openSecretValues } from '../src/services/secrets.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, req, type TestServer } from './helpers.js';
 
 let s: TestServer;
 
@@ -122,6 +122,18 @@ describe('mail connector slice 1', () => {
     expect(openSecretValues(deps(), s.team.id, [mail.id, other.id, renamed.id], null)).toEqual({
       OTHER: 'ok',
     });
+    const projectId = (
+      (await (await req(s.app, 'POST', '/api/projects', { name: 'cairn' })).json()) as {
+        id: string;
+      }
+    ).id;
+    createSecret(deps(), {
+      teamId: s.team.id,
+      name: 'TOKEN',
+      value: 'project-value',
+      projectId,
+    });
+    expect(openSecretValues(deps(), s.team.id, [renamed.id], projectId)).toEqual({});
     const audits: string[] = [];
     const tool = buildSecretTool({
       creds: {
@@ -246,10 +258,28 @@ describe('mail connector slice 1', () => {
     expect(stored?.snippet).toBe(notice.body);
     expect(stored?.snippet).not.toContain('SECRET SUBJECT');
     expect(seen).toEqual([{ id: eventId, body: notice.body, href: `/app?chief=${row?.buildId}` }]);
-    expect(s.db.select().from(pushDelivery).all()).toEqual([]);
-    deliverMailEvent(mailDeps(), eventId);
+    expect(s.db.select().from(pushDelivery).get()).toMatchObject({
+      id: eventId,
+      pushStatus: 'skipped',
+    });
+    s.db
+      .update(pushDelivery)
+      .set({ pushStatus: 'queued' })
+      .where(eq(pushDelivery.id, eventId))
+      .run();
+    deliverMailEvent(
+      {
+        ...mailDeps(),
+        pushToUser(db, vapid, userId, teamId, msg, deliveryId) {
+          seen.push({ id: deliveryId, body: msg.body, href: msg.href });
+          pushToUserSafely(db, vapid, userId, teamId, msg, deliveryId);
+        },
+      },
+      eventId,
+    );
     expect(s.db.select().from(step).all()).toHaveLength(1);
-    expect(seen).toHaveLength(1);
+    expect(seen).toHaveLength(2);
+    expect(s.db.select().from(pushDelivery).get()?.pushStatus).toBe('skipped');
   });
 
   test('deliver can_wait queues one digest item and no chief step', () => {

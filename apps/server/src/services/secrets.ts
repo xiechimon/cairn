@@ -140,12 +140,18 @@ export function openSecretValues(
   projectId: string | null,
 ): Record<string, string> {
   if (ids.length === 0) return {};
+  const linked = linkedMailSecretIds(deps.db, teamId);
   const granted = deps.db
     .select()
     .from(secret)
     .where(and(eq(secret.teamId, teamId), inArray(secret.id, [...ids])))
     .all()
-    .filter((row) => row.projectId === null || row.projectId === projectId);
+    .filter(
+      (row) =>
+        (row.projectId === null || row.projectId === projectId) &&
+        !isMailSecretName(row.name) &&
+        !linked.has(row.id),
+    );
   const names = [...new Set(granted.map((row) => row.name))];
   const projectRows =
     projectId === null || names.length === 0
@@ -161,7 +167,6 @@ export function openSecretValues(
             ),
           )
           .all();
-  const linked = linkedMailSecretIds(deps.db, teamId);
   const values: Record<string, string> = {};
   for (const row of [
     ...granted.filter((r) => r.projectId === null),
