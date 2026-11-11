@@ -51,10 +51,10 @@ States: `uploading`, `pending`, `failed`, `cancelled`. Ack deletes a live row. A
 | `pending` | deleted | a success response for that route: a server message id where the route returns one; on `POST /api/todos/:id/messages` the stored `ThreadMessageResult` itself is the ack, matched by `clientMessageId` |
 | `failed` | `pending` or `uploading` | Retry, same id and same route |
 | any, never dispatched | deleted | Delete before the first POST |
-| any, `dispatchedAt` set or in flight | `cancelled` | Delete or edit before ack. Abort the local `fetch`. Survives reload. Does not POST the body |
+| any, `dispatchedAt` set or in flight | `cancelled` | Delete before ack. Abort the local `fetch`. Survives reload. Does not POST the body. An edit is not this row until suppression or withdraw has succeeded |
 | `cancelled` | deleted | Lookup-or-suppress returns a stored response and withdraw or cancel succeeds, or it inserts a suppression marker because nothing was stored. Never a replay of the send |
 
-The composer clears when the row is enqueued. `发送失败，请重试。` and `没发给 #{seq}，再试一次。` move onto the transcript row, with Retry, Edit, and Delete. Edit keeps the id only while `fetch` has not started. Once `fetch` has started, an edit before ack aborts that fetch, suppresses that id, and enqueues a new row with a new id and a later `enqueueSeq`. Reusing the id would replay the original content. Edit after ack is a new message. Delete after ack uses `withdrawChiefMessage` or `cancelQueuedMessage`, and if the turn has started the message stands.
+The composer clears when the row is enqueued. `发送失败，请重试。` and `没发给 #{seq}，再试一次。` move onto the transcript row, with Retry, Edit, and Delete. Edit keeps the id only while `fetch` has not started. Once `fetch` has started, an edit aborts that fetch and runs lookup-or-suppress, but it does not enqueue a replacement yet. The replacement, with a new id and a later `enqueueSeq`, is enqueued only after that call confirms the original was suppressed or withdrawn. Aborting the local fetch does not undo a commit that already happened. `withdrawChiefMessage` returns 409 once the chief turn has started (`chief-turns.ts`). A committed steer, revision, restart, or todo message (rows 4, 7, 9, and 10) has no withdraw. In those cases the original stands, the edit is not applied, and the transcript says so. Reusing the id would replay the original content. Delete after ack uses `withdrawChiefMessage` or `cancelQueuedMessage`, and if the turn has started the message stands.
 
 Ordering: `readConversationPage` walks `createdAt` then `rowid` (`apps/server/src/services/conversation-page.ts`). Pending rows render after that page, and the drainer sends them, both sorted by `enqueueSeq`. On ack, drop the local row and let the server position stand. Match the server message id from the stored response, not the text; the todo route has no message id, so its row is dropped on the stored result and the server page positions the message.
 
@@ -68,7 +68,7 @@ The picked file renders from a local blob immediately. The message waits in `upl
 
 ## Tests the implementation owes
 
-One test per row above, plus: reload keeps a `pending` row and retries the same id; a retry after a committed coordinator send returns the stored message id; a retry of revision does not apply twice; a missing id on routes 1–5 is rejected; a failed send does not restore the composer; an upload failure marks the message and does not POST it; an acked row is not duplicated when the page arrives; a cancel whose POST never reached the server does not create the message; two offline sends render and drain in `enqueueSeq` order after reload.
+One test per row above, plus: reload keeps a `pending` row and retries the same id; a retry after a committed coordinator send returns the stored message id; a retry of revision does not apply twice; a missing id on routes 1–5 is rejected; a failed send does not restore the composer; an upload failure marks the message and does not POST it; an acked row is not duplicated when the page arrives; a cancel whose POST never reached the server does not create the message; an edit whose lookup does not confirm suppression or withdraw does not enqueue a replacement; two offline sends render and drain in `enqueueSeq` order after reload.
 
 ## Risks
 
@@ -78,4 +78,4 @@ Two-way door for the outbox. The ledger change is two-way if the pending marker 
 
 - Video. Recommendation: no. 10 MB and a five-minute grant cannot carry it, and the allowlist on main has no video type.
 - Chunked resume. Recommendation: no at this cap. Whole-file retry fits the grant.
-- Edit after the server has accepted the message. Recommendation: no. Withdraw if the turn has not started; otherwise the message stands.
+- Edit after the server has accepted the message. Recommendation: no. Withdraw if that route has a withdraw and the turn has not started; otherwise the message stands and the replacement is not sent.
