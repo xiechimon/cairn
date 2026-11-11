@@ -308,6 +308,7 @@ interface ChiefStreamRowProps {
   onRewindRequest: (index: number, id: string | null) => void;
   onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
   entering?: boolean;
+  onRetry?: (() => void) | undefined;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -408,6 +409,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onRewindRequest,
   onReply,
   entering = false,
+  onRetry,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
@@ -437,9 +439,20 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-        <Marker role="alert" className={MARKER_ERROR_CLS}>
-          <MarkerContent>{t('Coordinator 本轮执行失败')}</MarkerContent>
-          <span className="mt-0.5 block break-all text-(--text-tertiary)">{item.text}</span>
+        <Marker role="alert" className={MARKER_ERROR_CLS} title={item.text}>
+          <MarkerContent data-testid="chief-turn-error">
+            {t('Coordinator 这一轮没有完成。')}
+          </MarkerContent>
+          {onRetry !== undefined && (
+            <Button
+              variant="ghost"
+              data-testid="chief-turn-retry"
+              className="h-7 cursor-pointer px-0 text-meta font-medium text-(--destructive) hover:bg-transparent hover:underline dark:hover:bg-transparent"
+              onClick={onRetry}
+            >
+              {t('重试')}
+            </Button>
+          )}
         </Marker>
       </MessageScrollerItem>
     );

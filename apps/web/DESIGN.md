@@ -218,7 +218,7 @@ From top to bottom:
 See "Page patterns · Settings list" below.
 
 ### Conversation
-- User turns sit on the right as a flat bubble: 12px radius, `8px 12px` padding, at most `min(85%, 42rem)` wide, filled with the solid `--bubble-base` tint (no texture, gradient or ring), so the user's own messages stay distinguishable without a coloured surface.
+- User turns sit on the right in the `bubble-gradient` bubble (`UserMessageBubble`): `--cds-radius-xl` radius, `8px 12px` padding, at most `min(85%, 42rem)` wide, a `--bubble-base` fill with a faint noise texture, three soft radial washes (`--bubble-wash-a` to `-c`) and a 1px conic rim (`--bubble-rim-a` to `-c`), copied from the measured claude.ai bubble (V3 exception, owner decision 2026-11-07). It is the only textured surface in chat.
 - Agent and Coordinator replies carry no avatar column: plain full-width text. A reply from a bound agent (not the coordinator) keeps a small identity line above it. Hovering a user message reveals a row under the bubble with its time, copy and restore actions; touch screens always show it.
 - Markers between turns ("Plan approved", handoffs, origin notes) are a centred hairline rule in `--text-tertiary`; an error marker stays a soft `danger-soft` box. A turn longer than a minute ends with a "Worked for N minutes" rule.
 - Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.

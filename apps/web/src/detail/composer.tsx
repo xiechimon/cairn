@@ -19,7 +19,7 @@ const COMPOSER_CARD_EDITABLE =
   'bg-(--card) shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 const COMPOSER_CARD_READ_ONLY = 'bg-secondary shadow-(--shadow-composer)';
 const COMPOSER_INPUT =
-  "field-sizing-fixed h-9 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-card-title text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
+  'field-sizing-fixed h-9 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent';
 const COMPOSER_TOOL =
   "flex size-7 cursor-pointer items-center justify-center rounded-(--radius-control) border-none bg-transparent p-0 font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto";
 const COMPOSER_SQUARE =

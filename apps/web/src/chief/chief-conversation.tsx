@@ -41,6 +41,7 @@ import {
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
+import { toastError } from '../components/ui/toaster.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
@@ -423,6 +424,17 @@ export function ChiefConversation({
       />
     </>
   );
+  const lastUserText = latestUser?.item.kind === 'user' ? latestUser.item.text : null;
+  const retryLastUser =
+    onSend == null || lastUserText === null
+      ? undefined
+      : () => {
+          followSentRef.current = true;
+          Promise.resolve(onSend(lastUserText)).catch((error: unknown) => {
+            followSentRef.current = false;
+            toastError(t('没发出去，再试一次。'), error);
+          });
+        };
   const clock = useMinuteClock();
   const dividerClock = { previousAt: null as number | null };
   const streamRow = ({ item, i }: GroupedRow) => {
@@ -461,6 +473,7 @@ export function ChiefConversation({
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
+      onRetry={retryLastUser}
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
     />
   );

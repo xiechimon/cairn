@@ -1221,6 +1221,7 @@ export const EN: Record<string, string> = {
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
+  'Coordinator 这一轮没有完成。': 'The Coordinator did not finish this turn.',
   'Coordinator 本轮执行失败': 'The Coordinator turn failed',
   '撤回失败，Coordinator 可能已经开始处理这条了。':
     'Could not withdraw: the Coordinator may already be working on it.',
