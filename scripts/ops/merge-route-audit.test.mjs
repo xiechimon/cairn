@@ -228,6 +228,29 @@ test('a queue draft landing is audited as the original that had queued', () => {
   releaseTestTempDir(f.dir);
 });
 
+test('a pull_requests list without a trailing newline still names every original', () => {
+  const f = fixture();
+  const sha = 'a'.repeat(40);
+  const result = f.run(sha, {
+    pulls: [
+      queueDraft(
+        3949,
+        'merge queue: merged #3948',
+        'pull_requests:\n- number: 3948\n- number: 3951',
+      ),
+    ],
+    pull: { number: 3948, merged_at: '2026-11-11T06:13:12Z' },
+    timelineByPull: {
+      3948: [{ event: 'labeled', label: { name: 'queued' }, created_at: '2026-11-11T06:06:06Z' }],
+      3951: [{ event: 'labeled', label: { name: 'queued' }, created_at: '2026-11-11T06:06:06Z' }],
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /#3948 merged through the queue/);
+  assert.match(result.stdout, /#3951 merged through the queue/);
+  releaseTestTempDir(f.dir);
+});
+
 test('a queue draft landing whose original has no queued label is a violation', () => {
   const f = fixture();
   const sha = 'a'.repeat(40);
