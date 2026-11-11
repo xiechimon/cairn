@@ -1,6 +1,6 @@
 # Message-first sending
 
-Status: proposal for the owner's review. Nothing here is built. Checked against `origin/main` at `7299c658ea26d798eca5d2f647e3e50c3a0cb007`. Prior art: `docs/research/message-first-sending-2026-11-11.md`.
+Status: proposal for the owner's review. Nothing here is built. Checked against `origin/main` at `f6411d379f9f5097f3ec2e0cb96ab568ccb07b92`. Prior art: `docs/research/message-first-sending-2026-11-11.md`.
 
 The owner's rule: what the user sends shows at once; the network works behind it. Today the web awaits the request. `composer-wire.ts` clears the draft only after the promise resolves, and a rejection leaves the text in the composer. `useSendKey` keeps the idempotency id in memory until `settle()`, so a reload mints a new id.
 
@@ -38,9 +38,9 @@ Person HTTP routes 1–5 must require the id, matching row 7. Rows 9 and 10 must
 
 ## Outbox
 
-State lives in IndexedDB, one row per send, per browser profile. It is not `composer_draft` and not `localStorage`. Fields: `clientMessageId`, route, scope id, content, attachment blobs, state, `dispatchedAt` (set before the first POST leaves, never cleared), server message id once known.
+State lives in IndexedDB, one row per send, per browser profile. It is not `composer_draft` and not `localStorage`. Fields: `clientMessageId`, `enqueueSeq`, route, scope id, content, attachment blobs, state, `dispatchedAt` (set in the IndexedDB transaction that starts `fetch`, never cleared, and not proof the server stored a row), server message id once known. `enqueueSeq` is a monotonic integer assigned at enqueue and never reused. `clientMessageId` is a UUID, so IndexedDB key order is not enqueue order. Rendering and draining both sort by `enqueueSeq`.
 
-States: `uploading`, `pending`, `failed`, `cancelled`. Ack deletes a live row. A `cancelled` row is a tombstone: it keeps id, route and scope so the drainer can replay the same id, read the stored response and withdraw it.
+States: `uploading`, `pending`, `failed`, `cancelled`. Ack deletes a live row. A `cancelled` row is a tombstone. It keeps id, route, and scope, and it does not replay the send body. `findClientMessage` returns only a non-null `response`, and main has no public lookup route, so cancellation adds a person-session read-or-suppress call on the same scope and `clientMessageId`. It is not added to `isExempt`. A stored response is withdrawn or cancelled, then the tombstone is deleted. No row: the call inserts a suppression marker in one transaction and does not run the send handler. A later POST of that id hits `claimClientMessage`, gets the marker back, and does not insert a message or start a turn. A null `response` is in-flight; suppress retries the read and does not claim.
 
 | From | To | When |
 |---|---|---|
@@ -51,14 +51,14 @@ States: `uploading`, `pending`, `failed`, `cancelled`. Ack deletes a live row. A
 | `pending` | deleted | a success response for that route: a server message id where the route returns one; on `POST /api/todos/:id/messages` the stored `ThreadMessageResult` itself is the ack, matched by `clientMessageId` |
 | `failed` | `pending` or `uploading` | Retry, same id and same route |
 | any, never dispatched | deleted | Delete before the first POST |
-| any, `dispatchedAt` set | `cancelled` | Delete or edit before ack. Survives reload |
-| `cancelled` | deleted | Replay of the same id returns the stored response and the withdraw or cancel call succeeds, or the replay returns an error that is not a stored response (nothing was created) |
+| any, `dispatchedAt` set or in flight | `cancelled` | Delete or edit before ack. Abort the local `fetch`. Survives reload. Does not POST the body |
+| `cancelled` | deleted | Lookup-or-suppress returns a stored response and withdraw or cancel succeeds, or it inserts a suppression marker because nothing was stored. Never a replay of the send |
 
-The composer clears when the row is enqueued. `发送失败，请重试。` and `没发给 #{seq}，再试一次。` move onto the transcript row, with Retry, Edit, and Delete. Edit keeps the id only while the row has never been dispatched. Once a POST has left, an edit before ack is a cancel of that send (withdraw or cancel once the stored response is known) followed by a new row with a new id, because the ledger would replay the original content. Edit after ack is a new message. Delete after ack uses `withdrawChiefMessage` or `cancelQueuedMessage`, and if the turn has started the message stands.
+The composer clears when the row is enqueued. `发送失败，请重试。` and `没发给 #{seq}，再试一次。` move onto the transcript row, with Retry, Edit, and Delete. Edit keeps the id only while `fetch` has not started. Once `fetch` has started, an edit before ack aborts that fetch, suppresses that id, and enqueues a new row with a new id and a later `enqueueSeq`. Reusing the id would replay the original content. Edit after ack is a new message. Delete after ack uses `withdrawChiefMessage` or `cancelQueuedMessage`, and if the turn has started the message stands.
 
-Ordering: `readConversationPage` walks `createdAt` then `rowid`. Pending rows render after that page, in enqueue order. On ack, drop the local row and let the server position stand. Match the server message id from the stored response, not the text; the todo route has no message id, so its row is dropped on the stored result and the server page positions the message.
+Ordering: `readConversationPage` walks `createdAt` then `rowid` (`apps/server/src/services/conversation-page.ts`). Pending rows render after that page, and the drainer sends them, both sorted by `enqueueSeq`. On ack, drop the local row and let the server position stand. Match the server message id from the stored response, not the text; the todo route has no message id, so its row is dropped on the stored result and the server page positions the message.
 
-Two tabs share the database. One tab drains, holding the Web Locks API lock `cairn-outbox` (`navigator.locks.request` with exclusive mode). The browser releases the lock when the holding tab closes, crashes or is discarded, and the next waiting tab acquires it and drains; no lease timestamps are stored. A suspended holder keeps the lock, so a visible tab that waits longer than 30 seconds requests it with `steal: true`; the old holder's next IndexedDB write checks that it still owns the lock and stops. A second POST of the same id is still safe only on routes that claim before the side effect. Tests: closing the draining tab hands off to another; a steal stops the old drainer; two tabs never POST one row at once.
+Two tabs share the database. One tab drains, holding the Web Locks API lock `cairn-outbox` (`navigator.locks.request` with exclusive mode). The browser releases the lock when the holding tab closes, crashes or is discarded, and the next waiting tab acquires it and drains; no lease timestamps are stored. A suspended holder keeps the lock, so a visible tab that waits longer than 30 seconds requests it with `steal: true`. Steal does not stop the old callback: released code keeps running, and `navigator.locks.query()` does not expose this document's client id, so an ownership check is not a fence. Persist `drainGeneration`. The stealer increments it in one IndexedDB transaction before any POST. Each callback captures the generation it acquired. Before every POST, one IndexedDB transaction re-reads `drainGeneration`, aborts unless it still matches, and only then sets `dispatchedAt` and `inflightGeneration` and starts `fetch`. A newer generation aborts the in-flight `fetch`. The new holder does not POST a row whose `inflightGeneration` is the generation it replaced until that flag is clear. A second POST of the same id is still safe only on routes that claim before the side effect; the generation check is what keeps the non-idempotent paths from running twice. Tests: closing the draining tab hands off to another; a steal stops the old callback before its next POST, including after it had already passed an earlier check; two tabs never POST one row at once.
 
 ## Attachment failure
 
@@ -68,7 +68,7 @@ The picked file renders from a local blob immediately. The message waits in `upl
 
 ## Tests the implementation owes
 
-One test per row above, plus: reload keeps a `pending` row and retries the same id; a retry after a committed coordinator send returns the stored message id; a retry of revision does not apply twice; a missing id on routes 1–5 is rejected; a failed send does not restore the composer; an upload failure marks the message and does not POST it; an acked row is not duplicated when the page arrives.
+One test per row above, plus: reload keeps a `pending` row and retries the same id; a retry after a committed coordinator send returns the stored message id; a retry of revision does not apply twice; a missing id on routes 1–5 is rejected; a failed send does not restore the composer; an upload failure marks the message and does not POST it; an acked row is not duplicated when the page arrives; a cancel whose POST never reached the server does not create the message; two offline sends render and drain in `enqueueSeq` order after reload.
 
 ## Risks
 
