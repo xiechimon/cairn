@@ -357,19 +357,47 @@ test('reconnect replaces an old live result with the current persisted history',
 test('private REST history disappears at the auth gate and a late old response cannot replace the next scope', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => localStorage.setItem('cairn.token', 'scope-first'));
   let rejectFirst = false;
   let holdFirstHistory = false;
   let historyStarted = false;
   let release: () => void = () => {};
-  const held = new Promise<void>((resolve) => { release = resolve; });
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const scopeOf = (route: {
+    request: () => { headers: () => { cookie?: string } };
+  }): 'first' | 'second' | 'none' => {
+    const cookie = route.request().headers().cookie ?? '';
+    if (cookie.includes('cairn_auth=scope-second')) return 'second';
+    if (cookie.includes('cairn_auth=scope-first')) return 'first';
+    return 'none';
+  };
   await mockLive(page, { threads: [], messages: HISTORY, machines: [] }, (path, route, json) => {
-    const authorization = route.request().headers().authorization;
-    const first = authorization === 'Bearer scope-first';
+    const request = route.request();
+    if (path === '/api/auth/bootstrap' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true }),
+        headers: { 'set-cookie': 'cairn_auth=scope-first; Path=/' },
+      });
+    }
+    if (path === '/api/remote/descriptor') return json({ environmentId: 'env-1', version: 1 });
+    if (path === '/api/remote/pair' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ token: 'device', deviceId: 'd1', environmentId: 'env-1' }),
+        headers: { 'set-cookie': 'cairn_auth=scope-second; Path=/' },
+      });
+    }
+    if (path === '/api/auth/stream-ticket' && request.method() === 'POST') {
+      return json({ ticket: 'ticket-1', expiresAt: Date.now() + 60_000 });
+    }
+    const scope = scopeOf(route);
+    const first = scope === 'first';
     if (path === '/api/teams') {
-      return ['Bearer scope-first', 'Bearer scope-second'].includes(authorization ?? '')
-        ? json([TEAM])
-        : json({ error: 'Unauthorized' }, 401);
+      return scope === 'none' ? json({ error: 'Unauthorized' }, 401) : json([TEAM]);
     }
     if (path === '/api/computers') {
       return first && rejectFirst
@@ -381,7 +409,13 @@ test('private REST history disappears at the auth gate and a late old response c
         historyStarted = true;
         return held.then(() => json({ commands: [command(1, { command: 'first-owner-only' })] }));
       }
-      return json({ commands: [command(first ? 1 : 2, { command: first ? 'first-owner-only' : 'second-owner-only' })] });
+      return json({
+        commands: [
+          command(first ? 1 : 2, {
+            command: first ? 'first-owner-only' : 'second-owner-only',
+          }),
+        ],
+      });
     }
     return undefined;
   });
@@ -404,7 +438,11 @@ test('private REST history disappears at the auth gate and a late old response c
     await page.locator('.token-gate-submit').click();
     await expect(page.locator('.token-gate')).toHaveCount(0);
     await expect(entries(panel)).toContainText(['second-owner-only']);
-    const late = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/computers/comp-1/commands' && response.request().headers().authorization === 'Bearer scope-first');
+    const late = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/computers/comp-1/commands' &&
+        (response.request().headers().cookie ?? '').includes('cairn_auth=scope-first'),
+    );
     release();
     await late;
     await expect(entries(panel)).toContainText(['second-owner-only']);
