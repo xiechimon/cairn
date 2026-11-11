@@ -2,6 +2,7 @@ import type { ActionEntry } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
+import { coordinatorToolsExtension, createStepGate } from '../src/coordinator/runtime/tools.js';
 import {
   actionJournal,
   actionProposal,
@@ -19,6 +20,7 @@ import {
   sweepExpiredActionProposals,
 } from '../src/services/action-proposals.js';
 import { executeAction } from '../src/services/action-registry.js';
+import { fakeMachineApi } from './coordinator/fake-machine-api.js';
 import { bootServer, req } from './helpers.js';
 
 const noted: ActionEntry = {
@@ -89,6 +91,23 @@ function propose(
 }
 
 describe('action proposals', () => {
+  test('the Coordinator tool list omits delete_project and the proposal service still accepts it', () => {
+    for (const routerTools of [true, false]) {
+      const names = (
+        coordinatorToolsExtension(fakeMachineApi(), createStepGate(), { routerTools }).tools ?? []
+      ).map((tool) => tool.name);
+      expect(names).toEqual(expect.arrayContaining(['archive_project', 'unarchive_project']));
+      expect(names).not.toContain('delete_project');
+    }
+    const s = world();
+    const proposed = propose(s, 'thread-a', 'project-a');
+    expect(proposed.status).toBe('pending');
+    if (proposed.status !== 'pending') return;
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
+    expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
+    s.dispose();
+  });
+
   test('coordinator confirm-once without a thread writes nothing', () => {
     const s = world();
     expect(() =>

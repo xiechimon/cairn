@@ -187,10 +187,9 @@ export function coordinatorToolsExtension(
   const actionCopy: Record<string, string> = {
     archive_project: 'Archive a project. It stays readable and can be unarchived.',
     unarchive_project: 'Unarchive a project so it can be changed again.',
-    delete_project: 'Propose deleting a project. The owner confirms before the project is deleted.',
   };
-  const actionTools: RemoteToolDef[] = SLICE1_ACTIONS.filter((entry) =>
-    entry.surfaces.includes('coordinator'),
+  const actionTools: RemoteToolDef[] = SLICE1_ACTIONS.filter(
+    (entry) => entry.surfaces.includes('coordinator') && entry.toolName !== 'delete_project',
   ).map((entry) => {
     const description = actionCopy[entry.toolName];
     if (description === undefined) throw new Error(`no Coordinator copy for ${entry.toolName}`);
