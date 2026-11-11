@@ -601,6 +601,11 @@ describe('F7 the existing delete paths succeed with gate rows present', () => {
 
   test('deleting a project (steps and todos deleted in the transaction)', async () => {
     const { s, projectId, buildId } = await started();
+    s.db
+      .update(schema.step)
+      .set({ status: 'done', finishedAt: 11 })
+      .where(eq(schema.step.buildId, buildId))
+      .run();
     const res = await req(s.app, 'DELETE', `/api/projects/${projectId}`);
     expect(res.status).toBe(204);
     expectGone(s, buildId);

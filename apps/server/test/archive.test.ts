@@ -561,11 +561,27 @@ test.each([
   else if (path === 'abandon') sweepAbandonedBuildSteps(deps, now + 300_000);
   else if (path === 'reset') resetTodo(deps, 'todo-archive');
   else if (path === 'delete-task') deleteTodo(deps, 'todo-archive');
-  else deleteProject(deps, 'project-archive');
+  else {
+    s.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
+    deleteProject(deps, 'project-archive');
+  }
   expect(s.db.select().from(stopPending).all()).toEqual([]);
   const remaining = s.db.select().from(step).where(eq(step.id, row.id)).get();
   expect(remaining?.archiveStop ?? null).toBeNull();
   expect(remaining?.status).not.toBe('claimed');
+});
+
+test('deleting a project with a claimed step refuses and leaves the stop pending', () => {
+  const { s, deps } = world();
+  requestStop(deps, 'build-archive', { discard: false }, { actor: 'person', reason: 'test stop' });
+  expect(() => deleteProject(deps, 'project-archive')).toThrow(
+    /cannot delete project while work is running: step step-archive claimed on build build-archive/,
+  );
+  expect(s.db.select().from(stopPending).all()).toHaveLength(1);
+  expect(s.db.select().from(step).where(eq(step.id, 'step-archive')).get()?.status).toBe('claimed');
+  expect(s.db.select().from(project).where(eq(project.id, 'project-archive')).get()?.id).toBe(
+    'project-archive',
+  );
 });
 
 test('a regular stop survives release and same-machine reclaim before its late poll', async () => {
