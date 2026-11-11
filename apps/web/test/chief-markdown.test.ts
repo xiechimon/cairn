@@ -248,6 +248,18 @@ describe('mapChief typing tail row (#651 F-B1..B4)', () => {
     ...(liveText !== undefined ? { liveText } : {}),
   });
 
+  test.each([false, true])('a live resumed response follows its projected boundary: %s', (boundary) => {
+    const messages = [row('user-wake', 'user', '[wake:failed] provenance=watch:other')];
+    if (boundary) messages.push(row('user-resumed', 'system', ''));
+    const content = mapChief(ENV, {
+      ...opts({ phase: 'chief' }, 'Reading your answer.'),
+      messages,
+      liveThinking: 'Checking the request.',
+    });
+    expect(robotItems(content.stream ?? []).some((item) => item.typing === true)).toBe(boundary);
+    expect((content.stream ?? []).some((item) => item.kind === 'thinking')).toBe(boundary);
+  });
+
   test('F-B1 turn in flight + non-empty buffer → typing robot row hangs at the stream tail', () => {
     const content = mapChief(ENV, opts({ phase: 'chief' }, '正在读取 **仓库结构**'));
     const stream = content.stream ?? [];

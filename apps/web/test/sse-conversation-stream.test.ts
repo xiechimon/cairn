@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activityStore } from '../src/api/activity.js';
 import { agentTodoStore } from '../src/api/agent-todo.js';
@@ -262,6 +262,33 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
 
     expect(liveTextStore.get(CONV)).toBe('段');
     expect(liveTextStore.getVisible(CONV, new Set(['m-tool']))).toBe('段');
+  });
+
+  it('a claim refreshes a cached pending page before streamed resumed text arrives', async () => {
+    const qc = freshClient();
+    const key = ['messages', CONV, 'pages'];
+    const wake = { id: 'user-wake', role: 'user', content: '[wake:failed]', createdAt: 1 };
+    const boundary = { id: 'user-resumed', role: 'system', content: '', createdAt: 2 };
+    let claimed = false;
+    const options = {
+      queryKey: key,
+      staleTime: Infinity,
+      queryFn: async () => ({ messages: claimed ? [wake, boundary] : [wake] }),
+    };
+    await qc.fetchQuery(options);
+    const observer = new QueryObserver(qc, options);
+    const unsubscribe = observer.subscribe(() => {});
+    const es = startStream(qc);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(qc.getQueryData(key)).toEqual({ messages: [wake] });
+    claimed = true;
+    es.push({ type: 'step', step: { id: 'resumed', buildId: CONV, kind: 'chief', machineId: null, createdAt: 2, status: 'claimed' } });
+    es.push({ type: 'text_delta', text: 'Reading your answer.' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(qc.getQueryData(key)).toEqual({ messages: [wake, boundary] });
+    expect(liveTextStore.get(CONV)).toBe('Reading your answer.');
+    unsubscribe();
+    qc.clear();
   });
 
   it('step event: invalidates and refetches, buffer untouched', () => {

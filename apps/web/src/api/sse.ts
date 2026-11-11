@@ -267,6 +267,9 @@ export function startConversationStream(
           void invalidateConverged(qc, { queryKey: ['changes', conversationId] });
           void invalidateConverged(qc, { queryKey: ['plans'] });
           if (isChiefConversationId(conversationId)) {
+            if (step.status === 'claimed') {
+              void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
+            }
             void invalidateConverged(qc, { queryKey: ['chiefThreads'] });
             if (step.status === 'done' || step.status === 'failed' || step.status === 'stopped') {
               void invalidateConverged(qc, { queryKey: ['chief'] });
