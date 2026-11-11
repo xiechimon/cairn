@@ -36,6 +36,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
 import {
@@ -321,6 +322,22 @@ export async function executeChiefTool(
   assertToolNotRemoved(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
+  if (name === 'delete_project') {
+    return json(
+      executeAction(
+        { db, reposDir: deps.reposDir },
+        {
+          id: 'project.delete',
+          input: params,
+          actor: 'coordinator',
+          surface: 'coordinator',
+          teamId: ctx.teamId,
+          threadId: ctx.threadId,
+          scopeProjectId: ctx.turnScopeProjectId ?? null,
+        },
+      ),
+    );
+  }
   switch (name) {
     case 'projects': {
       const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();

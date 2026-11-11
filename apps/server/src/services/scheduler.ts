@@ -18,6 +18,7 @@ import {
   type ReflectCurateLogger,
   sweepReflectCurate,
 } from '../trajectory-reflect-curate.js';
+import { dispatchActionWakes, sweepExpiredActionProposals } from './action-proposals.js';
 import {
   ATTACHMENT_GC_INTERVAL_MS,
   type GcLogger,
@@ -488,6 +489,8 @@ export function createScheduler(
   }
 
   function runTick(now: number): Promise<void> {
+    sweepExpiredActionProposals(deps.db, now);
+    dispatchActionWakes(deps);
     const pending: Promise<void>[] = [];
     if (!alertsSweeping) {
       alertsSweeping = true;
@@ -780,6 +783,8 @@ export function createScheduler(
     start() {
       if (dueStarted) return;
       dueStarted = true;
+      sweepExpiredActionProposals(deps.db);
+      dispatchActionWakes(deps);
       setScheduleClockListener(() => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       ensureDue(
