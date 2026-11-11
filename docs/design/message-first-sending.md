@@ -48,13 +48,13 @@ States: `uploading`, `pending`, `failed`. Ack deletes the row.
 | composer send | `pending` | text only, or every attachment is ready |
 | `uploading` | `pending` | every upload reached `ready` |
 | `uploading` or `pending` | `failed` | upload failed, or the send returned an error that is not a stored response |
-| `pending` | deleted | the response carries a server message id |
+| `pending` | deleted | a success response for that route: a server message id where the route returns one; on `POST /api/todos/:id/messages` the stored `ThreadMessageResult` itself is the ack, matched by `clientMessageId` |
 | `failed` | `pending` or `uploading` | Retry, same id and same route |
 | any | deleted | Delete before ack. In flight: mark cancelled; if a stored response then arrives, withdraw or cancel once |
 
-The composer clears when the row is enqueued. `发送失败，请重试。` and `没发给 #{seq}，再试一次。` move onto the transcript row, with Retry, Edit, and Delete. Edit before ack keeps the id. Edit after ack is a new message. Delete after ack uses `withdrawChiefMessage` or `cancelQueuedMessage`, and if the turn has started the message stands.
+The composer clears when the row is enqueued. `发送失败，请重试。` and `没发给 #{seq}，再试一次。` move onto the transcript row, with Retry, Edit, and Delete. Edit keeps the id only while the row has never been dispatched. Once a POST has left, an edit before ack is a cancel of that send (withdraw or cancel once the stored response is known) followed by a new row with a new id, because the ledger would replay the original content. Edit after ack is a new message. Delete after ack uses `withdrawChiefMessage` or `cancelQueuedMessage`, and if the turn has started the message stands.
 
-Ordering: `readConversationPage` walks `createdAt` then `rowid`. Pending rows render after that page, in enqueue order. On ack, drop the local row and let the server position stand. Match the server message id from the stored response, not the text.
+Ordering: `readConversationPage` walks `createdAt` then `rowid`. Pending rows render after that page, in enqueue order. On ack, drop the local row and let the server position stand. Match the server message id from the stored response, not the text; the todo route has no message id, so its row is dropped on the stored result and the server page positions the message.
 
 Two tabs share the database. One tab drains. A second POST of the same id is safe only on routes that claim before the side effect.
 
