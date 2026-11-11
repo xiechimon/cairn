@@ -5,6 +5,12 @@ import { attachment, chiefMessage, jobApplication } from '../db/schema.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
+import {
+  answerQuestion,
+  askQuestionContentOf,
+  cancelQuestion,
+  isOwnerAnswered,
+} from './chief-questions.js';
 
 export const JOB_CAP_DEFAULT = 5;
 export const JOB_PREVIEW_TTL_MS = 15 * 60 * 1000;
@@ -390,7 +396,7 @@ export function postPreviewQuestion(
       id: questionId,
       threadId,
       role: 'assistant',
-      content: {
+      content: JSON.stringify({
         kind: 'ask_user_question',
         requestId: questionId,
         status: 'pending',
@@ -403,7 +409,7 @@ export function postPreviewQuestion(
         ],
         answers: null,
         askedFor: ['job_submit'],
-      },
+      }),
       createdAt: now,
     })
     .run();
@@ -441,19 +447,10 @@ function settleAbandoned(doc: Doc, now: number): void {
 }
 function ownerAffirmed(db: Db, questionId: string): boolean {
   const row = db.select().from(chiefMessage).where(eq(chiefMessage.id, questionId)).get();
-  if (row === undefined || row.content === null || typeof row.content !== 'object') return false;
-  const content = row.content as {
-    status?: string;
-    answeredBy?: string;
-    answers?: { choices?: string[] }[] | null;
-  };
+  const content = row === undefined ? null : askQuestionContentOf(row.content);
+  if (content === null || !isOwnerAnswered(content)) return false;
   const choices = content.answers?.[0]?.choices;
-  return (
-    content.status === 'answered' &&
-    content.answeredBy === 'person' &&
-    choices?.length === 1 &&
-    choices[0] === JOB_SUBMIT_AFFIRMATIVE
-  );
+  return choices?.length === 1 && choices[0] === JOB_SUBMIT_AFFIRMATIVE;
 }
 export function recordOwnerAnswer(
   db: Db,
@@ -463,22 +460,22 @@ export function recordOwnerAnswer(
 ): void {
   ownerOnly(caller);
   const row = db.select().from(chiefMessage).where(eq(chiefMessage.id, questionId)).get();
-  if (row === undefined || row.content === null || typeof row.content !== 'object') {
-    throw new HttpError(404, `question ${questionId}`);
+  if (row === undefined) throw new HttpError(404, `question ${questionId}`);
+  if (answer.cancelled === true) {
+    cancelQuestion(
+      { db },
+      { threadId: row.threadId, requestId: questionId, reason: 'owner declined' },
+    );
+    return;
   }
-  const content = row.content as Record<string, unknown>;
-  db.update(chiefMessage)
-    .set({
-      content: {
-        ...content,
-        status: answer.cancelled === true ? 'cancelled' : 'answered',
-        answers:
-          answer.cancelled === true ? null : [{ header: 'Submit', choices: answer.choices ?? [] }],
-        answeredBy: 'person',
-      },
-    })
-    .where(eq(chiefMessage.id, questionId))
-    .run();
+  answerQuestion(
+    { db },
+    {
+      threadId: row.threadId,
+      requestId: questionId,
+      answers: [{ header: 'Submit', choices: answer.choices ?? [] }],
+    },
+  );
 }
 function busy(doc: Doc, hash: string): boolean {
   return Object.values(doc.attempts).some(

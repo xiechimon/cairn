@@ -284,7 +284,10 @@ describe('job application server gate', () => {
       .from(chiefMessage)
       .where(eq(chiefMessage.id, posted.questionId))
       .get();
-    expect(message?.content).toMatchObject({ status: 'pending', requestId: posted.questionId });
+    expect(JSON.parse(String(message?.content))).toMatchObject({
+      status: 'pending',
+      requestId: posted.questionId,
+    });
     expect(JSON.stringify(message?.content)).not.toContain('Example');
     expect(posted.status).not.toBe('submitted');
   });
@@ -538,5 +541,36 @@ describe('job application server gate', () => {
     expect(tomorrow.counted).toBe(0);
     expect(readJobCap(db, userId, AT).counted).toBe(0);
     expect(readJobCap(db, userId, AT).limit).toBe(7);
+  });
+
+  test('the production question answer route is what the confirm gate reads', async () => {
+    const server = bootServer();
+    profile(server.db, server.user.id, server.team.id);
+    allow(server.db, server.user.id);
+    const attempt = openAttempt(server.db, server.user.id);
+    beginBrowsing(server.db, attempt.id, HOST, AT);
+    buildJobPreview(server.db, attempt.id, FORM, AT);
+    const threadId = thread(server.db, server.user.id, server.team.id);
+    const posted = postPreviewQuestion(server.db, attempt.id, threadId, AT, () => true);
+    const answered = await server.app.request(
+      `/api/teams/${server.team.id}/chief/threads/${threadId}/questions/${posted.questionId}/answer`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          answers: [{ header: 'Submit', choices: [JOB_SUBMIT_AFFIRMATIVE] }],
+        }),
+      },
+    );
+    expect(answered.status).toBe(200);
+    expect(
+      answerAndReserve(
+        server.db,
+        attempt.id,
+        { questionId: posted.questionId, choices: ['not the stored answer'] },
+        FORM,
+        AT,
+      ),
+    ).toMatchObject({ status: 'submitting', clicked: false });
   });
 });
