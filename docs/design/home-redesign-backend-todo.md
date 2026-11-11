@@ -4,6 +4,10 @@ The UI of the Coordinator home redesign is built against fixtures. The items bel
 
 A box marked **owner route** changes a security surface from `packages/shared/merge-gate-paths.json` and needs the owner's review. A box marked **design first** changes persisted state, a wire protocol or the command boundary and needs a one-page design before code.
 
+## Larger than this list
+
+- [ ] AI-native action registry: one typed registry that the web, the Coordinator tools, the MCP face and the CLI are generated from, with a journal and undo. Proposal in `docs/design/ai-native-actions.md`; a separate project that needs the owner's review first.
+
 ## Done with the UI change
 
 - [x] Quick replies: `suggest_replies` tool and stored replies (`docs/design/coordinator-quick-replies.md`).
