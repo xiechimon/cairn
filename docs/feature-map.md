@@ -584,10 +584,10 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### sidebar
 
-**Sidebar** (shipped). The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.
+**Sidebar** (shipped). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu and the machine-status footer.
 
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
-- Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
+- Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: **gap**: no design for unread and read marks across devices
 
 ### skills

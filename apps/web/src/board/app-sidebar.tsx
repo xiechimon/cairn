@@ -14,6 +14,7 @@ import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import { toastError } from '../components/ui/toaster.js';
+import { markDeleted } from '../fixtures/deletions.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useTypeToCompose } from '../overlay/hotkeys.js';
@@ -22,7 +23,12 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { toastArchived } from './archive-toast.js';
 import { useAttentionTitle } from './attention-title.js';
 import { fleetStatus } from './fleet-status.js';
-import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
+import {
+  BoardSidebar,
+  type SidebarProject,
+  type SidebarProjectActions,
+  type SidebarSelected,
+} from './sidebar.js';
 import { projectStatuses, waitingProjectIds } from './sidebar-projects.js';
 import { needsYouBadge } from './tasks-sections.js';
 import { THREAD_PARAM } from './thread-copy.js';
@@ -68,6 +74,7 @@ export function AppSidebar({
   const mutations = useApiMutations(teamId);
   const navigate = useNavigate();
   const projectsQ = useProjects(teamId, live);
+  const [fixtureEdits, setFixtureEdits] = useState<Record<string, Partial<SidebarProject>>>({});
   const projects: SidebarProject[] | undefined = useMemo(() => {
     if (live) {
       return (projectsQ.data ?? []).map((p) => ({
@@ -83,9 +90,18 @@ export function AppSidebar({
     return Object.entries(fixture.projectNames).map(([id, name]) => ({
       id,
       name,
+      group: fixture.projectGroups?.[id] ?? null,
       ...fixture.projectAvatars?.[id],
+      ...fixtureEdits[id],
     }));
-  }, [live, projectsQ.data, fixture.projectNames, fixture.projectAvatars]);
+  }, [
+    live,
+    projectsQ.data,
+    fixture.projectNames,
+    fixture.projectGroups,
+    fixture.projectAvatars,
+    fixtureEdits,
+  ]);
   const projectsPhase = live
     ? queryPhase(withTeamsFailure(projectsQ, teamsQuery), (projectsQ.data ?? []).length === 0)
     : undefined;
@@ -129,30 +145,91 @@ export function AppSidebar({
     live || fixtureMachines != null ? fleet.online : fixture.chief != null ? 1 : 0;
   const { search: locationSearch } = location;
   useTypeToCompose();
-  const archiveProject = (id: string) => {
-    mutations.setProjectArchived.mutate(
-      { id, archived: true },
-      {
-        onSuccess: () => {
-          const name = projects?.find((project) => project.id === id)?.name;
-          if (name !== undefined) {
-            toastArchived(t, name, (handlers) =>
-              mutations.setProjectArchived.mutate({ id, archived: false }, handlers),
-            );
-          }
-          if (new URLSearchParams(locationSearch).get('project') === id) {
-            navigate({ pathname: '/app' });
-          }
-        },
-        onError: (error) => toastError(t('无法归档项目。'), error),
-      },
-    );
+  const editFixture = (id: string, patch: Partial<SidebarProject>) =>
+    setFixtureEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  const leaveIfOpen = (id: string) => {
+    const params = new URLSearchParams(locationSearch);
+    if (params.get('project') !== id) return;
+    params.delete('project');
+    navigate({ pathname: '/app', search: `?${params}` });
   };
-  const moveProject = (id: string, group: string | null) => {
-    mutations.patchProject.mutate(
-      { id, body: { group } },
-      { onError: (error) => toastError(t('无法移动项目。'), error) },
-    );
+  const nameOf = (id: string) => projects?.find((project) => project.id === id)?.name;
+  const inGroup = (group: string) => (projects ?? []).filter((project) => project.group === group);
+  const liveActions: SidebarProjectActions = {
+    move: (id, group) =>
+      mutations.patchProject.mutate(
+        { id, body: { group } },
+        { onError: (error) => toastError(t('无法移动项目。'), error) },
+      ),
+    archive: (id) =>
+      mutations.setProjectArchived.mutate(
+        { id, archived: true },
+        {
+          onSuccess: () => {
+            const name = nameOf(id);
+            if (name !== undefined) {
+              toastArchived(t, name, (handlers) =>
+                mutations.setProjectArchived.mutate({ id, archived: false }, handlers),
+              );
+            }
+            leaveIfOpen(id);
+          },
+          onError: (error) => toastError(t('无法归档项目。'), error),
+        },
+      ),
+    rename: async (id, name) => {
+      try {
+        await mutations.patchProject.mutateAsync({ id, body: { name } });
+      } catch (error) {
+        toastError(t('无法重命名项目。'), error);
+        throw error;
+      }
+    },
+    remove: (id) =>
+      mutations.deleteProject.mutate(id, {
+        onSuccess: () => leaveIfOpen(id),
+        onError: (error) => toastError(t('删除项目失败，请重试。'), error),
+      }),
+    renameGroup: async (from, to) => {
+      try {
+        await Promise.all(
+          inGroup(from).map((project) =>
+            mutations.patchProject.mutateAsync({ id: project.id, body: { group: to } }),
+          ),
+        );
+      } catch (error) {
+        toastError(t('无法重命名分组。'), error);
+        throw error;
+      }
+    },
+    ungroup: (group) => {
+      Promise.all(
+        inGroup(group).map((project) =>
+          mutations.patchProject.mutateAsync({ id: project.id, body: { group: null } }),
+        ),
+      ).catch((error: unknown) => toastError(t('无法移动项目。'), error));
+    },
+  };
+  const fixtureActions: SidebarProjectActions = {
+    move: (id, group) => editFixture(id, { group }),
+    archive: (id) => {
+      editFixture(id, { archivedAt: Date.now() });
+      const name = nameOf(id);
+      if (name !== undefined) toastArchived(t, name, () => editFixture(id, { archivedAt: null }));
+      leaveIfOpen(id);
+    },
+    rename: async (id, name) => editFixture(id, { name }),
+    remove: (id) => {
+      markDeleted(id);
+      editFixture(id, {});
+      leaveIfOpen(id);
+    },
+    renameGroup: async (from, to) => {
+      for (const project of inGroup(from)) editFixture(project.id, { group: to });
+    },
+    ungroup: (group) => {
+      for (const project of inGroup(group)) editFixture(project.id, { group: null });
+    },
   };
   const sidebarProps = {
     machinesOnline,
@@ -163,8 +240,8 @@ export function AppSidebar({
     usageNav: fixture.usageNav === true,
     selected,
     projects,
-    onArchiveProject: live ? archiveProject : undefined,
-    onMoveProject: live ? moveProject : undefined,
+    statuses,
+    actions: live ? liveActions : projects === undefined ? undefined : fixtureActions,
     projectsState:
       projectsPhase === 'loading' || projectsPhase === 'error' ? projectsPhase : undefined,
     onRetryProjects: () => {
@@ -189,6 +266,7 @@ export function AppSidebar({
           <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
             <DialogContent
               showCloseButton={false}
+              initialFocus={(openType) => openType !== 'touch'}
               onClickCapture={(event) => {
                 if ((event.target as Element).closest('a[href]') != null) closeDrawer();
               }}
@@ -198,7 +276,6 @@ export function AppSidebar({
               <BoardSidebar
                 {...sidebarProps}
                 collapsed={false}
-                statuses={statuses}
                 onToggle={closeDrawer}
                 onSearch={() => {
                   closeDrawer();

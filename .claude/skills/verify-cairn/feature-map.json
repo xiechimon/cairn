@@ -1758,15 +1758,17 @@
     {
       "id": "sidebar",
       "name": "Sidebar",
-      "summary": "The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.",
-      "states": "Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.",
+      "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu and the machine-status footer.",
+      "states": "Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, and the 48px rail.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/sidebar.tsx",
           "apps/web/src/board/app-sidebar.tsx",
-          "apps/web/src/board/sidebar-projects.ts"
+          "apps/web/src/board/sidebar-projects.ts",
+          "apps/web/src/board/sidebar-project-menu.tsx",
+          "apps/web/src/components/shell/sidebar-project.tsx"
         ],
         "server": [
           "apps/server/src/services/notifications.ts"
@@ -1779,7 +1781,6 @@
       },
       "reach": [
         "open /app",
-        "click testid:project-group",
         "click testid:project-group-header"
       ],
       "research": [
@@ -1787,6 +1788,7 @@
       ],
       "frontendDesign": [
         "docs/design/references/thread-list-sidebar",
+        "docs/design/references/coordinator-chat",
         "docs/design/claude-ai-spec.md"
       ],
       "backendDesign": {
@@ -1795,6 +1797,7 @@
       "evidence": [
         "apps/web/e2e/sidebar-nav.spec.ts",
         "apps/web/e2e/sidebar-projects.spec.ts",
+        "apps/web/e2e/sidebar-visual.spec.ts",
         "apps/server/test/unread-notifications.test.ts"
       ],
       "batch": "B7"

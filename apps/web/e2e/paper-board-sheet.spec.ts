@@ -43,7 +43,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto(SCHEDULES);
       const pages = await sheetOf(page, '.page-main');
 
-      const left = rail ? 40 : 248;
+      const left = rail ? 48 : 220;
       expect(home.box).toEqual({ x: left, y: 0, w: 1440 - left, h: 900 });
       expect(home).toEqual(pages);
       expect(home.radius).toBe('0px');
@@ -52,7 +52,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(home.shadow).toBe('none');
       expect(home.selfShadow).toBe('none');
       expect(home.sidebarBorderRightW).toBe('0px');
-      expect(home.canvas).toBe(home.sidebarBg);
+      expect(home.sidebarBg).toBe(home.bg);
       expect(home.canvas).not.toBe(home.bg);
     });
   }
@@ -64,7 +64,7 @@ test('chief settings swaps in inside the same sheet', async ({ page }) => {
   await expect(heading).toBeVisible();
   await expect(page.getByTestId('home-c')).toHaveCount(0);
   const sheet = await sheetOf(page, '.board-sheet');
-  expect(sheet.box).toEqual({ x: 248, y: 0, w: 1192, h: 900 });
+  expect(sheet.box).toEqual({ x: 220, y: 0, w: 1220, h: 900 });
 });
 
 test.describe('on a 2x screen', () => {

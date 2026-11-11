@@ -48,7 +48,10 @@ export function ProjectSettingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  const [tab, setTab] = useState('basic');
+  const [tab, setTab] = useState(() => {
+    const asked = searchParams.get('tab');
+    return TABS.find((entry) => entry.id === asked)?.id ?? 'basic';
+  });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [accelDraft, setAccelDraft] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState<string | null>(null);

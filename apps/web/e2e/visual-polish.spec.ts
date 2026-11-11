@@ -60,7 +60,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(banner.shadow).not.toContain(banner.cardShadow);
   });
 
-  test(`sidebar sits on canvas beside the sheet, no seam of its own (${theme})`, async ({ page }) => {
+  test(`sidebar shares the sheet surface, no seam of its own (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
@@ -76,7 +76,7 @@ for (const theme of ['light', 'dark'] as const) {
         shadow: cs.boxShadow,
       };
     });
-    expect(probe.sidebarBg).not.toBe(probe.mainBg);
+    expect(probe.sidebarBg).toBe(probe.mainBg);
     expect(probe.borderRight).toBe('0px');
     expect(probe.shadow).toBe('none');
   });

@@ -38,13 +38,6 @@
   ],
   "brandInkText": [
     {
-      "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button)",
-      "role": "indicator",
-      "reason": "Collapsed-rail twin of the active row icon (icon-only rows).",
-      "contrast": "measured 2026-10-25 in the fixture build (light / dark): same fill as the expanded active row (9.14 / 6.90); non-text glyph, 3:1 gate"
-    },
-    {
       "file": "apps/web/src/phase.ts",
       "anchor": "const ACCENT_INK = 'text-(--card-button)'",
       "role": "indicator",

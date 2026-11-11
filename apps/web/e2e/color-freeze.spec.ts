@@ -71,8 +71,8 @@ const FROZEN_RGB: Record<'dark' | 'light', Record<string, string>> = {
     border: 'rgb(255 255 255 / 0.1)',
   },
   light: {
-    'sidebar-hover': 'rgb(0 0 0 / 0.05)',
-    'sidebar-active': 'rgb(0 0 0 / 0.1)',
+    'sidebar-hover': 'rgb(0 0 0 / 0.06)',
+    'sidebar-active': 'rgb(0 0 0 / 0.12)',
     'dialog-backdrop': 'rgb(0 0 0 / 0.4)',
     border: 'rgb(0 0 0 / 0.1)',
   },
@@ -156,7 +156,7 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
   });
   expect(vals.composer).toBe('14px');
   expect(vals.bubble).toBe('18px');
-  expect(vals.sidebar).toBe('248px');
+  expect(vals.sidebar).toBe('220px');
   expect(vals.chat).toBe('768px');
   expect(vals.edge).toBe('12px');
   expect(vals.card).toBe('12px');

@@ -74,18 +74,16 @@ test.describe('at phone width', () => {
     await expect(composer(page)).toHaveValue('Check the relay probe');
   });
 
-  test('drawer project rows carry one status line', async ({ page }) => {
+  test('drawer project rows keep their status in the description, not a second line', async ({ page }) => {
     await page.goto(HOME);
     await page.getByRole('button', { name: '展开侧边栏' }).click();
     const aside = page.locator('aside.board-sidebar');
     const row = (name: string) =>
       aside.locator('[data-slot="sidebar-project-row"]').filter({ hasText: name });
-    await expect(row('cairn').locator('[data-slot="project-status"]')).toHaveText(
-      '待回答 · 计划写好了',
-    );
-    await expect(row('Credential relay').locator('[data-slot="project-status"]')).toHaveText(
-      '2 件进行中',
-    );
+    await expect(row('cairn')).toHaveAttribute('aria-description', '待回答 · 计划写好了');
+    await expect(row('cairn')).toHaveText('cairn');
+    await expect(row('Credential relay')).toHaveAttribute('aria-description', '2 件进行中');
+    await expect(row('Credential relay')).toHaveText('Credential relay');
   });
 });
 

@@ -28,9 +28,9 @@ test.describe('sidebar seam (Paper Grouped)', () => {
 
       expect(m.borderRightW).toBe('0px');
       expect(m.shadow).toBe('none');
-      expect(m.sidebarW).toBe(248);
+      expect(m.sidebarW).toBe(220);
       expect(m.navBorderTopW).toBe('0px');
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
+      expect(await teamRowBox(page)).toEqual({ x: 8, y: 0, w: 204, h: 48 });
     });
 
     test(`schedules page: the workspace row keeps the board geometry (${theme})`, async ({
@@ -39,7 +39,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app/schedules?scenario=12');
       await expect(page.locator('[data-route="schedules"]')).toBeVisible();
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
+      expect(await teamRowBox(page)).toEqual({ x: 8, y: 0, w: 204, h: 48 });
     });
 
     test(`rail: no seam either (${theme})`, async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
 
       expect(m.borderRightW).toBe('0px');
       expect(m.shadow).toBe('none');
-      expect(m.railW).toBe(40);
+      expect(m.railW).toBe(48);
     });
 
     for (const [name, url] of [
@@ -78,7 +78,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
         });
         expect(m.borderRightW).toBe('0px');
         expect(m.shadow).toBe('none');
-        expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
+        expect(await teamRowBox(page)).toEqual({ x: 8, y: 0, w: 204, h: 48 });
       });
     }
   }

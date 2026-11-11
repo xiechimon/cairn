@@ -22,7 +22,7 @@ test.describe('wide screens', () => {
     await tasksToggle(page).click();
     await expect(page.locator('.side-panel')).toBeVisible();
     await expect(railed(page)).toBeVisible();
-    expect(await railed(page).evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
+    expect(await railed(page).evaluate((el) => el.getBoundingClientRect().width)).toBe(48);
     await tasksToggle(page).click();
     await expect(page.locator('.side-panel')).toHaveCount(0);
     await expectFull(page);

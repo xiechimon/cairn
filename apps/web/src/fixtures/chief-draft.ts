@@ -1,5 +1,6 @@
 import { legacyReview, PROJECT_ID, probeTodo, r7 } from './core.js';
 import type { FixtureSet, TodoRecord } from './records.js';
+import { RESOURCES } from './resources.js';
 
 const CAIRN_PROJECT = 'chief-draft-cairn';
 const READ_REPO_ID = 'chief-draft-read-repo';
@@ -60,4 +61,30 @@ export const chiefDraft: FixtureSet = {
     quickReplies: ['好，等你汇报', '先只看 README'],
     context: { tokens: 24_000, contextWindow: 200_000 },
   },
+};
+
+const ACME_WEB = 'sidebar-ref-acme-web';
+const ACME_API = 'sidebar-ref-acme-api';
+
+const acmeReview: TodoRecord = {
+  ...legacyReview,
+  id: 'sidebar-ref-acme-review',
+  seqNum: 14,
+  title: '给 acme-api 的限流加一组回归测试',
+  spec: '给 acme-api 的限流加一组回归测试',
+  projectId: ACME_API,
+  section: 'ready_for_review',
+};
+
+export const sidebarRef: FixtureSet = {
+  ...chiefDraft,
+  todos: [readRepo, acmeReview],
+  projectNames: {
+    [CAIRN_PROJECT]: 'cairn',
+    [PROJECT_ID]: 'r3-lifecycle',
+    [ACME_WEB]: 'acme-web',
+    [ACME_API]: 'acme-api',
+  },
+  projectGroups: { [ACME_WEB]: '客户', [ACME_API]: '客户' },
+  resources: RESOURCES,
 };

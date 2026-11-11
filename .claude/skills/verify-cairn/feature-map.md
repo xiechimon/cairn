@@ -980,23 +980,22 @@ Reach:
 
 ### sidebar
 
-**Sidebar** (shipped, centrality 3). The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.
+**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu and the machine-status footer.
 
-States: Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.
+States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, and the 48px rail.
 
 Reach:
 
 1. `open /app`
-2. `click testid:project-group`
-3. `click testid:project-group-header`
+2. `click testid:project-group-header`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `project-group`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`
+- Test ids in its code: `project-group-header`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
-- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
+- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: **gap**: no design for unread and read marks across devices
-- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/server/test/unread-notifications.test.ts`
+- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/web/e2e/sidebar-visual.spec.ts`, `apps/server/test/unread-notifications.test.ts`
 
 ### skills
 

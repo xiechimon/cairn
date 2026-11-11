@@ -1,22 +1,16 @@
 import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
-import {
-  Activity,
-  ChartColumn,
-  ChevronDown,
-  PanelLeft,
-  Plus,
-  Search,
-  Server,
-  Settings,
-} from 'lucide-react';
+import { cn } from 'cn';
+import { Activity, ChartColumn, PanelLeft, Plus, Search, Server, Settings } from 'lucide-react';
 import { type ReactElement, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
   ProjectGlyph,
+  SIDEBAR_ROW_ACTION,
   SidebarProjectGroupHeader,
   SidebarProjectRow,
+  type TreePlace,
 } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
@@ -29,11 +23,13 @@ import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
-import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
+import { SETTINGS_HREF } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
 import { coordinatorSearch } from './open-composer.js';
-import { SidebarProjectMenu } from './sidebar-project-menu.js';
+import { SidebarGroupMenu, SidebarProjectMenu } from './sidebar-project-menu.js';
 import { type ProjectStatus, sidebarProjects } from './sidebar-projects.js';
+import { THREAD_PARAM } from './thread-copy.js';
+import { PANE_PARAM } from './work-panel.js';
 
 export type SidebarSelected =
   | 'board'
@@ -55,7 +51,16 @@ export interface SidebarProject {
   archivedAt?: number | null | undefined;
 }
 
-const CANON_PROJECT: SidebarProject = { id: PROJECT_ID, name: PROJECT_NAME };
+export interface SidebarProjectActions {
+  move: (id: string, group: string | null) => void;
+  archive: (id: string) => void;
+  rename: (id: string, name: string) => Promise<void>;
+  remove: (id: string) => void;
+  renameGroup: (from: string, to: string) => Promise<void>;
+  ungroup: (group: string) => void;
+}
+
+const CANON_PROJECTS: readonly SidebarProject[] = [{ id: PROJECT_ID, name: PROJECT_NAME }];
 
 interface BoardSidebarProps {
   collapsed?: boolean;
@@ -69,27 +74,17 @@ interface BoardSidebarProps {
   projects?: SidebarProject[];
   waiting?: ReadonlySet<string>;
   statuses?: ReadonlyMap<string, ProjectStatus>;
-  onArchiveProject?: (id: string) => void;
-  onMoveProject?: (id: string, group: string | null) => void;
+  actions?: SidebarProjectActions;
   projectsState?: 'loading' | 'error';
   onRetryProjects?: () => void;
 }
 
 export const GROUP_STORAGE_KEYS = {
-  project: 'cairn.sidebarProjectsCollapsed',
   groups: 'cairn.sidebarGroupsCollapsed',
 } as const;
 
 const NOTHING_WAITING: ReadonlySet<string> = new Set();
 const NO_STATUSES: ReadonlyMap<string, ProjectStatus> = new Map();
-
-function readProjectsCollapsed(storage: Storage | null): boolean {
-  try {
-    return storage?.getItem(GROUP_STORAGE_KEYS.project) === '1';
-  } catch {
-    return false;
-  }
-}
 
 function readGroupsCollapsed(storage: Storage | null): ReadonlySet<string> {
   try {
@@ -100,7 +95,13 @@ function readGroupsCollapsed(storage: Storage | null): ReadonlySet<string> {
   }
 }
 
-const ICON = 'size-4.5 flex-none';
+function treePlace(index: number, count: number): TreePlace {
+  if (count === 1) return 'only';
+  if (index === 0) return 'first';
+  return index === count - 1 ? 'last' : 'middle';
+}
+
+const ICON = 'size-4 flex-none';
 const STROKE = 1.75;
 
 const FOCUS =
@@ -112,43 +113,57 @@ const SEARCH_OPEN_DIM =
 const SEARCH_OPEN_DIM_CURRENT =
   '[html[data-search-open]_&_[aria-current=page]]:bg-transparent [html[data-search-open]_&_[aria-current=page]]:text-content-secondary';
 
-const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover ${FOCUS}`;
+const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--cds-radius-md) border-none bg-transparent p-0 text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent ${FOCUS}`;
 
-const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_RING_INSET}`;
-const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button) hover:bg-(--hover-1) hover:text-(--card-button) ${SEARCH_OPEN_DIM}`;
+const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-md) text-sidebar-ink no-underline transition-[background-color,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_RING_INSET}`;
+const RAIL_ACTIVE = `bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active) hover:text-foreground ${SEARCH_OPEN_DIM}`;
 const RAIL_BTN =
-  'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground';
+  'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-sidebar-ink aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground';
 
-function SidebarFooterIcon({
+function SidebarTip({
+  label,
+  hint,
+  side = 'top',
+  children,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  side?: 'top' | 'bottom' | 'right';
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={children} />
+      <TooltipContent side={side} sideOffset={side === 'right' ? 8 : 6}>
+        {label}
+        {hint}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function FooterIcon({
   label,
   to,
-  state,
   testId,
   children,
 }: {
   label: string;
   to: To;
-  state?: unknown;
   testId?: string;
   children: ReactNode;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Link
-            to={to}
-            state={state}
-            aria-label={label}
-            data-testid={testId}
-            className={`grid size-8 place-items-center rounded-(--cds-radius-lg) text-content-tertiary hover:bg-sidebar-hover hover:text-foreground ${FOCUS}`}
-          />
-        }
+    <SidebarTip label={label}>
+      <Link
+        to={to}
+        aria-label={label}
+        data-testid={testId}
+        className={`grid size-7 flex-none place-items-center rounded-(--cds-radius-md) text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground active:bg-(--sidebar-active) ${FOCUS}`}
       >
         {children}
-      </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
-    </Tooltip>
+      </Link>
+    </SidebarTip>
   );
 }
 
@@ -186,8 +201,7 @@ export function BoardSidebar({
   projects,
   waiting = NOTHING_WAITING,
   statuses = NO_STATUSES,
-  onArchiveProject,
-  onMoveProject,
+  actions,
   projectsState,
   onRetryProjects,
 }: BoardSidebarProps) {
@@ -204,49 +218,62 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const machinesParams = new URLSearchParams(pathname === '/app' ? search : baseParams);
+  machinesParams.delete(THREAD_PARAM);
+  machinesParams.set(PANE_PARAM, 'machines');
+  const machinesTarget = { pathname: '/app', search: `?${machinesParams}` };
+  const newProjectTarget = { pathname: '/app/project/new', search: plain };
   const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
+  const allProjects = projects ?? CANON_PROJECTS;
   const layout = useMemo(
-    () => sidebarProjects((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
-    [projects],
+    () => sidebarProjects(allProjects.filter((row) => !isDeleted(row.id))),
+    [allProjects],
   );
   const listed = useMemo(
     () => [...layout.ungrouped, ...layout.groups.flatMap((group) => group.projects)],
     [layout],
   );
   const groupNames = useMemo(() => layout.groups.map((group) => group.name), [layout]);
-  const activeProject = (projects ?? [CANON_PROJECT]).some((row) => row.id === projectParam)
-    ? projectParam
-    : null;
+  const activeProject = allProjects.some((row) => row.id === projectParam) ? projectParam : null;
   const waitingLabel = t('有任务在等你');
-  const statusText = (status: ProjectStatus | undefined) =>
-    status === undefined
-      ? null
-      : status.kind === 'working'
-        ? t('{n} 件进行中', { n: status.count })
-        : `${t(status.word)} · ${t(status.what.key, status.what.params)}`;
+  const statusText = (id: string) => {
+    const status = statuses.get(id);
+    if (status === undefined) return waiting.has(id) ? waitingLabel : null;
+    return status.kind === 'working'
+      ? t('{n} 件进行中', { n: status.count })
+      : `${t(status.word)} · ${t(status.what.key, status.what.params)}`;
+  };
   const projectMenu = (row: SidebarProject) =>
-    onArchiveProject === undefined || onMoveProject === undefined ? undefined : (
+    actions === undefined ? undefined : (
       <SidebarProjectMenu
         name={row.name}
         group={row.group ?? null}
         groups={groupNames}
-        onMove={(group) => onMoveProject(row.id, group)}
-        onArchive={() => onArchiveProject(row.id)}
+        onMove={(group) => actions.move(row.id, group)}
+        onArchive={() => actions.archive(row.id)}
+        onRename={(name) => actions.rename(row.id, name)}
+        onDelete={() => actions.remove(row.id)}
+        onInstructions={() => {
+          const next = new URLSearchParams(baseParams);
+          next.set('tab', 'memory');
+          navigate({ pathname: `/app/project/${row.id}/settings`, search: `?${next}` });
+        }}
       />
     );
-  const projectRow = (row: SidebarProject, nested: boolean) => (
-    <SidebarProjectRow
-      key={row.id}
-      name={row.name}
-      icon={row.icon}
-      nested={nested}
-      waiting={waiting.has(row.id) ? waitingLabel : null}
-      status={statusText(statuses.get(row.id))}
-      active={activeProject === row.id}
-      onClick={() => navigate(projectHref(row.id))}
-      menu={projectMenu(row)}
-    />
-  );
+  const projectRows = (rows: readonly SidebarProject[]) =>
+    rows.map((row, index) => (
+      <SidebarProjectRow
+        key={row.id}
+        name={row.name}
+        icon={row.icon}
+        place={treePlace(index, rows.length)}
+        waiting={waiting.has(row.id) ? waitingLabel : null}
+        status={statusText(row.id)}
+        active={activeProject === row.id}
+        onClick={() => navigate(projectHref(row.id))}
+        menu={projectMenu(row)}
+      />
+    ));
   const [groupsCollapsed, setGroupsCollapsed] = useState(() =>
     readGroupsCollapsed(safeLocalStorage()),
   );
@@ -258,26 +285,12 @@ export function BoardSidebar({
       return next;
     });
   }, []);
-
-  const [projectsCollapsed, setProjectsCollapsed] = useState(() =>
-    readProjectsCollapsed(safeLocalStorage()),
-  );
-  const toggleProjects = useCallback(() => {
-    setProjectsCollapsed((prev) => {
-      safeSetItem(GROUP_STORAGE_KEYS.project, prev ? '0' : '1');
-      return !prev;
-    });
-  }, []);
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
   const coordinatorActive = selected === 'board' && activeProject === null;
 
-  const settingsLink = {
-    to: { pathname: SETTINGS_HREF, search: plain },
-  };
-  const activityLink = {
-    to: { pathname: ACTIVITY_PATH, search: plain },
-  };
+  const settingsTarget = { pathname: SETTINGS_HREF, search: plain };
+  const activityTarget = { pathname: ACTIVITY_PATH, search: plain };
   const fleet = fleetSummary(
     { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
     t,
@@ -295,192 +308,164 @@ export function BoardSidebar({
       'aria-label': label,
     });
     return (
-      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col items-center gap-px bg-(--surface-1) pt-2 pb-2">
-        <RailTip label={t('展开侧边栏')} icon={<PanelLeft className={ICON} strokeWidth={STROKE} />}>
-          <Button
-            variant="ghost"
-            className={`rail-toggle ${RAIL_ROW} ${RAIL_BTN}`}
-            aria-label={t('展开侧边栏')}
-            onClick={onToggle}
-          />
-        </RailTip>
-        <RailTip
-          label={t('搜索')}
-          hint={<Kbd>⌘K</Kbd>}
-          icon={<Search className={ICON} strokeWidth={STROKE} />}
-        >
-          <Button
-            variant="ghost"
-            className={`${RAIL_ROW} ${RAIL_BTN}`}
-            aria-label={t('搜索')}
-            onClick={onSearch}
-          />
-        </RailTip>
-        <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <RailTip label={t('Coordinator')} icon={<BrandGlyph className={ICON} />}>
-            <Link {...railLink(coordinatorTarget, coordinatorActive, t('Coordinator'))} />
-          </RailTip>
+      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-(--sidebar-rail-w) flex-none flex-col items-center bg-(--sidebar-surface) pb-2">
+        <div className="mx-2 flex h-12 flex-none items-center justify-center self-stretch border-b border-border">
           <RailTip
-            label={t(projectsCollapsed ? '展开{label}' : '收起{label}', { label: t('项目') })}
-            icon={
-              <ChevronDown
-                className="size-3.5 transition-transform duration-150 group-[.rail-group--collapsed]:-rotate-90"
-                strokeWidth={STROKE}
-              />
-            }
+            label={t('展开侧边栏')}
+            icon={<PanelLeft className="size-4.5" strokeWidth={STROKE} />}
           >
             <Button
               variant="ghost"
-              className={`rail-group group mt-2 ${RAIL_ROW} ${RAIL_BTN} ${projectsCollapsed ? 'rail-group--collapsed' : ''}`}
-              aria-label={t(projectsCollapsed ? '展开{label}' : '收起{label}', {
-                label: t('项目'),
-              })}
-              aria-expanded={!projectsCollapsed}
-              onClick={toggleProjects}
+              className={cn('rail-toggle', RAIL_ROW, RAIL_BTN, 'size-7 text-content-tertiary')}
+              aria-label={t('展开侧边栏')}
+              onClick={onToggle}
             />
           </RailTip>
-          {!projectsCollapsed &&
-            listed.map((row) => {
-              const href = projectHref(row.id);
-              const label = waiting.has(row.id)
-                ? t('{name}：有任务在等你', { name: row.name })
-                : row.name;
-              return (
-                <RailTip
-                  key={row.id}
-                  label={label}
-                  icon={
-                    <>
-                      <ProjectGlyph icon={row.icon} />
-                      {waiting.has(row.id) && (
-                        <span
-                          data-slot="needs-you-dot"
-                          className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
-                        />
-                      )}
-                    </>
-                  }
-                >
-                  <Link {...railLink(href, activeProject === row.id, label)} />
-                </RailTip>
-              );
-            })}
+        </div>
+        <nav className="flex min-h-0 flex-1 flex-col items-center gap-0.5 overflow-y-auto pt-1">
+          <RailTip
+            label={t('搜索')}
+            hint={<Kbd>⌘K</Kbd>}
+            icon={<Search className={ICON} strokeWidth={STROKE} />}
+          >
+            <Button
+              variant="ghost"
+              className={`${RAIL_ROW} ${RAIL_BTN}`}
+              aria-label={t('搜索')}
+              onClick={onSearch}
+            />
+          </RailTip>
+          <span aria-hidden className="h-1 flex-none" />
+          <RailTip label={t('Coordinator')} icon={<BrandGlyph className={ICON} />}>
+            <Link {...railLink(coordinatorTarget, coordinatorActive, t('Coordinator'))} />
+          </RailTip>
+          {listed.map((row) => {
+            const href = projectHref(row.id);
+            const label = waiting.has(row.id)
+              ? t('{name}：有任务在等你', { name: row.name })
+              : row.name;
+            return (
+              <RailTip
+                key={row.id}
+                label={label}
+                icon={
+                  <>
+                    <ProjectGlyph icon={row.icon} />
+                    {waiting.has(row.id) && (
+                      <span
+                        data-slot="needs-you-dot"
+                        className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
+                      />
+                    )}
+                  </>
+                }
+              >
+                <Link {...railLink(href, activeProject === row.id, label)} />
+              </RailTip>
+            );
+          })}
           <RailTip label={t('新建项目')} icon={<Plus className={ICON} strokeWidth={STROKE} />}>
             <Link
-              {...railLink({ pathname: '/app/project/new', search: plain }, false, t('新建项目'))}
+              {...railLink(newProjectTarget, false, t('新建项目'))}
               data-slot="sidebar-new-project"
             />
           </RailTip>
         </nav>
-        {fleet != null && (
-          <RailTip
-            label={fleet.title}
-            icon={
-              <>
-                <Server className={ICON} strokeWidth={STROKE} />
-                {fleet.tone === 'offline' && (
-                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
-                )}
-              </>
-            }
-          >
-            <Link
-              {...railLink(
-                { pathname: settingsHref('machines'), search: plain },
-                false,
-                fleet.title,
-              )}
-              data-testid="sidebar-attention"
-              data-fleet={fleet.tone}
-            />
+        <div className="flex flex-none flex-col items-center gap-0.5 pt-2">
+          {fleet != null && (
+            <RailTip
+              label={fleet.title}
+              icon={
+                <>
+                  <Server className={ICON} strokeWidth={STROKE} />
+                  <span
+                    className={cn(
+                      'absolute top-1 right-1 size-1.5 rounded-full',
+                      fleet.tone === 'offline' ? 'bg-destructive' : 'bg-running',
+                    )}
+                  />
+                </>
+              }
+            >
+              <Link
+                {...railLink(machinesTarget, false, fleet.title)}
+                data-testid="sidebar-attention"
+                data-fleet={fleet.tone}
+              />
+            </RailTip>
+          )}
+          <RailTip label={t('活动')} icon={<Activity className={ICON} strokeWidth={STROKE} />}>
+            <Link {...railLink(activityTarget, false, t('活动'))} data-testid="sidebar-activity" />
           </RailTip>
-        )}
-        <RailTip label={t('设置')} icon={<Settings className={ICON} strokeWidth={STROKE} />}>
-          <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings" />
-        </RailTip>
-        <RailTip label={t('活动')} icon={<Activity className={ICON} strokeWidth={STROKE} />}>
-          <Link {...railLink(activityLink.to, false, t('活动'))} data-testid="sidebar-activity" />
-        </RailTip>
+          <RailTip label={t('设置')} icon={<Settings className={ICON} strokeWidth={STROKE} />}>
+            <Link {...railLink(settingsTarget, false, t('设置'))} data-testid="sidebar-settings" />
+          </RailTip>
+        </div>
       </aside>
     );
   }
 
+  const ungroupedSpaced = layout.ungrouped.length > 0 || projectsState !== undefined;
+
   return (
     <aside
-      className={`board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden bg-(--surface-1) px-3 pt-3 pb-2.5 ${SEARCH_OPEN_DIM_CURRENT}`}
+      className={`board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden bg-(--sidebar-surface) ${SEARCH_OPEN_DIM_CURRENT}`}
     >
       <div
         data-testid="team-row"
-        className="sidebar-team-row flex h-11 flex-none items-center text-foreground"
+        className="sidebar-team-row mx-2 flex h-12 flex-none items-center border-b border-border pl-0.5 text-foreground"
       >
-        <Button
-          variant="ghost"
-          className={`sidebar-team-collapse ${ICON_BTN}`}
-          aria-label={t('收起侧边栏')}
-          onClick={onToggle}
-        >
-          <PanelLeft className={ICON} strokeWidth={STROKE} />
-        </Button>
-        <span className="sidebar-team-name ml-1 min-w-0 flex-1 truncate voice-title text-brand text-foreground">
+        <SidebarTip label={t('收起侧边栏')} side="bottom">
+          <Button
+            variant="ghost"
+            className={cn('sidebar-team-collapse', ICON_BTN, 'text-content-tertiary')}
+            aria-label={t('收起侧边栏')}
+            onClick={onToggle}
+          >
+            <PanelLeft className="size-4.5" strokeWidth={STROKE} />
+          </Button>
+        </SidebarTip>
+        <span className="sidebar-team-name ml-0.75 min-w-0 flex-1 truncate voice-title text-brand text-foreground">
           {BRAND.manifestName}
         </span>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                className={`sidebar-search ${ICON_BTN}`}
-                aria-label={t('搜索')}
-                onClick={onSearch}
-              >
-                <Search className="size-4" strokeWidth={STROKE} />
-              </Button>
-            }
-          />
-          <TooltipContent side="bottom" sideOffset={6}>
-            <Kbd>⌘K</Kbd>
-          </TooltipContent>
-        </Tooltip>
+        <SidebarTip label={<Kbd>⌘K</Kbd>} side="bottom">
+          <Button
+            variant="ghost"
+            className={`sidebar-search ${ICON_BTN}`}
+            aria-label={t('搜索')}
+            onClick={onSearch}
+          >
+            <Search className={ICON} strokeWidth={STROKE} />
+          </Button>
+        </SidebarTip>
       </div>
 
-      <div className="mt-2 flex flex-none flex-col gap-px">
+      <nav
+        ref={navRef}
+        className={`flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-2 ${scrollFadeClassName()}`}
+      >
         <SidebarNavRow
           icon={<BrandGlyph className="size-4" />}
           label={t('Coordinator')}
           active={coordinatorActive}
           onClick={() => navigate(coordinatorTarget)}
+          actions={
+            <SidebarTip label={t('新建项目')}>
+              <Link
+                to={newProjectTarget}
+                aria-label={t('新建项目')}
+                className={`grid place-items-center ${SIDEBAR_ROW_ACTION} ${FOCUS}`}
+              >
+                <Plus strokeWidth={STROKE} />
+              </Link>
+            </SidebarTip>
+          }
         />
-      </div>
-
-      <nav
-        ref={navRef}
-        className={`-mx-1 mt-3 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 ${scrollFadeClassName()}`}
-      >
-        <div
-          data-testid="project-group"
-          className="mt-1 mb-0.5 flex h-6 flex-none items-center pr-1 pl-2 text-caption font-normal text-content-tertiary"
-        >
-          <Button
-            variant="ghost"
-            className={`sidebar-group group h-6 cursor-pointer gap-1 rounded-(--radius-control) border-none bg-transparent px-0 text-caption font-normal text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent ${FOCUS} ${
-              projectsCollapsed ? 'sidebar-group--collapsed' : ''
-            }`}
-            aria-expanded={!projectsCollapsed}
-            onClick={toggleProjects}
-          >
-            {t('项目')}
-            <ChevronDown
-              aria-hidden
-              className="sidebar-group-chevron size-3.5 text-content-dim opacity-0 transition-transform duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 group-[.sidebar-group--collapsed]:-rotate-90 group-[.sidebar-group--collapsed]:opacity-100 pointer-coarse:opacity-100"
-              strokeWidth={STROKE}
-            />
-          </Button>
-        </div>
-        {!projectsCollapsed && projectsState === 'loading' && (
+        {projectsState === 'loading' && (
           <div
             data-testid="sidebar-projects-loading"
             aria-busy="true"
-            className="flex flex-col gap-1.5 px-2.5 py-1"
+            className="ml-5.5 flex flex-col gap-1.5 py-1 pr-2 pl-2.5"
           >
             <span className="sr-only">{t('正在加载项目')}</span>
             {[0, 1, 2].map((i) => (
@@ -488,10 +473,10 @@ export function BoardSidebar({
             ))}
           </div>
         )}
-        {!projectsCollapsed && projectsState === 'error' && (
+        {projectsState === 'error' && (
           <div
             data-testid="sidebar-projects-error"
-            className="flex items-center gap-2 px-2.5 py-1 text-meta text-content-secondary"
+            className="ml-5.5 flex items-center gap-2 py-1 pr-1 pl-2.5 text-meta text-content-secondary"
           >
             <span className="min-w-0 flex-1">{t('项目没能加载')}</span>
             <Button
@@ -504,68 +489,86 @@ export function BoardSidebar({
             </Button>
           </div>
         )}
-        {!projectsCollapsed && (
-          <>
-            {layout.ungrouped.map((row) => projectRow(row, false))}
-            {layout.groups.map((group) => {
-              const expanded = !groupsCollapsed.has(group.name);
-              return (
-                <div key={group.name} className="flex flex-col gap-px">
-                  <SidebarProjectGroupHeader
-                    name={group.name}
-                    expanded={expanded}
-                    onToggle={() => toggleGroup(group.name)}
-                  />
-                  {expanded && group.projects.map((row) => projectRow(row, true))}
-                </div>
-              );
-            })}
-          </>
-        )}
+        {projectRows(layout.ungrouped)}
+        {layout.groups.map((group, index) => {
+          const expanded = !groupsCollapsed.has(group.name);
+          const previous = layout.groups[index - 1];
+          const spaced =
+            previous === undefined
+              ? ungroupedSpaced
+              : !groupsCollapsed.has(previous.name) && previous.projects.length > 0;
+          const groupWaiting = group.projects.some((row) => waiting.has(row.id));
+          return (
+            <div key={group.name} className="flex flex-col gap-0.5">
+              <SidebarProjectGroupHeader
+                name={group.name}
+                expanded={expanded}
+                count={group.projects.length}
+                waiting={groupWaiting ? waitingLabel : null}
+                spaced={spaced}
+                onToggle={() => toggleGroup(group.name)}
+                menu={
+                  actions === undefined ? undefined : (
+                    <SidebarGroupMenu
+                      name={group.name}
+                      onRename={(next) => actions.renameGroup(group.name, next)}
+                      onUngroup={() => actions.ungroup(group.name)}
+                    />
+                  )
+                }
+              />
+              {expanded && projectRows(group.projects)}
+            </div>
+          );
+        })}
         <Link
           data-slot="sidebar-new-project"
-          className={`flex h-9 flex-none items-center gap-2.5 rounded-(--radius-control) px-2 text-ui text-content-secondary no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`}
-          to={{ pathname: '/app/project/new', search: plain }}
+          className={`ml-5.5 flex h-8.5 flex-none items-center gap-3 rounded-(--cds-radius-md) pr-2 pl-2.5 text-meta text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`}
+          to={newProjectTarget}
         >
-          <Plus className="size-4 flex-none text-content-tertiary" strokeWidth={STROKE} />
+          <Plus className={ICON} strokeWidth={STROKE} />
           {t('新建项目')}
         </Link>
       </nav>
 
       <div
         data-testid="sidebar-footer"
-        className="box-content flex h-8 flex-none items-center gap-0.5 pt-2"
+        className="flex h-13.5 flex-none items-center gap-1 border-t border-border pr-1.5 pl-2"
       >
-        <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
-          <Settings className={ICON} strokeWidth={STROKE} />
-        </SidebarFooterIcon>
-        <SidebarFooterIcon label={t('活动')} testId="sidebar-activity" {...activityLink}>
-          <Activity className={ICON} strokeWidth={STROKE} />
-        </SidebarFooterIcon>
+        {fleet == null ? (
+          <span className="flex-1" />
+        ) : (
+          <Link
+            data-testid="sidebar-attention"
+            data-fleet={fleet.tone}
+            to={machinesTarget}
+            title={fleet.title}
+            aria-label={fleet.title}
+            className={`flex h-9.5 min-w-0 flex-1 items-center gap-3 rounded-(--cds-radius-lg) pr-2 pl-1.5 text-meta whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) ${FOCUS}`}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'mx-1.25 size-1.5 flex-none rounded-full',
+                fleet.tone === 'offline' ? 'bg-destructive' : 'bg-running',
+              )}
+            />
+            <span className="min-w-0 truncate">{fleet.label}</span>
+          </Link>
+        )}
         {usageNav && (
-          <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
+          <FooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
             <ChartColumn className={ICON} strokeWidth={STROKE} />
-          </SidebarFooterIcon>
+          </FooterIcon>
         )}
-        {fleet != null && (
-          <div className="@container flex min-w-0 flex-1 justify-end">
-            <Link
-              data-testid="sidebar-attention"
-              data-fleet={fleet.tone}
-              to={{ pathname: settingsHref('machines'), search: plain }}
-              title={fleet.title}
-              aria-label={fleet.title}
-              className={`flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 text-caption whitespace-nowrap text-content-tertiary no-underline hover:text-content-secondary ${FOCUS}`}
-            >
-              <span
-                aria-hidden
-                className={`size-1.5 flex-none rounded-full ${fleet.tone === 'offline' ? 'bg-destructive' : 'bg-running'}`}
-              />
-              <span className="@min-[9rem]:hidden">{fleet.short}</span>
-              <span className="hidden @min-[9rem]:inline">{fleet.label}</span>
-            </Link>
-          </div>
-        )}
+        <div className="flex flex-none items-center gap-0.5">
+          <FooterIcon label={t('活动')} testId="sidebar-activity" to={activityTarget}>
+            <Activity className={ICON} strokeWidth={STROKE} />
+          </FooterIcon>
+          <FooterIcon label={t('设置')} testId="sidebar-settings" to={settingsTarget}>
+            <Settings className={ICON} strokeWidth={STROKE} />
+          </FooterIcon>
+        </div>
       </div>
     </aside>
   );
