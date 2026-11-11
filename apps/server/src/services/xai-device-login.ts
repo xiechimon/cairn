@@ -320,11 +320,11 @@ async function refreshAccess(
 ): Promise<string> {
   if (Date.now() < secret.expires) return secret.access;
   const row = deps.db
-    .select({ id: provider.id })
+    .select({ id: provider.id, apiKeyCipher: provider.apiKeyCipher })
     .from(provider)
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
-  if (!row) throw new HttpError(502, 'xAI subscription token refresh failed');
+  if (!row?.apiKeyCipher) throw new HttpError(502, 'xAI subscription token refresh failed');
   const response = await postForm(deps.fetch, XAI_TOKEN_URL, {
     grant_type: 'refresh_token',
     client_id: XAI_PI_PUBLIC_CLIENT_ID,
@@ -333,10 +333,23 @@ async function refreshAccess(
   if (!response.ok) throw new HttpError(502, 'xAI subscription token refresh failed');
   const tokens = tokensFromBody(response.body, secret.refresh);
   const sealed = sealSecret(tokens);
+  const latest = deps.db
+    .select({ apiKeyCipher: provider.apiKeyCipher })
+    .from(provider)
+    .where(eq(provider.id, row.id))
+    .get();
+  const latestRaw = latest?.apiKeyCipher == null ? null : deps.box.open(latest.apiKeyCipher);
+  const latestSecret = latestRaw == null ? null : secretOf(latestRaw);
+  if (latestSecret?.refresh !== secret.refresh) {
+    if (latestRaw == null) throw new HttpError(502, 'xAI subscription token refresh failed');
+    if (latestSecret == null) return latestRaw;
+    if (Date.now() < latestSecret.expires) return latestSecret.access;
+    return refreshAccess(deps, teamId, providerId, latestSecret);
+  }
   deps.db
     .update(provider)
     .set({ apiKeyCipher: deps.box.seal(sealed), updatedAt: nowMs() })
-    .where(eq(provider.id, row.id))
+    .where(and(eq(provider.id, row.id), eq(provider.apiKeyCipher, row.apiKeyCipher)))
     .run();
   return tokens.access;
 }

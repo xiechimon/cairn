@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProvider, openProviderKey } from '../src/services/providers.js';
+import { createProvider, openProviderKey, updateProvider } from '../src/services/providers.js';
 import {
   materializeXaiAccessToken,
   XAI_DEVICE_CODE_URL,
@@ -211,5 +211,62 @@ describe('xAI SuperGrok device login', () => {
     const opened = openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai');
     expect(opened?.apiKey).toContain(ROTATED);
     expect(opened?.apiKey).not.toContain(REFRESH);
+  });
+
+  it('does not overwrite a credential replaced while refresh is in flight', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = async () => {
+      await gate;
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({
+          access_token: 'stale-access',
+          refresh_token: 'stale-refresh',
+          expires_in: 3600,
+        }),
+        text: async () => '',
+      };
+    };
+    const { s } = boot([{ json: {} }]);
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.user.id,
+        body: {
+          providerId: 'xai',
+          label: 'xAI',
+          baseUrl: 'https://api.x.ai/v1',
+          api: 'openai-responses',
+          apiKey: JSON.stringify({
+            kind: 'xai-oauth',
+            refresh: REFRESH,
+            access: ACCESS,
+            expires: Date.now() - 1_000,
+          }),
+        },
+      },
+    );
+    const opened = openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai');
+    if (!opened?.apiKey) throw new Error('stored secret missing');
+    const pending = materializeXaiAccessToken(
+      { db: s.db, box: s.secretBox, fetch: fetchImpl, states: s.xaiDeviceStates },
+      s.team.id,
+      'xai',
+      opened.apiKey,
+    );
+    updateProvider({ db: s.db, box: s.secretBox }, s.team.id, opened.row.id, {
+      apiKey: 'console-key',
+    });
+    release();
+    await expect(pending).resolves.toBe('console-key');
+    expect(openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai')?.apiKey).toBe(
+      'console-key',
+    );
   });
 });
