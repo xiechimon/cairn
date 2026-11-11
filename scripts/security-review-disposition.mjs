@@ -1,5 +1,7 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { matchesGlob } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const CATEGORIES = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth'];
 const SHA = /^[0-9a-f]{40}$/;
@@ -39,10 +41,32 @@ export function touchesSecurity(files, patterns, pathsFileTouched) {
   );
 }
 
+const markdownLib = fileURLToPath(new URL('./pr_body.py', import.meta.url));
+
+export function visibleMarkdown(body) {
+  const result = spawnSync(
+    'python3',
+    [
+      '-c',
+      [
+        'import sys',
+        'from pathlib import Path',
+        'sys.path.insert(0, str(Path(sys.argv[1]).parent))',
+        'from pr_body import visible_markdown',
+        'sys.stdout.write(visible_markdown(sys.stdin.read(), blank_fences=True))',
+      ].join('\n'),
+      markdownLib,
+    ],
+    { input: body, encoding: 'utf8' },
+  );
+  if (result.status !== 0) throw new Error(result.stderr || 'visible_markdown failed');
+  return result.stdout ?? '';
+}
+
 export function outsideFences(body) {
-  return body
-    .split('```')
-    .filter((_, index) => index % 2 === 0)
+  return visibleMarkdown(body)
+    .split('\n')
+    .filter((line) => !/^(?: {4}|\t)/.test(line))
     .join('\n');
 }
 

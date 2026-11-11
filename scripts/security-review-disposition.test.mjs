@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   dispositionMatches,
@@ -67,6 +68,21 @@ test('a fenced example of the line does not count', () => {
     dispositionMatches(`\`\`\`\nSecurity review (${HEAD}): recorded\n\`\`\`\n`, HEAD),
     false,
   );
+});
+
+test('a tilde fence, an HTML comment and an indented code line do not count', () => {
+  for (const body of [
+    `~~~\nSecurity review (${HEAD}): recorded\n~~~\n`,
+    `<!-- Security review (${HEAD}): recorded -->\n`,
+    `    Security review (${HEAD}): recorded\n`,
+  ])
+    assert.equal(dispositionMatches(body, HEAD), false, body);
+});
+
+test('the workflow runs the base copy of the checker, not the PR copy', () => {
+  const yaml = readFileSync('.github/workflows/pr-evidence.yml', 'utf8');
+  assert.match(yaml, /git show "\$BASE_SHA:scripts\/security-review-disposition.mjs"/);
+  assert.doesNotMatch(yaml, /node scripts\/security-review-disposition.mjs/);
 });
 
 test('a rename out of a security surface still needs the line', () => {
