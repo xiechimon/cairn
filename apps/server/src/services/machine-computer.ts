@@ -534,6 +534,13 @@ export function stopStepComputer(
   releaseExecutionLease(db, stepId);
 }
 
+function machineAcceptsTool(row: typeof machine.$inferSelect, tool: ComputerTool): boolean {
+  if (isComputerBrowserTool(tool)) {
+    return row.browserOverride !== false && row.capabilities?.browser === true;
+  }
+  return row.desktopOverride !== false && row.capabilities?.computer === true;
+}
+
 function assertMachineGrant(db: Db, machineId: string, tool: ComputerTool): void {
   const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (isComputerBrowserTool(tool)) {
@@ -562,10 +569,11 @@ function selectTarget(
     .orderBy(desc(machine.lastSeenAt))
     .all()
     .filter(capable);
-  const live = fleet.filter((row) => machineHub.isConnected(row.id));
+  const connected = fleet.filter((row) => machineHub.isConnected(row.id));
+  const live = connected.filter((row) => machineAcceptsTool(row, tool));
 
   if (wantsOwn) {
-    const chosen = live[0];
+    const chosen = live[0] ?? connected[0];
     if (chosen) return { machineId: chosen.id, computerId: null };
     throw new HttpError(
       409,
@@ -586,6 +594,7 @@ function selectTarget(
   }
   const chosen = live[0];
   if (!chosen) {
+    if (connected[0]) assertMachineGrant(db, connected[0].id, tool);
     throw new HttpError(
       409,
       fleet.length === 0

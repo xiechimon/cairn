@@ -268,6 +268,29 @@ describe('forwardComputerCall target and presence', () => {
     expect(s.db.select().from(computerCallTable).all()).toEqual([]);
   });
 
+  test('a new computer skips a newer ineligible machine and uses an eligible one', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'older', { computer: true, browser: true }, 1);
+    addMachine(s, 'newer', { computer: true, browser: true }, 5);
+    s.db
+      .update(machineTable)
+      .set({ browserOverride: false, desktopOverride: false })
+      .where(eq(machineTable.id, 'newer'))
+      .run();
+    const olderCalls = connect(s, 'older');
+    connect(s, 'newer');
+    const browser = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId: 'browser-pick',
+      params: { url: 'https://example.com' },
+    });
+    expect(olderCalls).toHaveLength(1);
+    receiveComputerFrames(s.db, s.hub, 'older', olderCalls[0]!.callId, [done(1, 'picked')]);
+    expect((await browser).text).toBe('picked');
+    expect(s.db.select().from(computerTable).get()?.machineId).toBe('older');
+  });
+
   test('browser tools refuse when the pinned machine no longer reports browser capability', async () => {
     const { s, deps, chiefId } = boot();
     addMachine(s, 'omarchy', { computer: true, browser: true });
