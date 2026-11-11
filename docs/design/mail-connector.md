@@ -1,0 +1,115 @@
+# Mail connector
+
+Status: proposal for the owner's review. Nothing here is built. Owner route: a later implementation touches the secrets service and adds an unauthenticated inbound endpoint. This page does not change code.
+
+Completes to-do item: Mail that reaches the owner without polling. The checkbox stays unticked until #3924 merges.
+
+## Problem
+
+The owner wants new mail in two mailboxes to reach him without a poll loop, and wants the Coordinator to raise only what matters. Mail is written by strangers. It is data, never instructions.
+
+## What exists
+
+Checked on `origin/main` (`7299c658e`). No Gmail, IMAP, Pub/Sub, or inbound webhook code.
+
+| Need | Where it stands |
+|---|---|
+| Wake | `enqueueChiefStep` in `apps/server/src/services/chief.ts` inserts a chief step whose prompt starts `[wake:…] provenance=`, then calls `wakeCoordinator`. `apps/server/src/index.ts` wires that to `coordinator.wake`. A missing coordinator makes the wake a no-op; the step row remains. |
+| Speak to the owner | `notify_user` (`apps/server/src/services/chief-tools.ts`) writes a chief message and `notifyChiefMessage` (`apps/server/src/services/notifications.ts`). It does not call push. |
+| In-app notice | `notification` rows, id `${userId}:${entityId}`, channels only `in_app`. Types are the closed enum in `packages/shared/src/records/notification.ts`. One row per entity: a later upsert replaces the snippet. |
+| Web push | `pushToUserSafely` in `apps/server/src/services/push.ts`. Callers today: `apps/server/src/services/owner.ts`, `chief-questions.ts` (questions, not `notify_user`), `chief-report.ts`. No-op when VAPID is null, the user is viewing that href (`isViewingThread`), or the href is a silenced todo. `queuePushDigest` / `sweepPushDigest` batch the rest. |
+| Secrets | `apps/server/src/services/secrets.ts` seals `valueCipher` and never returns it from `toSecretRecord`. `openSecretValues` is how a step receives secrets (`apps/server/src/services/credentials.ts`). Chief steps get `secrets: {}`. `get_secret` in `apps/daemon/src/secret-channel.ts` returns the value to the model when a step was granted the name. |
+| OAuth | `apps/server/src/services/oauth.ts` and `GET /api/oauth/callback` cover provider presets and GitHub only (`packages/shared/src/records/provider.ts`). |
+| MCP | `apps/server/src/services/mcp-face.ts` is cairn's own server at `/api/mcp`. `apps/server/src/services/mcp-servers.ts` only lists the host Claude config. No connect flow, no token store, no invoke. |
+| Public origin | `CAIRN_WEB_ORIGIN` (`apps/server/src/config.ts`) is the web origin push links use. It defaults to `https://cairn.local`. There is no stored public API origin. Session-token middleware skips `/api/oauth/callback`, `/api/mcp`, and `/api/machine/*` (`isExempt` in `apps/server/src/lib/token-auth.ts`). Anything else under `/api/` requires the session token. Machine routes use their own credentials. |
+| Timers | `createDueRunner` in `apps/server/src/services/scheduler.ts` already runs named `due_event` kinds with backoff (`apps/server/src/services/due-events.ts`). |
+| Third-party text | `fenceIssueText` (`packages/shared/src/records/prompts.ts`). `shortEvent` (`packages/shared/src/chief-event.ts`) omits that fence from the short event line. `validateMemoryText` (`apps/server/src/services/memory.ts`) refuses to save it. |
+
+`apps/server/src/services/browser-session.ts` is the web auth cookie. It is not a mail or browser-control surface.
+
+## Recommendation
+
+One server-side connector, not a stdio MCP process and not a daemon mailbox loop.
+
+A stdio server whose environment holds the token would put the token in a file `mcp-servers.ts` already lists, and a model that can spawn that process can read it. `get_secret` must not be granted these names either. The connector opens the cipher inside the server process and returns only fenced text.
+
+Gmail uses a mailbox watch and a Pub/Sub push to this server. QQ Mail uses one held IMAP IDLE connection on the server. Both write the same event row. The daemon stays out of v1: a new machine route would widen the command boundary for a socket that does not need the desktop. If the server cannot reach the IMAP host, the account is `degraded` and the owner is told. There is no poll that pulls bodies into a prompt.
+
+No tunnel client ships in cairn. The webhook URL is an owner-set public API origin, not `CAIRN_WEB_ORIGIN` and not the request host (a forwarded proto is not a registration target). If that origin is unset or not public `https`, watch registration fails closed.
+
+v1 is inbound only. Sending mail is a later confirm-once action (`docs/design/ai-native-actions.md` is not built). This page does not add a second inbox. Needs-you mail wakes the Coordinator thread that already exists.
+
+Rules are owner-written and deterministic. No model ranks mail. A model ranker would be another place for injected text to choose a tool call.
+
+## State
+
+`mail_account`: `disconnected`, `connecting`, `watching`, `degraded`, `revoked`.
+
+`mail_event`: `received`, `ranked`, `delivered`, `dropped`. Unique on `(accountId, externalId)`. `externalId` is the provider message id, not the Gmail history id. The account stores the history watermark and, for IMAP, `UIDVALIDITY`.
+
+`mail_rule`: owner rows. Match kind is sender allow or subject contains. Rank is `needs_you`, `can_wait`, or `drop`. No match means `can_wait`.
+
+A secret row holds the refresh token or the app password. Its name is not grantable to a step. `openSecretValues` and `get_secret` refuse it.
+
+## Transitions
+
+| From | To | Who |
+|---|---|---|
+| `disconnected` | `connecting` | Owner starts connect. No secret row yet. |
+| `connecting` | `watching` | OAuth or app password sealed, Gmail watch registered or IMAP IDLE up, renewal `due_event` armed. |
+| `connecting` | `disconnected` | OAuth denied, seal failed, or origin not publicly reachable. Delete any partial secret. |
+| `watching` | `degraded` | IDLE drop, watch renew failure, history fetch failure. Watermark does not advance. |
+| `degraded` | `watching` | Renew or reconnect succeeded. |
+| `watching` or `degraded` | `revoked` | Provider rejected the token. Stop the socket and the watch. Do not retry the token. |
+| `revoked` | `connecting` | Owner reconnects. New secret. Old cipher deleted. |
+| any | `disconnected` | Owner disconnects. Delete secret, events stay as ids without bodies. |
+
+Event: webhook or IDLE line accepted → `received` (ids only) → fetch metadata inside the connector → `ranked` by rules → `delivered` or `dropped`. A `dropped` row stores the id and the reason, not the body.
+
+## Paths that read or write this state
+
+| Path | Reads | Writes | On failure |
+|---|---|---|---|
+| Connect (owner, new route beside `oauth.ts`) | owner-set public API origin, existing account | secret via `createSecret`, account `connecting` then `watching`, `due_event` renew row | Origin unset, not public `https`, or provider error: account `disconnected`, no secret left, no watch registered. |
+| `openSecretValues` / `get_secret` | secret names granted to a step | nothing for mail | Mail names are refused even if a routing rule lists them. The step sees the same miss as an unknown name. The value is not logged. |
+| Gmail webhook (new path, own verifier, not added to `isExempt` without that verifier) | account by the push's mailbox id, OIDC audience | `mail_event` `received`, or nothing | Bad token, wrong audience, or unknown mailbox: 401, no row, no wake. Body is not logged. |
+| History fetch (connector only) | watermark, secret opened in-process | event external ids, watermark only after a full page | Fetch fails: watermark unchanged, account `degraded`, `due_event` retry. No wake. |
+| IMAP IDLE (connector only) | account, secret opened in-process | one event per new UID | Disconnect: `degraded`, backoff reconnect. `UIDVALIDITY` change drops in-flight UIDs and stores the new value. Duplicate UID is an idempotent no-op. |
+| Watch renew (`due_event` kind, handler next to the scheduler map) | account, secret in-process | `watchExpiration`, next due time | Failure: `degraded`, backoff, no second watch if the old one might still be live. 401: `revoked`. |
+| Rule edit (owner only) | rules | rules | Agent and MCP face have no write tool. A bad rule is rejected and the old rows stay. |
+| Rank | rules, event id | `rank` | No body available: stay `received`, do not rank from the webhook payload. |
+| Deliver `needs_you` | event, coordinator thread | chief step via `enqueueChiefStep` (`trigger: 'wake'`, provenance `mail:<eventId>`), `notifyChiefMessage`, `pushToUserSafely` | Wake insert fails: stay `ranked`, retry. Push no-subscription, expired, or viewing the thread: in-app row still stands; push is not retried. VAPID null: in-app only. |
+| Deliver `can_wait` | event | `queuePushDigest` item, no chief step | Digest send fails: existing sweep keeps the item. No Coordinator turn. |
+| Deliver `drop` | event | `dropped`, no notice, no wake | — |
+| Disconnect | account, secret id | account `disconnected`, secret deleted | Secret already gone: still mark `disconnected`. |
+
+User-visible push title and body are a fixed template naming the rule that matched, not the subject or the body. The href is the Coordinator thread, so `isViewingThread` suppresses push while that thread is open. The in-app snippet is the same template. Raw mail never enters `push.ts` or `notification.snippet`.
+
+The wake prompt carries ids, the rule name, and a fenced excerpt. It tells the turn the server already notified, and that `notify_user` and `ask_user` are refused on this provenance. That closes the hole where `notify_user` would copy injected text into the notice `notify_user` does not itself push.
+
+## Fence
+
+Reuse the issue-fence shape, with a mail marker, not `ISSUE_FENCE_OPEN`. Excerpt is display name, subject, and a short text slice. No raw MIME, no attachment bytes, no tokens.
+
+Same omissions as GitHub text, or the short event line leaks the body:
+
+- `shortEvent` omits the mail fence the way it omits `ISSUE_FENCE_OPEN`.
+- `validateMemoryText` rejects the mail marker the way it rejects the issue fence.
+- `read_history` may return the fenced body. The fence stays on that text.
+
+Instructions inside the fence are not followed, not saved, and not passed to shell, browser tools, `get_secret`, or another connector.
+
+## Risks
+
+- A webhook verifier bug is an unauthenticated write onto the Coordinator. The path is an external entry. Implementation is owner-routed (`token-auth.ts`, `secrets.ts`, `oauth.ts`).
+- Pub/Sub push retries. Idempotency is the event unique key, not a 200 that forgot to store the id.
+- IDLE on the server ties mailbox reachability to wherever the server runs. That is accepted in v1; see the open decision.
+- `notification` collapses to one row per entity. Using the chief thread id replaces the previous chief snippet. The event rows are the record; the notice is a pointer. Do not mint a second inbox to keep every subject.
+- Prompt injection that survives the fence still cannot send mail in v1, because send does not exist, and cannot notify, because this provenance refuses `notify_user`.
+
+## Open decisions for the owner
+
+1. IDLE on the server (recommended) or on the daemon. Daemon IDLE needs a new machine route and is a wider command-boundary change. Choose it only if QQ Mail cannot be reached from the server.
+2. Ingress. Recommended: an owner-set public API origin, fail closed when it is missing. Do not reuse `CAIRN_WEB_ORIGIN`. No embedded tunnel.
+3. Default rank when no rule matches. Recommended: `can_wait`, not `needs_you`.
+4. Whether a needs-you wake may call tools at all. Recommended: it may read the fenced excerpt and stop. It may not notify, ask, save memory, or call a computer tool.
