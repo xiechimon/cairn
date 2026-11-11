@@ -331,4 +331,45 @@ describe('xAI SuperGrok device login', () => {
       'console-key',
     );
   });
+
+  it('dispatches the stored credential, not an unexpired token read before a replacement', async () => {
+    const { s, mock } = boot([]);
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.user.id,
+        body: {
+          providerId: 'xai',
+          label: 'xAI',
+          baseUrl: 'https://api.x.ai/v1',
+          api: 'openai-responses',
+          apiKey: JSON.stringify({
+            kind: 'xai-oauth',
+            refresh: REFRESH,
+            access: ACCESS,
+            expires: Date.now() + 60_000,
+          }),
+        },
+      },
+    );
+    const opened = openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai');
+    if (!opened?.apiKey) throw new Error('stored secret missing');
+    updateProvider({ db: s.db, box: s.secretBox }, s.team.id, opened.row.id, {
+      apiKey: JSON.stringify({
+        kind: 'xai-oauth',
+        refresh: 'newer-refresh',
+        access: 'newer-access',
+        expires: Date.now() + 60_000,
+      }),
+    });
+    const access = await materializeXaiAccessToken(
+      { db: s.db, box: s.secretBox, fetch: mock.fetchImpl, states: s.xaiDeviceStates },
+      s.team.id,
+      'xai',
+      opened.apiKey,
+    );
+    expect(access).toBe('newer-access');
+    expect(mock.calls).toEqual([]);
+  });
 });

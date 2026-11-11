@@ -376,8 +376,14 @@ export async function materializeXaiAccessToken(
   providerId: string,
   rawKey: string,
 ): Promise<string> {
-  const secret = secretOf(rawKey);
-  if (!secret) return rawKey;
+  const stored = deps.db
+    .select({ apiKeyCipher: provider.apiKeyCipher })
+    .from(provider)
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
+    .get();
+  const raw = stored?.apiKeyCipher == null ? rawKey : deps.box.open(stored.apiKeyCipher);
+  const secret = secretOf(raw);
+  if (!secret) return raw;
   const lockKey = `${teamId}/${providerId}`;
   const inflight = refreshInflight.get(lockKey);
   if (inflight) return inflight;
