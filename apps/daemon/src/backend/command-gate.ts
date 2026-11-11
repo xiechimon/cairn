@@ -39,6 +39,14 @@ function hasRecursiveFlag(args: string[]): boolean {
   );
 }
 
+function effectiveDdOutput(args: readonly string[]): string | undefined {
+  let output: string | undefined;
+  for (const arg of args) {
+    if (arg.startsWith('of=')) output = arg.slice(3);
+  }
+  return output;
+}
+
 function rmOperands(args: string[]): string[] {
   const out: string[] = [];
   let restAreOperands = false;
@@ -109,8 +117,12 @@ export const DEFAULT_BASH_PATTERNS: readonly BashGatePattern[] = [
     action: 'ask',
     description: 'dd 直写块设备（of=/dev/…；of=/dev/null 是空洞放行）',
     scope: 'segment',
-    test: (_text, s) =>
-      s.head === 'dd' && s.text.includes('of=/dev/') && !s.text.includes('of=/dev/null'),
+    test: (_text, s) => {
+      if (s.head !== 'dd') return false;
+      const output = effectiveDdOutput(s.args);
+      if (output === undefined || output === '/dev/null') return false;
+      return output.startsWith('/dev/');
+    },
   },
   {
     id: 'ask-power',
@@ -423,7 +435,12 @@ function normalizeBackticks(source: string): string {
     }
     if (quote === '"' && character === '\\') {
       const next = source[index + 1];
-      if (next === '`' || next === '$' || next === '\\' || next === '"') {
+      if (next === '$') {
+        out += `\\${next}`;
+        index += 1;
+        continue;
+      }
+      if (next === '`' || next === '\\' || next === '"') {
         out += next;
         index += 1;
         continue;
@@ -721,8 +738,8 @@ function collectCommands(entries: readonly ShellParseEntry[]): CollectedCommands
         continue;
       }
       if (typeof entry === 'object' && 'comment' in entry) {
-        index = entries.length;
-        break;
+        index += 1;
+        continue;
       }
       const op = opName(entry);
       if (op && COMMAND_SEPARATORS.has(op)) {

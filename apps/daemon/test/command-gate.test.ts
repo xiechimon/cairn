@@ -106,6 +106,10 @@ describe('shell syntax does not hide a gated command', () => {
     ['"$(echo rm)" -rf /', 'ask-rm-rf-root'],
     ['chroot / rm -rf /', 'ask-rm-rf-root'],
     ['unshare rm -rf /', 'ask-rm-rf-root'],
+    ['echo ok # comment\nreboot', 'ask-power'],
+    ['echo foo#bar; reboot', 'ask-power'],
+    ['dd of="/dev/null" of=/dev/sda if=/dev/zero', 'ask-dd-disk'],
+    ['echo "$(reboot)"', 'ask-power'],
   ];
   for (const [command, ruleId] of asked) {
     it(`${command} → ${ruleId}`, () => {
@@ -128,6 +132,10 @@ describe('shell syntax does not hide a gated command', () => {
     'rm -rf ./dist',
     '/bin/echo ok',
     'sh -c \'echo "rm -rf /"\'',
+    'echo "\\$(reboot)"',
+    'echo ok # reboot',
+    'echo foo#bar',
+    'dd of=/dev/sda of=/dev/null',
   ];
   for (const command of allowed) {
     it(`${JSON.stringify(command)} stays allow`, () => {
