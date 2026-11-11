@@ -37,7 +37,12 @@ import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import { type AutonomousToken, githubAppBotLogin, githubTokenFetch } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
-import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
+import {
+  buildCiFixPrompt,
+  buildMergeConflictPrompt,
+  latestCompletedCheckRuns,
+  verdictOfCheckRuns,
+} from './ci-loop.js';
 import { reconcilePrReviewFindings } from './pr-review-findings.js';
 import { retryIsParked } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
@@ -331,11 +336,8 @@ export function createPrWakes(deps: BuildDeps) {
           });
       }
     }
-    const failures = (runs ?? []).filter(
-      (r) =>
-        r.status === 'completed' &&
-        ['failure', 'timed_out'].includes(r.conclusion ?? '') &&
-        !runs?.some((other) => other.name === r.name && other.conclusion === 'success'),
+    const failures = latestCompletedCheckRuns(runs ?? []).filter((r) =>
+      ['failure', 'timed_out'].includes(r.conclusion ?? ''),
     );
     if (
       runs !== null &&
