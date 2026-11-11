@@ -62,8 +62,12 @@ test('OAuth badge rides wired family rows only (github-copilot); codex unwired c
   await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(0);
   await expect(codex).toBeDisabled();
   await expect(codex.getByText('暂未开通')).toHaveText('暂未开通');
-  const xai = dialog.locator('[data-preset-id]', { hasText: 'xAI' });
+  const xai = dialog.locator('[data-preset-id="xai"]');
   await expect(xai).toHaveCount(1);
+  await expect(dialog.locator('[data-preset-id]', { hasText: 'xAI' })).toHaveCount(1);
+  await expect(dialog.locator('[data-preset-id="google-vertex"]').getByText('VertexAI')).toHaveCount(
+    0,
+  );
   await expect(xai.getByText('OAuth', { exact: true })).toHaveCount(0);
 
   await expect(dialog.getByText('SuperGrok')).toHaveCount(0);
@@ -104,7 +108,7 @@ test('api_key row enters its preset key form prefilled; xai form shows the oauth
   await expect(dialog.locator('#dlg-provider-baseurl')).toHaveValue('https://api.deepseek.com');
 
   await dialog.getByRole('button', { name: '返回' }).click();
-  await dialog.locator('[data-preset-id]', { hasText: 'xAI' }).click();
+  await dialog.locator('[data-preset-id="xai"]').click();
   await expect(dialog.locator('#dlg-provider-label')).toHaveValue('xAI');
   await expect(dialog.getByText('Sign in with SuperGrok or X Premium')).toBeVisible();
 });

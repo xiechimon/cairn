@@ -26,6 +26,7 @@ import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
 import { ProviderConnectionDisclosure } from './provider-connection-disclosure.js';
 import { ProviderModelChips, pickedModels } from './provider-model-list.js';
 import { PROVIDER_PRESET_DEFAULTS } from './provider-preset-data.js';
+import { ProviderPresetIcon } from './provider-preset-icon.js';
 
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
@@ -345,7 +346,7 @@ export function CreateProviderDialog({
                       }
                     >
                       <span aria-hidden className={PICKER_TILE_CLS}>
-                        {row.label.charAt(0)}
+                        <ProviderPresetIcon id={row.id} />
                       </span>
                       <span className="min-w-0 truncate">{row.label}</span>
                       {row.wired && <span className={PICKER_TAG_CLS}>OAuth</span>}
