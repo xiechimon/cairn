@@ -268,6 +268,8 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   app.delete('/api/projects/:id', (c) => {
     const id = c.req.param('id');
+    const row = requireProject(ctx, id);
+    if (row.teamId !== ctx.team.id) throw notFound(`project ${id}`);
     if (!deleteProject({ db: ctx.db, reposDir: ctx.reposDir }, id)) {
       throw notFound(`project ${id}`);
     }
