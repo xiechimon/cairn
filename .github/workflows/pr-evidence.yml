@@ -154,6 +154,22 @@ jobs:
           git diff --name-only "$MERGE_BASE" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
           python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" --changed-files "$RUNNER_TEMP/changed-files.txt" "${schema_args[@]}" "${baseline_args[@]}"
 
+      - name: Check security-review disposition on a security surface
+        if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
+        run: |
+          BASE_SHA="$(jq -r '.base.sha' "$RUNNER_TEMP/pr.json")"
+          HEAD_SHA="$(jq -r '.head.sha' "$RUNNER_TEMP/pr.json")"
+          MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          git diff --name-status --find-renames "$MERGE_BASE" "$HEAD_SHA" > "$RUNNER_TEMP/name-status.txt"
+          git show "$BASE_SHA:packages/shared/merge-gate-paths.json" > "$RUNNER_TEMP/gate-paths.json"
+          if ! git cat-file -e "$BASE_SHA:scripts/security-review-disposition.mjs"; then
+            echo "security-review-disposition: base has no checker yet; not running the PR copy"
+            exit 0
+          fi
+          git show "$BASE_SHA:scripts/security-review-disposition.mjs" > "$RUNNER_TEMP/security-review-disposition.mjs"
+          git show "$BASE_SHA:scripts/pr_body.py" > "$RUNNER_TEMP/pr_body.py"
+          node "$RUNNER_TEMP/security-review-disposition.mjs" --body "$RUNNER_TEMP/pr-body.md" --name-status "$RUNNER_TEMP/name-status.txt" --head "$HEAD_SHA" --paths "$RUNNER_TEMP/gate-paths.json"
+
       - name: Check PR body tasks (no unchecked task anywhere)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: |
