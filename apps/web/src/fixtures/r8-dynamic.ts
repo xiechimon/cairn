@@ -166,7 +166,7 @@ function transcript12(stamp: string): TranscriptItem[] {
     {
       kind: 'fail',
       title: '运行该任务的机器已离线',
-      body: '请将其重新上线，或重新运行任务以改派其他机器。',
+      body: '请将这台机器重新上线。这一步不会改派到其他机器。',
     },
   ];
 }
@@ -484,7 +484,7 @@ const RUN1_FAILED: TranscriptItem[] = [
   {
     kind: 'fail',
     title: '运行该任务的机器已离线',
-    body: '请将其重新上线，或重新运行任务以改派其他机器。',
+    body: '请将这台机器重新上线。这一步不会改派到其他机器。',
   },
 ];
 

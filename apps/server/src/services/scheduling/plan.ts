@@ -6,7 +6,6 @@ import type {
   ScheduleLabelChange,
   ScheduleReport,
 } from '@cairn/shared';
-import { SCHEDULE_CLOSE_REASONS } from '@cairn/shared';
 
 export const IN_PROGRESS_EXECUTOR = '已在做';
 
@@ -138,26 +137,6 @@ export function supersedingEvidence(
     ];
   }
   return [];
-}
-
-const DELIVERY_MARKERS =
-  /(?:拆成|已由|由\s*#[\d#\s、,，]+完成|delivered by|split into|landed in)/iu;
-
-export function handoverEvidence(target: ScheduleIssue, input: ScheduleInput): ScheduleEvidence[] {
-  const byPull = new Map(input.mergedPulls.map((p) => [p.number, p]));
-  const evidence: ScheduleEvidence[] = [];
-  for (const comment of target.comments ?? []) {
-    if (!DELIVERY_MARKERS.test(comment)) continue;
-    for (const match of comment.matchAll(/#(\d+)/gu)) {
-      const number = Number(match[1]);
-      const pull = byPull.get(number);
-      if (pull === undefined) continue;
-      const already = evidence.some((e) => e.ref === `#${number}`);
-      if (already) continue;
-      evidence.push({ kind: 'handover', ref: `#${number}`, url: pull.url });
-    }
-  }
-  return evidence.sort((a, b) => Number(a.ref.slice(1)) - Number(b.ref.slice(1)));
 }
 
 export function closeSignal(
@@ -314,8 +293,4 @@ export function planSchedule(input: ScheduleInput, readyLabel = 'ready-for-agent
     decidedBy: null,
     appliedAt: null,
   };
-}
-
-export function isCloseReason(value: string): value is ScheduleCloseReason {
-  return (SCHEDULE_CLOSE_REASONS as readonly string[]).includes(value);
 }

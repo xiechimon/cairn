@@ -1,4 +1,3 @@
-import { ENV_VARS } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { bootLiveServer, type LiveServer } from './live-server';
 
@@ -33,7 +32,7 @@ let authed: LiveServer;
 let openServer: LiveServer;
 
 test.beforeAll(async () => {
-  authed = await bootLiveServer(GATE_TOKEN, { [ENV_VARS.requireToken]: '1' });
+  authed = await bootLiveServer(GATE_TOKEN);
   openServer = await bootLiveServer(null);
 });
 
@@ -41,72 +40,31 @@ test.afterAll(async () => {
   await Promise.all([authed, openServer].map((server) => server?.dispose()));
 });
 
-test('auth on: first visit lands the gate page; wrong token stays without persisting; right token enters the UI and SSE carries ?token=', async ({
+test('auth on, loopback: bootstrap session opens the board and SSE uses a ticket, not the owner token', async ({
   page,
 }) => {
+  test.skip(process.platform !== 'linux', 'loopback bootstrap reads /proc/net/tcp');
   await recordEventSourceUrls(page);
   await page.goto(`${authed.base}/app`);
-
-  await expect(page.locator('.token-gate')).toBeVisible();
-  await expect(page.locator('.token-gate-title')).toHaveText('需要访问令牌');
-
-  await page.locator('.token-gate-input').fill('wrong-token');
-  await page.locator('.token-gate-submit').click();
-  await expect(page.locator('.token-gate-error')).toHaveText('令牌无效，请重试。');
-  await expect(page.locator('.token-gate')).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
-
-  expect(await page.locator('.token-gate').innerText()).not.toContain('Unauthorized');
-
-  const retryLands = page.waitForResponse(
-    (res) => res.url().endsWith('/api/teams') && res.status() === 200,
-  );
-  await page.locator('.token-gate-input').fill(GATE_TOKEN);
-  await page.locator('.token-gate-submit').click();
-  await expect(page.locator('.token-gate')).toHaveCount(0);
   await expect(page.locator('.board-sidebar')).toBeVisible();
-  const retried = await retryLands;
-  expect(retried.request().headers().authorization).toBe(`Bearer ${GATE_TOKEN}`);
-  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBe(GATE_TOKEN);
-
+  await expect(page.locator('.token-gate')).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
   await expect
     .poll(async () =>
-      (await streamUrls(page)).some(
-        (url) => url.includes('/stream?') && new URL(url, authed.base).searchParams.get('token') === GATE_TOKEN,
-      ),
+      (await streamUrls(page)).some((url) => url.includes('/stream?') && url.includes('ticket=')),
     )
     .toBe(true);
+  for (const url of await streamUrls(page)) expect(url).not.toContain('token=');
 });
 
-test('auth on: a stale bad token lands the gate page on first visit and the bad value is cleared', async ({ page }) => {
+test('auth on: a stored owner token is cleared and is not sent', async ({ page }) => {
+  test.skip(process.platform !== 'linux', 'loopback bootstrap reads /proc/net/tcp');
   await recordEventSourceUrls(page);
   await page.addInitScript(() => localStorage.setItem('cairn.token', 'stale-bad-token'));
   await page.goto(`${authed.base}/app`);
-
-  await expect(page.locator('.token-gate')).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
-  for (const url of await streamUrls(page)) {
-    expect(url).not.toContain('stale-bad-token');
-  }
-});
-
-test('auth on: a good token already in localStorage → first visit reaches the UI directly, zero gate page', async ({ page }) => {
-  await recordEventSourceUrls(page);
-  await page.addInitScript(
-    (token: string) => localStorage.setItem('cairn.token', token),
-    GATE_TOKEN,
-  );
-  const firstLoad = page.waitForResponse(
-    (res) => res.url().endsWith('/api/teams') && res.status() === 200,
-  );
-  await page.goto(`${authed.base}/app`);
-
   await expect(page.locator('.board-sidebar')).toBeVisible();
-  await expect(page.locator('.token-gate')).toHaveCount(0);
-  expect((await firstLoad).request().headers().authorization).toBe(`Bearer ${GATE_TOKEN}`);
-  await expect
-    .poll(async () => (await streamUrls(page)).some((url) => url.includes('/stream?token=')))
-    .toBe(true);
+  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
+  for (const url of await streamUrls(page)) expect(url).not.toContain('stale-bad-token');
 });
 
 test('auth off: zero gate page, zero token attached, behavior unchanged', async ({ page }) => {
@@ -127,62 +85,13 @@ test('auth off: zero gate page, zero token attached, behavior unchanged', async 
   }
 });
 
-test('#1048 gate page guide: the zh face tells where the token comes from (cairn token command / server log / variable name)', async ({
-  page,
-}) => {
-  await page.goto(`${authed.base}/app`);
-  const help = page.locator('.token-gate-help');
-  await expect(help).toBeVisible();
-
-  await expect(help).toContainText('cairn token');
-  await expect(help).toContainText('日志');
-  await expect(help).toContainText(ENV_VARS.token);
-  expect(await help.innerText()).not.toMatch(new RegExp(`${ENV_VARS.token}\\s*=`));
-});
-
-test('#1048 gate page guide: the en face keeps the same facts undistorted (command name / log / variable name interpolated through the dictionary template)', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('cairn.locale', 'en');
-    localStorage.setItem('cairn-locale', 'en');
-  });
-  await page.goto(`${authed.base}/app`);
-  const help = page.locator('.token-gate-help');
-  await expect(help).toBeVisible();
-
-  await expect(help).toContainText(ENV_VARS.token);
-  await expect(help).toContainText('cairn token');
-  await expect(help).toContainText(/log/i);
-  expect(await help.innerText()).not.toMatch(new RegExp(`${ENV_VARS.token}\\s*=`));
-});
-
-test('#2057 a Tailscale-User-Login header from loopback does not skip the gate', async ({
-  page,
-}) => {
+test('a forged Tailscale-User-Login header is not required on loopback', async ({ page }) => {
+  test.skip(process.platform !== 'linux', 'loopback bootstrap reads /proc/net/tcp');
   await page.setExtraHTTPHeaders({ 'Tailscale-User-Login': FORGED_TAILSCALE_LOGIN });
-  const firstLoad = page.waitForResponse((res) => res.url().endsWith('/api/teams'));
+  const loaded = page.waitForResponse(
+    (res) => res.url().endsWith('/api/teams') && res.status() === 200,
+  );
   await page.goto(`${authed.base}/app`);
-
-  expect((await firstLoad).status()).toBe(401);
-  await expect(page.locator('.token-gate')).toBeVisible();
-});
-
-test('#1708 login link: /app#token=<valid> signs in and strips the fragment', async ({ page }) => {
-  await recordEventSourceUrls(page);
-  await page.goto(`${authed.base}/app#token=${GATE_TOKEN}`);
-
-  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await loaded;
   await expect(page.locator('.token-gate')).toHaveCount(0);
-  expect(new URL(page.url()).hash).toBe('');
-  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBe(GATE_TOKEN);
-});
-
-test('#1708 login link: an invalid fragment token lands the gate error copy and still strips the fragment', async ({
-  page,
-}) => {
-  await page.goto(`${authed.base}/app#token=wrong-fragment-token`);
-
-  await expect(page.locator('.token-gate')).toBeVisible();
-  await expect(page.locator('.token-gate-error')).toHaveText('令牌无效，请重试。');
-  expect(new URL(page.url()).hash).toBe('');
-  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
 });

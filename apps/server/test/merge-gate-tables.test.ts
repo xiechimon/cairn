@@ -11,7 +11,7 @@ import { type Db, MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { startBuilds } from '../src/services/builds.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
 
 const GATE_TABLES = ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state'] as const;
 const D1 = `pd2:${'a'.repeat(64)}`;
@@ -504,6 +504,7 @@ describe('F7 the existing delete paths succeed with gate rows present', () => {
         await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'g', spec: 'x' })
       ).json(),
     );
+    insertMachine(s);
     const [b] = startBuilds(s.svc, {
       projectId,
       todoIds: [todo.id],

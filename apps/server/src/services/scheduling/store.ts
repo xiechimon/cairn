@@ -57,34 +57,3 @@ export function insertScheduleReport(db: Db, report: ScheduleReport): ScheduleRe
     .run();
   return report;
 }
-
-export function markScheduleApplied(
-  db: Db,
-  projectId: string,
-  id: string,
-  at: number,
-  decidedBy: string,
-): void {
-  const existing = scheduleReportById(db, projectId, id);
-  if (existing === null) return;
-  const items = existing.items.map((item) =>
-    item.labelChange === null ? item : { ...item, labelChange: null },
-  );
-  db.update(scheduleReportTable)
-    .set({ appliedAt: at, decidedAt: at, decidedBy, items })
-    .where(and(eq(scheduleReportTable.projectId, projectId), eq(scheduleReportTable.id, id)))
-    .run();
-}
-
-export function updateScheduleDecision(
-  db: Db,
-  projectId: string,
-  id: string,
-  decidedBy: string,
-  at: number,
-): void {
-  db.update(scheduleReportTable)
-    .set({ decidedAt: at, decidedBy })
-    .where(and(eq(scheduleReportTable.projectId, projectId), eq(scheduleReportTable.id, id)))
-    .run();
-}

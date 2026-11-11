@@ -1381,7 +1381,9 @@
           "settings:remote"
         ],
         "server": [
-          "/api/remote/**"
+          "/api/remote/**",
+          "/api/auth/bootstrap",
+          "/api/auth/stream-ticket"
         ]
       },
       "reach": [

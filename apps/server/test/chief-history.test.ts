@@ -506,8 +506,8 @@ describe('cache-stable system prompt', () => {
   test('static content precedes team context, which precedes digests', () => {
     H.s.db.insert(chiefMessage).values(digestRow(1, 'a decision')).run();
     const { text } = buildChiefSystemPrompt(resource(), H.teamId, H.threadId);
-    const order = ['## 工作约定', '## 团队资源清单', '## 记忆', '## 之前对话的摘要'].map((m) =>
-      text.indexOf(m),
+    const order = ['## 工作约定', '## 团队', '## 记忆', '## 之前对话的摘要'].map((m) =>
+      text.indexOf(`\n${m}`),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);

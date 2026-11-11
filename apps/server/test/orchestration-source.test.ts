@@ -17,7 +17,14 @@ import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites, updateAutonomousTodo } from '../src/services/todos.js';
-import { bootServer, postProject, req, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  postProject,
+  req,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 import { ownerTodoParams } from './owner-message.js';
 
 const AGENT_ID = 'agent-orch-1';
@@ -139,6 +146,7 @@ beforeEach(async () => {
     };
   };
   s = bootServer({ githubFetch: ghFetch });
+  insertMachine(s);
   teamId = s.team.id;
   userId = s.user.id;
   chiefId = `chief-${userId}-${teamId}`;
@@ -334,10 +342,9 @@ describe('B prompt surface: orchestration round splitting discipline (the r14 §
       { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir: s.skillsDir },
       teamId,
     );
-    expect(prompt).toContain('拆分粒度 = 核销次数');
-    expect(prompt).toContain('可独立验收');
-    expect(prompt).toContain('quotes 填这张卡覆盖的主人原句');
-    expect(prompt).not.toContain('原文片段');
+    expect(prompt).toContain('按可独立验收的成果拆，不按执行步骤拆');
+    expect(prompt).toContain('quotes 填这张卡覆盖的用户原句');
+    expect(prompt).toContain('兄弟任务');
     expect(prompt).toContain('open_thread');
     expect(prompt).not.toContain('withPlan:false');
   });

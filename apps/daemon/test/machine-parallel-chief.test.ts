@@ -151,9 +151,8 @@ describe('#1148 port base (CAIRN_PORT_BASE slot segmentation)', () => {
     const backend = recordingBackend([gate.promise]);
     const { handle } = await boot({ api, backend });
     await waitFor(() => api.claimBodies.length >= 1);
-    expect(api.claimBodies[0]).toEqual({ maxWorkers: 2 });
+    expect(api.claimBodies[0]).toMatchObject({ maxWorkers: 2 });
     gate.resolve();
-    await waitFor(() => api.doneBodies.length >= 0);
     await handle.stop();
     await handle.done;
   });

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { chief as chiefTable, chiefThread, step as stepTable } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
@@ -50,7 +51,7 @@ async function claimToken(): Promise<string> {
   const enroll = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${plain}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId, name: 'route-probe', cliVersion: '0.1.0' }),
+    body: JSON.stringify(readyMachine({ teamId, name: 'route-probe', cliVersion: '0.1.0' })),
   });
   expect(enroll.status).toBe(200);
   seedRoute(s, 'coordinator', {
@@ -167,6 +168,7 @@ describe('claim-surface skill routing (#823)', () => {
     const prompt = claimed.chief?.systemPrompt ?? '';
     expect(prompt).toContain('morning-reminder');
     expect(prompt).toContain('定时提醒与日程通知');
-    expect(prompt).toContain('技能路由提示节在位时');
+    expect(prompt).toContain('「技能路由提示」一节');
+    expect(prompt).toMatch(/^- morning-reminder：定时提醒与日程通知$/m);
   });
 });

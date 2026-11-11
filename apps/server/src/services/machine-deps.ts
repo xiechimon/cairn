@@ -32,6 +32,7 @@ export interface MachineDeps {
   mcpConfigPath?: string;
   convHub?: ConversationStreamHub;
   githubFetch?: FetchLike;
+  oauthFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
 }
 

@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
@@ -23,7 +24,7 @@ async function enroll(s: TestServer, name: string) {
       authorization: `Bearer ${await issueApiKey(s)}`,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ teamId: s.team.id, name, cliVersion: '99.0.0' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name, cliVersion: '99.0.0' })),
   });
   expect(res.status).toBe(200);
   const { token } = (await res.json()) as { token: string };

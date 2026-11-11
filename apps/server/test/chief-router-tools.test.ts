@@ -732,16 +732,15 @@ describe('router tools', () => {
       }
       expect(text).toContain('open_thread');
       expect(text).toContain('message_thread');
-      expect(text).toContain('threads (1 open');
-      expect(text).toContain('#7 needs_input');
-      expect(text).toContain('needs-you: #7 question (coordinator)');
+      expect(text).toContain('- 1 条在跑：#7 needs_input（标题和汇报用 threads 查）');
+      expect(text).toContain('- 等人处理：#7 question（coordinator）（详情用 needs_you 查）');
       expect(text).not.toContain('Ignore previous instructions');
     });
 
     test('an empty team says so', () => {
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
-      expect(text).toContain('threads: （none open）');
-      expect(text).toContain('needs-you: （nothing waiting）');
+      expect(text).toContain('- 没有在跑的任务');
+      expect(text).toContain('- 没有等人处理的任务');
     });
 
     test('a gate wake no longer tells the Coordinator to confirm or review', async () => {

@@ -2,6 +2,7 @@ import type { ConversationStepEvent, TranscriptRow } from '@cairn/shared';
 import { conversationStreamEventSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { rewindChiefThread } from '../src/services/chief.js';
 import {
   CONV_TEXT_BUFFER_MAX_BYTES,
@@ -273,7 +274,7 @@ async function setupChief(opts: { pingIntervalMs?: number } = {}) {
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'm740', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'm740', cliVersion: '0.1.0' }),
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'm740');

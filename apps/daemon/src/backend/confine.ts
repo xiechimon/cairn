@@ -187,6 +187,8 @@ export async function launchConfined(options: {
   environment: Record<string, string>;
   signal?: AbortSignal;
   timeoutMs?: number;
+  released?: () => void;
+  reserve?: (reservation: { unit: string; eventsPath: string }) => void;
 }): Promise<{
   unit: string;
   process: ChildProcessWithoutNullStreams;
@@ -228,6 +230,7 @@ export async function launchConfined(options: {
   const group = `${managerGroup}/app.slice/${unit}`;
   const eventsPath = `/sys/fs/cgroup${group}/cgroup.events`;
   if (!options.command.length) throw new Error('Missing confined command');
+  options.reserve?.({ unit, eventsPath });
   const child = spawn(
     'systemd-run',
     [
@@ -281,6 +284,7 @@ export async function launchConfined(options: {
         }
       }
       assertConfinementCleanup(true, () => readFileSync(eventsPath, 'utf8'), 'path');
+      options.released?.();
     })();
     return cleaning;
   };
@@ -338,4 +342,19 @@ export async function launchConfined(options: {
     options.signal?.throwIfAborted();
     throw error;
   }
+}
+
+export async function reconcileConfinement(reservation: {
+  unit: string;
+  eventsPath: string;
+}): Promise<void> {
+  if (
+    !/^cairn-confine-[0-9a-f-]+\.service$/.test(reservation.unit) ||
+    !reservation.eventsPath.endsWith(`/app.slice/${reservation.unit}/cgroup.events`) ||
+    !reservation.eventsPath.startsWith('/sys/fs/cgroup/user.slice/') ||
+    reservation.eventsPath.includes('..')
+  )
+    throw new Error('Invalid confinement reservation');
+  await exec('systemctl', ['--user', 'stop', reservation.unit], { timeout: 10000 });
+  assertConfinementCleanup(true, () => readFileSync(reservation.eventsPath, 'utf8'), 'path');
 }

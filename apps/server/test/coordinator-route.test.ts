@@ -2,6 +2,7 @@ import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { coordinatorProviders } from '../src/coordinator/credentials.js';
 import { machine as machineTable, routingRule, team as teamTable } from '../src/db/schema.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
@@ -50,7 +51,7 @@ async function world(opts: { rule?: boolean } = {}): Promise<World> {
   const key = await issueApiKey(s);
   const enrolled = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId, name: 'route-mbp', cliVersion: '9.9.9' },
+    body: readyMachine({ teamId, name: 'route-mbp', cliVersion: '9.9.9' }),
   });
   const { token } = (await enrolled.json()) as { token: string };
   const machineId = s.db.select().from(machineTable).get()!.id;
@@ -199,7 +200,7 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     const key = await issueApiKey(w.s);
     const enrolled = await call(w.s.app, 'POST', '/api/machine/enroll', {
       cred: key,
-      body: { teamId: w.teamId, name: 'other-mbp', cliVersion: '9.9.9' },
+      body: readyMachine({ teamId: w.teamId, name: 'other-mbp', cliVersion: '9.9.9' }),
     });
     const other = (await enrolled.json()) as { token: string; machineId: string };
     seedRoute(w.s, 'coordinator', {

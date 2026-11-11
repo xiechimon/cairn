@@ -93,6 +93,7 @@ import {
   scanLocalSkills,
   updateLocalSkill,
 } from './services/skills.js';
+import { pollXaiDeviceLogin, startXaiDeviceLogin } from './services/xai-device-login.js';
 
 export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -457,6 +458,33 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     states: ctx.oauthStates,
     fetch: ctx.oauthFetch ?? globalThis.fetch,
     client: ctx.oauthClient,
+  });
+
+  const xaiDeviceDeps = () => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    fetch: ctx.oauthFetch ?? globalThis.fetch,
+    states: ctx.xaiDeviceStates,
+  });
+
+  app.post('/api/teams/:id/providers/oauth/xai/device', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const started = await startXaiDeviceLogin(xaiDeviceDeps(), {
+      teamId,
+      createdBy: ctx.user.id,
+    });
+    return c.json(started);
+  });
+
+  app.post('/api/teams/:id/providers/oauth/xai/device/poll', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = (await jsonBody(c)) as { state?: unknown };
+    if (typeof body.state !== 'string' || body.state === '') {
+      throw new HttpError(400, 'state required');
+    }
+    return c.json(await pollXaiDeviceLogin(xaiDeviceDeps(), { teamId, state: body.state }));
   });
 
   app.post('/api/teams/:id/providers/oauth/:preset/authorize', (c) => {

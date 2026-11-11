@@ -820,6 +820,32 @@ export const pairedDevice = sqliteTable(
   (t) => [uniqueIndex('paired_device_tokenHash_unique').on(t.tokenHash)],
 );
 
+export const pairingGrant = sqliteTable(
+  'pairing_grant',
+  {
+    id: text('id').primaryKey(),
+    codeHash: text('codeHash').notNull(),
+    expiresAt: epochMs('expiresAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    revokedAt: epochMs('revokedAt'),
+    redeemedAt: epochMs('redeemedAt'),
+  },
+  (t) => [uniqueIndex('pairing_grant_codeHash_unique').on(t.codeHash)],
+);
+
+export const browserSession = sqliteTable(
+  'browser_session',
+  {
+    id: text('id').primaryKey(),
+    tokenHash: text('tokenHash').notNull(),
+    kind: text('kind').notNull(),
+    deviceId: text('deviceId').references(() => pairedDevice.id, { onDelete: 'cascade' }),
+    expiresAt: epochMs('expiresAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('browser_session_tokenHash_unique').on(t.tokenHash)],
+);
+
 export const machine = sqliteTable(
   'machine',
   {

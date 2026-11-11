@@ -20,6 +20,7 @@ async function world() {
   const created = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'Thread', spec: '' })
   ).json()) as { id: string };
+  insertMachine(s);
   builds.startBuilds(s.svc, {
     projectId,
     todoIds: [created.id],

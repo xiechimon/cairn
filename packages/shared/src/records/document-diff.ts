@@ -29,10 +29,3 @@ export const diffFileContentSchema = z.object({
   content: z.string(),
 });
 export type DiffFileContent = z.infer<typeof diffFileContentSchema>;
-
-export const DIFF_UI_COPY = {
-  compareWith: '与其他版本对比…',
-  previousVersion: '上一版本',
-  expandAll: '全部展开',
-  preview: '预览',
-} as const;

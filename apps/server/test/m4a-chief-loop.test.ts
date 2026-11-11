@@ -3,6 +3,7 @@ import { CHIEF_ROUTER_TOOL_NAMES, CHIEF_TOOL_COUNT, claimedStepSchema } from '@c
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chiefMessage,
@@ -66,12 +67,12 @@ async function setupChiefWorld(opts?: {
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: {
+    body: readyMachine({
       teamId,
       name: 'm4a-mbp',
       cliVersion: '0.1.0',
       ...(opts?.claudeCode !== undefined ? { claudeCode: opts.claudeCode } : {}),
-    },
+    }),
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'm4a-mbp');

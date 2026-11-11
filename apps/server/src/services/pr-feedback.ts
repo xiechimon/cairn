@@ -1,4 +1,8 @@
-import { isBuildStepKind, neutralizeIssueAttachmentTokens } from '@cairn/shared';
+import {
+  ACTIVE_STEP_STATUSES,
+  isBuildStepKind,
+  neutralizeIssueAttachmentTokens,
+} from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { build, message, project, steerPending, step, team, threadPr, todo } from '../db/schema.js';
 import { type FetchLike, githubCollaboratorPermission, githubPull } from '../lib/github.js';
@@ -180,7 +184,7 @@ export function createPrFeedbackPoller(
                   .where(
                     and(
                       eq(step.buildId, target.build.id),
-                      inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+                      inArray(step.status, [...ACTIVE_STEP_STATUSES]),
                     ),
                   )
                   .all();

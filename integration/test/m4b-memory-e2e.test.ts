@@ -12,6 +12,7 @@ import {
   AGENT_ID,
   api,
   bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
   daemonLogLines,
   type RealServer,
   seedWorld,
@@ -79,6 +80,8 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);
 }, 120_000);

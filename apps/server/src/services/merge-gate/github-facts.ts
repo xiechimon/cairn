@@ -50,10 +50,42 @@ export interface GateReadCache {
   present: Set<string>;
 }
 
+const READ_CACHE_LIMIT = 500;
+
+function evictOldest<K>(collection: {
+  size: number;
+  keys(): IterableIterator<K>;
+  delete(key: K): boolean;
+}): void {
+  while (collection.size > READ_CACHE_LIMIT) {
+    const oldest = collection.keys().next().value;
+    if (oldest === undefined) return;
+    collection.delete(oldest);
+  }
+}
+
+class BoundedMap<K, V> extends Map<K, V> {
+  override set(key: K, value: V): this {
+    this.delete(key);
+    super.set(key, value);
+    evictOldest(this);
+    return this;
+  }
+}
+
+class BoundedSet<T> extends Set<T> {
+  override add(value: T): this {
+    this.delete(value);
+    super.add(value);
+    evictOldest(this);
+    return this;
+  }
+}
+
 export const newGateReadCache = (): GateReadCache => ({
-  bodies: new Map(),
-  present: new Set(),
-  autonomyPause: new Map(),
+  bodies: new BoundedMap(),
+  present: new BoundedSet(),
+  autonomyPause: new BoundedMap(),
 });
 
 export interface GateEvidencePresence {

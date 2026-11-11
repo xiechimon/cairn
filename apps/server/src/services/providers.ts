@@ -1,8 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { join } from 'node:path';
 import {
-  type ModelSource,
   type ModelSourceModel,
   type ModelSourcesEnvelope,
   PROVIDER_OAUTH_PRESET_IDS,
@@ -102,40 +99,6 @@ export function getProvidersEnvelope(
   teamId: string,
 ): { presets: ProviderPreset[]; providers: ProviderRecord[] } {
   return { presets: providerPresets(), providers: listProviders(deps, teamId) };
-}
-
-const CLAUDE_MODEL_SLOT_PATTERN = /^ANTHROPIC_([A-Z0-9_]+)_MODEL$/;
-
-export function claudeCodeModelSource(homeDir: string): ModelSource {
-  const host = hostname();
-  const notInstalled: ModelSource = {
-    runtime: 'claude-code',
-    installed: false,
-    hostname: host,
-    models: [],
-  };
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(join(homeDir, '.claude', 'settings.json'), 'utf8'));
-  } catch {
-    return notInstalled;
-  }
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return notInstalled;
-  const settings = raw as { model?: unknown; env?: unknown };
-  const models: ModelSourceModel[] = [];
-  if (typeof settings.model === 'string' && settings.model !== '') {
-    models.push({ id: settings.model, name: settings.model, slot: 'default' });
-  }
-  const env = settings.env;
-  if (typeof env === 'object' && env !== null && !Array.isArray(env)) {
-    for (const [key, value] of Object.entries(env)) {
-      const match = CLAUDE_MODEL_SLOT_PATTERN.exec(key);
-      const slot = match?.[1];
-      if (slot === undefined || typeof value !== 'string' || value === '') continue;
-      models.push({ id: value, name: value, slot: slot.toLowerCase().replace(/_/g, '-') });
-    }
-  }
-  return { runtime: 'claude-code', installed: true, hostname: host, models };
 }
 
 export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {

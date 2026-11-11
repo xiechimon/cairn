@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ClaudeAuthStateWire, ClaudeCodeReport } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chief as chiefTable,
@@ -261,10 +262,11 @@ describe.each(['subscription-only', 'allow-paid'] as const)('%s machine auth', (
                 return insertBuildStep(s, projectId);
               })();
         const claimed = await claimAs(s, claimantId);
-        const modelUnverifiable = kind === 'build' && role === 'spare' && noReport;
-        if (modelUnverifiable && claudeUsage === 'allow-paid') {
+        if (role === 'spare') {
           expect(claimed).toBeNull();
-          expect(stepStatus(s, stepId)).toBe('pending');
+          expect(
+            s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()?.machineId,
+          ).toBe(null);
         } else if (claudeUsage === 'allow-paid' || subscription) {
           expect(claimed?.step).toMatchObject({ id: stepId, machineId: claimantId });
         } else {
@@ -273,13 +275,7 @@ describe.each(['subscription-only', 'allow-paid'] as const)('%s machine auth', (
             {
               status: 'waiting_quota',
               machineId: null,
-              quotaBlock:
-                role === 'spare'
-                  ? {
-                      source: 'claude_rate_limit',
-                      reason: 'Claude subscription five_hour rejected',
-                    }
-                  : { source: 'subscription_policy', reason: 'subscription-only' },
+              quotaBlock: { source: 'subscription_policy', reason: 'subscription-only' },
             },
           );
         }
@@ -416,7 +412,9 @@ describe('presence stores Claude Code login and the machine record exposes it', 
     const enrolled = await s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: s.team.id, name: 'omarchy', cliVersion: '0.1.0' }),
+      body: JSON.stringify(
+        readyMachine({ teamId: s.team.id, name: 'omarchy', cliVersion: '0.1.0' }),
+      ),
     });
     expect(enrolled.status).toBe(200);
     const { machineId, token } = (await enrolled.json()) as { machineId: string; token: string };

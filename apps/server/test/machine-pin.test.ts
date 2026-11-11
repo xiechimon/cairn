@@ -12,6 +12,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
@@ -66,7 +67,7 @@ async function enroll(s: TestServer, name: string): Promise<string> {
   const key = await issueApiKey(s);
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
   });
   expect(res.status).toBe(200);
   return ((await res.json()) as { token: string }).token;
@@ -180,7 +181,7 @@ describe('#1312 other-machine mark on a resumed session', () => {
     expect(doneRes.status).toBe(200);
   }
 
-  test('same-machine resume carries no priorMachineId; claim after rebind carries the previous-round machine', async () => {
+  test('same-machine resume carries no priorMachineId; rebinding the rule does not move the session', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId);
     startLegacyBuild(w.s, todoId, { withPlan: true });
@@ -218,13 +219,7 @@ describe('#1312 other-machine mark on a resumed session', () => {
       .where(eq(stepTable.status, 'pending'))
       .run();
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    const moved = await claim(w.s.app, w.tokenB);
-    expect(moved).not.toBeNull();
-    expect(moved!.step.kind).toBe('build');
-    expect(moved!.session.action).toBe('continue');
-    expect(moved!.session.sessionId).toBe('sess-moved');
-    const priorMachineId = (moved!.session as { priorMachineId?: string }).priorMachineId;
-    expect(priorMachineId).toBe(w.machineAId);
+    expect(await claim(w.s.app, w.tokenB)).toBeNull();
   });
 });
 

@@ -7,8 +7,10 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
+  machine as machineTable,
   notification as notificationTable,
   provider as providerTable,
   step as stepTable,
@@ -18,6 +20,7 @@ import {
 import {
   bootServer,
   issueApiKey,
+  pinSessionRoute,
   postProject,
   seedSessionRoute,
   startLegacyBuild,
@@ -72,13 +75,15 @@ async function setupWorld() {
   async function enroll(name: string, cred: string): Promise<string> {
     const res = await call(s.app, 'POST', '/api/machine/enroll', {
       cred,
-      body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
     });
     expect(res.status).toBe(200);
     return ((await res.json()) as { token: string }).token;
   }
   const token = await enroll('stop-mbp', key);
   const otherToken = await enroll('other-mbp', await issueApiKey(s));
+  const home = s.db.select().from(machineTable).where(eq(machineTable.name, 'stop-mbp')).get();
+  pinSessionRoute(s, home!.id);
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '停止探针', spec: '写一行停止探针到 README.md' },

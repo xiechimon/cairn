@@ -2,9 +2,11 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   claudeSubscription,
   machine as machineTable,
+  routingRule,
   step,
   stepRoute,
   todo as todoTable,
@@ -15,6 +17,7 @@ import { decideStepRoute, recordStepRoute, routedModelRunsOn } from '../src/serv
 import {
   bootServer,
   issueApiKey,
+  pinSessionRoute,
   postProject,
   req,
   seedRoute,
@@ -105,7 +108,9 @@ async function setupWorld(): Promise<World> {
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'route-box', cliVersion: '0.1.0' }),
+    body: JSON.stringify(
+      readyMachine({ teamId: s.team.id, name: 'route-box', cliVersion: '0.1.0' }),
+    ),
   });
   expect(res.status).toBe(200);
   const machineToken = ((await res.json()) as { token: string }).token;
@@ -329,18 +334,21 @@ describe('a routed model only runs on a machine that can host it', () => {
     const other = 'claude-only-box';
     w.s.db
       .insert(machineTable)
-      .values({
-        ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
-        id: other,
-        name: other,
-        tokenHash: 'other-token-hash',
-      })
+      .values(
+        readyMachine({
+          ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
+          id: other,
+          name: other,
+          tokenHash: 'other-token-hash',
+        }),
+      )
       .run();
     w.s.db
       .update(machineTable)
       .set({ enabledRuntimes: ['claude-code', 'pi'], capabilities: { mcpServers: [], skills: [] } })
       .where(eq(machineTable.id, other))
       .run();
+    pinSessionRoute(w.s, w.machineId);
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
       provider: 'openai-codex',
@@ -384,7 +392,15 @@ describe('the router leaves the execution constraints of the rule alone', () => 
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
-    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ machineId: null });
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ machineId: w.machineId });
+    expect(
+      w.s.db
+        .select()
+        .from(routingRule)
+        .where(eq(routingRule.teamId, w.s.team.id))
+        .all()
+        .every((rule) => rule.machineId === null),
+    ).toBe(true);
   });
 });
 
@@ -413,11 +429,13 @@ describe('the router respects where the step can actually run', () => {
     const other = 'other-machine';
     w.s.db
       .insert(machineTable)
-      .values({
-        ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
-        id: other,
-        name: 'codex-box',
-      })
+      .values(
+        readyMachine({
+          ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
+          id: other,
+          name: 'codex-box',
+        }),
+      )
       .run();
     w.s.db
       .update(machineTable)

@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, machine, step, team, todo } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { openResearchThread } from '../src/services/research-thread.js';
-import { bootServer, postProject, seedSessionRoute } from './helpers.js';
+import { bootServer, insertMachine, postProject, seedSessionRoute } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -12,6 +13,7 @@ afterEach(() => {
 
 async function world() {
   const s = bootServer();
+  insertMachine(s);
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'research');
   return { s, projectId, teamId: s.team.id };
@@ -86,14 +88,16 @@ describe('openResearchThread', () => {
     w.s.db.update(team).set({ claudeUsage: 'allow-paid' }).run();
     w.s.db
       .insert(machine)
-      .values({
-        id: 'research-host',
-        teamId: w.teamId,
-        name: 'Research host',
-        online: true,
-        enabledRuntimes: ['claude-code'],
-        capabilities: { mcpServers: [], skills: [], executor: 'host' },
-      })
+      .values(
+        readyMachine({
+          id: 'research-host',
+          teamId: w.teamId,
+          name: 'Research host',
+          online: true,
+          enabledRuntimes: ['claude-code'],
+          capabilities: { mcpServers: [], skills: [], executor: 'host' },
+        }),
+      )
       .run();
     const routeId = seedSessionRoute(w.s, { machineId: 'research-host' });
     const opened = openResearchThread(w.s.svc, {

@@ -946,6 +946,26 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "confinement": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+        "invocation": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "invocation",
+        "generation",
+      ],
+      "type": "object",
+    },
     "maxWorkers": {
       "maximum": 9007199254740991,
       "minimum": 1,
@@ -4917,11 +4937,6 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                           "minimum": -9007199254740991,
                           "type": "integer",
                         },
-                        "fallbackAt": {
-                          "maximum": 9007199254740991,
-                          "minimum": -9007199254740991,
-                          "type": "integer",
-                        },
                         "machineId": {
                           "type": "string",
                         },
@@ -6330,11 +6345,6 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
               "additionalProperties": false,
               "properties": {
                 "capacity": {
-                  "maximum": 9007199254740991,
-                  "minimum": -9007199254740991,
-                  "type": "integer",
-                },
-                "fallbackAt": {
                   "maximum": 9007199254740991,
                   "minimum": -9007199254740991,
                   "type": "integer",
@@ -8027,6 +8037,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
     "auth": "CAIRN_AUTH",
+    "confinementPlatform": "CAIRN_CONFINEMENT_PLATFORM",
     "coordinatorInServer": "CAIRN_COORDINATOR_IN_SERVER",
     "coordinatorMachineId": "CAIRN_COORDINATOR_MACHINE_ID",
     "coordinatorServerContext": "CAIRN_COORDINATOR_SERVER_CONTEXT",
@@ -8511,6 +8522,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "secret",
   "api_key",
   "paired_device",
+  "pairing_grant",
+  "browser_session",
   "machine",
   "token_usage",
   "chief",
@@ -8985,6 +8998,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "#231 [设计]：签发授权 URL（state 入册，TTL 10min 单次核销）",
     "path": "/api/teams/{id}/providers/oauth/{preset}/authorize",
+  },
+  {
+    "method": "POST",
+    "note": "SuperGrok device-code start; device_code stays on the server",
+    "path": "/api/teams/{id}/providers/oauth/xai/device",
+  },
+  {
+    "method": "POST",
+    "note": "SuperGrok device-code poll; stores the refresh token, not the access token",
+    "path": "/api/teams/{id}/providers/oauth/xai/device/poll",
   },
   {
     "method": "GET",
@@ -9846,6 +9869,85 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "const": true,
               "type": "boolean",
             },
+            "confinement": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "generation": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "invocation": {
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "type": "string",
+                    },
+                    "revision": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "state": {
+                      "enum": [
+                        "checking",
+                        "ready",
+                        "not-applicable",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "invocation",
+                    "generation",
+                    "state",
+                    "revision",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "generation": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "invocation": {
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "type": "string",
+                    },
+                    "reason": {
+                      "enum": [
+                        "startup-failed",
+                        "cleanup-failed",
+                        "unsupported-platform",
+                      ],
+                      "type": "string",
+                    },
+                    "revision": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "state": {
+                      "const": "unavailable",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "invocation",
+                    "generation",
+                    "state",
+                    "revision",
+                    "reason",
+                  ],
+                  "type": "object",
+                },
+              ],
+            },
             "executor": {
               "enum": [
                 "orb",
@@ -9894,6 +9996,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "type": "string",
               },
               "type": "array",
+            },
+            "osPlatform": {
+              "enum": [
+                "linux",
+                "darwin",
+                "other",
+              ],
+              "type": "string",
             },
             "ownComputer": {
               "const": true,

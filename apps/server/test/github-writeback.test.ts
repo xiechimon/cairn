@@ -3,6 +3,7 @@ import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   taskIssueClose as taskIssueCloseTable,
@@ -412,7 +413,7 @@ describe('title write-back and claim meta (B family)', () => {
     const plain = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: plain,
-      body: { teamId: s.team.id, name: 'l452', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name: 'l452', cliVersion: '0.1.0' }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedSessionRoute(s, { provider: 'p', modelId: 'm' });

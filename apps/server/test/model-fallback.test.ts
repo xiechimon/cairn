@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -90,7 +91,7 @@ async function setupWorld(
   for (const p of ['relay-a', 'relay-b', 'relay-c']) insertProvider(s, p);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'fallback-box', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'fallback-box', cliVersion: '0.1.0' }),
   });
   expect(enrollRes.status).toBe(200);
   const token = ((await enrollRes.json()) as { token: string }).token;

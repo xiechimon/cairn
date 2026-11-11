@@ -508,7 +508,7 @@ describe('prompt-set resume provenance', () => {
       const currentTexts = systemTexts(relay.requests);
       expect(currentTexts.length).toBeGreaterThan(0);
       const currentPrompt = currentTexts[0] ?? '';
-      expect(currentPrompt).toContain('ADR 0026');
+      expect(currentPrompt).toContain('自动合并（autonomous）');
       expect(currentPrompt).toContain(CHIEF_CONVENTIONS_HEADER);
 
       relay.requests.length = 0;
@@ -520,7 +520,7 @@ describe('prompt-set resume provenance', () => {
       expect(cutTexts.length).toBeGreaterThan(0);
       const cutPrompt = cutTexts[0] ?? '';
       expect(cutPrompt.length).toBeLessThan(currentPrompt.length);
-      expect(cutPrompt).not.toContain('ADR 0026');
+      expect(cutPrompt).not.toContain('自动合并（autonomous）');
       expect(cutPrompt).toContain('交付物优先于路径');
       expect(promptSetIdentity(prod)).not.toBe(promptSetIdentity(applyPromptSet(prod, 'cut')));
       expect(promptSetIdentity(prod)).not.toBe(promptSetIdentity('prompt-set:current'));
@@ -561,7 +561,7 @@ describe('prompt-set resume provenance', () => {
       const texts = systemTexts(relay.requests);
       expect(texts.length).toBeGreaterThan(0);
       expect(texts.some((text) => text.includes('交付物优先于路径'))).toBe(true);
-      expect(texts.every((text) => !text.includes('ADR 0026'))).toBe(true);
+      expect(texts.every((text) => !text.includes('自动合并（autonomous）'))).toBe(true);
       const rows = readFileSync(join(home, 'v1/results.jsonl'), 'utf8')
         .trim()
         .split('\n')

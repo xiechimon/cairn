@@ -1,3 +1,4 @@
+import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -129,6 +130,7 @@ export async function bootRealServer(opts: {
       uploads: new Map(),
       enrollments: new Map(),
       oauthStates: new Map(),
+      xaiDeviceStates: new Map(),
       oauthClient: null,
       reposDir,
       attachmentsDir,
@@ -338,6 +340,35 @@ export async function seedWorld(
   const todoId = (res.body as { id: string }).id;
   return { projectId, todoId };
 }
+
+type ConfinementPreflight = NonNullable<
+  import('../../apps/daemon/src/machine-loop.js').MachineLoopOpts['confinementPreflight']
+>;
+
+export const CONFINEMENT_READY_LAUNCH: ConfinementPreflight = async (options) => {
+  const [command, ...args] = options.command;
+  const child = spawn(command ?? process.execPath, args, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }) as ChildProcessWithoutNullStreams;
+  const completed = new Promise<void>((resolve) => {
+    child.once('close', () => {
+      options.released?.();
+      resolve();
+    });
+  });
+  options.reserve?.({
+    unit: 'cairn-confine-test.service',
+    eventsPath: '/sys/fs/cgroup/user.slice/test/app.slice/cairn-confine-test.service/cgroup.events',
+  });
+  return {
+    unit: 'cairn-confine-test.service',
+    process: child,
+    completed,
+    stop: async () => {
+      child.kill('SIGKILL');
+    },
+  };
+};
 
 export function daemonLogLines(daemonLog: string): string[] {
   try {

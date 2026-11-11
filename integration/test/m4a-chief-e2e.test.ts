@@ -13,7 +13,14 @@ import {
   tokenUsage,
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, daemonLogLines, type RealServer, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
+  daemonLogLines,
+  type RealServer,
+  waitFor,
+} from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 let stub: StubLlm;
@@ -48,6 +55,8 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);
 }, 120_000);

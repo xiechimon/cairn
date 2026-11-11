@@ -5,6 +5,7 @@ import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
+import { confinementIdentitySchema } from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
   messageRoleSchema,
@@ -32,9 +33,6 @@ import {
 import { computerPresenceListSchema } from './computer-presence.js';
 import { computerScreenRequestSchema } from './computer-screen.js';
 import { machineJsonSchema } from './executor.js';
-
-export const MACHINE_AUTH_HEADER = 'authorization';
-export const MACHINE_AUTH_SCHEME = 'Bearer';
 
 export const machineEnrollBodySchema = z.object({
   teamId: recordId,
@@ -65,7 +63,6 @@ export const machineEnrollPollResponseSchema = z.union([
 ]);
 
 export const machineEnrollConfirmBodySchema = z.object({ enrollId: z.string() });
-export const machineEnrollConfirmResponseSchema = z.object({ machine: machineJsonSchema });
 
 export const machineMeResponseSchema = machineRecordSchema;
 
@@ -101,6 +98,7 @@ export const machineRecoverResponseSchema = z.object({
 export type MachineRecoverResponse = z.infer<typeof machineRecoverResponseSchema>;
 
 export const machineClaimBodySchema = z.object({
+  confinement: confinementIdentitySchema.optional(),
   verifyAttachments: z.literal(true).optional(),
   maxWorkers: z.number().int().min(1).optional(),
   role: z.literal('coordinator').optional(),

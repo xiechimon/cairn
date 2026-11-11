@@ -1,13 +1,14 @@
 import { SESSION_BRIEF } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, step, todo } from '../src/db/schema.js';
+import { build, machine, step, todo } from '../src/db/schema.js';
 import { completeStep, listSteps, startBuilds } from '../src/services/builds.js';
 import { countMarkedRounds } from '../src/services/ci-loop.js';
 import { priorSessionOf } from '../src/services/machine-routing.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness } from './chief-harness.js';
+import { insertMachine } from './helpers.js';
 
 registerChiefHarness();
 
@@ -39,6 +40,12 @@ function seedTodo(id = 'session-todo') {
 }
 
 function startSession() {
+  if (
+    H.s.db.select({ id: machine.id }).from(machine).where(eq(machine.teamId, H.teamId)).get() ===
+    undefined
+  ) {
+    insertMachine(H.s);
+  }
   const todoId = seedTodo();
   const [started] = startBuilds(deps(), {
     projectId: H.projectId,

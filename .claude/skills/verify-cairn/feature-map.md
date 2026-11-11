@@ -591,7 +591,7 @@ Reach:
 - Web routes: none
 - Settings: `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-routes-empty`, `tailnet-owner-identity`
+- Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-routes-empty`
 - Research: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md), [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the remote access page, route list and pairing flow have no design
 - Backend design: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md)

@@ -12,7 +12,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { repoDirFor } from '../src/services/git.js';
-import { bootServer, postProject, req, seedSessionRoute } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 
 async function expectErrorShape(res: Response, status: number): Promise<void> {
   expect(res.status).toBe(status);
@@ -44,6 +44,7 @@ describe('DELETE /api/projects/{id} (#189)', () => {
 
   test('cascade: todo/build/step/plan/tag/schedule rows cleared; watch detached; memories kept with project set to null', async () => {
     const s = bootServer();
+    insertMachine(s);
     seedSessionRoute(s);
     const projectId = await postProject(s.app);
     const todoDoc = todoRecordSchema.parse(

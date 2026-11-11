@@ -93,8 +93,6 @@ export const teamStreamEventSchema = z.discriminatedUnion('type', [
 ]);
 export type TeamStreamEvent = z.infer<typeof teamStreamEventSchema>;
 
-export const MACHINE_STREAM_EVENT_TYPES = ['wake', 'shutdown'] as const;
-
 export const conversationMessageEventSchema = z.object({
   type: z.literal('message'),
   conversationId: recordId.optional(),

@@ -1,7 +1,7 @@
 import { threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
-import { build, chiefMessage, message, project, step, todo } from '../src/db/schema.js';
+import { build, chiefMessage, machine, message, project, step, todo } from '../src/db/schema.js';
 import {
   applyStoppedStep,
   completeStep,
@@ -15,6 +15,7 @@ import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { pendingWorkerQuestionIds } from '../src/services/worker-question-store.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { H, registerChiefHarness } from './chief-harness.js';
+import { insertMachine } from './helpers.js';
 
 registerChiefHarness();
 
@@ -60,6 +61,12 @@ function asking(todoId: string): boolean {
 }
 
 function startSession() {
+  if (
+    H.s.db.select({ id: machine.id }).from(machine).where(eq(machine.teamId, H.teamId)).get() ===
+    undefined
+  ) {
+    insertMachine(H.s);
+  }
   const todoId = seedTodo();
   const [started] = startBuilds(deps(), {
     projectId: H.projectId,

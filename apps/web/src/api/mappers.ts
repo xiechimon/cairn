@@ -117,19 +117,6 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
         }
       : { label: '排队中：等机器上线（前面 {ahead} 个）', vars: { ahead } };
   }
-  if (queue.waitingFor?.fallbackAt != null) {
-    return {
-      label:
-        '排队中：等首选机器 {machine}（{running}/{cap} 在跑），{time} 起其他机器可接手（前面 {ahead} 个）',
-      vars: {
-        machine: queue.waitingFor.name,
-        running: queue.waitingFor.running,
-        cap: queue.waitingFor.capacity,
-        time: clockTime(queue.waitingFor.fallbackAt),
-        ahead,
-      },
-    };
-  }
   return queue.waitingFor != null
     ? {
         label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
@@ -999,7 +986,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
     case 'network':
-      return '请将其重新上线，或重新运行任务以改派其他机器。';
+      return '请将这台机器重新上线。这一步不会改派到其他机器。';
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':
@@ -1425,6 +1412,17 @@ function collectChiefStream(
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
     lastAt = m.createdAt;
+    if (
+      m.role === 'system' &&
+      m.content === '' &&
+      m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+    ) {
+      eventTurn = false;
+      pendingTools = [];
+      fallback = null;
+      flushCards();
+      continue;
+    }
     if (m.role === 'user' && fallback !== null) {
       const stepOfRow = m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
         ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)

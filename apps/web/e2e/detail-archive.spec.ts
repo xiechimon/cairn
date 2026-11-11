@@ -143,6 +143,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/skills': [],
       '/api/teams/team-archive/members': [],
       '/api/teams/team-archive/machines': [],
+      '/api/teams/team-archive/routing-settings': { enabled: false, rules: [], policies: [] },
       '/api/teams/team-archive/chief/threads': [],
       '/api/teams/team-archive/chief': {
         chief: { id: 'chief-archive', teamId: 'team-archive', agent: null },
@@ -159,6 +160,14 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
     };
     if (request.method() === 'GET' && Object.hasOwn(responses, path))
       return route.fulfill({ json: responses[path] });
+    if (
+      request.method() === 'POST' &&
+      (path === '/api/auth/bootstrap' || path === '/api/auth/stream-ticket')
+    ) {
+      return route.fulfill({
+        json: path.endsWith('bootstrap') ? { ok: true } : { ticket: 'archive-ticket', expiresAt: 1 },
+      });
+    }
     unexpected.push(`${request.method()} ${path}`);
     return route.fulfill({ status: 404, json: { error: 'Unexpected archive test request' } });
   });

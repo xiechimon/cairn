@@ -2,6 +2,7 @@ import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { step as stepTable, todo as todoTable, todoTag } from '../src/db/schema.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
@@ -66,7 +67,7 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
     const plain = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: plain,
-      body: { teamId: s.team.id, name: 'task-meta', cliVersion: '0.1.0' },
+      body: readyMachine({ teamId: s.team.id, name: 'task-meta', cliVersion: '0.1.0' }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedSessionRoute(s, { provider: 'p', modelId: 'm' });

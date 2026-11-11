@@ -27,6 +27,7 @@ import { repoDirFor } from '../../../apps/server/src/services/git.js';
 import {
   api,
   bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
   daemonLogLines,
   type RealServer,
   waitFor,
@@ -229,6 +230,7 @@ export async function bootStack(opts: { promptSet?: PromptSet } = {}): Promise<S
     fetchImpl,
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   const logLines = (): string[] => daemonLogLines(paths.daemonLog);
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);

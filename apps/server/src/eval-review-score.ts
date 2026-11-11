@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type FailureWhere,
@@ -287,13 +287,6 @@ export function writeWeekArtifact(dir: string, artifact: WeekScoreArtifact): str
   const path = join(dir, `score-${artifact.week}.json`);
   writeFileSync(path, `${JSON.stringify(artifact, null, 2)}\n`);
   return path;
-}
-
-export function discoverWeekDirs(reviewsDir: string): string[] {
-  return readdirSync(reviewsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
 }
 
 export function loadWeekInput(reviewsDir: string, week: string): WeekInput {

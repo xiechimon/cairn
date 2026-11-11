@@ -7,6 +7,7 @@ import {
   buildTaskPromptText,
   claudeLoginBlocksClaim,
   claudeRateBlock,
+  confinementDispatchReady,
   fencedTitle,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
@@ -73,9 +74,8 @@ import {
   priorSessionOf,
   routeTargets,
   routeVerdict,
-  targetUnavailable,
+  soleClaimMachineId,
   type WorkerStepFacts,
-  waitingSince,
   workerIneligibility,
 } from './machine-routing.js';
 import { injectMemories } from './memory.js';
@@ -337,9 +337,15 @@ function claimChiefTurn(
     }
     const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
-    if (cand.agentRow.machineId !== null && cand.agentRow.machineId !== machineId) {
-      if (chiefRuntime !== 'claude-code' || !claudeBlocked(cand.agentRow.machineId)) continue;
-    }
+    const sole = soleClaimMachineId(
+      db
+        .select({ id: machine.id, online: machine.online })
+        .from(machine)
+        .where(eq(machine.teamId, teamId))
+        .all(),
+    );
+    const chiefMachine = cand.agentRow.machineId ?? sole;
+    if (chiefMachine !== machineId) continue;
     const claimed = buildChiefClaim(
       deps,
       machineId,
@@ -371,13 +377,6 @@ async function tryClaim(
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
   const catalog = mergedCatalogModels();
-  const machineCache = new Map<string, typeof machine.$inferSelect | undefined>();
-  const machineById = (id: string) => {
-    if (!machineCache.has(id)) {
-      machineCache.set(id, db.select().from(machine).where(eq(machine.id, id)).get());
-    }
-    return machineCache.get(id);
-  };
   const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
   const queued = full ? [] : claimCandidates(deps, machineId, teamId);
   const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
@@ -453,16 +452,20 @@ async function tryClaim(
     );
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
+    const sole = soleClaimMachineId(
+      db
+        .select({ id: machine.id, online: machine.online })
+        .from(machine)
+        .where(eq(machine.teamId, teamId))
+        .all(),
+    );
     const allowed = routeVerdict({
       machineId,
       targets: routeTargets(
         !freshSession && priorSessionId !== null ? priorMachineId : null,
         agentRow.machineId,
+        sole,
       ),
-      unavailable: (targetId) =>
-        targetUnavailable(db, machineById(targetId), teamId, facts, catalog, now),
-      waitingSince: waitingSince(cand.stepRow),
-      now,
     }).claim;
     if (!allowed) continue;
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
@@ -689,7 +692,23 @@ export async function claimStep(
   body?: MachineClaimBody,
   authorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
-  const stillAuthorized = () => authorized() && readDeployLease(deps.db).status === 'accepting';
+  const stillAuthorized = () => {
+    const capabilities = deps.db
+      .select()
+      .from(machine)
+      .where(eq(machine.id, machineId))
+      .get()?.capabilities;
+    const report = capabilities?.confinement;
+    return (
+      authorized() &&
+      !signal?.aborted &&
+      readDeployLease(deps.db).status === 'accepting' &&
+      confinementDispatchReady(capabilities) &&
+      (capabilities?.osPlatform !== 'linux' ||
+        (report?.generation === body?.confinement?.generation &&
+          report?.invocation === body?.confinement?.invocation))
+    );
+  };
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   const first = await tryClaim(

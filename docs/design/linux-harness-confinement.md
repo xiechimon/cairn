@@ -72,3 +72,21 @@ One child per live session; no persisted protocol state or daemon-wide environme
 ## Acceptance before implementation is called complete
 
 Red-first: argv snapshots; launch/state tests per table row; structural tests; per-profile Linux probes for worktree writes, denied home writes/secret reads, hidden daemon PID, HTTP and GPU. Cover nested daemon-home paths, protected git metadata, absent targets, startup/cancel/parent-death races, independently verified cgroup cleanup and machine-unavailable behavior for namespace/mount failure, including the visible reason and exactly one outage notification. Real Claude/Codex/pi fake-model E2Es request sentinel reads/home writes and prove denial; record omarchy install (`pnpm install --ignore-scripts`) and tests inside confine. Use targeted Vitest `--maxWorkers=4`, lint, typecheck, spec:parse and prepush. No fresh runtime pass or macOS evidence is claimed. Design approval is recorded above; implementation starts only after this docs PR merges, in ordered red-first PRs.
+
+## Segment 3 availability
+
+Accepted coordinator contract (2026-11-10), refs #3787. This section supersedes the non-Linux refusal and all-at-once availability delivery statements above. Follow the existing [process-ownership research](../research/confine-process-ownership-2026-11-09.md); no harness adapter migration belongs to 3a.
+
+Persist a strict confinement observation in machine capabilities without a migration: `checking`, `ready`, `unavailable` or `not-applicable`; invocation UUID, positive server-fenced generation and increasing revision. Unavailable reasons are bounded to `startup-failed`, `cleanup-failed` and `unsupported-platform`; exception text stays local. Linux enforces readiness. macOS reports `not-applicable` and retains existing dispatch behavior because Seatbelt remains outside the owner's Linux-only scope. Preserve owner-enabled runtimes and online presence.
+
+After enrollment, read `me`, submit `checking` at the previous generation plus one with a fresh invocation, then read back the exact identity before preflight. A new generation requires `checking` at current plus one. Same-generation reports require the same invocation and a greater revision; reject stale or competing reports with HTTP 409. Missing or invalid reports revoke readiness while retaining the generation fence. Never order observations by client clocks. Linux claims supply the acknowledged invocation/generation; re-read readiness after asynchronous checks and before atomic mutation, including long-poll wake and both worker/chief entry paths. Blocked work stays pending.
+
+Run `launchConfined` against empty private scratch with no git directories before harness auth/version probes, recovery launches or claims. Ready requires startup acknowledgement, successful probe exit and verified cleanup. Persist launch-unit/path reservations before launch; reconcile them before any later preflight, including after restart. Uncertain cleanup retains reservations and reports unavailable. Explicit daemon-handle recheck runs this same path after repair; no timer rechecks.
+
+| Segment | Deliver and verify |
+| --- | --- |
+| 3a | Preflight, cleanup reservations, capability parser/persistence and fencing, routing eligibility and worker/chief claims. Red-first: startup/recheck/recovery suppression; cleanup retention/restart reconciliation; enrollment/parser/service stale reports; pending worker/chief steps across asynchronous checks; macOS not-applicable with dispatch unchanged. |
+| 3b | Separate reviewed design before code: post-claim start gate, release only the exact unstarted claim instance, durable started acknowledgement. Run the repository verify-step-claim TLA+ model and record its result. |
+| 3c | Claude-owned machine list/detail/SSE states and machine-unavailable notification. Server owns an outage UUID across checking/restarts; atomically persist one notification per outage, publish after commit, clear only on confirmed ready. |
+
+Keep the in-server Coordinator runtime outside daemon confinement. Keep protected machine services minimal; do not close the parent issue from an intermediate segment. Implementation uses `gpt-6.1-sol`; review uses Codex cloud on the final head.

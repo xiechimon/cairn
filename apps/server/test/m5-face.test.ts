@@ -7,6 +7,7 @@ import {
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { plan as planTable, provider as providerTable } from '../src/db/schema.js';
 import {
@@ -68,7 +69,7 @@ async function setupWorld(opts: { webDir?: string | null; pingIntervalMs?: numbe
     .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: apiKey,
-    body: { teamId: s.team.id, name: 'm5-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'm5-mbp', cliVersion: '0.1.0' }),
   });
 
   const { token, machineId } = (await enrollRes.json()) as { token: string; machineId: string };

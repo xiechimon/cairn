@@ -298,7 +298,7 @@ describe('the identity header is read in exactly one module', () => {
       }
     };
     walk(root);
-    expect(offenders.sort()).toEqual(['config.ts', 'lib/tailnet-listener.ts']);
+    expect(offenders.sort()).toEqual(['lib/tailnet-listener.ts']);
   });
 });
 
@@ -321,4 +321,30 @@ describe('request origins are derived in one place', () => {
     walk(root);
     expect(offenders).toEqual(['routes-helpers.ts']);
   });
+});
+
+test('a session cookie set through the tailnet socket is Secure', async () => {
+  const { socketPath, port } = await bothListeners();
+  const issued = await fetch(`http://127.0.0.1:${port}/api/remote/pairing`, {
+    method: 'POST',
+    headers: bearer,
+  });
+  expect(issued.status).toBe(201);
+  const code = ((await issued.json()) as { code: string }).code;
+  const setCookie = await new Promise<string>((resolve, reject) => {
+    const req = request({
+      socketPath,
+      path: '/api/remote/pair',
+      method: 'POST',
+      headers: { host: 'cairn.tail.ts.net', 'content-type': 'application/json' },
+    });
+    req.on('response', (res) => {
+      res.resume();
+      resolve(res.headers['set-cookie']?.join('; ') ?? '');
+    });
+    req.on('error', reject);
+    req.end(JSON.stringify({ code, name: 'phone' }));
+  });
+  expect(setCookie).toContain('cairn_auth=');
+  expect(setCookie.toLowerCase()).toContain('secure');
 });

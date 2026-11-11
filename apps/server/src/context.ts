@@ -12,6 +12,7 @@ import type { MachineWakeHub } from './services/machine-wake-hub.js';
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
+import type { XaiDeviceState } from './services/xai-device-login.js';
 
 export interface RemoteAccessContext {
   environmentId: string;
@@ -57,6 +58,7 @@ export interface AppContext {
   webDir?: string | null;
   githubFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;
+  xaiDeviceStates: Map<string, XaiDeviceState>;
   oauthFetch?: FetchLike;
   providerTestFetch?: typeof fetch;
   providerTestTimeoutMs?: number;

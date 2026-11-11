@@ -639,7 +639,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'ask_user',
     description:
-      'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). Use it whenever the answer would change what you do next; batch up to 4 questions per call instead of asking one at a time.',
+      'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). Use it whenever the answer would change what you do next; batch up to 4 questions per call instead of asking one at a time. Every card already offers a free-text answer, so list only real choices.',
     parameters: obj(
       {
         questions: arr(

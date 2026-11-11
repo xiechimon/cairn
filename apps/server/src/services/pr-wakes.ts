@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  ACTIVE_STEP_STATUSES,
   buildReviewFindingsPrompt,
   isBuildStepKind,
   neutralizeIssueAttachmentTokens,
@@ -36,7 +37,12 @@ import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import { type AutonomousToken, githubAppBotLogin, githubTokenFetch } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
-import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
+import {
+  buildCiFixPrompt,
+  buildMergeConflictPrompt,
+  latestCompletedCheckRuns,
+  verdictOfCheckRuns,
+} from './ci-loop.js';
 import { reconcilePrReviewFindings } from './pr-review-findings.js';
 import { retryIsParked } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
@@ -130,12 +136,7 @@ function roundRunning(deps: BuildDeps, buildId: string): boolean {
     deps.db
       .select({ id: step.id })
       .from(step)
-      .where(
-        and(
-          eq(step.buildId, buildId),
-          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-        ),
-      )
+      .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
       .get() !== undefined
   );
 }
@@ -260,10 +261,7 @@ export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
           .select({ id: step.id })
           .from(step)
           .where(
-            and(
-              eq(step.buildId, row.buildId),
-              inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-            ),
+            and(eq(step.buildId, row.buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])),
           )
           .get() !== undefined
       )
@@ -338,11 +336,8 @@ export function createPrWakes(deps: BuildDeps) {
           });
       }
     }
-    const failures = (runs ?? []).filter(
-      (r) =>
-        r.status === 'completed' &&
-        ['failure', 'timed_out'].includes(r.conclusion ?? '') &&
-        !runs?.some((other) => other.name === r.name && other.conclusion === 'success'),
+    const failures = latestCompletedCheckRuns(runs ?? []).filter((r) =>
+      ['failure', 'timed_out'].includes(r.conclusion ?? ''),
     );
     if (
       runs !== null &&
@@ -529,12 +524,7 @@ export function createPrWakes(deps: BuildDeps) {
       const active = deps.db
         .select()
         .from(step)
-        .where(
-          and(
-            eq(step.buildId, row.buildId),
-            inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-          ),
-        )
+        .where(and(eq(step.buildId, row.buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
         .all();
       if (active.some((s) => !isBuildStepKind(s.kind) && s.kind !== 'plan')) return;
       if (ledger.wakes >= 10) notices.push('Total wake cap (10) reached. Auto-fix disabled.');

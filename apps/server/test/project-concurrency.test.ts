@@ -1,7 +1,8 @@
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { build, step, todo } from '../src/db/schema.js';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
+import { build, machine, step, todo } from '../src/db/schema.js';
 import { enqueueStep } from '../src/services/builds.js';
 import { bootServer, issueApiKey, req, seedSessionRoute, type TestServer } from './helpers.js';
 
@@ -13,7 +14,7 @@ async function enroll(name: string): Promise<string> {
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name, cliVersion: '0.1.0' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name, cliVersion: '0.1.0' })),
   });
   expect(res.status).toBe(200);
   return ((await res.json()) as { token: string }).token;
@@ -130,10 +131,23 @@ describe('project concurrency (D74 P4)', () => {
   });
 
   test('two machines claiming different steps of a serial project at once admit only one', async () => {
-    const otherToken = await enroll('cc-builder-2');
     const serial = await createProject('serial', 1);
     await startBuild(serial, 'first');
     await startBuild(serial, 'second');
+    const otherToken = await enroll('cc-builder-2');
+    const home = s.db.select().from(machine).where(eq(machine.name, 'cc-builder')).get();
+    const other = s.db.select().from(machine).where(eq(machine.name, 'cc-builder-2')).get();
+    const tasks = s.db.select().from(todo).where(eq(todo.projectId, serial)).all();
+    s.db
+      .update(todo)
+      .set({ routeOverride: { machineId: home!.id } })
+      .where(eq(todo.id, tasks[0]!.id))
+      .run();
+    s.db
+      .update(todo)
+      .set({ routeOverride: { machineId: other!.id } })
+      .where(eq(todo.id, tasks[1]!.id))
+      .run();
     const results = await Promise.all([claim(), claim(otherToken)]);
     expect(results.filter((r) => r !== null)).toHaveLength(1);
     expect(

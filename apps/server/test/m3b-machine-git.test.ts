@@ -5,6 +5,7 @@ import { claimedStepSchema, machineTokenResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   apiKey as apiKeyTable,
@@ -74,7 +75,7 @@ async function setupGitWorld(): Promise<GitWorld> {
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId: s.team.id, name: 'm3b-mbp', cliVersion: '0.1.0' },
+    body: readyMachine({ teamId: s.team.id, name: 'm3b-mbp', cliVersion: '0.1.0' }),
   });
   const machineJson = (await enrollRes.json()) as { token: string };
   seedSessionRoute(s, {
@@ -217,7 +218,7 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
     const key = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: key,
-      body: { teamId: s.team.id, name: 'm3b-plain' },
+      body: readyMachine({ teamId: s.team.id, name: 'm3b-plain' }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedSessionRoute(s, {

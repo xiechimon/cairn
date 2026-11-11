@@ -71,8 +71,6 @@ export const LOCAL_STORAGE_KEYS: readonly ClientStateKey[] = [
   },
 ];
 
-export const CACHE_KEY_PATTERN = '<brand>.cache.<entity>-v<N>:<scope…>';
-
 export const THIRD_PARTY_CLIENT_KEYS = [
   {
     key: 'nextauth.message',

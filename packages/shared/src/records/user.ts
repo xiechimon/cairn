@@ -17,5 +17,3 @@ export const patchUserBodySchema = z
     message: 'patch needs at least one field',
   });
 export type PatchUserBody = z.infer<typeof patchUserBodySchema>;
-
-export const AUTH_SESSION_NOTE = '单用户 seed + 自动登录（02 §2.1）；无登录页复刻';

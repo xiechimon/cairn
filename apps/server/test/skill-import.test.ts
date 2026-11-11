@@ -18,6 +18,7 @@ import {
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { skillAudit } from '../src/db/schema.js';
 import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
@@ -904,7 +905,7 @@ describe('refresh and the machine-wire listing (the #920 handoff)', () => {
       const key = await issueApiKey(s);
       const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
         cred: key,
-        body: { teamId: s.team.id, name: 'import-dist', cliVersion: '0.1.0' },
+        body: readyMachine({ teamId: s.team.id, name: 'import-dist', cliVersion: '0.1.0' }),
       });
       expect(enroll.status).toBe(200);
       const { token } = (await enroll.json()) as { token: string };

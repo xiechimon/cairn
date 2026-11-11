@@ -11,6 +11,7 @@ import {
   chiefDigestGroupSchema,
   chiefDigestThreadId,
   ISSUE_FENCE_OPEN,
+  isActiveStepStatus,
   isChiefDigestThreadId,
   shortEvent,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -444,7 +445,7 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
       .get();
     if (
       lastRun !== undefined &&
-      (['pending', 'claimed', 'waiting_quota'].includes(lastRun.status) ||
+      (isActiveStepStatus(lastRun.status) ||
         (lastRun.status === 'failed' &&
           now - (lastRun.finishedAt ?? lastRun.createdAt) < CHIEF_DIGEST_RETRY_MS))
     )
@@ -525,10 +526,6 @@ function parseDigestJson(text: string): unknown {
   } catch {
     return null;
   }
-}
-
-export function parseChiefDigestOutput(text: string): ChiefDigestItem[] | null {
-  return digestItemsOf(parseDigestJson(text));
 }
 
 function digestItemsOf(parsed: unknown): ChiefDigestItem[] | null {

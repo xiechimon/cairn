@@ -13,7 +13,7 @@ import {
   planResearchCitationChecks,
 } from '../src/services/research-citations.js';
 import { openResearchThread } from '../src/services/research-thread.js';
-import { bootServer, postProject, seedRoute, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, postProject, seedRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -29,6 +29,7 @@ const transient = 'connection reset by peer';
 
 async function world() {
   const s = bootServer();
+  insertMachine(s);
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'citations');
   seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });

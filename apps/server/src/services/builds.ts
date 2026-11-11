@@ -17,6 +17,7 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  ACTIVE_STEP_STATUSES,
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
   ANSWERS_CONTINUE_PROMPT,
@@ -40,6 +41,7 @@ import {
   EVIDENCE_PREFIX,
   GATE_LIMITS,
   hasBlockingFinding,
+  isActiveStepStatus,
   isBuildStepKind,
   isPlanContractRewritePrompt,
   isWaitingPhase,
@@ -62,6 +64,7 @@ import {
   type StopAttribution,
   systemRowOf,
   type TodoOutputKind,
+  UNSTARTED_STEP_STATUSES,
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
@@ -288,12 +291,7 @@ function continuationTodo(
   const active = deps.db
     .select({ id: step.id })
     .from(step)
-    .where(
-      and(
-        eq(step.buildId, buildRow.id),
-        inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-      ),
-    )
+    .where(and(eq(step.buildId, buildRow.id), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .get();
   const stopped =
     deps.db
@@ -685,9 +683,7 @@ export function requestStop(
   const active = db
     .select()
     .from(step)
-    .where(
-      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
-    )
+    .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
@@ -830,9 +826,7 @@ export function cancelBuild(
   const active = db
     .select()
     .from(step)
-    .where(
-      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
-    )
+    .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
@@ -896,7 +890,7 @@ export function stopUnclaimedGateSteps(
     .where(
       and(
         eq(step.buildId, buildId),
-        inArray(step.status, ['pending', 'waiting_quota']),
+        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
         inArray(step.kind, ['verify', 'review']),
       ),
     )
@@ -938,7 +932,7 @@ export function stopActiveStepsForArchive(
     .from(step)
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
-    .where(and(eq(todo.id, todoId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])))
+    .where(and(eq(todo.id, todoId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .all();
   for (const buildId of new Set(rows.map((r) => r.stepRow.buildId)))
     recordStop(deps.db, buildId, by);
@@ -965,9 +959,7 @@ function prepareStopFor(
   const active = db
     .select()
     .from(step)
-    .where(
-      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
-    )
+    .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
@@ -1004,12 +996,7 @@ export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()):
     const active = deps.db
       .select({ id: step.id })
       .from(step)
-      .where(
-        and(
-          eq(step.buildId, buildRow.id),
-          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-        ),
-      )
+      .where(and(eq(step.buildId, buildRow.id), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
       .all();
     if (active.length > 0) continue;
     releaseZombieQueued(deps, buildRow, todoRow, {
@@ -1126,6 +1113,35 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
   }));
 }
 
+export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): void {
+  namedMachineForStart(deps, { teamId }, undefined);
+}
+
+function namedMachineForStart(
+  deps: BuildDeps,
+  todoRecord: { teamId: string; routeOverride?: { machineId?: string } | null },
+  routeOverride: { machineId?: string } | undefined,
+): { machineId: string; pin: boolean } | null {
+  const profile = profileForStep(deps.db, todoRecord, 'session', null);
+  const named =
+    routeOverride?.machineId ?? todoRecord.routeOverride?.machineId ?? profile?.machineId ?? null;
+  if (named !== null) return { machineId: named, pin: false };
+  const registered = deps.db
+    .select({ id: machine.id, online: machine.online })
+    .from(machine)
+    .where(eq(machine.teamId, todoRecord.teamId))
+    .all();
+  const online = registered.filter((row) => row.online);
+  const onlyOnline = online[0];
+  if (online.length === 1 && onlyOnline !== undefined)
+    return { machineId: onlyOnline.id, pin: true };
+  const onlyRegistered = registered[0];
+  if (registered.length === 1 && onlyRegistered !== undefined) {
+    return { machineId: onlyRegistered.id, pin: true };
+  }
+  throw new HttpError(409, 'Name a machine before starting this task');
+}
+
 export function startBuilds(
   deps: BuildDeps,
   input: {
@@ -1169,12 +1185,25 @@ export function startBuilds(
     if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
     if (triggerSource !== 'user') assertAutomaticRetryAllowed(deps, todoId);
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
+    namedMachineForStart(deps, todoRecord, input.routeOverride);
   }
   const created: BuildRecord[] = [];
   for (const todoId of input.todoIds) {
     const todoRecord = getTodo(deps, todoId);
     if (!todoRecord) throw new NotFoundError(`todo ${todoId}`);
     assertPhaseTransition(todoRecord.phase, 'queued');
+    const named = namedMachineForStart(deps, todoRecord, input.routeOverride);
+    const routeOverride =
+      input.routeOverride === undefined
+        ? named?.pin === true
+          ? { machineId: named.machineId }
+          : undefined
+        : {
+            ...input.routeOverride,
+            ...(input.routeOverride.machineId === undefined && named !== null
+              ? { machineId: named.machineId }
+              : {}),
+          };
     const id = newUuidv7();
     const createdAt = nowMs();
     deps.db
@@ -1207,7 +1236,7 @@ export function startBuilds(
       [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
     );
     setTodoPhase(deps, todoId, 'queued', {
-      ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
+      ...(routeOverride !== undefined ? { routeOverride } : {}),
       latestBuildId: id,
       lastRunAt: createdAt,
     });
@@ -1241,9 +1270,9 @@ export function maybeEnqueueVerifyStep(
         eq(step.buildId, buildId),
         eq(step.kind, 'verify'),
         opts.reverify === true
-          ? inArray(step.status, ['pending', 'claimed', 'waiting_quota'])
+          ? inArray(step.status, [...ACTIVE_STEP_STATUSES])
           : or(
-              inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+              inArray(step.status, [...ACTIVE_STEP_STATUSES]),
               gte(step.createdAt, roundStart(deps, buildId)),
             ),
       ),
@@ -1282,8 +1311,6 @@ export function maybeEnqueueVerifyStep(
   });
 }
 
-const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
-
 function authorModelOf(deps: BuildDeps, todoRow: TodoRow, buildId: string): string | null {
   const authorStep = deps.db
     .select()
@@ -1313,7 +1340,7 @@ export function maybeEnqueueIndependentReview(
     .from(step)
     .where(and(eq(step.buildId, buildId), eq(step.kind, 'review')))
     .all();
-  if (reviews.some((row) => (REVIEW_IN_FLIGHT as readonly string[]).includes(row.status))) return;
+  if (reviews.some((row) => isActiveStepStatus(row.status))) return;
   const since = roundStart(deps, buildId);
   if (
     reviews.some(
@@ -1511,7 +1538,14 @@ export async function applyBuildStepAction(
       .get();
     const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
     const prClosed: 'merged' | 'closed' | null =
-      reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
+      reworkTarget !== null
+        ? await probeReworkTargetPr(
+            deps,
+            reworkTarget,
+            todoRecord,
+            githubPrOf(deps, todoRecord, reworkTarget.prNumber) !== null,
+          )
+        : null;
     const afterCommit: (() => void)[] = [];
     const transcriptDeps = { ...deps, afterCommit };
     deps.db.transaction(() => {
@@ -1837,18 +1871,7 @@ export async function requestMerge(
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   if (todoRow.output === 'info') throw new HttpError(409, INFO_CARD_MERGE_REFUSAL);
-  const inFlight = deps.db
-    .select({ id: step.id })
-    .from(step)
-    .where(
-      and(
-        eq(step.buildId, buildId),
-        eq(step.kind, 'merge'),
-        inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-      ),
-    )
-    .get();
-  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
+  assertNoMergeStepInFlight(deps, buildId);
   const projectRow = projectOfTodo(deps.db, todoRow);
   const shipRoute = projectRow === undefined ? DEFAULT_SHIP_ROUTE : projectShipRouteOf(projectRow);
   if (shipRoute === 'local-merge' && projectRow?.repoKind !== 'local') {
@@ -1924,8 +1947,24 @@ export async function requestMerge(
       configuredBaseBranch: projectRow.baseBranch,
     });
   }
+  if (prompt !== undefined) assertNoMergeStepInFlight(deps, buildId);
   enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt);
   return { delegated: true };
+}
+
+function assertNoMergeStepInFlight(deps: BuildDeps, buildId: string): void {
+  const inFlight = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'merge'),
+        inArray(step.status, [...ACTIVE_STEP_STATUSES]),
+      ),
+    )
+    .get();
+  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
 }
 
 export const INFO_CARD_MERGE_REFUSAL =
@@ -2000,7 +2039,7 @@ function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
           or(
             eq(step.status, 'claimed'),
             and(
-              inArray(step.status, ['pending', 'waiting_quota']),
+              inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
               notInArray(step.kind, ['verify', 'review']),
             ),
           ),
@@ -2671,7 +2710,7 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     .where(
       and(
         or(isNotNull(todo.archivedAt), inArray(todo.phase, ['closed', 'done'])),
-        inArray(step.status, ['pending', 'waiting_quota']),
+        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
       ),
     )
     .all();
@@ -2922,9 +2961,7 @@ function planAutoConfirmation(deps: Pick<BuildDeps, 'db'>, buildId: string): Pla
   const liveStep = deps.db
     .select({ id: step.id })
     .from(step)
-    .where(
-      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
-    )
+    .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .get();
   if (liveStep !== undefined) return { eligible: false, reason: 'Build still has an active step' };
   if (!checkPlanContract(latestPlan.content).ok)

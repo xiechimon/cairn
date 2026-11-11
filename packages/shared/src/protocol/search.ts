@@ -38,21 +38,6 @@ export const searchResponseSchema = z.object({
 });
 export type SearchResponse = z.infer<typeof searchResponseSchema>;
 
-export const SEARCH_PLACEHOLDER = '搜索任务、项目…';
-
-export const SEARCH_GOTO_GROUP = [
-  '看板',
-  '定时',
-  '团队',
-  '技能',
-  'MCP',
-  '密钥',
-  '机器',
-  '模型服务',
-  '帐号',
-  'API 密钥',
-] as const;
-
 export function searchNoResultsCopy(query: string): string {
   return `没有与“${query}”匹配的结果`;
 }

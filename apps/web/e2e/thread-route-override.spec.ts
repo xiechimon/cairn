@@ -13,7 +13,8 @@ test('thread more menu opens the per-todo route override dialog', async ({ page 
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId('route-override-machine')).toBeVisible();
   await dialog.getByTestId('route-override-machine').click();
-  await expect(page.getByRole('option', { name: '不固定' })).toBeVisible();
+  await expect(page.getByRole('option', { name: '不固定' })).toHaveCount(0);
+  await expect(page.getByRole('option').first()).toBeVisible();
   await page.keyboard.press('Escape');
 
   await dialog.getByRole('switch', { name: '要求 Orb' }).click();

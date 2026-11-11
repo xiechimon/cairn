@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { schedule, todo } from '../src/db/schema.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 const tz = 'Asia/Shanghai';
@@ -14,6 +14,7 @@ afterEach(() => {
 
 async function setup() {
   const server = bootServer();
+  insertMachine(server);
   servers.push(server);
   const projectId = await postProject(server.app, 'Schedule archive');
   const createTodo = async (title: string) => {

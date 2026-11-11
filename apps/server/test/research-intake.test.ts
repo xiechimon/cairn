@@ -30,7 +30,7 @@ import { openCitationCheck } from '../src/services/research-citations.js';
 import { planResearchIntake } from '../src/services/research-intake.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
-import { bootServer, postProject, req, seedRoute } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, seedRoute } from './helpers.js';
 
 const TZ = 'Asia/Shanghai';
 const DAY_MS = 86_400_000;
@@ -64,6 +64,7 @@ async function world(opts: { github?: { calls: string[] } } = {}) {
           },
         },
   );
+  insertMachine(s);
   disposables.push(() => s.dispose());
   if (calls !== undefined)
     upsertGithubConnection(

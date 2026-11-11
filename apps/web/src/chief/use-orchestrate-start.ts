@@ -3,10 +3,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { settingsHref } from '../settings/settings-href.js';
+import { needsMachineName } from './needs-machine-name.js';
 import { inflightOrchestrationFor } from './orchestration-inflight.js';
 
 export interface OrchestrateStart {
@@ -20,12 +23,34 @@ export function useOrchestrateStart(): OrchestrateStart {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const mutations = useApiMutations(teamId);
+  const machinesQ = useMachines(teamId, live);
+  const routingQ = useRoutingSettings(teamId, live);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const inFlight = useRef(false);
 
   const orchestrate = useCallback(
-    (todo: { id: string; seqNum: number }, opts?: { savedTitle?: string }) => {
+    (
+      todo: {
+        id: string;
+        seqNum: number;
+        routeOverride?: { machineId?: string | null } | null;
+      },
+      opts?: { savedTitle?: string },
+    ) => {
       if (!live || inFlight.current) return;
+      const sessionMachineId = routingQ.data?.rules?.find(
+        (rule) => rule.use === 'session',
+      )?.machineId;
+      if (needsMachineName(machinesQ.data, sessionMachineId, todo.routeOverride?.machineId)) {
+        toast.warning(t('先选择机器'), {
+          description: t('多台机器在线时，开工前要在规则里点名一台。'),
+          action: {
+            label: t('去选择'),
+            onClick: () => navigate(settingsHref('work-routing')),
+          },
+        });
+        return;
+      }
       const existing = inflightOrchestrationFor(
         queryClient.getQueryData<ChiefThread[]>(['chiefThreads', teamId]),
         todo,
@@ -65,7 +90,16 @@ export function useOrchestrateStart(): OrchestrateStart {
         },
       });
     },
-    [live, teamId, mutations.orchestrateTodo, queryClient, navigate, t],
+    [
+      live,
+      teamId,
+      machinesQ.data,
+      routingQ.data,
+      mutations.orchestrateTodo,
+      queryClient,
+      navigate,
+      t,
+    ],
   );
 
   return { orchestrate, pendingId };

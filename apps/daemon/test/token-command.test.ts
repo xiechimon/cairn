@@ -83,7 +83,7 @@ describe('cairn token (print)', () => {
     ['0.0.0.0', 'localhost'],
     ['::', 'localhost'],
     ['::1', '[::1]'],
-  ])('prints a login link for bind host %s', (host, display) => {
+  ])('prints the owner token without a login link for bind host %s', (host) => {
     const home = scratchHome();
     const token = 'synthetic-token+with/reserved=';
     writeTokenFile(home, token);
@@ -92,12 +92,10 @@ describe('cairn token (print)', () => {
       { [ENV_VARS.home]: home, HOST: host, PORT: '9876' },
     );
     expect(code).toBe(0);
-    const link = out.match(/Login link: (.+)/)?.[1];
-    expect(link !== undefined).toBe(true);
-    const url = new URL(link ?? 'http://invalid');
-    expect(url.origin).toBe(`http://${display}:9876`);
-    expect(url.pathname).toBe('/app');
-    expect(new URLSearchParams(url.hash.slice(1)).get('token') === token).toBe(true);
+    expect(out).toContain(token);
+    expect(out).not.toContain('#token=');
+    expect(out).not.toContain('Login link:');
+    expect(out).toContain('pairing code');
   });
 
   test('failure mode 4: neither -> guidance, exit 0', () => {

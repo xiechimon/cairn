@@ -34,8 +34,6 @@ export const CLAIM_BACKOFF_CAP_MS = 30_000;
 export const REMOTE_TOOL_RETRY_DELAYS_MS = [500, 2000] as const;
 export const REMOTE_TOOL_TIMEOUT_MS = 10_000;
 
-export const ENROLL_PATHS = ['browser', 'api-key'] as const;
-
 export const ONLINE_SEQUENCE_CANON = [
   'Loading pi runtime…',
   'Online (machineId=…); polling <url>',

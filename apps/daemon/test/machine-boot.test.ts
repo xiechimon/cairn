@@ -53,17 +53,18 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
       capabilitiesProbe: () => ({ mcpServers: ['figma'], skills: ['verify-cairn'] }),
     });
     await waitFor(() => api.presenceBodies.length > 0);
-    expect((api.enrollBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
+    expect((api.enrollBodies[0] as { capabilities?: unknown }).capabilities).toMatchObject({
       mcpServers: ['figma'],
       skills: ['verify-cairn'],
       executor: 'host',
       codexLogin: { state: 'absent' },
     });
-    expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
+    expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities).toMatchObject({
       mcpServers: ['figma'],
       skills: ['verify-cairn'],
       executor: 'host',
       codexLogin: { state: 'absent' },
+      confinement: expect.objectContaining({ state: 'checking' }),
     });
     await handle.stop();
     await handle.done;

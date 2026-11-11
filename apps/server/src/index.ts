@@ -140,6 +140,7 @@ const app = createApp(
     uploads: new Map(),
     enrollments: new Map(),
     oauthStates: new Map(),
+    xaiDeviceStates: new Map(),
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
     githubAppIdentity: config.githubAppIdentity,

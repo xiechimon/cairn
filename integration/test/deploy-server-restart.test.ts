@@ -10,7 +10,7 @@ import { runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { statePaths } from '../../apps/daemon/src/state.js';
 import { step } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, seedWorld, waitFor } from './helpers.js';
+import { api, bootRealServer, CONFINEMENT_READY_LAUNCH, seedWorld, waitFor } from './helpers.js';
 
 test('a running daemon step completes after a same-port server restart without a daemon restart', async () => {
   const dbPath = join(makeTestTempDir('deploy-restart-db-'), 'server.db');
@@ -63,6 +63,8 @@ test('a running daemon step completes after a same-port server restart without a
     presenceIntervalMs: 60_000,
     claimBackoffBaseMs: 10,
     proxyEnv: {},
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   try {
     const world = await seedWorld(server.url, server.teamId, {

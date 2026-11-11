@@ -5,6 +5,7 @@ import type {
   MachineAttachmentResponse,
   MachineCapabilities,
   MachineDoneBody,
+  MachinePresenceBody,
   MachineSteerAckBody,
   MachineStreamEvent,
   SteerAnswer,
@@ -13,6 +14,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { onTestFinished } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
@@ -101,7 +103,7 @@ export class FakeMachineApi implements MachineApi {
     };
   }
   async me() {
-    return {
+    return readyMachine({
       id: 'm1',
       name: 'n',
       teamId: 't1',
@@ -109,8 +111,11 @@ export class FakeMachineApi implements MachineApi {
       latestCliVersion: null,
       kind: 'remote' as const,
       enabledRuntimes: [],
+      capabilities: (this.presenceBodies.at(-1) as MachinePresenceBody | undefined)?.capabilities as
+        | MachineCapabilities
+        | undefined,
       ...this.mePatch,
-    };
+    });
   }
   async presence(body?: { cliVersion?: string; claudeCode?: unknown }) {
     this.calls.push('presence');
@@ -272,6 +277,8 @@ export async function boot(opts: {
   capEnv?: NodeJS.ProcessEnv;
   orbProvider?: OrbProvider;
   orbComputer?: ScopedComputerProviders;
+  confinementPlatform?: string;
+  confinementPreflight?: import('../src/machine-loop.js').MachineLoopOpts['confinementPreflight'];
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
 }) {
   const home = makeTestTempDir('loop-');
@@ -304,6 +311,8 @@ export async function boot(opts: {
       paths,
       logger,
       client: api,
+      confinementPlatform: opts.confinementPlatform ?? 'darwin',
+      confinementPreflight: opts.confinementPreflight,
       ...(opts.useDefaultBackend ? {} : { backend: opts.backend ?? fakeBackend([]).backend }),
       claudeCodeBackend: opts.claudeCodeBackend,
       claudeCodeAuthProbe:

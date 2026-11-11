@@ -87,9 +87,9 @@ npx @xiechimon/cairn
 | `apps/server` | server：Hono REST + SSE + SQLite（包名 `@xiechimon/cairn`，目录名 ≠ 包名） |
 | `apps/daemon` | 执行机 daemon（包名 `@xiechimon/cairn-cli`，目录名 ≠ 包名） |
 | `packages/shared` | 协议词表 / 记录形状 / 品牌槽单源（`@cairn/shared`） |
-| `docs/spec/` | 实现正典 00–29 册（中文） |
+| `docs/spec/` | 实现正典 00–30 册 |
 | `docs/research/` | r1–r15 原站盘点与后续产品调研（历史档案） |
-| `scripts/` | 构建期工具（含 `generate-icons.mjs`） |
+| `scripts/` | 构建、CI 与运维工具 |
 
 ## 社区
 

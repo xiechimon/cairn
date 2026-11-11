@@ -66,6 +66,8 @@ import type {
   TranscriptRow,
   UpdateSkillBody,
   UserRecord,
+  XaiDevicePollResponse,
+  XaiDeviceStartResponse,
 } from '@cairn/shared';
 import {
   backupHealthSchema,
@@ -498,13 +500,27 @@ export function useRemoteMutations() {
   return {
     createPairingCode: useMutation({
       mutationFn: () => api.post<PairingCodeResponse>('/api/remote/pairing', {}),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
     }),
     revokeDevice: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/remote/devices/${encodeURIComponent(id)}`),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['remoteDevices'] }),
     }),
+    revokePairingCode: useMutation({
+      mutationFn: (id: string) => api.del<void>(`/api/remote/pairing/${encodeURIComponent(id)}`),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
+    }),
   };
 }
+
+export const usePairingGrants = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['pairingGrants'],
+    queryFn: () =>
+      api.get<Array<{ id: string; expiresAt: number; createdAt: number }>>('/api/remote/pairing'),
+    enabled,
+    refetchInterval: DEVICES_POLL_MS,
+  });
 
 export const useMcpServers = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
@@ -937,6 +953,19 @@ export function useApiMutations(teamId: string | undefined) {
           `/api/teams/${teamId}/providers/oauth/${presetId}/authorize`,
           {},
         ),
+    }),
+    startXaiDevice: useMutation({
+      mutationFn: () =>
+        api.post<XaiDeviceStartResponse>(`/api/teams/${teamId}/providers/oauth/xai/device`, {}),
+    }),
+    pollXaiDevice: useMutation({
+      mutationFn: (state: string) =>
+        api.post<XaiDevicePollResponse>(`/api/teams/${teamId}/providers/oauth/xai/device/poll`, {
+          state,
+        }),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
     }),
     startGithubOAuth: useMutation({
       mutationFn: () =>

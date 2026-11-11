@@ -53,6 +53,7 @@ function world() {
     uploads: new Map(),
     enrollments: new Map(),
     oauthStates: new Map(),
+    xaiDeviceStates: new Map(),
     oauthClient: null,
     authToken: null,
     reposDir: dir,

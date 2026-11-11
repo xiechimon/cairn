@@ -1,4 +1,5 @@
 import {
+  isActiveStepStatus,
   isBuildStepKind,
   type MergeReadiness,
   mergeReadinessSchema,
@@ -73,7 +74,6 @@ export interface MergeGateRunRecord {
 }
 
 const readCaches = new Map<string, GateReadCache>();
-const IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
 
 export function readMergeGateState(
   db: Db,
@@ -308,8 +308,7 @@ export async function evaluateMergeGate(
       repoKind: projectRow.repoKind === 'local' ? 'local' : 'github',
       isCurrent: todoRow.latestBuildId === buildId,
       phase: todoRow.phase,
-      stepsInFlight: steps.filter((item) => (IN_FLIGHT as readonly string[]).includes(item.status))
-        .length,
+      stepsInFlight: steps.filter((item) => isActiveStepStatus(item.status)).length,
     },
     repo: {
       owner: repo.owner,
@@ -354,9 +353,7 @@ export async function evaluateMergeGate(
       })
       .onConflictDoNothing()
       .run();
-    const open = steps.some(
-      (item) => item.kind === 'review' && (IN_FLIGHT as readonly string[]).includes(item.status),
-    );
+    const open = steps.some((item) => item.kind === 'review' && isActiveStepStatus(item.status));
     const closed = views.some(
       (item) =>
         item.kind === 'review' &&

@@ -4,8 +4,15 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { chief as chiefTable, skillAudit, step as stepTable } from '../src/db/schema.js';
+import {
+  chief as chiefTable,
+  machine as machineTable,
+  routingRule,
+  skillAudit,
+  step as stepTable,
+} from '../src/db/schema.js';
 import {
   bootServer,
   issueApiKey,
@@ -91,7 +98,7 @@ async function setupWorld(): Promise<World> {
   const res = await s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'si-mbp', cliVersion: '0.1.0' }),
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'si-mbp', cliVersion: '0.1.0' })),
   });
   expect(res.status).toBe(200);
   const token = ((await res.json()) as { token: string }).token;
@@ -350,10 +357,18 @@ describe('#1971 worker claim skill_audit inject rows', () => {
     const enroll2 = await w.s.app.request('/api/machine/enroll', {
       method: 'POST',
       headers: { authorization: `Bearer ${key2}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ teamId: w.s.team.id, name: 'si-mbp-2', cliVersion: '0.1.0' }),
+      body: JSON.stringify(
+        readyMachine({ teamId: w.s.team.id, name: 'si-mbp-2', cliVersion: '0.1.0' }),
+      ),
     });
     expect(enroll2.status).toBe(200);
     const token2 = ((await enroll2.json()) as { token: string }).token;
+    const home = w.s.db.select().from(machineTable).where(eq(machineTable.name, 'si-mbp')).get();
+    w.s.db
+      .update(routingRule)
+      .set({ machineId: home!.id })
+      .where(eq(routingRule.id, w.sessionRouteId))
+      .run();
     const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
     await startBuild(w.s, w.projectId, todoId);
     const winner = await claim(w.s.app, w.token);

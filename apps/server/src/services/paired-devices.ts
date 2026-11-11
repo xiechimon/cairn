@@ -7,12 +7,13 @@ import {
   PAIRING_CODE_TTL_MS,
   type PairedDevice,
 } from '@cairn/shared';
-import { asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { pairedDevice, pushSubscription } from '../db/schema.js';
+import { pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { issueBrowserSession } from './browser-session.js';
 
 const LAST_SEEN_RESOLUTION_MS = 60_000;
 const CODE_BYTES = 24;
@@ -154,6 +155,93 @@ export function pairedDeviceExists(db: Db, id: string): boolean {
     db.select({ id: pairedDevice.id }).from(pairedDevice).where(eq(pairedDevice.id, id)).get() !==
     undefined
   );
+}
+
+export interface IssuedPairingGrant {
+  id: string;
+  code: string;
+  expiresAt: number;
+}
+
+export interface PairingGrantView {
+  id: string;
+  expiresAt: number;
+  createdAt: number;
+}
+
+export function issuePairingGrant(db: Db, now = nowMs()): IssuedPairingGrant {
+  db.delete(pairingGrant)
+    .where(
+      or(
+        isNotNull(pairingGrant.revokedAt),
+        isNotNull(pairingGrant.redeemedAt),
+        lte(pairingGrant.expiresAt, now),
+      ),
+    )
+    .run();
+  const active = db
+    .select()
+    .from(pairingGrant)
+    .where(and(isNull(pairingGrant.revokedAt), isNull(pairingGrant.redeemedAt)))
+    .all()
+    .filter((row) => row.expiresAt > now);
+  const overflow = active.length - PAIRING_CODE_CAP + 1;
+  if (overflow > 0) {
+    for (const row of active.slice(0, overflow)) {
+      db.update(pairingGrant).set({ revokedAt: now }).where(eq(pairingGrant.id, row.id)).run();
+    }
+  }
+  const code = randomBytes(CODE_BYTES).toString('base64url');
+  const id = newRecordId();
+  const expiresAt = now + PAIRING_CODE_TTL_MS;
+  db.insert(pairingGrant)
+    .values({ id, codeHash: hashCredential(code), expiresAt, createdAt: now })
+    .run();
+  return { id, code, expiresAt };
+}
+
+export function listPairingGrants(db: Db, now = nowMs()): PairingGrantView[] {
+  return db
+    .select()
+    .from(pairingGrant)
+    .where(and(isNull(pairingGrant.revokedAt), isNull(pairingGrant.redeemedAt)))
+    .all()
+    .filter((row) => row.expiresAt > now)
+    .map((row) => ({ id: row.id, expiresAt: row.expiresAt, createdAt: row.createdAt }));
+}
+
+export function revokePairingGrant(db: Db, id: string, now = nowMs()): boolean {
+  const row = db.select().from(pairingGrant).where(eq(pairingGrant.id, id)).get();
+  if (row === undefined || row.revokedAt !== null || row.redeemedAt !== null) return false;
+  db.update(pairingGrant).set({ revokedAt: now }).where(eq(pairingGrant.id, id)).run();
+  return true;
+}
+
+export function pairFromGrant(
+  db: Db,
+  input: { code: string; teamId: string; name: string },
+): { device: PairedDevice; token: string; sessionToken: string } | null {
+  return db.transaction((tx) => {
+    if (!hasRoomForDevice(tx)) {
+      throw new HttpError(409, 'too many paired devices; revoke one first');
+    }
+    if (!redeemPairingGrant(tx, input.code)) return null;
+    const created = createPairedDevice(tx, { teamId: input.teamId, name: input.name });
+    const session = issueBrowserSession(tx, 'device', created.device.id);
+    return { device: created.device, token: created.token, sessionToken: session.token };
+  });
+}
+
+export function redeemPairingGrant(db: Db, code: string, now = nowMs()): boolean {
+  const row = db
+    .select()
+    .from(pairingGrant)
+    .where(eq(pairingGrant.codeHash, hashCredential(code)))
+    .get();
+  if (row === undefined || row.revokedAt !== null || row.redeemedAt !== null) return false;
+  if (row.expiresAt <= now) return false;
+  db.update(pairingGrant).set({ redeemedAt: now }).where(eq(pairingGrant.id, row.id)).run();
+  return true;
 }
 
 export function revokePairedDevice(db: Db, teamId: string, id: string): boolean {

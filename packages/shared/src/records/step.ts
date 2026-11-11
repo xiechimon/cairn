@@ -45,6 +45,20 @@ export const stepStatusSchema = z.enum([
 ]);
 export type StepStatus = z.infer<typeof stepStatusSchema>;
 
+export const ACTIVE_STEP_STATUSES = [
+  'pending',
+  'claimed',
+  'waiting_quota',
+] as const satisfies readonly StepStatus[];
+export const UNSTARTED_STEP_STATUSES = [
+  'pending',
+  'waiting_quota',
+] as const satisfies readonly StepStatus[];
+
+export function isActiveStepStatus(status: string): boolean {
+  return (ACTIVE_STEP_STATUSES as readonly string[]).includes(status);
+}
+
 export const quotaWaitSchema = z.object({
   kind: z.enum(['quota', 'capacity']),
   providerId: z.string(),
@@ -80,7 +94,6 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
           name: z.string(),
           running: z.number().int(),
           capacity: z.number().int(),
-          fallbackAt: epochMs.optional(),
         })
         .nullable(),
       hold: z

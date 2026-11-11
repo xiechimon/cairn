@@ -10,5 +10,3 @@ export const tagRecordSchema = z.object({
   v: z.number().int(),
 });
 export type TagRecord = z.infer<typeof tagRecordSchema>;
-
-export const TAG_DEFAULT_COLOR = '#6366f1';
