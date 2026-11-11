@@ -19,6 +19,7 @@ export * from './failure-replay-candidate.js';
 export * from './failure-review.js';
 export * from './genai-conventions.js';
 export * from './git-ops.js';
+export * from './mail.js';
 export * from './model-routing.js';
 export * from './orb-services.js';
 export * from './phase.js';

@@ -120,12 +120,12 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     }
   });
 
-  test('upgrades a database that already applied 0151_action_journal', () => {
+  test('upgrades a database that already applied 0152_action_journal', () => {
     const journal = JSON.parse(
       readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
     ) as { entries: { tag: string; when: number }[] };
-    const tip = journal.entries.findIndex((entry) => entry.tag === '0151_action_journal');
-    if (tip < 0) throw new Error('0151_action_journal missing');
+    const tip = journal.entries.findIndex((entry) => entry.tag === '0152_action_journal');
+    if (tip < 0) throw new Error('0152_action_journal missing');
     const applied = journal.entries.slice(0, tip + 1);
     const directory = makeTestTempDir('cairn-migration-0151-');
     const sqlite = new Database(':memory:');

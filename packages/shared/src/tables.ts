@@ -80,6 +80,9 @@ export const DB_TABLES = [
   'data_migration',
   'task_issue_close',
   'deploy_lease',
+  'mail_account',
+  'mail_event',
+  'mail_rule',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -92,6 +95,9 @@ export const INTERNAL_ONLY_TABLES = [
   'action_subscriber',
   'action_wake_outbox',
   'hosted_cleanup_outbox',
+  'mail_account',
+  'mail_event',
+  'mail_rule',
   'steer_pending',
   'autonomy_pause',
   'step_route',

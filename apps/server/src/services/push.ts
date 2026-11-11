@@ -234,6 +234,7 @@ export function pushToUserSafely(
   userId: string,
   teamId: string,
   msg: PushMessage,
+  deliveryId?: string,
 ): void {
   if (
     vapid === null ||
@@ -241,7 +242,14 @@ export function pushToUserSafely(
     isViewingThread(db, userId, teamId, msg.href)
   )
     return;
-  void sendPushToUser(db, vapid, userId, teamId, msg).catch(() => {
+  void sendPushToUser(
+    db,
+    vapid,
+    userId,
+    teamId,
+    msg,
+    deliveryId === undefined ? undefined : { id: deliveryId, required: false },
+  ).catch(() => {
     process.stderr.write('web push delivery failed\n');
   });
 }

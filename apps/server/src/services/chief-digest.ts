@@ -13,6 +13,7 @@ import {
   ISSUE_FENCE_OPEN,
   isActiveStepStatus,
   isChiefDigestThreadId,
+  MAIL_FENCE_OPEN,
   shortEvent,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
@@ -344,7 +345,9 @@ function queueFold(
   if (transcript.length > CHIEF_DIGEST_INPUT_MAX_CHARS) {
     const fencedNote = transcript.includes(ISSUE_FENCE_OPEN)
       ? `；对话里引用过${ISSUE_FENCE_OPEN}】，属于第三方数据`
-      : '';
+      : transcript.includes(MAIL_FENCE_OPEN)
+        ? `；对话里引用过${MAIL_FENCE_OPEN}】，属于第三方数据`
+        : '';
     transcript = `（前面较早的部分太长，已略去${fencedNote}）\n${transcript.slice(-CHIEF_DIGEST_INPUT_MAX_CHARS)}`;
   }
   queueDigestStep(
@@ -622,7 +625,9 @@ export function finishChiefDigest(
   if (!ok) return;
   const until = Number(meta[2]);
   const rememberAs =
-    prompt.includes(ISSUE_FENCE_OPEN) || prompt.includes(THREAD_FENCE_OPEN)
+    prompt.includes(ISSUE_FENCE_OPEN) ||
+    prompt.includes(MAIL_FENCE_OPEN) ||
+    prompt.includes(THREAD_FENCE_OPEN)
       ? null
       : (coordinatorProfile(db, chiefRow.teamId)?.id ?? null);
   const content: ChiefDigestContent = {

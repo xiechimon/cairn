@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "69408c22-447e-414e-bcb4-4b7c04a61b73",
-  "prevId": "7bdba825-a0fb-46e6-a121-eaf2a6658f01",
+  "id": "7bdba825-a0fb-46e6-a121-eaf2a6658f01",
+  "prevId": "476e713a-33ca-4c97-9446-adb7801502dc",
   "tables": {
     "action_journal": {
       "name": "action_journal",
@@ -4022,97 +4022,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "hosted_cleanup_outbox": {
-      "name": "hosted_cleanup_outbox",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "teamId": {
-          "name": "teamId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "projectId": {
-          "name": "projectId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "repoName": {
-          "name": "repoName",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "nextAttemptAt": {
-          "name": "nextAttemptAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lastError": {
-          "name": "lastError",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "hosted_cleanup_unresolved_idx": {
-          "name": "hosted_cleanup_unresolved_idx",
-          "columns": [
-            "teamId",
-            "repoName"
-          ],
-          "isUnique": true,
-          "where": "\"hosted_cleanup_outbox\".\"state\" != 'done'"
-        }
-      },
-      "foreignKeys": {
-        "hosted_cleanup_outbox_teamId_team_id_fk": {
-          "name": "hosted_cleanup_outbox_teamId_team_id_fk",
-          "tableFrom": "hosted_cleanup_outbox",
-          "tableTo": "team",
-          "columnsFrom": [
-            "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "machine": {
       "name": "machine",
       "columns": {
@@ -4269,6 +4178,430 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "mail_account": {
+      "name": "mail_account",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mailbox": {
+          "name": "mailbox",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "historyWatermark": {
+          "name": "historyWatermark",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "uidValidity": {
+          "name": "uidValidity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lastReconciledUid": {
+          "name": "lastReconciledUid",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pushServiceAccountEmail": {
+          "name": "pushServiceAccountEmail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "secretId": {
+          "name": "secretId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "watchExpiration": {
+          "name": "watchExpiration",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "mail_account_team_idx": {
+          "name": "mail_account_team_idx",
+          "columns": [
+            "teamId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "mail_account_teamId_team_id_fk": {
+          "name": "mail_account_teamId_team_id_fk",
+          "tableFrom": "mail_account",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "mail_account_userId_user_id_fk": {
+          "name": "mail_account_userId_user_id_fk",
+          "tableFrom": "mail_account",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "mail_account_secretId_secret_id_fk": {
+          "name": "mail_account_secretId_secret_id_fk",
+          "tableFrom": "mail_account",
+          "tableTo": "secret",
+          "columnsFrom": [
+            "secretId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "mail_account_status": {
+          "name": "mail_account_status",
+          "value": "\"mail_account\".\"status\" in ('disconnected', 'connecting', 'watching', 'degraded', 'revoked')"
+        },
+        "mail_account_provider": {
+          "name": "mail_account_provider",
+          "value": "\"mail_account\".\"provider\" in ('gmail', 'imap')"
+        }
+      }
+    },
+    "mail_event": {
+      "name": "mail_event",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "accountId": {
+          "name": "accountId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "externalId": {
+          "name": "externalId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ruleId": {
+          "name": "ruleId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ruleName": {
+          "name": "ruleName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dropReason": {
+          "name": "dropReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fromAddress": {
+          "name": "fromAddress",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "excerpt": {
+          "name": "excerpt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "mail_event_account_external_unique": {
+          "name": "mail_event_account_external_unique",
+          "columns": [
+            "accountId",
+            "externalId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "mail_event_accountId_mail_account_id_fk": {
+          "name": "mail_event_accountId_mail_account_id_fk",
+          "tableFrom": "mail_event",
+          "tableTo": "mail_account",
+          "columnsFrom": [
+            "accountId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "mail_event_status": {
+          "name": "mail_event_status",
+          "value": "\"mail_event\".\"status\" in ('received', 'ranked', 'delivered', 'dropped')"
+        },
+        "mail_event_rank": {
+          "name": "mail_event_rank",
+          "value": "\"mail_event\".\"rank\" is null or \"mail_event\".\"rank\" in ('needs_you', 'can_wait', 'drop')"
+        },
+        "mail_event_drop_reason": {
+          "name": "mail_event_drop_reason",
+          "value": "\"mail_event\".\"status\" != 'dropped' or \"mail_event\".\"dropReason\" is not null"
+        },
+        "mail_event_dropped_body": {
+          "name": "mail_event_dropped_body",
+          "value": "\"mail_event\".\"status\" != 'dropped' or (\"mail_event\".\"excerpt\" is null and \"mail_event\".\"subject\" is null and \"mail_event\".\"displayName\" is null and \"mail_event\".\"fromAddress\" is null)"
+        }
+      }
+    },
+    "mail_rule": {
+      "name": "mail_rule",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "accountId": {
+          "name": "accountId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "matchKind": {
+          "name": "matchKind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pattern": {
+          "name": "pattern",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "mail_rule_account_idx": {
+          "name": "mail_rule_account_idx",
+          "columns": [
+            "accountId",
+            "createdAt",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "mail_rule_accountId_mail_account_id_fk": {
+          "name": "mail_rule_accountId_mail_account_id_fk",
+          "tableFrom": "mail_rule",
+          "tableTo": "mail_account",
+          "columnsFrom": [
+            "accountId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "mail_rule_kind": {
+          "name": "mail_rule_kind",
+          "value": "\"mail_rule\".\"matchKind\" in ('sender_allow', 'subject_contains')"
+        },
+        "mail_rule_rank": {
+          "name": "mail_rule_rank",
+          "value": "\"mail_rule\".\"rank\" in ('needs_you', 'can_wait', 'drop')"
+        },
+        "mail_rule_pattern": {
+          "name": "mail_rule_pattern",
+          "value": "length(trim(\"mail_rule\".\"pattern\")) > 0"
+        }
+      }
     },
     "member_activity": {
       "name": "member_activity",

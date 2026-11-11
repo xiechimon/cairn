@@ -1,4 +1,5 @@
 import type { BoundGitCredentials, MachineTokenResponse, ProviderConfig } from '@cairn/shared';
+import { isMailSecretName } from '@cairn/shared';
 
 export interface SecretVault {
   names: readonly string[];
@@ -8,7 +9,7 @@ export interface SecretVault {
 export const EMPTY_SECRET_VAULT: SecretVault = { names: [], take: () => null };
 
 function openSecretVault(values: Record<string, string>): SecretVault {
-  const held = new Map(Object.entries(values));
+  const held = new Map(Object.entries(values).filter(([name]) => !isMailSecretName(name)));
   return {
     names: [...held.keys()],
     take(name: string): string | null {

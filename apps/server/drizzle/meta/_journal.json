@@ -1034,22 +1034,29 @@
     {
       "idx": 151,
       "version": "6",
-      "when": 1794422917828,
-      "tag": "0151_action_journal",
+      "when": 1794422961790,
+      "tag": "0151_mail_connector",
       "breakpoints": true
     },
     {
       "idx": 152,
       "version": "6",
-      "when": 1794422917829,
-      "tag": "0152_action_proposal",
+      "when": 1794422961791,
+      "tag": "0152_action_journal",
       "breakpoints": true
     },
     {
       "idx": 153,
       "version": "6",
-      "when": 1794422917830,
-      "tag": "0153_hosted_cleanup_outbox",
+      "when": 1794422961792,
+      "tag": "0153_action_proposal",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "6",
+      "when": 1794422961793,
+      "tag": "0154_hosted_cleanup_outbox",
       "breakpoints": true
     }
   ]
