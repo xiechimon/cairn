@@ -148,7 +148,7 @@ export function ComposerThreadTargetMenu({
   if (questionDockState.uploading())
     return (
       <DropdownMenuItem disabled title={t('附件上传中')}>
-        <MessageSquare width={16} height={16} />
+        <MessageSquare width={20} height={20} />
         {t('对某个 thread 说')}
       </DropdownMenuItem>
     );
@@ -176,7 +176,7 @@ export function ComposerThreadTarget({ targets, picked, composerRef, onPick }: T
             />
           }
         >
-          <GitBranch width={14} height={14} />
+          <GitBranch width={16} height={16} />
           <span className="truncate">{`#${picked.seq} ${picked.title}`}</span>
           <ChevronDown width={12} height={12} />
         </DropdownMenuTrigger>
@@ -204,7 +204,7 @@ export function ComposerThreadTarget({ targets, picked, composerRef, onPick }: T
           />
         }
       >
-        <X width={14} height={14} />
+        <X width={16} height={16} />
       </IconTooltip>
     </>
   );

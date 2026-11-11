@@ -570,7 +570,7 @@ export function ChiefConversation({
               </MessageScrollerContent>
             </FadeScrollerViewport>
             <JumpToLatestButton>
-              <ArrowDown width={16} height={16} />
+              <ArrowDown width={20} height={20} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
             <SelectionReply
@@ -613,7 +613,7 @@ export function ChiefConversation({
                 data-testid="chief-composer-error"
                 className={`mx-auto mt-2 mb-0 flex w-[calc(100%-2rem)] max-w-chat max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
               >
-                <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
+                <TriangleAlert aria-hidden="true" className="size-4 flex-none" />
                 {composerError}
               </p>
             )}

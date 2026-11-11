@@ -40,11 +40,11 @@ function Toaster({ ...props }: ToasterProps) {
       mobileOffset={{ top: 56, left: 16, right: 16 }}
       className="group"
       icons={{
-        success: <CircleCheck className="size-4 text-running-text" />,
-        info: <Info className="size-4" />,
-        warning: <TriangleAlert className="size-4 text-(--badge-attention)" />,
-        error: <OctagonX className="size-4 text-destructive" />,
-        loading: <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />,
+        success: <CircleCheck className="size-5 text-running-text" />,
+        info: <Info className="size-5" />,
+        warning: <TriangleAlert className="size-5 text-(--badge-attention)" />,
+        error: <OctagonX className="size-5 text-destructive" />,
+        loading: <LoaderCircle className="size-5 animate-spin motion-reduce:animate-none" />,
       }}
       style={
         {

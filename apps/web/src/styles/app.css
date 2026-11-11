@@ -69,7 +69,6 @@
     font-weight: 400;
     line-height: calc(20 / 14);
     text-autospace: normal;
-    -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
   svg {

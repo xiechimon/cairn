@@ -60,7 +60,7 @@
     },
     {
       "file": "apps/web/src/chief/chief-outage-banner.tsx",
-      "anchor": "size-4.5 flex-none text-(--card-button)",
+      "anchor": "size-5.5 flex-none text-(--card-button)",
       "role": "indicator",
       "reason": "Coordinator outage banner alert glyph: non-text 18px icon, same warning tone as NoticeBanner.",
       "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"

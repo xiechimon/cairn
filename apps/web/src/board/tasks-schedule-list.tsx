@@ -63,17 +63,13 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
                 className="h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) pointer-coarse:pr-12 dark:hover:bg-(--menu-hover)"
               >
                 <span className="flex size-7 flex-none items-center justify-center rounded-(--radius-control) bg-(--hover-1)">
-                  <Clock
-                    aria-hidden
-                    className="size-3.5 text-content-tertiary"
-                    strokeWidth={1.75}
-                  />
+                  <Clock aria-hidden className="size-4 text-content-tertiary" strokeWidth={1.75} />
                 </span>
                 <span className="flex min-h-7 min-w-0 flex-1 flex-col justify-center">
                   <span className="truncate text-ui leading-5 text-foreground">
                     {row.todo.title}
                   </span>
-                  <span className="truncate text-caption leading-4 text-content-tertiary">
+                  <span className="truncate text-meta leading-4.5 text-content-tertiary">
                     {row.enabled === false
                       ? (row.pausedReason ?? t('已暂停'))
                       : scheduleSummary(row, now, t)}
@@ -96,7 +92,7 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
         className="mt-1 gap-1.5 self-start text-meta text-content-secondary"
         render={<Link to="/app/schedules" />}
       >
-        <CalendarClock aria-hidden className="size-3.5" strokeWidth={1.75} />
+        <CalendarClock aria-hidden className="size-4" strokeWidth={1.75} />
         {t('管理定时')}
       </Button>
       <ScheduleDetailController schedule={selected} now={now} onClose={() => setSelected(null)} />

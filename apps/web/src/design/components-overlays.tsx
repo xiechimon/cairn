@@ -108,7 +108,7 @@ export function MenuSection() {
                 </KeyedMenuSubContent>
               </DropdownMenuSub>
               <KeyedMenuItem shortcut="G" onClick={() => setLast('Open in GitHub')}>
-                <ExternalLink className="size-4.5" />
+                <ExternalLink className="size-5.5" />
                 Open in GitHub
               </KeyedMenuItem>
             </DropdownMenuGroup>

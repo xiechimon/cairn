@@ -48,7 +48,7 @@ export function StatusGlyph({
       role={label == null ? undefined : 'img'}
       aria-label={label}
       aria-hidden={label == null ? true : undefined}
-      className={cn('size-3.5 flex-none', className)}
+      className={cn('size-4 flex-none', className)}
     >
       {cut != null ? (
         <>

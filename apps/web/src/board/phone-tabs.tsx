@@ -8,7 +8,7 @@ import { PANE_PARAM, type WorkPane } from './work-panel.js';
 
 export const NARROW_FLOAT_CLS = 'pointer-events-auto bg-popover shadow-(--e2)';
 
-export const NARROW_ICON_CLS = 'size-4.5';
+export const NARROW_ICON_CLS = 'size-5.5';
 
 export function NeedsYouCount({ count, className }: { count: number; className?: string }) {
   return (

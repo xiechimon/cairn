@@ -63,7 +63,7 @@ export function SettingsNav({
                       : 'text-foreground hover:bg-sidebar-hover',
                   )}
                 >
-                  <item.Icon aria-hidden className="size-4 flex-none" strokeWidth={1.75} />
+                  <item.Icon aria-hidden className="size-5 flex-none" strokeWidth={1.75} />
                   <span className="min-w-0 flex-auto truncate">{item.label}</span>
                   {item.badge !== undefined && (
                     <span

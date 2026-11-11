@@ -399,7 +399,7 @@ function CopyCodeButton({
         />
       }
     >
-      {copied ? <Check width={18} height={18} /> : <Copy width={18} height={18} />}
+      {copied ? <Check width={22} height={22} /> : <Copy width={22} height={22} />}
     </IconTooltip>
   );
 }
@@ -433,7 +433,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
             />
           }
         >
-          <ChiefExpand width={18} height={18} />
+          <ChiefExpand width={22} height={22} />
         </IconTooltip>
         <CopyCodeButton text={text} testId="md-code-copy" />
       </div>

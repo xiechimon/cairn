@@ -72,7 +72,7 @@ function RepoSwapButton({
         />
       }
     >
-      <ChevronRight width={14} height={14} />
+      <ChevronRight width={16} height={16} />
     </DropdownMenuTrigger>
   );
 }
@@ -433,7 +433,7 @@ export function ProjectNewPage() {
                         ) : (
                           <span>{githubRepo}</span>
                         )}
-                        <ChevronRight width={14} height={14} />
+                        <ChevronRight width={16} height={16} />
                       </PopoverTrigger>
                       <RepoSwapButton label={t('选择仓库')} buttonRef={swapBtnRef} />
                     </>
@@ -498,7 +498,7 @@ export function ProjectNewPage() {
                     }
                   >
                     <span className="text-content-tertiary">{t('选择仓库')}</span>
-                    <ChevronRight width={14} height={14} />
+                    <ChevronRight width={16} height={16} />
                   </DropdownMenuTrigger>
                 )}
                 <KeyedMenuContent
@@ -576,7 +576,7 @@ export function ProjectNewPage() {
                           {repo.full_name}
                           {githubRepo === repo.full_name && (
                             <span className="ml-auto flex text-primary">
-                              <Check width={14} height={14} />
+                              <Check width={16} height={16} />
                             </span>
                           )}
                         </Button>

@@ -60,7 +60,7 @@ export function ProfileHeader({
           className={cn('h-8 flex-none gap-1.5 px-3 text-ui', editClassName)}
           onClick={() => setDraft(name)}
         >
-          <SquarePen className="size-4" />
+          <SquarePen className="size-5" />
           {t('编辑名称')}
         </Button>
       }

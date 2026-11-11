@@ -40,7 +40,7 @@ function CardBody({
             className={`block max-h-40 max-w-full object-cover${imageHookClassName != null ? ` ${imageHookClassName}` : ''}`}
           />
         ) : (
-          <FileText width={18} height={18} className="text-icon" />
+          <FileText width={22} height={22} className="text-icon" />
         )}
       </AttachmentMedia>
       <AttachmentContent>

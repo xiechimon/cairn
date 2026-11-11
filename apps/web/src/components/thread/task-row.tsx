@@ -31,7 +31,7 @@ const ROW_DESCRIPTION_DELAY = 600;
 
 function Glyph({ glyph, waiting }: { glyph: TaskRowGlyph; waiting: boolean }) {
   const ink = waiting ? ACCENT_INK : 'text-content-tertiary';
-  if (glyph === 'question') return <BrandGlyph className={cn('size-3.5 flex-none', ink)} />;
+  if (glyph === 'question') return <BrandGlyph className={cn('size-4 flex-none', ink)} />;
   return <StatusGlyph kind={glyph} className={ink} />;
 }
 
@@ -116,7 +116,7 @@ export function TaskRow({
           {waiting && (
             <span
               data-slot="task-row-what"
-              className="min-w-0 truncate text-caption leading-4 text-content-tertiary"
+              className="min-w-0 truncate text-meta leading-4.5 text-content-tertiary"
             >
               {what}
             </span>

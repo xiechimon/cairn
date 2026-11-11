@@ -323,7 +323,7 @@ export function HomeC({
         className="text-meta text-content-secondary"
         render={<Link to={{ pathname: '/app', search: projectHomeSearch(searchParams) }} />}
       >
-        <House aria-hidden="true" className="size-3.5" />
+        <House aria-hidden="true" className="size-4" />
         {t('项目主页')}
       </Button>
       <Button
@@ -332,7 +332,7 @@ export function HomeC({
         className="text-meta text-content-secondary"
         render={<Link to={`/app/project/${projectId}/tasks`} />}
       >
-        <ListChecks aria-hidden="true" className="size-3.5" />
+        <ListChecks aria-hidden="true" className="size-4" />
         {t('任务')}
       </Button>
       <Button
@@ -341,7 +341,7 @@ export function HomeC({
         className="text-meta text-content-secondary"
         render={<Link to={`/app/project/${projectId}/settings`} />}
       >
-        <Settings2 aria-hidden="true" className="size-3.5" />
+        <Settings2 aria-hidden="true" className="size-4" />
         {t('项目设置')}
       </Button>
     </nav>

@@ -204,7 +204,7 @@ export function SidePanelHead({
         aria-label={closeLabel}
         onClick={onClose}
       >
-        <X aria-hidden strokeWidth={1.75} className="size-4.5" />
+        <X aria-hidden strokeWidth={1.75} className="size-5.5" />
       </Button>
     </div>
   );

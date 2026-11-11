@@ -314,7 +314,7 @@ export function Gallery() {
     <div className="flex h-full bg-canvas text-foreground">
       <aside className="hidden h-full w-62 flex-none flex-col overflow-y-auto px-3 py-5 md:flex">
         <a href="#top" className="flex items-center gap-2 px-2.5 pb-1 text-foreground no-underline">
-          <BrandGlyph className="size-4" />
+          <BrandGlyph className="size-5" />
           <span
             className="text-heading font-semibold"
             style={{ fontFamily: 'var(--font-display)' }}

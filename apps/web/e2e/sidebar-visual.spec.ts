@@ -247,7 +247,7 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   expect(m.padding).toBe('6px');
   expect(m.itemHeights).toEqual([27, 27, 27, 27, 27]);
   expect(m.itemRadius).toBe('6px');
-  expect(m.icon).toEqual([16, 10]);
+  expect(m.icon).toEqual([20, 10]);
   expect(m.font).toBe('13px');
   expect(m.danger).toBe(m.destructive);
   expect(m.triggerSize).toEqual([22, 22]);

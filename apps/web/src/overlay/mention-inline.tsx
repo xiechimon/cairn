@@ -20,15 +20,15 @@ export interface MentionInlineProps {
 function InlineKindIcon({ kind }: { kind: InlineCompletionRow['kind'] }) {
   switch (kind) {
     case 'todo':
-      return <FileCheck width={14} height={14} />;
+      return <FileCheck width={16} height={16} />;
     case 'skill':
-      return <Puzzle width={14} height={14} />;
+      return <Puzzle width={16} height={16} />;
     case 'project':
-      return <Layers width={14} height={14} />;
+      return <Layers width={16} height={16} />;
     case 'machine':
-      return <Server width={14} height={14} />;
+      return <Server width={16} height={16} />;
     case 'file':
-      return <FileText width={14} height={14} />;
+      return <FileText width={16} height={16} />;
     case 'agent':
       return null;
   }

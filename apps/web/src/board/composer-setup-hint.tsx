@@ -41,12 +41,12 @@ export function ComposerSetupHint() {
   if (!live || next === null) return null;
   const copy: Record<FirstRunStepId, { icon: ReactNode; label: string; hint: ReactNode }> = {
     'model-source': {
-      icon: <Key width={14} height={14} />,
+      icon: <Key width={16} height={16} />,
       label: t('接入模型来源'),
       hint: t('添加模型服务商，或在机器上登录 Claude Code'),
     },
     machine: {
-      icon: <Monitor width={14} height={14} />,
+      icon: <Monitor width={16} height={16} />,
       label: t('连接一台机器'),
       hint: (
         <>
@@ -56,7 +56,7 @@ export function ComposerSetupHint() {
       ),
     },
     coordinator: {
-      icon: <Settings width={14} height={14} />,
+      icon: <Settings width={16} height={16} />,
       label: t('打开工作路由'),
       hint: t('先创建 Coordinator 规则，它才能回答你的消息。'),
     },

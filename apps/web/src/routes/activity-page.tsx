@@ -202,7 +202,7 @@ export function ActivityPage() {
     >
       <div className="flex flex-col gap-2 px-4 py-3">
         <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-card px-2.5 py-1 text-content-tertiary dark:bg-input/30">
-          <Search width={14} height={14} className="flex-none" />
+          <Search width={16} height={16} className="flex-none" />
           {chips.map((chip, index) => (
             <QueryChip
               key={`${chip.raw}-${index}`}

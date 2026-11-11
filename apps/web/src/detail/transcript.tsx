@@ -410,7 +410,7 @@ function Row({
       return (
         <>
           <div className="chat-plan mt-3.5 flex items-center text-meta text-(--text-secondary) [&_svg]:text-(--text-tertiary)">
-            <FileTab width={14} height={14} />
+            <FileTab width={16} height={16} />
             <span className="chat-plan-title ml-1.5">{item.title}</span>
             {onOpenPlan != null ? (
               <Button

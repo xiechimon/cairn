@@ -214,9 +214,9 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
           }
         >
           {copied ? (
-            <Check aria-hidden className="size-4.5" />
+            <Check aria-hidden className="size-5.5" />
           ) : (
-            <Copy aria-hidden className="size-4.5" />
+            <Copy aria-hidden className="size-5.5" />
           )}
         </IconTooltip>
         <IconTooltip
@@ -233,7 +233,7 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
             />
           }
         >
-          <Download aria-hidden className="size-4.5" />
+          <Download aria-hidden className="size-5.5" />
         </IconTooltip>
       </SidePanelHead>
       {body}

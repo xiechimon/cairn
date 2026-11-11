@@ -167,7 +167,7 @@ export function Composer({
             />
           }
         >
-          <Plus width={16} height={16} />
+          <Plus width={20} height={20} />
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8}>
           {t('更多')}
@@ -182,12 +182,12 @@ export function Composer({
         className={MENU_CONTENT_CLS}
       >
         <DropdownMenuItem disabled={attaching || !onAttachment} onClick={openFilePicker}>
-          <Paperclip width={16} height={16} />
+          <Paperclip width={20} height={20} />
           {t('添加附件')}
         </DropdownMenuItem>
         {aiReview && (
           <DropdownMenuItem onClick={onReview}>
-            <SearchPlus width={16} height={16} />
+            <SearchPlus width={20} height={20} />
             {t('审阅')}
           </DropdownMenuItem>
         )}
@@ -284,7 +284,7 @@ export function Composer({
             className="flex min-h-7 min-w-0 flex-1 items-center gap-2 px-1.5 text-ui leading-5 text-(--text-secondary)"
             data-testid="composer-placeholder"
           >
-            {readOnly && <Lock width={16} height={16} className="flex-none" />}
+            {readOnly && <Lock width={20} height={20} className="flex-none" />}
             {t(placeholder)}
           </div>
         )}
@@ -326,7 +326,7 @@ export function Composer({
                 />
               }
             >
-              <CornerDownLeft width={16} height={16} />
+              <CornerDownLeft width={20} height={20} />
             </IconTooltip>
           </>
         )}

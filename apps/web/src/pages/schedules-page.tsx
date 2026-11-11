@@ -325,7 +325,7 @@ export function SchedulesPage() {
               else setFixtureFormOpen(true);
             }}
           >
-            <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+            <Plus aria-hidden strokeWidth={1.75} className="size-4" />
             {t('新建')}
           </Button>
         )

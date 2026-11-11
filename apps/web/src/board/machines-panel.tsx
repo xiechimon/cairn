@@ -60,7 +60,7 @@ function MachineGlyph({ machine }: { machine: MachineRow }) {
   const Icon = machine.kind === 'local' ? Laptop : Server;
   return (
     <span className="relative flex flex-none text-content-secondary">
-      <Icon aria-hidden="true" className="size-4.5" />
+      <Icon aria-hidden="true" className="size-5.5" />
       <StatusDot
         online={machine.online === true}
         className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
@@ -160,7 +160,7 @@ export function MachineChip({
         />
       }
     >
-      <Laptop aria-hidden="true" className={round ? 'size-4.5' : undefined} />
+      <Laptop aria-hidden="true" className={round ? 'size-5.5' : undefined} />
       {loading ? (
         <Skeleton
           className={cn(
@@ -273,7 +273,7 @@ function MachineDetail({
           aria-label={t('关闭')}
           onClick={() => setExpanded(false)}
         >
-          <X width={16} height={16} />
+          <X width={20} height={20} />
         </Button>
       </div>
       <div
@@ -326,7 +326,7 @@ function MachineDetail({
               data-testid="machine-screen-hint"
               className="m-0 flex items-center gap-2 px-2.5 text-meta text-content-tertiary"
             >
-              <MonitorSmartphone aria-hidden="true" className="size-3.5 flex-none" />
+              <MonitorSmartphone aria-hidden="true" className="size-4 flex-none" />
               {t('未开启桌面控制，开启后这里显示屏幕')}
             </p>
           )}
@@ -352,7 +352,7 @@ function MachineDetail({
                 >
                   <Folder
                     aria-hidden="true"
-                    className="size-4.5 flex-none text-content-secondary"
+                    className="size-5.5 flex-none text-content-secondary"
                   />
                   <span className="min-w-0 flex-1 truncate font-mono text-ui text-foreground">
                     {folder.path}
@@ -417,7 +417,7 @@ function RunningHere({ machine }: { machine: MachineRow }) {
                 ])}
               </span>
             </span>
-            <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-tertiary" />
+            <ChevronRight aria-hidden="true" className="size-5 flex-none text-content-tertiary" />
           </Button>
         ))}
       </ListCard>
@@ -462,7 +462,7 @@ function LineRow({
         <span className="flex flex-none text-content-secondary">{icon}</span>
         <span className="min-w-0 flex-1 truncate text-ui text-foreground">{label}</span>
         {chevron && (
-          <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-tertiary" />
+          <ChevronRight aria-hidden="true" className="size-5 flex-none text-content-tertiary" />
         )}
       </Button>
     </ListCard>
@@ -521,7 +521,7 @@ export function MachinesPanel({
               />
             }
           >
-            <ChevronLeft aria-hidden="true" className="size-4.5" />
+            <ChevronLeft aria-hidden="true" className="size-5.5" />
           </IconTooltip>
           <h2 className="m-0 min-w-0 flex-1 truncate text-heading font-normal text-foreground">
             {selected.name}
@@ -556,7 +556,7 @@ export function MachinesPanel({
           />
           <div className="mt-7">
             <LineRow
-              icon={<Laptop aria-hidden="true" className="size-4.5" />}
+              icon={<Laptop aria-hidden="true" className="size-5.5" />}
               label={t('所有电脑')}
               chevron
               onClick={() => setOpenKey(null)}
@@ -598,7 +598,7 @@ export function MachinesPanel({
                 </span>
                 <ChevronRight
                   aria-hidden="true"
-                  className="size-4 flex-none text-content-tertiary"
+                  className="size-5 flex-none text-content-tertiary"
                 />
               </Button>
             ))}
@@ -620,7 +620,7 @@ export function MachinesPanel({
               <Spinner
                 role="presentation"
                 aria-hidden="true"
-                className="size-3.5 text-content-tertiary"
+                className="size-4 text-content-tertiary"
               />
             ) : (
               t('再检查一次')
@@ -629,7 +629,7 @@ export function MachinesPanel({
         </div>
         <div data-testid="machines-add" className="mt-7">
           <LineRow
-            icon={<Plus aria-hidden="true" className="size-4.5" />}
+            icon={<Plus aria-hidden="true" className="size-5.5" />}
             label={t('添加电脑')}
             render={<Link to={settingsHref('machines')} />}
           />

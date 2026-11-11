@@ -41,7 +41,7 @@ import { canMarkDone, useMarkDone } from './use-mark-done.js';
 export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
 
 export const PANEL_HEAD = 'h-13 gap-0.5 pr-4 pl-4';
-export const PANEL_HEAD_BUTTON = 'size-9 text-foreground [&_svg]:size-4.5';
+export const PANEL_HEAD_BUTTON = 'size-9 text-foreground [&_svg]:size-5.5';
 export const PANEL_TITLE = 'text-heading font-normal';
 const PANEL_TABS = 'h-7.5 gap-0.5 group-data-horizontal/tabs:h-7.5';
 const PANEL_TAB =
@@ -305,7 +305,7 @@ export function TasksPanel({
             />
           }
         >
-          <Plus aria-hidden className="size-4.5" strokeWidth={1.75} />
+          <Plus aria-hidden className="size-5.5" strokeWidth={1.75} />
         </IconTooltip>
       </SidePanelHead>
       <div className="flex flex-none px-2 pb-2">

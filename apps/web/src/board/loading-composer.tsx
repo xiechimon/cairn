@@ -39,7 +39,7 @@ export function LoadingComposer({ draft, onDraftChange, placeholder }: LoadingCo
               />
             }
           >
-            <ArrowUp width={14} height={14} />
+            <ArrowUp width={16} height={16} />
           </IconTooltip>
         </div>
       </div>

@@ -127,7 +127,7 @@ export function ProjectHome({
               className="text-meta text-content-secondary"
               render={<Link to={`/app/project/${project.id}/tasks`} />}
             >
-              <ListTodo aria-hidden="true" className="size-3.5" />
+              <ListTodo aria-hidden="true" className="size-4" />
               {t('任务')}
             </Button>
             <Button
@@ -136,7 +136,7 @@ export function ProjectHome({
               className="text-meta text-content-secondary"
               render={<Link to={`/app/project/${project.id}/settings`} />}
             >
-              <Settings2 aria-hidden="true" className="size-3.5" />
+              <Settings2 aria-hidden="true" className="size-4" />
               {t('项目设置')}
             </Button>
           </nav>
@@ -180,7 +180,7 @@ export function ProjectHome({
                 className="mt-5 h-11 w-full max-w-160 justify-start gap-2 rounded-xl bg-card text-ui font-normal text-content-secondary shadow-(--e1)"
                 render={<Link to={chatHref} />}
               >
-                <MessageSquare aria-hidden="true" className="size-4" />
+                <MessageSquare aria-hidden="true" className="size-5" />
                 {t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
               </Button>
             ) : (
@@ -233,7 +233,7 @@ export function ProjectHome({
               <aside className="flex flex-col gap-4">
                 <ListCard>
                   <CardHead
-                    icon={<BookText className="size-3.5" />}
+                    icon={<BookText className="size-4" />}
                     title={t('项目说明')}
                     action={
                       archived === null ? (
@@ -284,13 +284,13 @@ export function ProjectHome({
                   )}
                 </ListCard>
                 <ListCard>
-                  <CardHead icon={<Brain className="size-3.5" />} title={t('项目记忆')} />
+                  <CardHead icon={<Brain className="size-4" />} title={t('项目记忆')} />
                   <CardNote>
                     {t('Coordinator 在本项目学到的事会记在这里，默认只在本项目内使用。即将上线。')}
                   </CardNote>
                 </ListCard>
                 <ListCard>
-                  <CardHead icon={<Layers className="size-3.5" />} title={t('定时任务')} />
+                  <CardHead icon={<Layers className="size-4" />} title={t('定时任务')} />
                   {ownSchedules.length === 0 ? (
                     <CardNote>{t('没有定时任务')}</CardNote>
                   ) : (
@@ -320,7 +320,7 @@ export function ProjectHome({
                 <ListCard>
                   <Link to={SECRETS_HREF} className="text-inherit no-underline">
                     <ListRow
-                      icon={<KeyRound className="size-4" />}
+                      icon={<KeyRound className="size-5" />}
                       title={t('密钥')}
                       subtitle={t('目前用团队密钥')}
                     />
@@ -330,7 +330,7 @@ export function ProjectHome({
                     className="text-inherit no-underline"
                   >
                     <ListRow
-                      icon={<Gauge className="size-4" />}
+                      icon={<Gauge className="size-5" />}
                       title={t('并发与优先级')}
                       subtitle={t('目前跟随机器上限')}
                     />

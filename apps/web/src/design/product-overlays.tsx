@@ -60,17 +60,17 @@ const SEARCH_CONTEXT: SearchContext = {
   seqNum: 71,
   title: 'Cache the project file tree',
   commands: [
-    { id: 'primary', label: 'Confirm', icon: <Play width={15} height={15} />, run: () => {} },
+    { id: 'primary', label: 'Confirm', icon: <Play width={18} height={18} />, run: () => {} },
     {
       id: 'assign',
       label: 'Edit assignment…',
-      icon: <Settings width={15} height={15} />,
+      icon: <Settings width={18} height={18} />,
       run: () => {},
     },
     {
       id: 'more',
       label: 'More actions…',
-      icon: <EllipsisVertical width={15} height={15} />,
+      icon: <EllipsisVertical width={18} height={18} />,
       run: () => {},
     },
   ],

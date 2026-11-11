@@ -195,7 +195,7 @@ export function ProjectSettingsPage() {
                 ) : (
                   <>
                     {project?.name ?? ''}
-                    <SquarePen width={14} height={14} className={ROW_ICON_CLS} />
+                    <SquarePen width={16} height={16} className={ROW_ICON_CLS} />
                   </>
                 )}
               </SettingsRow>
@@ -258,7 +258,7 @@ export function ProjectSettingsPage() {
                     className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
                   >
                     {project?.defaultBranch ?? 'main'}
-                    <ChevronDown width={14} height={14} className={ROW_ICON_CLS} />
+                    <ChevronDown width={16} height={16} className={ROW_ICON_CLS} />
                   </span>
                 )}
               </SettingsRow>
@@ -342,7 +342,7 @@ export function ProjectSettingsPage() {
                 ) : (
                   <>
                     {project?.description ?? t('尚无描述')}
-                    <SquarePen width={14} height={14} className={ROW_ICON_CLS} />
+                    <SquarePen width={16} height={16} className={ROW_ICON_CLS} />
                   </>
                 )}
               </SettingsRow>

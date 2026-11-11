@@ -89,9 +89,7 @@ function stateIcon(pr: PrCardModel) {
       : pr.state === 'closed'
         ? GitPullRequestClosed
         : GitPullRequest;
-  return (
-    <Icon aria-hidden strokeWidth={1.75} className="size-3.5 flex-none text-content-tertiary" />
-  );
+  return <Icon aria-hidden strokeWidth={1.75} className="size-4 flex-none text-content-tertiary" />;
 }
 
 function CheckCount({ pr }: { pr: PrCardModel }) {
@@ -238,7 +236,7 @@ export function PrCard(props: PrCardProps) {
             aria-label={t('详情')}
             className="inline-flex size-6 flex-none items-center justify-center rounded-md text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <ChevronDown className="size-3.5 group-data-[open]/details:rotate-180" />
+            <ChevronDown className="size-4 group-data-[open]/details:rotate-180" />
           </CollapsibleTrigger>
           {githubHref != null && (
             <PrRowMenu
@@ -254,7 +252,7 @@ export function PrCard(props: PrCardProps) {
             data-slot="pr-card-late"
             className="m-0 flex items-center gap-1.5 pt-0.5 pl-5.5 text-meta text-content-tertiary"
           >
-            <Clock className="size-3.5 flex-none" aria-hidden />
+            <Clock className="size-4 flex-none" aria-hidden />
             {t('{n} 分钟前读取，GitHub 可能被限流或延迟', { n: pr.readAgoMinutes })}
           </p>
         )}

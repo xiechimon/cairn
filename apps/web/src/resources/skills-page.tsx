@@ -66,7 +66,7 @@ export function SkillsPage() {
             onClick={() => setImportOpen(true)}
             data-testid="resource-import"
           >
-            <Download aria-hidden className="size-3.5 text-content-tertiary" />
+            <Download aria-hidden className="size-4 text-content-tertiary" />
             {t('导入')}
           </Button>
           <ResourceNewButton onClick={openCreate} />

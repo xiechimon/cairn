@@ -44,7 +44,7 @@ const NAME_FORM = 'sidebar-name-form';
 export const SIDEBAR_MENU_CLS = 'w-42 min-w-42 rounded-(--radius-tile) p-1.5';
 
 export const SIDEBAR_MENU_ITEM_CLS =
-  'h-6.75 gap-2.5 rounded-(--cds-radius-md) px-2.5 text-meta focus:bg-(--sidebar-active) data-open:bg-(--sidebar-active) data-popup-open:bg-(--sidebar-active) [&_svg]:text-sidebar-ink [&_svg:not([class*=size-])]:size-4';
+  'h-6.75 gap-2.5 rounded-(--cds-radius-md) px-2.5 text-meta focus:bg-(--sidebar-active) data-open:bg-(--sidebar-active) data-popup-open:bg-(--sidebar-active) [&_svg]:text-sidebar-ink [&_svg:not([class*=size-])]:size-5';
 
 const DANGER_ITEM_CLS = 'text-destructive [&_svg]:text-destructive';
 

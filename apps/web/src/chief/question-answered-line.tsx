@@ -20,7 +20,7 @@ export function QuestionAnsweredLine({ item }: { item: ChiefQuestionItem }) {
       title={text}
       className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary"
     >
-      <Icon aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
+      <Icon aria-hidden strokeWidth={1.75} className="size-4 flex-none" />
       <span className="min-w-0 truncate">{text}</span>
     </p>
   );

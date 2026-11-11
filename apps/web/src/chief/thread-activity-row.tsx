@@ -58,7 +58,7 @@ export function ThreadEventLine({
   const phase = item.kind === 'thread-report' ? item.phase : undefined;
   return (
     <div className={EVENT_CLS} data-testid={testId ?? eventTestId(item)} data-phase={phase}>
-      <FileText width={14} height={14} className={`${ICON_CLS} mt-0.5`} />
+      <FileText width={16} height={16} className={`${ICON_CLS} mt-0.5`} />
       <span className="min-w-0 break-words">
         {item.kind === 'thread-report'
           ? sentence('任务 #{n} {title}：{status}', item.todoId, item.seqNum, {
@@ -130,7 +130,7 @@ export function ThreadActivityRow({ activity }: { activity: ThreadActivity }) {
   return (
     <div className="flex min-w-0 flex-col" data-testid="thread-activity">
       <div className={ROW_CLS}>
-        <FileText width={14} height={14} className={ICON_CLS} />
+        <FileText width={16} height={16} className={ICON_CLS} />
         <span className="min-w-0 truncate" data-testid="thread-activity-summary">
           <SummaryText summary={summary} todoId={activity.todoId} />
         </span>

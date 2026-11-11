@@ -47,7 +47,7 @@ export function MadeCard({
         </h4>
         <div className="pointer-events-none relative mt-1.5 flex h-5 flex-none items-center gap-2 px-4">
           <span className="flex size-5 flex-none items-center justify-center rounded-(--cds-radius-md) bg-secondary text-content-secondary">
-            <Icon aria-hidden="true" className="size-3.5" />
+            <Icon aria-hidden="true" className="size-4" />
           </span>
           <span
             data-testid="made-card-meta"
@@ -67,7 +67,7 @@ export function MadeCard({
           )}
           {todo.visibility === 'private' && (
             <span className="flex flex-none text-content-tertiary">
-              <Lock aria-hidden="true" className="size-3.5" />
+              <Lock aria-hidden="true" className="size-4" />
               <span className="sr-only">{t('仅自己可见')}</span>
             </span>
           )}
@@ -81,7 +81,7 @@ export function MadeCard({
               data-testid="made-card-placeholder"
               className="flex size-full items-start justify-center bg-secondary pt-5 text-content-dim"
             >
-              <Icon aria-hidden="true" className="size-4.5" />
+              <Icon aria-hidden="true" className="size-5.5" />
             </div>
           ) : (
             <img
@@ -182,7 +182,7 @@ export function MadeCarousel({
             />
           }
         >
-          <ChevronLeft aria-hidden="true" className="size-4.5" />
+          <ChevronLeft aria-hidden="true" className="size-5.5" />
         </IconTooltip>
       )}
       {edges.next && (
@@ -200,7 +200,7 @@ export function MadeCarousel({
             />
           }
         >
-          <ChevronRight aria-hidden="true" className="size-4.5" />
+          <ChevronRight aria-hidden="true" className="size-5.5" />
         </IconTooltip>
       )}
     </div>

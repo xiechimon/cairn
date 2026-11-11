@@ -20,7 +20,7 @@ export function PrLink({ number, url, className }: PrLinkProps) {
       )}
     >
       PR #{number}
-      <ExternalLink aria-hidden strokeWidth={1.75} className="size-3.5" />
+      <ExternalLink aria-hidden strokeWidth={1.75} className="size-4" />
     </a>
   );
 }

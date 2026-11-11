@@ -42,7 +42,7 @@ export function TasksAddInput({
         className="flex h-11.5 min-w-0 flex-1 items-center gap-3 rounded-(--radius-tile) bg-(--hover-1) pr-1.5 pl-2 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)]"
       >
         <span className="flex size-7 flex-none items-center justify-center rounded-(--cds-radius-md) bg-(--sidebar-active)">
-          <ListChecks aria-hidden className="size-4 text-content-secondary" strokeWidth={1.75} />
+          <ListChecks aria-hidden className="size-5 text-content-secondary" strokeWidth={1.75} />
         </span>
         <Input
           ref={ref}
@@ -69,7 +69,7 @@ export function TasksAddInput({
             />
           }
         >
-          <ArrowUp aria-hidden className="size-4.5" strokeWidth={1.75} />
+          <ArrowUp aria-hidden className="size-5.5" strokeWidth={1.75} />
         </IconTooltip>
       </div>
     </form>

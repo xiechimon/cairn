@@ -357,7 +357,7 @@ export function StreamSection() {
                 </MessageScrollerContent>
               </FadeScrollerViewport>
               <JumpToLatestButton aria-label="Jump to latest">
-                <ArrowDown width={16} height={16} />
+                <ArrowDown width={20} height={20} />
               </JumpToLatestButton>
             </MessageScroller>
           </MessageScrollerProvider>

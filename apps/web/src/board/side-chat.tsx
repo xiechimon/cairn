@@ -45,7 +45,7 @@ import { PANE_PARAM } from './work-panel.js';
 const OVERLAY_QUERY = '(max-width: 1100px)';
 
 export const THREAD_HEAD_BUTTON =
-  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-4.5 max-[640px]:size-8';
+  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -216,7 +216,7 @@ function ChangesButton({
         active && 'bg-(--menu-hover) text-foreground',
       )}
     >
-      <FileDiff aria-hidden="true" strokeWidth={1.75} className="size-3.5" />
+      <FileDiff aria-hidden="true" strokeWidth={1.75} className="size-4" />
       {changes.status === 'ready' && (
         <>
           <span className="text-(--diff-add-fg) tabular-nums">+{changes.added}</span>
@@ -587,7 +587,7 @@ function Head({
         data-slot="side-chat-glyph"
         className="mt-1 ml-1.5 flex size-7 flex-none items-center justify-center rounded-(--cds-radius-md) border border-border"
       >
-        <ListChecks strokeWidth={1.75} className="size-4 text-content-secondary" />
+        <ListChecks strokeWidth={1.75} className="size-5 text-content-secondary" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-2 pl-3">
         <div className="flex min-w-0 items-center gap-1">

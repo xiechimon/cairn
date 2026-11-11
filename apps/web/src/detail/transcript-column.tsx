@@ -107,7 +107,7 @@ function TranscriptColumnInner({
         </MessageScrollerContent>
       </FadeScrollerViewport>
       <JumpToLatestButton>
-        <ArrowDown width={16} height={16} />
+        <ArrowDown width={20} height={20} />
         <span className="sr-only">{t('滚动到最新')}</span>
       </JumpToLatestButton>
       {earlier !== undefined && settled && (openedKey === threadKey || transcript.length === 0) && (

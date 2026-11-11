@@ -66,7 +66,7 @@ export function MessageToolbar({
             />
           }
         >
-          <Reply width={18} height={18} />
+          <Reply width={22} height={22} />
         </IconTooltip>
       )}
       <DropdownMenu>
@@ -86,7 +86,7 @@ export function MessageToolbar({
               />
             }
           >
-            <Ellipsis width={18} height={18} />
+            <Ellipsis width={22} height={22} />
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={8}>
             {t('更多')}
@@ -94,12 +94,12 @@ export function MessageToolbar({
         </Tooltip>
         <DropdownMenuContent align="start" aria-label={t('更多')} className="w-auto min-w-40">
           <DropdownMenuItem data-action="copy" data-testid="chief-msg-copy" onClick={onCopy}>
-            <Copy width={16} height={16} />
+            <Copy width={20} height={20} />
             {t('复制')}
           </DropdownMenuItem>
           {onRewind !== undefined && (
             <DropdownMenuItem data-action="rewind" onClick={onRewind}>
-              <Restore width={16} height={16} />
+              <Restore width={20} height={20} />
               {t('恢复到此处')}
             </DropdownMenuItem>
           )}

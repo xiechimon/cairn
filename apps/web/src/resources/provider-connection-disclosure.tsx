@@ -26,7 +26,7 @@ export function ProviderConnectionDisclosure({
       className="group/conn rounded-md ring-1 ring-border"
     >
       <CollapsibleTrigger className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-        <ChevronRight className="size-3.5 flex-none text-content-tertiary transition-transform duration-(--dur-fast) group-data-open/conn:rotate-90" />
+        <ChevronRight className="size-4 flex-none text-content-tertiary transition-transform duration-(--dur-fast) group-data-open/conn:rotate-90" />
         <span className="flex-none text-ui font-medium text-foreground">{t('连接设置')}</span>
         <span className="min-w-0 truncate text-meta text-content-tertiary">{summary}</span>
       </CollapsibleTrigger>

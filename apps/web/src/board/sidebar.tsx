@@ -136,13 +136,13 @@ function treePlace(index: number, count: number): TreePlace {
   return index === count - 1 ? 'last' : 'middle';
 }
 
-const ICON = 'size-4 flex-none';
+const ICON = 'size-5 flex-none';
 const STROKE = 1.75;
 
 const FOCUS =
   'outline-none focus-visible:[outline:var(--focus-width)_solid_var(--focus-ring)] focus-visible:outline-offset-0';
 
-const SIDEBAR_FOOT_ROW = `flex h-8.5 flex-none items-center justify-start gap-3 rounded-(--cds-radius-md) pr-2 pl-1.5 text-meta text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`;
+const SIDEBAR_FOOT_ROW = `flex h-8.5 flex-none items-center justify-start gap-3 rounded-(--cds-radius-md) pr-2 pl-1.5 text-ui text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`;
 
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
@@ -396,7 +396,7 @@ export function BoardSidebar({
         <div className="mx-2 flex h-12 flex-none items-center justify-center self-stretch border-b border-border">
           <RailTip
             label={t('展开侧边栏')}
-            icon={<PanelLeft className="size-4.5" strokeWidth={STROKE} />}
+            icon={<PanelLeft className="size-5.5" strokeWidth={STROKE} />}
           >
             <Button
               variant="ghost"
@@ -506,7 +506,7 @@ export function BoardSidebar({
             aria-label={t('收起侧边栏')}
             onClick={onToggle}
           >
-            <PanelLeft className="size-4.5" strokeWidth={STROKE} />
+            <PanelLeft className="size-5.5" strokeWidth={STROKE} />
           </Button>
         </SidebarTip>
         <span className="sidebar-team-name ml-0.75 min-w-0 flex-1 truncate voice-title text-brand text-foreground">
@@ -529,7 +529,7 @@ export function BoardSidebar({
         className={`flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-1 ${scrollFadeClassName()}`}
       >
         <SidebarNavRow
-          icon={<BrandGlyph className="size-4" />}
+          icon={<BrandGlyph className="size-5" />}
           label={t('Coordinator')}
           active={coordinatorActive}
           onClick={() => navigate(coordinatorTarget)}
@@ -700,7 +700,7 @@ export function BoardSidebar({
             to={machinesTarget}
             title={fleet.title}
             aria-label={fleet.title}
-            className={`flex h-9.5 min-w-0 flex-1 items-center gap-3 rounded-(--cds-radius-lg) pr-2 pl-1.5 text-meta whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) ${FOCUS}`}
+            className={`flex h-9.5 min-w-0 flex-1 items-center gap-3 rounded-(--cds-radius-lg) pr-2 pl-1.5 text-ui whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) ${FOCUS}`}
           >
             <span
               aria-hidden

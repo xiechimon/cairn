@@ -224,7 +224,7 @@ export function useThreadActions({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={() => setMenuOpen(!menuOpen)}
-        className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-4.5 max-[640px]:size-8"
+        className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8"
       >
         <Ellipsis aria-hidden="true" />
       </Button>

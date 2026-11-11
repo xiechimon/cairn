@@ -323,7 +323,7 @@ export function AppSidebar({
               aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
             >
-              <PanelLeft className="size-4.5" strokeWidth={1.75} />
+              <PanelLeft className="size-5.5" strokeWidth={1.75} />
             </Button>
           )}
           <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>

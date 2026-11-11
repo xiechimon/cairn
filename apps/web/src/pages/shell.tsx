@@ -105,7 +105,7 @@ export function PageShell({
                   to={back}
                   aria-label={t('返回')}
                 >
-                  <ChevronLeft width={16} height={16} />
+                  <ChevronLeft width={20} height={20} />
                 </Link>
               )}
               <h1 className="min-w-0 truncate voice-title text-page text-foreground">{title}</h1>

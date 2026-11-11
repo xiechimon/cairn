@@ -196,7 +196,7 @@ export function SettingsSection() {
             sub="Owner · signed in with GitHub"
             action={
               <Button variant="outline" className="h-8 gap-1.5 px-3 text-ui">
-                <SquarePen className="size-4" />
+                <SquarePen className="size-5" />
                 Edit name
               </Button>
             }

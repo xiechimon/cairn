@@ -59,8 +59,8 @@ export function ReplyingToBar({
     >
       <Reply
         aria-hidden="true"
-        width={18}
-        height={18}
+        width={22}
+        height={22}
         className="flex-none text-content-secondary"
       />
       <p
@@ -81,7 +81,7 @@ export function ReplyingToBar({
           />
         }
       >
-        <X width={18} height={18} />
+        <X width={22} height={22} />
       </IconTooltip>
     </fieldset>
   );

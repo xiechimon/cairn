@@ -329,7 +329,7 @@ export function SearchPanel({
           </div>
         )}
         <div className="flex min-h-12 flex-none flex-wrap items-center gap-1.5 border-b border-border px-4 py-2 text-content-tertiary">
-          <Search width={16} height={16} className="flex-none" />
+          <Search width={20} height={20} className="flex-none" />
           {chips.map((chip, index) => (
             <QueryChip
               key={`${chip.raw}-${index}`}
@@ -404,7 +404,7 @@ export function SearchPanel({
             data-testid="search-error"
             className="flex flex-none items-center gap-3 border-b border-border px-4 py-2.5 text-ui text-content-secondary"
           >
-            <TriangleAlert aria-hidden="true" className="size-4 flex-none text-destructive" />
+            <TriangleAlert aria-hidden="true" className="size-5 flex-none text-destructive" />
             <span className="min-w-0 flex-1">{t('搜索没能完成，下面只是本地匹配的结果。')}</span>
             <Button
               size="sm"
@@ -530,7 +530,7 @@ export function SearchPanel({
                       className={`${ROW_BASE} ${rowLitClasses(cursor === base + todos.length + projects.length, kbd)}`}
                       onClick={openActivity}
                     >
-                      <Activity width={15} height={15} />
+                      <Activity width={18} height={18} />
                       {t('在活动里查看全部 {n} 条', { n: viewAllCount })}
                       <span className={ROW_END}>
                         <ShortcutHint keys={['mod', 'enter']} />

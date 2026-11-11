@@ -116,7 +116,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             )}
             {call?.unfinished === true && !running && call.cancelled !== true && (
               <CircleDashed
-                className="size-3.5"
+                className="size-4"
                 data-testid="work-unfinished"
                 aria-label={t('未完成')}
               />

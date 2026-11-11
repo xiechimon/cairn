@@ -38,7 +38,7 @@ export function ProposalCard({
       className={cn('rounded-(--radius-card) bg-card px-4 py-3.5 shadow-(--e1)', className)}
     >
       <div className="flex items-center gap-2 text-ui font-semibold text-foreground">
-        <Icon className="size-4 flex-none text-content-secondary" />
+        <Icon className="size-5 flex-none text-content-secondary" />
         {applied ? appliedTitle : title}
       </div>
       {!applied && <p className="mt-1.5 mb-0 text-ui text-content-secondary">{description}</p>}

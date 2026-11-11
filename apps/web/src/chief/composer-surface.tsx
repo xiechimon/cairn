@@ -227,10 +227,10 @@ export function ComposerSurface({
             <span
               className={`${ROUND_FACE_CLS} group-hover/round:bg-(--menu-hover) group-aria-expanded/round:bg-(--menu-hover)`}
             >
-              <Plus width={16} height={16} />
+              <Plus width={20} height={20} />
             </span>
           ) : (
-            <Plus width={16} height={16} />
+            <Plus width={20} height={20} />
           )}
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8}>
@@ -245,7 +245,7 @@ export function ComposerSurface({
         className={MENU_CONTENT_CLS}
       >
         <DropdownMenuItem disabled={attaching || onAttachment == null} onClick={openFilePicker}>
-          <Paperclip width={16} height={16} />
+          <Paperclip width={20} height={20} />
           {t('添加附件')}
         </DropdownMenuItem>
         {menu != null && (
@@ -448,10 +448,10 @@ export function ComposerSurface({
                         : 'bg-(--hover-1) text-content-tertiary',
                     )}
                   >
-                    <ArrowUp width={16} height={16} />
+                    <ArrowUp width={20} height={20} />
                   </span>
                 ) : (
-                  <CornerDownLeft width={16} height={16} />
+                  <CornerDownLeft width={20} height={20} />
                 )}
               </Button>
             ))}

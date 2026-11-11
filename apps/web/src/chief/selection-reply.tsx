@@ -25,7 +25,7 @@ interface Target {
 const BAR_CLS =
   'fixed top-0 left-0 z-(--z-dialog) flex items-center rounded-lg border border-(--selection-bar-ring) bg-(--selection-bar-bg) text-(--selection-bar-ink) shadow-(--shadow-selection-bar) backdrop-blur-sm select-none';
 const BAR_BUTTON_CLS =
-  "h-8 gap-1 rounded-lg border-0 px-3 py-1.5 text-ui font-medium text-(--selection-bar-ink) transition-none hover:bg-(--selection-bar-hover) hover:text-(--selection-bar-ink) dark:hover:bg-(--selection-bar-hover) [&_svg:not([class*='size-'])]:size-4";
+  "h-8 gap-1 rounded-lg border-0 px-3 py-1.5 text-ui font-medium text-(--selection-bar-ink) transition-none hover:bg-(--selection-bar-hover) hover:text-(--selection-bar-ink) dark:hover:bg-(--selection-bar-hover) [&_svg:not([class*='size-'])]:size-5";
 
 function sourceOf(node: Node, container: HTMLElement): HTMLElement | null {
   const element = node instanceof HTMLElement ? node : node.parentElement;

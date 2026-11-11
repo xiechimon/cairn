@@ -83,7 +83,7 @@ export function ThreadRow({
           </span>
           {pr != null && (
             <span className="inline-flex flex-none items-center gap-0.5 text-meta text-content-tertiary tabular-nums">
-              <GitPullRequest className="size-3.5" />#{pr}
+              <GitPullRequest className="size-4" />#{pr}
             </span>
           )}
         </span>
@@ -100,7 +100,7 @@ export function ThreadRow({
           menu != null && 'group-focus-within/row:invisible group-hover/row:invisible',
         )}
       >
-        {snoozed ? <AlarmClockOff className="size-3.5" aria-label={t('已暂停')} /> : age}
+        {snoozed ? <AlarmClockOff className="size-4" aria-label={t('已暂停')} /> : age}
       </span>
       {menu != null && (
         <span className="absolute top-1.5 right-1.5 hidden items-center group-focus-within/row:flex group-hover/row:flex">

@@ -141,7 +141,7 @@ export function ProviderModelChips({
                 className="h-8 w-full justify-start gap-2 rounded-md px-2 text-ui font-normal text-content-secondary hover:bg-secondary"
                 onClick={() => add(typed)}
               >
-                <PlusSmall className="size-4" />
+                <PlusSmall className="size-5" />
                 {t('添加自定义模型「{id}」', { id: typed })}
               </Button>
             )}

@@ -11,7 +11,7 @@ export function ResourceNewButton({ onClick }: { onClick: () => void }) {
   const { t } = useI18n();
   return (
     <Button className={TOPBAR_PRIMARY_BUTTON} onClick={onClick} data-testid="resource-new">
-      <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+      <Plus aria-hidden strokeWidth={1.75} className="size-4" />
       {t('新建')}
     </Button>
   );
@@ -99,7 +99,7 @@ export function RowMeta({ className, children }: { className?: string; children:
 }
 
 export function RowChevron() {
-  return <ChevronRight aria-hidden className="size-4 flex-none text-content-tertiary" />;
+  return <ChevronRight aria-hidden className="size-5 flex-none text-content-tertiary" />;
 }
 
 export function OnlineStatus({ on }: { on: boolean }) {

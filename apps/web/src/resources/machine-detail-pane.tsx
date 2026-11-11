@@ -251,7 +251,7 @@ export function MachineDetailPane({
                 <TriangleAlert
                   aria-hidden
                   strokeWidth={1.75}
-                  className="mt-0.5 size-3.5 flex-none text-content-secondary"
+                  className="mt-0.5 size-4 flex-none text-content-secondary"
                 />
                 <span>
                   <TextWithCode text={loginWarning} />

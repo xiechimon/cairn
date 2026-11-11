@@ -460,7 +460,7 @@ export function ChiefQuestionCard({
               disabled={!pending || !shownPager.canPrev}
               onClick={shownPager.onPrev}
             >
-              <ChevronLeft aria-hidden className="size-3.5" />
+              <ChevronLeft aria-hidden className="size-4" />
             </Button>
             <span
               data-testid="chief-question-position"
@@ -476,7 +476,7 @@ export function ChiefQuestionCard({
               disabled={!pending || !shownPager.canNext}
               onClick={shownPager.onNext}
             >
-              <ChevronRight aria-hidden className="size-3.5" />
+              <ChevronRight aria-hidden className="size-4" />
             </Button>
           </div>
         )}
@@ -493,7 +493,7 @@ export function ChiefQuestionCard({
                 />
               }
             >
-              <Ellipsis aria-hidden className="size-3.5" />
+              <Ellipsis aria-hidden className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               side="bottom"
@@ -536,9 +536,9 @@ export function ChiefQuestionCard({
           onClick={toggleCollapsed}
         >
           {collapsed ? (
-            <ChevronUp aria-hidden className="size-3.5" />
+            <ChevronUp aria-hidden className="size-4" />
           ) : (
-            <ChevronDown aria-hidden className="size-3.5" />
+            <ChevronDown aria-hidden className="size-4" />
           )}
         </Button>
         <Button
@@ -551,7 +551,7 @@ export function ChiefQuestionCard({
           disabled={!pending || onCancel === undefined}
           onClick={dismiss}
         >
-          <X aria-hidden className="size-3.5" />
+          <X aria-hidden className="size-4" />
         </Button>
       </div>
       {!collapsed && (
@@ -659,7 +659,7 @@ function ChoiceMark({ multi, selected }: { multi: boolean; selected: boolean }) 
     >
       {selected &&
         (multi ? (
-          <Check strokeWidth={1.75} className="size-3.5" />
+          <Check strokeWidth={1.75} className="size-4" />
         ) : (
           <span className="size-1.5 rounded-full bg-primary-foreground" />
         ))}

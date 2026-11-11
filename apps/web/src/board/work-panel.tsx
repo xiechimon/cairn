@@ -175,7 +175,7 @@ export function WorkPanel({
             />
           }
         >
-          <Search aria-hidden className="size-4.5" strokeWidth={1.75} />
+          <Search aria-hidden className="size-5.5" strokeWidth={1.75} />
         </IconTooltip>
       </SidePanelHead>
       {searching && <MadeSearch value={query} onChange={setQuery} onClose={closeSearch} />}

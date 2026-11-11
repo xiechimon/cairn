@@ -27,7 +27,7 @@ export function ArchivedProjectBar({
         className,
       )}
     >
-      <Archive aria-hidden className="size-4 flex-none text-content-tertiary" strokeWidth={1.75} />
+      <Archive aria-hidden className="size-5 flex-none text-content-tertiary" strokeWidth={1.75} />
       <p className="m-0 min-w-0 flex-1 basis-48 text-ui text-foreground">
         {t('这个项目已归档。取消归档后才能发消息。')}
       </p>

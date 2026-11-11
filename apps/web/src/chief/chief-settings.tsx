@@ -62,7 +62,7 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
             />
           }
         >
-          <ChevronLeft width={16} height={16} />
+          <ChevronLeft width={20} height={20} />
         </IconTooltip>
         <h1 className="min-w-0 truncate voice-title text-page text-foreground">
           {t('Coordinator 设置')}
@@ -94,7 +94,7 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
                     {t('跟随 coordinator 路由规则，在路由设置里调整。')}
                   </span>
                 </span>
-                <ChevronRight width={14} height={14} className="ml-auto text-content-tertiary" />
+                <ChevronRight width={16} height={16} className="ml-auto text-content-tertiary" />
               </Button>
             </SettingsCard>
           )}

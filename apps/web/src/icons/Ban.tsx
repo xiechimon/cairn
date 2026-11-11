@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-export function Ban({ width = 14, height = 14, ...props }: SVGProps<SVGSVGElement>) {
+export function Ban({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       aria-hidden="true"

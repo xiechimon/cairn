@@ -29,7 +29,7 @@ const TRACK_CLS =
   'inline-flex h-8 w-fit items-center justify-center gap-0.5 rounded-md bg-secondary p-0.5 text-content-secondary group-data-horizontal/tabs:h-8';
 
 const OPTION_CLS =
-  "relative inline-flex h-7 flex-none items-center justify-center gap-1.5 rounded-(--cds-radius-sm) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-content-secondary transition-[color,background-color] duration-(--dur-fast) ease-out hover:text-foreground dark:text-content-secondary dark:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5";
+  "relative inline-flex h-7 flex-none items-center justify-center gap-1.5 rounded-(--cds-radius-sm) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-content-secondary transition-[color,background-color] duration-(--dur-fast) ease-out hover:text-foreground dark:text-content-secondary dark:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
 
 const QUIET_TRACK_CLS =
   'inline-flex h-7 w-fit items-center gap-1 bg-transparent p-0 text-content-secondary group-data-horizontal/tabs:h-7';

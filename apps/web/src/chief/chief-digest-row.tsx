@@ -122,7 +122,7 @@ export function ChiefDigestRow({
                               );
                           }}
                         >
-                          <Trash2 width={14} height={14} />
+                          <Trash2 width={16} height={16} />
                         </Button>
                       )}
                     </li>

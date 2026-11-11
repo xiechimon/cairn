@@ -29,7 +29,7 @@ export function StreamDigest({ rows, className }: { rows: DigestRow[]; className
             <b className="w-4.5 font-semibold text-foreground tabular-nums">{row.count}</b>
             <span>{row.label}</span>
             {row.onSelect != null && (
-              <ChevronRight className="ml-auto size-3.5 text-content-tertiary" />
+              <ChevronRight className="ml-auto size-4 text-content-tertiary" />
             )}
           </>
         );

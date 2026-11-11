@@ -43,7 +43,7 @@ export function SidebarSection() {
       >
         <div className="flex w-55 flex-col gap-0.5 px-2 py-1">
           <SidebarNavRow
-            icon={<BrandGlyph className="size-4" />}
+            icon={<BrandGlyph className="size-5" />}
             label="Coordinator"
             active={active === 'coordinator'}
             onClick={() => setActive('coordinator')}
@@ -137,19 +137,19 @@ export function ProjectsSection() {
       >
         <ListCard className="w-full max-w-130">
           <ListRow
-            icon={<Inbox className="size-4" />}
+            icon={<Inbox className="size-5" />}
             title="batch-b2-plan.md"
             subtitle="Coordinator · 12 KB"
             trailing="2h ago"
           />
           <ListRow
-            icon={<FolderGit2 className="size-4" />}
+            icon={<FolderGit2 className="size-5" />}
             title="screenshots"
             subtitle="Thread 2235 · 6 files"
             trailing="Yesterday"
           />
           <ListRow
-            icon={<CalendarClock className="size-4" />}
+            icon={<CalendarClock className="size-5" />}
             title="weekly-report.md"
             subtitle="Scheduled task · 3 KB"
             trailing="Oct 27"
@@ -174,7 +174,7 @@ export function ProjectsSection() {
                 label: 'Coordinator',
                 icon: <BrandGlyph className="size-5" />,
               },
-              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-4.5" /> },
+              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-5.5" /> },
             ]}
           />
         </div>
