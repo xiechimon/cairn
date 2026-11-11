@@ -34,11 +34,12 @@ The daemon CLI (`apps/daemon/src/cli.ts`) is machine start, stop, and token. It 
 
 Three tables, team-scoped, cascade on team delete. No retention TTL in this slice.
 
-- Proposal: `pending`, `refused`, `accepted`, `executed`, `failed`, `expired`, `superseded`. Holds the validated input, its hash, `targetId`, actor, `threadId` (the Coordinator thread that proposed, or empty for an owner click), `scopeProjectId`, `wakeStepId` (`wake:` plus the proposal id, set when the proposal is inserted), decision (`refuse` | `allow-once` | `always` or empty), and expiry.
+- Proposal: `pending`, `refused`, `executed`, `failed`, `expired`, `superseded`. No committed `accepted`. Holds the validated input, its hash, `targetId`, `scopeProjectId`, decision (`refuse` | `allow-once` | `always` or empty), and expiry.
+- Subscriber: one row per Coordinator thread waiting on a proposal. Holds `proposalId`, `threadId`, and `wakeStepId` (`wake:` plus proposal id plus thread id). Unique on proposal and thread.
 - Grant: `active` or revoked (`revokedAt` set, row kept). Unique on team, action, and match hash while active.
 - Journal: append-only. One row per run, undo, or refused undo. A refusal lives on the proposal, not a second copy in the journal.
 
-A pending proposal is unique on team, action, and target. A repeat returns that row. A new pending proposal for the same target marks the old one `superseded`.
+A pending proposal is unique on team, action, and target. A repeat from any thread returns that row and adds a subscriber. It does not replace the stored input. A new pending proposal for the same target, with a different input hash, marks the old one `superseded` and drops its subscribers.
 
 Expiry is 7 days from insert, not the end of the Coordinator turn. The #3924 proposal says a confirm-once proposal expires with its turn. A turn ends before the owner is back; expiring with the turn would throw away the answer. The disagreement is open below.
 
@@ -47,16 +48,17 @@ Expiry is 7 days from insert, not the end of the Coordinator turn. The #3924 pro
 ```mermaid
 stateDiagram-v2
   [*] --> pending: coordinator calls confirm-once
-  pending --> refused: refuse
+  pending --> refused: refuse, one transaction
   pending --> expired: past expiry
-  pending --> superseded: newer proposal, same target
-  pending --> accepted: allow once
-  accepted --> executed: handler and journal commit
-  accepted --> failed: handler throws
+  pending --> superseded: newer input, same target
+  pending --> executed: allow once, handler, and journal, one transaction
+  pending --> failed: handler throws inside that transaction
   [*] --> executed: free action, or the owner's own click
 ```
 
-The Coordinator tool returns `pending` and the proposal id. It does not call `holdForQuestion`. A Coordinator propose without a `threadId` is 400 and writes nothing: `enqueueChiefStep` (`apps/server/src/services/chief.ts`) needs that id, and a team can have more than one Coordinator thread. The answer route wakes only the stored `threadId`, passing the stored `wakeStepId` to `enqueueChiefStep` with trigger `wake` and provenance `action-proposal:<id>`. It does not add a trigger kind and does not pick another thread. An owner click stores no `threadId` and does not wake. Claim: the decision transaction writes `wakeStepId` before the enqueue. Lookup: a step row with that id means the wake already landed. Completion: inserting that id is the delivery marker; a primary-key conflict is success, not a second step. Failure: the step is absent, and the next read retries the same id. A stored thread that no longer exists does not wake a different thread; the decision stands and the journal row says the wake was skipped.
+Allow once does not commit `accepted` and then run the handler. The decision, the handler, the journal row, and the hosted-delete outbox row are one transaction. A crash before commit leaves `pending`, so the same answer can be retried. There is no sweep for a half-applied approval.
+
+The Coordinator tool returns `pending` and the proposal id. It does not call `holdForQuestion`. A Coordinator propose without a `threadId` is 400 and writes nothing. Each waiting thread is a subscriber. The answer route wakes every subscriber: `enqueueChiefStep` (`apps/server/src/services/chief.ts`) gets that subscriber's `threadId` and `wakeStepId`, trigger `wake`, provenance `action-proposal:<id>`. It does not add a trigger kind and does not wake a thread that did not subscribe. An owner click has no subscriber and does not wake. Claim: the subscriber row, including `wakeStepId`, exists before the enqueue. Lookup: a step with that id means that subscriber was woken. Completion: inserting that id is the marker; a primary-key conflict is success. Failure: the step is absent, and the next read retries that subscriber's id only.
 
 The owner's own click is the confirmation. Actor `user` on `project.delete` runs the handler and journals it. It does not insert a proposal, so the person is not asked twice. Actor `coordinator` always proposes.
 
@@ -69,11 +71,11 @@ The owner's own click is the confirmation. Actor `user` on `project.delete` runs
 | Execute, target missing or other team | project row | nothing | 404, no row. Archive already checks team (`routes-projects.ts`); delete does not, and this check closes that gap |
 | Execute, caller surface not listed | registry | nothing | 403, no row. MCP and the daemon CLI hit this |
 | Execute, free, or user on confirm-once | registry, project | project row and one journal row, one transaction. Hosted `project.delete` also writes the outbox row in that transaction | handler error rolls the transaction back and does not call `removeHostedRepoDir` |
-| Execute, coordinator confirm-once | registry, pending proposal, caller thread id | one `pending` row with that `threadId`, or none if one exists | no `threadId`: 400, no row. Otherwise returns the pending id; handler does not run |
+| Execute, coordinator confirm-once | registry, pending proposal, caller thread id | one `pending` row if none exists, plus one subscriber for this thread | no `threadId`: 400, no row. Same input: return the existing id and add the subscriber. Different input: supersede, new proposal, one subscriber. Handler does not run |
 | Answer, body contains `input` | proposal | nothing | 400. The stored input runs, or nothing runs |
 | Answer, not pending, unknown, or past expiry | proposal | expiry stamp if past `expiresAt` | 409, handler does not run |
 | Answer, refuse | proposal | status `refused`, decision, `decidedBy` | wake still fires; handler does not run |
-| Answer, allow once | proposal, stored input | status `accepted`, then handler and journal, then `executed` or `failed` | handler throw: `failed`, one journal row with the error, no retry |
+| Answer, allow once | proposal, subscribers, stored input | decision, handler, journal, and hosted-delete outbox, one transaction, then `executed` or `failed` | a crash before commit leaves `pending`. Handler throw commits `failed` and the error journal row, no retry |
 | Answer, always | proposal, registry flag | nothing in slice 1 | 409 `standing grant not offered`, proposal stays `pending` |
 | Revoke grant | grant, team | `revokedAt` | owner session only; agent and MCP get 403; other team is 404 |
 | Expiry sweep | pending proposals | `expired` | a failed sweep leaves them pending; the next sweep retries |
@@ -82,7 +84,7 @@ The owner's own click is the confirmation. Actor `user` on `project.delete` runs
 | Web pending list and journal list | proposals, journal | nothing | empty list |
 | Directory cleanup | outbox row not done, current project rows for that `repoName` | `removeHostedRepoDir` only if no current project owns the name, then outbox done and one journal row | runs only after the delete transaction commits. A current project with that name: no directory removal, outbox marked conflict. A missing directory is success. A failed sweep leaves the outbox row; the next sweep retries. It does not delete the project row again |
 | Create project name | project rows and pending outbox names | hosted `repoName` | a name in a pending outbox is taken, so a recreate during cleanup cannot reuse the path |
-| Coordinator wake | stored `threadId` and `wakeStepId`, existing step with that id | one `enqueueChiefStep` with that id, or none if the step exists | no stored thread: no wake. Missing thread: no substitute wake. Insert conflict on `wakeStepId`: already delivered. Step absent after a failed insert: the next read retries the same id and does not run the handler again |
+| Coordinator wake | every subscriber, existing step for that `wakeStepId` | one `enqueueChiefStep` per subscriber whose step is absent | no subscribers: no wake. Missing thread: skip that subscriber, wake the others, do not substitute. Insert conflict: that subscriber is delivered. A later read retries only subscribers whose step is absent, and does not run the handler again |
 
 The db half of delete still removes todos, builds, steps, and secrets, and it still does not stop running work. That guard is a separate to-do. The proposal text shown to the owner names the project and says running work is removed with it. Slice 1 does not add the guard. `ask_user`, the command gate, `clientMessage`, `skill_audit`, and plan auto-approve do not read or write these tables.
 
@@ -90,7 +92,7 @@ The db half of delete still removes todos, builds, steps, and secrets, and it st
 
 ## Tests the implementation writes first
 
-One test per row above, plus: a registry entry with surface `mcp` or `cli` fails the slice-1 fixture; `delete_project` is absent from `MCP_TOOL_REGISTRY` and `CHIEF_REMOTE_TOOLS`; the owner-only exception list is exact; a journal row never contains a field named `value`, `token`, `secret`, or `password`; two concurrent proposes for one target return one pending id; a rolled-back delete does not remove the hosted directory; a recreate while an outbox row is pending gets a different repo name, and cleanup does not delete that new directory; a Coordinator propose with no `threadId` writes nothing; an answer wakes the stored thread and no other; a second read after a landed wake does not insert a second step.
+One test per row above, plus: a registry entry with surface `mcp` or `cli` fails the slice-1 fixture; `delete_project` is absent from `MCP_TOOL_REGISTRY` and `CHIEF_REMOTE_TOOLS`; the owner-only exception list is exact; a journal row never contains a field named `value`, `token`, `secret`, or `password`; two concurrent proposes for one target return one pending id; a rolled-back delete does not remove the hosted directory; a recreate while an outbox row is pending gets a different repo name, and cleanup does not delete that new directory; a Coordinator propose with no `threadId` writes nothing; a second thread on the same target is a subscriber and is woken; an answer wakes every subscriber and no other thread; a crash during allow-once leaves `pending` and a retry runs the handler once; a second read after a landed wake does not insert a second step.
 
 ## Risks
 
