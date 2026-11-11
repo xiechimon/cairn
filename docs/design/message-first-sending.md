@@ -38,9 +38,9 @@ Person HTTP routes 1–5 must require the id, matching row 7. Rows 9 and 10 must
 
 ## Outbox
 
-State lives in IndexedDB, one row per send, per browser profile. It is not `composer_draft` and not `localStorage`. Fields: `clientMessageId`, route, scope id, content, attachment blobs, state, server message id once known.
+State lives in IndexedDB, one row per send, per browser profile. It is not `composer_draft` and not `localStorage`. Fields: `clientMessageId`, route, scope id, content, attachment blobs, state, `dispatchedAt` (set before the first POST leaves, never cleared), server message id once known.
 
-States: `uploading`, `pending`, `failed`. Ack deletes the row.
+States: `uploading`, `pending`, `failed`, `cancelled`. Ack deletes a live row. A `cancelled` row is a tombstone: it keeps id, route and scope so the drainer can replay the same id, read the stored response and withdraw it.
 
 | From | To | When |
 |---|---|---|
@@ -50,13 +50,15 @@ States: `uploading`, `pending`, `failed`. Ack deletes the row.
 | `uploading` or `pending` | `failed` | upload failed, or the send returned an error that is not a stored response |
 | `pending` | deleted | a success response for that route: a server message id where the route returns one; on `POST /api/todos/:id/messages` the stored `ThreadMessageResult` itself is the ack, matched by `clientMessageId` |
 | `failed` | `pending` or `uploading` | Retry, same id and same route |
-| any | deleted | Delete before ack. In flight: mark cancelled; if a stored response then arrives, withdraw or cancel once |
+| any, never dispatched | deleted | Delete before the first POST |
+| any, `dispatchedAt` set | `cancelled` | Delete or edit before ack. Survives reload |
+| `cancelled` | deleted | Replay of the same id returns the stored response and the withdraw or cancel call succeeds, or the replay returns an error that is not a stored response (nothing was created) |
 
 The composer clears when the row is enqueued. `发送失败，请重试。` and `没发给 #{seq}，再试一次。` move onto the transcript row, with Retry, Edit, and Delete. Edit keeps the id only while the row has never been dispatched. Once a POST has left, an edit before ack is a cancel of that send (withdraw or cancel once the stored response is known) followed by a new row with a new id, because the ledger would replay the original content. Edit after ack is a new message. Delete after ack uses `withdrawChiefMessage` or `cancelQueuedMessage`, and if the turn has started the message stands.
 
 Ordering: `readConversationPage` walks `createdAt` then `rowid`. Pending rows render after that page, in enqueue order. On ack, drop the local row and let the server position stand. Match the server message id from the stored response, not the text; the todo route has no message id, so its row is dropped on the stored result and the server page positions the message.
 
-Two tabs share the database. One tab drains. A second POST of the same id is safe only on routes that claim before the side effect.
+Two tabs share the database. One tab drains, holding the Web Locks API lock `cairn-outbox` (`navigator.locks.request` with exclusive mode). The browser releases the lock when the holding tab closes, crashes or is discarded, and the next waiting tab acquires it and drains; no lease timestamps are stored. A suspended holder keeps the lock, so a visible tab that waits longer than 30 seconds requests it with `steal: true`; the old holder's next IndexedDB write checks that it still owns the lock and stops. A second POST of the same id is still safe only on routes that claim before the side effect. Tests: closing the draining tab hands off to another; a steal stops the old drainer; two tabs never POST one row at once.
 
 ## Attachment failure
 
