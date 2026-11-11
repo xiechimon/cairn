@@ -1,0 +1,13 @@
+Before: origin/main
+PATCH /api/machines/evidence-orb
+{"browserOverride":false,"desktopOverride":false}
+HTTP 200
+{"id":"evidence-orb"}
+DB: {"id":"evidence-orb"}
+
+After: implementation
+PATCH /api/machines/evidence-orb
+{"browserOverride":false,"desktopOverride":false}
+HTTP 200
+{"id":"evidence-orb","browserOverride":false,"desktopOverride":false}
+DB: {"id":"evidence-orb","browserOverride":0,"desktopOverride":0}
