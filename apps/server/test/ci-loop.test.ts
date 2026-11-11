@@ -1036,6 +1036,38 @@ describe('#1150 (4) poller does not write back when a build was manually advance
     expect(w.fixRoundSteps()).toHaveLength(0);
     expect(w.todoRow().phase).toBe('review');
   });
+
+  test.each([
+    ['red', 'failure'],
+    ['green', 'success'],
+  ])(
+    'a build step enqueued during the check fetch (%s path) is not duplicated or advanced over',
+    async (_path, conclusion) => {
+      const w = makePrWorld({ checks: [{ name: 'lint', status: 'completed', conclusion }] });
+      const inner = w.mock.fetch;
+      const racing = (input: string | URL, init?: { headers?: Record<string, string> }) => {
+        const p = inner(input, init);
+        if (String(input).includes('/check-runs')) {
+          w.s.db
+            .insert(stepTable)
+            .values({
+              id: `step-raced-${conclusion}`,
+              buildId: w.buildId,
+              kind: 'build',
+              status: 'pending',
+              createdAt: Date.now(),
+            })
+            .run();
+        }
+        return p;
+      };
+      const poller2 = createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: racing });
+      await poller2.sweep();
+      expect(w.allSteps().filter((r) => r.status === 'pending')).toHaveLength(1);
+      expect(w.fixRoundSteps()).toHaveLength(0);
+      expect(w.todoRow().phase).toBe('building');
+    },
+  );
 });
 
 describe('#1150 green push-through / completeStep holds building / scheduler wiring', () => {

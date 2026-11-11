@@ -964,7 +964,7 @@ export function createCiPoller(
       tally.pending += 1;
       return;
     }
-    if (freshGrindRow(cand.todoId) === null) {
+    if (freshGrindRow(cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
       tally.skipped += 1;
       return;
     }

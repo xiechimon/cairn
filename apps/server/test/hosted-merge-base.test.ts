@@ -4,7 +4,7 @@ import { expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, step, todo } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
-import { requestMerge } from '../src/services/builds.js';
+import { enqueueStep, requestMerge } from '../src/services/builds.js';
 import { applyMergeLanding } from '../src/services/machine-merge-landing.js';
 import { bootServer, issueApiKey, req, seedSessionRoute } from './helpers.js';
 
@@ -151,6 +151,24 @@ test('claiming an enqueued merge keeps its pinned base in the daemon repository 
     expect(claimed.step?.project?.repo).toMatchObject({ baseBranch: 'dev' });
     expect(claimed.step?.instruction).toContain('"baseBranch":"dev"');
   } finally {
+    w.s.dispose();
+  }
+});
+
+test('a merge step enqueued while requestMerge awaits the hosted branch listing is not duplicated', async () => {
+  const w = await mergeWorld();
+  const real = systemGitOps.listBranches.bind(systemGitOps);
+  const spy = vi.spyOn(systemGitOps, 'listBranches').mockImplementation(async (...args) => {
+    enqueueStep(w.deps, 'build', 'merge', w.s.team.id);
+    return real(...args);
+  });
+  try {
+    w.s.db.delete(step).where(eq(step.id, w.merge.id)).run();
+    await expect(requestMerge(w.deps, 'build')).rejects.toMatchObject({ status: 409 });
+    const merges = w.s.db.select().from(step).where(eq(step.buildId, 'build')).all();
+    expect(merges.filter((row) => row.kind === 'merge')).toHaveLength(1);
+  } finally {
+    spy.mockRestore();
     w.s.dispose();
   }
 });
