@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "69408c22-447e-414e-bcb4-4b7c04a61b73",
-  "prevId": "7bdba825-a0fb-46e6-a121-eaf2a6658f01",
+  "id": "7bdba825-a0fb-46e6-a121-eaf2a6658f01",
+  "prevId": "476e713a-33ca-4c97-9446-adb7801502dc",
   "tables": {
     "action_journal": {
       "name": "action_journal",
@@ -4015,97 +4015,6 @@
             "id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "hosted_cleanup_outbox": {
-      "name": "hosted_cleanup_outbox",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "teamId": {
-          "name": "teamId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "projectId": {
-          "name": "projectId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "repoName": {
-          "name": "repoName",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "nextAttemptAt": {
-          "name": "nextAttemptAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lastError": {
-          "name": "lastError",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "hosted_cleanup_unresolved_idx": {
-          "name": "hosted_cleanup_unresolved_idx",
-          "columns": [
-            "teamId",
-            "repoName"
-          ],
-          "isUnique": true,
-          "where": "\"hosted_cleanup_outbox\".\"state\" != 'done'"
-        }
-      },
-      "foreignKeys": {
-        "hosted_cleanup_outbox_teamId_team_id_fk": {
-          "name": "hosted_cleanup_outbox_teamId_team_id_fk",
-          "tableFrom": "hosted_cleanup_outbox",
-          "tableTo": "team",
-          "columnsFrom": [
-            "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

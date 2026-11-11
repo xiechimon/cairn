@@ -63,7 +63,11 @@ describe('coordinator tools', () => {
     const extension = coordinatorToolsExtension(fakeMachineApi(), createStepGate());
     const tools = extension.tools ?? [];
     const defs = [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS];
-    expect(tools.map((t) => t.name).sort()).toEqual(defs.map((t) => t.name).sort());
+    expect(tools.map((t) => t.name).sort()).toEqual(
+      [...defs.map((t) => t.name), 'delete_project'].sort(),
+    );
+    expect(CHIEF_REMOTE_TOOLS.map((t) => t.name)).not.toContain('delete_project');
+    expect(tools.find((t) => t.name === 'delete_project')?.replay).toBe('unsafe');
     for (const def of defs) {
       const tool = tools.find((t) => t.name === def.name);
       expect({ name: def.name, replay: tool?.replay }).toEqual({
