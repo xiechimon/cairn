@@ -40,8 +40,8 @@ jobs:
           fi
           violations=""
           for sha in $commits; do
-            node scripts/ops/merge-route-audit.mjs commit "$sha"
-            status=$?
+            status=0
+            node scripts/ops/merge-route-audit.mjs commit "$sha" || status=$?
             case "$status" in
               0) ;;
               1) violations="$violations $sha" ;;

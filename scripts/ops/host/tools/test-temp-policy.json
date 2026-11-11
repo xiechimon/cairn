@@ -260,6 +260,7 @@
     "pr-body-hook-test-",
     "pr-gate-lines-",
     "prepush-vitest-",
+    "queue-audit-workflow-",
     "relay-",
     "routing-boundary-check-",
     "routing-enforcement-",
