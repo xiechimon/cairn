@@ -1508,6 +1508,7 @@ export async function applyBuildStepAction(
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
   origin: 'person' | 'automatic' = 'person',
+  nestedTodoId?: string,
 ): Promise<void> {
   if (
     (body.action === 'revision' || body.action === 'restart') &&
@@ -1558,6 +1559,7 @@ export async function applyBuildStepAction(
       claimClientMessage(deps.db, buildId, body.clientMessageId, {
         delegated: true,
         delivered: 'restart',
+        ...(nestedTodoId !== undefined ? { nestedTodoId } : {}),
       });
       const current = getTodo(deps, row.todoId);
       if (
@@ -1792,6 +1794,7 @@ export async function applyBuildStepAction(
     claimClientMessage(deps.db, buildId, body.clientMessageId, {
       delegated: true,
       delivered: 'revision',
+      ...(nestedTodoId !== undefined ? { nestedTodoId } : {}),
     });
     recordBuildFeedback(
       deps.db,

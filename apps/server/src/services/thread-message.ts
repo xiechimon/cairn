@@ -130,6 +130,7 @@ async function deliver(
         clientMessageId: body.clientMessageId,
       },
       ...stepActionAttribution(origin),
+      row.id,
     );
     if (prior === undefined) holdSecondRejectionRework(deps, buildId);
     return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'revision' };
@@ -140,6 +141,7 @@ async function deliver(
       buildId,
       { action: 'restart', feedback: body.content, clientMessageId: body.clientMessageId },
       ...stepActionAttribution(origin),
+      row.id,
     );
     return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'restart' };
   }
@@ -224,15 +226,14 @@ function recoverRecordedBuildSend(
 ): ThreadMessageResult | undefined {
   const builds = deps.db.select({ id: build.id }).from(build).where(eq(build.todoId, row.id)).all();
   const delivered = builds
-    .map(
-      (candidate) =>
-        findClientMessage<{ delivered?: ThreadMessageDelivery }>(
-          deps.db,
-          candidate.id,
-          body.clientMessageId,
-        )?.delivered,
+    .map((candidate) =>
+      findClientMessage<{ delivered?: ThreadMessageDelivery; nestedTodoId?: string }>(
+        deps.db,
+        candidate.id,
+        body.clientMessageId,
+      ),
     )
-    .find((value) => value !== undefined);
+    .find((receipt) => receipt?.nestedTodoId === row.id)?.delivered;
   if (delivered === undefined || row.latestBuildId === null) return undefined;
   const sent = { conversationId: row.latestBuildId, delivered };
   try {
