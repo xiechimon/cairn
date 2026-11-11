@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createProvider, openProviderKey, updateProvider } from '../src/services/providers.js';
+import {
+  createProvider,
+  deleteProvider,
+  openProviderKey,
+  updateProvider,
+} from '../src/services/providers.js';
 import {
   materializeXaiAccessToken,
   XAI_DEVICE_CODE_URL,
@@ -203,7 +208,6 @@ describe('xAI SuperGrok device login', () => {
       },
       s.team.id,
       'xai',
-      openedBefore.apiKey,
     );
     expect(access).toBe(NEXT_ACCESS);
     expect(access).not.toContain(REFRESH);
@@ -258,7 +262,6 @@ describe('xAI SuperGrok device login', () => {
       { db: s.db, box: s.secretBox, fetch: fetchImpl, states: s.xaiDeviceStates },
       s.team.id,
       'xai',
-      opened.apiKey,
     );
     updateProvider({ db: s.db, box: s.secretBox }, s.team.id, opened.row.id, {
       apiKey: 'console-key',
@@ -324,7 +327,6 @@ describe('xAI SuperGrok device login', () => {
       { db: s.db, box: s.secretBox, fetch: mock.fetchImpl, states: s.xaiDeviceStates },
       s.team.id,
       'xai',
-      opened.apiKey,
     );
     expect(access).toBe('console-key');
     expect(openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai')?.apiKey).toBe(
@@ -367,9 +369,35 @@ describe('xAI SuperGrok device login', () => {
       { db: s.db, box: s.secretBox, fetch: mock.fetchImpl, states: s.xaiDeviceStates },
       s.team.id,
       'xai',
-      opened.apiKey,
     );
     expect(access).toBe('newer-access');
+    expect(mock.calls).toEqual([]);
+  });
+
+  it('does not dispatch a key after the provider row is removed', async () => {
+    const { s, mock } = boot([]);
+    const created = createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.user.id,
+        body: {
+          providerId: 'xai',
+          label: 'xAI',
+          baseUrl: 'https://api.x.ai/v1',
+          api: 'openai-responses',
+          apiKey: 'console-key',
+        },
+      },
+    );
+    deleteProvider({ db: s.db, box: s.secretBox }, s.team.id, created.id);
+    await expect(
+      materializeXaiAccessToken(
+        { db: s.db, box: s.secretBox, fetch: mock.fetchImpl, states: s.xaiDeviceStates },
+        s.team.id,
+        'xai',
+      ),
+    ).rejects.toMatchObject({ status: 409 });
     expect(mock.calls).toEqual([]);
   });
 

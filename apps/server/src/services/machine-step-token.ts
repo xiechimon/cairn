@@ -124,7 +124,6 @@ async function dispatchProvider(
     },
     teamId,
     bundleProvider.providerId,
-    bundleProvider.apiKey,
   );
   return toProviderConfig({ ...bundleProvider, apiKey }, agentProviderId);
 }

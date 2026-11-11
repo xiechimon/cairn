@@ -391,14 +391,16 @@ export async function materializeXaiAccessToken(
   deps: XaiDeviceDeps,
   teamId: string,
   providerId: string,
-  rawKey: string,
 ): Promise<string> {
   const stored = deps.db
     .select({ apiKeyCipher: provider.apiKeyCipher })
     .from(provider)
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
-  const raw = stored?.apiKeyCipher == null ? rawKey : deps.box.open(stored.apiKeyCipher);
+  if (stored?.apiKeyCipher == null) {
+    throw new HttpError(409, 'provider credential is no longer stored');
+  }
+  const raw = deps.box.open(stored.apiKeyCipher);
   const secret = secretOf(raw);
   if (!secret) return raw;
   const lockKey = `${teamId}/${providerId}`;
