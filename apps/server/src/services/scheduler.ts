@@ -49,6 +49,7 @@ import {
 import { createDueRunner, type DueClock } from './due-events.js';
 import { projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
+import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import {
   createIssueIntake,
   ISSUE_INTAKE_INTERVAL_MS,
@@ -491,6 +492,7 @@ export function createScheduler(
   function runTick(now: number): Promise<void> {
     sweepExpiredActionProposals(deps.db, now);
     dispatchActionWakes(deps);
+    if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir, now);
     const pending: Promise<void>[] = [];
     if (!alertsSweeping) {
       alertsSweeping = true;
@@ -785,6 +787,7 @@ export function createScheduler(
       dueStarted = true;
       sweepExpiredActionProposals(deps.db);
       dispatchActionWakes(deps);
+      if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir);
       setScheduleClockListener(() => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       ensureDue(

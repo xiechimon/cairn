@@ -12,7 +12,7 @@ import {
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type ChiefDeps, enqueueChiefStep } from './chief.js';
-import { removeHostedRepoDir } from './git.js';
+import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import { deleteProject, type ProjectTx } from './projects.js';
 
 type ProposalStatus = 'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded';
@@ -191,11 +191,10 @@ export function answerProposal(
   input: AnswerInput,
 ): { status: ProposalStatus } {
   const now = input.now ?? nowMs();
-  const outcome: {
-    status: ProposalStatus;
-    expired: boolean;
-    cleanup: { teamId: string; repoName: string } | null;
-  } = { status: 'pending', expired: false, cleanup: null };
+  const outcome: { status: ProposalStatus; expired: boolean } = {
+    status: 'pending',
+    expired: false,
+  };
   deps.db.transaction(
     (tx) => {
       const row = tx
@@ -224,10 +223,7 @@ export function answerProposal(
           const removed = deleteProject(
             deps,
             row.targetId,
-            (inner, deleted) => {
-              if (deleted.repoKind === 'hosted' && deleted.repoName !== null) {
-                outcome.cleanup = { teamId: deleted.teamId, repoName: deleted.repoName };
-              }
+            (inner) => {
               journal(inner, row, 'run', now);
             },
             savepoint,
@@ -237,7 +233,6 @@ export function answerProposal(
         closeProposal(tx, row, 'executed', 'allow-once', input.decidedBy, now);
         outcome.status = 'executed';
       } catch {
-        outcome.cleanup = null;
         journal(tx, row, 'error', now);
         closeProposal(tx, row, 'failed', 'allow-once', input.decidedBy, now);
         outcome.status = 'failed';
@@ -246,9 +241,7 @@ export function answerProposal(
     { behavior: 'immediate' },
   );
   if (outcome.expired) throw new HttpError(409, `proposal ${input.proposalId} expired`);
-  if (outcome.status === 'executed' && outcome.cleanup) {
-    removeHostedRepoDir(deps.reposDir, outcome.cleanup.teamId, outcome.cleanup.repoName);
-  }
+  if (outcome.status === 'executed') dispatchHostedCleanup(deps.db, deps.reposDir);
   return { status: outcome.status };
 }
 

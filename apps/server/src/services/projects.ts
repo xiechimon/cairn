@@ -32,8 +32,9 @@ import type { FetchLike } from '../lib/github.js';
 import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
-import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
+import { isGithubRepoRef, validateGithubLocalSlotPath } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
+import { dispatchHostedCleanup, enqueueHostedCleanup } from './hosted-cleanup.js';
 import { moveProjectMemoriesToTeam } from './memory.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
@@ -211,14 +212,15 @@ export function deleteProject(
     tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
     tx.delete(project).where(eq(project.id, id)).run();
     beforeCommit?.(tx, row);
+    if (row.repoKind === 'hosted' && row.repoName !== null) {
+      enqueueHostedCleanup(tx, row, `cleanup-${row.id}`);
+    }
     return row;
   };
   if (join) return run(join) !== null;
   const removed = deps.db.transaction(run, { behavior: 'immediate' });
   if (removed === null) return false;
-  if (removed.repoKind === 'hosted' && removed.repoName !== null) {
-    removeHostedRepoDir(deps.reposDir, removed.teamId, removed.repoName);
-  }
+  dispatchHostedCleanup(deps.db, deps.reposDir);
   return true;
 }
 

@@ -18,9 +18,14 @@ import {
 } from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { parsePatch } from 'diff';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build as buildTable, project, todo as todoTable } from '../db/schema.js';
+import {
+  build as buildTable,
+  hostedCleanupOutbox,
+  project,
+  todo as todoTable,
+} from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { isSafeRepoPath, lsFilesRecursive, runGit, systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
@@ -54,6 +59,13 @@ export async function uniqueRepoName(ctx: RepoCtx, teamId: string, base: string)
       .map((r) => r.repoName)
       .filter((v): v is string => v !== null),
   );
+  for (const row of ctx.db
+    .select({ repoName: hostedCleanupOutbox.repoName })
+    .from(hostedCleanupOutbox)
+    .where(and(eq(hostedCleanupOutbox.teamId, teamId), ne(hostedCleanupOutbox.state, 'done')))
+    .all()) {
+    existing.add(row.repoName);
+  }
   let candidate = base;
   for (let i = 2; existing.has(candidate); i++) {
     candidate = `${base}-${i}`;

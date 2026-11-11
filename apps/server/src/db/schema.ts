@@ -1534,3 +1534,24 @@ export const actionWakeOutbox = sqliteTable(
   },
   (t) => [uniqueIndex('action_wake_outbox_proposal_thread_idx').on(t.proposalId, t.threadId)],
 );
+
+export const hostedCleanupOutbox = sqliteTable(
+  'hosted_cleanup_outbox',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    projectId: text('projectId').notNull(),
+    repoName: text('repoName').notNull(),
+    state: text('state').$type<'pending' | 'retrying' | 'conflict' | 'done'>().notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: epochMs('nextAttemptAt').notNull(),
+    lastError: text('lastError'),
+  },
+  (t) => [
+    uniqueIndex('hosted_cleanup_unresolved_idx')
+      .on(t.teamId, t.repoName)
+      .where(sql`${t.state} != 'done'`),
+  ],
+);
