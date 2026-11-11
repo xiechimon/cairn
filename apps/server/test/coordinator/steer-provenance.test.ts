@@ -153,6 +153,7 @@ test('a quoted answer inherits an image consumed as a steer in the real Coordina
   });
   expect(enrolled.status).toBe(200);
   const machine = machineEnrollResponseSchema.parse(await enrolled.json());
+  seedSessionRoute(w.s, { provider: 'stub', modelId: 'm', machineId: machine.machineId });
   expect(
     (
       await req(w.s.app, 'POST', `/api/projects/${projectId}/builds`, {

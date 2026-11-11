@@ -8,6 +8,7 @@ import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import {
   bootServer,
+  insertMachine,
   postProject,
   seedRoute,
   seedSessionRoute,
@@ -133,6 +134,7 @@ export function registerChiefHarness(): void {
     H.projectId = await postProject(H.s.app, 'demo');
     seedRoute(H.s, 'coordinator', { id: AGENT_ID, provider: 'stub-gw', modelId: 'stub-model' });
     seedSessionRoute(H.s, { id: AGENT2_ID, provider: 'stub-gw', modelId: 'stub-model-2' });
+    insertMachine(H.s);
     seedChiefThread();
   });
 }

@@ -1113,6 +1113,35 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
   }));
 }
 
+export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): void {
+  namedMachineForStart(deps, { teamId }, undefined);
+}
+
+function namedMachineForStart(
+  deps: BuildDeps,
+  todoRecord: { teamId: string; routeOverride?: { machineId?: string } | null },
+  routeOverride: { machineId?: string } | undefined,
+): { machineId: string; pin: boolean } | null {
+  const profile = profileForStep(deps.db, todoRecord, 'session', null);
+  const named =
+    routeOverride?.machineId ?? todoRecord.routeOverride?.machineId ?? profile?.machineId ?? null;
+  if (named !== null) return { machineId: named, pin: false };
+  const registered = deps.db
+    .select({ id: machine.id, online: machine.online })
+    .from(machine)
+    .where(eq(machine.teamId, todoRecord.teamId))
+    .all();
+  const online = registered.filter((row) => row.online);
+  const onlyOnline = online[0];
+  if (online.length === 1 && onlyOnline !== undefined)
+    return { machineId: onlyOnline.id, pin: true };
+  const onlyRegistered = registered[0];
+  if (registered.length === 1 && onlyRegistered !== undefined) {
+    return { machineId: onlyRegistered.id, pin: true };
+  }
+  throw new HttpError(409, 'Name a machine before starting this task');
+}
+
 export function startBuilds(
   deps: BuildDeps,
   input: {
@@ -1156,12 +1185,25 @@ export function startBuilds(
     if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
     if (triggerSource !== 'user') assertAutomaticRetryAllowed(deps, todoId);
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
+    namedMachineForStart(deps, todoRecord, input.routeOverride);
   }
   const created: BuildRecord[] = [];
   for (const todoId of input.todoIds) {
     const todoRecord = getTodo(deps, todoId);
     if (!todoRecord) throw new NotFoundError(`todo ${todoId}`);
     assertPhaseTransition(todoRecord.phase, 'queued');
+    const named = namedMachineForStart(deps, todoRecord, input.routeOverride);
+    const routeOverride =
+      input.routeOverride === undefined
+        ? named?.pin === true
+          ? { machineId: named.machineId }
+          : undefined
+        : {
+            ...input.routeOverride,
+            ...(input.routeOverride.machineId === undefined && named !== null
+              ? { machineId: named.machineId }
+              : {}),
+          };
     const id = newUuidv7();
     const createdAt = nowMs();
     deps.db
@@ -1194,7 +1236,7 @@ export function startBuilds(
       [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
     );
     setTodoPhase(deps, todoId, 'queued', {
-      ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
+      ...(routeOverride !== undefined ? { routeOverride } : {}),
       latestBuildId: id,
       lastRunAt: createdAt,
     });

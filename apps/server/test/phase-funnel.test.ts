@@ -4,7 +4,14 @@ import { describe, expect, test } from 'vitest';
 import { todo as todoTable } from '../src/db/schema.js';
 import { startBuilds } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, openStream, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  openStream,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 async function withConfirmTodo(): Promise<TestServer & { todoId: string }> {
   const s = bootServer({ pingIntervalMs: 100 });
@@ -12,6 +19,7 @@ async function withConfirmTodo(): Promise<TestServer & { todoId: string }> {
   const todoDoc = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: '写周报', spec: '' })
   ).json()) as { id: string };
+  insertMachine(s);
   startBuilds(s.svc, {
     projectId,
     todoIds: [todoDoc.id],

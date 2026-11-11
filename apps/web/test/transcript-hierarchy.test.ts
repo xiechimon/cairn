@@ -252,7 +252,9 @@ describe('task thread hierarchy', () => {
     });
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
-    expect(fails[0]).toMatchObject({ body: '请将其重新上线，或重新运行任务以改派其他机器。' });
+    expect(fails[0]).toMatchObject({
+      body: '请将这台机器重新上线。这一步不会改派到其他机器。',
+    });
   });
 
   test('a failure with several preserved commits carries every one, oldest first', () => {

@@ -131,10 +131,10 @@ describe('project concurrency (D74 P4)', () => {
   });
 
   test('two machines claiming different steps of a serial project at once admit only one', async () => {
-    const otherToken = await enroll('cc-builder-2');
     const serial = await createProject('serial', 1);
     await startBuild(serial, 'first');
     await startBuild(serial, 'second');
+    const otherToken = await enroll('cc-builder-2');
     const home = s.db.select().from(machine).where(eq(machine.name, 'cc-builder')).get();
     const other = s.db.select().from(machine).where(eq(machine.name, 'cc-builder-2')).get();
     const tasks = s.db.select().from(todo).where(eq(todo.projectId, serial)).all();

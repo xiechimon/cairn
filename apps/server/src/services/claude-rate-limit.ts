@@ -138,19 +138,21 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       buildRow === null
         ? { priorSessionId: null, priorMachineId: null, freshSession: true }
         : priorSessionOf(deps.db, stepRow, buildRow);
-    const homeId =
-      routeTargets(
-        !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null,
-        agentRow.machineId,
-        sole,
-      )[0]?.machineId ?? null;
+    const sessionId =
+      !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
+    const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;
+    const homeId = namedId ?? sole;
+    const policyOwner = namedId ? byId.get(namedId) : undefined;
     const owner = homeId ? byId.get(homeId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
+    const policyBlock = policyOwner
+      ? claudeRateBlock(policyOwner.claudeRateLimits ?? [], now)
+      : null;
     const claimants = machines.filter(
       (row) =>
         row.online &&
-        homeId !== null &&
-        row.id === homeId &&
+        namedId !== null &&
+        row.id === namedId &&
         runtimeGatePasses(row, model.provider) &&
         capabilityGatePasses(row, agentRow) &&
         claudeRateBlock(row.claudeRateLimits ?? [], now) === null,
@@ -159,10 +161,12 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const claude = isClaudeModel(model.provider, model.modelId);
     const paid =
       stepRuntimeFor(model.provider) !== 'claude-code' ||
-      (owner !== undefined && !claudeUsageGatePasses(deps, owner, model)) ||
+      (policyOwner !== undefined && !claudeUsageGatePasses(deps, policyOwner, model)) ||
       claimants.some((row) => !claudeUsageGatePasses(deps, row, model));
     const rateLimitedSubscriptionOwner =
-      ownerBlock !== null && owner !== undefined && claudeUsageGatePasses(deps, owner, model);
+      policyBlock !== null &&
+      policyOwner !== undefined &&
+      claudeUsageGatePasses(deps, policyOwner, model);
     if (
       !localMerge &&
       subscriptionOnly &&
