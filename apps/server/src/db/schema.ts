@@ -866,6 +866,8 @@ export const machine = sqliteTable(
     maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
     lastSeenAt: epochMs('lastSeenAt'),
     capabilities: json<MachineCapabilities | null>('capabilities'),
+    browserOverride: bool('browserOverride'),
+    desktopOverride: bool('desktopOverride'),
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
 );
@@ -1477,4 +1479,23 @@ export const actionJournal = sqliteTable(
     check('action_journal_actor', sql`${t.actor} in ('user', 'coordinator')`),
     check('action_journal_kind', sql`${t.kind} in ('run', 'undo', 'undo-refused', 'error')`),
   ],
+);
+
+export const threadConversation = sqliteTable('thread_conversation', {
+  threadId: text('threadId').primaryKey(),
+  storeId: text('storeId').notNull(),
+  conversationId: text('conversationId').notNull(),
+  lastMirroredEntryId: text('lastMirroredEntryId'),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const threadEntry = sqliteTable(
+  'thread_entry',
+  {
+    messageId: text('messageId').primaryKey(),
+    threadId: text('threadId').notNull(),
+    conversationId: text('conversationId').notNull(),
+    entryId: text('entryId').notNull(),
+  },
+  (t) => [index('thread_entry_thread_idx').on(t.threadId, t.conversationId)],
 );
