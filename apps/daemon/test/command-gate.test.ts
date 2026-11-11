@@ -76,6 +76,90 @@ describe('gate only irreversible shapes (nothing else)', () => {
   });
 });
 
+describe('shell syntax does not hide a gated command', () => {
+  const asked: Array<[string, string]> = [
+    ["'rm' -rf '/'", 'ask-rm-rf-root'],
+    ['rm -rf "$HOME"', 'ask-rm-rf-home'],
+    ['sudo -n /bin/rm -rf /', 'ask-rm-rf-root'],
+    ['exec /usr/bin/../bin/rm -rf /', 'ask-rm-rf-root'],
+    ["bash -c 'rm -rf /'", 'ask-rm-rf-root'],
+    ["eval 'shutdown -h now'", 'ask-power'],
+    ['true & rm -rf /', 'ask-rm-rf-root'],
+    ['true |& mkfs.ext4 /dev/sda1', 'ask-mkfs'],
+    ['(rm -rf /)', 'ask-rm-rf-root'],
+    ['{ rm -rf ~; }', 'ask-rm-rf-home'],
+    ['$(rm -rf /)', 'ask-rm-rf-root'],
+    ['echo $(dd if=/dev/zero of=/dev/sda)', 'ask-dd-disk'],
+    ['`reboot`', 'ask-power'],
+    ['if true; then rm -rf /; fi', 'ask-rm-rf-root'],
+    ['</dev/null rm -rf /', 'ask-rm-rf-root'],
+    ['FOO=1 rm -rf /', 'ask-rm-rf-root'],
+    ['command -p /bin/rm -rf /', 'ask-rm-rf-root'],
+    ['env -i /sbin/halt', 'ask-power'],
+    ['nice -n 19 rm -rf /', 'ask-rm-rf-root'],
+    ['timeout 1 rm -rf /', 'ask-rm-rf-root'],
+    ['find / -exec rm -rf / \\;', 'ask-rm-rf-root'],
+    ['xargs rm -rf /', 'ask-rm-rf-root'],
+    ['echo "$(rm -rf /)"', 'ask-rm-rf-root'],
+    ['echo "`reboot`"', 'ask-power'],
+    ['$(echo rm) -rf /', 'ask-rm-rf-root'],
+    ['"$(echo rm)" -rf /', 'ask-rm-rf-root'],
+    ['chroot / rm -rf /', 'ask-rm-rf-root'],
+    ['unshare rm -rf /', 'ask-rm-rf-root'],
+  ];
+  for (const [command, ruleId] of asked) {
+    it(`${command} → ${ruleId}`, () => {
+      const d = decideBashCommand(command);
+      expect(d.action).toBe('ask');
+      expect(d.ruleId).toBe(ruleId);
+    });
+  }
+
+  const allowed = [
+    'echo "rm -rf /"',
+    "echo 'mkfs.ext4 /dev/sda'",
+    "echo '$(rm -rf /)'",
+    'echo $(date)',
+    '$(date)',
+    'command -v rm',
+    `rm -rf '${'$'}{HOME}'`,
+    'dd if=/dev/zero of=/dev/null',
+    "dd of='/dev/null'",
+    'rm -rf ./dist',
+    '/bin/echo ok',
+    'sh -c \'echo "rm -rf /"\'',
+  ];
+  for (const command of allowed) {
+    it(`${JSON.stringify(command)} stays allow`, () => {
+      expect(decideBashCommand(command).action).toBe('allow');
+    });
+  }
+
+  it('fork bomb inside a shell string is still rejected', () => {
+    const d = decideBashCommand("eval ':(){ :|:& };:'");
+    expect(d.action).toBe('reject');
+    expect(d.ruleId).toBe('reject-forkbomb');
+  });
+  it('quoted fork-bomb text is not a command', () => {
+    expect(decideBashCommand("echo ':(){ :|:& };:'").action).toBe('allow');
+  });
+  it('a non-static shell script is not allowed', () => {
+    const d = decideBashCommand('bash -c "$(echo rm -rf /)"');
+    expect(d.action).toBe('ask');
+    expect(d.ruleId).toBe('ask-unresolved-command');
+  });
+  it('a parameter expansion in command position is not allowed', () => {
+    const d = decideBashCommand('$BIN -rf /');
+    expect(d.action).toBe('ask');
+    expect(d.ruleId).toBe('ask-rm-rf-root');
+  });
+  it('a parameter expansion with no gated shape is still not allowed', () => {
+    const d = decideBashCommand('$BIN status');
+    expect(d.action).toBe('ask');
+    expect(d.ruleId).toBe('ask-unresolved-command');
+  });
+});
+
 describe('rule table is programmable (caller-provided table wins over the default)', () => {
   it('custom table hit → verdict per the custom table', () => {
     const custom: PermissionRule[] = [
