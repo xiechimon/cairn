@@ -42,9 +42,14 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
       scopeKey: row.scopeKey,
       state: row.state,
       controlHolder: row.controlHolder,
-      browserEnabled: host.browserOverride !== false && host.capabilities?.browser === true,
+      browserEnabled: compatibilityBrowserEnabled(host),
       machine: { id: row.machineId, name: machineName, online: machineOnline },
     }));
+}
+
+function compatibilityBrowserEnabled(host: typeof machine.$inferSelect): boolean {
+  if (host.browserOverride === true) return true;
+  return host.browserOverride !== false && host.capabilities?.browser === true;
 }
 
 function machineOffersBrowser(
