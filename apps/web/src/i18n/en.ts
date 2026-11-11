@@ -134,6 +134,9 @@ export const EN: Record<string, string> = {
   正在连接屏幕: 'Connecting to the screen',
   屏幕暂时连不上: 'The screen could not connect',
   出错: 'Error',
+  这一块出错了: 'This part failed',
+  '页面其余部分还在，重试会重新打开这一块。':
+    'The rest of the page is still here. Retry opens this part again.',
   开着: 'On',
   正在开机: 'Starting up',
   关着: 'Off',
