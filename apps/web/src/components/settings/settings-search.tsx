@@ -5,7 +5,6 @@ import { useI18n } from '../../i18n/provider.js';
 import { SETTINGS_ROW_INDEX } from '../../settings/settings-index.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
-import { Kbd } from '../ui/kbd.js';
 
 export interface SettingsSearchSection {
   id: string;
@@ -132,7 +131,6 @@ export function SettingsSearch({
           ref={inputRef}
           role="combobox"
           aria-label={t('搜索设置')}
-          aria-keyshortcuts="/"
           aria-expanded={showPopover}
           aria-controls={listId}
           aria-autocomplete="list"
@@ -171,12 +169,6 @@ export function SettingsSearch({
             }
           }}
         />
-        <Kbd
-          data-testid="settings-search-hint"
-          className="h-5 flex-none bg-transparent px-1.5 text-caption font-normal text-content-tertiary ring-1 ring-border max-md:hidden"
-        >
-          /
-        </Kbd>
       </div>
       {showPopover && (
         <div

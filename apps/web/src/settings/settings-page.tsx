@@ -20,6 +20,7 @@ import {
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -46,6 +47,7 @@ import {
 import { Button } from '../components/ui/button.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { useTypeToFocus } from '../overlay/hotkeys.js';
 import { EmbeddedShell, PageShell } from '../pages/shell.js';
 import { MachinesPage } from '../resources/machines-page.js';
 import { McpServersPage } from '../resources/mcp-servers-page.js';
@@ -187,6 +189,9 @@ function useMachineBadge(): string | undefined {
 const TABBABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const LAYER_ABOVE_SETTINGS =
+  '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
+
 function isEditable(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
@@ -252,21 +257,21 @@ export function SettingsDialog({
       if (isEditable(event.target)) return;
       closeRef.current();
     };
-    const onSlash = (event: KeyboardEvent) => {
-      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isEditable(event.target)) return;
-      const input = searchRef.current;
-      if (input === null || input.offsetParent === null) return;
-      event.preventDefault();
-      input.focus();
-    };
     document.addEventListener('keydown', onKey, true);
-    document.addEventListener('keydown', onSlash);
-    return () => {
-      document.removeEventListener('keydown', onKey, true);
-      document.removeEventListener('keydown', onSlash);
-    };
+    return () => document.removeEventListener('keydown', onKey, true);
   }, []);
+  const searchNow = useCallback(() => {
+    const input = searchRef.current;
+    return input === null || input.offsetParent === null ? null : input;
+  }, []);
+  const layerAbove = useCallback(
+    () =>
+      [...document.querySelectorAll(LAYER_ABOVE_SETTINGS)].some(
+        (el) => el !== popupRef.current && el.checkVisibility(),
+      ),
+    [],
+  );
+  useTypeToFocus(searchNow, layerAbove);
   const hrefFor = (id: string): To => ({ pathname: `${SETTINGS_HREF}/${id}`, search });
   const groups: SettingsNavGroup[] = GROUPS.map((group) => ({
     heading: group.heading === null ? null : t(group.heading),

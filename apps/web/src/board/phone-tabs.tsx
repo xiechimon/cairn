@@ -15,7 +15,7 @@ export function NeedsYouCount({ count, className }: { count: number; className?:
     <span
       data-testid="tasks-badge"
       className={cn(
-        'absolute grid h-4.5 min-w-4.5 place-items-center rounded-full bg-(--card-button) px-1 text-caption leading-none font-semibold tabular-nums text-(--text-on-accent) ring-2 ring-popover',
+        'absolute grid h-4.5 min-w-4.5 place-items-center rounded-full bg-(--count-badge) px-1 text-caption leading-none font-semibold tabular-nums text-(--count-badge-ink) ring-2 ring-popover',
         className,
       )}
     >

@@ -660,13 +660,12 @@ Reach:
 
 **App shell and settings window** (shipped, centrality 3). The served single-page app, the live team event stream, and the settings window that hosts every section.
 
-States: The settings window with grouped navigation, a search field reached by slash, a breadcrumb, and the live stream reconnecting after a drop.
+States: The settings window with grouped navigation, a search field that typing with nothing focused fills, a breadcrumb, and the live stream reconnecting after a drop.
 
 Reach:
 
 1. `open /app/settings`
 2. `click testid:settings-search`
-3. `press /`
 
 - Web routes: `/app/settings/:section?`
 - Keyboard shortcuts in its code: none

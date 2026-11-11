@@ -4,6 +4,7 @@ const HOME = '/app?scenario=home-c';
 
 const tabs = (page: Page) => page.getByRole('navigation', { name: '对话、任务和成果' });
 const tab = (page: Page, name: RegExp) => tabs(page).getByRole('link', { name });
+const BADGE_BLUE = 'rgb(55, 109, 214)';
 const top = (page: Page) => page.locator('[data-slot="narrow-top"]');
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).first().boundingBox();
@@ -49,6 +50,21 @@ for (const viewport of [
       ).toBe(await shadow('narrow-menu'));
       await expect(page.getByTestId('tasks-toggle').getByTestId('tasks-badge')).toHaveText('3');
       expect(await overflow(page)).toBe(0);
+    });
+
+    test('count badges are the reference blue with a white digit, top and bottom', async ({
+      page,
+    }) => {
+      await page.goto(HOME);
+      for (const badge of [
+        page.getByTestId('tasks-toggle').getByTestId('tasks-badge'),
+        tabs(page).getByTestId('tasks-badge'),
+      ]) {
+        await expect(badge).toHaveCSS('background-color', BADGE_BLUE);
+        await expect(badge).toHaveCSS('color', 'rgb(255, 255, 255)');
+        const size = await badge.boundingBox();
+        expect(size!.height).toBe(18);
+      }
     });
 
     test('the top right holds only the tasks button: no avatar or account button', async ({
@@ -232,4 +248,19 @@ test('wide screens keep the header controls and draw no narrow chrome', async ({
   await expect(page.getByTestId('narrow-menu')).toHaveCount(0);
   await expect(page.locator('[data-slot="phone-bar"]')).toHaveCount(0);
   await expect(page.locator('html')).not.toHaveAttribute('data-narrow-chrome', '');
+  await expect(
+    page.getByTestId('home-c-pane-buttons').locator('[data-slot="needs-you-dot"]'),
+  ).toHaveCSS('background-color', BADGE_BLUE);
+});
+
+test.describe('dark theme', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('the count badge keeps the same blue and white digit', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cairn-theme', 'dark'));
+    await page.goto(HOME);
+    const badge = tabs(page).getByTestId('tasks-badge');
+    await expect(badge).toHaveCSS('background-color', BADGE_BLUE);
+    await expect(badge).toHaveCSS('color', 'rgb(255, 255, 255)');
+  });
 });

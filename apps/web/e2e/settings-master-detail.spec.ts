@@ -26,10 +26,13 @@ test('other sections keep one heading for the page, the breadcrumb', async ({ pa
   }
 });
 
-test('search is quiet, shows a / hint and the / key focuses it', async ({ page }) => {
+test('search is quiet, shows no key hint, and typing with nothing focused goes into it', async ({
+  page,
+}) => {
   await page.goto(MACHINES);
   const search = settings(page).getByLabel('搜索设置');
-  await expect(settings(page).getByTestId('settings-search-hint')).toHaveText('/');
+  await expect(settings(page).getByTestId('settings-search').locator('kbd')).toHaveCount(0);
+  await expect(search).not.toHaveAttribute('aria-keyshortcuts');
   const look = await search.evaluate((el) => {
     const css = getComputedStyle(el);
     return { border: css.borderTopWidth, bg: css.backgroundColor };
@@ -37,8 +40,56 @@ test('search is quiet, shows a / hint and the / key focuses it', async ({ page }
   expect(look.border).toBe('0px');
   expect(look.bg).toBe('rgba(0, 0, 0, 0)');
   await expect(search).not.toBeFocused();
-  await page.keyboard.press('/');
+  await page.keyboard.type('color');
   await expect(search).toBeFocused();
+  await expect(search).toHaveValue('color');
+  await expect(settings(page).getByTestId('settings-search-results')).toBeVisible();
+  await expect(settings(page).locator('[data-settings-result="appearance"]').first()).toBeVisible();
+});
+
+test('the slash key is no longer a shortcut: it types a slash into the search like any character', async ({
+  page,
+}) => {
+  await page.goto(MACHINES);
+  const search = settings(page).getByLabel('搜索设置');
+  await page.keyboard.press('/');
+  await expect(search).toHaveValue('/');
+});
+
+test('IME composition started with nothing focused lands in the search', async ({ page }) => {
+  await page.goto(MACHINES);
+  const search = settings(page).getByLabel('搜索设置');
+  const client = await page.context().newCDPSession(page);
+  await expect(search).not.toBeFocused();
+  await client.send('Input.dispatchKeyEvent', {
+    type: 'rawKeyDown',
+    key: 'Process',
+    code: 'KeyJ',
+    windowsVirtualKeyCode: 229,
+  });
+  await expect(search).toBeFocused();
+  await client.send('Input.imeSetComposition', { text: 'ji', selectionStart: 2, selectionEnd: 2 });
+  await client.send('Input.insertText', { text: '机' });
+  await client.send('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key: 'Process',
+    code: 'KeyJ',
+    windowsVirtualKeyCode: 229,
+  });
+  await expect(search).toHaveValue('机');
+  await expect(settings(page).locator('[data-settings-result="machines"]').first()).toBeVisible();
+});
+
+test('typing while a menu is open in settings does not move focus to the search', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/account?scenario=providers-fleet');
+  const search = settings(page).getByLabel('搜索设置');
+  const trigger = settings(page).getByRole('combobox', { name: '语言' });
+  await trigger.click();
+  await expect(page.getByRole('listbox')).toBeVisible();
+  await page.keyboard.press('x');
+  await expect(search).not.toBeFocused();
   await expect(search).toHaveValue('');
 });
 
@@ -56,7 +107,7 @@ test('search shows one ring on the whole pill while focused, and Esc clears and 
   const search = settings(page).getByLabel('搜索设置');
   const pill = settings(page).getByTestId('settings-search');
   expect(await ringOf(pill)).toMatchObject({ shadow: 'none' });
-  await page.keyboard.press('/');
+  await search.focus();
   await expect(search).toBeFocused();
   expect((await ringOf(pill)).shadow).not.toBe('none');
   const focusedInput = await ringOf(search);
@@ -76,7 +127,7 @@ test('search shows one ring on the whole pill while focused, and Esc clears and 
 test('Esc during IME composition leaves the search query and focus alone', async ({ page }) => {
   await page.goto(MACHINES);
   const search = settings(page).getByLabel('搜索设置');
-  await page.keyboard.press('/');
+  await search.focus();
   await page.keyboard.type('机');
   await search.evaluate((el) => {
     el.dispatchEvent(
@@ -93,7 +144,7 @@ test('Esc during IME composition leaves the search query and focus alone', async
   await expect(settings(page)).toBeVisible();
 });
 
-test('typing a slash inside another field does not steal focus', async ({ page }) => {
+test('typing inside another settings field does not steal focus', async ({ page }) => {
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   const name = settings(page).getByLabel('名称');
   await name.fill('');

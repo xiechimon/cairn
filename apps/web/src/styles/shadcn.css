@@ -245,6 +245,8 @@
   --diff-add-word-bg: #2b3f29;
   --diff-del-word-bg: #48291f;
   --text-on-accent: #1a1404;
+  --count-badge: #376dd6;
+  --count-badge-ink: var(--text-on-veil);
   --overlay-scrim: rgb(0 0 0 / 0.5);
   --text-on-veil: #ffffff;
   --qr-light: #ffffff;
@@ -391,6 +393,8 @@
   --diff-add-word-bg: #d2e4c7;
   --diff-del-word-bg: #f1d2c9;
   --text-on-accent: #ffffff;
+  --count-badge: #376dd6;
+  --count-badge-ink: var(--text-on-veil);
   --overlay-scrim: rgb(0 0 0 / 0.4);
   --text-on-veil: #ffffff;
   --qr-light: #ffffff;

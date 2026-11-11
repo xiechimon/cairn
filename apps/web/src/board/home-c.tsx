@@ -415,7 +415,7 @@ export function HomeC({
             <span
               aria-hidden="true"
               data-slot="needs-you-dot"
-              className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
+              className="absolute top-1 right-1 size-1.75 rounded-full bg-(--count-badge)"
             />
             <span data-testid="tasks-badge" className="sr-only">
               {badge}

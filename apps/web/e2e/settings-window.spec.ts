@@ -127,15 +127,19 @@ test('search lists matching sections and rows, jumps to the pick and highlights 
   await expect(settings(page).getByText('没有匹配的设置')).toBeVisible();
 });
 
-test('search keeps the slash shortcut and Escape clears it without closing', async ({ page }) => {
+test('typing opens the search, Escape clears it first and a second Escape closes settings', async ({
+  page,
+}) => {
   await page.goto(`/app/settings/account?${FLEET}`);
-  await page.keyboard.press('/');
+  await page.keyboard.type('key');
   const search = settings(page).getByLabel('搜索设置');
   await expect(search).toBeFocused();
-  await search.fill('密');
+  await expect(search).toHaveValue('key');
   await search.press('Escape');
   await expect(search).toHaveValue('');
   await expect(settings(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(settings(page)).toHaveCount(0);
 });
 
 test('appearance section switches the theme between system, light and dark', async ({ page }) => {

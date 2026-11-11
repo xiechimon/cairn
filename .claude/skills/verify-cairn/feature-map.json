@@ -2278,7 +2278,7 @@
       "id": "app-shell",
       "name": "App shell and settings window",
       "summary": "The served single-page app, the live team event stream, and the settings window that hosts every section.",
-      "states": "The settings window with grouped navigation, a search field reached by slash, a breadcrumb, and the live stream reconnecting after a drop.",
+      "states": "The settings window with grouped navigation, a search field that typing with nothing focused fills, a breadcrumb, and the live stream reconnecting after a drop.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2305,8 +2305,7 @@
       },
       "reach": [
         "open /app/settings",
-        "click testid:settings-search",
-        "press /"
+        "click testid:settings-search"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/hotkeys.md",
