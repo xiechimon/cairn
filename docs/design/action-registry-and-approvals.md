@@ -1,6 +1,6 @@
 # Action registry and approvals
 
-Status: design for the owner's review. Nothing here is built. First slice of the proposal on #3924 (`docs/design/ai-native-actions.md`), plus approvals as its confirm-once class. Grounded on `origin/main` `7299c658e`. Prior art: `docs/research/action-registry-approvals-2026-11-11.md`.
+Status: design for the owner's review. Nothing here is built. First slice of the action-registry proposal, plus approvals as its confirm-once class. That proposal is not on `main`; it is `docs/design/ai-native-actions.md` on #3924 (`origin/claude/gracious-cray-wl8xyh`). This PR does not copy it, because that PR owns the file. The rules this slice uses are restated here so the design stands alone. Grounded on `origin/main` `7299c658e`. Prior art: `docs/research/action-registry-approvals-2026-11-11.md`.
 
 ## Decision
 
@@ -22,7 +22,7 @@ Slice 1 entries:
 | `project.unarchive` | free | `project.archive` | no | web, coordinator |
 | `project.delete` | confirm-once | none | no | web, coordinator |
 
-`toolName` is a field (`archive_project`, `unarchive_project`, `delete_project`), not derived. Handlers are the existing functions: `setProjectArchived` and `deleteProject` (`apps/server/src/services/projects.ts`). REST archive, unarchive, and delete call the execute function. The Coordinator tools are registered from these three entries and call the same function. They are not added to `CHIEF_REMOTE_TOOLS`.
+`toolName` is a field (`archive_project`, `unarchive_project`, `delete_project`), not derived. Archive and unarchive call `setProjectArchived` (`apps/server/src/services/projects.ts`). Delete does not call `deleteProject` unchanged. That function commits its db work and then calls `removeHostedRepoDir` before returning (`projects.ts`, `git.ts`). An outer transaction that rolls back after that return would restore the project row after the directory is gone. Slice 1 splits it: the db deletes and a cleanup outbox row commit with the journal row; `removeHostedRepoDir` runs only after that commit, from the outbox. The only production caller today is `DELETE /api/projects/:id` (`routes-projects.ts`). It calls the execute function, not `deleteProject`. REST archive and unarchive do the same. The Coordinator tools are registered from these three entries and call the same execute function. They are not added to `CHIEF_REMOTE_TOOLS`.
 
 `project.delete` does not offer always-allow. A grant with no match would delete any later project. The grant table exists so a later action can set `standingGrant` without a new store. Slice 1 has no such action.
 
@@ -34,13 +34,13 @@ The daemon CLI (`apps/daemon/src/cli.ts`) is machine start, stop, and token. It 
 
 Three tables, team-scoped, cascade on team delete. No retention TTL in this slice.
 
-- Proposal: `pending`, `refused`, `accepted`, `executed`, `failed`, `expired`, `superseded`. Holds the validated input, its hash, `targetId`, actor, decision (`refuse` | `allow-once` | `always` or empty), and expiry.
+- Proposal: `pending`, `refused`, `accepted`, `executed`, `failed`, `expired`, `superseded`. Holds the validated input, its hash, `targetId`, actor, `threadId` (the Coordinator thread that proposed, or empty for an owner click), `scopeProjectId`, decision (`refuse` | `allow-once` | `always` or empty), and expiry.
 - Grant: `active` or revoked (`revokedAt` set, row kept). Unique on team, action, and match hash while active.
 - Journal: append-only. One row per run, undo, or refused undo. A refusal lives on the proposal, not a second copy in the journal.
 
 A pending proposal is unique on team, action, and target. A repeat returns that row. A new pending proposal for the same target marks the old one `superseded`.
 
-Expiry is 7 days from insert, not the end of the Coordinator turn. A turn ends before the owner is back; expiring with the turn would throw away the answer. This disagrees with the proposal's "expires with its turn" and is open below.
+Expiry is 7 days from insert, not the end of the Coordinator turn. The #3924 proposal says a confirm-once proposal expires with its turn. A turn ends before the owner is back; expiring with the turn would throw away the answer. The disagreement is open below.
 
 ## Transitions
 
@@ -56,7 +56,7 @@ stateDiagram-v2
   [*] --> executed: free action, or the owner's own click
 ```
 
-The Coordinator tool returns `pending` and the proposal id. It does not call `holdForQuestion`. The answer route wakes the Coordinator once by calling `enqueueChiefStep` (`apps/server/src/services/chief.ts`) with trigger `wake` and provenance `action-proposal:<id>`. That insert is the wake. It does not add a trigger kind. No existing sweep knows about proposals, so a decided proposal with no wake is retried by the next read of that proposal, which enqueues once.
+The Coordinator tool returns `pending` and the proposal id. It does not call `holdForQuestion`. A Coordinator propose without a `threadId` is 400 and writes nothing: `enqueueChiefStep` (`apps/server/src/services/chief.ts`) needs that id, and a team can have more than one Coordinator thread. The answer route wakes only the stored `threadId`, with trigger `wake` and provenance `action-proposal:<id>`. It does not add a trigger kind and does not pick another thread. An owner click stores no `threadId` and does not wake. A decided proposal whose wake did not land is retried by the next read of that proposal, which enqueues once on the stored thread. A stored thread that no longer exists does not wake a different thread; the decision stands and the journal row says the wake was skipped.
 
 The owner's own click is the confirmation. Actor `user` on `project.delete` runs the handler and journals it. It does not insert a proposal, so the person is not asked twice. Actor `coordinator` always proposes.
 
@@ -68,8 +68,8 @@ The owner's own click is the confirmation. Actor `user` on `project.delete` runs
 | Execute, owner-only id | registry | nothing | 403, no row |
 | Execute, target missing or other team | project row | nothing | 404, no row. Archive already checks team (`routes-projects.ts`); delete does not, and this check closes that gap |
 | Execute, caller surface not listed | registry | nothing | 403, no row. MCP and the daemon CLI hit this |
-| Execute, free, or user on confirm-once | registry, project | project row and one journal row, one transaction | handler error rolls both back; 4xx or 5xx, no journal row |
-| Execute, coordinator confirm-once | registry, pending proposal | one `pending` row, or none if one exists | returns the pending id; handler does not run |
+| Execute, free, or user on confirm-once | registry, project | project row and one journal row, one transaction. Hosted `project.delete` also writes the outbox row in that transaction | handler error rolls the transaction back and does not call `removeHostedRepoDir` |
+| Execute, coordinator confirm-once | registry, pending proposal, caller thread id | one `pending` row with that `threadId`, or none if one exists | no `threadId`: 400, no row. Otherwise returns the pending id; handler does not run |
 | Answer, body contains `input` | proposal | nothing | 400. The stored input runs, or nothing runs |
 | Answer, not pending, unknown, or past expiry | proposal | expiry stamp if past `expiresAt` | 409, handler does not run |
 | Answer, refuse | proposal | status `refused`, decision, `decidedBy` | wake still fires; handler does not run |
@@ -78,18 +78,18 @@ The owner's own click is the confirmation. Actor `user` on `project.delete` runs
 | Revoke grant | grant, team | `revokedAt` | owner session only; agent and MCP get 403; other team is 404 |
 | Expiry sweep | pending proposals | `expired` | a failed sweep leaves them pending; the next sweep retries |
 | Undo | journal row, inverse, current project | one new journal row, and the inverse write if it still matches | no inverse: 409, no write. State moved: journal `undo-refused`, names the later journal id, does not overwrite |
-| Delete files follow-up | journal row for `project.delete` | one journal row for the directory removal | `deleteProject` removes the hosted repo directory after the db transaction. The db delete and its journal row commit together; the directory removal is a second row. A crash between them is retried by the sweep, which does not delete again |
+| Delete db plus outbox | project, hosted repo name | project rows, one journal row, one outbox row, one transaction | a throw before commit rolls all three back and does not call `removeHostedRepoDir` |
 | Web pending list and journal list | proposals, journal | nothing | empty list |
-| Coordinator wake | proposal id on the answer | one `enqueueChiefStep` row | enqueue failure after the decision commit leaves the proposal decided; the next read enqueues once and does not run the handler again |
-| `ask_user`, command gate, `clientMessage`, `skill_audit`, plan auto-approve | their own rows | their own rows | unchanged. They do not read or write these three tables |
+| Directory cleanup | outbox row not done | `removeHostedRepoDir`, then outbox done and one journal row | runs only after the delete transaction commits. A missing directory is success. A failed sweep leaves the outbox row; the next sweep retries. It does not delete the project again |
+| Coordinator wake | stored `threadId` | one `enqueueChiefStep` on that thread | no stored thread: no wake. Missing thread: no substitute wake. Enqueue failure after the decision: the next read enqueues once and does not run the handler again |
 
-`deleteProject` still deletes todos, builds, steps, and secrets, and it still does not stop running work. That guard is a separate to-do. The proposal text shown to the owner names the project and says running work is removed with it. Slice 1 does not add the guard.
+The db half of delete still removes todos, builds, steps, and secrets, and it still does not stop running work. That guard is a separate to-do. The proposal text shown to the owner names the project and says running work is removed with it. Slice 1 does not add the guard. `ask_user`, the command gate, `clientMessage`, `skill_audit`, and plan auto-approve do not read or write these tables.
 
 `deleteTodo` (`apps/server/src/services/todos.ts`) also queues a GitHub issue close. It is not in this slice, because that side effect is outside the journal transaction.
 
 ## Tests the implementation writes first
 
-One test per row above, plus: a registry entry with surface `mcp` or `cli` fails the slice-1 fixture; `delete_project` is absent from `MCP_TOOL_REGISTRY` and `CHIEF_REMOTE_TOOLS`; the owner-only exception list is exact; a journal row never contains a field named `value`, `token`, `secret`, or `password`; two concurrent proposes for one target return one pending id.
+One test per row above, plus: a registry entry with surface `mcp` or `cli` fails the slice-1 fixture; `delete_project` is absent from `MCP_TOOL_REGISTRY` and `CHIEF_REMOTE_TOOLS`; the owner-only exception list is exact; a journal row never contains a field named `value`, `token`, `secret`, or `password`; two concurrent proposes for one target return one pending id; a rolled-back delete does not remove the hosted directory; a Coordinator propose with no `threadId` writes nothing; an answer wakes the stored thread and no other.
 
 ## Risks
 
@@ -97,7 +97,7 @@ Deleting a project is still not undoable, and a confirmed delete still removes r
 
 ## Open decisions
 
-- Expiry: 7 days, recommended here, against the proposal's turn expiry.
+- Expiry: 7 days, recommended here, against the #3924 proposal's rule that a proposal expires with its turn.
 - Always-allow on delete: not offered, recommended. The owner can require it for a matched scope.
 - Whether a worker thread or an MCP client later shares the Coordinator's free class: not in this slice.
 - Journal retention: keep with the team, no TTL, until the owner says otherwise.
