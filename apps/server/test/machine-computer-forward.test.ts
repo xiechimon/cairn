@@ -435,6 +435,29 @@ describe('forwardComputerCall target and presence', () => {
     expect(s.db.select().from(computerTable).all()).toEqual([]);
   });
 
+  test('user_computer tools stay on the newest own-computer host when an older machine also offers Orb', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'orb-old', { ownComputer: true, computer: true }, 10);
+    addMachine(s, 'host-new', { ownComputer: true }, 20);
+    const oldCalls = connect(s, 'orb-old');
+    const newCalls = connect(s, 'host-new');
+    void forwardComputerCall(
+      deps,
+      'sidecar',
+      'step-a',
+      {
+        computer: true,
+        name: 'user_computer_shell',
+        toolCallId: 'own-host',
+        params: { command: 'uname' },
+      },
+      { ownComputerGate: () => {} },
+    );
+    expect(oldCalls).toEqual([]);
+    expect(newCalls).toHaveLength(1);
+    expect(s.db.select().from(computerTable).all()).toEqual([]);
+  });
+
   test('the Coordinator computer is created on first use, bound to the connected machine, with the Orb name', async () => {
     const { s, deps, chiefId } = boot();
     addMachine(s, 'omarchy', { computer: true });

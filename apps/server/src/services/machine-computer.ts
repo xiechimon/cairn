@@ -573,7 +573,7 @@ function selectTarget(
   const live = connected.filter((row) => machineAcceptsTool(row, tool));
 
   if (wantsOwn) {
-    const chosen = live[0] ?? connected[0];
+    const chosen = connected[0];
     if (chosen) return { machineId: chosen.id, computerId: null };
     throw new HttpError(
       409,
