@@ -164,8 +164,8 @@ export const EN: Record<string, string> = {
   屏幕已放大: 'Screen is enlarged',
   在大屏里点击和键入: 'Click and type in the enlarged screen',
   打开桌面控制后再操作: 'Turn on desktop control to click and type',
-  '让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。':
-    'Lets agents operate apps on this computer. macOS needs Accessibility permission.',
+  '由你接管这台电脑的桌面，在大屏里点击和键入。打开期间 agent 不能操作桌面上的应用，关掉后恢复。':
+    'You take over this computer’s desktop and click and type in the large view. While it is on, the agent cannot operate desktop apps; turning it off lets it resume.',
   浏览器: 'Browser',
   '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
   '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',

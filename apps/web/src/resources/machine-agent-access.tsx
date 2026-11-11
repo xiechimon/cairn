@@ -124,7 +124,9 @@ export function MachineAgentAccess({
         />
         <CapabilitySwitch
           label={t('桌面控制')}
-          hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
+          hint={t(
+            '由你接管这台电脑的桌面，在大屏里点击和键入。打开期间 agent 不能操作桌面上的应用，关掉后恢复。',
+          )}
           checked={desktopInstalled && control.controlHeld}
           disabled={!canToggleDesktop}
           disabledReason={desktopBlockedReason}
