@@ -116,6 +116,10 @@ describe('shell syntax does not hide a gated command', () => {
     ['cat <<EOF\n$(reboot)\nEOF', 'ask-power'],
     ["cat <<'EOF'; reboot\ntext\nEOF", 'ask-power'],
     ["flock /tmp/lock -c 'reboot'", 'ask-power'],
+    ['flock -E 1 /tmp/lock reboot', 'ask-power'],
+    ['xargs -e reboot', 'ask-power'],
+    ['xargs --eof reboot', 'ask-power'],
+    ["printf '%s\\n' \"<<'EOF'\"\nreboot\nEOF", 'ask-power'],
     ['find . -maxdepth 0 -exec true \\; -exec reboot \\;', 'ask-power'],
   ];
   for (const [command, ruleId] of asked) {
@@ -142,7 +146,6 @@ describe('shell syntax does not hide a gated command', () => {
     'echo ok # reboot',
     'echo foo#bar',
     'dd of=/dev/sda of=/dev/null',
-    "cat <<'EOF'\n$(reboot)\nEOF",
   ];
   for (const command of allowed) {
     it(`${JSON.stringify(command)} stays allow`, () => {

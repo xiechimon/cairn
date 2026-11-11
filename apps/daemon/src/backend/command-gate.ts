@@ -191,6 +191,7 @@ interface WrapperSpec {
   pid?: boolean;
   numeric?: boolean;
   scripts?: readonly string[];
+  optionalValues?: readonly string[];
 }
 
 const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
@@ -206,7 +207,7 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
   exec: { flags: ['c', 'l'], values: ['a'] },
   flock: {
     flags: ['s', 'shared', 'x', 'exclusive', 'n', 'nonblock', 'u', 'unlock', 'o', 'close'],
-    values: ['w', 'wait', 'timeout'],
+    values: ['w', 'wait', 'timeout', 'E', 'conflict-exit-code'],
     skipOperand: true,
   },
   ionice: {
@@ -327,13 +328,8 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
       'a',
       'arg-file',
       'E',
-      'e',
-      'eof',
       'I',
-      'i',
-      'replace',
       'L',
-      'l',
       'max-lines',
       'n',
       'max-args',
@@ -344,6 +340,7 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
       'd',
       'delimiter',
     ],
+    optionalValues: ['e', 'eof', 'i', 'replace', 'l'],
   },
 };
 
@@ -519,38 +516,9 @@ function matchingParen(source: string, open: number): number | undefined {
   return undefined;
 }
 
-function maskQuotedHeredocs(source: string): string {
-  let out = '';
-  let index = 0;
-  while (index < source.length) {
-    const match = /<<-?\s*(?:'([^'\n]+)'|"([^"\n]+)"|\\(\w+))/.exec(source.slice(index));
-    if (!match || match.index === undefined) {
-      out += source.slice(index);
-      break;
-    }
-    const delimiter = match[1] ?? match[2] ?? match[3] ?? '';
-    const start = index + match.index;
-    const headerEnd = source.indexOf('\n', start);
-    if (headerEnd === -1 || delimiter === '') {
-      out += source.slice(index);
-      break;
-    }
-    out += source.slice(index, headerEnd + 1);
-    const end = source.indexOf(`\n${delimiter}`, headerEnd + 1);
-    if (end === -1) {
-      out += ' '.repeat(source.length - (headerEnd + 1));
-      break;
-    }
-    const stop = end + 1 + delimiter.length;
-    out += ' '.repeat(stop - (headerEnd + 1));
-    index = stop;
-  }
-  return out;
-}
-
 function executableSubstitutionBodies(source: string): string[] {
   const bodies: string[] = [];
-  const scanned = maskQuotedHeredocs(source);
+  const scanned = source;
   let quote: "'" | '"' | undefined;
   for (let index = 0; index < scanned.length; index += 1) {
     const character = scanned[index];
@@ -608,6 +576,17 @@ function noteScript(word: string, collected: CollectedCommands): void {
   if (word !== '') collected.scripts.push(word);
 }
 
+function knownWrapperOption(spec: WrapperSpec, name: string): boolean {
+  return (
+    spec.flags.includes(name) ||
+    spec.values.includes(name) ||
+    (spec.optionalValues?.includes(name) ?? false) ||
+    (spec.scripts?.includes(name) ?? false) ||
+    name === 'help' ||
+    name === 'version'
+  );
+}
+
 function consumeWrapper(
   words: readonly string[],
   start: number,
@@ -639,6 +618,14 @@ function consumeWrapper(
         return { index: index + 1, stop: true };
       }
       if (name === 'pid' || name === 'list') noCommand = true;
+      if (!knownWrapperOption(spec, name)) {
+        collected.unresolved = true;
+        return { index, stop: true };
+      }
+      if (spec.optionalValues?.includes(name)) {
+        index += 1;
+        continue;
+      }
       if (spec.values.includes(name) && eq === -1) index += 1;
       index += 1;
       continue;
@@ -646,14 +633,25 @@ function consumeWrapper(
     let consumeNext = false;
     for (let letter = 1; letter < word.length; letter += 1) {
       const name = word[letter] ?? '';
-      if (spec.lookup && (name === 'v' || name === 'V')) lookup = true;
-      if (spec.pid && name === 'p') noCommand = true;
+      if (spec.lookup && (name === 'v' || name === 'V')) {
+        lookup = true;
+        continue;
+      }
+      if (spec.pid && name === 'p') {
+        noCommand = true;
+        continue;
+      }
       if (spec.scripts?.includes(name)) {
         const attached = word.slice(letter + 1);
         const value = attached || words[index + 1];
         if (!attached) index += 1;
         if (value !== undefined) noteScript(value, collected);
         return { index: index + 1, stop: true };
+      }
+      if (spec.optionalValues?.includes(name)) continue;
+      if (!knownWrapperOption(spec, name)) {
+        collected.unresolved = true;
+        return { index, stop: true };
       }
       if (spec.values.includes(name)) {
         if (letter === word.length - 1) consumeNext = true;
@@ -901,10 +899,9 @@ function classifyCommand(
   if (forkbomb?.test(stripped, { head: '', args: [], text: stripped })) {
     return { action: forkbomb.action, ruleId: forkbomb.id };
   }
-  const masked = maskQuotedHeredocs(command);
   let normalized: string;
   try {
-    normalized = normalizeBackticks(masked);
+    normalized = normalizeBackticks(command);
   } catch {
     return UNRESOLVED_COMMAND;
   }
