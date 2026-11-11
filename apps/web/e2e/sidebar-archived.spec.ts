@@ -41,7 +41,9 @@ async function open(page: Page, url = '/app', archived = [ARCHIVED, GROUPED]): P
 const rows = (page: Page) => page.locator('aside [data-slot="sidebar-project-row"]');
 
 async function chooseFilter(page: Page, label: '进行中' | '已归档' | '全部') {
-  await page.locator('aside [data-slot="sidebar-nav-row"]').first().hover();
+  if ((await page.getByTestId('sidebar-archived-page').count()) === 0) {
+    await page.locator('aside [data-slot="sidebar-nav-row"]').first().hover();
+  }
   await page.getByTestId('sidebar-project-filter').click();
   await page.getByRole('menuitem', { name: /状态/ }).hover();
   await page.getByRole('menuitemradio', { name: label }).click();
@@ -60,11 +62,32 @@ test('the filter starts on active and lists archived projects, groups included',
   await expect(page.getByTestId('sidebar-archived-note')).toHaveText(
     '已归档的项目和它们的对话会一直保留，直到你删除。',
   );
-  await expect(page.getByTestId('project-group-header')).toHaveText(/客户/);
+  await expect(page.getByTestId('project-group-header')).toHaveCount(0);
   await expect(page.locator('aside [data-slot="sidebar-new-project"]')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-project-filter')).toBeVisible();
+  await expect(page.getByTestId('sidebar-project-filter')).toHaveCount(1);
+  await expect(page.getByTestId('sidebar-archived-page').getByRole('heading')).toHaveText(
+    '已归档的项目',
+  );
   await page.mouse.move(900, 400);
   await expect(page.getByTestId('sidebar-project-filter')).toBeVisible();
+});
+
+test('the normal list never shows the note and pins the archived entry above the footer', async ({
+  page,
+}) => {
+  await open(page);
+  await expect(page.getByTestId('sidebar-archived-note')).toHaveCount(0);
+  const entry = page.locator('aside [data-slot="sidebar-archived-entry"]');
+  await expect(entry).toHaveText('已归档');
+  const footer = await page.getByTestId('sidebar-footer').boundingBox();
+  const box = await entry.boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(footer!.y);
+  await entry.click();
+  await expect(page.getByTestId('sidebar-archived-note')).toBeVisible();
+  await expect(page.locator('aside [data-slot="sidebar-archived-entry"]')).toHaveCount(0);
+  await page.locator('aside [data-slot="sidebar-filter-back"]').click();
+  await expect(page.getByTestId('sidebar-archived-note')).toHaveCount(0);
+  await expect(entry).toBeVisible();
 });
 
 test('the filter choice survives a reload and the back row returns to active', async ({
@@ -83,6 +106,7 @@ test('the filter choice survives a reload and the back row returns to active', a
 test('all shows both, with only the archived rows marked', async ({ page }) => {
   await open(page);
   await chooseFilter(page, '全部');
+  await expect(page.getByTestId('sidebar-archived-note')).toHaveCount(0);
   await expect(rows(page)).toHaveCount(3);
   await expect(page.locator('aside [data-slot="sidebar-project-row"][data-archived]')).toHaveCount(
     2,
@@ -98,7 +122,7 @@ test('an empty archived view says so in one line', async ({ page }) => {
   await open(page, '/app', []);
   await chooseFilter(page, '已归档');
   await expect(rows(page)).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-archived-note')).toHaveText('没有已归档的项目');
+  await expect(page.getByTestId('sidebar-archived-empty')).toHaveText('没有已归档的项目');
 });
 
 test('the archived row menu unarchives back into the active list', async ({ page }) => {
@@ -145,7 +169,7 @@ test('an archived project opens read-only and unarchiving brings the composer ba
   await expect(block.getByRole('textbox')).toHaveCount(0);
   await expect(page.getByTestId('home-c-starters')).toHaveCount(0);
   await page.getByTestId('archived-project-bar-unarchive').click();
-  expect(calls.posts).toEqual(['/api/projects/proj-old/unarchive']);
+  await expect.poll(() => calls.posts).toEqual(['/api/projects/proj-old/unarchive']);
   await expect(block.getByTestId('archived-project-bar')).toHaveCount(0);
   await expect(block.getByRole('textbox')).toHaveCount(1);
 });
@@ -170,15 +194,13 @@ test('the tasks panel of an archived project cannot add a task', async ({ page }
   await expect(page.getByTestId('tasks-add-input')).toHaveCount(0);
 });
 
-test('the phone drawer carries the same filter', async ({ page }) => {
+test('the phone drawer carries the archived entry and page', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page);
   await page.getByRole('button', { name: '展开侧边栏' }).first().click();
   const drawer = page.getByRole('dialog');
-  await drawer.locator('[data-slot="sidebar-nav-row"]').first().hover();
-  await drawer.getByTestId('sidebar-project-filter').click();
-  await page.getByRole('menuitem', { name: /状态/ }).click();
-  await page.getByRole('menuitemradio', { name: '已归档' }).click();
+  await drawer.locator('[data-slot="sidebar-archived-entry"]').click();
   await expect(drawer.locator('[data-slot="sidebar-project-row"]')).toHaveCount(2);
   await expect(drawer.getByTestId('sidebar-archived-note')).toBeVisible();
+  await expect(drawer.locator('[data-slot="sidebar-filter-back"]')).toBeVisible();
 });

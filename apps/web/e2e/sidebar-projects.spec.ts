@@ -74,7 +74,7 @@ test('archived projects are not listed in the sidebar', async ({ page }) => {
   ]);
   await expect(rows(page)).toHaveText(['cairn', 'dogfood-sandbox']);
   await expect(sidebar(page)).not.toContainText('pacman-gh-probe');
-  await expect(sidebar(page)).not.toContainText('已归档');
+  await expect(page.getByTestId('sidebar-archived-page')).toHaveCount(0);
   await expect(groupHeaders(page)).toHaveCount(0);
 });
 

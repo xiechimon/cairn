@@ -2,6 +2,7 @@ import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
 import {
   Activity,
+  Archive,
   ChartColumn,
   ChevronLeft,
   PanelLeft,
@@ -273,6 +274,11 @@ export function BoardSidebar({
     [activeLayout],
   );
   const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
+  const archivedPage = filter === 'archived';
+  const archivedRows = useMemo(
+    () => (archivedPage ? [...layout.ungrouped, ...layout.groups.flatMap((g) => g.projects)] : []),
+    [archivedPage, layout],
+  );
   const archivedCount = useMemo(() => present.filter(isArchivedProject).length, [present]);
   const activeProject = allProjects.some((row) => row.id === projectParam) ? projectParam : null;
   const waitingLabel = t('有任务在等你');
@@ -307,13 +313,14 @@ export function BoardSidebar({
         }}
       />
     );
-  const projectRows = (rows: readonly SidebarProject[]) =>
+  const projectRows = (rows: readonly SidebarProject[], flat = false) =>
     rows.map((row, index) => (
       <SidebarProjectRow
         key={row.id}
         name={row.name}
         icon={row.icon}
         place={treePlace(index, rows.length)}
+        flat={flat}
         waiting={waiting.has(row.id) ? waitingLabel : null}
         status={isArchivedProject(row) ? null : statusText(row.id)}
         archived={isArchivedProject(row) ? archivedLabel : null}
@@ -490,18 +497,18 @@ export function BoardSidebar({
 
       <nav
         ref={navRef}
-        className={`flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-2 ${scrollFadeClassName()}`}
+        className={`flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-1 ${scrollFadeClassName()}`}
       >
         <SidebarNavRow
           icon={<BrandGlyph className="size-4" />}
           label={t('Coordinator')}
           active={coordinatorActive}
           onClick={() => navigate(coordinatorTarget)}
-          actionsPinned={filter !== 'active'}
+          actionsPinned={filter === 'all'}
           actions={
-            <>
-              <ProjectFilterMenu filter={filter} onFilter={chooseFilter} />
-              {filter !== 'archived' && (
+            archivedPage ? undefined : (
+              <>
+                <ProjectFilterMenu filter={filter} onFilter={chooseFilter} />
                 <SidebarTip label={t('新建项目')}>
                   <Link
                     to={newProjectTarget}
@@ -511,19 +518,32 @@ export function BoardSidebar({
                     <Plus strokeWidth={STROKE} />
                   </Link>
                 </SidebarTip>
-              )}
-            </>
+              </>
+            )
           }
         />
-        {filter === 'archived' && projectsState === undefined && (
-          <p
-            data-testid="sidebar-archived-note"
-            className="m-0 flex-none pt-0.5 pr-2 pb-1.5 pl-8.5 text-meta text-content-tertiary"
-          >
-            {archivedCount === 0
-              ? t('没有已归档的项目')
-              : t('已归档的项目和它们的对话会一直保留，直到你删除。')}
-          </p>
+        {archivedPage && projectsState === undefined && (
+          <div data-testid="sidebar-archived-page" className="flex flex-none flex-col gap-0.5">
+            <div className="mt-3 flex h-8.5 flex-none items-center justify-between pr-1 pl-2.5">
+              <h2 className="m-0 text-ui font-medium text-foreground">{t('已归档的项目')}</h2>
+              <ProjectFilterMenu filter={filter} onFilter={chooseFilter} />
+            </div>
+            <p
+              data-testid="sidebar-archived-note"
+              className="m-0 flex-none pr-2 pb-1.5 pl-2.5 text-meta text-content-tertiary"
+            >
+              {t('已归档的项目和它们的对话会一直保留，直到你删除。')}
+            </p>
+            {archivedCount === 0 && (
+              <p
+                data-testid="sidebar-archived-empty"
+                className="m-0 flex-none py-1 pr-2 pl-2.5 text-meta text-content-secondary"
+              >
+                {t('没有已归档的项目')}
+              </p>
+            )}
+            {projectRows(archivedRows, true)}
+          </div>
         )}
         {projectsState === 'loading' && (
           <div
@@ -553,39 +573,43 @@ export function BoardSidebar({
             </Button>
           </div>
         )}
-        {projectRows(layout.ungrouped)}
-        {layout.groups.map((group, index) => {
-          const expanded = !groupsCollapsed.has(group.name);
-          const previous = layout.groups[index - 1];
-          const spaced =
-            previous === undefined
-              ? ungroupedSpaced
-              : !groupsCollapsed.has(previous.name) && previous.projects.length > 0;
-          const groupWaiting = group.projects.some((row) => waiting.has(row.id));
-          return (
-            <div key={group.name} className="flex flex-col gap-0.5">
-              <SidebarProjectGroupHeader
-                name={group.name}
-                expanded={expanded}
-                count={group.projects.length}
-                waiting={groupWaiting ? waitingLabel : null}
-                spaced={spaced}
-                onToggle={() => toggleGroup(group.name)}
-                menu={
-                  actions === undefined || filter === 'archived' ? undefined : (
-                    <SidebarGroupMenu
-                      name={group.name}
-                      onRename={(next) => actions.renameGroup(group.name, next)}
-                      onUngroup={() => actions.ungroup(group.name)}
-                    />
-                  )
-                }
-              />
-              {expanded && projectRows(group.projects)}
-            </div>
-          );
-        })}
-        {filter === 'archived' ? (
+        {!archivedPage && projectRows(layout.ungrouped)}
+        {!archivedPage &&
+          layout.groups.map((group, index) => {
+            const expanded = !groupsCollapsed.has(group.name);
+            const previous = layout.groups[index - 1];
+            const spaced =
+              previous === undefined
+                ? ungroupedSpaced
+                : !groupsCollapsed.has(previous.name) && previous.projects.length > 0;
+            const groupWaiting = group.projects.some((row) => waiting.has(row.id));
+            return (
+              <div key={group.name} className="flex flex-col gap-0.5">
+                <SidebarProjectGroupHeader
+                  name={group.name}
+                  expanded={expanded}
+                  count={group.projects.length}
+                  waiting={groupWaiting ? waitingLabel : null}
+                  spaced={spaced}
+                  onToggle={() => toggleGroup(group.name)}
+                  menu={
+                    actions === undefined ? undefined : (
+                      <SidebarGroupMenu
+                        name={group.name}
+                        onRename={(next) => actions.renameGroup(group.name, next)}
+                        onUngroup={() => actions.ungroup(group.name)}
+                      />
+                    )
+                  }
+                />
+                {expanded && projectRows(group.projects)}
+              </div>
+            );
+          })}
+      </nav>
+
+      <div data-testid="sidebar-pinned" className="flex flex-none flex-col gap-0.5 px-2 pb-2">
+        {archivedPage ? (
           <Button
             variant="ghost"
             data-slot="sidebar-filter-back"
@@ -596,12 +620,30 @@ export function BoardSidebar({
             {t('进行中')}
           </Button>
         ) : (
-          <Link data-slot="sidebar-new-project" className={SIDEBAR_FOOT_ROW} to={newProjectTarget}>
-            <Plus className={ICON} strokeWidth={STROKE} />
-            {t('新建项目')}
-          </Link>
+          <>
+            <Link
+              data-slot="sidebar-new-project"
+              className={SIDEBAR_FOOT_ROW}
+              to={newProjectTarget}
+            >
+              <Plus className={ICON} strokeWidth={STROKE} />
+              {t('新建项目')}
+            </Link>
+            <Button
+              variant="ghost"
+              data-slot="sidebar-archived-entry"
+              className={cn(
+                SIDEBAR_FOOT_ROW,
+                'border-none font-normal dark:hover:bg-sidebar-hover',
+              )}
+              onClick={() => chooseFilter('archived')}
+            >
+              <Archive className={ICON} strokeWidth={STROKE} />
+              {archivedLabel}
+            </Button>
+          </>
         )}
-      </nav>
+      </div>
 
       <div
         data-testid="sidebar-footer"

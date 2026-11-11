@@ -23,7 +23,7 @@ export function ArchivedProjectBar({
     <div
       data-testid="archived-project-bar"
       className={cn(
-        'flex min-h-11.5 flex-none flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-tile) border border-border bg-card py-2 pr-2 pl-4',
+        'flex min-h-11.5 flex-none flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-composer) border-0 bg-background py-2 pr-2 pl-4 shadow-(--shadow-composer)',
         className,
       )}
     >
@@ -37,7 +37,7 @@ export function ArchivedProjectBar({
         data-testid="archived-project-bar-unarchive"
         onClick={state.onUnarchive}
         disabled={state.pending}
-        className="h-7.5 px-3 text-ui font-normal"
+        className="h-7.5 border-border px-3 text-ui font-medium text-foreground"
       >
         {state.pending && <Spinner data-icon="inline-start" />}
         {t('取消归档')}

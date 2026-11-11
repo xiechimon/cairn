@@ -1330,6 +1330,7 @@ export const EN: Record<string, string> = {
     'This project is archived. Unarchive it to send messages.',
   '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
+  已归档的项目: 'Archived projects',
   '在侧栏项目菜单里归档的项目会出现在这里。':
     'Projects you archive from the sidebar project menu appear here.',
   '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',

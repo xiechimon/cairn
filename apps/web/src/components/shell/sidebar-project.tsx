@@ -16,6 +16,7 @@ export interface SidebarProjectRowProps {
   waiting?: string | null;
   status?: string | null;
   archived?: string | null;
+  flat?: boolean;
   onClick?: () => void;
   menu?: ReactNode;
 }
@@ -115,6 +116,7 @@ export function SidebarProjectRow({
   waiting = null,
   status = null,
   archived = null,
+  flat = false,
   onClick,
   menu,
 }: SidebarProjectRowProps) {
@@ -169,8 +171,8 @@ export function SidebarProjectRow({
     </Button>
   );
   return (
-    <div className="group/row relative ml-5.5 flex flex-none">
-      <TreeGuide place={place} />
+    <div className={cn('group/row relative flex flex-none', !flat && 'ml-5.5')}>
+      {!flat && <TreeGuide place={place} />}
       {(status ?? archived) === null ? (
         button
       ) : (
