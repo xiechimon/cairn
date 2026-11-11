@@ -1,6 +1,6 @@
-const MAX_BYTES = 10 * 1024 * 1024;
-const ALLOWED_PREFIXES = ['text/', 'image/'];
-const ALLOWED_EXACT = new Set(['application/json', 'application/pdf', 'application/xml']);
+import { ATTACHMENT_MAX_BYTES, resolveAttachmentMime } from '@cairn/shared';
+
+const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
 export type AttachmentRejectReason = 'invalid-name' | 'size' | 'mime' | 'grant' | 'upload';
 
@@ -12,11 +12,6 @@ export class AttachmentError extends Error {
     this.name = 'AttachmentError';
     this.reason = reason;
   }
-}
-
-function isAllowedMime(mime: string): boolean {
-  if (ALLOWED_EXACT.has(mime)) return true;
-  return ALLOWED_PREFIXES.some((p) => mime.startsWith(p));
 }
 
 export function isValidFileName(fileName: string): boolean {
@@ -55,11 +50,11 @@ export async function attachFile(input: AttachFileInput): Promise<AttachResult> 
   if (!isValidFileName(file.name)) {
     throw new AttachmentError('invalid-name', `invalid fileName: ${file.name}`);
   }
-  if (file.size <= 0 || file.size > MAX_BYTES) {
+  if (file.size < 0 || file.size > MAX_BYTES) {
     throw new AttachmentError('size', `size out of range: ${file.size} (max ${MAX_BYTES})`);
   }
-  if (!isAllowedMime(file.type || '')) {
-    throw new AttachmentError('mime', `mime not allowed: ${file.type || '(empty)'}`);
+  if (resolveAttachmentMime(file.name, file.type) === null) {
+    throw new AttachmentError('mime', `file type not allowed: ${file.name}`);
   }
   const grantRes = await fetch('/api/uploads/grant', {
     method: 'POST',

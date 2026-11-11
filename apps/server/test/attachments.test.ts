@@ -109,10 +109,6 @@ describe('attachments -- grant side', () => {
     { body: {}, label: 'empty body' },
     { body: { kind: 'attachment' }, label: 'missing fileName/mimeType/size' },
     {
-      body: { kind: 'attachment', fileName: 'x.md', mimeType: 'text/markdown', size: 0 },
-      label: 'size=0',
-    },
-    {
       body: { kind: 'attachment', fileName: 'x.md', mimeType: 'text/markdown', size: -1 },
       label: 'negative size',
     },

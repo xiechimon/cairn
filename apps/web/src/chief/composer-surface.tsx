@@ -1,3 +1,4 @@
+import { ATTACHMENT_ACCEPT } from '@cairn/shared';
 import { cn } from 'cn';
 import { CornerDownLeft } from 'lucide-react';
 import { type ReactNode, type Ref, useCallback, useImperativeHandle } from 'react';
@@ -323,7 +324,7 @@ export function ComposerSurface({
           multiple
           style={{ display: 'none' }}
           onChange={onPickFiles}
-          accept="text/*,image/*,application/json,application/pdf,application/xml"
+          accept={ATTACHMENT_ACCEPT}
         />
       </div>
       <div className="mt-1 flex items-center gap-0.5 px-1">

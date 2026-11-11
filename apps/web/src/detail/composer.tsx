@@ -1,3 +1,4 @@
+import { ATTACHMENT_ACCEPT } from '@cairn/shared';
 import { CornerDownLeft } from 'lucide-react';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -328,7 +329,7 @@ export function Composer({
         multiple
         style={{ display: 'none' }}
         onChange={onPickFiles}
-        accept="text/*,image/*,application/json,application/pdf,application/xml"
+        accept={ATTACHMENT_ACCEPT}
       />
       <SlashHelp
         open={helpOpen}

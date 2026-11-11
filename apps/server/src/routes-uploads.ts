@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isInlineAttachment, servedAttachmentMime } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
@@ -12,20 +13,12 @@ import {
 } from './services/attachments.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 
-const INLINE_ATTACHMENT_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-]);
-
 export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
   const grantBodySchema = z.object({
     kind: z.literal('attachment'),
     fileName: z.string(),
     mimeType: z.string(),
-    size: z.number().int().positive(),
+    size: z.number().int().nonnegative(),
     scope: z.enum(['spec', 'message']).optional(),
   });
 
@@ -95,12 +88,12 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
     return new Response(bytes, {
       status: 200,
       headers: {
-        'content-type': row.mimeType,
+        'content-type': servedAttachmentMime(row.storageKey),
         'content-length': String(row.sizeBytes),
         'cache-control': 'private, max-age=300',
         'x-content-type-options': 'nosniff',
         'content-security-policy': "sandbox; default-src 'none'",
-        'content-disposition': INLINE_ATTACHMENT_MIME_TYPES.has(row.mimeType)
+        'content-disposition': isInlineAttachment(row.storageKey, row.mimeType)
           ? 'inline'
           : 'attachment',
       },

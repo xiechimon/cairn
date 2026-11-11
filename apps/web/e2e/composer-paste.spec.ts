@@ -321,12 +321,12 @@ test('detail face: a non-whitelisted paste is rejected with a toast, grant never
   const input = await bootDetail(page);
 
   await input.fill('kept');
-  await pasteFiles(page, COMPOSER, [{ name: 'evil.zip', type: 'application/zip' }]);
+  await pasteFiles(page, COMPOSER, [{ name: 'evil.exe', type: 'application/x-msdownload' }]);
 
   const toast = page.locator('[data-sonner-toast]');
   await expect(toast).toBeVisible();
   await expect(toast).toContainText('不支持该文件类型');
-  await expect(toast).toContainText('evil.zip');
+  await expect(toast).toContainText('evil.exe');
   expect(uploads.grants).toEqual([]);
   // FM12: the draft survives the rejection untouched.
   await expect(input).toHaveValue('kept');
@@ -367,6 +367,25 @@ test('detail face: a non-image whitelist file (text/plain) is accepted under its
     mimeType: 'text/plain',
     scope: 'message',
   });
+});
+
+test('detail face: a 0-byte .txt and an .xlsx are accepted as tiles', async ({ page }) => {
+  const uploads = await stubUploads(page);
+  const input = await bootDetail(page);
+  const xlsxType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+  await pasteFiles(page, COMPOSER, [
+    { name: 'empty.txt', type: 'text/plain', size: 0 },
+    { name: 'sheet.xlsx', type: xlsxType, size: 12 },
+  ]);
+
+  await expect(input).toHaveValue('');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(2);
+  await expect(page.getByTestId('composer-attachments').getByRole('img', { name: 'empty.txt' })).toBeVisible();
+  await expect(page.getByTestId('composer-attachments').getByRole('img', { name: 'sheet.xlsx' })).toBeVisible();
+  await expect.poll(() => uploads.grants.length).toBe(2);
+  expect(uploads.grants[0]).toMatchObject({ fileName: 'empty.txt', size: 0 });
+  expect(uploads.grants[1]).toMatchObject({ fileName: 'sheet.xlsx', mimeType: xlsxType });
 });
 
 test('detail face: a mixed file+text clipboard takes the files and drops the text', async ({
