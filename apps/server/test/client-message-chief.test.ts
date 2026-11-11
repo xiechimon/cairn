@@ -65,11 +65,15 @@ describe.each(entryPoints)('%s with a client message id', (_name, urlOf) => {
     expect(chiefSteps()).toHaveLength(2);
   });
 
-  test('no key keeps today behaviour: two sends are two messages and two steps', async () => {
-    await post(urlOf(), { content: 'hello' });
-    await post(urlOf(), { content: 'hello' });
-    expect(userMessages()).toHaveLength(2);
-    expect(chiefSteps()).toHaveLength(2);
+  test('a missing clientMessageId is rejected and writes nothing', async () => {
+    const res = await H.s.app.request(urlOf(), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cairn-raw-send': '1' },
+      body: JSON.stringify({ content: 'hello' }),
+    });
+    expect(res.status).toBe(400);
+    expect(userMessages()).toEqual([]);
+    expect(chiefSteps()).toEqual([]);
   });
 
   test('a key reused with different content returns the ORIGINAL response and stores nothing new', async () => {

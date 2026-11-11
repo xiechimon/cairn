@@ -1509,6 +1509,12 @@ export async function applyBuildStepAction(
   actor?: string,
   origin: 'person' | 'automatic' = 'person',
 ): Promise<void> {
+  if (
+    (body.action === 'revision' || body.action === 'restart') &&
+    findClientMessage(deps.db, buildId, body.clientMessageId) !== undefined
+  ) {
+    return;
+  }
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
   assertSplitProposalExecutable(row.errorMessage);
@@ -1560,6 +1566,7 @@ export async function applyBuildStepAction(
           409,
           'Task changed while restart was being prepared; retry from its current state.',
         );
+      claimClientMessage(deps.db, buildId, body.clientMessageId, { delegated: true });
       todoRecord = current;
       if (origin === 'automatic') assertAutomaticRetryAllowed(deps, current.id);
       if (reworkTarget !== null && prClosed === null) {
@@ -1775,41 +1782,48 @@ export async function applyBuildStepAction(
   if (todoRecord.phase !== 'confirm' && todoRecord.phase !== 'review') {
     throw new HttpError(409, `revision 仅在待确认/审核关口允许，当前相位 ${todoRecord.phase}`);
   }
-  recordBuildFeedback(
-    deps.db,
-    buildId,
-    'revision',
-    todoRecord.phase === 'confirm' ? 'plan' : 'build',
-    body.feedback,
-    actorName,
-  );
-  insertMessageRow(deps, buildId, {
-    id: newRecordId(),
-    role: 'user',
-    content: body.feedback,
-    createdAt: nowMs(),
-  });
-  if (todoRecord.phase === 'review' && buildRunsSession(deps, buildId)) {
-    deps.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
-    setTodoPhase(deps, todoRecord.id, 'queued');
-    enqueueStep(
-      deps,
+  const revising = todoRecord;
+  const afterCommit: (() => void)[] = [];
+  const transcriptDeps = { ...deps, afterCommit };
+  deps.db.transaction(() => {
+    claimClientMessage(deps.db, buildId, body.clientMessageId, { delegated: true });
+    recordBuildFeedback(
+      deps.db,
       buildId,
-      'session',
-      todoRecord.teamId,
-      `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
-      false,
-      origin === 'person',
-      { kind: 'rework' },
+      'revision',
+      revising.phase === 'confirm' ? 'plan' : 'build',
+      body.feedback,
+      actorName,
     );
-    return;
-  }
-  setTodoPhase(deps, todoRecord.id, 'planning');
-  const replanPrompt =
-    todoRecord.phase === 'review'
-      ? buildReviewRejectPrompt(body.feedback)
-      : buildReplanPrompt(body.feedback);
-  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, origin === 'person');
+    insertMessageRow(transcriptDeps, buildId, {
+      id: newRecordId(),
+      role: 'user',
+      content: body.feedback,
+      createdAt: nowMs(),
+    });
+    if (revising.phase === 'review' && buildRunsSession(deps, buildId)) {
+      deps.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
+      setTodoPhase(deps, revising.id, 'queued');
+      enqueueStep(
+        deps,
+        buildId,
+        'session',
+        revising.teamId,
+        `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
+        false,
+        origin === 'person',
+        { kind: 'rework' },
+      );
+      return;
+    }
+    setTodoPhase(deps, revising.id, 'planning');
+    const replanPrompt =
+      revising.phase === 'review'
+        ? buildReviewRejectPrompt(body.feedback)
+        : buildReplanPrompt(body.feedback);
+    enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person');
+  });
+  for (const publish of afterCommit) publish();
 }
 
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
