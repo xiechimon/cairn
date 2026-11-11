@@ -116,3 +116,10 @@ Implementation must first fail tests for: a Gmail push that stores a message-id 
 2. Ingress. Recommended: an owner-set public API origin, fail closed when it is missing. Do not reuse `CAIRN_WEB_ORIGIN`. No embedded tunnel.
 3. Default rank when no rule matches. Recommended: `can_wait`, not `needs_you`.
 4. Whether a needs-you wake may call tools at all. Recommended: one mail-body read for this event, then stop. No other chief, relay, computer, shell, or secret tool.
+
+## Open for implementation
+
+These two notes are not settled here. Implementation must close them before the connector ships. This page does not specify the procedure.
+
+- Mail that arrives after `users.watch` returns and before the pre-baseline inventory finishes can be stored as `pre-baseline` and then skipped by catch-up. The inventory is not snapshot-bound.
+- A `UIDVALIDITY` change resets the cursor to zero and can rank every current UID as new, because `(uidvalidity, uid)` no longer matches the old epoch. A stable cross-epoch identity is not specified here.

@@ -128,3 +128,10 @@ Implementation must first fail tests for: a prefilled username, one-time code, o
 2. Daily cap. Recommended default 5 delivered submits per UTC day, owner-editable, agent-immutable.
 3. Per-host terms acceptance. Recommended: `refused` until the owner allows that host, with the terms risk stated on that screen. No global allow.
 4. Whether `job_submit` waits for the action-registry confirm-once, or ships the interim gate above. Recommended: interim gate now, same function called by the registry later, so there is still one mechanism.
+
+## Open for implementation
+
+These two notes are not settled here. Implementation must close them before submit ships. This page does not specify the procedure.
+
+- `ask_user` records a cancel or a negative reply as an answer. Matching the question id and hash is not an approval. An affirmative server-generated choice is not specified here.
+- An allowed page can post a form to another host. `job_submit` checks the page host, not the form action. That check is not specified here.
