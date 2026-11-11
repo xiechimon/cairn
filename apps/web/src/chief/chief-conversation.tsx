@@ -206,6 +206,7 @@ export function ChiefConversation({
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
   const followSentRef = useRef(false);
+  const [enteringKey, setEnteringKey] = useState<string | number | null>(null);
   const latestUserKeyRef = useRef<string | number | null>(null);
   const userKeyAtSendRef = useRef<string | number | null>(null);
   const prevThreadRef = useRef(chief.threadTitle);
@@ -392,6 +393,7 @@ export function ChiefConversation({
     }
     if (latestUserPosition <= sentRowPosition) return;
     followSentRef.current = false;
+    setEnteringKey(latestUserKey);
     scrollToEnd();
   }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd]);
   const queuedCapsules = allRows.flatMap(({ item }) =>
@@ -458,6 +460,7 @@ export function ChiefConversation({
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
+      entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
     />
   );

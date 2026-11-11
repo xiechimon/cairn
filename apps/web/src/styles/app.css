@@ -465,6 +465,20 @@
   }
 }
 
+@keyframes message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@utility message-enter {
+  animation: message-enter 160ms ease-out both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 @keyframes spiral-trace {
   from {
     stroke-dashoffset: 1;

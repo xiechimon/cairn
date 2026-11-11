@@ -317,3 +317,27 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     expect(await body.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
   });
 }
+
+for (const reduced of [false, true]) {
+  test(`a sent message rises in over 160ms, history rows do not (reduced motion: ${reduced})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+    await mockSlowSend(page, 6);
+    await page.goto('/app');
+    await expect(row(page, 'answer 5')).toBeVisible();
+    const animationOf = (text: string) =>
+      messageOf(page, text).evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { name: style.animationName, duration: style.animationDuration };
+      });
+    expect((await animationOf('question 4')).name).toBe('none');
+    const input = home(page).getByTestId('chief-composer-input');
+    await input.fill('rise in');
+    await input.press('Enter');
+    await expect(row(page, 'rise in')).toBeVisible();
+    const shown = await animationOf('rise in');
+    if (reduced) expect(shown.name).toBe('none');
+    else expect(shown).toEqual({ name: 'message-enter', duration: '0.16s' });
+  });
+}

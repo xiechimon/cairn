@@ -307,6 +307,7 @@ interface ChiefStreamRowProps {
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
   onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
+  entering?: boolean;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -406,6 +407,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onToggleTools,
   onRewindRequest,
   onReply,
+  entering = false,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
@@ -468,7 +470,10 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const shown = reply?.body ?? item.markdown;
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`${USER_ROW_CLS} justify-end`} data-testid="chief-msg">
+        <Message
+          className={`${USER_ROW_CLS} justify-end ${entering ? 'message-enter' : ''}`}
+          data-testid="chief-msg"
+        >
           <MessageContent
             className="relative max-w-[min(85%,42rem)] flex-none items-end gap-0"
             data-testid="chief-msg-col"
