@@ -12,6 +12,7 @@ import {
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
+  isChiefConversationId,
   isWaitingPhase,
   MEMORY_LAYERS,
   MERGE_HUMAN_ONLY_COPY,
@@ -276,6 +277,18 @@ function requireTeamBuild(db: Db, buildId: string, teamId: string) {
     .get();
   if (!owned) throw new HttpError(404, `build ${buildId}`);
   return row;
+}
+function requireTeamConversation(db: Db, conversationId: string, teamId: string): void {
+  if (!isChiefConversationId(conversationId)) {
+    requireTeamBuild(db, conversationId, teamId);
+    return;
+  }
+  const thread = db
+    .select({ id: chiefThread.id })
+    .from(chiefThread)
+    .where(and(eq(chiefThread.id, conversationId), eq(chiefThread.teamId, teamId)))
+    .get();
+  if (!thread) throw new HttpError(404, `conversation ${conversationId}`);
 }
 export async function executeChiefTool(
   deps: ChiefToolDeps,
@@ -545,6 +558,7 @@ export async function executeChiefTool(
     }
     case 'conversation': {
       const conversationId = str(params, 'conversationId');
+      requireTeamConversation(db, conversationId, ctx.teamId);
       return json(readConversationPage(db, conversationId, optStr(params, 'before')));
     }
     case 'search_history':
