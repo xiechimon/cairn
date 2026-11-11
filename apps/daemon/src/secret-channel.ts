@@ -1,4 +1,5 @@
 import type { LocalToolDef } from '@cairn/shared';
+import { isMailSecretName } from '@cairn/shared';
 import type { StepCredentials } from './credentials.js';
 
 export const GET_SECRET_TOOL_NAME = 'get_secret';
@@ -42,11 +43,12 @@ export function buildSecretTool(opts: SecretChannelOpts): LocalToolDef {
     execute: async (params: Record<string, unknown>): Promise<string> => {
       const name = typeof params.name === 'string' ? params.name : '';
       if (name === '') return 'get_secret needs a non-empty "name".';
-      const value = opts.creds.secrets.take(name);
+      const granted = opts.creds.secrets.names.filter((entry) => !isMailSecretName(entry));
+      const value = isMailSecretName(name) ? null : opts.creds.secrets.take(name);
       if (value === null) {
-        return opts.creds.secrets.names.length === 0
+        return granted.length === 0
           ? `no team secret is available for this step (asked for "${name}"); this step's credential lifetime may have ended.`
-          : `secret "${name}" is not granted to this agent for this step; granted: ${opts.creds.secrets.names.join(', ')}.`;
+          : `secret "${name}" is not granted to this agent for this step; granted: ${granted.join(', ')}.`;
       }
       opts.onAudit(
         secretAuditLine({
