@@ -2,6 +2,7 @@ import { createElement as h, type ReactNode, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { conversationBoundaryKey } from '../src/board/home-c.js';
 import { SubtreeErrorBoundary } from '../src/components/subtree-error-boundary.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
@@ -255,5 +256,22 @@ describe('SubtreeErrorBoundary', () => {
     const after = mounts;
     flushSync(() => root.render(view('project-b')));
     expect(mounts).toBe(after);
+  });
+
+  it('changes the conversation key when a Coordinator deep link switches threads', () => {
+    const stuck = conversationBoundaryKey({
+      projectId: null,
+      chat: null,
+      threadId: null,
+      chiefThreadId: 'old-thread',
+    });
+    const next = conversationBoundaryKey({
+      projectId: null,
+      chat: null,
+      threadId: null,
+      chiefThreadId: 'linked-thread',
+    });
+    expect(stuck).toBe('coordinator:::old-thread');
+    expect(next).not.toBe(stuck);
   });
 });

@@ -111,6 +111,20 @@ function projectHomeSearch(params: URLSearchParams): string {
   return `?${next.toString()}`;
 }
 
+export function conversationBoundaryKey(input: {
+  projectId: string | null;
+  chat: string | null;
+  threadId: string | null;
+  chiefThreadId: string | null;
+}): string {
+  return [
+    input.projectId ?? 'coordinator',
+    input.chat ?? '',
+    input.threadId ?? '',
+    input.chiefThreadId ?? '',
+  ].join(':');
+}
+
 function ConversationBoundary({ children, resetKey }: { children: ReactNode; resetKey: string }) {
   return (
     <SubtreeErrorBoundary resetKey={resetKey}>
@@ -150,7 +164,6 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
-  const conversationResetKey = `${projectId ?? 'coordinator'}:${searchParams.get('chat') ?? ''}:${threadId ?? ''}`;
   const narrow = useNarrow();
   const showPane = (next: WorkPane | null, state: unknown = location.state) => {
     const params = new URLSearchParams(searchParams);
@@ -167,6 +180,12 @@ export function HomeC({
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState('');
   const { chiefData } = surface;
+  const conversationResetKey = conversationBoundaryKey({
+    projectId,
+    chat: searchParams.get('chat'),
+    threadId,
+    chiefThreadId: chiefData.threadId ?? null,
+  });
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const loaded = surface.load === 'ready';
   useEffect(() => {
