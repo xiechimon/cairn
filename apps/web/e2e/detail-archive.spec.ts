@@ -159,6 +159,14 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
     };
     if (request.method() === 'GET' && Object.hasOwn(responses, path))
       return route.fulfill({ json: responses[path] });
+    if (
+      request.method() === 'POST' &&
+      (path === '/api/auth/bootstrap' || path === '/api/auth/stream-ticket')
+    ) {
+      return route.fulfill({
+        json: path.endsWith('bootstrap') ? { ok: true } : { ticket: 'archive-ticket', expiresAt: 1 },
+      });
+    }
     unexpected.push(`${request.method()} ${path}`);
     return route.fulfill({ status: 404, json: { error: 'Unexpected archive test request' } });
   });

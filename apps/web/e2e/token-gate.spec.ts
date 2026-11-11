@@ -88,8 +88,10 @@ test('auth off: zero gate page, zero token attached, behavior unchanged', async 
 test('a forged Tailscale-User-Login header is not required on loopback', async ({ page }) => {
   test.skip(process.platform !== 'linux', 'loopback bootstrap reads /proc/net/tcp');
   await page.setExtraHTTPHeaders({ 'Tailscale-User-Login': FORGED_TAILSCALE_LOGIN });
-  const firstLoad = page.waitForResponse((res) => res.url().endsWith('/api/teams'));
+  const loaded = page.waitForResponse(
+    (res) => res.url().endsWith('/api/teams') && res.status() === 200,
+  );
   await page.goto(`${authed.base}/app`);
-  expect((await firstLoad).status()).toBe(200);
+  await loaded;
   await expect(page.locator('.token-gate')).toHaveCount(0);
 });
