@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, Copy, Download, FileText, ImageOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
-import { readStoredToken } from '../api/auth.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -22,11 +21,7 @@ const COPIED_MS = 1500;
 const HEAD_BTN_CLS = 'text-content-secondary hover:text-foreground';
 
 async function fetchAttachmentText(url: string): Promise<string> {
-  const token = readStoredToken();
-  const res = await fetch(
-    url,
-    token === null ? {} : { headers: { authorization: `Bearer ${token}` } },
-  );
+  const res = await fetch(url, { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`attachment read failed: ${res.status}`);
   return res.text();
 }

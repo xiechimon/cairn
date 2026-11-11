@@ -42,3 +42,28 @@ test('a failed turn says so in a plain sentence, keeps the raw text in a tooltip
   await page.getByTestId('chief-turn-retry').click();
   await expect.poll(() => sent).toEqual(['Check the repo']);
 });
+
+test('only the latest failed turn offers retry once the owner has sent another message', async ({
+  page,
+}) => {
+  const failure = (id: string, createdAt: number) => ({
+    id,
+    role: 'system',
+    content: JSON.stringify({ kind: 'chief_turn_error', message: 'provider timeout' }),
+    createdAt,
+  });
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'm1', role: 'user', content: 'Check the repo', createdAt: 10 },
+      failure('m2', 11),
+      { id: 'm3', role: 'user', content: 'Open the pull request', createdAt: 12 },
+      failure('m4', 13),
+    ],
+  });
+  await page.goto('/app');
+  await expect(page.getByTestId('chief-turn-error')).toHaveCount(2);
+  const alerts = page.getByRole('alert').filter({ has: page.getByTestId('chief-turn-error') });
+  await expect(alerts.first().getByTestId('chief-turn-retry')).toHaveCount(0);
+  await expect(alerts.last().getByTestId('chief-turn-retry')).toBeVisible();
+});

@@ -480,7 +480,7 @@ export function ChiefConversation({
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
-      onRetry={retryLastUser}
+      onRetry={latestUser != null && i > latestUser.i ? retryLastUser : undefined}
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
     />
   );

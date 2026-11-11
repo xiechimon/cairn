@@ -339,11 +339,7 @@ export function readAttachmentMeta(
 } {
   const row = requireAttachmentRow(deps.db, teamId, attachmentId);
   const bytes = readFileSync(join(deps.attachmentsDir, row.storageKey));
-  const isText =
-    attachmentKindOf(row.storageKey) === 'text' &&
-    (row.mimeType.startsWith('text/') ||
-      row.mimeType === 'application/json' ||
-      row.mimeType === 'application/xml');
+  const isText = attachmentKindOf(row.storageKey) === 'text';
   return {
     id: row.id,
     fileName: row.fileName,
