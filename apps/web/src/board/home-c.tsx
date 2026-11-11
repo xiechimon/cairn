@@ -277,6 +277,7 @@ export function HomeC({
     loadingEarlier: surface.earlier?.loading === true,
     failedEarlier: surface.earlier?.failed === true,
     dismissing: questionDockState.isDismissing,
+    shown: questionScope,
   };
   const openQuestion = (target: QuestionTarget) => {
     const step = questionOpenStep(target, questionView);

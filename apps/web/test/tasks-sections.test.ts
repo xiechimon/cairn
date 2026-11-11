@@ -252,6 +252,21 @@ describe('a question row opens the question in the Coordinator thread that asked
     });
   });
 
+  test('focus counts only the questions the project view shows', () => {
+    const stream = [pending('a1'), pending('b1'), pending('b2')];
+    const shown = new Set(['b1', 'b2']);
+    expect(
+      questionOpenStep({ requestId: 'b1', threadId: 'chief-a' }, view({ stream, shown })),
+    ).toEqual({ kind: 'focus', at: 0 });
+    expect(
+      questionOpenStep({ requestId: 'b2', threadId: 'chief-a' }, view({ stream, shown })),
+    ).toEqual({ kind: 'focus', at: 1 });
+    expect(questionOpenStep({ requestId: 'b1', threadId: 'chief-a' }, view({ stream }))).toEqual({
+      kind: 'focus',
+      at: 1,
+    });
+  });
+
   test('a question from another thread opens that thread first', () => {
     expect(questionOpenStep({ requestId: 'r9', threadId: 'chief-b' }, view())).toEqual({
       kind: 'open-thread',
