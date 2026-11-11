@@ -137,6 +137,7 @@ export async function runCoordinatorTurn(
   let stopPoll: ReturnType<typeof setInterval> | undefined;
   let steerPoll: ReturnType<typeof setInterval> | undefined;
   let rootKey: string | null = null;
+  let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
   try {
     const root = await activeConversation(harness, deps.conversationId, context);
     if (root === undefined) {
@@ -255,7 +256,7 @@ export async function runCoordinatorTurn(
       newest,
       deps.inputs?.storeId(),
     );
-    const watch = await root.watch(context);
+    watch = await root.watch(context);
     watch.start(async (call) => {
       if (call.kind !== 'value') return;
       reportLiveCompactionFailure({ threadId, stepId }, call.value.docs['pi.live']);
@@ -406,6 +407,7 @@ export async function runCoordinatorTurn(
     }
     return finished;
   } finally {
+    void watch?.stop();
     clearInterval(stopPoll);
     clearInterval(steerPoll);
     deps.gate?.set(null);

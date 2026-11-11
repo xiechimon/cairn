@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { UserEntry } from '@earendil-works/pi-durable';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
-import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
+import { chiefStep, type FakeMachineApi, fakeMachineApi } from './fake-machine-api.js';
 
 const ctx = BACKGROUND_CONTEXT;
 const dirs: string[] = [];
@@ -39,6 +39,63 @@ function setup(tokensPerSecond = 1e9) {
     }),
   );
   return { coordinatorModels: createCoordinatorModels([faux.provider]), faux, seen };
+}
+
+type TestHarness = Awaited<ReturnType<typeof openCoordinatorHarness>>;
+type TestRoot = Awaited<ReturnType<TestHarness['root']>>;
+
+function bound<T extends object>(target: T, prop: string | symbol): unknown {
+  const value = Reflect.get(target, prop, target);
+  return typeof value === 'function' ? value.bind(target) : value;
+}
+
+function instrumentWatch(
+  harness: TestHarness,
+  hooks: {
+    afterWatch?: () => Promise<void>;
+    submit?: () => Promise<never>;
+  },
+) {
+  const stops: ReturnType<typeof vi.fn>[] = [];
+  const instrumentedRoot = (root: TestRoot): TestRoot =>
+    new Proxy(root, {
+      get(target, prop) {
+        if (prop === 'watch') {
+          return async (...args: Parameters<TestRoot['watch']>) => {
+            const handle = await target.watch(...args);
+            stops.push(vi.spyOn(handle, 'stop'));
+            await hooks.afterWatch?.();
+            return handle;
+          };
+        }
+        if (prop === 'submit' && hooks.submit !== undefined) return hooks.submit;
+        return bound(target, prop);
+      },
+    });
+  const instrumented = new Proxy(harness, {
+    get(target, prop) {
+      if (prop === 'root') {
+        return async (...args: Parameters<TestHarness['root']>) =>
+          instrumentedRoot(await target.root(...args));
+      }
+      return bound(target, prop);
+    },
+  });
+  return { harness: instrumented, stops };
+}
+
+async function expectNoMirrorWriteAfterTurn(
+  harness: TestHarness,
+  api: FakeMachineApi,
+): Promise<void> {
+  const rows = api.rows.length;
+  const deltas = api.deltas.length;
+  const root = await harness.root(ctx);
+  const later = await root.submit({ type: 'input', content: 'later', requestId: 'later' }, ctx);
+  await later.wait(ctx);
+  await new Promise((r) => setTimeout(r, 50));
+  expect(api.rows).toHaveLength(rows);
+  expect(api.deltas).toHaveLength(deltas);
 }
 
 describe('runCoordinatorTurn', () => {
@@ -183,5 +240,55 @@ describe('runCoordinatorTurn', () => {
     ]);
     expect(api.keys).toHaveLength(0);
     await harness.close(ctx);
+  });
+
+  it('stops the conversation watch when a stop request lands before the turn submits', async () => {
+    const { coordinatorModels } = setup();
+    const raw = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
+    const api = fakeMachineApi();
+    const { harness, stops } = instrumentWatch(raw, {
+      afterWatch: async () => {
+        api.stopRequested.add('step-early');
+        await new Promise((r) => setTimeout(r, 60));
+      },
+    });
+    const result = await runCoordinatorTurn(
+      {
+        harness,
+        models: coordinatorModels,
+        api,
+        context: ctx,
+        heartbeatMs: 1000,
+        stopPollMs: 5,
+        now: () => 1,
+      },
+      chiefStep('step-early', 'never submitted'),
+    );
+    expect(result.status).toBe('stopped');
+    expect(stops).toHaveLength(1);
+    expect(stops[0]).toHaveBeenCalled();
+    await expectNoMirrorWriteAfterTurn(raw, api);
+    await raw.close(ctx);
+  });
+
+  it('stops the conversation watch when the turn throws after the watch started', async () => {
+    const { coordinatorModels } = setup();
+    const raw = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
+    const api = fakeMachineApi();
+    const { harness, stops } = instrumentWatch(raw, {
+      submit: async () => {
+        throw new Error('submit failed');
+      },
+    });
+    await expect(
+      runCoordinatorTurn(
+        { harness, models: coordinatorModels, api, context: ctx, heartbeatMs: 1000, now: () => 1 },
+        chiefStep('step-throw', 'boom'),
+      ),
+    ).rejects.toThrow('submit failed');
+    expect(stops).toHaveLength(1);
+    expect(stops[0]).toHaveBeenCalled();
+    await expectNoMirrorWriteAfterTurn(raw, api);
+    await raw.close(ctx);
   });
 });
