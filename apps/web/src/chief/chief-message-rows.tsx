@@ -1,4 +1,5 @@
 import { parseReplyQuote } from '@cairn/shared';
+import { cn } from 'cn';
 import { Ellipsis, Reply } from 'lucide-react';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp } from '../board/rel-time.js';
@@ -21,7 +22,12 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { ChatMarkdown, MD_LIST, MD_LIST_ITEM } from '../detail/chat-markdown.js';
-import { type TodoGlance, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
+import {
+  type TodoGlance,
+  TodoGlanceContext,
+  TodoStatus,
+  taskChipClass,
+} from '../detail/segments.js';
 import type {
   ChiefContent,
   ChiefSegment,
@@ -32,9 +38,9 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
-import { isInFlightPhase, PHASE_UI } from '../phase.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
+import { TaskRefRow } from './chief-task-ref-row.js';
 import { taskRefsOf } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
@@ -139,7 +145,7 @@ function TodoSegmentChip({ seq }: { seq: number }) {
       todoId={known[0]}
       data-testid="chief-chip-todo"
       data-phase={known[1].phase}
-      className={`${cls} cursor-pointer`}
+      className={cn(cls, taskChipClass(known[1].phase))}
     >
       {chip}
     </ThreadLink>
@@ -147,30 +153,13 @@ function TodoSegmentChip({ seq }: { seq: number }) {
 }
 
 function TaskRefRows({ source }: { source: Parameters<typeof taskRefsOf>[0] }) {
-  const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   const refs = taskRefsOf(source, glances ?? NO_GLANCES);
   if (refs.length === 0) return null;
   return (
     <div className="mb-1.5 flex flex-col gap-0.5" data-testid="chief-task-refs">
       {refs.map((ref) => (
-        <ThreadLink
-          key={ref.todoId}
-          todoId={ref.todoId}
-          data-phase={ref.phase}
-          data-testid="chief-task-ref"
-          className="ml-1 flex w-fit max-w-full cursor-pointer items-center gap-1.5 text-meta font-medium text-(--foreground) no-underline hover:underline"
-        >
-          <span
-            aria-hidden="true"
-            className="size-2.5 flex-none translate-y-1 rounded-tl-md border-t border-l border-(--text-tertiary)"
-          />
-          <TodoStatus phase={ref.phase} />
-          <span className="min-w-0 truncate">{ref.title ?? `#${ref.seq ?? ''}`}</span>
-          <span className="flex-none font-normal text-(--text-tertiary)">
-            {`· ${t(isInFlightPhase(ref.phase) ? '进行中' : PHASE_UI[ref.phase].chip)}`}
-          </span>
-        </ThreadLink>
+        <TaskRefRow key={ref.todoId} taskRef={ref} />
       ))}
     </div>
   );

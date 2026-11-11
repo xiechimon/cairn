@@ -1,12 +1,13 @@
 import { PHASE_VALUES } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
+import { TaskRefRow } from '../chief/chief-task-ref-row.js';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import { Button } from '../components/ui/button.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
-import { Segments, TodoStatus } from '../detail/segments.js';
+import { Segments, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -251,6 +252,9 @@ function DialogsSpecimen() {
   );
 }
 
+const TASK_REF_TITLE = 'Read the cairn repo';
+const TASK_REF_PHASES = ['building', 'review', 'done', 'failed', 'todo'] as const;
+
 export function ProductDetailSection() {
   const { t } = useI18n();
   const [queued, setQueued] = useState([
@@ -416,6 +420,46 @@ export function ProductDetailSection() {
             />
           </p>
         </Cell>
+      </Specimen>
+      <Specimen
+        id="task-references"
+        title="Task references"
+        note="Reference row above a Coordinator reply and the inline chip, per task state: a tinted tile or pill, the status word only while working"
+        className="flex-col items-start"
+      >
+        {TASK_REF_PHASES.map((phase) => (
+          <Cell key={phase} label={phase}>
+            <TodoGlanceContext.Provider
+              value={new Map([[`gallery-ref-${phase}`, { phase, seq: 12, title: TASK_REF_TITLE }]])}
+            >
+              <div className="flex w-110 flex-col gap-1">
+                <TaskRefRow
+                  taskRef={{
+                    todoId: `gallery-ref-${phase}`,
+                    seq: 12,
+                    title: TASK_REF_TITLE,
+                    phase,
+                  }}
+                />
+                <p className="m-0 text-ui leading-[22px]">
+                  <Segments
+                    codeClassName="chat-code"
+                    segments={[
+                      { text: 'Added the repository, and the test task ' },
+                      {
+                        text: TASK_REF_TITLE,
+                        style: 'mention',
+                        mentionKind: 'todo',
+                        mentionId: `gallery-ref-${phase}`,
+                      },
+                      { text: ' is set up and reading it now.' },
+                    ]}
+                  />
+                </p>
+              </div>
+            </TodoGlanceContext.Provider>
+          </Cell>
+        ))}
       </Specimen>
       <Specimen
         id="plan-and-changes"

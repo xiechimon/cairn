@@ -6,7 +6,7 @@ import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
-import { ACCENT_INK, PHASE_STATUS, PHASE_UI } from '../phase.js';
+import { PHASE_UI } from '../phase.js';
 import { AttachmentChip, AttachmentPreviewHandler } from './attachment-chip.js';
 
 const CODE_SKIN: Record<string, string> = {
@@ -37,22 +37,74 @@ export interface TodoGlance {
 
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);
 
-const QUIET_INK = 'text-content-tertiary';
+type StatusTone = 'working' | 'wait' | 'quiet' | 'fail';
 
-const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; ink: string }> = {
-  ...PHASE_STATUS,
-  planning: { glyph: 'progress', ink: 'text-content-secondary' },
-  building: { glyph: 'progress', ink: 'text-content-secondary' },
-  confirm: { glyph: 'attention', ink: ACCENT_INK },
-  needs_input: { glyph: 'attention', ink: ACCENT_INK },
-  review: { glyph: 'attention', ink: ACCENT_INK },
-  done: { glyph: 'done', ink: QUIET_INK },
+const TONE_CLASS: Record<StatusTone, { ink: string; tile: string; chip: string }> = {
+  working: {
+    ink: 'text-tint-working-ink',
+    tile: 'bg-tint-working',
+    chip: 'bg-tint-working-soft text-tint-working-ink',
+  },
+  wait: {
+    ink: 'text-tint-wait-ink',
+    tile: 'bg-tint-wait',
+    chip: 'bg-tint-wait-soft text-tint-wait-ink',
+  },
+  quiet: {
+    ink: 'text-tint-quiet-ink',
+    tile: 'bg-tint-quiet',
+    chip: 'bg-tint-quiet-soft text-tint-quiet-ink',
+  },
+  fail: {
+    ink: 'text-tint-fail-ink',
+    tile: 'bg-tint-fail',
+    chip: 'bg-tint-fail-soft text-tint-fail-ink',
+  },
 };
+
+const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; tone: StatusTone }> = {
+  todo: { glyph: 'todo', tone: 'quiet' },
+  queued: { glyph: 'queued', tone: 'quiet' },
+  planning: { glyph: 'progress', tone: 'working' },
+  building: { glyph: 'progress', tone: 'working' },
+  confirm: { glyph: 'attention', tone: 'wait' },
+  needs_input: { glyph: 'attention', tone: 'wait' },
+  review: { glyph: 'attention', tone: 'wait' },
+  failed: { glyph: 'failed', tone: 'fail' },
+  done: { glyph: 'done', tone: 'quiet' },
+  closed: { glyph: 'closed', tone: 'quiet' },
+};
+
+const TASK_CHIP_CLS =
+  'mx-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-0 align-top font-sans text-ui leading-[inherit] font-normal no-underline';
+
+export function taskChipClass(phase: Phase): string {
+  return cn(TASK_CHIP_CLS, TONE_CLASS[CONVERSATION_STATUS[phase].tone].chip);
+}
 
 export function TodoStatus({ phase }: { phase: Phase }) {
   const { t } = useI18n();
-  const { glyph, ink } = CONVERSATION_STATUS[phase];
-  return <StatusGlyph kind={glyph} label={t(PHASE_UI[phase].chip)} className={cn('size-3', ink)} />;
+  const { glyph, tone } = CONVERSATION_STATUS[phase];
+  return (
+    <StatusGlyph
+      kind={glyph}
+      label={t(PHASE_UI[phase].chip)}
+      className={cn('size-3', TONE_CLASS[tone].ink)}
+    />
+  );
+}
+
+export function TodoStatusTile({ phase }: { phase: Phase }) {
+  return (
+    <span
+      className={cn(
+        'grid size-5 flex-none place-items-center rounded-sm',
+        TONE_CLASS[CONVERSATION_STATUS[phase].tone].tile,
+      )}
+    >
+      <TodoStatus phase={phase} />
+    </span>
+  );
 }
 
 function MentionChip({ seg }: { seg: DocSegment }) {
@@ -63,7 +115,11 @@ function MentionChip({ seg }: { seg: DocSegment }) {
   const glance = todoId != null ? glances?.get(todoId) : undefined;
   const phase = glance?.phase;
   return href != null ? (
-    <Link className={`${className} cursor-pointer`} to={href} data-phase={phase}>
+    <Link
+      className={cn(className, phase != null ? taskChipClass(phase) : 'cursor-pointer')}
+      to={href}
+      data-phase={phase}
+    >
       {phase != null && <TodoStatus phase={phase} />}
       {seg.text}
     </Link>

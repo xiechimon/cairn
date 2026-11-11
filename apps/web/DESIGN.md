@@ -34,6 +34,18 @@ colors:
   pebble-idle: '#878787'      # idle or snoozed
   pebble-resolved: '#c7c7c7'  # merged or resolved
   danger-line: '#d98c7d'      # error ring and danger-zone outline
+  tint-working: '#d2e4ff'
+  tint-working-soft: '#e6eefb'
+  tint-working-ink: '#2f55a8'
+  tint-wait: '#f3e6c8'
+  tint-wait-soft: '#f8efdc'
+  tint-wait-ink: '#6e4900'
+  tint-quiet: '#ececec'
+  tint-quiet-soft: '#f2f2f2'
+  tint-quiet-ink: '#666666'
+  tint-fail: '#f5ddd6'
+  tint-fail-soft: '#f9e8e3'
+  tint-fail-ink: '#a33a2a'
 colors-dark:
   # Dark (:root default): page, sidebar one step lighter, raised surfaces lighter again
   canvas: '#1f1f1f'
@@ -66,6 +78,18 @@ colors-dark:
   pebble-idle: '#757575'
   pebble-resolved: '#474747'
   danger-line: '#8c4a3e'
+  tint-working: '#223a5e'
+  tint-working-soft: '#1d2d49'
+  tint-working-ink: '#9cbcf2'
+  tint-wait: '#3d3014'
+  tint-wait-soft: '#2e2510'
+  tint-wait-ink: '#f2cf86'
+  tint-quiet: '#2e2e2e'
+  tint-quiet-soft: '#262626'
+  tint-quiet-ink: '#a6a6a6'
+  tint-fail: '#4a2a24'
+  tint-fail-soft: '#3a2420'
+  tint-fail-ink: '#f09a88'
 typography:
   greeting:     { fontFamily: serif, fontSize: 32px, fontWeight: '360' }
   page-title:   { fontFamily: serif, fontSize: 24px, fontWeight: '500' }
@@ -136,7 +160,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 - **Contrast (measured, WCAG 2.x)**: light on the page, `ink` 17.4, `ink-2` 5.74, `ink-3` 5.33, `accent` 4.96, `running-text` 6.16, `destructive` 6.57; `ink-3` on `secondary` `#f2f2f2` 4.76. Dark on the page, `ink` 15.29, `ink-2` 6.4, `ink-3` 6.17, `accent` 9.43; on `popover` `ink-2` 4.81 and `ink-3` 4.63. White text on the light `accent` is 4.96; `on-primary` on `primary` is 17.4 light and 15.29 dark. `ink-4` is decorative only.
 - **Focus ring**: `--focus-ring` is the ochre accent (`#9a6500` light, 4.96 on the page; `#ebb550` dark, 9.43), where claude.ai uses its blue (spec section 3). Buttons, checkboxes, switches and badges draw it as a `--focus-width` (2.4px) outline at offset 0, hugging the control's radius; rows and segmented options draw it inset. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape. An invalid field (`aria-invalid`) shows one `destructive` 1px border at rest and, when focused, that border plus a 3px `--danger-halo` (destructive at 20%); it never stacks the focus ring on the red border.
 - **Brand marks**: the spiral disc (the Coordinator's face) uses `--fab-surface` `#2f5a2a` with the `--fab-mark` `#f4f6f1` spiral in both themes, a stone green that sets the Coordinator's face apart from the neutral brand plate.
-- **Palette roles** (anti-slop batch 1, 2026-11-06): ochre is the one accent and means "waiting on you" (`--waiting-ink` for text and icons, `--badge-attention` for dots); green is a 6px dot for running or online and nothing else; rust (`--destructive`, `--danger-soft`) is failure and destructive actions only. Status chips are one neutral fill (`bg-secondary`) with the status in the text and icon colour; there are no tinted chip fills, no slate and no per-project hues.
+- **Palette roles** (anti-slop batch 1, 2026-11-06): ochre is the one accent and means "waiting on you" (`--waiting-ink` for text and icons, `--badge-attention` for dots); green is a 6px dot for running or online and nothing else; rust (`--destructive`, `--danger-soft`) is failure and destructive actions only. Status chips are one neutral fill (`bg-secondary`) with the status in the text and icon colour; there are no slate and no per-project hues. The one exception is the task reference in the Coordinator conversation (owner decision 2026-11-11, matching the reference app): its glyph tile and inline chip take a status tint from the `tint-*` tokens (`tint-working` calm blue, `tint-wait` ochre, `tint-quiet` neutral, `tint-fail` rust; each has a tile fill, a softer chip fill `-soft` and an ink `-ink`, all text pairs 4.5 or more). Lists, the sidebar and the tasks panel keep one neutral fill.
 - **Accent discipline**: `accent` is used only for: needs-your-attention states and counts, action links on cards, icons of the active nav item, and count-badge backgrounds. It is never decorative and never a large-area background.
 - **Status is never color alone**: every status is a triple of "icon + color + text" (failed ⊗ failed / awaiting confirmation ☰ awaiting confirmation / awaiting review ⑂ awaiting review); color-blind users can tell them apart by icon and text.
 - **The primary button is `primary`**: the shadcn Button default tier, the ink itself: `#1a1a1a` with white text in light, `#efefef` with `#191919` text in dark (claude.ai). Ochre is never the primary-button background, so "do this" and "waiting on you" never look alike; the enabled send button and a switch that is on are the accent roles (V5).
@@ -220,6 +244,7 @@ See "Page patterns · Settings list" below.
 ### Conversation
 - User turns sit on the right in a flat warm sand bubble (`UserMessageBubble`, `data-slot="user-bubble"`): one `--bubble-fill` (`#f3ead6` light, `#33290f` dark), no border, no texture and no gradient, `--radius-bubble` (18px) corners with a `--cds-radius-sm` (4px) tail at the bottom right, `8px 14px` padding, at most `min(85%, 42rem)` wide (approved chat draft, owner fidelity pass 2026-11-11; it replaced the 2026-11-07 gradient bubble).
 - Conversation text (user bubble, Coordinator reply, composer) is `text-ui` at a 22px line (`CHAT_BODY_CLS`, 14/22), matching the approved draft; the Coordinator column is 640px (`max-w-160`). Status lines between turns (task created, handoff, notes) are `text-meta` in `--text-tertiary`.
+- A reply that mentions a task gets a reference row above it and the mention renders as an inline chip, both tinted by the task's state (`TodoStatusTile`, `taskChipClass` in `detail/segments.tsx`). The row is a 20px rounded-square tile (`--radius-sm`) holding a 12px `StatusGlyph`, then the title in `text-ui` semibold ink; the quiet `· In progress` word shows only while the task works, other states keep the state in the glyph's accessible name and the row tooltip. The chip is a pill on the 22px line (`leading-[inherit]`, `align-top`, no vertical padding, so a paragraph holding chips keeps its line height) with 6px side padding, 6px radius, a 12px glyph and the title in `text-ui` regular, in the state's ink. Tone per phase: planning and building = `tint-working` with the spinning ring; confirm, needs input and review = `tint-wait` (ochre still means it waits on you) with the half-filled ring and dot; done, to start, queued, closed = `tint-quiet`; failed = `tint-fail`. Reduced motion stops the ring. Outside the Coordinator conversation (thread transcript mentions) a mention has no task state and stays the neutral chip.
 - Agent and Coordinator replies carry no avatar column: plain full-width text. A reply from a bound agent (not the coordinator) keeps a small identity line above it. Hovering or focusing any message, the latest included, reveals a quiet row under it (reply, copy, more, time, in `--text-tertiary`); touch screens always show it.
 - Markers between turns ("Plan approved", handoffs, origin notes) are a centred hairline rule in `--text-tertiary`; an error marker stays a soft `danger-soft` box. A turn longer than a minute ends with a "Worked for N minutes" rule.
 - Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.

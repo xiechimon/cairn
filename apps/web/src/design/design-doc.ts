@@ -40,6 +40,18 @@ export const COLOR_VARS: Record<string, string> = {
   'pebble-idle': '--pebble-idle',
   'pebble-resolved': '--pebble-resolved',
   'danger-line': '--danger-line',
+  'tint-working': '--tint-working',
+  'tint-working-soft': '--tint-working-soft',
+  'tint-working-ink': '--tint-working-ink',
+  'tint-wait': '--tint-wait',
+  'tint-wait-soft': '--tint-wait-soft',
+  'tint-wait-ink': '--tint-wait-ink',
+  'tint-quiet': '--tint-quiet',
+  'tint-quiet-soft': '--tint-quiet-soft',
+  'tint-quiet-ink': '--tint-quiet-ink',
+  'tint-fail': '--tint-fail',
+  'tint-fail-soft': '--tint-fail-soft',
+  'tint-fail-ink': '--tint-fail-ink',
 };
 
 export const RADIUS_EXPRS: Record<string, string> = {
