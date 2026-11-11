@@ -284,6 +284,31 @@ describe('D71 thread override set at dispatch', () => {
     expect(profile?.machineId).toBe(w.machineId);
   });
 
+  test('a capabilities-only start keeps the task machine pin', async () => {
+    const w = await setupWorld();
+    const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
+      title: 'keep pin',
+      spec: 'probe',
+    });
+    const todoId = ((await todoRes.json()) as { id: string }).id;
+    w.s.db
+      .update(todoTable)
+      .set({ routeOverride: { machineId: w.machineId } })
+      .where(eq(todoTable.id, todoId))
+      .run();
+    const started = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId],
+      routeOverride: { requiredCapabilities: { mcpServers: ['figma'] } },
+    });
+    expect(started.status).toBe(201);
+    expect(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.routeOverride,
+    ).toEqual({
+      machineId: w.machineId,
+      requiredCapabilities: { mcpServers: ['figma'] },
+    });
+  });
+
   test('an override naming a machine outside the team is refused', async () => {
     const w = await setupWorld();
     const { res } = await start(w, { machineId: newRecordId() });

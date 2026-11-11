@@ -1126,6 +1126,10 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
   }));
 }
 
+export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): void {
+  namedMachineForStart(deps, { teamId }, undefined);
+}
+
 function namedMachineForStart(
   deps: BuildDeps,
   todoRecord: { teamId: string; routeOverride?: { machineId?: string } | null },
@@ -1203,9 +1207,16 @@ export function startBuilds(
     assertPhaseTransition(todoRecord.phase, 'queued');
     const named = namedMachineForStart(deps, todoRecord, input.routeOverride);
     const routeOverride =
-      named?.pin === true
-        ? { ...(input.routeOverride ?? todoRecord.routeOverride ?? {}), machineId: named.machineId }
-        : input.routeOverride;
+      input.routeOverride === undefined
+        ? named?.pin === true
+          ? { machineId: named.machineId }
+          : undefined
+        : {
+            ...input.routeOverride,
+            ...(input.routeOverride.machineId === undefined && named !== null
+              ? { machineId: named.machineId }
+              : {}),
+          };
     const id = newUuidv7();
     const createdAt = nowMs();
     deps.db

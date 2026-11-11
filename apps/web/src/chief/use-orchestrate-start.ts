@@ -29,12 +29,19 @@ export function useOrchestrateStart(): OrchestrateStart {
   const inFlight = useRef(false);
 
   const orchestrate = useCallback(
-    (todo: { id: string; seqNum: number }, opts?: { savedTitle?: string }) => {
+    (
+      todo: {
+        id: string;
+        seqNum: number;
+        routeOverride?: { machineId?: string | null } | null;
+      },
+      opts?: { savedTitle?: string },
+    ) => {
       if (!live || inFlight.current) return;
       const sessionMachineId = routingQ.data?.rules?.find(
         (rule) => rule.use === 'session',
       )?.machineId;
-      if (needsMachineName(machinesQ.data, sessionMachineId)) {
+      if (needsMachineName(machinesQ.data, sessionMachineId, todo.routeOverride?.machineId)) {
         toast.warning(t('先选择机器'), {
           description: t('多台机器在线时，开工前要在规则里点名一台。'),
           action: {

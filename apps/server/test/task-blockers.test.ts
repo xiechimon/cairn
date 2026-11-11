@@ -216,6 +216,25 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     expect(row(id).blockedBy ?? []).toEqual([]);
   });
 
+  test('create_todo with two online machines and no pin creates nothing', async () => {
+    const before = H.s.db.select().from(todo).all().length;
+    H.s.db
+      .insert(machine)
+      .values({
+        ...readyMachine({
+          teamId: H.teamId,
+          name: 'second-online',
+          cliVersion: '0.1.0',
+        }),
+        id: 'second-online',
+        online: true,
+      })
+      .run();
+    H.s.db.update(machine).set({ online: true }).where(eq(machine.teamId, H.teamId)).run();
+    await expect(create()).rejects.toMatchObject({ status: 409 });
+    expect(H.s.db.select().from(todo).all()).toHaveLength(before);
+  });
+
   test('create_todo with an invalid blockedBy creates nothing', async () => {
     const before = H.s.db.select().from(todo).all().length;
     await expect(create({ blockedBy: ['missing-task'] })).rejects.toMatchObject({ status: 400 });

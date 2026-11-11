@@ -37,7 +37,12 @@ import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
-import { applyBuildStepAction, cancelBuild, stopActiveStepsAfterExit } from './builds.js';
+import {
+  applyBuildStepAction,
+  assertNamedMachineForNewTask,
+  cancelBuild,
+  stopActiveStepsAfterExit,
+} from './builds.js';
 import {
   addChiefWatch,
   clearChiefWake,
@@ -566,6 +571,7 @@ export async function executeChiefTool(
     case 'create_todo': {
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
       requireProjectRow(db, body.projectId, ctx.teamId);
+      assertNamedMachineForNewTask(svc, ctx.teamId);
       const record = createRequestTodo(svc, ctx, body, {
         createdBy:
           ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'

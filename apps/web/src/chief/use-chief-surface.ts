@@ -318,7 +318,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
               onClick: () => navigate(settingsHref('work-routing')),
             },
           });
-          return;
+          return Promise.reject(new Error('Name a machine first'));
         }
         const { key } = sendKey.attempt([projectId ?? '', text].join('\n'), 'chief');
         return mutations.chiefSend

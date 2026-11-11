@@ -9,6 +9,7 @@ describe('needsMachineName', () => {
   test('one online machine, an existing pin, or a still-loading list do not block', () => {
     expect(needsMachineName([{ online: true }, { online: false }], null)).toBe(false);
     expect(needsMachineName([{ online: true }, { online: true }], 'mach-a')).toBe(false);
+    expect(needsMachineName([{ online: true }, { online: true }], null, 'task-mach')).toBe(false);
     expect(needsMachineName(undefined, null)).toBe(false);
   });
 });
