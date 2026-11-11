@@ -85,7 +85,7 @@
       "id": "coordinator-chat",
       "name": "Coordinator chat",
       "summary": "The one never-ending Coordinator conversation on the home page, where the user dispatches work and reads reports.",
-      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row, and a connection-lost banner when the stream drops.",
+      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -135,7 +135,8 @@
       ],
       "backendDesign": [
         "docs/research/coordinator-in-server.md",
-        "docs/spec/26-pi-session-runtime-and-trust-surface.md"
+        "docs/spec/26-pi-session-runtime-and-trust-surface.md",
+        "docs/design/coordinator-quick-replies.md"
       ],
       "evidence": [
         "apps/web/e2e/chief-home-chat.spec.ts",

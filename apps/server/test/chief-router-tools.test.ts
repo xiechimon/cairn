@@ -1,5 +1,6 @@
 import {
   CHIEF_REMOTE_TOOLS,
+  CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_THREADS_PAGE,
   CHIEF_ROUTER_TOOL_NAMES,
   CHIEF_ROUTER_TOOLS,
@@ -96,8 +97,9 @@ describe('router tool vocabulary', () => {
     expect(chiefRemoteTools().map((t) => t.name)).toEqual([
       ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
       ...CHIEF_ROUTER_TOOL_NAMES,
+      ...CHIEF_REPLY_TOOLS.map((t) => t.name),
     ]);
-    expect(Object.keys(chiefToolDefHashes())).toHaveLength(53);
+    expect(Object.keys(chiefToolDefHashes())).toHaveLength(54);
   });
 });
 

@@ -656,4 +656,5 @@ export interface ChiefContent {
   outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
   fallbackModel?: string;
   hasEarlier?: boolean;
+  quickReplies?: string[];
 }

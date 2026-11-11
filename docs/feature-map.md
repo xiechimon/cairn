@@ -212,7 +212,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 - Research: [docs/research/coordinator-in-server.md](research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](design/pilot-coordinator-chat-2026-11-06.md) (not on main)
-- Backend design: [docs/research/coordinator-in-server.md](research/coordinator-in-server.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](spec/26-pi-session-runtime-and-trust-surface.md)
+- Backend design: [docs/research/coordinator-in-server.md](research/coordinator-in-server.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](spec/26-pi-session-runtime-and-trust-surface.md), [docs/design/coordinator-quick-replies.md](design/coordinator-quick-replies.md)
 
 ### coordinator-context
 

@@ -17,6 +17,7 @@ import {
   MERGE_HUMAN_ONLY_COPY,
   type MemoryLayer,
   MODEL_SOURCE_RUNTIME_LABELS,
+  SUGGEST_REPLIES_TOOL_NAME,
   snoozeTodoBodySchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
@@ -49,6 +50,7 @@ import {
 } from './chief.js';
 import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
@@ -303,6 +305,7 @@ export async function executeChiefTool(
   assertToolNotRemoved(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
+  if (name === SUGGEST_REPLIES_TOOL_NAME) return suggestQuickReplies(deps, ctx, params);
   switch (name) {
     case 'projects': {
       const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();

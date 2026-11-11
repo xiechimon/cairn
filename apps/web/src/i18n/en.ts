@@ -1364,6 +1364,7 @@ export const EN: Record<string, string> = {
   还开着: 'Still open',
   记住了: 'Remembered',
   '没能更新这条建议，请重试。': "Couldn't update this suggestion. Try again.",
+  建议回复: 'Suggested replies',
   '为什么没拦住：{why}': 'Why it slipped through: {why}',
   '防护：{safeguard}': 'Safeguard: {safeguard}',
   '出处：': 'Source: ',

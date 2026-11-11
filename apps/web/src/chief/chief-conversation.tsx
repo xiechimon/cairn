@@ -65,6 +65,7 @@ import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.
 import { outstandingReportIds } from './outstanding-reports.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
+import { QuickReplies } from './quick-replies.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
@@ -568,6 +569,19 @@ export function ChiefConversation({
         <ChiefQuestionDock bound={answerHere} ownFooter={mode === 'thread'} />
         {composerReplacement ?? (
           <>
+            <QuickReplies
+              replies={chief.quickReplies}
+              hidden={questionAttached || answerActive || !answerHere || chief.running === true}
+              onSend={
+                onSend == null
+                  ? undefined
+                  : (text) => {
+                      followSentRef.current = true;
+                      userKeyAtSendRef.current = latestUserKeyRef.current;
+                      return onSend(text);
+                    }
+              }
+            />
             {composerError != null && (
               <p
                 role="alert"

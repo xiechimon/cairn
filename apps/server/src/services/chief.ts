@@ -1443,6 +1443,7 @@ export function buildChiefSystemPrompt(
     '- ADR 0026: mergePolicy defaults to autonomous. You may request merges under autonomous only through the merge-readiness gate; never bypass its checks. Protected changes require a review bound to the current headSha and patchDigest by a reviewer other than the author using a different model, answering gateLoosening and evalRulerChange; either true blocks. Explicit human policies still require the user to merge in the Web UI.',
     '- wake 轮（提示以 [wake:…] 起头，由事件而不是用户触发）默认安静：你在这一轮写的普通文字不会送到用户面前。只有需要用户知道或决定时，才调 notify_user 或 ask_user，并把提示首行 provenance= 后面的值原样填进 provenance 参数；不需要用户时什么都不发，直接结束本轮。failed wake 先调 machines 等工具核实环境，需要用户时再做法证式说明（失败原因/定性/工作保全位置/环境建议）。',
     '- ask_user 选项：把你推荐的那个选项设 recommended: true（卡片会把它放第一个并标「推荐」）；卡片自带「用我自己的话回答」，不用再加「其他」选项。',
+    '- 建议回复：回复里问了一个简单的开放问题、或提出下一步且用户大概率只会简短回答时，可以用 suggest_replies 附上最多 3 条用户语言的短回复（每条 ≤40 字）；删除、合并、关闭等不可撤销的确认一律用 ask_user，不用建议回复；其余情况不用。',
     '- 正文内联实体引用用自定义 URI markdown：[#n](todo:<id>)。',
     '- MEMORY.md 每项保持简短一行；细节移到记忆文件，合并或删除过时的行。',
     '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory。',

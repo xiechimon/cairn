@@ -37,6 +37,7 @@ import {
   GATE_ANNOUNCEMENTS,
   GIT_CREDENTIAL_ROW_KIND,
   infoReportMessageSchema,
+  liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
   orchestratePromptHeadOf,
   PLAN_SECTIONS,
@@ -44,6 +45,7 @@ import {
   resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
+  SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
   stripSkillRouteSection,
@@ -1609,6 +1611,7 @@ function collectChiefStream(
       }
     }
     const call = toolCallOfContent(m.content);
+    if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
     if (call !== null) {
       const created = createdTodoOf(call);
       if (created !== null)
@@ -1793,6 +1796,8 @@ export function mapChief(
       waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
   }
   chiefStream.push(...(collected?.pending ?? []));
+  const quickReplies =
+    active === null ? [] : liveQuickReplies(opts.messages, { running: active.activeRun != null });
   return {
     view: 'none',
     bound,
@@ -1828,6 +1833,7 @@ export function mapChief(
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
     ...(env.outage != null ? { outage: env.outage } : {}),
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
+    ...(quickReplies.length > 0 ? { quickReplies } : {}),
   };
 }
 

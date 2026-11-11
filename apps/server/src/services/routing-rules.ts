@@ -1,5 +1,6 @@
 import {
   CHIEF_REMOTE_TOOLS,
+  CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   CODEX_MODEL,
   filterAgentTools,
@@ -62,7 +63,7 @@ const USE_DISPLAY_NAMES: Record<RouteUse, string> = {
 };
 
 export function chiefRemoteTools(): readonly RemoteToolDef[] {
-  return [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
+  return [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...CHIEF_REPLY_TOOLS];
 }
 
 function ruleRow(db: Pick<Db, 'select'>, teamId: string, use: RouteUse): RoutingRuleRow | null {
