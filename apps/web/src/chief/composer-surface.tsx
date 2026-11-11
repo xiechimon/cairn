@@ -69,6 +69,7 @@ export interface ComposerSurfaceProps {
   attached?: boolean;
   onFocusEnter?: (() => void) | undefined;
   onFocusLeave?: (() => void) | undefined;
+  onCancelReply?: (() => void) | undefined;
   placeholder: string;
   invalid: boolean;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
@@ -96,6 +97,7 @@ export function ComposerSurface({
   attached = false,
   onFocusEnter,
   onFocusLeave,
+  onCancelReply,
   placeholder,
   invalid,
   composerRef,
@@ -213,6 +215,16 @@ export function ComposerSurface({
                 ) {
                   event.preventDefault();
                   if (!attaching) onAdvance();
+                  return;
+                }
+                if (
+                  onCancelReply !== undefined &&
+                  event.key === 'Escape' &&
+                  wire.draft === '' &&
+                  wire.tokens.length === 0
+                ) {
+                  event.preventDefault();
+                  onCancelReply();
                   return;
                 }
                 wire.handleKeyDown(event);

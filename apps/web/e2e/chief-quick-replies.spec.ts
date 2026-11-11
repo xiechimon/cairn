@@ -40,7 +40,7 @@ function state(over: Partial<MockState> = {}): MockState {
   return { threads: [THREAD], messages: [...TURN], todos: [], ...over };
 }
 
-test('shows the latest reply suggestions above the composer as keyboard-reachable buttons', async ({
+test('shows the latest reply suggestions under the reply as outlined, keyboard-reachable pills', async ({
   page,
 }) => {
   await mockLive(page, state());
@@ -48,17 +48,46 @@ test('shows the latest reply suggestions above the composer as keyboard-reachabl
   await expect(chips(page)).toHaveText(REPLIES);
   await expect(page.getByRole('group', { name: '建议回复' })).toBeVisible();
   await expect(page.getByText('suggest_replies')).toHaveCount(0);
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-quick-replies')).toHaveCount(1);
   const group = await page.getByTestId('chief-quick-replies').boundingBox();
-  const composer = await page.getByTestId('home-c').getByTestId('chief-composer-input').boundingBox();
-  expect(group!.y + group!.height).toBeLessThanOrEqual(composer!.y);
-  const card = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
-  expect(card!.y - (group!.y + group!.height)).toBeGreaterThanOrEqual(6);
-  expect(card!.y - (group!.y + group!.height)).toBeLessThanOrEqual(12);
   const reply = await page.getByTestId('home-c').getByText('要不要先只看 README？').boundingBox();
   expect(group!.y - (reply!.y + reply!.height)).toBeGreaterThanOrEqual(12);
   expect(group!.y - (reply!.y + reply!.height)).toBeLessThanOrEqual(32);
+  expect(Math.abs(group!.x - reply!.x)).toBeLessThanOrEqual(2);
+  const composer = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
+  expect(group!.y + group!.height).toBeLessThanOrEqual(composer!.y);
+  const first = chips(page).first();
+  const look = await first.evaluate((el) => {
+    const css = getComputedStyle(el);
+    return {
+      height: el.getBoundingClientRect().height,
+      border: css.borderTopWidth,
+      fill: css.backgroundColor,
+      weight: css.fontWeight,
+    };
+  });
+  expect(look).toEqual({ height: 28, border: '1px', fill: 'rgba(0, 0, 0, 0)', weight: '400' });
+  const boxes = await chips(page).evaluateAll((els) => els.map((el) => el.getBoundingClientRect()));
+  expect(Math.round(boxes[1]!.x - (boxes[0]!.x + boxes[0]!.width))).toBe(12);
+  await first.focus();
+  await expect(first).toBeFocused();
+});
+
+test('hovering or focusing a chip previews its text in the empty composer and leaving restores it', async ({
+  page,
+}) => {
+  await mockLive(page, state());
+  await page.goto('/app');
+  const placeholder = page.getByTestId('home-c').getByTestId('chief-composer-placeholder');
+  const before = await placeholder.textContent();
+  await chips(page).nth(1).hover();
+  await expect(placeholder).toHaveText('先只看 README');
+  await page.mouse.move(0, 0);
+  await expect(placeholder).toHaveText(before ?? '');
   await chips(page).first().focus();
-  await expect(chips(page).first()).toBeFocused();
+  await expect(placeholder).toHaveText('好，等你汇报');
+  await page.getByTestId('home-c').getByTestId('chief-composer-input').focus();
+  await expect(placeholder).toHaveText(before ?? '');
 });
 
 test('clicking a chip sends exactly its text as an owner message and the chips go away', async ({

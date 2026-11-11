@@ -194,7 +194,7 @@ export function DialogShell({
         showCloseButton={false}
         aria-label={title}
         data-size={size}
-        style={{ width: dialogWidth(size) }}
+        style={{ width: width ?? dialogWidth(size) }}
         className={cn(
           DIALOG_PANEL_CLS,
           footer != null || hint != null

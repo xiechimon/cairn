@@ -1,10 +1,13 @@
 import { AGENT_TODO_LINE_RE, AGENT_TODO_MARKER_STATES, type AgentTodoState } from '@cairn/shared';
+import { cn } from 'cn';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import type { DocSegment } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Copy } from '../icons/index.js';
+import { Check, ChiefExpand, Copy } from '../icons/index.js';
 import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import {
@@ -502,6 +505,10 @@ function listGap(part: Extract<RenderPart, { kind: 'list' }>): string {
 
 const COPIED_MS = 1500;
 
+function capitalize(lang: string): string {
+  return lang.charAt(0).toUpperCase() + lang.slice(1);
+}
+
 function useCodeTokens(text: string, lang: string | undefined): CodeToken[][] | null {
   const [highlighted, setHighlighted] = useState<{
     text: string;
@@ -523,66 +530,143 @@ function useCodeTokens(text: string, lang: string | undefined): CodeToken[][] | 
     : null;
 }
 
-function CodeBlock({ lang, text }: { lang?: string; text: string }) {
-  const { t } = useI18n();
+function CodeLines({ lines, text }: { lines: CodeToken[][] | null; text: string }) {
+  if (lines === null) return text;
+  return lines.map((line, row) => (
+    <Fragment key={row}>
+      {row > 0 && '\n'}
+      {line.map((token, col) =>
+        token.color === undefined ? (
+          token.content
+        ) : (
+          <span key={col} style={{ color: token.color }}>
+            {token.content}
+          </span>
+        ),
+      )}
+    </Fragment>
+  ));
+}
+
+const CODE_BTN_CLS =
+  "size-8 flex-none cursor-pointer rounded-(--radius-control) text-content-tertiary transition-none hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
+
+function useCopied(text: string) {
   const [copied, setCopied] = useState(false);
-  const lines = useCodeTokens(text, lang);
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
     return () => window.clearTimeout(timer);
   }, [copied]);
+  const copy = () => {
+    void navigator.clipboard.writeText(text).then(() => setCopied(true));
+  };
+  return { copied, copy };
+}
+
+function CopyCodeButton({
+  text,
+  className,
+  testId,
+}: {
+  text: string;
+  className?: string;
+  testId: string;
+}) {
+  const { t } = useI18n();
+  const { copied, copy } = useCopied(text);
+  return (
+    <IconTooltip
+      label={t('复制')}
+      trigger={
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(CODE_BTN_CLS, className)}
+          data-testid={testId}
+          onClick={copy}
+        />
+      }
+    >
+      {copied ? <Check width={18} height={18} /> : <Copy width={18} height={18} />}
+    </IconTooltip>
+  );
+}
+
+function CodeBlock({ lang, text }: { lang?: string; text: string }) {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
+  const lines = useCodeTokens(text, lang);
+  const title = lang === undefined ? t('代码') : t('{lang} 代码', { lang: capitalize(lang) });
   return (
     <div
-      className="group/code relative my-2 min-w-0 max-w-full rounded-(--cds-radius-xl) border-[0.5px] border-(--prose-code-line) bg-(--prose-code-surface)"
+      className="my-2 w-fit min-w-48 max-w-full rounded-(--cds-radius-xl) border border-border bg-background"
       data-testid="md-code-block"
     >
-      {lang !== undefined && (
-        <div
-          className="px-3.5 pt-3.5 font-sans text-code-lang text-(--text-secondary)"
+      <div className="flex h-10 items-center gap-1 border-b border-border pr-1.5 pl-5">
+        <span
+          className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-tertiary"
           data-testid="md-code-lang"
         >
           {lang}
-        </div>
-      )}
-      <div className="absolute top-2 right-0 z-10 inline-flex h-8 items-center px-2">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="rounded-(--cds-radius-lg) text-(--foreground) opacity-0 transition-none hover:bg-(--prose-code-fill) dark:hover:bg-(--prose-code-fill) group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100"
-          aria-label={t('复制代码')}
-          data-testid="md-code-copy"
-          onClick={() => {
-            void navigator.clipboard.writeText(text).then(() => setCopied(true));
-          }}
+        </span>
+        <IconTooltip
+          label={t('展开')}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              className={CODE_BTN_CLS}
+              data-testid="md-code-expand"
+              onClick={() => setExpanded(true)}
+            />
+          }
         >
-          {copied ? <Check width={16} height={16} /> : <Copy width={16} height={16} />}
-        </Button>
+          <ChiefExpand width={18} height={18} />
+        </IconTooltip>
+        <CopyCodeButton text={text} testId="md-code-copy" />
       </div>
       <div className="overflow-x-auto overscroll-x-contain">
         <pre
-          className="chat-md-code m-0 p-3.5 font-prose-mono text-code-block whitespace-pre text-(--foreground)"
+          className="chat-md-code m-0 px-5 py-3 font-prose-mono text-code whitespace-pre text-(--foreground)"
           data-lang={lang ?? ''}
           data-testid="md-code"
         >
-          {lines === null
-            ? text
-            : lines.map((line, row) => (
-                <Fragment key={row}>
-                  {row > 0 && '\n'}
-                  {line.map((token, col) =>
-                    token.color === undefined ? (
-                      token.content
-                    ) : (
-                      <span key={col} style={{ color: token.color }}>
-                        {token.content}
-                      </span>
-                    ),
-                  )}
-                </Fragment>
-              ))}
+          <CodeLines lines={lines} text={text} />
         </pre>
       </div>
+      <DialogShell
+        open={expanded}
+        onClose={() => setExpanded(false)}
+        title={title}
+        width="min(100% - 2rem, var(--dialog-w-xl))"
+        footer={
+          <Button
+            variant="secondary"
+            className={DIALOG_PRIMARY_BUTTON}
+            data-testid="md-code-done"
+            onClick={() => setExpanded(false)}
+          >
+            {t('完成')}
+          </Button>
+        }
+      >
+        <div
+          className="relative rounded-(--cds-radius-xl) bg-secondary"
+          data-testid="md-code-dialog-body"
+        >
+          <CopyCodeButton
+            text={text}
+            testId="md-code-dialog-copy"
+            className="absolute top-2 right-2 z-10"
+          />
+          <div className="overflow-x-auto overscroll-x-contain">
+            <pre className="m-0 px-5 py-3 font-prose-mono text-code whitespace-pre text-(--foreground)">
+              <CodeLines lines={lines} text={text} />
+            </pre>
+          </div>
+        </div>
+      </DialogShell>
     </div>
   );
 }

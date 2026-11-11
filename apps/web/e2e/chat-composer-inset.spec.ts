@@ -86,7 +86,7 @@ async function clearance(page: Page, scope: ReturnType<Surface['scope']>) {
     const body = root.querySelector('[data-testid="chief-body"]');
     if (!last || !composer || !body) throw new Error('chat surfaces missing');
     const fade = Number.parseFloat((body as HTMLElement).style.getPropertyValue('--scroll-fade-bottom')) || 0;
-    const next = root.querySelector('[data-testid="chief-quick-replies"]') ?? composer;
+    const next = composer;
     return {
       room: next.getBoundingClientRect().top - fade - last.getBoundingClientRect().bottom,
       gap: body.scrollHeight - body.scrollTop - body.clientHeight,

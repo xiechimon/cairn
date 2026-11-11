@@ -45,6 +45,11 @@ import { taskRefsOf } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
+import {
+  REPLY_HIGHLIGHT_ATTR,
+  REPLY_HIGHLIGHT_CLS,
+  ReplySourceHighlightContext,
+} from './reply-source-highlight.js';
 import type { ReplyQuoteDraft } from './selection-reply.js';
 import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
 import type { ThreadActivity } from './thread-activity.js';
@@ -402,6 +407,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onRetry,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
+  const highlightedSource = useContext(ReplySourceHighlightContext);
+  const highlight = (id: string | undefined) =>
+    id !== undefined && id === highlightedSource ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message')
     return (
@@ -485,7 +493,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               data-testid="chief-bubble"
               data-md={shown != null ? '' : undefined}
               {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-              className={`w-fit max-w-full [overflow-wrap:anywhere] ${shown != null ? BUBBLE_MD_CLS : ''}`}
+              {...highlight(item.id)}
+              className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
             >
               {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
               {shown != null ? <ChatMarkdown text={shown} conversational /> : item.text}
@@ -610,8 +619,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           {item.typing !== true && <TaskRefRows source={item} />}
           <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
             <BubbleContent
-              className={BUBBLE_ROBOT_CLS}
+              className={`${BUBBLE_ROBOT_CLS} ${REPLY_HIGHLIGHT_CLS}`}
               {...(item.id != null && item.typing !== true ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+              {...highlight(item.id)}
             >
               {item.markdown != null ? (
                 <ChatMarkdown text={item.markdown} conversational />

@@ -73,7 +73,7 @@ test('bullets are native list markers in claude.ai geometry: disc, text colour, 
   );
 });
 
-test('code block copy sits in the block header, hidden at rest, shown on block hover and on keyboard focus, and copies the code', async ({
+test('code block header is always visible with the language, expand and copy, and copy copies the code', async ({
   page,
 }) => {
   const reply = await openChiefReply(page);
@@ -81,37 +81,60 @@ test('code block copy sits in the block header, hidden at rest, shown on block h
   const copy = block.getByTestId('md-code-copy');
   await expect(block.getByTestId('md-code-lang')).toHaveText('sh');
   await page.mouse.move(1, 1);
-  await expect(copy).toHaveCSS('opacity', '0');
-
-  await block.hover();
+  await expect(copy).toBeVisible();
   await expect(copy).toHaveCSS('opacity', '1');
-  await expect(copy).toHaveCSS('transition-duration', '0s');
-  const placement = await block.evaluate((el) => {
+  await expect(block.getByTestId('md-code-expand')).toBeVisible();
+  const geo = await block.evaluate((el) => {
     const b = el.getBoundingClientRect();
+    const head = el.firstElementChild!;
+    const h = head.getBoundingClientRect();
     const c = el.querySelector('[data-testid="md-code-copy"]')!.getBoundingClientRect();
-    return { right: b.right - c.right, top: c.top - b.top, size: c.width };
+    const x = el.querySelector('[data-testid="md-code-expand"]')!.getBoundingClientRect();
+    return {
+      head: h.height,
+      rule: getComputedStyle(head).borderBottomWidth,
+      size: c.width,
+      pitch: c.left - x.left,
+      right: b.right - c.right,
+    };
   });
-  expect(placement.size).toBe(28);
-  expect(placement.right).toBeGreaterThanOrEqual(8);
-  expect(placement.right).toBeLessThanOrEqual(9);
-  expect(placement.top).toBeGreaterThanOrEqual(10);
-  expect(placement.top).toBeLessThanOrEqual(11);
+  expect(geo.head).toBe(40);
+  expect(geo.rule).toBe('1px');
+  expect(geo.size).toBe(32);
+  expect(geo.pitch).toBe(36);
 
   await copy.hover();
-  await expect(copy).toHaveCSS('box-shadow', 'none');
-  await expect(copy).toHaveCSS('border-top-left-radius', '8px');
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('复制');
   await expect(copy).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-
-  await page.mouse.move(1, 1);
-  await copy.focus();
-  await expect(copy).toBeFocused();
-  await expect(copy).toHaveCSS('opacity', '1');
 
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await copy.click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     'curl -s localhost:8787/healthz',
   );
+});
+
+test('code expand opens a dialog with the full code, its own copy and Done, Escape returns focus to the expand button', async ({
+  page,
+}) => {
+  const reply = await openChiefReply(page);
+  const expand = reply.getByTestId('md-code-block').getByTestId('md-code-expand');
+  await expand.click();
+  const dialog = page.getByRole('dialog', { name: 'Sh 代码' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId('md-code-dialog-body')).toContainText(
+    'curl -s localhost:8787/healthz',
+  );
+  const width = await dialog.evaluate((el) => el.getBoundingClientRect().width);
+  expect(width).toBe(890);
+  await dialog.getByTestId('md-code-dialog-copy').click();
+  await expect(dialog.getByTestId('md-code-done')).toHaveText('完成');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(expand).toBeFocused();
+  await expand.click();
+  await page.getByTestId('md-code-done').click();
+  await expect(dialog).toHaveCount(0);
 });
 
 test('code block stays inside the reply column and long lines scroll inside it', async ({
@@ -134,8 +157,8 @@ test('code block stays inside the reply column and long lines scroll inside it',
   expect(geo.inside).toBe(true);
   expect(geo.scroller).toBe('auto');
   expect(geo.whiteSpace).toBe('pre');
-  expect(geo.fontSize).toBe('14px');
-  expect(geo.lineHeight).toBe('22.75px');
+  expect(geo.fontSize).toBe('13px');
+  expect(geo.lineHeight).toBe('20px');
   expect(geo.radius).toBe('12px');
 });
 

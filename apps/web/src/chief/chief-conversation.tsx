@@ -65,7 +65,8 @@ import { outstandingReportIds } from './outstanding-reports.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { QuickReplies } from './quick-replies.js';
-import { ReplyQuoteBlock } from './reply-quote-block.js';
+import { ReplyingToBar } from './reply-quote-block.js';
+import { ReplySourceHighlightContext } from './reply-source-highlight.js';
 import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
@@ -157,20 +158,25 @@ export function ChiefConversation({
 }: ChiefConversationProps) {
   const questionAttached = useQuestionDockVisible();
   const { t, locale } = useI18n();
+  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
+  const [highlightedSource, setHighlightedSource] = useState<string | null>(null);
+  const [previewReply, setPreviewReply] = useState<string | null>(null);
   const composerPlaceholder =
+    previewReply ??
     targetPlaceholder ??
-    (chief.outage != null
-      ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-      : chief.waitingTurn !== undefined
-        ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
-        : chief.running === true
-          ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-          : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+    (replyQuote !== null
+      ? t('回复这条消息')
+      : chief.outage != null
+        ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
+        : chief.waitingTurn !== undefined
+          ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+          : chief.running === true
+            ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+            : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
   const [threadOverride, setThreadOverride] = useState(false);
-  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const mode = composerMode({
     answerHere,
     questionPending: answerKey !== null,
@@ -403,7 +409,11 @@ export function ChiefConversation({
   const capsules = (
     <>
       {replyQuote !== null && (
-        <ReplyQuoteBlock quote={replyQuote.quote} onRemove={() => setReplyQuote(null)} />
+        <ReplyingToBar
+          quote={replyQuote.quote}
+          onRemove={() => setReplyQuote(null)}
+          onHighlight={(on) => setHighlightedSource(on ? replyQuote.sourceMessageId : null)}
+        />
       )}
       <QueuedCapsules
         messages={queuedCapsules}
@@ -472,7 +482,36 @@ export function ChiefConversation({
   );
   const keepsOwnRow = (item: ChiefStreamItem) =>
     item.kind === 'thread-report' && outstandingReports.has(item.id);
-  const renderRows = (list: StreamRow[]) => groupThreadEvents(list, keepsOwnRow).map(streamRow);
+  const lastRobotIndex = rows.findLastIndex(
+    ({ item }) => item.kind === 'robot' && item.typing !== true,
+  );
+  const quickAfter =
+    lastRobotIndex >= 0 && !rows.slice(lastRobotIndex).some(({ item }) => item.kind === 'user')
+      ? rows[lastRobotIndex]?.item
+      : undefined;
+  const quickReplies = (
+    <QuickReplies
+      replies={chief.quickReplies}
+      hidden={questionAttached || answerActive || !answerHere}
+      onPreview={setPreviewReply}
+      onSend={
+        onSend == null
+          ? undefined
+          : (text) => {
+              followSentRef.current = true;
+              userKeyAtSendRef.current = latestUserKeyRef.current;
+              return onSend(text);
+            }
+      }
+    />
+  );
+  const renderRows = (list: StreamRow[]) =>
+    groupThreadEvents(list, keepsOwnRow).map((grouped) => (
+      <Fragment key={chiefStreamRowKey(grouped.item, grouped.i)}>
+        {streamRow(grouped)}
+        {quickAfter !== undefined && grouped.item === quickAfter && quickReplies}
+      </Fragment>
+    ));
   const intro = !chief.bound && showBindGate && (
     <div
       data-testid="chief-gate"
@@ -508,18 +547,20 @@ export function ChiefConversation({
             >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>
-                  {lead}
-                  {day == null ? (
-                    renderRows(rows)
-                  ) : (
-                    <>
-                      <div data-testid="chief-earlier" className="opacity-60">
-                        {renderRows(rows.slice(0, day.earlier))}
-                      </div>
-                      {day.today}
-                      {renderRows(rows.slice(day.earlier))}
-                    </>
-                  )}
+                  <ReplySourceHighlightContext.Provider value={highlightedSource}>
+                    {lead}
+                    {day == null ? (
+                      renderRows(rows)
+                    ) : (
+                      <>
+                        <div data-testid="chief-earlier" className="opacity-60">
+                          {renderRows(rows.slice(0, day.earlier))}
+                        </div>
+                        {day.today}
+                        {renderRows(rows.slice(day.earlier))}
+                      </>
+                    )}
+                  </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>
@@ -560,19 +601,6 @@ export function ChiefConversation({
         <ChiefQuestionDock bound={answerHere} ownFooter={mode === 'thread'} />
         {composerReplacement ?? (
           <>
-            <QuickReplies
-              replies={chief.quickReplies}
-              hidden={questionAttached || answerActive || !answerHere}
-              onSend={
-                onSend == null
-                  ? undefined
-                  : (text) => {
-                      followSentRef.current = true;
-                      userKeyAtSendRef.current = latestUserKeyRef.current;
-                      return onSend(text);
-                    }
-              }
-            />
             {composerError != null && (
               <p
                 role="alert"
@@ -602,6 +630,7 @@ export function ChiefConversation({
                 focusedComposerRef.current = THREAD_COMPOSER;
               }}
               onFocusLeave={leaveComposer}
+              onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
               placeholder={composerPlaceholder}
               invalid={composerError != null}
               composerRef={answerActive ? undefined : composerRef}
