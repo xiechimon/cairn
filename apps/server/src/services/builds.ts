@@ -167,6 +167,7 @@ import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
+import { holdSecondRejectionRework } from './research-stuck.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertAutomaticRetryAllowed, parkFailedBuild, retryIsParked } from './retry-parking.js';
 import { policyForStep, profileForStep, routeForStep } from './routing-rules.js';
@@ -500,6 +501,13 @@ export async function sendBuildSteer(
           })
           .run();
       }
+      const result = {
+        conversationId: targetBuildId,
+        message: messageRow,
+        delivered: running ? ('steer' as const) : ('new-turn' as const),
+      };
+      completeClientMessage(db, conversationId, body.clientMessageId, result);
+      continuationOptions.beforeCommit?.();
       if (todoRow) {
         if (
           !continuationOptions.schedule &&
@@ -567,14 +575,11 @@ export async function sendBuildSteer(
           .set({ conversationId: targetBuildId })
           .where(eq(queuedMessage.conversationId, conversationId))
           .run();
-      const result = {
+      return {
         conversationId: targetBuildId,
         message: messageRow,
         delivered: running ? ('steer' as const) : ('new-turn' as const),
       };
-      completeClientMessage(db, conversationId, body.clientMessageId, result);
-      continuationOptions.beforeCommit?.();
-      return result;
     });
   } catch (error) {
     return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
@@ -1632,6 +1637,7 @@ export async function applyBuildStepAction(
           : reworkTarget.withPlan
             ? 'plan'
             : 'build';
+        recordRestartConversation(reworkTarget.id);
         enqueueStep(
           deps,
           reworkTarget.id,
@@ -1660,7 +1666,6 @@ export async function applyBuildStepAction(
         const reusedRow = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
         if (!reusedRow) throw new Error('build missing after update');
         publishBuild(deps, reusedRow);
-        recordRestartConversation(reworkTarget.id);
         return;
       }
       const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
@@ -1706,6 +1711,7 @@ export async function applyBuildStepAction(
         });
       }
       const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
+      recordRestartConversation(newId);
       enqueueStep(
         deps,
         newId,
@@ -1722,7 +1728,6 @@ export async function applyBuildStepAction(
       const newRow = deps.db.select().from(build).where(eq(build.id, newId)).get();
       if (!newRow) throw new Error('build missing after insert');
       publishBuild(deps, newRow);
-      recordRestartConversation(newId);
       return;
     });
     for (const publish of afterCommit) publish();
@@ -1821,6 +1826,7 @@ export async function applyBuildStepAction(
       content: body.feedback,
       createdAt: nowMs(),
     });
+    beforeCommit?.();
     if (revising.phase === 'review' && buildRunsSession(deps, buildId)) {
       deps.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
       setTodoPhase(deps, revising.id, 'queued');
@@ -1834,7 +1840,7 @@ export async function applyBuildStepAction(
         origin === 'person',
         { kind: 'rework' },
       );
-      beforeCommit?.();
+      holdSecondRejectionRework(deps, buildId);
       return;
     }
     setTodoPhase(deps, revising.id, 'planning');
@@ -1843,7 +1849,7 @@ export async function applyBuildStepAction(
         ? buildReviewRejectPrompt(body.feedback)
         : buildReplanPrompt(body.feedback);
     enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person');
-    beforeCommit?.();
+    holdSecondRejectionRework(deps, buildId);
   });
   for (const publish of afterCommit) publish();
 }

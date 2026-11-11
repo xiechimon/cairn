@@ -28,7 +28,6 @@ import {
 } from './client-message.js';
 import { assertProjectWritable } from './project-writable.js';
 import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
-import { holdSecondRejectionRework } from './research-stuck.js';
 import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
@@ -285,7 +284,6 @@ function bindRouteReceipt(
       findClientMessage(deps.db, buildId, nestedLedgerId(row.id, body.clientMessageId)),
     );
     if (sent === undefined) throw new Error('send receipt missing');
-    if (sent.delivered === 'revision') holdSecondRejectionRework(deps, buildId);
     claimClientMessage(deps.db, row.id, body.clientMessageId, { todoId: row.id, ...sent });
     published = insertCoordinatorMarker(deps, row, body, sent, origin);
   };

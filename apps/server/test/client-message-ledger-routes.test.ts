@@ -1,6 +1,6 @@
 import { STOP_MESSAGE } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { build, clientMessage, message, project, step, todo } from '../src/db/schema.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
@@ -235,6 +235,7 @@ function userMessages(buildId?: string) {
 
 test('a crash between the route receipt and the steer leaves no steer', async () => {
   seedRunning('crash-build', 'crash-todo');
+  const signal = vi.spyOn(H.s.machineHub, 'steerSignal');
   H.s.db.run(
     sql`CREATE TRIGGER abort_route_receipt BEFORE INSERT ON chief_message WHEN NEW.role = 'system' BEGIN SELECT RAISE(ABORT, 'marker write failed'); END`,
   );
@@ -244,6 +245,7 @@ test('a crash between the route receipt and the steer leaves no steer', async ()
   });
   H.s.db.run(sql`DROP TRIGGER abort_route_receipt`);
   expect(crashed.status).not.toBe(201);
+  expect(signal).not.toHaveBeenCalled();
   expect(userMessages()).toHaveLength(0);
   expect(
     H.s.db.select().from(clientMessage).where(eq(clientMessage.scopeId, 'crash-todo')).get(),
@@ -260,6 +262,7 @@ test('a crash between the route receipt and the steer leaves no steer', async ()
   expect(again.status).toBe(201);
   expect(await again.json()).toEqual(await retry.json());
   expect(userMessages('crash-build')).toHaveLength(1);
+  expect(signal).toHaveBeenCalledTimes(1);
 });
 
 test('a nested steer replay keeps the original build after a later build exists', async () => {

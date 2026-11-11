@@ -50,7 +50,6 @@ import { readMergeGateState } from './services/merge-gate-run.js';
 import { newestMessagePage } from './services/message-page.js';
 import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
-import { holdSecondRejectionRework } from './services/research-stuck.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
 import { listThreadPrs } from './services/thread-pr.js';
 
@@ -241,20 +240,16 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/builds/:id/steps', async (c) => {
     const body = parseWith(buildStepActionBodySchema, await jsonBody(c), 'body');
     const buildId = c.req.param('id');
-    const replay = () => c.json({ delegated: true }, 202);
-    const finish = () => {
-      if (body.action === 'revision') holdSecondRejectionRework(svc, buildId);
-    };
     if ('clientMessageId' in body) {
       const stored = findClientMessage(svc.db, buildId, body.clientMessageId);
-      if (stored !== undefined) return replay();
+      if (stored !== undefined) return c.json({ delegated: true }, 202);
     }
     try {
-      await applyBuildStepAction(svc, buildId, body, undefined, 'person', finish);
+      await applyBuildStepAction(svc, buildId, body);
     } catch (err) {
       if (err instanceof ClientMessageConflict && 'clientMessageId' in body) {
         const raced = findClientMessage(svc.db, buildId, body.clientMessageId);
-        if (raced !== undefined) return replay();
+        if (raced !== undefined) return c.json({ delegated: true }, 202);
       }
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;
