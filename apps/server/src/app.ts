@@ -10,8 +10,13 @@ import { registerRoutes } from './routes.js';
 import { registerMachineRoutes } from './routes-machine.js';
 import { registerRemoteRoutes } from './routes-remote.js';
 import { countsAsMemberWrite, recordMemberWrite } from './services/autonomy-gates.js';
+import { redeemStreamTicket, resolveBrowserSession } from './services/browser-session.js';
 import { NotFoundError } from './services/builds.js';
-import { pairedDeviceIdOfToken } from './services/paired-devices.js';
+import {
+  deviceStreams,
+  pairedDeviceExists,
+  pairedDeviceIdOfToken,
+} from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -85,7 +90,19 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
   registerTokenAuth(app, ctx.authToken, {
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
-    loopbackOwner: ctx.loopbackOwner ?? null,
+    resolveSession: (cookie) => resolveBrowserSession(ctx.db, cookie),
+    redeemTicket: (ticket) => {
+      const session = redeemStreamTicket(ticket);
+      if (session?.kind !== 'device') return session;
+      if (
+        session.deviceId === null ||
+        deviceStreams.isRevoked(session.deviceId) ||
+        !pairedDeviceExists(ctx.db, session.deviceId)
+      ) {
+        return null;
+      }
+      return session;
+    },
   });
   registerMemberActivity(app, ctx);
   registerRoutes(app, ctx);

@@ -74,13 +74,19 @@ function call(
   });
 }
 
-test('the owner browser on loopback gets teams without a token', async () => {
+test('the owner browser on loopback exchanges a bootstrap for a session', async () => {
   const { port } = await listen(ownerWithPeer(OWNER_UID));
-  expect((await call(port, '/api/teams')).status).toBe(200);
-  expect((await call(port, '/api/teams', { headers: { host: `localhost:${port}` } })).status).toBe(
-    200,
-  );
-  expect((await call(port, '/api/remote/identity')).body).toEqual({ login: null, via: null });
+  expect((await call(port, '/api/teams')).status).toBe(401);
+  const bootstrapped = await fetch(`http://127.0.0.1:${port}/api/auth/bootstrap`, {
+    method: 'POST',
+  });
+  expect(bootstrapped.status).toBe(200);
+  const cookie = (bootstrapped.headers.getSetCookie?.() ?? [])
+    .map((value) => value.split(';')[0] ?? '')
+    .find((value) => value.startsWith('cairn_auth='));
+  expect(cookie).toBeTruthy();
+  expect((await call(port, '/api/teams', { headers: { cookie: cookie ?? '' } })).status).toBe(200);
+  expect((await call(port, '/api/remote/identity')).body).toEqual({ error: 'Unauthorized' });
 });
 
 test('a peer owned by another local user still needs the token', async () => {
@@ -134,7 +140,7 @@ test.each<Record<string, string>>([
   { 'sec-fetch-site': 'same-site' },
 ])('a cross-site read %j is refused', async (headers) => {
   const { port } = await listen(ownerWithPeer(OWNER_UID));
-  expect((await call(port, '/api/teams', { headers })).status).toBe(403);
+  expect((await call(port, '/api/teams', { headers })).status).toBe(401);
 });
 
 test.each<Record<string, string>>([
@@ -144,16 +150,32 @@ test.each<Record<string, string>>([
   { origin: 'null' },
 ])('a cross-site write %j is refused', async (headers) => {
   const { port } = await listen(ownerWithPeer(OWNER_UID));
-  expect((await call(port, '/api/remote/pairing', { method: 'POST', headers })).status).toBe(403);
+  expect((await call(port, '/api/remote/pairing', { method: 'POST', headers })).status).toBe(401);
+  expect(
+    (
+      await call(port, '/api/auth/bootstrap', {
+        method: 'POST',
+        headers: { ...headers, host: `127.0.0.1:${port}` },
+      })
+    ).status,
+  ).toBe(headers['sec-fetch-site'] === undefined ? 200 : 403);
 });
 
-test('a same-origin write from the owner browser can do owner-only work', async () => {
+test('a same-origin write from the owner browser can do owner-only work after bootstrap', async () => {
   const { port } = await listen(ownerWithPeer(OWNER_UID));
+  const bootstrapped = await fetch(`http://127.0.0.1:${port}/api/auth/bootstrap`, {
+    method: 'POST',
+    headers: { 'sec-fetch-site': 'same-origin' },
+  });
+  expect(bootstrapped.status).toBe(200);
+  const cookie = (bootstrapped.headers.getSetCookie?.() ?? [])
+    .map((value) => value.split(';')[0] ?? '')
+    .find((value) => value.startsWith('cairn_auth='));
   expect(
     (
       await call(port, '/api/remote/pairing', {
         method: 'POST',
-        headers: { 'sec-fetch-site': 'same-origin' },
+        headers: { cookie: cookie ?? '', 'sec-fetch-site': 'same-origin' },
       })
     ).status,
   ).toBe(201);
@@ -161,10 +183,10 @@ test('a same-origin write from the owner browser can do owner-only work', async 
     (
       await call(port, '/api/remote/pairing', {
         method: 'POST',
-        headers: { origin: `http://127.0.0.1:${port}` },
+        headers: { cookie: cookie ?? '', 'sec-fetch-site': 'same-site' },
       })
     ).status,
-  ).toBe(201);
+  ).toBe(403);
 });
 
 test('a paired-device token on loopback keeps its narrower authority', async () => {

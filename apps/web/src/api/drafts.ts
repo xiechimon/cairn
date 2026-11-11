@@ -1,4 +1,3 @@
-import { readStoredToken } from './auth.js';
 import { api } from './client.js';
 
 export interface DraftSnapshot {
@@ -32,14 +31,11 @@ export function createDraftTransport(teamId: string, scope: string): DraftTransp
     load: async () => checked(await api.get<unknown>(path)),
     async save(content, options) {
       if (options?.keepalive !== true) return checked(await api.put<unknown>(path, { content }));
-      const token = readStoredToken();
       const res = await fetch(path, {
         method: 'PUT',
         keepalive: true,
-        headers: {
-          'content-type': 'application/json',
-          ...(token === null ? {} : { authorization: `Bearer ${token}` }),
-        },
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ content }),
       });
       if (!res.ok) throw new Error(`draft save failed: ${res.status}`);

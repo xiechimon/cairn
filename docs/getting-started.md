@@ -12,7 +12,13 @@ npx @xiechimon/cairn
 
 One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team. Use a different port with `PORT=9000 npx @xiechimon/cairn`.
 
-The server listens on loopback only and always requires an access token. The first start generates one in `~/.cairn/token` (mode 0600) and prints a one-time login link such as `http://127.0.0.1:8787/app#token=<token>`; open it once and the browser remembers the token. `cairn token` prints it again later. To reach the server from another machine, set `HOST=0.0.0.0` (or the LAN address) together with `CAIRN_TOKEN=<long random string>`; without a token a non-loopback `HOST` refuses to start. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
+The server listens on loopback only and always requires an access token for non-browser clients. The first start generates one in `~/.cairn/token` (mode 0600). A browser on a Linux server machine exchanges a loopback bootstrap for an HttpOnly session and does not paste the token. macOS, Windows, and `CAIRN_REQUIRE_TOKEN=1` have no loopback peer proof, so the first browser session is a pairing code minted with the owner token:
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" http://127.0.0.1:8787/api/remote/pairing
+```
+
+Open the returned code in the browser pairing page. Another device uses the same one-time code from Remote access. `cairn token` prints the owner token for this machine only. To reach the server from another machine, put Tailscale Serve or another route in front of loopback; the route does not sign the browser in. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
 
 ## Run builds on your own machines
 

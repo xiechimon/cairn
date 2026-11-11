@@ -1060,14 +1060,15 @@ export const EN: Record<string, string> = {
     'Running on a cloud server? Register with an API key instead',
   '获取 API key →': 'Get an API key →',
   // #253 token 门页（鉴权开时 401 落页；auth 单缝 = src/api/auth.ts）
-  需要访问令牌: 'Access token required',
-  '服务端已开启令牌鉴权，输入访问令牌后继续使用。':
-    'This server has token authentication enabled. Enter your access token to continue.',
-  '令牌从哪来：在运行服务端的机器上执行 `cairn token` 查看当前令牌（`cairn token --rotate` 换发新令牌；令牌存于服务端 {tokenFile} 文件，设了 {tokenVar} 环境变量则以环境变量为准）。本地自行部署时，服务端启动日志还会打印一次性登录链接；容器/托管部署（{requireTokenVar}）的日志是共享的，不会打印令牌值和登录链接，请向部署者索取。删除环境变量或令牌文件并重启服务端即可关闭令牌鉴权。':
-    'Where the token comes from: run `cairn token` on the machine running the server to see the current token (`cairn token --rotate` issues a new one; it is stored in the {tokenFile} file on the server, and the {tokenVar} environment variable wins when set). On a local self-hosted deployment, the server log also prints a one-time login link at startup; container/hosted deployments ({requireTokenVar}) keep shared logs free of the token value and the login link, so ask the deployer for access. Remove the environment variable or the token file and restart the server to turn token authentication off.',
-  访问令牌: 'Access token',
+  配对这台电脑: 'Pair this computer',
+  '正在配对…': 'Pairing…',
+  '输入一次性配对码。码在运行服务的电脑的远程访问设置里生成，5 分钟内有效，只能用一次。':
+    'Enter a one-time pairing code. Create it in Remote access on the computer running the server. It works once, for 5 minutes.',
+  配对码: 'Pairing code',
+  '配对码无效，请重试。': 'Pairing code is invalid. Try again.',
+  未使用的配对码: 'Unused pairing codes',
+  作废配对码: 'Revoke code',
   进入: 'Continue',
-  '令牌无效，请重试。': 'Invalid token — please try again.',
   // W4 #285 浏览器授权页（02 §5.2 路径一；/app/machines/authorize）
   授权机器: 'Authorize machine',
   '生成授权链接，在执行机上完成注册发起。':
@@ -1823,7 +1824,7 @@ export const EN: Record<string, string> = {
   正在加载对话: 'Loading the conversation',
   '加载完成后才能发送。': 'You can send once loading finishes.',
   远程访问: 'Remote access',
-  '已通过 Tailscale 登录为 {login}': 'Signed in as {login} via Tailscale',
+
   配对新设备: 'Pair a new device',
   '用手机扫描二维码，5 分钟内有效，只能用一次。':
     'Scan with your phone. Valid for 5 minutes, works once.',
@@ -1842,7 +1843,6 @@ export const EN: Record<string, string> = {
   还没有配对的设备: 'No paired devices yet',
   撤销设备: 'Revoke',
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
-  '配对失败，请在电脑上重新生成二维码。': 'Pairing failed. Create a new QR code on your computer.',
   等你审阅: 'Ready for review',
   '选择 {title}': 'Select {title}',
   '最后在线 {time}': 'Last seen {time}',

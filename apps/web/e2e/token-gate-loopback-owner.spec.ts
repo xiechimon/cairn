@@ -17,7 +17,9 @@ test('the owner browser on the server machine opens /app without a token', async
     localStorage.setItem('cairn.locale', 'en');
     localStorage.setItem('cairn-locale', 'en');
   });
-  const teams = page.waitForResponse((res) => new URL(res.url()).pathname === '/api/teams');
+  const teams = page.waitForResponse(
+    (res) => new URL(res.url()).pathname === '/api/teams' && res.status() === 200,
+  );
   await page.goto(`${live.base}/app/settings/remote`);
   expect((await teams).status()).toBe(200);
   await expect(page.locator('.token-gate')).toHaveCount(0);

@@ -25,11 +25,14 @@ export function syncPushAuthToken(token: string | null): Promise<void> {
   return pushAuthWrites;
 }
 
-function writeToken(token: string | null): void {
-  void syncPushAuthToken(token);
+export function clearLegacyBrowserToken(): void {
+  clearStoredToken();
+}
+
+function clearStoredToken(): void {
+  void syncPushAuthToken(null);
   try {
-    if (token === null) localStorage.removeItem(TOKEN_STORAGE_KEY);
-    else localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   } catch {}
 }
 
@@ -75,13 +78,13 @@ export async function probeToken(token: string): Promise<boolean> {
 }
 
 export function demandGate(): void {
-  writeToken(null);
+  clearStoredToken();
   if (snapshot.gateOpen) return;
   publish(true, false);
 }
 
-export function passGate(token: string): void {
-  writeToken(token);
+export function passGate(): void {
+  clearStoredToken();
   const waiters = gateWaiters;
   gateWaiters = [];
   publish(false, false, true);
@@ -94,26 +97,24 @@ export function beginGateProbe(): void {
 }
 
 export function rejectGate(): void {
-  writeToken(null);
+  clearStoredToken();
   publish(true, true);
 }
 
-const LOGIN_FRAGMENT_PREFIX = '#token=';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
-export async function consumeLoginFragment(): Promise<void> {
-  const hash = window.location.hash;
-  if (!hash.startsWith(LOGIN_FRAGMENT_PREFIX)) return;
-  const token = decodeURIComponent(hash.slice(LOGIN_FRAGMENT_PREFIX.length));
-  window.history.replaceState(null, '', window.location.pathname + window.location.search);
-  if (token === '') return;
+export function isLoopbackPage(): boolean {
+  return LOOPBACK_HOSTS.has(window.location.hostname);
+}
+
+export async function bootstrapLoopback(): Promise<boolean> {
+  if (!isLoopbackPage()) return false;
   try {
-    const open = await fetch(PROBE_PATH);
-    if (open.ok) return;
+    const res = await fetch('/api/auth/bootstrap', { method: 'POST' });
+    return res.ok;
   } catch {
-    return;
+    return false;
   }
-  if (await probeToken(token)) passGate(token);
-  else rejectGate();
 }
 
 const DESCRIPTOR_PATH = '/api/remote/descriptor';
@@ -144,9 +145,24 @@ export async function consumePairFragment(
     if (!res.ok) throw new Error(`pair ${res.status}`);
     const paired = (await res.json()) as PairResponse;
     if (paired.environmentId !== pair.environmentId) throw new Error('environment mismatch');
-    passGate(paired.token);
+    passGate();
   } catch (error) {
     onFailure(error);
+  }
+}
+
+export async function redeemPairingCode(code: string): Promise<boolean> {
+  try {
+    const descriptor = await fetch(DESCRIPTOR_PATH);
+    if (!descriptor.ok) return false;
+    const res = await fetch(PAIR_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code, name: pairedDeviceName() }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
