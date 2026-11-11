@@ -130,7 +130,7 @@ export function SidebarProjectRow({
       data-archived={archived != null ? '' : undefined}
       className={cn(
         SIDEBAR_ROW,
-        'pr-2 pl-2.5',
+        flat ? 'pr-2 pl-1.5' : 'pr-2 pl-2.5',
         active
           ? 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active)'
           : cn(
@@ -150,11 +150,15 @@ export function SidebarProjectRow({
           aria-hidden
           data-slot="archived-tag"
           className={cn(
-            'grid size-5.5 flex-none place-items-center rounded-full border border-border text-content-secondary',
+            flat
+              ? 'inline-flex h-5 flex-none items-center gap-1.5 rounded-full border border-border px-2 text-caption text-content-secondary'
+              : 'grid size-5.5 flex-none place-items-center rounded-full border border-border text-content-secondary',
             menu != null && TAG_HIDE_ON_REVEAL,
+            flat && menu != null && '[@media(hover:none)]:hidden',
           )}
         >
           <Archive className="size-3.5" strokeWidth={1.75} />
+          {flat && archived}
         </span>
       )}
       {waiting != null && (

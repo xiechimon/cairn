@@ -32,7 +32,8 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 
 ## Sidebar and projects
 
-- [ ] Refuse to delete a project that has running work, so a `Delete all` action on the archived page becomes safe to add.
+- [ ] Refuse to delete a project that has running work, or stop that work first. The archived page now has `Delete all`; archiving does not stop builds or steps and `deleteProject` removes them without a check, so the confirm dialog warns about it.
+- [ ] `DELETE /api/projects/:id` does not check that the project belongs to the caller's team, unlike archive and unarchive. Add the same team check.
 - [ ] Decide whether a task thread inside an archived project stays writable; the UI still shows its composer.
 
 ## Verification still owed
@@ -44,4 +45,3 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 
 - Logout in the account menu.
 - A hosted cloud computer: the user's own computer is the cloud computer.
-- `Delete all` for archived projects until the first sidebar item above lands.

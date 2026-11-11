@@ -229,6 +229,22 @@ export function AppSidebar({
         onSuccess: () => leaveIfOpen(id),
         onError: (error) => toastError(t('删除项目失败，请重试。'), error),
       }),
+    removeMany: async (ids) => {
+      let refused = 0;
+      let firstError: unknown;
+      for (const id of ids) {
+        try {
+          await mutations.deleteProject.mutateAsync(id);
+          leaveIfOpen(id);
+        } catch (error) {
+          refused += 1;
+          firstError ??= error;
+        }
+      }
+      if (refused > 0) {
+        toastError(t('{n} 个项目没能删除，已留在列表里。', { n: refused }), firstError);
+      }
+    },
     renameGroup: async (from, to) => {
       try {
         await Promise.all(
@@ -263,6 +279,11 @@ export function AppSidebar({
       markDeleted(id);
       editFixture(id, {});
       leaveIfOpen(id);
+    },
+    removeMany: async (ids) => {
+      for (const id of ids) markDeleted(id);
+      editFixture('', {});
+      for (const id of ids) leaveIfOpen(id);
     },
     renameGroup: async (from, to) => {
       for (const project of inGroup(from)) editFixture(project.id, { group: to });

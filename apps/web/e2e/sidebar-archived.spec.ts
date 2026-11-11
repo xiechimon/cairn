@@ -7,6 +7,7 @@ const GROUPED = { ...PROJECT, id: 'proj-v1', name: 'acme-api-v1', group: '客户
 interface Calls {
   posts: string[];
   deletes: string[];
+  refuse: Set<string>;
 }
 
 async function open(page: Page, url = '/app', archived = [ARCHIVED, GROUPED]): Promise<Calls> {
@@ -14,7 +15,7 @@ async function open(page: Page, url = '/app', archived = [ARCHIVED, GROUPED]): P
     id: string;
     archivedAt: number | null;
   }[];
-  const calls: Calls = { posts: [], deletes: [] };
+  const calls: Calls = { posts: [], deletes: [], refuse: new Set() };
   await mockLive(page, { threads: [THREAD], messages: [], projects }, (path, route, json) => {
     const method = route.request().method();
     const flip = /^\/api\/projects\/([^/]+)\/(archive|unarchive)$/.exec(path);
@@ -28,6 +29,7 @@ async function open(page: Page, url = '/app', archived = [ARCHIVED, GROUPED]): P
     const remove = /^\/api\/projects\/([^/]+)$/.exec(path);
     if (remove !== null && method === 'DELETE') {
       calls.deletes.push(path);
+      if (calls.refuse.has(remove[1] ?? '')) return json({ error: 'still running' }, 409);
       const index = projects.findIndex((p) => p.id === remove[1]);
       if (index >= 0) projects.splice(index, 1);
       return route.fulfill({ status: 204, body: '' });
@@ -203,4 +205,91 @@ test('the phone drawer carries the archived entry and page', async ({ page }) =>
   await expect(drawer.locator('[data-slot="sidebar-project-row"]')).toHaveCount(2);
   await expect(drawer.getByTestId('sidebar-archived-note')).toBeVisible();
   await expect(drawer.locator('[data-slot="sidebar-filter-back"]')).toBeVisible();
+});
+
+test('the archived page pairs the note with a delete-all button and a pill per row', async ({
+  page,
+}) => {
+  await open(page);
+  await chooseFilter(page, '已归档');
+  const del = page.getByTestId('sidebar-archived-delete-all');
+  await expect(del).toHaveText('全部删除');
+  const note = await page.getByTestId('sidebar-archived-note').boundingBox();
+  const button = await del.boundingBox();
+  expect(button!.x).toBeGreaterThan(note!.x + note!.width);
+  const pill = rows(page).first().locator('[data-slot="archived-tag"]');
+  await expect(pill).toHaveText('已归档');
+  expect((await pill.boundingBox())!.height).toBeCloseTo(20, 0);
+  await rows(page).first().hover();
+  await expect(pill).toBeHidden();
+  await expect(page.getByRole('button', { name: /的菜单/ }).first()).toBeVisible();
+});
+
+test('the back row and the pinned entries sit in the rows icon and label columns', async ({
+  page,
+}) => {
+  await open(page);
+  const coordinator = page.locator('aside [data-slot="sidebar-nav-row"]').first();
+  const iconX = async (row: ReturnType<Page['locator']>) =>
+    (await row.locator('svg').first().boundingBox())!.x;
+  const labelX = async (row: ReturnType<Page['locator']>) =>
+    (await row.locator('span').last().boundingBox())!.x;
+  const entry = page.locator('aside [data-slot="sidebar-archived-entry"]');
+  expect(await iconX(entry)).toBeCloseTo(await iconX(coordinator), 0);
+  await entry.click();
+  const back = page.locator('aside [data-slot="sidebar-filter-back"]');
+  expect(await iconX(back)).toBeCloseTo(await iconX(rows(page).first()), 0);
+  expect(await labelX(coordinator)).toBeGreaterThan(0);
+});
+
+test('delete all asks with the count, then deletes every archived project', async ({ page }) => {
+  const calls = await open(page);
+  await chooseFilter(page, '已归档');
+  await page.getByTestId('sidebar-archived-delete-all').click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toContainText('删除 2 个已归档的项目？');
+  await dialog.getByRole('button', { name: '全部删除' }).click();
+  await expect(rows(page)).toHaveCount(0);
+  expect(calls.deletes.sort()).toEqual(['/api/projects/proj-old', '/api/projects/proj-v1']);
+  await expect(page.getByTestId('sidebar-archived-empty')).toBeVisible();
+  await expect(page.getByTestId('sidebar-archived-delete-all')).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+});
+
+test('cancelling delete all deletes nothing', async ({ page }) => {
+  const calls = await open(page);
+  await chooseFilter(page, '已归档');
+  await page.getByTestId('sidebar-archived-delete-all').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '取消' }).click();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(rows(page)).toHaveCount(2);
+  expect(calls.deletes).toEqual([]);
+});
+
+test('a refused project stays in the list and one toast counts it', async ({ page }) => {
+  const calls = await open(page);
+  calls.refuse.add('proj-v1');
+  await chooseFilter(page, '已归档');
+  await page.getByTestId('sidebar-archived-delete-all').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '全部删除' }).click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page)).toContainText('acme-api-v1');
+  await expect(page.getByText('1 个项目没能删除，已留在列表里。')).toBeVisible();
+  expect(calls.deletes).toHaveLength(2);
+});
+
+test('delete all is disabled with a reason when nothing is archived', async ({ page }) => {
+  await open(page, '/app', []);
+  await chooseFilter(page, '已归档');
+  const del = page.getByTestId('sidebar-archived-delete-all');
+  await expect(del).toHaveAttribute('aria-disabled', 'true');
+  await del.click({ force: true });
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.mouse.move(900, 400);
+  await del.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(
+    '没有可删除的已归档项目',
+  );
 });

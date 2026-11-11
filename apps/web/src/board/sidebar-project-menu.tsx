@@ -377,9 +377,11 @@ export const PROJECT_FILTER_LABELS: Record<ProjectFilter, string> = {
 export function ProjectFilterMenu({
   filter,
   onFilter,
+  className,
 }: {
   filter: ProjectFilter;
   onFilter: (next: ProjectFilter) => void;
+  className?: string;
 }) {
   const { t } = useI18n();
   const label = t('筛选项目');
@@ -395,7 +397,7 @@ export function ProjectFilterMenu({
                   variant="ghost"
                   data-testid="sidebar-project-filter"
                   data-filter={filter}
-                  className={cn(SIDEBAR_ROW_ACTION, filtered && 'bg-(--sidebar-press)')}
+                  className={cn(SIDEBAR_ROW_ACTION, filtered && 'bg-(--sidebar-press)', className)}
                   aria-label={
                     filtered
                       ? t('筛选项目：{value}', { value: t(PROJECT_FILTER_LABELS[filter]) })

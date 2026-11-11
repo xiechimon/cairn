@@ -1331,6 +1331,13 @@ export const EN: Record<string, string> = {
   '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
   已归档的项目: 'Archived projects',
+  全部删除: 'Delete all',
+  没有可删除的已归档项目: 'No archived projects to delete',
+  '删除 {n} 个已归档的项目？': 'Delete {n#1 archived project|# archived projects}?',
+  '它们的对话、任务和仍在进行的工作会一起删除，无法恢复。':
+    'Their conversations, tasks and any work still running are deleted with them. This cannot be undone.',
+  '{n} 个项目没能删除，已留在列表里。':
+    '{n#1 project|# projects} could not be deleted and stay in the list.',
   '在侧栏项目菜单里归档的项目会出现在这里。':
     'Projects you archive from the sidebar project menu appear here.',
   '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',

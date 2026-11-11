@@ -31,6 +31,7 @@ import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
+import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projects-confirm.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
@@ -78,6 +79,7 @@ export interface SidebarProjectActions {
   unarchive: (id: string) => void;
   rename: (id: string, name: string) => Promise<void>;
   remove: (id: string) => void;
+  removeMany: (ids: readonly string[]) => Promise<void>;
   renameGroup: (from: string, to: string) => Promise<void>;
   ungroup: (group: string) => void;
 }
@@ -140,7 +142,7 @@ const STROKE = 1.75;
 const FOCUS =
   'outline-none focus-visible:[outline:var(--focus-width)_solid_var(--focus-ring)] focus-visible:outline-offset-0';
 
-const SIDEBAR_FOOT_ROW = `ml-5.5 flex h-8.5 flex-none items-center justify-start gap-3 rounded-(--cds-radius-md) pr-2 pl-2.5 text-meta text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`;
+const SIDEBAR_FOOT_ROW = `flex h-8.5 flex-none items-center justify-start gap-3 rounded-(--cds-radius-md) pr-2 pl-1.5 text-meta text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`;
 
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
@@ -175,6 +177,28 @@ function SidebarTip({
       </TooltipContent>
     </Tooltip>
   );
+}
+
+function DeleteAllButton({ count, onDelete }: { count: number; onDelete: () => void }) {
+  const { t } = useI18n();
+  const empty = count === 0;
+  const button = (
+    <Button
+      variant="secondary"
+      data-testid="sidebar-archived-delete-all"
+      aria-disabled={empty || undefined}
+      className={cn(
+        'h-7 flex-none rounded-(--cds-radius-md) border-none px-2.5 text-caption font-normal text-foreground pointer-coarse:h-11',
+        empty && 'cursor-not-allowed opacity-50',
+      )}
+      onClick={() => {
+        if (!empty) onDelete();
+      }}
+    >
+      {t('全部删除')}
+    </Button>
+  );
+  return empty ? <SidebarTip label={t('没有可删除的已归档项目')}>{button}</SidebarTip> : button;
 }
 
 function FooterIcon({
@@ -274,12 +298,17 @@ export function BoardSidebar({
     [activeLayout],
   );
   const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
+  const [confirmingAll, setConfirmingAll] = useState(false);
   const archivedPage = filter === 'archived';
   const archivedRows = useMemo(
     () => (archivedPage ? [...layout.ungrouped, ...layout.groups.flatMap((g) => g.projects)] : []),
     [archivedPage, layout],
   );
-  const archivedCount = useMemo(() => present.filter(isArchivedProject).length, [present]);
+  const archivedIds = useMemo(
+    () => present.filter(isArchivedProject).map((row) => row.id),
+    [present],
+  );
+  const archivedCount = archivedIds.length;
   const activeProject = allProjects.some((row) => row.id === projectParam) ? projectParam : null;
   const waitingLabel = t('有任务在等你');
   const archivedLabel = t('已归档');
@@ -523,26 +552,39 @@ export function BoardSidebar({
           }
         />
         {archivedPage && projectsState === undefined && (
-          <div data-testid="sidebar-archived-page" className="flex flex-none flex-col gap-0.5">
-            <div className="mt-3 flex h-8.5 flex-none items-center justify-between pr-1 pl-2.5">
-              <h2 className="m-0 text-ui font-medium text-foreground">{t('已归档的项目')}</h2>
-              <ProjectFilterMenu filter={filter} onFilter={chooseFilter} />
+          <div data-testid="sidebar-archived-page" className="flex flex-none flex-col">
+            <div className="mx-2 mt-3 border-t border-border pt-2.5">
+              <div className="flex h-7 items-center justify-between">
+                <h2 className="m-0 text-[calc(1.25rem*var(--type-scale))] leading-7 font-normal text-foreground">
+                  {t('已归档的项目')}
+                </h2>
+                <ProjectFilterMenu
+                  filter={filter}
+                  onFilter={chooseFilter}
+                  className="size-7 bg-transparent"
+                />
+              </div>
             </div>
-            <p
-              data-testid="sidebar-archived-note"
-              className="m-0 flex-none pr-2 pb-1.5 pl-2.5 text-meta text-content-tertiary"
-            >
-              {t('已归档的项目和它们的对话会一直保留，直到你删除。')}
-            </p>
+            <div className="mx-2 mt-2.5 mb-2 flex items-center gap-2">
+              <p
+                data-testid="sidebar-archived-note"
+                className="m-0 min-w-0 flex-1 text-caption text-content-tertiary"
+              >
+                {t('已归档的项目和它们的对话会一直保留，直到你删除。')}
+              </p>
+              {actions !== undefined && (
+                <DeleteAllButton count={archivedCount} onDelete={() => setConfirmingAll(true)} />
+              )}
+            </div>
             {archivedCount === 0 && (
               <p
                 data-testid="sidebar-archived-empty"
-                className="m-0 flex-none py-1 pr-2 pl-2.5 text-meta text-content-secondary"
+                className="m-0 flex-none py-1 pr-2 pl-3.5 text-meta text-content-secondary"
               >
                 {t('没有已归档的项目')}
               </p>
             )}
-            {projectRows(archivedRows, true)}
+            <div className="flex flex-col gap-0.5">{projectRows(archivedRows, true)}</div>
           </div>
         )}
         {projectsState === 'loading' && (
@@ -684,6 +726,17 @@ export function BoardSidebar({
           </FooterIcon>
         </div>
       </div>
+      {actions !== undefined && (
+        <DeleteArchivedProjectsConfirm
+          count={archivedCount}
+          open={confirmingAll}
+          onClose={() => setConfirmingAll(false)}
+          onConfirm={() => {
+            setConfirmingAll(false);
+            void actions.removeMany(archivedIds);
+          }}
+        />
+      )}
     </aside>
   );
 }
