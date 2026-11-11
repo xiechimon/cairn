@@ -18,7 +18,14 @@ import {
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
+  type RealServer,
+  seedWorld,
+  waitFor,
+} from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const TASK_TITLE = '空白反馈探针';
@@ -69,6 +76,8 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
 }, 120_000);
 

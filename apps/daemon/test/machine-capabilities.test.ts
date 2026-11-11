@@ -193,3 +193,10 @@ describe('probeMachineHardware (#1241 capability fingerprint)', () => {
     expect(beat.skills).toEqual([]);
   });
 });
+
+test('both machine capability probes report the current OS platform', () => {
+  const sources = { mcpConfigPath: join(tmpRoot(), 'absent.json'), skillsDir: tmpRoot() };
+  const osPlatform = ['linux', 'darwin'].includes(process.platform) ? process.platform : 'other';
+  expect(probeMachineCapabilities(sources)).toMatchObject({ osPlatform });
+  expect(createMachineCapabilitiesProbe(sources)()).toMatchObject({ osPlatform });
+});

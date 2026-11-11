@@ -256,6 +256,7 @@ export async function startStack({
           CAIRN_TEAM: team.id,
           CAIRN_EXECUTOR: executor,
           CAIRN_HOOK_TIMEOUT_MS: '180000',
+          CAIRN_CONFINEMENT_PLATFORM: 'test',
           ...(executor === 'orb' ? orbEnv : {}),
         },
       );
@@ -361,6 +362,7 @@ export async function startStack({
           CAIRN_HOME: daemonHome,
           CAIRN_EXECUTOR: executor,
           CAIRN_HOOK_TIMEOUT_MS: '180000',
+          CAIRN_CONFINEMENT_PLATFORM: 'test',
           ...(executor === 'orb' ? orbEnv : {}),
         },
       );

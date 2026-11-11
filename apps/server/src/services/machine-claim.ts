@@ -7,6 +7,7 @@ import {
   buildTaskPromptText,
   claudeLoginBlocksClaim,
   claudeRateBlock,
+  confinementDispatchReady,
   fencedTitle,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
@@ -691,7 +692,23 @@ export async function claimStep(
   body?: MachineClaimBody,
   authorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
-  const stillAuthorized = () => authorized() && readDeployLease(deps.db).status === 'accepting';
+  const stillAuthorized = () => {
+    const capabilities = deps.db
+      .select()
+      .from(machine)
+      .where(eq(machine.id, machineId))
+      .get()?.capabilities;
+    const report = capabilities?.confinement;
+    return (
+      authorized() &&
+      !signal?.aborted &&
+      readDeployLease(deps.db).status === 'accepting' &&
+      confinementDispatchReady(capabilities) &&
+      (capabilities?.osPlatform !== 'linux' ||
+        (report?.generation === body?.confinement?.generation &&
+          report?.invocation === body?.confinement?.invocation))
+    );
+  };
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   const first = await tryClaim(

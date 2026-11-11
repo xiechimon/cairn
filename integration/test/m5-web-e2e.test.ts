@@ -14,7 +14,13 @@ import { step as stepTable } from '../../apps/server/src/db/schema.js';
 import { readFile } from '../../apps/server/src/services/git.js';
 import { dueSchedules } from '../../apps/server/src/services/schedules.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
+  type RealServer,
+  waitFor,
+} from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
@@ -91,6 +97,8 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(() => {
     try {
