@@ -30,10 +30,17 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
   assert.ok(!agents.includes('codex exec` from Claude'));
 });
 
-test('the security review is not part of the merge route', () => {
+test('security surfaces merge on the queue after a recorded security review', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
-  assert.match(agents, /Codex security review is no longer part of the merge route/);
+  assert.match(agents, /\/security-review/);
+  assert.match(agents, /fixed or recorded/);
+  assert.match(agents, /`pr-evidence` fails without that line/);
+  assert.match(agents, /does not add `coordinator-hold`/);
+  assert.match(agents, /cairnwright\[bot\]` author uses the bot queue/);
   assert.doesNotMatch(agents, /Codex `security_review` state on the exact head/);
+  assert.doesNotMatch(agents, /still mark protected paths for routing and ownership/);
+  assert.doesNotMatch(agents, /no separate security approval is required/);
+  assert.doesNotMatch(agents, /which are owner-routed/);
 });
 
 test('AGENTS.md and pr-cairn agree that coordinator-hold is the only hold label', () => {

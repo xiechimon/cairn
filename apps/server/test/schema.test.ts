@@ -20,6 +20,8 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     expect(names).toHaveLength(DB_TABLES.length);
     expect(names).toContain('autonomous_merge_admission');
     expect(names).toContain('chief');
+    expect(names).toContain('thread_conversation');
+    expect(names).toContain('thread_entry');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');
     expect(names).toContain('github_connection');

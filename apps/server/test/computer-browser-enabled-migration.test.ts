@@ -59,7 +59,11 @@ test('machine migration maps legacy on to explicit on and false to unset', () =>
     sqlite.exec(
       "INSERT INTO machine VALUES ('on'), ('off'); INSERT INTO computer VALUES ('on', 1), ('off', 0);",
     );
-    const tag = journal.entries.find((entry) => entry.idx === 149)!.tag;
+    const tag = journal.entries.find((entry) =>
+      readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8').includes(
+        'ADD `browserOverride`',
+      ),
+    )!.tag;
     sqlite.exec(
       readFileSync(join(MIGRATIONS_FOLDER, `${tag}.sql`), 'utf8').replaceAll(
         '--> statement-breakpoint',
