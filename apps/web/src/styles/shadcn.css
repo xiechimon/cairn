@@ -112,6 +112,7 @@
   --dialog-w-l: 640px;
   --dialog-w-xl: 890px;
   --radius-composer: 14px;
+  --radius-code: 10px;
   --radius-tile: 10px;
   --radius-bubble: 18px;
   --radius-reply: 16px;
@@ -176,29 +177,13 @@
   --selection-bar-ink: rgb(255 255 255);
   --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(0 0 0 / 0.24);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
-  --composer-ring: rgb(255 255 255 / 0.08);
+  --composer-fill: var(--reply-bubble-fill);
+  --composer-ring: rgb(255 255 255 / 0.07);
   --composer-ring-focus: rgb(255 255 255 / 0.16);
-  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.35);
-  --shadow-composer: var(--composer-drop), inset 0 0 0 var(--hairline) var(--composer-ring);
+  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.24);
+  --shadow-composer: var(--composer-drop), inset 0 0 0 1px var(--composer-ring);
   --shadow-composer-hover: var(--shadow-composer);
-  --shadow-composer-focus:
-    var(--composer-drop), inset 0 0 0 var(--hairline) var(--composer-ring-focus);
-  --shadow-composer-attached:
-    var(--composer-drop), inset var(--hairline) 0 0 0 var(--composer-ring),
-    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring),
-    inset 0 calc(var(--hairline) * -1) 0 0 var(--composer-ring);
-  --shadow-composer-attached-focus:
-    var(--composer-drop), inset var(--hairline) 0 0 0 var(--composer-ring-focus),
-    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring-focus),
-    inset 0 calc(var(--hairline) * -1) 0 0 var(--composer-ring-focus);
-  --shadow-composer-cap:
-    inset var(--hairline) 0 0 0 var(--composer-ring),
-    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring),
-    inset 0 var(--hairline) 0 0 var(--composer-ring);
-  --shadow-composer-cap-focus:
-    inset var(--hairline) 0 0 0 var(--composer-ring-focus),
-    inset calc(var(--hairline) * -1) 0 0 0 var(--composer-ring-focus),
-    inset 0 var(--hairline) 0 0 var(--composer-ring-focus);
+  --shadow-composer-focus: var(--composer-drop), inset 0 0 0 1px var(--composer-ring-focus);
   --canvas: #1f1f1f;
   --background: #191919;
   --foreground: #f7f7f7;
@@ -286,6 +271,10 @@
   --code-token-comment: #818898;
   --bubble-fill: #33290f;
   --reply-bubble-fill: #292929;
+  --chat-link: #7aa5e0;
+  --task-chip-fill: #353535;
+  --task-wait-tint: #24402a;
+  --task-wait-ink: #8fd18a;
   --reply-bubble-highlight: #353535;
   --code-pill-ring: #333333;
   --tag-ink: 40%;
@@ -335,9 +324,10 @@
   --selection-bar-ink: rgb(255 255 255);
   --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(11 11 11 / 0.08);
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
-  --composer-ring: rgb(0 0 0 / 0.1);
-  --composer-ring-focus: rgb(0 0 0 / 0.2);
-  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.06);
+  --composer-fill: var(--background);
+  --composer-ring: rgb(0 0 0 / 0.13);
+  --composer-ring-focus: rgb(0 0 0 / 0.24);
+  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.04), 0 3px 10px rgb(0 0 0 / 0.05);
   --prose-code-surface: rgb(255 255 255 / 0.5);
   --prose-code-line: rgb(0 0 0 / 0.08);
   --prose-code-fill: rgb(0 0 0 / 0.05);
@@ -422,6 +412,10 @@
   --code-pill-bg: #f2f2f2;
   --bubble-fill: #f3ead6;
   --reply-bubble-fill: #f2f2f2;
+  --chat-link: #2f56b0;
+  --task-chip-fill: #dddddd;
+  --task-wait-tint: #d2ebcc;
+  --task-wait-ink: #2f6b2a;
   --reply-bubble-highlight: #e5e5e5;
   --code-pill-ring: #e6e6e6;
   --tag-ink: 35%;

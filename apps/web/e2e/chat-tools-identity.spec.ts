@@ -33,7 +33,7 @@ test('I3: assistant message copy stays available', async ({ page }) => {
   const reply = page.locator('[data-row="agent"]').filter({ has: page.locator('.chat-copy') }).first();
   const heading = await reply.locator('h2').innerText();
   await reply.hover();
-  await reply.getByRole('button', { name: '复制', exact: true }).click();
+  await reply.getByTestId('msg-actions').getByRole('button', { name: '复制', exact: true }).click();
   const clipboard = await readClipboard(page);
   expect(clipboard).toContain(`## ${heading}`);
   expect(clipboard).toContain('`ls -la`');

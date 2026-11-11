@@ -5,6 +5,7 @@ import { useThreadHref } from '../board/thread-link.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { Eye } from '../icons/index.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_UI } from '../phase.js';
 import { AttachmentChip, AttachmentPreviewHandler } from './attachment-chip.js';
@@ -16,6 +17,8 @@ const CODE_SKIN: Record<string, string> = {
 };
 const ANCHOR_SKIN =
   'text-inherit underline decoration-current/40 underline-offset-3 hover:decoration-current';
+const CHAT_ANCHOR_SKIN =
+  'text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)';
 const CODE_LINK_SKIN = 'bg-secondary text-content-secondary';
 
 interface SegmentsProps {
@@ -46,9 +49,9 @@ const TONE_CLASS: Record<StatusTone, { ink: string; tile: string; chip: string }
     chip: 'bg-tint-working-soft text-tint-working-ink',
   },
   wait: {
-    ink: 'text-tint-wait-ink',
-    tile: 'bg-tint-wait',
-    chip: 'bg-tint-wait-soft text-tint-wait-ink',
+    ink: 'text-(--task-wait-ink)',
+    tile: 'bg-(--task-wait-tint)',
+    chip: 'bg-(--task-chip-fill) text-(--chat-link)',
   },
   quiet: {
     ink: 'text-tint-quiet-ink',
@@ -85,6 +88,17 @@ export function taskChipClass(phase: Phase): string {
 export function TodoStatus({ phase }: { phase: Phase }) {
   const { t } = useI18n();
   const { glyph, tone } = CONVERSATION_STATUS[phase];
+  if (tone === 'wait')
+    return (
+      <span
+        role="img"
+        aria-label={t(PHASE_UI[phase].chip)}
+        data-glyph="eye"
+        className="grid size-4 flex-none place-items-center rounded-full bg-(--task-wait-tint) text-(--task-wait-ink)"
+      >
+        <Eye width={11} height={11} />
+      </span>
+    );
   return (
     <StatusGlyph
       kind={glyph}
@@ -159,7 +173,10 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               href={seg.href}
               target="_blank"
               rel="noreferrer"
-              className={cn(ANCHOR_SKIN, seg.strong === true && 'font-semibold')}
+              className={cn(
+                codeClassName === 'chat-code' ? CHAT_ANCHOR_SKIN : ANCHOR_SKIN,
+                seg.strong === true && 'font-semibold',
+              )}
             >
               {seg.text}
             </a>

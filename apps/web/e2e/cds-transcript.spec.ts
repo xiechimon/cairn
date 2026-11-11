@@ -111,7 +111,7 @@ test('CDS transcript: thinking trigger 12/16 medium; code block 12px radius, 14 
     expect(Number(styles.thinkingWeight)).toBeGreaterThanOrEqual(500);
   }
   if (styles.codeRadius != null) {
-    expect(styles.codeRadius).toBe('12px');
+    expect(styles.codeRadius).toBe('10px');
     expect(styles.codeFontSize).toBe('14px');
     expect(styles.codeLineHeight).toBe('22.75px');
   }

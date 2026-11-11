@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 export const TOOLS_OPEN_ATTR = 'data-tools-open';
 
-const MESSAGE_SELECTOR = '[data-testid="chief-msg"]';
+const MESSAGE_SELECTOR = '[data-testid="chief-msg"], [data-tools-root]';
 const INTERACTIVE_SELECTOR =
   'a, button, input, textarea, select, summary, label, [role="button"], [role="menuitem"], [contenteditable="true"]';
 const COARSE_QUERY = '(pointer: coarse)';

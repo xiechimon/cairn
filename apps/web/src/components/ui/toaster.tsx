@@ -37,7 +37,7 @@ function Toaster({ ...props }: ToasterProps) {
       theme={theme}
       position="top-center"
       offset={{ top: 16 }}
-      mobileOffset={{ top: 56, left: 16, right: 16 }}
+      mobileOffset={{ top: 66, left: 16, right: 16 }}
       className="group"
       icons={{
         success: <CircleCheck className="size-5 text-running-text" />,

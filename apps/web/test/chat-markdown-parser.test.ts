@@ -164,3 +164,37 @@ describe('reply bubbles', () => {
     ]);
   });
 });
+
+describe('progress checklist items keep everything under them', () => {
+  const tasksOf = (text: string) => {
+    const tasks = parseChatMarkdown(text).find((block) => block.kind === 'tasks');
+    if (tasks?.kind !== 'tasks') throw new Error('no tasks block');
+    return tasks.items;
+  };
+  const textOf = (blocks: ChatBlock[]): string => JSON.stringify(blocks);
+
+  it('keeps nested bullets under a progress item', () => {
+    const [deploy] = tasksOf('- [~] Deploy\n  - Run migrations\n  - Restart services');
+    expect(deploy?.segments.map((s) => s.text).join('')).toBe('Deploy');
+    expect(deploy?.blocks.map((block) => block.kind)).toEqual(['list']);
+    expect(textOf(deploy?.blocks ?? [])).toContain('Run migrations');
+    expect(textOf(deploy?.blocks ?? [])).toContain('Restart services');
+  });
+
+  it('keeps a second paragraph under a progress item', () => {
+    const [deploy] = tasksOf('- [~] Deploy\n\n  Waiting on the staging window.');
+    expect(textOf(deploy?.blocks ?? [])).toContain('Waiting on the staging window.');
+  });
+
+  it('keeps a fenced code block under a progress item', () => {
+    const [deploy] = tasksOf('- [/] Deploy\n\n  ```sh\n  pnpm migrate\n  ```');
+    expect(deploy?.blocks).toEqual([{ kind: 'code', lang: 'sh', text: 'pnpm migrate' }]);
+  });
+
+  it('keeps the children of a sibling item in the same run', () => {
+    const items = tasksOf('- [x] Build\n  - Lint passed\n- [~] Deploy');
+    expect(items.map((item) => item.state)).toEqual(['done', 'doing']);
+    expect(textOf(items[0]?.blocks ?? [])).toContain('Lint passed');
+    expect(items[1]?.blocks).toEqual([]);
+  });
+});

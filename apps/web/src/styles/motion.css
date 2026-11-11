@@ -236,13 +236,3 @@
 [data-slot="message-scroller-button"][data-active="false"] {
   transition-duration: var(--dur-fast);
 }
-
-@keyframes question-fade-out {
-  to {
-    opacity: 0;
-  }
-}
-
-.question-leaving {
-  animation: question-fade-out var(--dur-overlay) var(--ease-standard) forwards;
-}

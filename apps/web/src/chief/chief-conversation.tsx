@@ -52,13 +52,14 @@ import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { AnswerComposer } from './answer-composer.js';
+import { type BubbleRun, bubbleRuns } from './bubble-runs.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import {
   ChiefConnectionBanner,
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
-import { ChiefQuestionDock, useAnswerKey, useQuestionDockVisible } from './chief-question-dock.js';
+import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
 import { serverDraftBinding } from './composer-binding.js';
 import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
@@ -74,7 +75,7 @@ import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
-  'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 px-4 pt-8 [overflow-wrap:anywhere]';
+  'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
 
@@ -157,11 +158,13 @@ export function ChiefConversation({
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
-  const questionAttached = useQuestionDockVisible();
+  const questionPending = useQuestionPending();
   const { t, locale } = useI18n();
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
-  const [previewReply, setPreviewReply] = useState<string | null>(null);
+  const quickKey = (chief.quickReplies ?? []).join('\n');
+  const [preview, setPreview] = useState<{ key: string; text: string } | null>(null);
+  const previewReply = preview !== null && preview.key === quickKey ? preview.text : null;
   const composerPlaceholder =
     previewReply ??
     targetPlaceholder ??
@@ -343,7 +346,7 @@ export function ChiefConversation({
     [todoGlances, todosQ.data],
   );
   const empty = (chief.stream?.length ?? 0) === 0;
-  const heroLayout = empty && !heroCollapsed;
+  const heroLayout = empty && !heroCollapsed && !questionPending;
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
@@ -371,7 +374,7 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = awaitingStream(chief.stream ?? [], questionAttached).map((item, i) => ({
+  const allRows = awaitingStream(chief.stream ?? [], questionPending).map((item, i) => ({
     item,
     i,
   }));
@@ -446,7 +449,7 @@ export function ChiefConversation({
   );
   const clock = useMinuteClock();
   const dividerClock = { previousAt: null as number | null };
-  const streamRow = ({ item, i }: GroupedRow) => {
+  const streamRow = ({ item, i }: GroupedRow, run: BubbleRun | undefined) => {
     const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
     const divider =
       at !== null && needsTimeDivider(dividerClock.previousAt, at) ? (
@@ -465,11 +468,11 @@ export function ChiefConversation({
     return (
       <Fragment key={chiefStreamRowKey(item, i)}>
         {divider}
-        {row(item, i)}
+        {row(item, i, run)}
       </Fragment>
     );
   };
-  const row = (item: GroupedRow['item'], i: number) => (
+  const row = (item: GroupedRow['item'], i: number, run: BubbleRun | undefined) => (
     <ChiefStreamRow
       item={item}
       index={i}
@@ -482,6 +485,8 @@ export function ChiefConversation({
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
       onRetry={latestUser != null && i > latestUser.i ? retryLastUser : undefined}
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
+      joinsPrev={run?.joinsPrev === true}
+      joinsNext={run?.joinsNext === true}
     />
   );
   const keepsOwnRow = (item: ChiefStreamItem) =>
@@ -496,8 +501,8 @@ export function ChiefConversation({
   const quickReplies = (
     <QuickReplies
       replies={chief.quickReplies}
-      hidden={questionAttached || answerActive || !answerHere}
-      onPreview={setPreviewReply}
+      hidden={questionPending || answerActive || !answerHere}
+      onPreview={(text) => setPreview(text === null ? null : { key: quickKey, text })}
       onSend={
         onSend == null
           ? undefined
@@ -509,13 +514,16 @@ export function ChiefConversation({
       }
     />
   );
-  const renderRows = (list: StreamRow[]) =>
-    groupThreadEvents(list, keepsOwnRow).map((grouped) => (
-      <Fragment key={chiefStreamRowKey(grouped.item, grouped.i)}>
-        {streamRow(grouped)}
-        {quickAfter !== undefined && grouped.item === quickAfter && quickReplies}
+  const renderRows = (list: StreamRow[]) => {
+    const grouped = groupThreadEvents(list, keepsOwnRow);
+    const runs = bubbleRuns(grouped, dividerClock.previousAt);
+    return grouped.map((entry, n) => (
+      <Fragment key={chiefStreamRowKey(entry.item, entry.i)}>
+        {streamRow(entry, runs[n])}
+        {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
       </Fragment>
     ));
+  };
   const intro = !chief.bound && showBindGate && (
     <div
       data-testid="chief-gate"
@@ -565,6 +573,7 @@ export function ChiefConversation({
                         {renderRows(rows.slice(day.earlier))}
                       </>
                     )}
+                    <ChiefQuestion bound={answerHere} />
                   </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
@@ -604,7 +613,6 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="group/composer flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock bound={answerHere} ownFooter={mode === 'thread'} />
         {composerReplacement ?? (
           <>
             {composerError != null && (
@@ -631,7 +639,6 @@ export function ChiefConversation({
                 onStop: () => stopTurnRef.current?.(),
               }}
               active={!answerActive}
-              attached={questionAttached && answerHere}
               onFocusEnter={() => {
                 focusedComposerRef.current = THREAD_COMPOSER;
               }}
@@ -656,7 +663,6 @@ export function ChiefConversation({
                 answerKey={answerKey}
                 handleRef={answerSurfaceRef}
                 active={answerActive}
-                attached={questionAttached}
                 onFocusEnter={() => {
                   focusedComposerRef.current = answerKey;
                 }}

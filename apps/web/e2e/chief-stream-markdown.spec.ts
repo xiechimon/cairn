@@ -342,6 +342,33 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(page).toHaveURL(/[?&]thread=t16/);
   });
 
+  test('a progress checklist keeps the sub-steps, paragraphs and code under each item', async ({ page }) => {
+    await stubEventSource(page);
+    await stubCdnAvatar(page);
+    await mockChiefLiveApi(page, {
+      final: true,
+      messages: [
+        {
+          id: 'm9',
+          role: 'assistant',
+          content:
+            '- [x] Build\n  - Lint passed\n- [~] Deploy\n  - Run migrations\n  - Restart services\n\n  Waiting on the staging window.\n\n  ```sh\n  pnpm migrate\n  ```',
+          createdAt: 9,
+        },
+      ],
+    });
+    await page.goto('/app?chief=chief-bbb');
+    const card = page.getByTestId('home-c').getByTestId('md-tasks');
+    await expect(card.getByTestId('md-task')).toHaveCount(2);
+    const [build, deploy] = [card.getByTestId('md-task').nth(0), card.getByTestId('md-task').nth(1)];
+    await expect(build.getByTestId('md-task-children')).toContainText('Lint passed');
+    const children = deploy.getByTestId('md-task-children');
+    await expect(children).toContainText('Run migrations');
+    await expect(children).toContainText('Restart services');
+    await expect(children).toContainText('Waiting on the staging window.');
+    await expect(children.getByTestId('md-code')).toContainText('pnpm migrate');
+  });
+
   test('F-R15: copy payload = markdown source (not rendered output); the tool row (reply/copy/more) is unaffected', async ({
     page,
   }) => {

@@ -1,6 +1,6 @@
 import { pendingQuestions } from '../board/needs-you.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
-import type { ChiefQuestionItem } from './chief-question-card.js';
+import type { ChiefQuestionItem } from './question-chips.js';
 
 export interface OriginChiefQuestion {
   teamId: string;

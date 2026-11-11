@@ -45,13 +45,6 @@
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet and on card 4.99, AA for 12px and 13.5px text)"
     },
     {
-      "file": "apps/web/src/chief/chief-question-card.tsx",
-      "anchor": "const STATUS_WAITING_INK = 'text-(--card-button)';",
-      "role": "indicator",
-      "reason": "Coordinator question card status for a question waiting on the user (icon + 等你回答, #1398). A needs-you state: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label. 已回答 / 已取消 stay ink-3.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 12px text)"
-    },
-    {
       "file": "apps/web/src/components/notice-banner.tsx",
       "anchor": "warning: 'text-(--card-button)'",
       "role": "indicator",

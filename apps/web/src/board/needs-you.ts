@@ -1,4 +1,4 @@
-import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
+import type { ChiefQuestionItem } from '../chief/question-chips.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
 import { threadStatus } from './thread-copy.js';
 

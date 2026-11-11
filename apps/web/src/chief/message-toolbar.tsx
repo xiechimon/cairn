@@ -1,6 +1,6 @@
 import { cn } from 'cn';
-import { Ellipsis, Reply } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Ellipsis, Reply, X } from 'lucide-react';
+import { type ReactNode, useLayoutEffect, useRef } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -30,6 +30,49 @@ const PLACEMENT_CLS: Record<ToolbarPlacement, string> = {
   'below-end': `mt-1 hidden justify-end self-end ${TOUCH_REVEAL}`,
 };
 
+function clipEdges(node: HTMLElement): { left: number; right: number } {
+  let left = 0;
+  let right = document.documentElement.clientWidth;
+  for (let up = node.parentElement; up !== null; up = up.parentElement) {
+    const style = getComputedStyle(up);
+    if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+    const box = up.getBoundingClientRect();
+    left = Math.max(left, box.left);
+    right = Math.min(right, box.right);
+  }
+  return { left, right };
+}
+
+const EDGE_GAP = 8;
+
+function useKeepInside(placement: ToolbarPlacement) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    const block = node?.parentElement;
+    if (node == null || block == null || (placement !== 'right' && placement !== 'left')) return;
+    const fit = () => {
+      node.style.transform = '';
+      delete node.dataset.clamped;
+      const edges = clipEdges(node);
+      const shiftFor = (box: DOMRect) =>
+        placement === 'right'
+          ? Math.min(0, edges.right - EDGE_GAP - box.right)
+          : Math.max(0, edges.left + EDGE_GAP - box.left);
+      if (shiftFor(node.getBoundingClientRect()) === 0) return;
+      node.dataset.clamped = '';
+      node.style.transform = `translateX(${shiftFor(node.getBoundingClientRect())}px)`;
+    };
+    block.addEventListener('pointerenter', fit);
+    block.addEventListener('focusin', fit);
+    return () => {
+      block.removeEventListener('pointerenter', fit);
+      block.removeEventListener('focusin', fit);
+    };
+  }, [placement]);
+  return ref;
+}
+
 export function MessageToolbar({
   placement,
   stamp,
@@ -37,6 +80,7 @@ export function MessageToolbar({
   onReply,
   onCopy,
   onRewind,
+  onDismiss,
   testId,
 }: {
   placement: ToolbarPlacement;
@@ -45,9 +89,11 @@ export function MessageToolbar({
   onReply?: (() => void) | undefined;
   onCopy: () => void;
   onRewind?: (() => void) | undefined;
+  onDismiss?: (() => void) | undefined;
   testId: string;
 }) {
   const { t } = useI18n();
+  const keepInside = useKeepInside(placement);
   const pill = (
     <div
       className="flex flex-none items-center rounded-(--radius-tile) bg-popover p-px shadow-(--e2)"
@@ -103,13 +149,23 @@ export function MessageToolbar({
               {t('恢复到此处')}
             </DropdownMenuItem>
           )}
+          {onDismiss !== undefined && (
+            <DropdownMenuItem
+              variant="destructive"
+              data-testid="chief-question-dismiss"
+              onClick={onDismiss}
+            >
+              <X width={20} height={20} />
+              {t('取消提问')}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
   const meta = (
     <span
-      className="flex items-center gap-2 text-caption whitespace-nowrap text-(--text-tertiary)"
+      className="flex items-center gap-2 text-caption whitespace-nowrap text-(--text-tertiary) group-data-clamped/toolbar:rounded-(--radius-control) group-data-clamped/toolbar:bg-popover group-data-clamped/toolbar:px-1.5 group-data-clamped/toolbar:py-0.5 group-data-clamped/toolbar:shadow-(--e2)"
       data-slot="message-toolbar-meta"
     >
       {stamp}
@@ -118,7 +174,8 @@ export function MessageToolbar({
   );
   return (
     <div
-      className={cn('flex items-center gap-3', PLACEMENT_CLS[placement])}
+      ref={keepInside}
+      className={cn('group/toolbar flex items-center gap-3', PLACEMENT_CLS[placement])}
       data-testid={testId}
       data-placement={placement}
     >

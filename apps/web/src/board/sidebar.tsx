@@ -729,7 +729,7 @@ export function BoardSidebar({
             to={machinesTarget}
             title={fleet.title}
             aria-label={fleet.title}
-            className={`flex h-9.5 min-w-0 flex-1 items-center gap-2 rounded-(--cds-radius-lg) pr-2 pl-1.5 text-ui whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) pointer-coarse:h-11 ${FOCUS}`}
+            className={`flex h-9.5 min-w-0 flex-1 items-center gap-2.5 rounded-(--cds-radius-lg) pr-2 pl-2 text-ui whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) pointer-coarse:h-11 ${FOCUS}`}
           >
             <FleetChip tone={fleet.tone} online={machinesOnline} />
             <span className="min-w-0 truncate">

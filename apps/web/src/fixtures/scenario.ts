@@ -1,5 +1,6 @@
 import { accountsDefault, accountsEmpty } from './accounts.js';
 import { activityFixture, activityManyFixture } from './activity.js';
+import { chiefBubbleRuns } from './chief-bubble-runs.js';
 import { chiefDraft, sidebarRef } from './chief-draft.js';
 import { CHIEF_FILES_SCENARIOS } from './chief-files.js';
 import { CHIEF_MARK_SCENARIOS } from './chief-mark.js';
@@ -388,6 +389,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'chief-code': chiefCode,
       'chief-question': chiefQuestion,
       'chief-quick-replies': chiefQuickReplies,
+      'chief-bubble-runs': chiefBubbleRuns,
       'chief-draft': chiefDraft,
       'sidebar-ref': sidebarRef,
       'sidebar-archived': sidebarArchived,

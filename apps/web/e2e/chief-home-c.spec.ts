@@ -19,7 +19,8 @@ test('the home is one Coordinator conversation: no greeting once it has messages
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(2);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question-dock')).toBeVisible();
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toBeVisible();
+  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Coordinator');

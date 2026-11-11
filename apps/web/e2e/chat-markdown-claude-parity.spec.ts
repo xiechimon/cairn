@@ -101,7 +101,7 @@ test('code block header is always visible with the language, expand and copy, an
   expect(geo.head).toBe(40);
   expect(geo.rule).toBe('1px');
   expect(geo.size).toBe(32);
-  expect(geo.pitch).toBe(36);
+  expect(geo.pitch).toBe(32);
 
   await copy.hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('复制');
@@ -159,7 +159,7 @@ test('code block stays inside the reply column and long lines scroll inside it',
   expect(geo.whiteSpace).toBe('pre');
   expect(geo.fontSize).toBe('13px');
   expect(geo.lineHeight).toBe('20px');
-  expect(geo.radius).toBe('12px');
+  expect(geo.radius).toBe('10px');
 });
 
 test('status events are a left-aligned muted line with no rules, and a reply footer never overlaps the reply text', async ({

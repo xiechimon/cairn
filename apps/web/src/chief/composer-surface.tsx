@@ -58,14 +58,19 @@ const ROUND_FACE_CLS = 'grid size-8 place-items-center rounded-full';
 const HOME_COMPOSER_CLS =
   'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-chat flex-none';
 const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
-const ATTACHED_COMPOSER_CLS =
-  'mt-0 shadow-(--shadow-composer-attached) focus-within:shadow-(--shadow-composer-attached-focus)';
-const FREE_COMPOSER_CLS =
-  'rounded-t-(--radius-composer) shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
+const COMPOSER_FIELD_CLS =
+  'shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 
 export interface ComposerSurfaceHandle {
   focus: (options?: FocusOptions) => void;
   attach: (files: File[]) => void;
+}
+
+export interface ComposerSend {
+  label: string;
+  testId: string;
+  enabled: boolean;
+  onClick: () => void;
 }
 
 export interface ComposerSurfaceProps {
@@ -77,9 +82,8 @@ export interface ComposerSurfaceProps {
   onPickProject?: ((project: { id: string }) => void) | undefined;
   slash?: { reviewAvailable: boolean; stopAvailable: boolean; onStop: () => void } | undefined;
   onAdvance?: (() => void) | undefined;
-  primary?: ReactNode;
+  send?: ComposerSend | undefined;
   active?: boolean;
-  attached?: boolean;
   onFocusEnter?: (() => void) | undefined;
   onFocusLeave?: (() => void) | undefined;
   onCancelReply?: (() => void) | undefined;
@@ -107,9 +111,8 @@ export function ComposerSurface({
   onPickProject,
   slash,
   onAdvance,
-  primary,
+  send,
   active = true,
-  attached = false,
   onFocusEnter,
   onFocusLeave,
   onCancelReply,
@@ -201,9 +204,11 @@ export function ComposerSurface({
   const stopMode = canStop && wire.draft === '' && wire.tokens.length === 0;
   const narrow = useNarrow();
   const hasDraft =
-    wire.draft !== '' ||
-    wire.tokens.length > 0 ||
-    pendingAttachments.some((entry) => !entry.failed);
+    send !== undefined
+      ? send.enabled
+      : wire.draft !== '' ||
+        wire.tokens.length > 0 ||
+        pendingAttachments.some((entry) => !entry.failed);
   const showMeter = !live || contextPercent != null;
   const plusMenu = (
     <DropdownMenu>
@@ -217,7 +222,7 @@ export function ComposerSurface({
                   size="icon"
                   aria-label={t('更多')}
                   data-testid="composer-plus"
-                  className={narrow ? ROUND_HIT_CLS : TOOL_BTN_CLS}
+                  className={narrow ? ROUND_HIT_CLS : cn(TOOL_BTN_CLS, 'text-foreground')}
                 />
               }
             />
@@ -273,7 +278,7 @@ export function ComposerSurface({
       inert={!active}
       aria-hidden={active ? undefined : true}
       data-narrow={narrow || undefined}
-      className={cn(HOME_COMPOSER_CLS, attached ? 'mt-0' : 'mt-2')}
+      className={cn(HOME_COMPOSER_CLS, 'mt-2')}
       style={active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       <div
@@ -281,9 +286,9 @@ export function ComposerSurface({
         data-drop-target={dropActive && active ? '' : undefined}
         className={cn(
           active && 'chief-composer',
-          attached ? ATTACHED_COMPOSER_CLS : FREE_COMPOSER_CLS,
-          'data-invalid:ring-1 data-invalid:ring-destructive data-drop-target:ring-2 data-drop-target:ring-(--focus-ring) rounded-b-(--radius-composer) border-0 bg-background',
-          narrow ? 'px-2 py-2' : 'px-3.5 py-2',
+          COMPOSER_FIELD_CLS,
+          'data-invalid:ring-1 data-invalid:ring-destructive data-drop-target:ring-2 data-drop-target:ring-(--focus-ring) rounded-(--radius-composer) border-0 bg-(--composer-fill)',
+          narrow ? 'px-2 py-2' : 'px-3.5 py-2.25',
         )}
       >
         {above}
@@ -412,49 +417,50 @@ export function ComposerSurface({
               listboxId={slashListboxId}
             />
           </div>
-          {primary ??
-            (stopMode ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('停止 Coordinator 这次回复')}
-                className={narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, STOP_CLS)}
-                onClick={onStop}
-              >
-                {narrow ? (
-                  <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
-                    <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                  </span>
-                ) : (
+          {stopMode && send === undefined ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('停止 Coordinator 这次回复')}
+              className={narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, STOP_CLS)}
+              onClick={onStop}
+            >
+              {narrow ? (
+                <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
                   <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                )}
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('发送')}
-                className={
-                  narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
-                }
-                onClick={wire.send}
-              >
-                {narrow ? (
-                  <span
-                    className={cn(
-                      ROUND_FACE_CLS,
-                      hasDraft
-                        ? 'bg-(--card-button) text-(--text-on-accent)'
-                        : 'bg-(--hover-1) text-content-tertiary',
-                    )}
-                  >
-                    <ArrowUp width={20} height={20} />
-                  </span>
-                ) : (
-                  <CornerDownLeft width={20} height={20} />
-                )}
-              </Button>
-            ))}
+                </span>
+              ) : (
+                <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+              )}
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={send?.label ?? t('发送')}
+              data-testid={send?.testId}
+              disabled={send !== undefined && !send.enabled}
+              className={
+                narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
+              }
+              onClick={send?.onClick ?? wire.send}
+            >
+              {narrow ? (
+                <span
+                  className={cn(
+                    ROUND_FACE_CLS,
+                    hasDraft
+                      ? 'bg-(--card-button) text-(--text-on-accent)'
+                      : 'bg-(--hover-1) text-content-tertiary',
+                  )}
+                >
+                  <ArrowUp width={20} height={20} />
+                </span>
+              ) : (
+                <CornerDownLeft width={20} height={20} />
+              )}
+            </Button>
+          )}
         </div>
         {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
         <input
@@ -467,7 +473,7 @@ export function ComposerSurface({
         />
       </div>
       {!narrow && (
-        <div className="mt-1 flex items-center gap-0.5 px-1">
+        <div className="mt-1.5 flex items-center gap-0 px-1.5">
           {plusMenu}
           {tools}
           {showMeter && (

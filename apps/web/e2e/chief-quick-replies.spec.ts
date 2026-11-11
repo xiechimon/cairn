@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { type MockState, mockLive, type Row, THREAD, toolRow } from './chief-home-mock';
+import { type MockState, mockLive, PROJECT, type Row, THREAD, toolRow } from './chief-home-mock';
 
 const REPLIES = ['好，等你汇报', '先只看 README'];
 
@@ -105,11 +105,37 @@ test('clicking a chip sends exactly its text as an owner message and the chips g
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('');
 });
 
-test('a pending question hides the chips: the question dock wins', async ({ page }) => {
+test('a pending question hides the suggested replies: the question chips win', async ({ page }) => {
   await mockLive(page, state({ messages: [...TURN, pendingQuestion] }));
   await page.goto('/app');
-  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question-card')).toBeVisible();
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question-chips')).toBeVisible();
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
+});
+
+test('question chips and suggested-reply chips share one look', async ({ page }) => {
+  const look = (locator: ReturnType<Page['locator']>) =>
+    locator.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return [
+        style.height,
+        style.borderTopWidth,
+        style.borderTopColor,
+        style.borderTopLeftRadius,
+        style.backgroundColor,
+        style.fontSize,
+        style.fontWeight,
+        style.color,
+        style.paddingLeft,
+      ].join(' ');
+    });
+  await mockLive(page, state());
+  await page.goto('/app');
+  const reply = await look(chips(page).first());
+  await mockLive(page, state({ messages: [...TURN, pendingQuestion] }));
+  await page.goto('/app');
+  const option = page.getByTestId('chief-question-option-0-0');
+  await expect(option).toBeVisible();
+  expect(await look(option)).toBe(reply);
 });
 
 const STREAM = `/api/conversations/${THREAD.id}/stream`;
@@ -165,4 +191,51 @@ test('a failed chip send shows the error and keeps the chips', async ({ page }) 
   expect(posts).toBe(1);
   await expect(chips(page)).toHaveText(REPLIES);
   await expect(chips(page).first()).toBeEnabled();
+});
+
+const OTHER = { ...PROJECT, id: 'proj-2', name: 'landing' };
+const PROJECT_TURNS: Row[] = [
+  { id: 'b1', role: 'user', content: '看一下落地页', createdAt: 2, projectId: OTHER.id },
+  { id: 'b2', role: 'assistant', content: '落地页看过了，没有问题。', createdAt: 3 },
+  ...TURN.map((row) => (row.id === 'u1' ? { ...row, projectId: PROJECT.id } : row)),
+];
+
+function projectState(): MockState {
+  return state({ messages: PROJECT_TURNS, projects: [PROJECT, OTHER] });
+}
+
+test('suggestions belong to the turn that made them: another project view does not show them', async ({
+  page,
+}) => {
+  await mockLive(page, projectState());
+  await page.goto(`/app?project=${OTHER.id}&chat=1`);
+  await expect(page.getByTestId('chief-stream')).toContainText('落地页看过了');
+  await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
+  await page.goto('/app');
+  await expect(chips(page)).toHaveText(REPLIES);
+});
+
+test("in the owning project's view the suggestions show and send with that project", async ({ page }) => {
+  const bodies: { content?: string; projectId?: string }[] = [];
+  await mockLive(page, projectState(), (path, route) => {
+    if (route.request().method() === 'POST' && /\/messages$|\/chief\/threads$/.test(path))
+      bodies.push(route.request().postDataJSON() as { content?: string; projectId?: string });
+    return undefined;
+  });
+  await page.goto(`/app?project=${PROJECT.id}&chat=1`);
+  await expect(chips(page)).toHaveText(REPLIES);
+  await chips(page).nth(1).click();
+  await expect.poll(() => bodies.at(-1)).toMatchObject({ content: '先只看 README', projectId: PROJECT.id });
+});
+
+test("a pending question from another project is not answerable from this project's view", async ({
+  page,
+}) => {
+  const question = { ...pendingQuestion, createdAt: 14 };
+  await mockLive(page, state({ messages: [...PROJECT_TURNS, question], projects: [PROJECT, OTHER] }));
+  await page.goto(`/app?project=${OTHER.id}&chat=1`);
+  await expect(page.getByTestId('chief-stream')).toContainText('落地页看过了');
+  await expect(page.getByTestId('chief-question')).toHaveCount(0);
+  await page.goto(`/app?project=${PROJECT.id}&chat=1`);
+  await expect(page.getByTestId('chief-question')).toBeVisible();
 });

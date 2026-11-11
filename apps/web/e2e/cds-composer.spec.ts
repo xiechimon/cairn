@@ -153,7 +153,7 @@ test('CDS composer: one line at rest, like the main composer', async ({ page }) 
   await expect(card.locator('textarea')).toBeVisible();
   await expect(card.locator('textarea')).toHaveAttribute('placeholder', /回复这个任务|开始后才能回复/);
   const geom = await geometry(page);
-  expect(Math.round(geom.cardHeight)).toBe(44);
+  expect(Math.round(geom.cardHeight)).toBe(46);
   expect(geom).toMatchObject({ clearOfSend: true, clearOfPlus: true, bottomsAligned: true });
   await evidencePanelShot(page, 'one-line.png', card);
 });

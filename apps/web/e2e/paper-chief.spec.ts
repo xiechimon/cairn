@@ -136,24 +136,20 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('.settings-card').getByText(/暂无跟进事项/), 'S3').toBeVisible();
   });
 
-  test(`question card: card face, status triad, type keys (${theme})`, async ({ page }) => {
+  test(`question chips: reply bubble face, quiet header, chip type (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
     const win = await openHome(page, QUESTION);
-    const card = await probe(page, 'backgroundColor', 'var(--background)');
-    const accent = await probe(page, 'color', 'var(--card-button)');
+    const fill = await probe(page, 'backgroundColor', 'var(--reply-bubble-fill)');
     const ink3 = await probe(page, 'color', 'var(--text-tertiary)');
 
-    const pending = win.locator('[data-testid="chief-question-card"][data-status="pending"]');
+    const pending = win.locator('[data-testid="chief-question-chips"][data-status="pending"]');
     await pending.scrollIntoViewIfNeeded();
-    await expect(pending, 'Q1').toHaveCSS('border-top-left-radius', await token(page, '--radius-composer'));
-    await expect(pending, 'Q1').toHaveCSS('background-color', card);
-    const waiting = pending.getByTestId('chief-question-status');
-    await expect(waiting, 'Q1').toHaveClass(/sr-only/);
-    await pending.getByTestId('chief-question-collapse').click();
-    await expect(waiting, 'Q1').toHaveText('待你决定');
-    await expect(waiting.locator('svg'), 'Q1').toHaveCount(1);
-    await expect(waiting, 'Q1').toHaveCSS('color', accent);
-    await pending.getByTestId('chief-question-collapse').click();
+    await expect(pending.getByTestId('chief-question-text'), 'Q1').toHaveCSS('background-color', fill);
+    await expect(pending.getByTestId('chief-question-header'), 'Q1').toHaveCSS('color', ink3);
+    await expect(pending.getByTestId('chief-question-option-0-0'), 'Q1').toHaveCSS(
+      'background-color',
+      'rgba(0, 0, 0, 0)',
+    );
 
     const done = win.locator('[data-testid="chief-question-line"][data-status="answered"]');
     await expect(done, 'Q1').toContainText('已回答');

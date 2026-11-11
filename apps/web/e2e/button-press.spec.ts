@@ -32,7 +32,7 @@ for (const surface of SURFACES) {
   test(`a pressed button never moves on ${surface}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(surface);
-    const buttons = page.locator('[data-slot="button"]:visible');
+    const buttons = page.locator('button:is([data-slot="button"], [data-slot="tooltip-trigger"]):visible');
     await expect(buttons.first()).toBeVisible();
     const total = Math.min(await buttons.count(), 30);
     expect(total).toBeGreaterThan(3);

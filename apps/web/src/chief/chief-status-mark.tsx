@@ -5,7 +5,7 @@ import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { useQuestionDockVisible } from './chief-question-dock.js';
+import { useQuestionPending } from './chief-question.js';
 import {
   ANNOUNCE_SETTLE_MS,
   FULL_PEN,
@@ -218,7 +218,7 @@ export function ChiefStatusMark({
   className?: string;
 }) {
   const connected = useConnected();
-  const questionPending = useQuestionDockVisible();
+  const questionPending = useQuestionPending();
   const base = statusMarkView({ chief, questionPending, connected });
   const stream = chief.stream ?? [];
   const lastTurn = lastTurnOf(stream);

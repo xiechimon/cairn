@@ -303,34 +303,31 @@ test.describe('a staged or queued quote keeps its source', () => {
       return json({});
     });
     await page.goto('/app');
-    await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+    await expect(page.getByTestId('chief-question')).toBeVisible();
     const home = page.getByTestId('home-c');
     const input = home.getByTestId('chief-composer-input');
     const answerComposer = page.getByTestId('chief-question-primary');
-    const dockSubmit = page
-      .getByTestId('chief-question-dock')
-      .getByRole('button', { name: '提交回答' });
-    const expectOneAnswerPath = async (owner: 'answer composer' | 'question card') => {
-      await expect(owner === 'answer composer' ? answerComposer : dockSubmit).toBeVisible();
-      await expect(owner === 'answer composer' ? dockSubmit : answerComposer).toHaveCount(0);
+    const chip = page.getByTestId('chief-question').getByTestId('chief-question-option-0-1');
+    const expectOneAnswerPath = async (owner: 'answer composer' | 'question chips') => {
+      await expect(chip).toBeEnabled();
+      if (owner === 'answer composer') await expect(answerComposer).toBeVisible();
+      else await expect(answerComposer).toHaveCount(0);
     };
     await expectOneAnswerPath('answer composer');
     await selectIn(page, 'm6', '已经补给它了');
     await page.getByTestId('selection-reply').click();
-    await expectOneAnswerPath('question card');
+    await expectOneAnswerPath('question chips');
     await input.fill('先别合');
-    await expectOneAnswerPath('question card');
+    await expectOneAnswerPath('question chips');
     await input.fill('');
     await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
     await expect(input).toBeVisible();
-    await expectOneAnswerPath('question card');
-    await page.getByTestId('chief-question-option-0-1').click();
-    await expect(dockSubmit).toBeEnabled();
+    await expectOneAnswerPath('question chips');
     await page.getByTestId('composer-reply-quote-remove').click();
     await expectOneAnswerPath('answer composer');
     await selectIn(page, 'm6', '已经补给它了');
     await page.getByTestId('selection-reply').click();
-    await expectOneAnswerPath('question card');
+    await expectOneAnswerPath('question chips');
     await input.fill('补充一句');
     await input.press('Enter');
     await expect.poll(() => sent.at(-1)).toBe(

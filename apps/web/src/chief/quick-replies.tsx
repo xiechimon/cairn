@@ -3,7 +3,7 @@ import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { useI18n } from '../i18n/provider.js';
 
-const QUICK_REPLY_CLS =
+export const REPLY_CHIP_CLS =
   'h-7 min-h-7 max-w-full cursor-pointer rounded-full border border-border bg-transparent px-2.5 py-0 text-left text-ui font-normal whitespace-normal text-foreground hover:bg-(--menu-hover) dark:bg-transparent dark:hover:bg-(--menu-hover)';
 
 export function QuickReplies({
@@ -33,14 +33,14 @@ export function QuickReplies({
       <fieldset
         aria-label={t('建议回复')}
         data-testid="chief-quick-replies"
-        className="m-0 mt-4 flex min-w-0 pointer-coarse:mt-8 flex-wrap gap-3 border-0 p-0"
+        className="m-0 mt-4 flex min-w-0 flex-wrap gap-3 border-0 p-0"
       >
         {replies.map((text) => (
           <Button
             key={text}
             variant="ghost"
             data-testid="chief-quick-reply"
-            className={QUICK_REPLY_CLS}
+            className={REPLY_CHIP_CLS}
             disabled={sending}
             onClick={() => send(text)}
             onPointerEnter={() => onPreview(text)}

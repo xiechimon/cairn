@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ChiefDigestRow } from '../chief/chief-digest-row.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
-import { ChiefQuestionCard } from '../chief/chief-question-card.js';
+import { QuestionAnsweredLine } from '../chief/question-answered-line.js';
+import { QuestionChips } from '../chief/question-chips.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import {
   DIGEST_ITEMS,
@@ -24,15 +25,17 @@ export function ProductChiefSection() {
       lede="The Coordinator's parts: questions it asks you, the conversation digest, the home summary line, its identity, and outage banners."
     >
       <Specimen
-        id="question-card"
-        title="Question card"
-        note={last ?? 'ChiefQuestionCard: answer with clicks or the number keys'}
+        id="question-chips"
+        title="Question chips"
+        note={
+          last ?? 'QuestionChips: a chip answers, digits pick, the composer types a free answer'
+        }
         stage="canvas"
         className="flex-col"
       >
         <Labeled label="Pending, two steps, the second is multi-select">
           <div className="w-160">
-            <ChiefQuestionCard
+            <QuestionChips
               item={QUESTION_PENDING}
               numberKeys
               onAnswer={({ answers }) =>
@@ -46,12 +49,12 @@ export function ProductChiefSection() {
         </Labeled>
         <Labeled label="Answered">
           <div className="w-160">
-            <ChiefQuestionCard item={QUESTION_ANSWERED} />
+            <QuestionAnsweredLine item={QUESTION_ANSWERED} />
           </div>
         </Labeled>
         <Labeled label="Cancelled">
           <div className="w-160">
-            <ChiefQuestionCard item={QUESTION_CANCELLED} />
+            <QuestionAnsweredLine item={QUESTION_CANCELLED} />
           </div>
         </Labeled>
       </Specimen>

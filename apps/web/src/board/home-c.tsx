@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
 import { TaskCardContext } from '../chief/chief-message-rows.js';
+import { QuestionScopeContext } from '../chief/chief-question.js';
 import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { questionDockState } from '../chief/question-dock-state.js';
 import { useTouchMessageTools } from '../chief/touch-message-tools.js';
@@ -215,6 +216,28 @@ export function HomeC({
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
+  const questionScope = useMemo(
+    () =>
+      projectId === null
+        ? null
+        : new Set(
+            stream.flatMap((item) =>
+              item.kind === 'question' && item.status === 'pending' ? [item.requestId] : [],
+            ),
+          ),
+    [stream, projectId],
+  );
+  const quickOwner = useMemo(() => {
+    const full = chiefData.stream ?? [];
+    const at = full.findLastIndex((item) => item.kind === 'robot' && item.typing !== true);
+    if (at < 0 || full.slice(at).some((item) => item.kind === 'user')) return undefined;
+    return full[at];
+  }, [chiefData.stream]);
+  const quickReplies =
+    quickOwner !== undefined && stream.includes(quickOwner) ? chiefData.quickReplies : undefined;
+  const scopeQuestions = (node: ReactNode) => (
+    <QuestionScopeContext.Provider value={questionScope}>{node}</QuestionScopeContext.Provider>
+  );
   const todoGlances = useMemo(
     () =>
       new Map(
@@ -273,8 +296,7 @@ export function HomeC({
     if (questionTarget === null) return;
     if (stepKind === 'focus') {
       questionDockState.setFocus(focusAt);
-      if (questionDockState.isCollapsed(questionTarget.requestId))
-        questionDockState.toggleCollapsed(questionTarget.requestId);
+      questionDockState.reveal();
       setQuestionTarget(null);
     } else if (stepKind === 'load-earlier') {
       loadEarlier?.();
@@ -526,7 +548,7 @@ export function HomeC({
     setLoadingDraft('');
   }, [handedOver, loadingDraft]);
   if (load !== 'ready') {
-    return (
+    return scopeQuestions(
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="relative flex min-h-0 min-w-0 flex-1">
           <section
@@ -572,11 +594,11 @@ export function HomeC({
           {workPanel}
         </div>
         {phoneChrome}
-      </div>
+      </div>,
     );
   }
 
-  return (
+  return scopeQuestions(
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <section
@@ -599,7 +621,11 @@ export function HomeC({
             <OpenFileContext.Provider value={openFile}>
               <ChiefScrollProvider>
                 <ChiefConversation
-                  chief={{ ...chiefData, stream: conversation }}
+                  chief={{
+                    ...chiefData,
+                    stream: conversation,
+                    ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
+                  }}
                   onSend={
                     archived !== null
                       ? undefined
@@ -659,7 +685,7 @@ export function HomeC({
         {workPanel}
       </div>
       {phoneChrome}
-    </div>
+    </div>,
   );
 }
 

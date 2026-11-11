@@ -84,20 +84,24 @@ export function TaskCard({ items }: { items: TaskItem[] }) {
       data-testid="md-tasks"
     >
       {items.map((item, i) => (
-        <li
-          key={i}
-          className="flex items-start gap-3 text-ui"
-          data-testid="md-task"
-          data-state={item.state}
-        >
-          <TaskIcon state={item.state} />
-          <span
-            className={`min-w-0 ${
-              item.state === 'done' ? 'text-(--text-tertiary) line-through' : 'text-(--foreground)'
-            }`}
-          >
-            <Segments segments={item.segments} codeClassName="chat-code" />
-          </span>
+        <li key={i} className="flex flex-col text-ui" data-testid="md-task" data-state={item.state}>
+          <div className="flex items-start gap-3">
+            <TaskIcon state={item.state} />
+            <span
+              className={`min-w-0 ${
+                item.state === 'done'
+                  ? 'text-(--text-tertiary) line-through'
+                  : 'text-(--foreground)'
+              }`}
+            >
+              <Segments segments={item.segments} codeClassName="chat-code" />
+            </span>
+          </div>
+          {item.blocks.length > 0 && (
+            <div className="mt-1 min-w-0 pl-7 text-(--foreground)" data-testid="md-task-children">
+              <MarkdownBlocks blocks={item.blocks} depth={1} flow="list" />
+            </div>
+          )}
         </li>
       ))}
     </ul>
@@ -165,7 +169,7 @@ function TaskBox({ checked }: { checked: boolean }) {
       checked={checked}
       readOnly
       disabled
-      className="mt-0.75 size-3.5 cursor-default bg-background data-checked:border-(--text-tertiary) data-checked:bg-(--text-tertiary) data-checked:text-(--background) dark:data-checked:border-(--text-tertiary) dark:data-checked:bg-(--text-tertiary) data-disabled:opacity-100"
+      className="mt-0.5 size-4 cursor-default rounded-full border-[1.5px] border-dashed border-(--text-tertiary) bg-transparent data-checked:border-solid data-checked:border-(--text-tertiary) data-checked:bg-(--text-tertiary) data-checked:text-(--card) dark:bg-transparent dark:data-checked:border-(--text-tertiary) dark:data-checked:bg-(--text-tertiary) data-disabled:opacity-100 [&_svg]:size-2.5!"
       data-testid="md-checkbox"
     />
   );
@@ -220,7 +224,7 @@ function MarkdownListItem({
       className={cn(
         'chat-md-item marker:text-(--foreground)',
         ordered ? 'chat-md-item--ordered' : 'chat-md-item--bullet',
-        item.checked !== null && 'flex items-start gap-2.5',
+        item.checked !== null && 'flex items-start gap-3',
         item.checked === true && 'text-(--text-tertiary) line-through',
       )}
       data-testid={
@@ -411,10 +415,10 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
   const title = lang === undefined ? t('代码') : t('{lang} 代码', { lang: capitalize(lang) });
   return (
     <div
-      className="w-fit min-w-48 max-w-full rounded-(--cds-radius-xl) border border-border bg-background"
+      className="w-fit min-w-48 max-w-full rounded-(--radius-code) border border-border bg-background"
       data-testid="md-code-block"
     >
-      <div className="flex h-10 items-center gap-1 border-b border-border pr-1.5 pl-5">
+      <div className="flex h-10 items-center gap-0 border-b border-border pr-1.5 pl-5">
         <span
           className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-tertiary"
           data-testid="md-code-lang"

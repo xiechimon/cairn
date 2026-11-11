@@ -1,7 +1,4 @@
 import { type ReactNode, type Ref, useEffect, useRef, useSyncExternalStore } from 'react';
-import { ShortcutHint } from '../components/shortcut-hint.js';
-import { Button } from '../components/ui/button.js';
-import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { joinDraft, splitDraft } from '../overlay/attachment-paste.js';
@@ -19,7 +16,6 @@ const NO_MENTIONS = { todo: [], agent: [], project: [], skill: [], machine: [] }
 export interface AnswerComposerProps {
   answerKey: string;
   active: boolean;
-  attached: boolean;
   invalid: boolean;
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
@@ -37,7 +33,6 @@ export interface AnswerComposerProps {
 export function AnswerComposer({
   answerKey,
   active,
-  attached,
   invalid,
   onAttachment,
   composerRef,
@@ -87,22 +82,16 @@ export function AnswerComposer({
       onAttachment={attach}
       mentionGroups={NO_MENTIONS}
       onAdvance={advance}
-      primary={
-        <Button
-          data-testid={active ? 'chief-question-primary' : undefined}
-          className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
-          disabled={primary?.enabled !== true}
-          onClick={advance}
-        >
-          {primary?.last === true ? t('提交回答') : t('下一步')}
-          <ShortcutHint keys={['mod', 'enter']} className="pointer-coarse:hidden ml-1" />
-        </Button>
-      }
+      send={{
+        label: primary?.last === false ? t('下一步') : t('提交回答'),
+        testId: active ? 'chief-question-primary' : '',
+        enabled: primary?.enabled === true,
+        onClick: advance,
+      }}
       active={active}
-      attached={attached}
       onFocusEnter={onFocusEnter}
       onFocusLeave={onFocusLeave}
-      placeholder={t('输入你自己的回答，或留空使用选中的选项')}
+      placeholder={t('输入你自己的回答…')}
       invalid={invalid}
       composerRef={composerRef}
       above={above}

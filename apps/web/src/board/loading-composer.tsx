@@ -19,7 +19,7 @@ export function LoadingComposer({ draft, onDraftChange, placeholder }: LoadingCo
       className="mx-auto mt-2 mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-chat flex-none"
     >
       <p className="m-0 mb-1.5 px-1 text-meta text-content-tertiary">{reason}</p>
-      <div className="rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)">
+      <div className="rounded-(--radius-composer) border-0 bg-(--composer-fill) px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)">
         <Textarea
           value={draft}
           placeholder={placeholder}

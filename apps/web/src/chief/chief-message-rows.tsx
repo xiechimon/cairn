@@ -80,6 +80,13 @@ function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: 
   );
 }
 
+function runAttr(joinsPrev: boolean, joinsNext: boolean): string | undefined {
+  if (joinsPrev && joinsNext) return 'middle';
+  if (joinsPrev) return 'last';
+  if (joinsNext) return 'first';
+  return undefined;
+}
+
 const NO_GLANCES: ReadonlyMap<string, TodoGlance> = new Map();
 
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
@@ -90,6 +97,7 @@ const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
 const USER_ROW_CLS = 'mt-5';
+const RUN_ROW_CLS = 'mt-1';
 const EVENT_ROW_CLS = 'mt-5';
 const REPLY_ROW_CLS = 'mt-5';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
@@ -154,7 +162,7 @@ function TaskRefRows({ source }: { source: Parameters<typeof taskRefsOf>[0] }) {
   const refs = taskRefsOf(source, glances ?? NO_GLANCES);
   if (refs.length === 0) return null;
   return (
-    <div className="mb-1.5 flex flex-col gap-0.5" data-testid="chief-task-refs">
+    <div className="mb-2 flex flex-col gap-0.5" data-testid="chief-task-refs">
       {refs.map((ref) => (
         <TaskRefRow key={ref.todoId} taskRef={ref} />
       ))}
@@ -298,6 +306,8 @@ interface ChiefStreamRowProps {
   onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
   entering?: boolean;
   onRetry?: (() => void) | undefined;
+  joinsPrev?: boolean;
+  joinsNext?: boolean;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -337,6 +347,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onReply,
   entering = false,
   onRetry,
+  joinsPrev = false,
+  joinsNext = false,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
@@ -434,8 +446,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message
-          className={`${USER_ROW_CLS} justify-end ${entering ? 'message-enter' : ''}`}
+          className={`${joinsPrev ? RUN_ROW_CLS : USER_ROW_CLS} justify-end ${entering ? 'message-enter' : ''}`}
           data-testid="chief-msg"
+          data-run={runAttr(joinsPrev, joinsNext)}
         >
           <MessageContent
             className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
@@ -454,7 +467,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   data-md={shown != null ? '' : undefined}
                   {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
                   {...highlight(item.id)}
-                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
+                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''} ${joinsNext ? 'rounded-br-(--radius-bubble)' : ''}`}
                 >
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
@@ -571,7 +584,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   const quoted = highlightedSource?.quote ?? '';
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-      <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
+      <Message
+        className={joinsPrev ? RUN_ROW_CLS : REPLY_ROW_CLS}
+        data-testid="chief-msg"
+        data-run={runAttr(joinsPrev, joinsNext)}
+      >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
           {tools.length > 0 && (
             <TraceGroup

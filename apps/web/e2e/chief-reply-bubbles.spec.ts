@@ -38,7 +38,7 @@ test('every top-level block of a reply is its own grey bubble; tables and code a
   await evidenceShot(page, 'chief-reply-bubbles.png');
 });
 
-test('headings, inline styles, quote and task list render through the parser', async ({ page }) => {
+test('headings, inline styles, quote and a task list with the dashed-circle and filled-check glyphs render through the parser', async ({ page }) => {
   await page.goto(ROUTE);
   const message = reply(page);
   await expect(message.locator('h1.chat-md-head')).toHaveCSS('font-size', '18px');
@@ -51,7 +51,22 @@ test('headings, inline styles, quote and task list render through the parser', a
   await expect(boxes.nth(0)).not.toBeChecked();
   await expect(boxes.nth(1)).toBeChecked();
   await expect(boxes.nth(1)).toBeDisabled();
+  await expect(boxes.nth(0)).toHaveCSS('border-top-style', 'dashed');
+  await expect(boxes.nth(0)).toHaveCSS('border-top-left-radius', /e\+\d+px$|^8px$/);
+  await expect(boxes.nth(1).locator('svg')).toHaveCount(1);
+  await expect(message.getByTestId('md-item-task').nth(1)).toHaveCSS('text-decoration-line', 'line-through');
   await expect(message.getByTestId('md-tasks')).toHaveCount(0);
+  const linkInk = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--chat-link)';
+    document.body.append(probe);
+    const value = getComputedStyle(probe).color;
+    probe.remove();
+    return value;
+  });
+  expect(['rgb(47, 86, 176)', 'rgb(122, 165, 224)']).toContain(linkInk);
+  await expect(message.getByRole('link', { name: '链接示例' })).toHaveCSS('color', linkInk);
+  await expect(message.getByRole('link', { name: '链接示例' })).toHaveCSS('text-decoration-line', 'underline');
   await expect(message.getByRole('link', { name: '链接示例' })).toHaveAttribute(
     'href',
     'https://example.com',

@@ -331,8 +331,8 @@
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-question-card.tsx",
-          "apps/web/src/chief/chief-question-dock.tsx",
+          "apps/web/src/chief/question-chips.tsx",
+          "apps/web/src/chief/chief-question.tsx",
           "apps/web/src/chief/question-lifecycle.ts"
         ],
         "server": [
@@ -347,7 +347,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:chief-question-card"
+        "click testid:chief-question-option-0-0"
       ],
       "research": {
         "gap": "the Codex CLI and t3code question patterns behind D85 and D119 were never written up"

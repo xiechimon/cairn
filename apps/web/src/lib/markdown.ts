@@ -6,7 +6,7 @@ import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 
 export type TableAlign = 'left' | 'center' | 'right' | null;
 export type TaskState = AgentTodoItem['state'];
-export type TaskItem = { state: TaskState; segments: DocSegment[] };
+export type TaskItem = { state: TaskState; segments: DocSegment[]; blocks: ChatBlock[] };
 export type ListItem = { checked: boolean | null; blocks: ChatBlock[] };
 
 export type ChatBlock =
@@ -246,7 +246,8 @@ function agentTaskItem(item: Tokens.ListItem): TaskItem {
   const first = segments[0];
   if (first !== undefined) first.text = first.text.replace(ITEM_MARKER, '');
   const state: TaskState = marker !== null ? 'doing' : item.checked === true ? 'done' : 'todo';
-  return { state, segments: segments.filter((seg) => seg.text !== '') };
+  const rest = item.tokens.filter((token) => token !== head && token.type !== 'checkbox');
+  return { state, segments: segments.filter((seg) => seg.text !== ''), blocks: blocksOf(rest) };
 }
 
 function itemBlocks(item: Tokens.ListItem): ChatBlock[] {

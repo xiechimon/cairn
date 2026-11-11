@@ -1,14 +1,10 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
 import { THREAD_PARAM } from '../board/thread-copy.js';
+import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  ChiefQuestionCard,
-  type ChiefQuestionItem,
-  type QuestionPager,
-  recommendedFirst,
-} from './chief-question-card.js';
 import { useOptionalChiefRoot } from './chief-root.js';
+import { QuestionChips, type QuestionPager, recommendedFirst } from './question-chips.js';
 import { clampQuestionIndex } from './question-dock-index.js';
 import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
@@ -18,10 +14,7 @@ import {
   questionDraftStore,
   questionSubmitStore,
 } from './question-drafts.js';
-import { leavingQuestion, QUESTION_FADE_MS } from './question-lifecycle.js';
 import type { OriginChiefQuestion } from './question-origin.js';
-
-const DOCK_CLS = 'flex min-h-0 flex-col gap-1.5';
 
 function draftKeyOf(request: OriginChiefQuestion): string {
   return questionDraftKey({
@@ -52,64 +45,20 @@ function stepComplete(request: OriginChiefQuestion, typed: boolean): boolean {
   return questionDraftComplete(record?.drafts[step], questions[step]);
 }
 
-function DockQuestion({
-  request,
-  numberKeys,
-  pager,
-  bound,
-  ownFooter,
-}: {
-  request: OriginChiefQuestion;
-  numberKeys: boolean;
-  pager: QuestionPager | undefined;
-  bound: boolean;
-  ownFooter: boolean;
-}) {
-  const root = useOptionalChiefRoot();
-  const key = draftKeyOf(request);
-  const error = useSyncExternalStore(
-    questionDraftStore.subscribe,
-    () => questionSubmitStore.get(key).error,
-    () => null,
-  );
-  return (
-    <>
-      {error !== null && (
-        <p
-          role="status"
-          data-testid="chief-question-error"
-          className="m-0 text-ui text-destructive"
-        >
-          {error}
-        </p>
-      )}
-      <ChiefQuestionCard
-        item={request.item}
-        draftKey={key}
-        numberKeys={numberKeys}
-        {...(pager !== undefined ? { pager } : {})}
-        bound={bound}
-        ownFooter={ownFooter}
-        onAnswer={(input) =>
-          root?.surface.onAnswerQuestion?.({ ...input, threadId: request.conversationId })
-        }
-        onCancel={(requestId) =>
-          root?.surface.onCancelQuestion?.(requestId, request.conversationId)
-        }
-      />
-    </>
-  );
-}
+export const QuestionScopeContext = createContext<ReadonlySet<string> | null>(null);
 
 function useShownQuestions(): OriginChiefQuestion[] {
   const root = useOptionalChiefRoot();
+  const scope = useContext(QuestionScopeContext);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   return (root?.pendingQuestions ?? []).filter(
-    (request) => !questionDockState.isDismissing(request.item.requestId),
+    (request) =>
+      (scope === null || scope.has(request.item.requestId)) &&
+      !questionDockState.isDismissing(request.item.requestId),
   );
 }
 
-export function useQuestionDockVisible(): boolean {
+export function useQuestionPending(): boolean {
   return useShownQuestions().length > 0;
 }
 
@@ -125,30 +74,27 @@ export function useAnswerKey(): string | null {
   return answerKeyOf(draftKeyOf(shown), stepOf(shown));
 }
 
-function useLeavingQuestion(shownId: string | undefined): ChiefQuestionItem | null {
-  const root = useOptionalChiefRoot();
-  const streamRef = useRef(root?.surface.chiefData.stream ?? []);
-  streamRef.current = root?.surface.chiefData.stream ?? [];
-  const lastId = useRef<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [leaving, setLeaving] = useState<ChiefQuestionItem | null>(null);
-  useEffect(() => {
-    const previous = lastId.current;
-    lastId.current = shownId ?? null;
-    if (shownId !== undefined) setLeaving(null);
-    if (previous === null || previous === shownId) return;
-    const done = leavingQuestion(previous, streamRef.current);
-    if (done === null) return;
-    setLeaving(done);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setLeaving(null), QUESTION_FADE_MS);
-  }, [shownId]);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  return leaving;
+function QuestionError({ draftKey }: { draftKey: string }) {
+  const error = useSyncExternalStore(
+    questionDraftStore.subscribe,
+    () => questionSubmitStore.get(draftKey).error,
+    () => null,
+  );
+  if (error === null) return null;
+  return (
+    <p
+      role="status"
+      data-testid="chief-question-error"
+      className="m-0 mt-1 text-meta text-destructive"
+    >
+      {error}
+    </p>
+  );
 }
 
-export function ChiefQuestionDock({ bound, ownFooter }: { bound: boolean; ownFooter: boolean }) {
+export function ChiefQuestion({ bound }: { bound: boolean }) {
   const { t } = useI18n();
+  const root = useOptionalChiefRoot();
   const [searchParams] = useSearchParams();
   const numberKeys = bound && searchParams.get(THREAD_PARAM) === null;
   const pending = useShownQuestions();
@@ -159,23 +105,17 @@ export function ChiefQuestionDock({ bound, ownFooter }: { bound: boolean; ownFoo
     () => pending.map((request) => `${stepOf(request)}:${stepComplete(request, false)}`).join(','),
     () => '',
   );
+  const reveals = questionDockState.reveals();
+  const itemRef = useRef<HTMLDivElement | null>(null);
+  const revealedRef = useRef(reveals);
+  useEffect(() => {
+    if (revealedRef.current === reveals) return;
+    revealedRef.current = reveals;
+    itemRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [reveals]);
   const at = clampQuestionIndex(index, pending.length);
   const shown = pending[at];
-  const leaving = useLeavingQuestion(shown?.item.requestId);
-  const wrapCls = `${DOCK_CLS} mx-auto mt-2 w-[calc(100%-2rem)] max-w-chat`;
-  if (shown === undefined) {
-    if (leaving === null) return null;
-    return (
-      <section
-        inert
-        data-testid="chief-question-leaving"
-        aria-hidden="true"
-        className={`${wrapCls} question-leaving pointer-events-none`}
-      >
-        <ChiefQuestionCard item={leaving} />
-      </section>
-    );
-  }
+  if (shown === undefined) return null;
   const counts = pending.map((request) => request.item.questions.length);
   const total = counts.reduce((sum, count) => sum + count, 0);
   const step = stepOf(shown);
@@ -217,16 +157,31 @@ export function ChiefQuestionDock({ bound, ownFooter }: { bound: boolean; ownFoo
           },
         }
       : undefined;
+  const key = draftKeyOf(shown);
   return (
-    <section data-testid="chief-question-dock" aria-label={t('待回答的提问')} className={wrapCls}>
-      <DockQuestion
-        key={shown.item.requestId}
-        request={shown}
-        numberKeys={numberKeys}
-        pager={pager}
-        bound={bound}
-        ownFooter={ownFooter}
-      />
-    </section>
+    <MessageScrollerItem>
+      <section
+        ref={itemRef}
+        data-testid="chief-question"
+        aria-label={t('待回答的提问')}
+        className="mt-5"
+      >
+        <QuestionChips
+          key={shown.item.requestId}
+          item={shown.item}
+          draftKey={key}
+          numberKeys={numberKeys}
+          {...(pager !== undefined ? { pager } : {})}
+          bound={bound}
+          onAnswer={(input) =>
+            root?.surface.onAnswerQuestion?.({ ...input, threadId: shown.conversationId })
+          }
+          onCancel={(requestId) =>
+            root?.surface.onCancelQuestion?.(requestId, shown.conversationId)
+          }
+        />
+        <QuestionError draftKey={key} />
+      </section>
+    </MessageScrollerItem>
   );
 }

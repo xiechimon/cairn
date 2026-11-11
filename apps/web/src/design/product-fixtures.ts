@@ -8,7 +8,7 @@ import {
   type ProjectRecord,
   type TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
-import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
+import type { ChiefQuestionItem } from '../chief/question-chips.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type {
   ChangesContent,

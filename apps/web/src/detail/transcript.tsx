@@ -309,7 +309,7 @@ function Row({
           <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
             {item.markdown != null ? (
               <div
-                className="chat-text min-w-0 font-sans text-ui leading-5 break-words text-(--foreground)"
+                className="chat-text min-w-0 max-w-full font-sans text-ui leading-5 break-words text-(--foreground)"
                 data-testid="agent-text"
               >
                 <ChatMarkdown text={item.markdown} bubbles />
@@ -361,6 +361,7 @@ function Row({
             items={item.items.map((it) => ({
               state: it.state,
               segments: inlineSegments(it.text),
+              blocks: [],
             }))}
           />
         </div>

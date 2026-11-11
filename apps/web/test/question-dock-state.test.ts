@@ -30,4 +30,16 @@ describe('question dock state', () => {
     questionDockState.endUpload();
     expect(questionDockState.uploading()).toBe(false);
   });
+
+  test('a reveal bumps the reveal count and notifies subscribers', () => {
+    let heard = 0;
+    const stop = questionDockState.subscribe(() => {
+      heard += 1;
+    });
+    const before = questionDockState.reveals();
+    questionDockState.reveal();
+    expect(questionDockState.reveals()).toBe(before + 1);
+    expect(heard).toBe(1);
+    stop();
+  });
 });

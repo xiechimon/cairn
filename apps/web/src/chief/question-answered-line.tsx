@@ -1,6 +1,6 @@
 import { Ban, CircleCheck } from 'lucide-react';
 import { useI18n } from '../i18n/provider.js';
-import type { ChiefQuestionItem } from './chief-question-card.js';
+import type { ChiefQuestionItem } from './question-chips.js';
 import { answerSummary } from './question-lifecycle.js';
 
 export function QuestionAnsweredLine({ item }: { item: ChiefQuestionItem }) {

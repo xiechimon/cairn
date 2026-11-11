@@ -24,9 +24,9 @@ import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.j
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_CARD =
-  'composer relative mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-2 py-2';
+  'composer relative mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-2 py-2.25';
 const COMPOSER_CARD_EDITABLE =
-  'bg-background shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
+  'bg-(--composer-fill) shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 const COMPOSER_CARD_READ_ONLY = 'bg-secondary shadow-(--shadow-composer)';
 const COMPOSER_INPUT =
   'field-sizing-fixed h-7 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 py-1 font-sans text-ui leading-5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent';

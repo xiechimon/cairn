@@ -8,7 +8,7 @@ test('with a pending question and a task thread open at 1440 the header keeps it
   const header = page.getByTestId('home-c-pane-buttons');
   await expect(header).toBeVisible();
   await expect(page.getByTestId('side-chat')).toBeVisible();
-  await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+  await expect(page.getByTestId('chief-question')).toBeVisible();
   const column = (await page.getByTestId('home-c').boundingBox())!;
   await expect(header.getByRole('heading', { level: 1 })).toHaveText('Coordinator');
   await expect(header.getByRole('heading', { level: 1 })).toHaveClass(/sr-only/);
