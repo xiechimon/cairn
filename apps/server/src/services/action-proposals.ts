@@ -224,6 +224,7 @@ export function answerProposal(
         outcome.status = 'refused';
         return;
       }
+      let handlerFailed = false;
       try {
         tx.transaction((savepoint) => {
           const removed = deleteProject(
@@ -236,13 +237,17 @@ export function answerProposal(
           );
           if (!removed) throw notFound(`project ${row.targetId}`);
         });
-        closeProposal(tx, row, 'executed', 'allow-once', input.decidedBy, now);
-        outcome.status = 'executed';
       } catch {
+        handlerFailed = true;
+      }
+      if (handlerFailed) {
         journal(tx, row, 'error', now);
         closeProposal(tx, row, 'failed', 'allow-once', input.decidedBy, now);
         outcome.status = 'failed';
+        return;
       }
+      closeProposal(tx, row, 'executed', 'allow-once', input.decidedBy, now);
+      outcome.status = 'executed';
     },
     { behavior: 'immediate' },
   );

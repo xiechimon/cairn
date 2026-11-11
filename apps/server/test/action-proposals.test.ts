@@ -289,6 +289,25 @@ describe('action proposals', () => {
     s.dispose();
   });
 
+  test('a failed executed transition rolls back the delete and keeps the proposal pending', async () => {
+    const s = world();
+    const proposed = propose(s, 'thread-a', 'project-a') as { proposalId: string };
+    s.db.run(
+      "CREATE TRIGGER reject_executed BEFORE UPDATE ON action_proposal WHEN NEW.status = 'executed' BEGIN SELECT RAISE(FAIL, 'proposal close unavailable'); END",
+    );
+    const answered = await req(
+      s.app,
+      'POST',
+      `/api/actions/proposals/${proposed.proposalId}/answer`,
+      { decision: 'allow-once' },
+    );
+    expect(answered.status).toBe(500);
+    expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
+    expect(s.db.select().from(actionJournal).all()).toEqual([]);
+    s.dispose();
+  });
+
   test('always is refused and the proposal stays pending', async () => {
     const s = world();
     const proposed = propose(s, 'thread-a', null) as { proposalId: string };
