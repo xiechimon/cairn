@@ -1496,9 +1496,7 @@ export async function applyBuildStepAction(
       .get();
     const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
     const prClosed: 'merged' | 'closed' | null =
-      reworkTarget !== null
-        ? await probeReworkTargetPr(deps, reworkTarget, todoRecord, true)
-        : null;
+      reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
     const afterCommit: (() => void)[] = [];
     const transcriptDeps = { ...deps, afterCommit };
     deps.db.transaction(() => {

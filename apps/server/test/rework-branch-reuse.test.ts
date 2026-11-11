@@ -54,20 +54,8 @@ interface WorldOpts {
   githubFetch?: FetchLike;
 }
 
-const openPullFetch = (async () => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ state: 'open', merged: false }),
-  headers: { get: () => null },
-})) as unknown as FetchLike;
-
-function makeWorld(rawOpts: WorldOpts = {}): World {
-  const opts: WorldOpts = {
-    repoKind: 'github',
-    githubFetch: openPullFetch,
-    ...rawOpts,
-  };
-  const s = bootServer({ githubFetch: opts.githubFetch! });
+function makeWorld(opts: WorldOpts = {}): World {
+  const s = bootServer(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {});
   disposables.push(() => s.dispose());
   const base = nowMs();
   const suffix = Math.random().toString(36).slice(2);
@@ -344,7 +332,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     ).toBe(true);
   });
 
-  test('failure mode 5: the probe fails -> restart refuses with 409 and changes nothing (same as steer)', async () => {
+  test('failure mode 5: the probe fails -> fail-open reuse (no blind new branch)', async () => {
     const fetchMock: FetchLike = (async () => ({
       ok: false,
       status: 500,
@@ -352,13 +340,10 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
       headers: { get: () => null },
     })) as unknown as FetchLike;
     const w = makeWorld({ repoKind: 'github', githubFetch: fetchMock });
-    await expect(restart(w, '再试一次')).rejects.toMatchObject({
-      status: 409,
-      message: expect.stringContaining('Could not read PR'),
-    });
+    await restart(w, '再试一次');
     expect(buildsOf(w)).toHaveLength(1);
-    expect(todoRowOf(w).phase).toBe('failed');
-    expect(stepsOf(w, w.buildId).filter((st) => st.kind === 'plan')).toHaveLength(0);
+    const fresh = stepsOf(w, w.buildId).filter((st) => st.kind === 'plan');
+    expect(fresh[0]!.freshSession).toBe(true);
   });
 
   test('failure mode 6: no build with a PR -> the current new-build behavior kept (regression pin)', async () => {
@@ -441,16 +426,6 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
   test('failure mode 9: a revision rejection on a reuse round -> still no build/conv switch (the two paths converge)', async () => {
     const w = makeWorld();
     await restart(w, '先改方案');
-    w.s.db
-      .update(buildTable)
-      .set({ prNumber: null, prUrl: null })
-      .where(eq(buildTable.id, w.buildId))
-      .run();
-    w.s.db
-      .update(projectTable)
-      .set({ repoKind: 'local', githubRepo: null })
-      .where(eq(projectTable.id, w.projectId))
-      .run();
     const planId = newRecordId();
     w.s.db
       .insert(planTable)

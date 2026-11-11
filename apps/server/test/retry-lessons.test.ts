@@ -24,7 +24,6 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import type { FetchLike } from '../src/lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import {
   applyBuildStepAction,
@@ -52,22 +51,6 @@ interface World {
   projectId: string;
   buildId: string;
   machineId: string;
-}
-
-const openPullFetch = (async () => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ state: 'open', merged: false }),
-  headers: { get: () => null },
-})) as unknown as FetchLike;
-
-function linkGithubProbe(w: World): void {
-  w.s.db
-    .update(projectTable)
-    .set({ repoKind: 'github', githubRepo: 'octo/demo' })
-    .where(eq(projectTable.id, w.projectId))
-    .run();
-  w.deps = { ...w.deps, githubFetch: openPullFetch };
 }
 
 function makeWorld(opts: { withPlan?: boolean; sourceRef?: string } = {}): World {
@@ -315,7 +298,6 @@ describe('#1615 restarting injects the previous round lessons', () => {
   test('the rework path misses lessons: when the previous round has a PR, rework returns to the original build (new session), the first-step prompt carries the lessons too', async () => {
     const w = makeWorld();
     w.s.db.update(buildTable).set({ prNumber: 41 }).where(eq(buildTable.id, w.buildId)).run();
-    linkGithubProbe(w);
     await failedBuildA(w);
     await restart(w, '这次先补测试');
 
@@ -353,7 +335,6 @@ describe('#1615 restarting injects the previous round lessons', () => {
   test('repeated reuse mixing old rounds: the 3rd restart carries only the previous round lessons, not round 1', async () => {
     const w = makeWorld();
     w.s.db.update(buildTable).set({ prNumber: 41 }).where(eq(buildTable.id, w.buildId)).run();
-    linkGithubProbe(w);
     leaveRound(w, 'round1', nowMs() - 400_000, '失败原因-round1');
     await restart(w, '第二轮的反馈');
     expect(pendingStepOf(w).prompt).toContain('check-round1');
