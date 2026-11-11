@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
 import type { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
@@ -19,6 +21,8 @@ const INLINE_ATTACHMENT_MIME_TYPES = new Set([
   'image/webp',
   'application/pdf',
 ]);
+
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 
 export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
   const grantBodySchema = z.object({
@@ -49,7 +53,12 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
     return c.json(out, 200);
   });
 
-  app.post('/api/uploads/upload', async (c) => {
+  const boundedUpload = bodyLimit({
+    maxSize: ATTACHMENT_MAX_BYTES + MULTIPART_OVERHEAD_BYTES,
+    onError: (c) => c.json({ error: `invalid size: must be 1..${ATTACHMENT_MAX_BYTES}` }, 400),
+  });
+
+  app.post('/api/uploads/upload', boundedUpload, async (c) => {
     const form = await c.req.formData();
     const grant = form.get('grant');
     const file = form.get('file');
