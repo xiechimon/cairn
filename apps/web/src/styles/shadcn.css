@@ -73,6 +73,7 @@
   --z-floating: 15;
   --z-backdrop-low: 20;
   --z-panel-low: 21;
+  --z-narrow-chrome: 23;
   --z-modal-scrim: 40;
   --z-modal: 41;
   --z-dialog: 50;

@@ -1986,7 +1986,7 @@ export const EN: Record<string, string> = {
   '失败了，等自动重试': 'Failed; an automatic retry is coming',
   '{n} 件进行中': '{n} in progress',
   对话: 'Chat',
-  对话和任务: 'Chat and tasks',
+  '对话、任务和成果': 'Chat, tasks and results',
   决定与更新: 'Decisions and updates',
   '{time} 更新': 'Updated {time}',
   '{n} 条更新': '{n#1 update|# updates}',

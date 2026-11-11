@@ -2,17 +2,23 @@ import { expect, type Page, test } from '@playwright/test';
 
 const HOME = '/app?scenario=home-c';
 
-const tabs = (page: Page) => page.getByRole('navigation', { name: '对话和任务' });
+const tabs = (page: Page) => page.getByRole('navigation', { name: '对话、任务和成果' });
 const panel = (page: Page) => page.getByRole('complementary', { name: '任务' });
 const composer = (page: Page) => page.locator('.chief-composer textarea');
 
 test.describe('at phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('Chat and Tasks are bottom tabs, and the header has no Tasks toggle', async ({ page }) => {
+  test('Chat and Tasks are bottom tabs, and the only Tasks toggle sits in the top pill', async ({
+    page,
+  }) => {
     await page.goto(HOME);
     await expect(tabs(page)).toBeVisible();
-    await expect(page.getByTestId('tasks-toggle')).toHaveCount(0);
+    await expect(page.getByTestId('home-c-pane-buttons')).toHaveCount(0);
+    await expect(page.getByTestId('tasks-toggle')).toHaveCount(1);
+    await expect(
+      page.getByTestId('narrow-account-pill').getByTestId('tasks-toggle'),
+    ).toBeVisible();
     const chat = tabs(page).getByRole('link', { name: '对话' });
     const tasks = tabs(page).getByRole('link', { name: /任务/ });
     await expect(chat).toHaveAttribute('aria-current', 'page');
@@ -22,10 +28,12 @@ test.describe('at phone width', () => {
     await expect(page).toHaveURL(/[?&]pane=tasks/);
     await expect(tasks).toHaveAttribute('aria-current', 'page');
     const bar = await tabs(page).boundingBox();
-    const sheet = await panel(page).boundingBox();
+    const sheetBottom = await panel(page).evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      return box.bottom - Number.parseFloat(getComputedStyle(node).paddingBottom);
+    });
     expect(bar).not.toBeNull();
-    expect(sheet).not.toBeNull();
-    expect(sheet!.y + sheet!.height).toBeLessThanOrEqual(bar!.y + 1);
+    expect(sheetBottom).toBeLessThanOrEqual(bar!.y + 1);
     await chat.click();
     await expect(panel(page)).toHaveCount(0);
     await expect(page).not.toHaveURL(/pane=/);
@@ -42,11 +50,21 @@ test.describe('at phone width', () => {
     await expect(page.locator('aside.board-sidebar')).toBeVisible();
   });
 
-  test('an open task thread hides the tabs', async ({ page }) => {
+  test('an open task thread is a tab under the top controls, above the tab bar', async ({
+    page,
+  }) => {
     await page.goto(`${HOME}&pane=tasks`);
     await panel(page).getByText('Orb canary round 7').click();
     await expect(page).toHaveURL(/[?&]thread=home-c-working-c/);
-    await expect(tabs(page)).toHaveCount(0);
+    await expect(tabs(page)).toBeVisible();
+    const thread = page.getByTestId('side-chat');
+    await expect(thread).toBeVisible();
+    const head = await thread.getByRole('button', { name: '关闭' }).boundingBox();
+    const menu = await page.getByTestId('narrow-menu').boundingBox();
+    expect(head!.y).toBeGreaterThanOrEqual(menu!.y + menu!.height);
+    await page.goBack();
+    await expect(page).not.toHaveURL(/thread=/);
+    await expect(panel(page)).toBeVisible();
   });
 
   test('the Tasks plus button adds a task inline, then closes the sheet onto the composer', async ({

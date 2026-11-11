@@ -28,6 +28,7 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { toastArchived } from './archive-toast.js';
 import { useAttentionTitle } from './attention-title.js';
 import { fleetStatus } from './fleet-status.js';
+import { setDrawerOpen, useDrawerOpen } from './narrow-drawer.js';
 import {
   BoardSidebar,
   type SidebarProject,
@@ -63,6 +64,39 @@ export interface AppSidebarProps {
   todos?: TodoRecord[];
   searchPanel?: boolean;
   onSearch?: () => void;
+  menuTrigger?: boolean;
+}
+
+const SWIPE_CLOSE_PX = 60;
+const DRAWER_NAV_TARGETS =
+  'a[href], [data-slot="sidebar-nav-row"], [data-slot="sidebar-project-row"]';
+
+function useDrawerSwipeClose(open: boolean): void {
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    root.dataset.drawerOpen = '';
+    let start: { x: number; y: number } | null = null;
+    const onStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      start = touch === undefined ? null : { x: touch.clientX, y: touch.clientY };
+    };
+    const onEnd = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      if (start === null || touch === undefined) return;
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      start = null;
+      if (dx < -SWIPE_CLOSE_PX && Math.abs(dy) < Math.abs(dx)) setDrawerOpen(false);
+    };
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      delete root.dataset.drawerOpen;
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchend', onEnd);
+    };
+  }, [open]);
 }
 
 export function AppSidebar({
@@ -71,6 +105,7 @@ export function AppSidebar({
   todos,
   searchPanel = true,
   onSearch,
+  menuTrigger = true,
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { live, teamId, teamsQuery } = useLiveData();
@@ -108,8 +143,9 @@ export function AppSidebar({
   const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));
   const narrow = useNarrow();
   const docked = usePanelDocked();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerOpen = useDrawerOpen() && narrow;
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  useDrawerSwipeClose(drawerOpen);
   const location = useLocation();
   const { key: locationKey } = location;
   useEffect(() => {
@@ -257,24 +293,27 @@ export function AppSidebar({
     <>
       {narrow ? (
         <>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
-            aria-label={t('展开侧边栏')}
-            aria-expanded={drawerOpen}
-            onClick={() => setDrawerOpen(true)}
-          >
-            <PanelLeft className="size-4.5" strokeWidth={1.75} />
-          </Button>
+          {menuTrigger && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
+              aria-label={t('展开侧边栏')}
+              aria-expanded={drawerOpen}
+              onClick={() => setDrawerOpen(true)}
+            >
+              <PanelLeft className="size-4.5" strokeWidth={1.75} />
+            </Button>
+          )}
           <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
             <DialogContent
               showCloseButton={false}
               initialFocus={(openType) => openType !== 'touch'}
               onClickCapture={(event) => {
-                if ((event.target as Element).closest('a[href]') != null) closeDrawer();
+                const target = event.target as Element;
+                if (target.closest(DRAWER_NAV_TARGETS) != null) closeDrawer();
               }}
-              className="top-0 left-0 flex h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 shadow-xl ring-0 duration-200 ease-(--ease-standard) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
+              className="app-drawer top-0 left-0 flex h-full w-[85vw] max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-(--sidebar-surface) p-0 ring-0 duration-200 ease-(--ease-standard) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
             >
               <DialogTitle className="sr-only">{t('侧边栏')}</DialogTitle>
               <BoardSidebar

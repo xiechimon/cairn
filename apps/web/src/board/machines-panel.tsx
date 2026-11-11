@@ -124,11 +124,13 @@ export function MachineChip({
   open,
   onToggle,
   loading = false,
+  round = false,
 }: {
   machines: readonly MachineRow[];
   open: boolean;
   onToggle: () => void;
   loading?: boolean;
+  round?: boolean;
 }) {
   const { t } = useI18n();
   const connected = useConnected();
@@ -150,19 +152,31 @@ export function MachineChip({
           onClick={onToggle}
           data-testid="machines-button"
           data-connected={connected}
-          className="relative text-content-tertiary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+          className={cn(
+            'relative text-content-tertiary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground',
+            round &&
+              'size-11.5 rounded-full bg-popover text-foreground shadow-(--e2) hover:bg-popover dark:hover:bg-popover aria-pressed:bg-(--hover-1) dark:aria-pressed:bg-(--hover-1)',
+          )}
         />
       }
     >
-      <Laptop aria-hidden="true" />
+      <Laptop aria-hidden="true" className={round ? 'size-4.5' : undefined} />
       {loading ? (
-        <Skeleton className="absolute top-1 right-1 size-1.5 animate-none rounded-full" />
+        <Skeleton
+          className={cn(
+            'absolute size-1.5 animate-none rounded-full',
+            round ? 'top-3 right-3' : 'top-1 right-1',
+          )}
+        />
       ) : (
         hostOnline && (
           <span
             aria-hidden="true"
             data-testid="machines-online-dot"
-            className="absolute top-1 right-1 size-1.5 rounded-full bg-running"
+            className={cn(
+              'absolute size-1.5 rounded-full bg-running',
+              round ? 'top-3 right-3' : 'top-1 right-1',
+            )}
           />
         )
       )}

@@ -136,10 +136,10 @@ async function sendAtBottom(page: Page) {
   return history;
 }
 
-test('the status line after a send is visible without scrolling', async ({ page }) => {
+test('the typing dots after a send are visible without scrolling', async ({ page }) => {
   await sendAtBottom(page);
   await emit(page, { type: 'activity', activity: { phase: 'starting' } });
-  const status = home(page).getByText('正在连接模型...');
+  const status = home(page).getByTestId('typing-dots');
   await expect(status).toBeInViewport({ ratio: 1 });
   await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await evidenceShot(page, 'chief-stick-status.png');

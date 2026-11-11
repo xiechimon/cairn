@@ -25,7 +25,13 @@ import {
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
-export function StatusMarkGlyph({ state }: { state: StatusMarkId }) {
+export function StatusMarkGlyph({
+  state,
+  className = 'size-8',
+}: {
+  state: StatusMarkId;
+  className?: string;
+}) {
   const pathRef = useRef<SVGPathElement | null>(null);
   const shownRef = useRef(state);
   const changedRef = useRef(Number.NEGATIVE_INFINITY);
@@ -71,7 +77,7 @@ export function StatusMarkGlyph({ state }: { state: StatusMarkId }) {
   }, [state]);
 
   return (
-    <svg aria-hidden="true" viewBox={MARK_VIEWBOX} className="size-8">
+    <svg aria-hidden="true" viewBox={MARK_VIEWBOX} className={className}>
       <path
         ref={pathRef}
         d={initialPath}
@@ -90,11 +96,13 @@ export function StatusMarkFloat({
   view,
   elapsed = null,
   pinned = false,
+  large = false,
   className,
 }: {
   view: StatusMarkView;
   elapsed?: number | null;
   pinned?: boolean;
+  large?: boolean;
   className?: string;
 }) {
   const { t } = useI18n();
@@ -134,11 +142,15 @@ export function StatusMarkFloat({
       className={cn('pointer-events-none flex flex-col items-center', className)}
     >
       <div
-        className="pointer-events-auto grid size-11 place-items-center rounded-full bg-popover shadow-(--e2)"
+        data-slot="status-mark-circle"
+        className={cn(
+          'pointer-events-auto grid place-items-center rounded-full bg-popover shadow-(--e2)',
+          large ? 'size-15.5' : 'size-11',
+        )}
         onPointerEnter={() => setHover(true)}
         onPointerLeave={() => setHover(false)}
       >
-        <StatusMarkGlyph state={id} />
+        <StatusMarkGlyph state={id} className={large ? 'size-11' : 'size-8'} />
       </div>
       <div
         aria-hidden="true"
@@ -166,7 +178,15 @@ export function StatusMarkFloat({
 
 const DONE_VIEW: StatusMarkView = { id: 'done', label: STATUS_MARK_LABELS.done, announce: true };
 
-export function ChiefStatusMark({ chief }: { chief: ChiefContent }) {
+export function ChiefStatusMark({
+  chief,
+  large = false,
+  className = 'absolute inset-x-0 top-2.5 z-10',
+}: {
+  chief: ChiefContent;
+  large?: boolean;
+  className?: string;
+}) {
   const connected = useConnected();
   const questionPending = useQuestionDockVisible();
   const base = statusMarkView({ chief, questionPending, connected });
@@ -195,7 +215,8 @@ export function ChiefStatusMark({ chief }: { chief: ChiefContent }) {
     <StatusMarkFloat
       view={done && base.id === 'idle' ? DONE_VIEW : base}
       elapsed={elapsed}
-      className="absolute inset-x-0 top-2.5 z-10"
+      large={large}
+      className={className}
     />
   );
 }

@@ -158,7 +158,7 @@ export function WorkPanel({
   );
   const body = made.length === 0 ? emptyView : listView;
   return (
-    <SidePanel label={title} onDismiss={onClose}>
+    <SidePanel label={title} onDismiss={onClose} phoneTab>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
         <SidePanelTitle>{title}</SidePanelTitle>
         <IconTooltip

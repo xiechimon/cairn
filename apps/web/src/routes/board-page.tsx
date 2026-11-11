@@ -208,6 +208,12 @@ export function BoardPage() {
     picked.length === 0 ? undefined : (
       <div className="flex flex-col gap-2">{picked.map((entry) => entry.node)}</div>
     );
+  const homeShown =
+    chiefView !== 'settings' &&
+    projectLookup !== 'loading' &&
+    projectLookup !== 'failed' &&
+    !(projectLookup === 'unknown' && homeProjectId !== null) &&
+    !(homeProject !== null && !projectChat);
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
@@ -216,6 +222,7 @@ export function BoardPage() {
         selected={chiefView === 'settings' ? 'none' : 'board'}
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
+        menuTrigger={!homeShown}
       />
       <div className={`board-sheet ${SHEET_PANEL}`}>
         <div className="relative flex min-h-0 min-w-0 flex-1">

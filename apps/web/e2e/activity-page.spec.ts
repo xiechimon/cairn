@@ -179,7 +179,7 @@ test('the collapsed rail keeps Activity and Settings as direct links', async ({ 
 test('the phone drawer Activity link opens the page and dismisses the sidebar', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app?scenario=activity');
-  await page.locator('.app-menu-trigger').click();
+  await page.getByTestId('narrow-menu').click();
   await page.getByTestId('sidebar-activity').click();
   await expect(page).toHaveURL(/\/app\/activity/);
   await expect(page.getByRole('dialog')).toHaveCount(0);

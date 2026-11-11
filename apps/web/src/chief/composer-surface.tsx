@@ -1,6 +1,6 @@
 import { ATTACHMENT_ACCEPT } from '@cairn/shared';
 import { cn } from 'cn';
-import { CornerDownLeft } from 'lucide-react';
+import { ArrowUp, CornerDownLeft } from 'lucide-react';
 import {
   type ReactNode,
   type Ref,
@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { useNarrow } from '../board/use-narrow.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import type { ComposerBinding } from './composer-binding.js';
 import {
+  ContextMeterLine,
   ContextMeterRing,
   contextPercentOf,
   contextResumeOf,
@@ -50,6 +52,9 @@ const SEND_ON_CLS =
   'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button)/90 hover:text-(--text-on-accent) dark:hover:bg-(--card-button)/90 dark:hover:text-(--text-on-accent)';
 const STOP_CLS =
   'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
+const ROUND_HIT_CLS =
+  'group/round -m-1.5 size-11 flex-none cursor-pointer rounded-full border-0 bg-transparent p-0 text-foreground hover:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent';
+const ROUND_FACE_CLS = 'grid size-8 place-items-center rounded-full';
 const HOME_COMPOSER_CLS =
   'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-160 flex-none';
 const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
@@ -194,18 +199,92 @@ export function ComposerSurface({
     [textareaRef, composerRef],
   );
   const stopMode = canStop && wire.draft === '' && wire.tokens.length === 0;
+  const narrow = useNarrow();
+  const hasDraft =
+    wire.draft !== '' ||
+    wire.tokens.length > 0 ||
+    pendingAttachments.some((entry) => !entry.failed);
+  const showMeter = !live || contextPercent != null;
+  const plusMenu = (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('更多')}
+                  data-testid="composer-plus"
+                  className={narrow ? ROUND_HIT_CLS : TOOL_BTN_CLS}
+                />
+              }
+            />
+          }
+        >
+          {narrow ? (
+            <span
+              className={`${ROUND_FACE_CLS} group-hover/round:bg-(--menu-hover) group-aria-expanded/round:bg-(--menu-hover)`}
+            >
+              <Plus width={16} height={16} />
+            </span>
+          ) : (
+            <Plus width={16} height={16} />
+          )}
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={8}>
+          {t('更多')}
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent
+        side="top"
+        sideOffset={6}
+        aria-label={t('更多')}
+        finalFocus={textareaRef}
+        className={MENU_CONTENT_CLS}
+      >
+        <DropdownMenuItem disabled={attaching || onAttachment == null} onClick={openFilePicker}>
+          <Paperclip width={16} height={16} />
+          {t('添加附件')}
+        </DropdownMenuItem>
+        {menu != null && (
+          <>
+            <DropdownMenuSeparator />
+            {menu}
+          </>
+        )}
+        {narrow && showMeter && (
+          <>
+            <DropdownMenuSeparator />
+            <ContextMeterLine
+              percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
+              mock={contextPercent == null}
+              resume={contextResume}
+            />
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   return (
     <div
       hidden={!active}
       inert={!active}
       aria-hidden={active ? undefined : true}
-      className={`${HOME_COMPOSER_CLS} ${attached ? 'mt-0' : 'mt-2'}`}
+      data-narrow={narrow || undefined}
+      className={cn(HOME_COMPOSER_CLS, attached ? 'mt-0' : 'mt-2')}
       style={active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       <div
         data-invalid={invalid ? '' : undefined}
         data-drop-target={dropActive && active ? '' : undefined}
-        className={`${active ? 'chief-composer ' : ''}${attached ? ATTACHED_COMPOSER_CLS : FREE_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive data-drop-target:ring-2 data-drop-target:ring-(--focus-ring) rounded-b-(--radius-composer) border-0 bg-background px-3.5 py-2`}
+        className={cn(
+          active && 'chief-composer',
+          attached ? ATTACHED_COMPOSER_CLS : FREE_COMPOSER_CLS,
+          'data-invalid:ring-1 data-invalid:ring-destructive data-drop-target:ring-2 data-drop-target:ring-(--focus-ring) rounded-b-(--radius-composer) border-0 bg-background',
+          narrow ? 'px-2 py-2' : 'px-3.5 py-2',
+        )}
       >
         {above}
         <ComposerAttachments
@@ -216,7 +295,16 @@ export function ComposerSurface({
           seeded={seeded}
           onDismissSeeded={(index) => setSeeded((current) => current.filter((_, i) => i !== index))}
         />
-        <div className="flex items-end gap-2">
+        {narrow && (
+          <div
+            data-slot="composer-tools"
+            className="mb-1 flex flex-wrap items-center gap-1 empty:hidden"
+          >
+            {tools}
+          </div>
+        )}
+        <div className={cn('flex gap-2', narrow ? 'items-center' : 'items-end')}>
+          {narrow && plusMenu}
           <div className="relative min-w-0 flex-1">
             <Textarea
               ref={attachComposer}
@@ -330,26 +418,41 @@ export function ComposerSurface({
                 variant="ghost"
                 size="icon"
                 aria-label={t('停止 Coordinator 这次回复')}
-                className={cn(SEND_BTN_CLS, STOP_CLS)}
+                className={narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, STOP_CLS)}
                 onClick={onStop}
               >
-                <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+                {narrow ? (
+                  <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
+                    <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+                  </span>
+                ) : (
+                  <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+                )}
               </Button>
             ) : (
               <Button
                 variant="ghost"
                 size="icon"
                 aria-label={t('发送')}
-                className={cn(
-                  SEND_BTN_CLS,
-                  (wire.draft !== '' ||
-                    wire.tokens.length > 0 ||
-                    pendingAttachments.some((entry) => !entry.failed)) &&
-                    SEND_ON_CLS,
-                )}
+                className={
+                  narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
+                }
                 onClick={wire.send}
               >
-                <CornerDownLeft width={16} height={16} />
+                {narrow ? (
+                  <span
+                    className={cn(
+                      ROUND_FACE_CLS,
+                      hasDraft
+                        ? 'bg-(--card-button) text-(--text-on-accent)'
+                        : 'bg-(--hover-1) text-content-tertiary',
+                    )}
+                  >
+                    <ArrowUp width={16} height={16} />
+                  </span>
+                ) : (
+                  <CornerDownLeft width={16} height={16} />
+                )}
               </Button>
             ))}
         </div>
@@ -363,60 +466,21 @@ export function ComposerSurface({
           accept={ATTACHMENT_ACCEPT}
         />
       </div>
-      <div className="mt-1 flex items-center gap-0.5 px-1">
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={t('更多')}
-                      data-testid="composer-plus"
-                      className={TOOL_BTN_CLS}
-                    />
-                  }
-                />
-              }
-            >
-              <Plus width={16} height={16} />
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={8}>
-              {t('更多')}
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent
-            side="top"
-            sideOffset={6}
-            aria-label={t('更多')}
-            finalFocus={textareaRef}
-            className={MENU_CONTENT_CLS}
-          >
-            <DropdownMenuItem disabled={attaching || onAttachment == null} onClick={openFilePicker}>
-              <Paperclip width={16} height={16} />
-              {t('添加附件')}
-            </DropdownMenuItem>
-            {menu != null && (
-              <>
-                <DropdownMenuSeparator />
-                {menu}
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {tools}
-        {(!live || contextPercent != null) && (
-          <span className="ml-auto flex">
-            <ContextMeterRing
-              percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
-              mock={contextPercent == null}
-              resume={contextResume}
-            />
-          </span>
-        )}
-      </div>
+      {!narrow && (
+        <div className="mt-1 flex items-center gap-0.5 px-1">
+          {plusMenu}
+          {tools}
+          {showMeter && (
+            <span className="ml-auto flex">
+              <ContextMeterRing
+                percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
+                mock={contextPercent == null}
+                resume={contextResume}
+              />
+            </span>
+          )}
+        </div>
+      )}
       <SlashHelp
         open={helpOpen}
         onClose={closeHelp}

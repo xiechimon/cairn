@@ -82,7 +82,7 @@ test('a pending question counts as needs-you on the Tasks toggle and tab title, 
   await expect(stream).not.toContainText('Working on it');
 });
 
-test('a running turn with no question keeps its working label', async ({ page }) => {
+test('a running turn with no question keeps its typing dots', async ({ page }) => {
   await mockLive(page, {
     threads: [running],
     messages: [...HISTORY, { id: 'm7', role: 'user', content: 'Merge it when it is safe', createdAt: 30 }],
@@ -90,7 +90,7 @@ test('a running turn with no question keeps its working label', async ({ page })
   });
   await page.goto('/app');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Waiting for your answer');
-  await expect(page.getByTestId('chief-stream')).toContainText('Working on it');
+  await expect(page.getByTestId('chief-stream').getByTestId('typing-dots')).toBeVisible();
 });
 
 test('option descriptions are printed on the card, not hidden in a tooltip', async ({ page }) => {

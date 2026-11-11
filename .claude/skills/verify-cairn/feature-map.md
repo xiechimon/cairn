@@ -521,7 +521,7 @@ Reach:
 
 **Mobile web and PWA** (shipped, centrality 2). The web app installed on a phone: narrow layouts, the service worker and the home-screen app.
 
-States: At phone width the Coordinator home has bottom tabs for chat and Tasks, the sidebar becomes a drawer whose project rows carry one status line, and settings collapse to a list; the app can be installed to the home screen.
+States: At phone width the Coordinator home has no header bar: a round menu button, the status mark and an avatar-and-Tasks pill float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, the avatar opens the account menu, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.
 
 Reach:
 
@@ -529,11 +529,11 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `tasks-badge`
+- Test ids in its code: `account-menu`, `account-menu-name`, `account-menu-trigger`, `narrow-account-pill`, `narrow-menu`, `tasks-badge`, `tasks-toggle`
 - Research: **gap**: no note on how Amp, t3code and Claude handle mobile web and PWA install
 - Frontend design: [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: n/a: served by the same server; push is its own feature
-- Evidence: `apps/web/e2e/mobile-narrow.spec.ts`, `apps/web/e2e/chief-home-phone-tabs.spec.ts`, `apps/web/test/pwa.test.ts`
+- Evidence: `apps/web/e2e/mobile-narrow.spec.ts`, `apps/web/e2e/chief-home-phone-tabs.spec.ts`, `apps/web/e2e/chief-home-narrow-shell.spec.ts`, `apps/web/test/pwa.test.ts`
 
 ### own-key-sandboxes
 

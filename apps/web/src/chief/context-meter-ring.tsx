@@ -148,3 +148,24 @@ export function ContextMeterRing({
     </IconTooltip>
   );
 }
+
+export function ContextMeterLine({
+  percent = MOCK_CONTEXT_PERCENT,
+  mock = true,
+  resume = null,
+}: ContextMeterRingProps) {
+  const { t } = useI18n();
+  const filled = clampContextPercent(percent);
+  return (
+    <div
+      data-testid="composer-context-meter"
+      data-mock={mock ? '' : undefined}
+      data-percent={filled}
+      data-resume={resume ?? undefined}
+      className="flex h-8 items-center gap-2.5 px-2.5 text-meta tabular-nums text-content-tertiary"
+    >
+      <ContextMeterGlyph filled={filled} />
+      {contextMeterLabel(t, filled, mock, resume)}
+    </div>
+  );
+}

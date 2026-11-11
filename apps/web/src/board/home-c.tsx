@@ -47,6 +47,7 @@ import {
 import { FilePreviewPanel } from './file-preview-panel.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
+import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
 import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
 import { TaskCard } from './task-card.js';
@@ -381,42 +382,43 @@ export function HomeC({
     </section>
   );
 
-  const paneButtons = (
+  const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
+  const paneButtons = narrow ? (
+    heading
+  ) : (
     <header
       data-testid="home-c-pane-buttons"
-      className="flex h-12 flex-none items-center justify-end gap-1 pr-3.5 pl-5 max-[640px]:pl-14"
+      className="flex h-12 flex-none items-center justify-end gap-1 pr-3.5 pl-5"
     >
-      <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>
-      {!narrow && (
-        <IconTooltip
-          label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
-          side="bottom"
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon"
-              data-testid="tasks-toggle"
-              aria-pressed={pane === 'tasks' && threadId === null}
-              onClick={() => togglePane('tasks')}
-              className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      {heading}
+      <IconTooltip
+        label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon"
+            data-testid="tasks-toggle"
+            aria-pressed={pane === 'tasks' && threadId === null}
+            onClick={() => togglePane('tasks')}
+            className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+          />
+        }
+      >
+        <ListChecks aria-hidden="true" />
+        {badge > 0 && (
+          <>
+            <span
+              aria-hidden="true"
+              data-slot="needs-you-dot"
+              className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
             />
-          }
-        >
-          <ListChecks aria-hidden="true" />
-          {badge > 0 && (
-            <>
-              <span
-                aria-hidden="true"
-                data-slot="needs-you-dot"
-                className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
-              />
-              <span data-testid="tasks-badge" className="sr-only">
-                {badge}
-              </span>
-            </>
-          )}
-        </IconTooltip>
-      )}
+            <span data-testid="tasks-badge" className="sr-only">
+              {badge}
+            </span>
+          </>
+        )}
+      </IconTooltip>
       <IconTooltip
         label={t('成果')}
         side="bottom"
@@ -441,8 +443,22 @@ export function HomeC({
     </header>
   );
 
-  const phoneTabs = narrow && threadId === null && (
-    <PhoneTabs tasksOpen={pane === 'tasks'} badge={badge} />
+  const phoneChrome = narrow && (
+    <NarrowChrome
+      mark={loaded ? <ChiefStatusMark chief={chiefData} large className="" /> : null}
+      pane={pane}
+      badge={badge}
+      onTasks={() => togglePane('tasks')}
+      computers={
+        <MachineChip
+          round
+          machines={computers}
+          open={pane === 'machines' && threadId === null}
+          onToggle={() => togglePane('machines')}
+          loading={machinesQuery?.isPending === true}
+        />
+      }
+    />
   );
 
   const workPanel =
@@ -551,7 +567,7 @@ export function HomeC({
           </section>
           {workPanel}
         </div>
-        {phoneTabs}
+        {phoneChrome}
       </div>
     );
   }
@@ -565,9 +581,12 @@ export function HomeC({
           className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
         >
           {paneButtons}
-          <ChiefStatusMark chief={chiefData} />
+          {!narrow && <ChiefStatusMark chief={chiefData} />}
           {banner != null && (
-            <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-160 flex-none overflow-y-auto pt-3">
+            <div
+              data-home-banner=""
+              className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-160 flex-none overflow-y-auto pt-3"
+            >
               {banner}
             </div>
           )}
@@ -634,7 +653,29 @@ export function HomeC({
         </section>
         {workPanel}
       </div>
-      {phoneTabs}
+      {phoneChrome}
     </div>
+  );
+}
+
+function NarrowChrome({
+  mark,
+  pane,
+  badge,
+  onTasks,
+  computers,
+}: {
+  mark: ReactNode;
+  pane: WorkPane | null;
+  badge: number;
+  onTasks: () => void;
+  computers: ReactNode;
+}) {
+  const keyboardOpen = useNarrowChrome();
+  return (
+    <>
+      <NarrowTopControls mark={mark} tasksOpen={pane === 'tasks'} badge={badge} onTasks={onTasks} />
+      {!keyboardOpen && <PhoneTabs pane={pane} badge={badge} computers={computers} />}
+    </>
   );
 }

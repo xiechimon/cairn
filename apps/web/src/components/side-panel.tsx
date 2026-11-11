@@ -199,6 +199,7 @@ export function SidePanelHead({
       <Button
         variant="ghost"
         size="icon-sm"
+        data-panel-close=""
         className={cn('text-content-secondary hover:text-foreground', closeClassName)}
         aria-label={closeLabel}
         onClick={onClose}

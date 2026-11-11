@@ -55,7 +55,7 @@ test('at phone width a toast lands below the menu button and clear of the compos
   await page.waitForTimeout(500);
   const box = (await toast.boundingBox())!;
   const composerBox = (await page.getByTestId('home-c').locator('.chief-composer').boundingBox())!;
-  const menu = (await page.locator('.app-menu-trigger').boundingBox())!;
+  const menu = (await page.getByTestId('narrow-menu').boundingBox())!;
   expect(box.y).toBeGreaterThanOrEqual(menu.y + menu.height);
   expect(box.y + box.height).toBeLessThanOrEqual(composerBox.y);
 });
