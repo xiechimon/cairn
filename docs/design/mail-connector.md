@@ -119,7 +119,8 @@ Implementation must first fail tests for: a Gmail push that stores a message-id 
 
 ## Open for implementation
 
-These two notes are not settled here. Implementation must close them before the connector ships. This page does not specify the procedure.
+These notes are not settled here. Implementation must close them before the connector ships. This page does not specify the procedure. Further notes on this page are the same deferral.
 
 - Mail that arrives after `users.watch` returns and before the pre-baseline inventory finishes can be stored as `pre-baseline` and then skipped by catch-up. The inventory is not snapshot-bound.
 - A `UIDVALIDITY` change resets the cursor to zero and can rank every current UID as new, because `(uidvalidity, uid)` no longer matches the old epoch. A stable cross-epoch identity is not specified here.
+- History and full sync are not limited to inbound `messagesAdded`. A relabel, sent message, or draft can become an event. That filter is not specified here.

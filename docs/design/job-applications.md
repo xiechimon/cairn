@@ -131,7 +131,9 @@ Implementation must first fail tests for: a prefilled username, one-time code, o
 
 ## Open for implementation
 
-These two notes are not settled here. Implementation must close them before submit ships. This page does not specify the procedure.
+These notes are not settled here. Implementation must close them before submit ships. This page does not specify the procedure. Further notes on this page are the same deferral.
 
 - `ask_user` records a cancel or a negative reply as an answer. Matching the question id and hash is not an approval. An affirmative server-generated choice is not specified here.
 - An allowed page can post a form to another host. `job_submit` checks the page host, not the form action. That check is not specified here.
+- `job_fill` reads the live profile. A profile edit after preview can be typed before the submit hash is checked. Binding the fill to the previewed profile revision is not specified here.
+- Two attempts can both observe the daily cap and then click. Reserving the cap before the click is not specified here.
