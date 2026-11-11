@@ -110,6 +110,10 @@ describe('shell syntax does not hide a gated command', () => {
     ['echo foo#bar; reboot', 'ask-power'],
     ['dd of="/dev/null" of=/dev/sda if=/dev/zero', 'ask-dd-disk'],
     ['echo "$(reboot)"', 'ask-power'],
+    ["$(echo 'rm -rf /')", 'ask-unresolved-command'],
+    ['"$(echo reboot)"', 'ask-unresolved-command'],
+    ['echo `echo \\`reboot\\``', 'ask-power'],
+    ['cat <<EOF\n$(reboot)\nEOF', 'ask-power'],
   ];
   for (const [command, ruleId] of asked) {
     it(`${command} → ${ruleId}`, () => {
@@ -124,7 +128,6 @@ describe('shell syntax does not hide a gated command', () => {
     "echo 'mkfs.ext4 /dev/sda'",
     "echo '$(rm -rf /)'",
     'echo $(date)',
-    '$(date)',
     'command -v rm',
     `rm -rf '${'$'}{HOME}'`,
     'dd if=/dev/zero of=/dev/null',
@@ -136,6 +139,7 @@ describe('shell syntax does not hide a gated command', () => {
     'echo ok # reboot',
     'echo foo#bar',
     'dd of=/dev/sda of=/dev/null',
+    "cat <<'EOF'\n$(reboot)\nEOF",
   ];
   for (const command of allowed) {
     it(`${JSON.stringify(command)} stays allow`, () => {

@@ -403,15 +403,35 @@ function entryWord(entry: ShellParseEntry): string | undefined {
   return undefined;
 }
 
-function closingBacktick(source: string, start: number): number {
-  for (let index = start; index < source.length; index += 1) {
-    if (source[index] === '\\') {
-      index += 1;
+function convertBacktickSpan(
+  source: string,
+  open: number,
+): { text: string; end: number } | undefined {
+  let body = '';
+  for (let index = open + 1; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === '\\') {
+      const next = source[index + 1];
+      if (next === '`') {
+        const nestedStart = index + 2;
+        const nestedEnd = source.indexOf('\\`', nestedStart);
+        if (nestedEnd === -1) return undefined;
+        body += `$(${source.slice(nestedStart, nestedEnd)})`;
+        index = nestedEnd + 1;
+        continue;
+      }
+      if (next === '\\' || next === '$') {
+        body += next;
+        index += 1;
+        continue;
+      }
+      body += character;
       continue;
     }
-    if (source[index] === '`') return index;
+    if (character === '`') return { text: body, end: index };
+    body += character ?? '';
   }
-  return source.length;
+  return undefined;
 }
 
 function normalizeBackticks(source: string): string {
@@ -425,8 +445,15 @@ function normalizeBackticks(source: string): string {
       continue;
     }
     if (character === '\\' && quote !== '"') {
-      out += character;
       const next = source[index + 1];
+      if (next === '`') {
+        const nested = convertBacktickSpan(source, index + 1);
+        if (!nested) throw new Error('unclosed backtick');
+        out += `$(${nested.text})`;
+        index = nested.end;
+        continue;
+      }
+      out += character;
       if (next !== undefined) {
         out += next;
         index += 1;
@@ -449,9 +476,10 @@ function normalizeBackticks(source: string): string {
       continue;
     }
     if (character === '`') {
-      const end = closingBacktick(source, index + 1);
-      out += `$(${source.slice(index + 1, end)})`;
-      index = end;
+      const span = convertBacktickSpan(source, index);
+      if (!span) throw new Error('unclosed backtick');
+      out += `$(${span.text})`;
+      index = span.end;
       continue;
     }
     if (!quote && (character === "'" || character === '"')) quote = character;
@@ -491,11 +519,40 @@ function matchingParen(source: string, open: number): number | undefined {
   return undefined;
 }
 
+function maskQuotedHeredocs(source: string): string {
+  let out = '';
+  let index = 0;
+  while (index < source.length) {
+    const match = /<<-?\s*(?:'([^'\n]+)'|"([^"\n]+)"|\\(\w+))/.exec(source.slice(index));
+    if (!match || match.index === undefined) {
+      out += source.slice(index);
+      break;
+    }
+    const delimiter = match[1] ?? match[2] ?? match[3] ?? '';
+    const start = index + match.index;
+    const bodyStart = source.indexOf('\n', start);
+    if (bodyStart === -1 || delimiter === '') {
+      out += source.slice(index);
+      break;
+    }
+    const end = source.indexOf(`\n${delimiter}`, bodyStart + 1);
+    if (end === -1) {
+      out += source.slice(index, start) + ' '.repeat(source.length - start);
+      break;
+    }
+    const stop = end + 1 + delimiter.length;
+    out += source.slice(index, start) + ' '.repeat(stop - start);
+    index = stop;
+  }
+  return out;
+}
+
 function executableSubstitutionBodies(source: string): string[] {
   const bodies: string[] = [];
+  const scanned = maskQuotedHeredocs(source);
   let quote: "'" | '"' | undefined;
-  for (let index = 0; index < source.length; index += 1) {
-    const character = source[index];
+  for (let index = 0; index < scanned.length; index += 1) {
+    const character = scanned[index];
     if (quote === "'") {
       if (character === "'") quote = undefined;
       continue;
@@ -513,10 +570,10 @@ function executableSubstitutionBodies(source: string): string[] {
       quote = character;
       continue;
     }
-    if (character !== '$' || source[index + 1] !== '(' || source[index + 2] === '(') continue;
-    const end = matchingParen(source, index + 1);
+    if (character !== '$' || scanned[index + 1] !== '(' || scanned[index + 2] === '(') continue;
+    const end = matchingParen(scanned, index + 1);
     if (end === undefined) continue;
-    bodies.push(source.slice(index + 2, end));
+    bodies.push(scanned.slice(index + 2, end));
     index = end;
   }
   return bodies;
@@ -653,8 +710,13 @@ function emitSimple(
       if (word === 'function' && index < words.length && words[index] !== '{') index += 1;
       continue;
     }
-    if (isParameterHead(word) || word.startsWith('$(') || word.startsWith('`')) {
-      if (isParameterHead(word)) collected.unresolved = true;
+    if (
+      isParameterHead(word) ||
+      word.startsWith('$(') ||
+      word.startsWith('`') ||
+      word.startsWith('"$(')
+    ) {
+      collected.unresolved = true;
       rememberUnknownHead(words.slice(index + 1), collected);
       return;
     }
@@ -782,6 +844,7 @@ function collectCommands(entries: readonly ShellParseEntry[]): CollectedCommands
         continue;
       }
       if (commandPosition && word === '$' && nextOp === '(') {
+        collected.unresolved = true;
         awaitingSubstitutionArgs = true;
         continue;
       }
@@ -819,7 +882,13 @@ function classifyCommand(
   if (forkbomb?.test(stripped, { head: '', args: [], text: stripped })) {
     return { action: forkbomb.action, ruleId: forkbomb.id };
   }
-  const normalized = normalizeBackticks(command);
+  const masked = maskQuotedHeredocs(command);
+  let normalized: string;
+  try {
+    normalized = normalizeBackticks(masked);
+  } catch {
+    return UNRESOLVED_COMMAND;
+  }
   let entries: ShellParseEntry[];
   try {
     entries = parseShellWords(preserveShellCommandBoundaries(normalized), (name) =>
