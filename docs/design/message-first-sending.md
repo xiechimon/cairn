@@ -82,7 +82,8 @@ Two-way door for the outbox. The ledger change is two-way if the pending marker 
 
 ## Open for implementation
 
-These two notes are not settled here. Implementation must close them before the behavior ships. This page does not specify the procedure.
+These notes are not settled here. Implementation must close them before the behavior ships. This page does not specify the procedure. Further notes on this page are the same deferral.
 
 - Row 7 suppression. `messageThreadAsUser` claims after `deliver()` (`apps/server/src/services/thread-message.ts` on `origin/main`). An absent outer ledger row is not proof that no handler is running. Do not treat that as successful suppression.
 - Abandoned `inflightGeneration`. A closed or suspended holder cannot clear the flag. Takeover must not wait forever for that callback.
+- A ready attachment can sit in the outbox longer than the orphan grace. `sweepAttachmentBatches` deletes an unreferenced attachment after `ATTACHMENT_ORPHAN_GRACE_MS` (7 days, `apps/server/src/services/attachment-gc.ts`). Skipping the upload then posts a token for a deleted file. Re-upload when the server resource is gone is not specified here.
