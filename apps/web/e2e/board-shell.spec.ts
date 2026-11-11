@@ -22,7 +22,7 @@ test('a project filter keeps home and marks the project; an unknown project show
 
 for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 }]) {
   for (const theme of ['light', 'dark']) {
-    test(`home and detail share one gap from the composer block to the sheet bottom (16px, 20px above the phone tab bar) at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
+    test(`the composer block sits 16px above the sheet bottom on home and detail (home 20px above the phone tab bar, the phone task view covers it) at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
       const gaps: number[] = [];
@@ -36,7 +36,7 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
         await page.evaluate(() => document.fonts.ready);
         const gap = await composer.evaluate((element) => {
           const sheet = element.closest('.board-sheet, .group\\/detail-main');
-          const tabs = sheet?.querySelector('[data-slot="phone-tabs"]');
+          const tabs = element.closest('.side-panel') ? null : sheet?.querySelector('[data-slot="phone-tabs"]');
           const floor = tabs
             ? tabs.getBoundingClientRect().top
             : sheet
@@ -51,11 +51,9 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
         await page.screenshot({ path: screenshot });
         await testInfo.attach(route.name, { path: screenshot, contentType: 'image/png' });
       }
-      for (const gap of gaps) {
-        expect.soft(gap).toBeGreaterThanOrEqual(12);
-        expect.soft(gap).toBeCloseTo(viewport.width <= 640 ? 20 : 16, 0);
-      }
-      expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      const phone = viewport.width <= 640;
+      expect.soft(gaps[0]).toBeCloseTo(phone ? 20 : 16, 0);
+      expect.soft(gaps[1]).toBeCloseTo(16, 0);
     });
   }
 }

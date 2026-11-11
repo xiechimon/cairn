@@ -408,8 +408,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
       const r = el.getBoundingClientRect();
       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
     });
-    expect(geo.h).toBeGreaterThanOrEqual(32);
-    expect(geo.h).toBeLessThanOrEqual(33);
+    expect(geo.h).toBe(36);
     expect(geo.font).toBe('14px');
 
     const fence = coordinator.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });

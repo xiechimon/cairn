@@ -84,7 +84,7 @@ test('a letter that no row owns neither moves focus nor reaches the global hotke
   await page.keyboard.press('ArrowDown');
   const focused = await page.evaluate(() => document.activeElement?.textContent);
   await page.keyboard.press('q');
-  await page.keyboard.press('n');
+  await page.keyboard.press('z');
   await expect(moreMenu(page)).toBeVisible();
   expect(await page.evaluate(() => document.activeElement?.textContent)).toBe(focused);
   await expect(page.getByRole('dialog')).toHaveCount(0);
