@@ -30,14 +30,14 @@ export function useSettingsOverlay() {
   const section = settingsSectionOf(location.pathname);
   const lastPage = useRef<PageEntry | null>(null);
   const pageBeforeLast = useRef<PageEntry | null>(null);
-  const undoneRedirectKey = useRef<string | null>(null);
+  const undoneRedirect = useRef<Location | null>(null);
   if (section === null) {
-    if (lastPage.current?.location.key !== location.key) {
+    if (lastPage.current?.location !== location) {
       pageBeforeLast.current = lastPage.current;
       lastPage.current = { location, historyIndex: currentHistoryIndex() };
     }
-  } else if (arrivedBySettingsRedirect(location) && undoneRedirectKey.current !== location.key) {
-    undoneRedirectKey.current = location.key;
+  } else if (arrivedBySettingsRedirect(location) && undoneRedirect.current !== location) {
+    undoneRedirect.current = location;
     lastPage.current = pageBeforeLast.current;
   }
   const scenario = new URLSearchParams(location.search).get('scenario');

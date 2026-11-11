@@ -138,8 +138,10 @@ test('N stays retired — neither the Coordinator nor a dialog opens', async ({ 
 test.describe('⌘J leaves overlay routes for the Coordinator page', () => {
   test('machine detail: ⌘J navigates to the Coordinator page', async ({ page }) => {
     await page.goto(MACHINE_DETAIL);
-    await expect(page.getByTestId('machine-detail')).toBeVisible();
-    await pressAndExpect(page, 'Meta+j', home(page));
+    await expect(page.locator('[inert] [data-testid="home-c"]')).toHaveCount(1);
+    await pressAndExpect(page, 'Meta+j', page.getByTestId('machine-detail'), 'hidden');
+    await expect(page.locator('[inert] [data-testid="home-c"]')).toHaveCount(0);
+    await expect(home(page)).toBeVisible();
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
   });
 
