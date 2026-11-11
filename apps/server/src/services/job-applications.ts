@@ -44,6 +44,7 @@ interface Attempt {
   questionId: string | null;
   delivery: 'delivered' | 'unknown' | null;
   capDay: string | null;
+  submitBy: number | null;
 }
 interface Preview {
   url: string;
@@ -187,8 +188,11 @@ export function readFillableProfile(db: Db, userId: string) {
   return { fields: fields.map(({ id, name, value }) => ({ id, name, value })) };
 }
 export function readJobCap(db: Db, userId: string, now: number) {
+  const doc = load(db, userId);
+  settleAbandoned(doc, now);
+  save(db, userId, doc);
   const utcDay = dayOf(now);
-  const cap = capOf(load(db, userId), utcDay);
+  const cap = capOf(doc, utcDay);
   return { utcDay, limit: cap.limit, reserved: cap.reserved, counted: cap.counted };
 }
 export function setJobCapLimit(
@@ -209,7 +213,14 @@ export function openAttempt(db: Db, userId: string): { id: string; status: 'idle
   const doc = load(db, userId);
   const status = doc.profile !== null && doc.profile.fields.length > 0 ? 'reading' : 'idle';
   const id = newRecordId();
-  doc.attempts[id] = { status, previewHash: null, questionId: null, delivery: null, capDay: null };
+  doc.attempts[id] = {
+    status,
+    previewHash: null,
+    questionId: null,
+    delivery: null,
+    capDay: null,
+    submitBy: null,
+  };
   save(db, userId, doc);
   return { id, status };
 }
@@ -237,17 +248,35 @@ function sensitive(control: JobFormInput['controls'][number]): boolean {
     tokens.some((token) => SENSITIVE.has(token))
   );
 }
-function canonicalUrl(raw: string): { url: string; host: string } | null {
+function canonicalUrl(raw: string): { url: string; host: string; queryDigest: string } | null {
   try {
     const parsed = new URL(raw);
     if (parsed.protocol !== 'https:' || parsed.username !== '' || parsed.password !== '')
       return null;
+    const queryDigest = sha256Hex(
+      [...parsed.searchParams.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]))
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&'),
+    );
     parsed.search = '';
     parsed.hash = '';
-    return { url: parsed.toString(), host: parsed.hostname.toLowerCase() };
+    return { url: parsed.toString(), host: parsed.hostname.toLowerCase(), queryDigest };
   } catch {
     return null;
   }
+}
+function controlSig(controls: JobFormInput['controls']): string[] {
+  return controls
+    .map((control) =>
+      [
+        control.ref,
+        control.type ?? '',
+        control.autocomplete ?? '',
+        control.payment === true ? 'pay' : '',
+      ].join(':'),
+    )
+    .sort();
 }
 function chosen(profile: Doc['profile'], ids: string[]): Field[] | null {
   if (profile === null) return null;
@@ -258,17 +287,22 @@ function chosen(profile: Doc['profile'], ids: string[]): Field[] | null {
   return fields.filter((field) => field !== null);
 }
 function digest(
-  page: { url: string; pageHost: string; formActionHost: string },
+  page: { url: string; host: string; queryDigest: string },
+  pageHost: string,
+  formActionHost: string,
   refs: string[],
+  controls: JobFormInput['controls'],
   fields: Field[],
   profile: NonNullable<Doc['profile']>,
 ): string {
   return sha256Hex(
     JSON.stringify({
       url: page.url,
-      pageHost: page.pageHost,
-      formActionHost: page.formActionHost,
+      queryDigest: page.queryDigest,
+      pageHost,
+      formActionHost,
       fieldRefs: [...refs].sort(),
+      controls: controlSig(controls),
       fields: [...fields]
         .sort((a, b) => a.id.localeCompare(b.id))
         .map((field) => [field.id, field.value]),
@@ -299,8 +333,11 @@ export function buildJobPreview(db: Db, attemptId: string, input: JobFormInput, 
     return { status: 'blocked', hash: '' };
   }
   const hash = digest(
-    { url: page.url, pageHost, formActionHost },
+    page,
+    pageHost,
+    formActionHost,
     input.fieldRefs,
+    input.controls,
     fields,
     doc.profile,
   );
@@ -322,8 +359,15 @@ export function buildJobPreview(db: Db, attemptId: string, input: JobFormInput, 
 export function previewValues(
   db: Db,
   attemptId: string,
+  now?: number,
 ): Record<string, string> | null | undefined {
-  return found(db, attemptId).doc.previews[attemptId]?.values;
+  const { userId, doc } = found(db, attemptId);
+  const preview = doc.previews[attemptId];
+  if (preview === undefined) return undefined;
+  if (now === undefined || now <= preview.expiresAt) return preview.values;
+  preview.values = null;
+  save(db, userId, doc);
+  return null;
 }
 export function postPreviewQuestion(
   db: Db,
@@ -379,6 +423,63 @@ function sameList(left: readonly string[], right: readonly string[]): boolean {
   const b = [...right].sort();
   return a.length === b.length && a.every((item, index) => item === b[index]);
 }
+function settleAbandoned(doc: Doc, now: number): void {
+  for (const attempt of Object.values(doc.attempts)) {
+    if (attempt.status !== 'submitting' || attempt.submitBy === null || now <= attempt.submitBy)
+      continue;
+    const cap = attempt.capDay === null ? undefined : doc.caps[attempt.capDay];
+    if (cap !== undefined && cap.reserved > 0) {
+      cap.reserved -= 1;
+      cap.counted += 1;
+    }
+    attempt.status = 'blocked';
+    attempt.delivery = 'unknown';
+  }
+  for (const preview of Object.values(doc.previews)) {
+    if (now > preview.expiresAt) preview.values = null;
+  }
+}
+function ownerAffirmed(db: Db, questionId: string): boolean {
+  const row = db.select().from(chiefMessage).where(eq(chiefMessage.id, questionId)).get();
+  if (row === undefined || row.content === null || typeof row.content !== 'object') return false;
+  const content = row.content as {
+    status?: string;
+    answeredBy?: string;
+    answers?: { choices?: string[] }[] | null;
+  };
+  const choices = content.answers?.[0]?.choices;
+  return (
+    content.status === 'answered' &&
+    content.answeredBy === 'person' &&
+    choices?.length === 1 &&
+    choices[0] === JOB_SUBMIT_AFFIRMATIVE
+  );
+}
+export function recordOwnerAnswer(
+  db: Db,
+  caller: JobCaller,
+  questionId: string,
+  answer: JobAnswer,
+): void {
+  ownerOnly(caller);
+  const row = db.select().from(chiefMessage).where(eq(chiefMessage.id, questionId)).get();
+  if (row === undefined || row.content === null || typeof row.content !== 'object') {
+    throw new HttpError(404, `question ${questionId}`);
+  }
+  const content = row.content as Record<string, unknown>;
+  db.update(chiefMessage)
+    .set({
+      content: {
+        ...content,
+        status: answer.cancelled === true ? 'cancelled' : 'answered',
+        answers:
+          answer.cancelled === true ? null : [{ header: 'Submit', choices: answer.choices ?? [] }],
+        answeredBy: 'person',
+      },
+    })
+    .where(eq(chiefMessage.id, questionId))
+    .run();
+}
 function busy(doc: Doc, hash: string): boolean {
   return Object.values(doc.attempts).some(
     (row) =>
@@ -397,6 +498,7 @@ export function answerAndReserve(
 ) {
   return db.transaction(() => {
     const { userId, doc } = found(db, attemptId);
+    settleAbandoned(doc, now);
     const attempt = doc.attempts[attemptId];
     const preview = doc.previews[attemptId];
     if (attempt === undefined || preview === undefined)
@@ -421,17 +523,18 @@ export function answerAndReserve(
         ...(refused ? { refused: true } : {}),
       };
     };
-    const affirmative =
-      answer.cancelled !== true &&
-      answer.choices?.length === 1 &&
-      answer.choices[0] === JOB_SUBMIT_AFFIRMATIVE;
     if (busy(doc, preview.hash)) return stop('blocked', true);
-    if (answer.questionId !== attempt.questionId || !affirmative || now > preview.expiresAt)
+    if (
+      answer.questionId !== attempt.questionId ||
+      !ownerAffirmed(db, attempt.questionId ?? '') ||
+      now > preview.expiresAt
+    ) {
       return stop('failed');
+    }
     const pageHost = hostOf(live.pageHost);
     const formActionHost = hostOf(live.formActionHost);
     const page = canonicalUrl(live.url);
-    if (formActionHost !== pageHost) return stop('blocked');
+    if (formActionHost !== pageHost || live.controls.some(sensitive)) return stop('blocked');
     if (
       page === null ||
       page.url !== preview.url ||
@@ -443,9 +546,17 @@ export function answerAndReserve(
     }
     const fields = chosen(doc.profile, preview.profileFieldIds);
     const current =
-      fields === null || doc.profile === null
+      fields === null || doc.profile === null || page === null
         ? ''
-        : digest({ url: page.url, pageHost, formActionHost }, live.fieldRefs, fields, doc.profile);
+        : digest(
+            page,
+            pageHost,
+            formActionHost,
+            live.fieldRefs,
+            live.controls,
+            fields,
+            doc.profile,
+          );
     if (current !== preview.hash) return stop('failed');
     if (doc.hosts[pageHost] !== 'allowed') return stop('blocked');
     const day = dayOf(now);
@@ -455,6 +566,7 @@ export function answerAndReserve(
     preview.values = null;
     attempt.status = 'submitting';
     attempt.capDay = day;
+    attempt.submitBy = now + JOB_PREVIEW_TTL_MS;
     save(db, userId, doc);
     return { status: 'submitting', reserved: true, clicked: false as const };
   });
@@ -467,8 +579,10 @@ export function recordDelivery(
 ) {
   return db.transaction(() => {
     const { userId, doc } = found(db, attemptId);
+    settleAbandoned(doc, _now);
     const attempt = doc.attempts[attemptId];
     if (attempt === undefined || attempt.status !== 'submitting' || attempt.capDay === null) {
+      save(db, userId, doc);
       throw new HttpError(409, 'submit is not in flight');
     }
     const cap = doc.caps[attempt.capDay];

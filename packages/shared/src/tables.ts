@@ -1,6 +1,7 @@
 export const DB_TABLES = [
   'user',
   'team',
+  'job_application',
   'project',
   'todo',
   'tag',
@@ -100,6 +101,7 @@ export const INTERNAL_ONLY_TABLES = [
   'gate_round',
   'gate_verdict',
   'gate_state',
+  'job_application',
   'autonomy_state',
   'member_activity',
   'build_feedback',

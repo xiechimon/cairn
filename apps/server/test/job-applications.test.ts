@@ -25,6 +25,7 @@ import {
   readFillableProfile,
   readJobCap,
   recordDelivery,
+  recordOwnerAnswer,
   setJobCapLimit,
   writeJobHost,
   writeOwnerProfile,
@@ -290,6 +291,10 @@ describe('job application server gate', () => {
 
   test('owner answer must match the question id, current hash, and affirmative choice', () => {
     const negative = prepared();
+    recordOwnerAnswer(negative.db, 'owner', negative.questionId, {
+      questionId: negative.questionId,
+      choices: ['Do not submit'],
+    });
     expect(
       answerAndReserve(
         negative.db,
@@ -302,6 +307,10 @@ describe('job application server gate', () => {
     expect(readJobCap(negative.db, negative.userId, AT).counted).toBe(0);
 
     const cancelled = prepared();
+    recordOwnerAnswer(cancelled.db, 'owner', cancelled.questionId, {
+      questionId: cancelled.questionId,
+      cancelled: true,
+    });
     expect(
       answerAndReserve(
         cancelled.db,
@@ -313,6 +322,10 @@ describe('job application server gate', () => {
     ).toBe('failed');
 
     const wrong = prepared();
+    recordOwnerAnswer(wrong.db, 'owner', wrong.questionId, {
+      questionId: wrong.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     expect(
       answerAndReserve(
         wrong.db,
@@ -324,6 +337,10 @@ describe('job application server gate', () => {
     ).toBe('failed');
 
     const expired = prepared();
+    recordOwnerAnswer(expired.db, 'owner', expired.questionId, {
+      questionId: expired.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     expect(
       answerAndReserve(
         expired.db,
@@ -335,6 +352,10 @@ describe('job application server gate', () => {
     ).toBe('failed');
 
     const edited = prepared();
+    recordOwnerAnswer(edited.db, 'owner', edited.questionId, {
+      questionId: edited.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     writeOwnerProfile(edited.db, 'owner', {
       userId: edited.userId,
       teamId: edited.teamId,
@@ -353,6 +374,10 @@ describe('job application server gate', () => {
     expect(readJobCap(edited.db, edited.userId, AT).reserved).toBe(0);
 
     const ok = prepared();
+    recordOwnerAnswer(ok.db, 'owner', ok.questionId, {
+      questionId: ok.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     expect(
       answerAndReserve(
         ok.db,
@@ -367,6 +392,10 @@ describe('job application server gate', () => {
 
   test('submit reserves before a click and counts delivered or unknown', () => {
     const changed = prepared();
+    recordOwnerAnswer(changed.db, 'owner', changed.questionId, {
+      questionId: changed.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     expect(
       answerAndReserve(
         changed.db,
@@ -379,6 +408,10 @@ describe('job application server gate', () => {
     expect(previewValues(changed.db, changed.attemptId)).toBeNull();
 
     const crossHost = prepared();
+    recordOwnerAnswer(crossHost.db, 'owner', crossHost.questionId, {
+      questionId: crossHost.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     expect(
       answerAndReserve(
         crossHost.db,
@@ -391,6 +424,10 @@ describe('job application server gate', () => {
     expect(readJobCap(crossHost.db, crossHost.userId, AT).counted).toBe(0);
 
     const revoked = prepared();
+    recordOwnerAnswer(revoked.db, 'owner', revoked.questionId, {
+      questionId: revoked.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     writeJobHost(revoked.db, 'owner', revoked.userId, HOST, 'refused');
     expect(
       answerAndReserve(
@@ -409,6 +446,14 @@ describe('job application server gate', () => {
     buildJobPreview(first.db, second.id, FORM, AT);
     const secondQuestion = postPreviewQuestion(first.db, second.id, first.threadId, AT, () => true);
     setJobCapLimit(first.db, 'owner', first.userId, AT, 1);
+    recordOwnerAnswer(first.db, 'owner', first.questionId, {
+      questionId: first.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
+    recordOwnerAnswer(first.db, 'owner', secondQuestion.questionId, {
+      questionId: secondQuestion.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     answerAndReserve(
       first.db,
       first.attemptId,
@@ -442,6 +487,10 @@ describe('job application server gate', () => {
     ).toBe(true);
 
     const unknown = prepared(AT + 86_400_000);
+    recordOwnerAnswer(unknown.db, 'owner', unknown.questionId, {
+      questionId: unknown.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
     answerAndReserve(
       unknown.db,
       unknown.attemptId,
