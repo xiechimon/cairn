@@ -32,6 +32,7 @@ export type FetchLike = (
 }>;
 
 const FETCH_TIMEOUT_MS = 15_000;
+const CREATE_RETRY_MAX_WAIT_MS = 60_000;
 
 export type GithubCreateGate = () => Promise<unknown>;
 
@@ -1410,6 +1411,7 @@ export async function githubCreateIssue(
       const delay =
         Math.max(1000, (error.retryAt(Date.now()) ?? Date.now() + 60000) - Date.now()) *
         2 ** attempt;
+      if (delay > CREATE_RETRY_MAX_WAIT_MS) throw error;
       console.warn(`GitHub create rate limited; retrying in ${delay}ms`);
       await sleep(delay);
     }
