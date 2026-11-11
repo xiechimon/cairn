@@ -13,6 +13,7 @@ import { pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { issueBrowserSession } from './browser-session.js';
 
 const LAST_SEEN_RESOLUTION_MS = 60_000;
 const CODE_BYTES = 24;
@@ -214,6 +215,21 @@ export function revokePairingGrant(db: Db, id: string, now = nowMs()): boolean {
   if (row === undefined || row.revokedAt !== null || row.redeemedAt !== null) return false;
   db.update(pairingGrant).set({ revokedAt: now }).where(eq(pairingGrant.id, id)).run();
   return true;
+}
+
+export function pairFromGrant(
+  db: Db,
+  input: { code: string; teamId: string; name: string },
+): { device: PairedDevice; token: string; sessionToken: string } | null {
+  return db.transaction((tx) => {
+    if (!hasRoomForDevice(tx)) {
+      throw new HttpError(409, 'too many paired devices; revoke one first');
+    }
+    if (!redeemPairingGrant(tx, input.code)) return null;
+    const created = createPairedDevice(tx, { teamId: input.teamId, name: input.name });
+    const session = issueBrowserSession(tx, 'device', created.device.id);
+    return { device: created.device, token: created.token, sessionToken: session.token };
+  });
 }
 
 export function redeemPairingGrant(db: Db, code: string, now = nowMs()): boolean {

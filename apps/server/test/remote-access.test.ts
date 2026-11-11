@@ -18,7 +18,7 @@ import { pairedDevice, pairingGrant, pushSubscription } from '../src/db/schema.j
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from '../src/lib/environment-id.js';
 import { listenOnTailnetSocket } from '../src/lib/tailnet-listener.js';
 import type { SidecarStatus } from '../src/lib/tsnet-sidecar.js';
-import { createPairingBook } from '../src/services/paired-devices.js';
+import { createPairingBook, pairFromGrant } from '../src/services/paired-devices.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const OWNER = 'remote-access-owner-token-0123456789abcdef';
@@ -59,6 +59,15 @@ function readyStatus(overrides: Partial<SidecarStatus> = {}): SidecarStatus {
     ...overrides,
   };
 }
+
+test('a failed device insert does not consume the pairing code', async () => {
+  const s = bootServer({ authToken: OWNER });
+  const code = await issueCode(s);
+  expect(() => pairFromGrant(s.db, { code, teamId: 'missing-team', name: 'phone' })).toThrow();
+  const retry = await call(s, 'POST', '/api/remote/pair', { body: { code, name: 'phone' } });
+  expect(retry.status).toBe(201);
+  expect(s.db.select().from(pairedDevice).all()).toHaveLength(1);
+});
 
 test('issuing a pairing code deletes expired, redeemed and revoked grants', async () => {
   const s = bootServer({ authToken: OWNER });

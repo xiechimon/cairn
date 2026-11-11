@@ -6,14 +6,12 @@ import { HttpError, parseWith } from './lib/errors.js';
 import { buildRemoteRoutes } from './lib/remote-routes.js';
 import { matchesAuthToken } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
-import { issueBrowserSession, requestIsSecure, setAuthCookie } from './services/browser-session.js';
+import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
 import {
-  createPairedDevice,
-  hasRoomForDevice,
   issuePairingGrant,
   listPairedDevices,
   listPairingGrants,
-  redeemPairingGrant,
+  pairFromGrant,
   revokePairedDevice,
   revokePairingGrant,
 } from './services/paired-devices.js';
@@ -91,19 +89,19 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(409, 'pairing needs token auth, which is turned off');
     }
     const body = parseWith(pairBodySchema, await jsonBody(c), 'body');
-    if (!hasRoomForDevice(ctx.db)) {
-      throw new HttpError(409, 'too many paired devices; revoke one first');
-    }
-    if (!redeemPairingGrant(ctx.db, body.code)) {
-      throw new HttpError(401, 'pairing code is invalid or expired');
-    }
-    const { device, token } = createPairedDevice(ctx.db, {
+    const paired = pairFromGrant(ctx.db, {
+      code: body.code,
       teamId: ctx.team.id,
       name: body.name,
     });
-    const session = issueBrowserSession(ctx.db, 'device', device.id);
-    setAuthCookie(c, session.token, requestIsSecure(c));
-    return c.json({ token, deviceId: device.id, environmentId: remote.environmentId }, 201);
+    if (paired === null) {
+      throw new HttpError(401, 'pairing code is invalid or expired');
+    }
+    setAuthCookie(c, paired.sessionToken, requestIsSecure(c));
+    return c.json(
+      { token: paired.token, deviceId: paired.device.id, environmentId: remote.environmentId },
+      201,
+    );
   });
 
   app.get('/api/remote/devices', (c) => {
