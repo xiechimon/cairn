@@ -280,6 +280,7 @@ interface BuildSteerOptions {
   actor?: string;
   schedule?: { id: string; createdBy: string; at: number };
   answer?: QuestionAnswer;
+  beforeCommit?: () => void;
 }
 
 function continuationTodo(
@@ -572,6 +573,7 @@ export async function sendBuildSteer(
         delivered: running ? ('steer' as const) : ('new-turn' as const),
       };
       completeClientMessage(db, conversationId, body.clientMessageId, result);
+      continuationOptions.beforeCommit?.();
       return result;
     });
   } catch (error) {
@@ -1508,7 +1510,7 @@ export async function applyBuildStepAction(
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
   origin: 'person' | 'automatic' = 'person',
-  nestedTodoId?: string,
+  beforeCommit?: () => void,
 ): Promise<void> {
   if (
     (body.action === 'revision' || body.action === 'restart') &&
@@ -1559,15 +1561,14 @@ export async function applyBuildStepAction(
       completeClientMessage(deps.db, buildId, body.clientMessageId, {
         delegated: true,
         delivered: 'restart',
-        ...(nestedTodoId !== undefined ? { nestedTodoId } : {}),
         conversationId,
       });
+      beforeCommit?.();
     };
     deps.db.transaction(() => {
       claimClientMessage(deps.db, buildId, body.clientMessageId, {
         delegated: true,
         delivered: 'restart',
-        ...(nestedTodoId !== undefined ? { nestedTodoId } : {}),
       });
       const current = getTodo(deps, row.todoId);
       if (
@@ -1804,7 +1805,6 @@ export async function applyBuildStepAction(
     claimClientMessage(deps.db, buildId, body.clientMessageId, {
       delegated: true,
       delivered: 'revision',
-      ...(nestedTodoId !== undefined ? { nestedTodoId } : {}),
       conversationId: buildId,
     });
     recordBuildFeedback(
@@ -1834,6 +1834,7 @@ export async function applyBuildStepAction(
         origin === 'person',
         { kind: 'rework' },
       );
+      beforeCommit?.();
       return;
     }
     setTodoPhase(deps, revising.id, 'planning');
@@ -1842,6 +1843,7 @@ export async function applyBuildStepAction(
         ? buildReviewRejectPrompt(body.feedback)
         : buildReplanPrompt(body.feedback);
     enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person');
+    beforeCommit?.();
   });
   for (const publish of afterCommit) publish();
 }

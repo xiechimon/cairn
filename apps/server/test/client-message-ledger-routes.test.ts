@@ -1,7 +1,7 @@
 import { STOP_MESSAGE } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { build, clientMessage, message, step, todo } from '../src/db/schema.js';
+import { build, clientMessage, message, project, step, todo } from '../src/db/schema.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
@@ -190,6 +190,160 @@ test('a recovered restart replays the original conversation, not a later build',
     conversationId: 'restart-old',
     delivered: 'restart',
   });
+});
+
+function seedRunning(buildId: string, todoId: string) {
+  H.s.db
+    .insert(todo)
+    .values({
+      id: todoId,
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'running',
+      phase: 'building',
+      phaseAt: 1,
+      seqNum: 4,
+      latestBuildId: buildId,
+    })
+    .run();
+  H.s.db
+    .insert(build)
+    .values({ id: buildId, todoId, withPlan: false, triggerSource: 'user', createdAt: 1 })
+    .run();
+  H.s.db
+    .insert(step)
+    .values({
+      id: `${buildId}-step`,
+      buildId,
+      kind: 'build',
+      status: 'claimed',
+      sessionId: 'worker-session',
+      createdAt: 1,
+    })
+    .run();
+}
+
+function userMessages(buildId?: string) {
+  return H.s.db
+    .select()
+    .from(message)
+    .all()
+    .filter(
+      (row) => row.role === 'user' && (buildId === undefined || row.conversationId === buildId),
+    );
+}
+
+test('a crash between the route receipt and the steer leaves no steer', async () => {
+  seedRunning('crash-build', 'crash-todo');
+  H.s.db.run(
+    sql`CREATE TRIGGER abort_route_receipt BEFORE INSERT ON chief_message WHEN NEW.role = 'system' BEGIN SELECT RAISE(ABORT, 'marker write failed'); END`,
+  );
+  const crashed = await req(H.s.app, 'POST', '/api/todos/crash-todo/messages', {
+    content: 'Steer once',
+    clientMessageId: 'crash-1',
+  });
+  H.s.db.run(sql`DROP TRIGGER abort_route_receipt`);
+  expect(crashed.status).not.toBe(201);
+  expect(userMessages()).toHaveLength(0);
+  expect(
+    H.s.db.select().from(clientMessage).where(eq(clientMessage.scopeId, 'crash-todo')).get(),
+  ).toBeUndefined();
+  const retry = await req(H.s.app, 'POST', '/api/todos/crash-todo/messages', {
+    content: 'Steer once',
+    clientMessageId: 'crash-1',
+  });
+  expect(retry.status).toBe(201);
+  const again = await req(H.s.app, 'POST', '/api/todos/crash-todo/messages', {
+    content: 'Steer once',
+    clientMessageId: 'crash-1',
+  });
+  expect(again.status).toBe(201);
+  expect(await again.json()).toEqual(await retry.json());
+  expect(userMessages('crash-build')).toHaveLength(1);
+});
+
+test('a nested steer replay keeps the original build after a later build exists', async () => {
+  seedRunning('steer-old', 'steer-todo');
+  H.s.db
+    .insert(build)
+    .values({
+      id: 'steer-later',
+      todoId: 'steer-todo',
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: 2,
+    })
+    .run();
+  H.s.db
+    .update(todo)
+    .set({ latestBuildId: 'steer-later', phase: 'building' })
+    .where(eq(todo.id, 'steer-todo'))
+    .run();
+  H.s.db
+    .insert(clientMessage)
+    .values({
+      scopeId: 'steer-old',
+      clientMessageId: 'nested:steer-todo:steer-key',
+      response: {
+        conversationId: 'steer-old',
+        delivered: 'steer',
+        message: { id: 'steer-msg', role: 'user', content: 'Steer once', createdAt: 1 },
+      },
+      createdAt: 1,
+    })
+    .run();
+  const retry = await req(H.s.app, 'POST', '/api/todos/steer-todo/messages', {
+    content: 'Steer once',
+    clientMessageId: 'steer-key',
+  });
+  expect(retry.status).toBe(201);
+  expect(await retry.json()).toEqual({
+    todoId: 'steer-todo',
+    conversationId: 'steer-old',
+    delivered: 'steer',
+  });
+  expect(userMessages('steer-later')).toHaveLength(0);
+});
+
+test('a nested steer replay returns the stored response after archive', async () => {
+  seedRunning('arch-build', 'arch-todo');
+  H.s.db
+    .insert(clientMessage)
+    .values({
+      scopeId: 'arch-build',
+      clientMessageId: 'nested:arch-todo:arch-key',
+      response: {
+        conversationId: 'arch-build',
+        delivered: 'steer',
+        message: { id: 'arch-msg', role: 'user', content: 'Steer once', createdAt: 1 },
+      },
+      createdAt: 1,
+    })
+    .run();
+  H.s.db.update(todo).set({ archivedAt: 5 }).where(eq(todo.id, 'arch-todo')).run();
+  H.s.db.update(project).set({ archivedAt: 5 }).where(eq(project.id, H.projectId)).run();
+  const retry = await req(H.s.app, 'POST', '/api/todos/arch-todo/messages', {
+    content: 'Steer once',
+    clientMessageId: 'arch-key',
+  });
+  expect(retry.status).toBe(201);
+  expect(await retry.json()).toMatchObject({
+    conversationId: 'arch-build',
+    delivered: 'steer',
+  });
+});
+
+test('a lost nested steer receipt replays after archive without steering again', async () => {
+  seedRunning('live-build', 'live-todo');
+  const body = { content: 'Steer once', clientMessageId: 'live-1' };
+  const first = await req(H.s.app, 'POST', '/api/todos/live-todo/messages', body);
+  expect(first.status).toBe(201);
+  H.s.db.delete(clientMessage).where(eq(clientMessage.scopeId, 'live-todo')).run();
+  H.s.db.update(todo).set({ archivedAt: 9 }).where(eq(todo.id, 'live-todo')).run();
+  const retry = await req(H.s.app, 'POST', '/api/todos/live-todo/messages', body);
+  expect(retry.status).toBe(201);
+  expect(await retry.json()).toEqual(await first.json());
+  expect(userMessages('live-build')).toHaveLength(1);
 });
 
 test('a direct step receipt with the same key does not count as the thread send', async () => {
