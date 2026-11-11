@@ -30,6 +30,7 @@ import {
   isBackendRuntimeId,
   isChiefDigestThreadId,
   MAIL_FENCE_OPEN,
+  mailSharedTranscript,
   newChiefThreadId,
   orchestratedTodoIdOf,
   redactSecrets,
@@ -843,6 +844,9 @@ export function enqueueChiefStep(
       scopeProjectId: opts.scopeProjectId ?? null,
       ownerMessageIds: opts.ownerMessageIds,
       createdAt: nowMs(),
+      ...(opts.trigger !== 'user' && opts.provenance.startsWith('mail:')
+        ? { freshSession: true }
+        : {}),
     })
     .run();
   const activeRun = { phase: 'chief' } satisfies ActiveRun;
@@ -1628,6 +1632,20 @@ function wakeTodoProjectId(db: Db, teamId: string, todoId: unknown): string | nu
   );
 }
 
+function scrubMailFenceContent(content: unknown): unknown {
+  if (typeof content === 'string') return mailSharedTranscript(content);
+  if (Array.isArray(content)) return content.map(scrubMailFenceContent);
+  if (content !== null && typeof content === 'object') {
+    return Object.fromEntries(
+      Object.entries(content).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? mailSharedTranscript(value) : scrubMailFenceContent(value),
+      ]),
+    );
+  }
+  return content;
+}
+
 export function upsertChiefMessage(
   db: Db,
   row: {
@@ -1639,14 +1657,16 @@ export function upsertChiefMessage(
     projectId?: string | null;
   },
 ): void {
+  const content = scrubMailFenceContent(row.content);
   db.insert(chiefMessage)
     .values({
       ...row,
+      content,
       projectId: row.projectId === undefined ? writingTurnProjectId(db, row) : row.projectId,
     })
     .onConflictDoUpdate({
       target: chiefMessage.id,
-      set: { role: row.role, content: row.content, createdAt: row.createdAt },
+      set: { role: row.role, content, createdAt: row.createdAt },
     })
     .run();
   db.update(chiefThread).set({ updatedAt: nowMs() }).where(eq(chiefThread.id, row.threadId)).run();

@@ -66,6 +66,8 @@ export function rankMailEvent(db: Db, eventId: string): MailRank | null {
   if (!event) throw new HttpError(404, `mail event ${eventId}`);
   if (event.status !== 'received') return event.rank;
   if (event.excerpt === null || event.excerpt.trim() === '') return null;
+  const account = db.select().from(mailAccount).where(eq(mailAccount.id, event.accountId)).get();
+  if (!account || account.generation !== event.generation) return null;
   const rules = db
     .select()
     .from(mailRule)

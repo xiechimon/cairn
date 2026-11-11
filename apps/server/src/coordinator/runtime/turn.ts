@@ -2,8 +2,11 @@ import {
   type ClaimedStep,
   contextTokensOf,
   estimateTokens,
+  isMailWakeText,
   type MachineDoneBody,
   type ModelUsage,
+  mailFenceBlock,
+  mailSharedTranscript,
   type OtelObservation,
 } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
@@ -139,14 +142,24 @@ export async function runCoordinatorTurn(
   let rootKey: string | null = null;
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
   try {
-    const root = await activeConversation(harness, deps.conversationId, context);
+    const mailTurn = isMailWakeText(claimed.instruction ?? '');
+    const root = mailTurn
+      ? await harness.createConversation({ ownership: { kind: 'ownerless' } }, context)
+      : await activeConversation(harness, deps.conversationId, context);
     if (root === undefined) {
       return done({ status: 'failed', errorMessage: 'Coordinator conversation is missing' });
     }
     rootKey = String(root.id);
     const conversationKey = deps.inputs?.key(rootKey) ?? rootKey;
     deps.conversationGate?.set(rootKey, stepId);
-    deps.volatile?.set(rootKey, deps.volatileText ?? null);
+    const storedInstruction = mailTurn
+      ? mailSharedTranscript(claimed.instruction ?? '')
+      : claimed.instruction;
+    const mailExcerpt = mailTurn ? mailFenceBlock(claimed.instruction ?? '') : null;
+    const volatileText = [deps.volatileText, mailExcerpt]
+      .filter((part): part is string => part != null && part !== '')
+      .join('\n\n');
+    deps.volatile?.set(rootKey, volatileText === '' ? null : volatileText);
     deps.volatile?.setStep(rootKey, stepId);
     deps.volatile?.setColdSlim(rootKey, deps.coldSlim ?? null);
     let stopping: Promise<void> | null = null;
@@ -242,11 +255,13 @@ export async function runCoordinatorTurn(
       {
         ...api,
         transcriptRow: async (...args) => {
+          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptRow(...args);
         },
         transcriptDelta: async (...args) => {
+          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptDelta(...args);
@@ -283,16 +298,18 @@ export async function runCoordinatorTurn(
               ),
             context,
           );
-    const initial = await api.inputs?.prepare(
-      stepId,
-      conversationKey,
-      claimed.instruction ?? '',
-      prior?.entry === undefined ? undefined : String(prior.entry),
-    );
+    const initial = mailTurn
+      ? undefined
+      : await api.inputs?.prepare(
+          stepId,
+          conversationKey,
+          storedInstruction ?? '',
+          prior?.entry === undefined ? undefined : String(prior.entry),
+        );
     const submission = await root.submit(
       {
         type: 'input',
-        content: initial?.content ?? claimed.instruction ?? '',
+        content: initial?.content ?? storedInstruction ?? '',
         requestId: initial?.id ?? stepId,
       },
       context,

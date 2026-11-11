@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { fenceMailText } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { UserEntry } from '@earendil-works/pi-durable';
@@ -95,6 +96,52 @@ describe('volatile turn context', () => {
       'S',
     );
     expect(JSON.stringify(blocks)).toContain('"text":"\\n\\nS"');
+  });
+});
+
+describe('a mail wake does not leave fenced text in the next turn', () => {
+  it('keeps the excerpt out of the next normal turn model context', async () => {
+    const dir = makeTestTempDir('coord-mail-isolate-');
+    dirs.push(dir);
+    const requests: string[] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    faux.setResponses(
+      Array(4).fill((c: { messages: unknown[] }) => {
+        requests.push(JSON.stringify(c.messages));
+        return fauxAssistantMessage('ok');
+      }),
+    );
+    const models = createCoordinatorModels([faux.provider]);
+    const volatile = createVolatileContext();
+    const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
+      extensions: [volatileContextExtension(volatile)],
+    });
+    const deps = {
+      harness,
+      models,
+      api: fakeMachineApi(),
+      context: ctx,
+      heartbeatMs: 1000,
+      now: () => 1,
+      conversationGate: createConversationGate(),
+      volatile,
+    };
+    const secret = 'MAIL-SECRET-EXCERPT-9f3a';
+    const mail = `[wake:wake] provenance=mail:evt-1\n邮件事件 evt-1，账户 acc，外部编号 ext，规则 Payroll。\n${fenceMailText('ext', secret)}`;
+    await runCoordinatorTurn(deps, chiefStep('evt-1', mail));
+    await runCoordinatorTurn(deps, chiefStep('next', 'what should I do next'));
+    const root = await harness.root(ctx);
+    const view = await root.context(ctx);
+    const inherited = JSON.stringify(view.messages);
+    expect(requests[0]).toContain(secret);
+    expect(requests[1]).not.toContain(secret);
+    expect(inherited).not.toContain(secret);
+    expect(inherited).not.toContain('【邮件原文');
+    await harness.close(ctx);
   });
 });
 
