@@ -111,7 +111,7 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
     }, shellSel);
 
   const widthBefore = (await col.boundingBox())?.width ?? 0;
-  expect(widthBefore).toBe(768);
+  expect(widthBefore).toBe(672);
 
   const before = await readScrollLayer();
   const topbarBefore = await page.getByTestId('page-toolbar').boundingBox();

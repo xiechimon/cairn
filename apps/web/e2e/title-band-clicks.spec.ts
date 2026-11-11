@@ -38,7 +38,7 @@ for (const [route, scenario] of [
   test(`sidebar destination renders no back arrow — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);
     await expect(
-      page.locator('[data-testid="page-topbar"], [data-testid="settings-breadcrumb"]').first(),
+      page.locator('[data-testid="page-topbar"], [data-testid="settings-head"]').first(),
     ).toBeVisible();
     await expect(page.locator('[data-testid="page-topbar"] [aria-label="返回"]')).toHaveCount(0);
   });

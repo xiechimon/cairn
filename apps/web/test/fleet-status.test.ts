@@ -66,9 +66,9 @@ describe('fleetSummary', () => {
 
   it('is neutral and nameless when every machine is online', () => {
     expect(fleetSummary({ online: 3, offline: 0, offlineNames: [] }, t)).toEqual({
-      label: '3 在线',
+      label: '3 台在线',
       short: '3/3',
-      title: '3 在线',
+      title: '3 台在线',
       tone: 'online',
     });
   });

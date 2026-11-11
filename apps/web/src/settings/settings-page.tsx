@@ -16,8 +16,16 @@ import {
   Waypoints,
   X,
 } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
-import { Link, type To, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
+import { Link, type To, useLocation, useSearchParams } from 'react-router';
 import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { SettingsNav, type SettingsNavGroup } from '../components/settings/settings-nav.js';
@@ -39,7 +47,7 @@ import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
 import { ArchivedProjectsSection } from './archived-projects-section.js';
-import { lastOutsideLocation, SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
+import { SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
 
 interface Section {
   id: SettingsSectionId;
@@ -98,7 +106,7 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    heading: '模型与账户',
+    heading: '模型',
     sections: [
       { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
       { id: 'routing', label: '用量与连接', Icon: Route, element: () => <ModelRoutingPage /> },
@@ -116,12 +124,12 @@ const GROUPS: Group[] = [
       { id: 'machines', label: '机器', Icon: Server, element: () => <MachinesPage /> },
       { id: 'skills', label: '技能', Icon: Puzzle, element: () => <SkillsPage /> },
       { id: 'mcp', label: 'MCP', Icon: Plug, element: () => <McpServersPage /> },
-      { id: 'secrets', label: '密钥', Icon: ShieldEllipsis, element: () => <SecretsPage /> },
     ],
   },
   {
-    heading: '团队与访问',
+    heading: '安全',
     sections: [
+      { id: 'secrets', label: '密钥', Icon: ShieldEllipsis, element: () => <SecretsPage /> },
       { id: 'api-keys', label: 'API 密钥', Icon: KeyRound, element: () => <ApiKeysPage /> },
       {
         id: 'remote',
@@ -146,51 +154,79 @@ function useMachineBadge(): string | undefined {
   return `${rows.filter(Boolean).length}/${rows.length}`;
 }
 
-export function SettingsPage() {
+const TABBABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function isEditable(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || target.closest('input, textarea, select') !== null)
+  );
+}
+
+function trapTab(event: ReactKeyboardEvent<HTMLElement>): void {
+  if (event.key !== 'Tab' || !event.currentTarget.contains(event.target as Node)) return;
+  const tabbable = [...event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE)].filter(
+    (el) => el.offsetParent !== null,
+  );
+  const first = tabbable[0];
+  const last = tabbable[tabbable.length - 1];
+  if (first === undefined || last === undefined) {
+    event.preventDefault();
+    return;
+  }
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || active === event.currentTarget)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+export function SettingsDialog({
+  section: sectionParam,
+  onClose,
+}: {
+  section: string;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
-  const { section: sectionParam } = useParams();
   const { search } = useLocation();
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const machineBadge = useMachineBadge();
+  const titleId = useId();
   const section = SECTIONS.find((s) => s.id === sectionParam) ?? null;
   const shown = section ?? SECTIONS[0];
-  const [returnTo] = useState(() => {
-    const scenario = new URLSearchParams(search).get('scenario');
-    return lastOutsideLocation() ?? `/app${scenario === null ? '' : `?scenario=${scenario}`}`;
-  });
-  const close = () => navigate(returnTo);
-  const windowRef = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(
+    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  );
+  const popupRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const closeRef = useRef(close);
-  closeRef.current = close;
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const returnTo = opener.current;
+    return () => {
+      if (returnTo?.isConnected) returnTo.focus();
+    };
+  }, []);
   useLayoutEffect(() => {
-    windowRef.current?.focus();
+    popupRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (document.querySelector('[data-open]') !== null) return;
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable || target.closest('input, textarea, select') !== null)
-      ) {
-        return;
-      }
+      if (isEditable(event.target)) return;
       closeRef.current();
     };
     const onSlash = (event: KeyboardEvent) => {
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable || target.closest('input, textarea, select') !== null)
-      ) {
-        return;
-      }
-      const search = searchRef.current;
-      if (search === null || search.offsetParent === null) return;
+      if (isEditable(event.target)) return;
+      const input = searchRef.current;
+      if (input === null || input.offsetParent === null) return;
       event.preventDefault();
-      search.focus();
+      input.focus();
     };
     document.addEventListener('keydown', onKey, true);
     document.addEventListener('keydown', onSlash);
@@ -211,24 +247,24 @@ export function SettingsPage() {
   }));
   return (
     <>
-      <div aria-hidden className="h-full bg-(--surface-1)" />
       <div
         aria-hidden
         data-testid="settings-backdrop"
         className="fixed inset-0 z-(--z-backdrop-low) bg-(--overlay-scrim)"
-        onClick={close}
+        onClick={onClose}
       />
       <div
-        ref={windowRef}
+        ref={popupRef}
         role="dialog"
         aria-modal="true"
-        aria-label={t('设置')}
+        aria-labelledby={titleId}
         tabIndex={-1}
-        className="fixed inset-0 z-(--z-panel-low) flex overflow-hidden bg-background text-ui outline-none md:top-6 md:bottom-6 md:left-[max(1.5rem,calc(50%-38rem))] md:w-[min(76rem,calc(100%-3rem))] md:rounded-(--radius-card) md:shadow-(--e3) md:ring-1 md:ring-border"
+        onKeyDown={trapTab}
+        className="fixed inset-0 z-(--z-panel-low) flex overflow-hidden bg-background text-ui text-foreground outline-none md:inset-auto md:top-1/2 md:left-1/2 md:h-[min(40rem,calc(100%-3rem))] md:w-[min(56rem,calc(100%-3rem))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-(--radius-card) md:shadow-(--e3) md:ring-1 md:ring-border"
       >
         <div
           className={cn(
-            'w-full flex-none bg-(--surface-1) md:w-60 md:border-r md:border-border',
+            'w-full flex-none bg-(--surface-1) md:w-48 md:border-r md:border-border',
             section !== null && 'max-md:hidden',
           )}
         >
@@ -240,9 +276,17 @@ export function SettingsPage() {
             onQuery={setQuery}
             searchRef={searchRef}
             top={
-              <div className="flex items-center justify-between px-1 md:hidden">
-                <span className="text-card-title font-medium text-foreground">{t('设置')}</span>
-                <Button variant="ghost" size="icon-sm" aria-label={t('关闭设置')} onClick={close}>
+              <div className="flex items-center justify-between px-2">
+                <span id={titleId} className="text-meta text-content-tertiary">
+                  {t('设置')}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="md:hidden"
+                  aria-label={t('关闭设置')}
+                  onClick={onClose}
+                >
                   <X />
                 </Button>
               </div>
@@ -254,31 +298,29 @@ export function SettingsPage() {
           className={cn('flex min-w-0 flex-auto flex-col', section === null && 'max-md:hidden')}
         >
           <div
-            data-testid="settings-breadcrumb"
-            className="flex h-11 flex-none items-center gap-2 border-b border-border px-4 text-meta text-content-tertiary"
+            data-testid="settings-head"
+            className="flex h-12 flex-none items-center gap-2 px-4 md:pl-5"
           >
             <Button
               variant="ghost"
               size="icon-sm"
-              className="md:hidden"
+              className="-ml-2 md:hidden"
               aria-label={t('返回设置')}
               render={<Link to={{ pathname: SETTINGS_HREF, search }} replace />}
             >
               <ArrowLeft />
             </Button>
-            <span>{t('设置')}</span>
             {shown !== undefined && (
-              <>
-                <span aria-hidden>/</span>
-                <h1 className="m-0 text-meta font-medium text-foreground">{t(shown.label)}</h1>
-              </>
+              <h1 className="m-0 min-w-0 flex-1 truncate text-card-title font-semibold text-foreground">
+                {t(shown.label)}
+              </h1>
             )}
             <Button
               variant="ghost"
               size="icon-sm"
               className="ml-auto max-md:hidden"
               aria-label={t('关闭设置')}
-              onClick={close}
+              onClick={onClose}
             >
               <X />
             </Button>

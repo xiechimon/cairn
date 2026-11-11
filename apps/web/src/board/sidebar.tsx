@@ -515,7 +515,7 @@ export function BoardSidebar({
             >
               <span
                 aria-hidden
-                className={`size-1.5 flex-none rounded-full ${fleet.tone === 'offline' ? 'bg-destructive' : 'bg-content-tertiary'}`}
+                className={`size-1.5 flex-none rounded-full ${fleet.tone === 'offline' ? 'bg-destructive' : 'bg-running'}`}
               />
               <span className="@min-[9rem]:hidden">{fleet.short}</span>
               <span className="hidden @min-[9rem]:inline">{fleet.label}</span>

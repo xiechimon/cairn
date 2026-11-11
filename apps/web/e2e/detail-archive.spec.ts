@@ -216,7 +216,8 @@ test('archive toast Undo restores the composer immediately', async ({
     await unarchiveAllowed;
     await route.fallback();
   });
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText('已归档「Archive probe」')).toBeVisible();
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
   try {
     await expect(page.locator('.side-panel textarea')).toBeVisible();
   } finally {

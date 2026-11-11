@@ -15,12 +15,13 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { toastArchived } from './archive-toast.js';
 import { MoveToProjectSub } from './task-move-menu.js';
 import { canMarkDone } from './use-mark-done.js';
 
@@ -113,10 +114,9 @@ export function TaskRowMenu({
       { id: todo.id, archived: true },
       {
         onSuccess: () =>
-          toastSuccess(t('Task archived'), {
-            label: t('Undo'),
-            onClick: () => mutations.setTodoArchived.mutate({ id: todo.id, archived: false }),
-          }),
+          toastArchived(t, todo.title, (handlers) =>
+            mutations.setTodoArchived.mutate({ id: todo.id, archived: false }, handlers),
+          ),
         onError: (error) => toastError(t('Could not archive task.'), error),
       },
     );

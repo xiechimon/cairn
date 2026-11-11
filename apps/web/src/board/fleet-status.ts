@@ -35,7 +35,7 @@ export interface FleetSummary {
 export function fleetSummary(status: FleetStatus, t: Translate): FleetSummary | null {
   if (status.online + status.offline === 0) return null;
   if (status.offline === 0) {
-    const label = t('{online} 在线', { online: status.online });
+    const label = t('{online} 台在线', { online: status.online });
     return { label, short: `${status.online}/${status.online}`, title: label, tone: 'online' };
   }
   return {

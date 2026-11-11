@@ -7,7 +7,7 @@ import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -16,6 +16,7 @@ import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { AcceptTaskDialog } from './accept-task-dialog.js';
+import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
@@ -105,10 +106,9 @@ export function useThreadActions({
         {
           onSuccess: () => {
             if (next)
-              toastSuccess(t('Task archived'), {
-                label: t('Undo'),
-                onClick: () => mutations.setTodoArchived.mutate({ id: todo.id, archived: false }),
-              });
+              toastArchived(t, todo.title, (handlers) =>
+                mutations.setTodoArchived.mutate({ id: todo.id, archived: false }, handlers),
+              );
           },
           onError: (error) =>
             toastError(next ? t('Could not archive task.') : t('Could not unarchive task.'), error),

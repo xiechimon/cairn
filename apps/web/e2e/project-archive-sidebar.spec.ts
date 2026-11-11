@@ -55,3 +55,14 @@ test('archiving never issues a delete', async ({ page }) => {
   await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(0);
   expect(deletes).toEqual([]);
 });
+
+test('archive toast names the project and Undo brings it back', async ({ page }) => {
+  const calls = await open(page);
+  await rows(page).filter({ hasText: 'probe-old' }).hover();
+  await page.getByRole('button', { name: 'probe-old 的菜单' }).click();
+  await page.getByRole('menuitem', { name: '归档' }).click();
+  await expect(page.getByText('已归档「probe-old」')).toBeVisible();
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(1);
+  expect(calls).toEqual(['/api/projects/proj-2/archive', '/api/projects/proj-2/unarchive']);
+});

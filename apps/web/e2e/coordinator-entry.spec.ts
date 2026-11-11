@@ -18,7 +18,8 @@ test.describe('the Coordinator lives only on the home', () => {
       await expect(page.locator('[data-route]').first()).toBeVisible();
       await expect(page.locator('.chief-fab')).toHaveCount(0);
       await expect(page.getByRole('complementary', { name: 'Coordinator' })).toHaveCount(0);
-      const onHome = new URL(page.url()).pathname === '/app';
+      const pathname = new URL(page.url()).pathname;
+      const onHome = pathname === '/app' || pathname.startsWith('/app/settings');
       await expect(page.getByTestId('chief-composer-input')).toHaveCount(onHome ? 1 : 0);
     });
   }

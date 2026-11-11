@@ -11,7 +11,7 @@ test('the breadcrumb is the only page title: no second heading repeats it', asyn
   await expect(settings(page).getByRole('heading', { level: 1 })).toHaveText('机器');
   await expect(settings(page).getByRole('heading', { name: '机器', exact: true })).toHaveCount(1);
   await expect(settings(page).getByTestId('page-topbar')).toHaveCount(0);
-  await expect(settings(page).getByTestId('settings-breadcrumb')).toContainText('设置');
+  await expect(settings(page).getByTestId('settings-head')).toContainText('机器');
 });
 
 test('other sections keep one heading for the page, the breadcrumb', async ({ page }) => {

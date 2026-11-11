@@ -21,12 +21,8 @@ export function settingsHref(section: SettingsSectionId): string {
   return `${SETTINGS_HREF}/${section}`;
 }
 
-let lastOutside: string | null = null;
-
-export function recordOutsideLocation(path: string): void {
-  lastOutside = path;
-}
-
-export function lastOutsideLocation(): string | null {
-  return lastOutside;
+export function settingsSectionOf(pathname: string): string | null {
+  const match = /^\/app\/settings(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (match === null || match[1] === 'team') return null;
+  return match[1] ?? '';
 }

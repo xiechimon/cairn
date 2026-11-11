@@ -19,7 +19,7 @@ import { useI18n } from '../i18n/provider.js';
 import { useTypeToCompose } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { recordOutsideLocation } from '../settings/settings-href.js';
+import { toastArchived } from './archive-toast.js';
 import { useAttentionTitle } from './attention-title.js';
 import { fleetStatus } from './fleet-status.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
@@ -111,17 +111,19 @@ export function AppSidebar({
   const fleet = fleetStatus(live ? (machinesQ.data ?? []) : (fixtureMachines ?? []));
   const machinesOnline =
     live || fixtureMachines != null ? fleet.online : fixture.chief != null ? 1 : 0;
-  const { pathname, search: locationSearch } = location;
-  useEffect(
-    () => recordOutsideLocation(`${pathname}${locationSearch}`),
-    [pathname, locationSearch],
-  );
+  const { search: locationSearch } = location;
   useTypeToCompose();
   const archiveProject = (id: string) => {
     mutations.setProjectArchived.mutate(
       { id, archived: true },
       {
         onSuccess: () => {
+          const name = projects?.find((project) => project.id === id)?.name;
+          if (name !== undefined) {
+            toastArchived(t, name, (handlers) =>
+              mutations.setProjectArchived.mutate({ id, archived: false }, handlers),
+            );
+          }
           if (new URLSearchParams(locationSearch).get('project') === id) {
             navigate({ pathname: '/app' });
           }
