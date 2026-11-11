@@ -321,6 +321,9 @@ export function ProvidersPage() {
           if (result.status === 'denied') {
             setXaiDevice(null);
             setXaiDeviceError(t('xAI 登录被拒绝。'));
+          } else if (result.status === 'superseded') {
+            setXaiDevice(null);
+            setXaiDeviceError(t('已有更新的 xAI 凭证，这次登录没有覆盖它。'));
           } else if (result.status === 'expired') {
             setXaiDevice(null);
             setXaiDeviceError(t('验证码已过期，请重试。'));

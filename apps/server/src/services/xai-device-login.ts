@@ -5,7 +5,7 @@ import { provider } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { createProvider, updateProvider } from './providers.js';
+import { createProvider } from './providers.js';
 
 export const XAI_DEVICE_CODE_URL = 'https://auth.x.ai/oauth2/device/code';
 export const XAI_TOKEN_URL = 'https://auth.x.ai/oauth2/token';
@@ -37,6 +37,7 @@ export interface XaiDeviceState {
   teamId: string;
   createdBy: string;
   deviceCode: string;
+  baselineCipher: string | null;
   intervalSeconds: number;
   expiresAt: number;
   lastPollAt: number;
@@ -204,10 +205,16 @@ export async function startXaiDeviceLogin(
   const verificationUri = httpsUri(complete);
   const expiresInSeconds = positiveNumber(response.body, 'expires_in');
   const state = newRecordId(32);
+  const existing = deps.db
+    .select({ apiKeyCipher: provider.apiKeyCipher })
+    .from(provider)
+    .where(and(eq(provider.teamId, input.teamId), eq(provider.providerId, 'xai')))
+    .get();
   deps.states.set(state, {
     teamId: input.teamId,
     createdBy: input.createdBy,
     deviceCode: requiredString(response.body, 'device_code'),
+    baselineCipher: existing?.apiKeyCipher ?? null,
     intervalSeconds,
     expiresAt: Date.now() + expiresInSeconds * 1000,
     lastPollAt: Date.now(),
@@ -229,38 +236,46 @@ function ownState(deps: XaiDeviceDeps, teamId: string, state: string): XaiDevice
 
 function saveSubscription(
   deps: XaiDeviceDeps,
-  input: { teamId: string; createdBy: string; sealed: string },
-): void {
+  input: { teamId: string; createdBy: string; sealed: string; baselineCipher: string | null },
+): boolean {
   const existing = deps.db
     .select()
     .from(provider)
     .where(and(eq(provider.teamId, input.teamId), eq(provider.providerId, 'xai')))
     .get();
   const keyDeps = { db: deps.db, box: deps.box };
-  if (existing) {
-    updateProvider(keyDeps, input.teamId, existing.id, {
-      label: 'xAI',
-      baseUrl: XAI_PROVIDER_BASE_URL,
-      api: 'openai-responses',
-      authHeader: false,
-      apiKey: input.sealed,
-      ...(existing.models.length === 0 ? { models: XAI_SUBSCRIPTION_MODELS } : {}),
+  if (input.baselineCipher === null) {
+    if (existing) return false;
+    createProvider(keyDeps, {
+      teamId: input.teamId,
+      createdBy: input.createdBy,
+      body: {
+        providerId: 'xai',
+        label: 'xAI',
+        baseUrl: XAI_PROVIDER_BASE_URL,
+        api: 'openai-responses',
+        authHeader: false,
+        models: XAI_SUBSCRIPTION_MODELS,
+        apiKey: input.sealed,
+      },
     });
-    return;
+    return true;
   }
-  createProvider(keyDeps, {
-    teamId: input.teamId,
-    createdBy: input.createdBy,
-    body: {
-      providerId: 'xai',
+  if (!existing || existing.apiKeyCipher !== input.baselineCipher) return false;
+  const written = deps.db
+    .update(provider)
+    .set({
       label: 'xAI',
       baseUrl: XAI_PROVIDER_BASE_URL,
       api: 'openai-responses',
       authHeader: false,
-      models: XAI_SUBSCRIPTION_MODELS,
-      apiKey: input.sealed,
-    },
-  });
+      apiKeyCipher: deps.box.seal(input.sealed),
+      ...(existing.models.length === 0 ? { models: XAI_SUBSCRIPTION_MODELS } : {}),
+      updatedAt: nowMs(),
+    })
+    .where(and(eq(provider.id, existing.id), eq(provider.apiKeyCipher, input.baselineCipher)))
+    .run();
+  return written.changes === 1;
 }
 
 export async function pollXaiDeviceLogin(
@@ -269,6 +284,7 @@ export async function pollXaiDeviceLogin(
 ): Promise<
   | { status: 'pending'; intervalSeconds: number }
   | { status: 'complete' }
+  | { status: 'superseded' }
   | { status: 'denied' }
   | { status: 'expired' }
 > {
@@ -288,13 +304,14 @@ export async function pollXaiDeviceLogin(
   });
   if (response.ok) {
     const tokens = tokensFromBody(response.body);
-    saveSubscription(deps, {
+    const saved = saveSubscription(deps, {
       teamId: entry.teamId,
       createdBy: entry.createdBy,
       sealed: sealSecret(tokens),
+      baselineCipher: entry.baselineCipher,
     });
     deps.states.delete(input.state);
-    return { status: 'complete' };
+    return saved ? { status: 'complete' } : { status: 'superseded' };
   }
   const error = response.body.error;
   if (error === 'authorization_pending') {

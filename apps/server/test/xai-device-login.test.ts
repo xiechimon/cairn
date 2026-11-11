@@ -372,4 +372,59 @@ describe('xAI SuperGrok device login', () => {
     expect(access).toBe('newer-access');
     expect(mock.calls).toEqual([]);
   });
+
+  it('does not store an older device login over a credential saved while xAI was pending', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    const fetchImpl = async (input: string | URL) => {
+      calls += 1;
+      const url = String(input);
+      if (url === XAI_TOKEN_URL) await gate;
+      const json =
+        url === XAI_TOKEN_URL
+          ? { access_token: ACCESS, refresh_token: REFRESH, expires_in: 3600 }
+          : deviceJson;
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => json,
+        text: async () => JSON.stringify(json),
+      };
+    };
+    const s = bootServer({ oauthFetch: fetchImpl });
+    const { body } = await start(s);
+    const entry = s.xaiDeviceStates.get(body.state ?? '');
+    if (!entry) throw new Error('state missing');
+    expect(entry.baselineCipher).toBeNull();
+    entry.lastPollAt = 0;
+    const pending = req(s.app, 'POST', `/api/teams/${s.team.id}/providers/oauth/xai/device/poll`, {
+      state: body.state,
+    });
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.user.id,
+        body: {
+          providerId: 'xai',
+          label: 'xAI',
+          baseUrl: 'https://api.x.ai/v1',
+          api: 'openai-responses',
+          apiKey: 'console-key',
+        },
+      },
+    );
+    release();
+    const res = await pending;
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: 'superseded' });
+    expect(openProviderKey({ db: s.db, box: s.secretBox }, s.team.id, 'xai')?.apiKey).toBe(
+      'console-key',
+    );
+    expect(calls).toBe(2);
+  });
 });

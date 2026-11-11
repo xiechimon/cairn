@@ -172,6 +172,7 @@ export type XaiDeviceStartResponse = z.infer<typeof xaiDeviceStartResponseSchema
 export const xaiDevicePollResponseSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('pending'), intervalSeconds: z.number().positive() }),
   z.object({ status: z.literal('complete') }),
+  z.object({ status: z.literal('superseded') }),
   z.object({ status: z.literal('denied') }),
   z.object({ status: z.literal('expired') }),
 ]);
