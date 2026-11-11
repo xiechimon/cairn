@@ -1,5 +1,11 @@
-import type { TaskRequest } from '@cairn/shared';
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+  forwardRef,
+  type ReactNode,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
@@ -13,11 +19,10 @@ import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
 import { openingAnchor } from './scroll-anchor.js';
-import { SpecBlock } from './spec-block.js';
 import { type LiveStep, Transcript } from './transcript.js';
 
 const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
-const VIEWPORT_CLS = 'chat-col pt-5 pr-4 pb-(--chat-extra-space) pl-5';
+const VIEWPORT_CLS = 'chat-col px-4 pt-3 pb-(--chat-extra-space)';
 const CONTENT_CLS =
   'mx-auto block w-full max-w-(--chat-max-w) min-w-0 gap-0 [overflow-wrap:anywhere]';
 
@@ -30,8 +35,7 @@ interface TranscriptColumnProps {
   liveStep: LiveStep | null;
   agent: { displayName: string; avatarUrl: string | null } | null;
   onOpenPlan?: () => void;
-  spec?: string;
-  request?: TaskRequest | null;
+  lead?: ReactNode;
   autoScroll: boolean;
   running?: boolean;
   settled?: boolean;
@@ -59,8 +63,7 @@ function TranscriptColumnInner({
   liveStep,
   agent,
   onOpenPlan,
-  spec,
-  request,
+  lead,
   running,
   settled = true,
   threadKey,
@@ -97,7 +100,7 @@ function TranscriptColumnInner({
         className={VIEWPORT_CLS}
       >
         <MessageScrollerContent className={CONTENT_CLS}>
-          {spec != null && <SpecBlock spec={spec} request={request} />}
+          {lead}
           <Transcript
             transcript={transcript}
             liveStep={liveStep}

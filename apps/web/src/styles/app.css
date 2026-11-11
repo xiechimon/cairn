@@ -556,6 +556,12 @@
     box-shadow: none;
   }
 
+  html[data-narrow-chrome] .board-sheet .side-panel[data-testid="side-chat-panel"] {
+    z-index: calc(var(--z-narrow-chrome) + 1);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   html[data-narrow-chrome] .board-sheet .side-panel-scrim {
     display: none;
   }

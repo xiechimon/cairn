@@ -17,7 +17,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
 import { inlineSegments } from '../lib/markdown.js';
-import { ChatMarkdown, TaskCard } from './chat-markdown.js';
+import { ChatMarkdown, REPLY_BUBBLE_CLS, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 import { shouldExpandLastWork } from './work-expansion.js';
 import { InjectedSkills, WorkTrace } from './work-trace.js';
@@ -62,11 +62,11 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
     case 'streaming':
     case 'review':
     case 'report':
-      return endsWithAgentRow(prev) ? 'mt-3' : 'mt-5';
+      return endsWithAgentRow(prev) ? 'mt-1' : 'mt-5';
     case 'chief':
       return 'mt-1';
     case 'user':
-      return 'mt-4';
+      return prev?.kind === 'user' ? 'mt-1' : 'mt-5';
     default:
       return prev?.kind === 'step-prompt' ? 'mt-1.5' : '';
   }
@@ -82,6 +82,7 @@ function ActionRow({
   stamp,
   t,
   align = 'start',
+  overlay = false,
 }: {
   seconds?: number;
   bare?: boolean;
@@ -89,10 +90,11 @@ function ActionRow({
   stamp?: string;
   t: TFunc;
   align?: 'start' | 'end';
+  overlay?: boolean;
 }) {
   return (
     <div
-      className={`chat-row-icons mt-1.5 flex items-center gap-3.5 text-(--text-tertiary) ${align === 'end' ? 'justify-end' : ''}`}
+      className={`chat-row-icons flex items-center gap-3.5 text-(--text-tertiary) ${align === 'end' ? 'justify-end' : ''} ${overlay ? 'mt-1 h-0 overflow-visible' : 'mt-1.5'}`}
       data-testid="msg-actions"
     >
       {stamp != null && (
@@ -172,28 +174,18 @@ function Row({
   switch (item.kind) {
     case 'run':
       return (
-        <div className="flex-none text-center text-meta text-(--text-tertiary)">
-          {item.at != null && <div>{item.at}</div>}
-          {item.machine != null && (
-            <div className="mt-1 text-caption leading-3 text-(--text-tertiary) [&_span]:underline">
-              {t('运行在 {m} 上', { m: item.machine ?? '' })
-                .split(item.machine ?? '')
-                .map((part, i) =>
-                  i === 0 ? (
-                    <span key={i}>
-                      {part}
-                      <span>{item.machine}</span>
-                    </span>
-                  ) : (
-                    <span key={i}>{part}</span>
-                  ),
-                )}
-            </div>
-          )}
+        <div
+          data-testid="transcript-time-divider"
+          className="mt-5 w-full text-center text-caption text-(--text-tertiary)"
+        >
+          {[item.at, item.machine != null ? t('运行在 {m} 上', { m: item.machine }) : null]
+            .filter((part) => part != null)
+            .join(' · ')}
           {item.cancelled === true && (
-            <div className="chat-stamp-cancelled mt-1 text-caption leading-3 text-(--fail-fg)">
+            <span className="chat-stamp-cancelled text-(--fail-fg)">
+              {item.at != null || item.machine != null ? ' · ' : ''}
               {t('已取消')}
-            </div>
+            </span>
           )}
         </div>
       );
@@ -201,7 +193,7 @@ function Row({
       return (
         <div
           data-testid="transcript-question"
-          className="mt-3.5 flex flex-col gap-2 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui"
+          className={`mt-5 flex flex-col gap-2 py-2 text-ui ${REPLY_BUBBLE_CLS}`}
         >
           {item.questions.map((q) => (
             <div key={q.header} className="flex flex-col gap-1">
@@ -230,7 +222,7 @@ function Row({
       );
     case 'note':
       return (
-        <StatusLine className="mt-5" testId="transcript-note">
+        <StatusLine className="mt-5 justify-center text-center" testId="transcript-note">
           {t(item.text)}
         </StatusLine>
       );
@@ -295,12 +287,12 @@ function Row({
               <span className="flex h-5 flex-none items-center rounded-(--cds-radius-sm) bg-(--muted) px-2 text-caption text-(--text-secondary)">
                 #{item.seq}
               </span>
-              <span className="ml-1 min-w-0 break-words text-card-title leading-5 font-medium text-(--foreground)">
+              <span className="ml-1 min-w-0 truncate text-meta leading-5 text-(--text-secondary)">
                 {item.title}
               </span>
             </div>
           )}
-          <ActionRow copy={item.markdown ?? item.text} stamp={item.at} t={t} align="end" />
+          <ActionRow copy={item.markdown ?? item.text} stamp={item.at} t={t} align="end" overlay />
         </>
       );
     case 'robot':
@@ -315,14 +307,15 @@ function Row({
                 <ChatMarkdown text={item.markdown} bubbles />
               </div>
             ) : (
-              <span
-                className="chat-text -mt-px agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
+              <div
+                className={`chat-text min-w-0 font-sans text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
+                data-slot="reply-bubble"
                 data-testid="agent-text"
               >
                 {(item.paragraphs ?? []).map((raw, i) => (
                   <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
                 ))}
-              </span>
+              </div>
             )}
             {item.footer != null && (
               <ActionRow seconds={item.footer.seconds} copy={robotCopyText(item)} t={t} />
@@ -338,12 +331,12 @@ function Row({
     case 'report':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span
-            className="chat-text -mt-px agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
+          <div
+            className="chat-text min-w-0 max-w-full font-sans text-ui leading-5 break-words text-(--foreground)"
             data-testid="info-report"
           >
-            <ChatMarkdown text={item.markdown} />
-          </span>
+            <ChatMarkdown text={item.markdown} bubbles />
+          </div>
         </div>
       );
     case 'thinking':
@@ -370,7 +363,7 @@ function Row({
       return <FailRow item={item} margin={margin} t={t} />;
     case 'streaming':
       return (
-        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
+        <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
           <LiveRow
             variant="detail"
             label={item.label}
@@ -455,8 +448,9 @@ function Row({
     case 'review':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span
-            className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
+          <div
+            className={`chat-text min-w-0 text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
+            data-slot="reply-bubble"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -532,15 +526,16 @@ function Row({
                 )}
               </div>
             ))}
-          </span>
+          </div>
           <ActionRow copy={reviewCopyText(item)} t={t} />
         </div>
       );
     case 'verify':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span
-            className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
+          <div
+            className={`chat-text min-w-0 text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
+            data-slot="reply-bubble"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -578,7 +573,7 @@ function Row({
                 />
               </p>
             ))}
-          </span>
+          </div>
           <ActionRow copy={verifyCopyText(item)} t={t} />
         </div>
       );

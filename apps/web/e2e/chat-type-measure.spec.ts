@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 14px (text-ui) on a fixed 22px line, as in the approved chat draft', async ({
+test('chat body reads at 14px (text-ui) on the fixed 20px line of the main conversation bubbles', async ({
   page,
 }) => {
   await page.goto(DONE);
@@ -20,11 +20,11 @@ test('chat body reads at 14px (text-ui) on a fixed 22px line, as in the approved
     return { ...before, scaled };
   });
   expect(cs.fontSize).toBe('14px');
-  expect(cs.lineHeight).toBe('22px');
-  expect(cs.scaled).toBe('22px');
+  expect(cs.lineHeight).toBe('20px');
+  expect(cs.scaled).toBe('20px');
 });
 
-test('68ch measure cap binds the body text and the centered note', async ({ page }) => {
+test('reply bubbles cap at the reply-bubble width and the centred note at 68ch', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto(DONE);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
@@ -51,21 +51,29 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
       const used = Number.parseFloat(getComputedStyle(el).maxWidth);
       return used / zeroWidth(el);
     };
+    const bubbles = [...document.querySelectorAll('.side-panel [data-testid="agent-text"]')];
+    const probe = document.createElement('span');
+    probe.style.width = 'var(--container-reply-bubble)';
+    probe.style.position = 'absolute';
+    document.body.append(probe);
+    const cap = probe.getBoundingClientRect().width;
+    probe.remove();
     return {
-      text: ratio('[data-testid="agent-text"]'),
+      widest: Math.max(...bubbles.map((el) => el.getBoundingClientRect().width)),
+      cap,
       note: ratio('[data-testid="transcript-note"] > span'),
     };
   });
-  for (const r of [caps.text, caps.note]) {
-    expect(r).toBeGreaterThan(67.5);
-    expect(r).toBeLessThanOrEqual(68.5);
-  }
+  expect(caps.cap).toBe(512);
+  expect(caps.widest).toBeLessThanOrEqual(caps.cap + 0.5);
+  expect(caps.note).toBeGreaterThan(67.5);
+  expect(caps.note).toBeLessThanOrEqual(68.5);
   const note = await page.getByTestId('transcript-note').first().evaluate((el) => {
     const s = getComputedStyle(el);
     const text = el.firstElementChild!.getBoundingClientRect();
     const line = el.getBoundingClientRect();
     return {
-      leftGap: text.left - line.left,
+      leftGap: Math.abs(text.left - line.left - (line.right - text.right)),
       before: getComputedStyle(el, '::before').content,
       after: getComputedStyle(el, '::after').content,
       fontSize: s.fontSize,
@@ -74,7 +82,7 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
       secondary: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
     };
   });
-  expect(note.leftGap).toBe(0);
+  expect(note.leftGap).toBeLessThanOrEqual(1);
   expect(note.before).toBe('none');
   expect(note.after).toBe('none');
   expect(note.fontSize).toBe('13px');

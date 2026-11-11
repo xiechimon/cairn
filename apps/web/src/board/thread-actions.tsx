@@ -1,13 +1,17 @@
 import { canOrchestrate } from '@cairn/shared';
+import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
 import { useApiMutations, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
+import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -18,6 +22,8 @@ import { MoreMenu } from '../overlay/more-menu.js';
 import { AcceptTaskDialog } from './accept-task-dialog.js';
 import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
+import { MoveToProjectSub } from './task-move-menu.js';
+import { RenameDialog } from './task-row-menu.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
 export type ThreadActionKind = 'start' | 'approve' | 'finish' | 'retry' | 'unarchive';
@@ -47,8 +53,6 @@ const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }>
   unarchive: { reason: '这个任务已归档。取消归档后才能发消息。', primary: '取消归档' },
 };
 
-const ACTION_LINK = 'h-7 px-0 text-meta';
-
 export interface ThreadActions {
   card: ReactNode;
   menu: ReactNode;
@@ -59,11 +63,13 @@ export function useThreadActions({
   chat,
   onGone,
   onViewPlan,
+  onUsage,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   onGone: () => void;
   onViewPlan: (() => void) | undefined;
+  onUsage: (() => void) | undefined;
 }): ThreadActions {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -71,9 +77,9 @@ export function useThreadActions({
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialog, setDialog] = useState<'accept' | 'delete' | 'stop' | 'route-override' | null>(
-    null,
-  );
+  const [dialog, setDialog] = useState<
+    'accept' | 'delete' | 'stop' | 'route-override' | 'rename' | null
+  >(null);
   const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
   const phase = todo.phase;
@@ -182,33 +188,38 @@ export function useThreadActions({
       <div
         data-testid="side-chat-action"
         data-action={kind}
-        className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-x-3 gap-y-1 px-1 text-meta"
+        className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-2 text-ui"
       >
-        <p className="m-0 min-w-0 flex-1 basis-48 text-content-tertiary">
-          {t(ACTION_COPY[kind].reason)}
-        </p>
-        <div className="flex flex-none items-center gap-3">
-          {kind === 'approve' && onViewPlan !== undefined && (
-            <Button variant="link" onClick={onViewPlan} className={ACTION_LINK}>
-              {t('查看计划')}
-            </Button>
-          )}
-          {canFinishFailed && (
-            <Button variant="link" onClick={openAccept} className={ACTION_LINK}>
-              {t('完成…')}
-            </Button>
-          )}
-          <Button
-            variant="link"
-            onClick={runPrimary[kind]}
-            disabled={pending || orchestrating}
-            data-orchestrating={orchestrating ? 'true' : undefined}
-            className={`${ACTION_LINK} font-medium`}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                onClick={runPrimary[kind]}
+                disabled={pending || orchestrating}
+                data-orchestrating={orchestrating ? 'true' : undefined}
+                aria-description={t(ACTION_COPY[kind].reason)}
+                className={cn(REPLY_CHIP_CLS, 'w-auto')}
+              />
+            }
           >
             {(pending || orchestrating) && <Spinner data-icon="inline-start" />}
             {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={6}>
+            {t(ACTION_COPY[kind].reason)}
+          </TooltipContent>
+        </Tooltip>
+        {kind === 'approve' && onViewPlan !== undefined && (
+          <Button variant="ghost" onClick={onViewPlan} className={cn(REPLY_CHIP_CLS, 'w-auto')}>
+            {t('查看计划')}
           </Button>
-        </div>
+        )}
+        {canFinishFailed && (
+          <Button variant="ghost" onClick={openAccept} className={cn(REPLY_CHIP_CLS, 'w-auto')}>
+            {t('完成…')}
+          </Button>
+        )}
       </div>
     );
 
@@ -216,18 +227,23 @@ export function useThreadActions({
     phase === 'review' || phase === 'confirm' || (phase === 'failed' && chat.buildLegDone);
   const menu = (
     <>
-      <Button
-        ref={moreRef}
-        variant="ghost"
-        size="icon"
-        aria-label={t('更多操作…')}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(!menuOpen)}
-        className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8"
+      <IconTooltip
+        label={t('更多操作…')}
+        side="bottom"
+        trigger={
+          <Button
+            ref={moreRef}
+            variant="ghost"
+            size="icon"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8"
+          />
+        }
       >
         <Ellipsis aria-hidden="true" />
-      </Button>
+      </IconTooltip>
       <MoreMenu
         open={menuOpen}
         anchor={moreRef}
@@ -253,7 +269,21 @@ export function useThreadActions({
           setMenuOpen(false);
           setDialog('route-override');
         }}
+        onRename={() => {
+          setMenuOpen(false);
+          setDialog('rename');
+        }}
+        moveSub={<MoveToProjectSub todo={todo} />}
+        {...(onUsage !== undefined
+          ? {
+              onUsage: () => {
+                setMenuOpen(false);
+                onUsage();
+              },
+            }
+          : {})}
       />
+      {dialog === 'rename' && <RenameDialog todo={todo} open onClose={() => setDialog(null)} />}
       <DeleteConfirm
         open={dialog === 'delete'}
         title={t('确定删除该任务？此操作不可撤销。')}

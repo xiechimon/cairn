@@ -28,7 +28,7 @@ import { canMarkDone } from './use-mark-done.js';
 
 const RENAME_FORM = 'task-rename-form';
 
-function RenameDialog({
+export function RenameDialog({
   todo,
   open,
   onClose,

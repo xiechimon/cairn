@@ -126,7 +126,8 @@ async function openPagedThread(page: Page, history: Row[] = chat(250)) {
 }
 
 const column = (page: Page) => page.getByTestId('transcript-col');
-const text = (page: Page, label: string) => column(page).getByText(label, { exact: true });
+const text = (page: Page, label: string) =>
+  column(page).locator('[data-slot="message-scroller-item"]').getByText(label, { exact: true });
 
 async function scrollToTop(page: Page) {
   await column(page).evaluate((node) => {

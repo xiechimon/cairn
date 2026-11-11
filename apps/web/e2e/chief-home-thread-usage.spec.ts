@@ -83,18 +83,23 @@ async function setup(page: Page, options: SetupOptions = {}) {
 
 const footer = (page: Page) => page.getByTestId('thread-usage');
 const toggle = (page: Page) => footer(page).getByRole('button', { name: 'Thread usage' });
+const openUsage = async (page: Page) => {
+  await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
+  await page.getByRole('menuitem', { name: /Usage/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Usage' })).toBeVisible();
+};
 
 for (const theme of ['light', 'dark'] as const) {
-test(`usage sits under the thread header and expands below the meta (${theme})`, async ({ page }) => {
+test(`usage opens from the thread menu as one dialog (${theme})`, async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
   const requested = await setup(page);
   await page.goto('/app?thread=todo-1');
+  await expect(page.getByTestId('side-chat')).toBeVisible();
+  await expect(footer(page)).toHaveCount(0);
+  await openUsage(page);
   await expect(toggle(page)).toContainText('$4.00');
   await expect(toggle(page)).toContainText('Tokens: 2.5k');
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-  await evidencePanelShot(page, `thread-usage-quiet-${theme}.png`, page.locator('.side-panel'));
-  await toggle(page).focus();
-  await toggle(page).press('Enter');
   await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true');
   await expect(footer(page)).toContainText('90%');
   await expect(footer(page)).toContainText('provider/model-a');
@@ -103,19 +108,16 @@ test(`usage sits under the thread header and expands below the meta (${theme})`,
   await expect(footer(page)).toContainText('Mac');
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').nth(2)).toHaveText('—');
   expect(new Set(requested).size).toBe(2);
-  const headerBox = await page.getByTestId('side-chat').boundingBox();
-  const footerBox = await footer(page).boundingBox();
-  const composerBox = await page.locator('.side-panel .composer').boundingBox();
-  expect(footerBox?.y ?? 0).toBeGreaterThanOrEqual(headerBox?.y ?? 0);
-  expect((footerBox?.y ?? 0) + (footerBox?.height ?? 0)).toBeLessThanOrEqual(
-    (headerBox?.y ?? 0) + (headerBox?.height ?? 0) + 1,
-  );
-  expect((footerBox?.y ?? 0) + (footerBox?.height ?? 0)).toBeLessThan(composerBox?.y ?? Number.POSITIVE_INFINITY);
+  await expect(page.getByRole('dialog', { name: 'Usage' }).getByTestId('thread-usage')).toBeVisible();
   await expect(footer(page)).toContainText('Total duration is unavailable.');
-  await evidencePanelShot(page, `thread-usage-expanded-${theme}.png`, page.locator('.side-panel'));
+  await evidencePanelShot(page, `thread-usage-expanded-${theme}.png`, page.getByRole('dialog', { name: 'Usage' }));
+  await toggle(page).focus();
   await toggle(page).press('Enter');
   await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle(page)).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Usage' })).toHaveCount(0);
+  await expect(page.getByTestId('side-chat')).toBeVisible();
 });
 
 }
@@ -125,6 +127,9 @@ test('a thread that has not started has no usage footer or usage request', async
   await page.route('**/api/todos/todo-1', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ...TASK, latestBuildId: null, buildHistory: [] }) }));
   await page.goto('/app?thread=todo-1');
   await expect(page.getByTestId('side-chat')).toBeVisible();
+  await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /Usage/ })).toHaveCount(0);
   await expect(footer(page)).toHaveCount(0);
   expect(requested).toEqual([]);
 });
@@ -132,9 +137,9 @@ test('a thread that has not started has no usage footer or usage request', async
 test('an unpriced thread shows an unknown cost and never a free price', async ({ page }) => {
   await setup(page, { unpriced: true });
   await page.goto('/app?thread=todo-1');
+  await openUsage(page);
   await expect(toggle(page)).toContainText('2.5k');
   await expect(toggle(page)).not.toContainText('$0.00');
-  await toggle(page).click();
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
 });
 
@@ -142,9 +147,9 @@ for (const missing of ['unpriced row', 'empty run'] as const) {
   test(`a priced aggregate stays unknown with an ${missing}`, async ({ page }) => {
     await setup(page, { mixedPricing: missing === 'unpriced row', emptyRun: missing === 'empty run' });
     await page.goto('/app?thread=todo-1');
+    await openUsage(page);
     await expect(footer(page)).toHaveAttribute('data-state', 'ready');
-    await toggle(page).click();
-    await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
+      await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
     await expect(footer(page)).not.toContainText('$4.00');
     await expect(footer(page)).not.toContainText('$0.00');
     if (missing === 'empty run') await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').nth(1)).toHaveText('—');
@@ -157,9 +162,9 @@ test('a pending run never appears as a partial thread total', async ({ page }) =
   const delay = new Promise<void>((resolve) => { release = resolve; });
   await setup(page, { delay });
   await page.goto('/app?thread=todo-1');
+  await openUsage(page);
   await expect(footer(page)).toHaveAttribute('data-state', 'loading');
   await expect(toggle(page)).not.toContainText('1.3k');
-  await toggle(page).click();
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
   release();
   await expect(footer(page)).toHaveAttribute('data-state', 'ready');
@@ -172,13 +177,13 @@ test(`usage errors offer retry without claiming an unvalidated cost (${theme})`,
   const options = { error: true };
   await setup(page, options);
   await page.goto('/app?thread=todo-1');
+  await openUsage(page);
   await expect(footer(page)).toHaveAttribute('data-state', 'error');
   await expect(footer(page).getByTestId('thread-usage-retry')).toBeVisible();
-  await toggle(page).click();
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
   await expect(footer(page)).not.toContainText('$4.00');
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-  await evidencePanelShot(page, `thread-usage-error-${theme}.png`, page.locator('.side-panel'));
+  await evidencePanelShot(page, `thread-usage-error-${theme}.png`, page.getByRole('dialog', { name: 'Usage' }));
   options.error = false;
   await expect(footer(page).getByTestId('thread-usage-retry')).toBeVisible();
   await footer(page).getByTestId('thread-usage-retry').click();
@@ -195,9 +200,9 @@ for (const teams of ['error', 'empty'] as const) {
     page.on('request', (request) => requests.push(new URL(request.url()).pathname));
     await setup(page, options);
     await page.goto('/app?thread=todo-1');
+    await openUsage(page);
     await expect(footer(page)).toHaveAttribute('data-state', 'error');
-    await toggle(page).click();
-    await expect(footer(page)).toContainText('$4.00');
+      await expect(footer(page)).toContainText('$4.00');
     expect(requests.filter((path) => path.endsWith('/machines'))).toEqual([]);
 
     delete options.teams;
@@ -223,14 +228,14 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
     await setup(page);
     await page.goto('/app?thread=todo-1');
+    await openUsage(page);
     await expect(footer(page)).toHaveAttribute('data-state', 'ready');
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await toggle(page).click();
     const violations = (await new AxeBuilder({ page }).include('[data-testid="thread-usage"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations;
     expect(violations.map((violation) => violation.id)).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-    await evidencePanelShot(page, `thread-usage-phone-${theme}.png`, page.locator('.side-panel'));
+    await evidencePanelShot(page, `thread-usage-phone-${theme}.png`, page.getByRole('dialog', { name: 'Usage' }));
   });
 }
 
@@ -239,6 +244,7 @@ test('finishing a step refreshes whole-thread cost and current-run tokens withou
   const options: SetupOptions = { multiplier: 1, threadTotal: 4, currentCost: 2 };
   const requested = await setup(page, options);
   await page.goto('/app?thread=todo-1');
+  await openUsage(page);
   await expect(toggle(page)).toContainText('2.5k');
   await expect(toggle(page)).toContainText('$4.00');
   options.multiplier = 2;
@@ -259,7 +265,6 @@ test('finishing a step refreshes whole-thread cost and current-run tokens withou
     stream.emit(ev);
   }, event);
   await expect(footer(page)).toHaveAttribute('data-state', 'loading');
-  await toggle(page).click();
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
   release();
   await expect(footer(page)).toHaveAttribute('data-state', 'ready');
@@ -274,6 +279,7 @@ test('fresh usage determines cost while the todo aggregate refresh is held', asy
   const options: SetupOptions = { currentCost: 2 };
   await setup(page, options);
   await page.goto('/app?thread=todo-1');
+  await openUsage(page);
   await expect(toggle(page)).toContainText('$4.00');
   options.currentCost = 5;
   let release: () => void = () => {};
@@ -298,6 +304,7 @@ test('fresh usage determines cost while the todo aggregate refresh is held', asy
 test('complete priced-zero rows show a known-free total', async ({ page }) => {
   await setup(page, { free: true, threadTotal: 9 });
   await page.goto('/app?thread=todo-1');
+  await openUsage(page);
   await expect(toggle(page)).toContainText('$0.00');
   await expect(toggle(page)).toContainText('Tokens: 2.5k');
 });
@@ -311,14 +318,17 @@ test('switching threads resets the disclosure and never retains the previous tot
   await page.route('**/api/builds/build-other', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ id: 'build-other', createdAt: NOW, triggerSource: 'user' }) }));
   await page.route('**/api/conversations/build-other/messages', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ messages: [], queuedMessages: [] }) }));
   await page.goto('/app?thread=todo-1');
+  await openUsage(page);
   await expect(toggle(page)).toContainText('$4.00');
-  await toggle(page).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Usage' })).toHaveCount(0);
   await page.keyboard.press('Meta+k');
   const search = page.getByRole('dialog', { name: 'Search' });
   await search.getByRole('textbox').fill('Another');
   await search.locator('[data-row-kind="todo"]').click();
   await expect(page.getByTestId('side-chat')).toHaveAttribute('data-todo-id', 'todo-other');
-  await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('dialog', { name: 'Usage' })).toHaveCount(0);
+  await openUsage(page);
   await expect(toggle(page)).toContainText('$0.50');
   await expect(toggle(page)).not.toContainText('$4.00');
 });

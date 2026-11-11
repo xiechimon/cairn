@@ -7,7 +7,7 @@ export function ThreadOriginLine({ origin, onJump }: { origin: ThreadOrigin; onJ
   return (
     <div
       data-testid="thread-origin"
-      className="mx-4 mt-3 flex flex-none items-baseline justify-between gap-3 text-meta text-content-tertiary"
+      className="mt-1.5 flex flex-wrap items-baseline justify-end gap-x-2 text-meta text-content-tertiary"
     >
       <span className="min-w-0 truncate">
         {origin.at === null
@@ -15,11 +15,10 @@ export function ThreadOriginLine({ origin, onJump }: { origin: ThreadOrigin; onJ
           : t('来自主对话 · {time}', { time: clockTime(origin.at, locale) })}
       </span>
       <Button
-        variant="link"
-        size="sm"
+        variant="ghost"
         data-testid="thread-origin-jump"
         onClick={onJump}
-        className="h-auto flex-none p-0 text-meta font-medium text-foreground"
+        className="h-auto flex-none rounded-none bg-transparent p-0 text-meta font-normal text-foreground hover:bg-transparent hover:underline dark:hover:bg-transparent"
       >
         {t('在主对话中查看')}
       </Button>

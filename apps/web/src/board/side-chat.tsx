@@ -11,14 +11,15 @@ import { SidePanel } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
+import { taskStatusInk } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { ACCENT_INK } from '../phase.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
@@ -26,7 +27,7 @@ import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
 import { THREAD_PARAM, threadCopy, threadStatus, VIEW_PARAM } from './thread-copy.js';
-import { ThreadOriginLine } from './thread-origin-line.js';
+import { ThreadLead } from './thread-lead.js';
 import {
   type ThreadChatStream,
   type ThreadOrigin,
@@ -36,10 +37,10 @@ import {
   threadUpdates,
 } from './thread-panel-model.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
-import { ThreadUpdatesBlock } from './thread-updates-block.js';
-import { ThreadUsageFooter } from './thread-usage-footer.js';
+import { ThreadUsageDisclosure } from './thread-usage-footer.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
+import { useThreadUsage } from './use-thread-usage.js';
 import { PANE_PARAM } from './work-panel.js';
 
 const OVERLAY_QUERY = '(max-width: 1100px)';
@@ -55,16 +56,19 @@ function StatusLine({
   now,
   waitingOnChecks,
   updates,
+  originText,
 }: {
   todo: TodoRecord;
   machineName: string | null;
   now: number;
   waitingOnChecks: boolean;
   updates: ThreadUpdates | null;
+  originText: string | null;
 }) {
   const { t } = useI18n();
   const needsYou = threadStatus(todo) === 'needs-you';
-  const purpose = threadPurpose(todo);
+  const stated = threadPurpose(todo);
+  const purpose = stated === originText?.trim() ? '' : stated;
   const meta =
     needsYou && updates !== null
       ? t('{n} 条更新', { n: updates.lines.length })
@@ -74,12 +78,12 @@ function StatusLine({
   return (
     <p
       data-testid="side-chat-status"
-      className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary"
+      className="m-0 flex min-w-0 items-center gap-1 text-meta text-content-tertiary"
     >
       <span
         className={cn(
-          'flex-none font-medium',
-          needsYou && todo.quotaWait == null ? ACCENT_INK : 'text-content-secondary',
+          'flex-none',
+          todo.quotaWait == null ? taskStatusInk(todo.phase) : 'text-content-secondary',
         )}
       >
         {todo.quotaWait != null
@@ -204,28 +208,36 @@ function ChangesButton({
 }) {
   const { t } = useI18n();
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      aria-pressed={active}
-      aria-label={active ? t('返回对话') : t('查看变更')}
-      data-testid="side-chat-changes"
-      onClick={onToggle}
-      className={cn(
-        'h-7 gap-1 px-1.5 text-meta text-content-secondary max-[640px]:h-8',
-        active && 'bg-(--menu-hover) text-foreground',
-      )}
-    >
-      <FileDiff aria-hidden="true" strokeWidth={1.75} className="size-4" />
-      {changes.status === 'ready' && (
-        <>
-          <span className="text-(--diff-add-fg) tabular-nums">+{changes.added}</span>
-          {changes.removed > 0 && (
-            <span className="text-destructive tabular-nums">−{changes.removed}</span>
-          )}
-        </>
-      )}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            aria-pressed={active}
+            aria-label={active ? t('返回对话') : t('查看变更')}
+            data-testid="side-chat-changes"
+            onClick={onToggle}
+            className={cn(
+              'h-9 flex-none gap-1 px-2 text-meta text-content-secondary max-[640px]:h-8',
+              active && 'bg-(--menu-hover) text-foreground',
+            )}
+          />
+        }
+      >
+        <FileDiff aria-hidden="true" className="size-5" />
+        {changes.status === 'ready' && (
+          <>
+            <span className="text-(--diff-add-fg) tabular-nums">+{changes.added}</span>
+            {changes.removed > 0 && (
+              <span className="text-destructive tabular-nums">−{changes.removed}</span>
+            )}
+          </>
+        )}
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={8}>
+        {active ? t('返回对话') : t('查看变更')}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -265,10 +277,6 @@ function ThreadBody({
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
-      {view === 'chat' && updates !== null && <ThreadUpdatesBlock updates={updates} />}
-      {view === 'chat' && origin !== null && (
-        <ThreadOriginLine origin={origin} onJump={onJumpToOrigin} />
-      )}
       {view === 'changes' ? (
         <ChangesView chat={chat} now={now} />
       ) : (
@@ -277,8 +285,15 @@ function ThreadBody({
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}
-          spec={todo.spec.trim() !== '' && !chat.hasEarlier ? todo.spec : undefined}
-          request={todo.request}
+          lead={
+            <ThreadLead
+              todo={todo}
+              showSpec={!chat.hasEarlier}
+              updates={updates}
+              origin={origin}
+              onJumpToOrigin={onJumpToOrigin}
+            />
+          }
           hasEarlier={chat.hasEarlier}
           {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
           autoScroll={chat.transcript.length > 0}
@@ -408,7 +423,12 @@ export function SideChat({
   }, [onClose, showsChanges]);
 
   return (
-    <SidePanel ref={panelRef} label={todo?.title ?? t('任务')} onDismiss={onClose}>
+    <SidePanel
+      ref={panelRef}
+      label={todo?.title ?? t('任务')}
+      onDismiss={onClose}
+      testId="side-chat-panel"
+    >
       {todo != null && chat.load === 'ready' ? (
         <ReadyThread
           todo={todo}
@@ -452,7 +472,15 @@ function ReadyThread({
   const { t } = useI18n();
   const [planOpen, setPlanOpen] = useState(false);
   const openPlan = chat.planDoc !== undefined ? () => setPlanOpen(true) : undefined;
-  const actions = useThreadActions({ todo, chat, onGone: onClose, onViewPlan: openPlan });
+  const usage = useThreadUsage(todo);
+  const [usageFor, setUsageFor] = useState<string | null>(null);
+  const actions = useThreadActions({
+    todo,
+    chat,
+    onGone: onClose,
+    onViewPlan: openPlan,
+    onUsage: usage.hasRuns ? () => setUsageFor(todo.id) : undefined,
+  });
   const { live, teamId } = useLiveData();
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
@@ -479,6 +507,7 @@ function ReadyThread({
         onClose={onCloseAll}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
+        tooltip={`#${todo.seqNum} ${todo.title}`}
         {...(chat.changes.status !== 'none'
           ? {
               changesButton: (
@@ -497,8 +526,8 @@ function ReadyThread({
           now={now}
           waitingOnChecks={chat.waitingOnChecks}
           updates={updates}
+          originText={origin?.text ?? null}
         />
-        <ThreadUsageFooter key={todo.id} todo={todo} />
       </Head>
       <ThreadPrPanel
         status={prs.status}
@@ -518,6 +547,20 @@ function ReadyThread({
         onOpenPlan={openPlan}
         onClose={onClose}
       />
+      <DialogShell
+        open={usageFor === todo.id}
+        onClose={() => setUsageFor(null)}
+        size="s"
+        title={t('用量')}
+        subtitle={`#${todo.seqNum} ${todo.title}`}
+      >
+        <ThreadUsageDisclosure
+          summary={usage.summary}
+          state={usage.state}
+          onRetry={usage.retry}
+          defaultOpen
+        />
+      </DialogShell>
       <DialogShell
         open={planOpen}
         onClose={() => setPlanOpen(false)}
@@ -548,6 +591,7 @@ function Head({
   menu,
   changesButton,
   titleExtra,
+  tooltip,
   children,
 }: {
   todoId: string;
@@ -557,15 +601,27 @@ function Head({
   menu?: ReactNode;
   changesButton?: ReactNode;
   titleExtra?: ReactNode;
+  tooltip?: string;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
+  const title = (
+    <h2 className="m-0 min-w-0 truncate text-heading leading-5 font-normal text-foreground">
+      {todo != null ? (
+        <>
+          <span className="text-content-tertiary tabular-nums">#{todo.seqNum}</span> {todo.title}
+        </>
+      ) : (
+        t('任务')
+      )}
+    </h2>
+  );
   return (
     <header
       data-testid="side-chat"
       data-todo-id={todoId}
       data-phase={todo?.phase}
-      className="flex flex-none items-start gap-0.5 py-2 pr-3.5 pl-1.5"
+      className="flex min-h-17 flex-none items-center gap-0.5 py-3.5 pr-3.5 pl-1.5"
     >
       <IconTooltip
         label={t('返回')}
@@ -580,38 +636,32 @@ function Head({
           />
         }
       >
-        <ChevronLeft aria-hidden="true" strokeWidth={1.75} />
+        <ChevronLeft aria-hidden="true" />
       </IconTooltip>
       <span
         aria-hidden="true"
         data-slot="side-chat-glyph"
-        className="mt-1 ml-1.5 flex size-7 flex-none items-center justify-center rounded-(--cds-radius-md) border border-border"
+        className="ml-1.5 flex size-7 flex-none items-center justify-center rounded-(--cds-radius-md) border border-border bg-background"
       >
-        <ListChecks strokeWidth={1.75} className="size-5 text-content-secondary" />
+        <ListChecks className="size-4 text-content-secondary" />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-2 pl-3">
-        <div className="flex min-w-0 items-center gap-1">
-          <h2 className="m-0 line-clamp-2 min-w-0 text-heading font-normal text-foreground">
-            {todo != null ? (
-              <>
-                <span className="text-content-tertiary tabular-nums">#{todo.seqNum}</span>{' '}
-                {todo.title}
-              </>
-            ) : (
-              t('任务')
-            )}
-          </h2>
+      <div data-slot="side-chat-titles" className="flex min-w-0 flex-1 flex-col gap-0.5 pr-1 pl-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {tooltip === undefined ? (
+            title
+          ) : (
+            <Tooltip>
+              <TooltipTrigger delay={600} render={title} />
+              <TooltipContent side="bottom" align="start" sideOffset={6}>
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          )}
           {titleExtra}
         </div>
-        {changesButton == null ? (
-          children
-        ) : (
-          <div className="flex min-w-0 items-start gap-2">
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">{children}</div>
-            {changesButton}
-          </div>
-        )}
+        {children}
       </div>
+      {changesButton}
       {menu}
       <IconTooltip
         label={t('关闭')}
@@ -620,7 +670,7 @@ function Head({
           <Button variant="ghost" size="icon" onClick={onClose} className={THREAD_HEAD_BUTTON} />
         }
       >
-        <X aria-hidden="true" strokeWidth={1.75} />
+        <X aria-hidden="true" />
       </IconTooltip>
     </header>
   );

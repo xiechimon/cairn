@@ -12,6 +12,7 @@ export interface ThreadUpdates {
 
 export interface ThreadOrigin {
   messageId: string;
+  text: string;
   at: number | null;
 }
 
@@ -86,11 +87,13 @@ export function threadOrigin(
   );
   if (segment === undefined || segment.source.kind !== 'chat') return null;
   const messageId = segment.source.messageId;
+  const text = segment.text;
   const index = stream?.items.findIndex((item) => item.kind === 'user' && item.id === messageId);
-  if (stream === undefined || index === undefined || index < 0) return { messageId, at: null };
+  if (stream === undefined || index === undefined || index < 0)
+    return { messageId, text, at: null };
   const item = stream.items[index];
   const stamped = item?.kind === 'user' ? item.createdAt : undefined;
-  return { messageId, at: stamped ?? stream.at[index] ?? null };
+  return { messageId, text, at: stamped ?? stream.at[index] ?? null };
 }
 
 export function clockTime(ts: number, locale: string): string {

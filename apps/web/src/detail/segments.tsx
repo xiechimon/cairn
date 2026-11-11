@@ -85,6 +85,10 @@ export function taskChipClass(phase: Phase): string {
   return cn(TASK_CHIP_CLS, TONE_CLASS[CONVERSATION_STATUS[phase].tone].chip);
 }
 
+export function taskStatusInk(phase: Phase): string {
+  return TONE_CLASS[CONVERSATION_STATUS[phase].tone].ink;
+}
+
 export function TodoStatus({ phase }: { phase: Phase }) {
   const { t } = useI18n();
   const { glyph, tone } = CONVERSATION_STATUS[phase];

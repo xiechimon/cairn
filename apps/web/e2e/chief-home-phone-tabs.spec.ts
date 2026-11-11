@@ -50,18 +50,22 @@ test.describe('at phone width', () => {
     await expect(page.locator('aside.board-sidebar')).toBeVisible();
   });
 
-  test('an open task thread is a tab under the top controls, above the tab bar', async ({
+  test('an open task thread covers the top controls and the tab bar, as the reference phone task view', async ({
     page,
   }) => {
     await page.goto(`${HOME}&pane=tasks`);
     await panel(page).getByText('Orb canary round 7').click();
     await expect(page).toHaveURL(/[?&]thread=home-c-working-c/);
-    await expect(tabs(page)).toBeVisible();
     const thread = page.getByTestId('side-chat');
     await expect(thread).toBeVisible();
     const head = await thread.getByRole('button', { name: '关闭' }).boundingBox();
     const menu = await page.getByTestId('narrow-menu').boundingBox();
-    expect(head!.y).toBeGreaterThanOrEqual(menu!.y + menu!.height);
+    expect(head!.y).toBeLessThan(menu!.y + menu!.height);
+    const covered = await tabs(page).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('aside.side-panel') != null;
+    });
+    expect(covered).toBe(true);
     await page.goBack();
     await expect(page).not.toHaveURL(/thread=/);
     await expect(panel(page)).toBeVisible();
