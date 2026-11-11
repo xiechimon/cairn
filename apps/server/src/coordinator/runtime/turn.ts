@@ -143,9 +143,7 @@ export async function runCoordinatorTurn(
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
   try {
     const mailTurn = isMailWakeText(claimed.instruction ?? '');
-    const root = mailTurn
-      ? await harness.createConversation({ ownership: { kind: 'ownerless' } }, context)
-      : await activeConversation(harness, deps.conversationId, context);
+    const root = await activeConversation(harness, deps.conversationId, context);
     if (root === undefined) {
       return done({ status: 'failed', errorMessage: 'Coordinator conversation is missing' });
     }
@@ -255,13 +253,11 @@ export async function runCoordinatorTurn(
       {
         ...api,
         transcriptRow: async (...args) => {
-          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptRow(...args);
         },
         transcriptDelta: async (...args) => {
-          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptDelta(...args);
@@ -298,14 +294,12 @@ export async function runCoordinatorTurn(
               ),
             context,
           );
-    const initial = mailTurn
-      ? undefined
-      : await api.inputs?.prepare(
-          stepId,
-          conversationKey,
-          storedInstruction ?? '',
-          prior?.entry === undefined ? undefined : String(prior.entry),
-        );
+    const initial = await api.inputs?.prepare(
+      stepId,
+      conversationKey,
+      storedInstruction ?? '',
+      prior?.entry === undefined ? undefined : String(prior.entry),
+    );
     const submission = await root.submit(
       {
         type: 'input',

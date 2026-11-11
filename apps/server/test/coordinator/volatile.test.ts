@@ -7,7 +7,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
-import { createConversationGate } from '../../src/coordinator/runtime/tools.js';
+import {
+  coordinatorToolsExtension,
+  createConversationGate,
+} from '../../src/coordinator/runtime/tools.js';
 import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import {
   createVolatileContext,
@@ -141,6 +144,61 @@ describe('a mail wake does not leave fenced text in the next turn', () => {
     expect(requests[1]).not.toContain(secret);
     expect(inherited).not.toContain(secret);
     expect(inherited).not.toContain('【邮件原文');
+    await harness.close(ctx);
+  });
+
+  it('runs the mail wake on the registered conversation the input channel accepts', async () => {
+    const dir = makeTestTempDir('coord-mail-registered-');
+    dirs.push(dir);
+    const requests: string[] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    faux.setResponses(
+      Array(4).fill((c: { messages: unknown[] }) => {
+        requests.push(JSON.stringify(c.messages));
+        return fauxAssistantMessage('ok');
+      }),
+    );
+    const models = createCoordinatorModels([faux.provider]);
+    const volatile = createVolatileContext();
+    let registered = '';
+    const seen: string[] = [];
+    const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
+      extensions: [
+        coordinatorToolsExtension(fakeMachineApi(), createConversationGate(), {
+          beforeTool: async (_signal, conversationId) => {
+            seen.push(conversationId ?? '');
+            if (registered !== '' && conversationId !== registered) {
+              throw new Error(`unregistered conversation ${conversationId}`);
+            }
+          },
+        }),
+        volatileContextExtension(volatile),
+      ],
+    });
+    registered = String((await harness.root(ctx)).id);
+    const deps = {
+      harness,
+      models,
+      api: fakeMachineApi(),
+      context: ctx,
+      heartbeatMs: 1000,
+      now: () => 1,
+      conversationGate: createConversationGate(),
+      volatile,
+    };
+    const secret = 'MAIL-SECRET-EXCERPT-9f3a';
+    const mail = `[wake:wake] provenance=mail:evt-1\n邮件事件 evt-1，账户 acc，外部编号 ext，规则 Payroll。\n${fenceMailText('ext', secret)}`;
+    await runCoordinatorTurn(deps, chiefStep('evt-1', mail));
+    await runCoordinatorTurn(deps, chiefStep('next', 'what should I do next'));
+    const view = await (await harness.root(ctx)).context(ctx);
+    expect(seen).toContain(registered);
+    expect(seen.every((id) => id === registered)).toBe(true);
+    expect(requests[0]).toContain(secret);
+    expect(JSON.stringify(view.messages)).not.toContain(secret);
     await harness.close(ctx);
   });
 });
