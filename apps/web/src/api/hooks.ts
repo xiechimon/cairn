@@ -66,6 +66,8 @@ import type {
   TranscriptRow,
   UpdateSkillBody,
   UserRecord,
+  XaiDevicePollResponse,
+  XaiDeviceStartResponse,
 } from '@cairn/shared';
 import {
   backupHealthSchema,
@@ -935,6 +937,19 @@ export function useApiMutations(teamId: string | undefined) {
           `/api/teams/${teamId}/providers/oauth/${presetId}/authorize`,
           {},
         ),
+    }),
+    startXaiDevice: useMutation({
+      mutationFn: () =>
+        api.post<XaiDeviceStartResponse>(`/api/teams/${teamId}/providers/oauth/xai/device`, {}),
+    }),
+    pollXaiDevice: useMutation({
+      mutationFn: (state: string) =>
+        api.post<XaiDevicePollResponse>(`/api/teams/${teamId}/providers/oauth/xai/device/poll`, {
+          state,
+        }),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
     }),
     startGithubOAuth: useMutation({
       mutationFn: () =>

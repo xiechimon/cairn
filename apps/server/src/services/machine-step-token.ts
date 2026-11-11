@@ -20,6 +20,7 @@ import {
 } from './machine-deps.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { readTeamAttributionSettings } from './team-attribution-settings.js';
+import { materializeXaiAccessToken } from './xai-device-login.js';
 
 export async function stepToken(
   deps: MachineDeps,
@@ -61,6 +62,12 @@ export async function stepToken(
           }
         : null;
   }
+  const provider = await dispatchProvider(
+    deps,
+    todoRow?.teamId,
+    bundle.provider,
+    stepRow?.fallback?.model?.provider ?? agentRow?.provider,
+  );
   return {
     commitIdentity: softwareCommitIdentity(deps),
     coAuthor:
@@ -69,10 +76,7 @@ export async function stepToken(
       readTeamAttributionSettings(deps.db, todoRow.teamId).coAuthorTrailer
         ? humanWorkIdentity(deps.db, todoRow, buildRow?.triggerSource)
         : null,
-    provider: toProviderConfig(
-      bundle.provider,
-      stepRow?.fallback?.model?.provider ?? agentRow?.provider,
-    ),
+    provider,
     secrets: bundle.secrets,
     ...(owned.status === 'claimed' && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
@@ -102,12 +106,35 @@ export function toProviderConfig(
   return agentProviderId ? { kind: 'api_key', providerId: agentProviderId } : null;
 }
 
-function chiefStepToken(
+async function dispatchProvider(
+  deps: MachineDeps,
+  teamId: string | undefined,
+  bundleProvider: StepCredentialBundle['provider'],
+  agentProviderId: string | null | undefined,
+): Promise<ProviderConfig | null> {
+  if (!bundleProvider || bundleProvider.apiKey === null || teamId === undefined) {
+    return toProviderConfig(bundleProvider, agentProviderId);
+  }
+  const apiKey = await materializeXaiAccessToken(
+    {
+      db: deps.db,
+      box: deps.box,
+      fetch: deps.oauthFetch ?? globalThis.fetch,
+      states: new Map(),
+    },
+    teamId,
+    bundleProvider.providerId,
+    bundleProvider.apiKey,
+  );
+  return toProviderConfig({ ...bundleProvider, apiKey }, agentProviderId);
+}
+
+async function chiefStepToken(
   deps: MachineDeps,
   stepId: string,
   conversationId: string,
   claimed: boolean,
-): MachineTokenResponse {
+): Promise<MachineTokenResponse> {
   const threadId = conversationId;
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   const bundle = resolveChiefStepCredentials(
@@ -118,7 +145,7 @@ function chiefStepToken(
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   const agentRow = threadRow ? coordinatorProfile(deps.db, threadRow.teamId) : null;
   return {
-    provider: toProviderConfig(bundle.provider, agentRow?.provider),
+    provider: await dispatchProvider(deps, threadRow?.teamId, bundle.provider, agentRow?.provider),
     secrets: bundle.secrets,
     ...(claimed && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }

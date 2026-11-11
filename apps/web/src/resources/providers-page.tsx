@@ -2,7 +2,7 @@ import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared'
 import { MACHINE_RUNTIMES } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu, Plus } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
@@ -250,6 +250,15 @@ export function ProvidersPage() {
     null,
   );
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [xaiDevice, setXaiDevice] = useState<{
+    state: string;
+    userCode: string;
+    verificationUri: string;
+    intervalSeconds: number;
+  } | null>(null);
+  const [xaiDeviceError, setXaiDeviceError] = useState<string | null>(null);
+  const pollXai = useRef(mutations.pollXaiDevice);
+  pollXai.current = mutations.pollXaiDevice;
 
   const sources = live
     ? (sourcesQ.data?.sources ?? [])
@@ -295,6 +304,38 @@ export function ProvidersPage() {
     next.delete('reason');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, t]);
+
+  useEffect(() => {
+    if (!createOpen || xaiDevice === null) return;
+    let stopped = false;
+    const timer = setInterval(() => {
+      void pollXai.current.mutateAsync(xaiDevice.state).then(
+        (result) => {
+          if (stopped) return;
+          if (result.status === 'complete') {
+            setXaiDevice(null);
+            setXaiDeviceError(null);
+            setCreateOpen(false);
+            return;
+          }
+          if (result.status === 'denied') {
+            setXaiDevice(null);
+            setXaiDeviceError(t('xAI 登录被拒绝。'));
+          } else if (result.status === 'expired') {
+            setXaiDevice(null);
+            setXaiDeviceError(t('验证码已过期，请重试。'));
+          }
+        },
+        () => {
+          if (!stopped) setXaiDeviceError(t('xAI 登录失败，请重试。'));
+        },
+      );
+    }, xaiDevice.intervalSeconds * 1000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [createOpen, t, xaiDevice]);
 
   useEffect(() => {
     const add = searchParams.get('add');
@@ -509,7 +550,23 @@ export function ProvidersPage() {
         onClose={() => {
           setCreateOpen(false);
           setConnectError(null);
+          setXaiDevice(null);
+          setXaiDeviceError(null);
         }}
+        onXaiSignIn={
+          live
+            ? () => {
+                setXaiDeviceError(null);
+                mutations.startXaiDevice.mutate(undefined, {
+                  onSuccess: (started) => setXaiDevice(started),
+                  onError: () => setXaiDeviceError(t('xAI 登录失败，请重试。')),
+                });
+              }
+            : undefined
+        }
+        xaiSignInPending={mutations.startXaiDevice.isPending}
+        xaiDevice={xaiDevice}
+        xaiDeviceError={xaiDeviceError}
         pending={mutations.createProvider.isPending}
         onCreate={
           live

@@ -181,6 +181,10 @@ interface CreateProviderDialogProps {
   connectPending?: boolean;
   connectError?: string | null;
   onPickClaudeSubscription?: () => void;
+  onXaiSignIn?: () => void;
+  xaiSignInPending?: boolean;
+  xaiDevice?: { userCode: string; verificationUri: string } | null;
+  xaiDeviceError?: string | null;
 }
 
 export function CreateProviderDialog({
@@ -192,6 +196,10 @@ export function CreateProviderDialog({
   connectPending,
   connectError,
   onPickClaudeSubscription,
+  onXaiSignIn,
+  xaiSignInPending,
+  xaiDevice,
+  xaiDeviceError,
 }: CreateProviderDialogProps) {
   const { t } = useI18n();
   const [view, setView] = useState<'picker' | 'form'>('picker');
@@ -380,7 +388,28 @@ export function CreateProviderDialog({
             {t('返回')}
           </Button>
           {preset?.id === PROVIDER_XAI_PRESET.id && (
-            <FieldDescription>{PROVIDER_XAI_PRESET.oauthLabel}</FieldDescription>
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={xaiSignInPending === true || onXaiSignIn == null}
+                onClick={onXaiSignIn}
+              >
+                {t('用 SuperGrok 登录')}
+              </Button>
+              {xaiDevice != null && (
+                <FieldDescription>
+                  {t('在浏览器打开这个链接，输入验证码。')}{' '}
+                  <a href={xaiDevice.verificationUri} target="_blank" rel="noreferrer">
+                    {xaiDevice.verificationUri}
+                  </a>{' '}
+                  <span className="font-mono">{xaiDevice.userCode}</span>
+                </FieldDescription>
+              )}
+              {xaiDeviceError != null && xaiDeviceError !== '' && (
+                <FieldError>{xaiDeviceError}</FieldError>
+              )}
+            </div>
           )}
           <FormField label={t('名称')} htmlFor="dlg-provider-label">
             <Input
