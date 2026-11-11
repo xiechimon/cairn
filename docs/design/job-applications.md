@@ -74,7 +74,7 @@ Pending confirmation lives on the attempt (`previewHash`, `questionId`), not in 
 | `reading` | `browsing` | Host is `allowed` and the day's count is under the cap. |
 | `browsing` | `previewed` | Snapshot of a form on an allowed host. Hash stored. |
 | `previewed` | `confirming` | Server posts `ask_user` with the exact field list. |
-| `confirming` | `submitting` | Owner answer matches that question id and the current hash. Cap re-checked. |
+| `confirming` | `submitting` | Owner answer matches that question id. The server then snapshots the live form again and the new hash matches. Cap re-checked. |
 | `submitting` | `submitted` | Browser reports the click delivered. Cap increments. |
 | `submitting` | `blocked` | Delivery `unknown`. Cap increments (fail closed). No retry of that hash. |
 | any active | `blocked` | Captcha, block page, host not allowed, cap reached, machine offline, user holds the lease, login form. |
@@ -91,11 +91,12 @@ A second `job_submit` for a hash already `submitted` or `blocked` with unknown d
 | Profile edit (owner only) | `owner_profile` | fields, attachment id | Empty profile: attempts stay `idle`. Attachment missing: resume id cleared, other fields kept. |
 | Read profile (chief tool) | `owner_profile` | nothing | Returns field names and values the owner marked fillable. Omits anything he did not mark. No secrets. |
 | Host browser snapshot (new daemon tool, not `browser.ts`) | allowlist, attach the owner started | `computer_call` with redacted tree, attempt `browsing` or `previewed` | Attach down or machine offline: `blocked`, nothing clicked. Password and cookie fields stripped before `resultText` is stored. Off-host URL: refuse, no navigation. |
-| Orb `browser_navigate` / `browser_act` | existing gates | existing call log | Unchanged, and not a legal submit path. A job attempt that calls them does not move to `submitting`. |
+| Host browser fill (`job_fill`, not `browser_act`) | preview field ids, `owner_profile` | values go to the browser only; `computer_call.params` stores field ids, not values; result text redacted | Unknown field id or a password field: refuse, no type. Orb `browser_act` is not this path and must not be used to fill a job form. |
+| Orb `browser_navigate` / `browser_act` | existing gates | existing call log | Unchanged, and not a legal fill or submit path. A job attempt that calls them does not move to `submitting`. |
 | Preview build | snapshot, profile | `job_preview` hash and values | Page has a password or payment field: `blocked`, values not stored, owner asked to take the lease. |
 | `ask_user` for that preview | preview | `chiefMessage` question, attempt `confirming` | Push failure does not confirm. The question remains until answered or expired. |
 | Owner answer | question id, current hash | answer on the question | Mismatch or stale hash: `failed`, no click. |
-| `job_submit` | attempt, hash, cap, lease, host | click, then `submitted` and cap, or `blocked` | Cap reached, lease held, hash mismatch, or host no longer `allowed`: refuse before the click, cap unchanged. Delivery unknown: `blocked`, cap incremented, no automatic retry. |
+| `job_submit` | attempt, stored hash, cap, lease, host, then a fresh snapshot | click only after the live hash matches; then `submitted` and cap, or `blocked` | Before the click: acquire the execution lease, snapshot URL, form action, field refs, values, and the submit control, recompute the hash. Any mismatch, cap reached, lease not acquired, or host no longer `allowed`: refuse, no click, cap unchanged, attempt back to `browsing` if the page changed. Delivery unknown: `blocked`, cap incremented, no automatic retry. |
 | User takeover (`computer-control.ts`) | lease | lease | While the user holds it, snapshot may run; `job_submit` and fills refuse with the existing 409. |
 | Cap read | `job_cap` | nothing until a delivered or unknown submit | Clock skew does not reset the counter early: the key is the UTC day stored on the row, not the model's idea of today. |
 
@@ -103,7 +104,7 @@ A second `job_submit` for a hash already `submitted` or `blocked` with unknown d
 
 ## Page text is data
 
-A posting is third-party text. The snapshot that reaches the model uses the same fence rule as `docs/design/mail-connector.md`: fenced, omitted from `shortEvent`, rejected by `validateMemoryText`. Instructions on the page are not followed. The agent does not pass page text to shell or to `get_secret`.
+A posting is third-party text. The snapshot that reaches the model uses the same fence rule as `docs/design/mail-connector.md`, including the `buildChiefSystemPrompt` trust-boundary paragraph, not only `shortEvent` and `validateMemoryText`. Instructions on the page are not followed. The agent does not pass page text to shell or to `get_secret`.
 
 Filled values come only from profile field ids in the preview. The model does not get to add a field at submit time.
 

@@ -45,7 +45,7 @@ Rules are owner-written and deterministic. No model ranks mail. A model ranker w
 
 `mail_account`: `disconnected`, `connecting`, `watching`, `degraded`, `revoked`.
 
-`mail_event`: `received`, `ranked`, `delivered`, `dropped`. Unique on `(accountId, externalId)`. `externalId` is the provider message id, not the Gmail history id. The account stores the history watermark and, for IMAP, `UIDVALIDITY`.
+`mail_event`: `received`, `ranked`, `delivered`, `dropped`. Unique on `(accountId, externalId)`. Gmail `externalId` is the message id, not the history id. IMAP `externalId` is `uidvalidity:uid`, so a UID reused after `UIDVALIDITY` changes is a new event, not a duplicate. The account also stores the history watermark and the current `UIDVALIDITY`.
 
 `mail_rule`: owner rows. Match kind is sender allow or subject contains. Rank is `needs_you`, `can_wait`, or `drop`. No match means `can_wait`.
 
@@ -74,30 +74,27 @@ Event: webhook or IDLE line accepted → `received` (ids only) → fetch metadat
 | `openSecretValues` / `get_secret` | secret names granted to a step | nothing for mail | Mail names are refused even if a routing rule lists them. The step sees the same miss as an unknown name. The value is not logged. |
 | Gmail webhook (new path, own verifier, not added to `isExempt` without that verifier) | account by the push's mailbox id, OIDC audience | `mail_event` `received`, or nothing | Bad token, wrong audience, or unknown mailbox: 401, no row, no wake. Body is not logged. |
 | History fetch (connector only) | watermark, secret opened in-process | event external ids, watermark only after a full page | Fetch fails: watermark unchanged, account `degraded`, `due_event` retry. No wake. |
-| IMAP IDLE (connector only) | account, secret opened in-process | one event per new UID | Disconnect: `degraded`, backoff reconnect. `UIDVALIDITY` change drops in-flight UIDs and stores the new value. Duplicate UID is an idempotent no-op. |
+| IMAP IDLE (connector only) | account, secret opened in-process | one event per `uidvalidity:uid` | Disconnect: `degraded`, backoff reconnect. `UIDVALIDITY` change stores the new value and drops in-flight UIDs from the old epoch. A repeated `uidvalidity:uid` is an idempotent no-op. A bare UID from a new epoch is not. |
 | Watch renew (`due_event` kind, handler next to the scheduler map) | account, secret in-process | `watchExpiration`, next due time | Failure: `degraded`, backoff, no second watch if the old one might still be live. 401: `revoked`. |
 | Rule edit (owner only) | rules | rules | Agent and MCP face have no write tool. A bad rule is rejected and the old rows stay. |
 | Rank | rules, event id | `rank` | No body available: stay `received`, do not rank from the webhook payload. |
-| Deliver `needs_you` | event, coordinator thread | chief step via `enqueueChiefStep` (`trigger: 'wake'`, provenance `mail:<eventId>`), `notifyChiefMessage`, `pushToUserSafely` | Wake insert fails: stay `ranked`, retry. Push no-subscription, expired, or viewing the thread: in-app row still stands; push is not retried. VAPID null: in-app only. |
+| Deliver `needs_you` | event, coordinator thread, existing step id | one outbox row keyed by event id; chief step id is that event id (`enqueueChiefStep` already takes `id`); provenance `mail:<eventId>`; `notifyChiefMessage`; `pushToUserSafely` with `delivery.id` equal to the event id | Step insert and the move to `delivered` commit together. A retry that finds the step does not insert another. Notice id `${userId}:${threadId}` upserts. Push no-subscription, expired, or viewing the thread: in-app row still stands; push is not a reason to open a second turn. VAPID null: in-app only. |
 | Deliver `can_wait` | event | `queuePushDigest` item, no chief step | Digest send fails: existing sweep keeps the item. No Coordinator turn. |
 | Deliver `drop` | event | `dropped`, no notice, no wake | — |
 | Disconnect | account, secret id | account `disconnected`, secret deleted | Secret already gone: still mark `disconnected`. |
 
 User-visible push title and body are a fixed template naming the rule that matched, not the subject or the body. The href is the Coordinator thread, so `isViewingThread` suppresses push while that thread is open. The in-app snippet is the same template. Raw mail never enters `push.ts` or `notification.snippet`.
 
-The wake prompt carries ids, the rule name, and a fenced excerpt. It tells the turn the server already notified, and that `notify_user` and `ask_user` are refused on this provenance. That closes the hole where `notify_user` would copy injected text into the notice `notify_user` does not itself push.
+The wake prompt carries ids, the rule name, and a fenced excerpt. The server already notified. Prompt text is not the control: a turn whose provenance starts with `mail:` is refused, in the tool handler, for `notify_user`, `ask_user`, `save_memory`, `update_memory`, and every computer tool.
 
 ## Fence
 
 Reuse the issue-fence shape, with a mail marker, not `ISSUE_FENCE_OPEN`. Excerpt is display name, subject, and a short text slice. No raw MIME, no attachment bytes, no tokens.
 
-Same omissions as GitHub text, or the short event line leaks the body:
+The live wake is untrusted only if the Coordinator's own prompt says so. `buildChiefSystemPrompt` in `apps/server/src/services/chief.ts` names `ISSUE_FENCE_OPEN` and nothing else. The mail marker is added to that third-party paragraph. The same marker is added wherever that constant is the trust boundary today: `shortEvent`, `validateMemoryText`, `apps/server/src/services/memory-consolidation.ts`, `chief-digest.ts`, `chief-report.ts`, `trajectory-curate.ts`, and `trajectory-reflect.ts`. A marker that only `shortEvent` omits still sits in the prompt as instructions.
 
-- `shortEvent` omits the mail fence the way it omits `ISSUE_FENCE_OPEN`.
-- `validateMemoryText` rejects the mail marker the way it rejects the issue fence.
 - `read_history` may return the fenced body. The fence stays on that text.
-
-Instructions inside the fence are not followed, not saved, and not passed to shell, browser tools, `get_secret`, or another connector.
+- Server-side refusal, not the prompt, blocks `notify_user`, `ask_user`, memory writes, computer tools, shell, and `get_secret` on this provenance.
 
 ## Risks
 
@@ -105,7 +102,7 @@ Instructions inside the fence are not followed, not saved, and not passed to she
 - Pub/Sub push retries. Idempotency is the event unique key, not a 200 that forgot to store the id.
 - IDLE on the server ties mailbox reachability to wherever the server runs. That is accepted in v1; see the open decision.
 - `notification` collapses to one row per entity. Using the chief thread id replaces the previous chief snippet. The event rows are the record; the notice is a pointer. Do not mint a second inbox to keep every subject.
-- Prompt injection that survives the fence still cannot send mail in v1, because send does not exist, and cannot notify, because this provenance refuses `notify_user`.
+- Prompt injection that survives the fence still cannot send mail in v1, because send does not exist, and cannot notify, because the tool handler refuses `notify_user` on this provenance. The system prompt names the fence so the model is told; the handler is what holds.
 
 ## Open decisions for the owner
 
