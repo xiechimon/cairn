@@ -87,7 +87,7 @@ export function PageShell({
           {embedded ? (
             <div
               data-testid="page-toolbar"
-              className="mx-auto flex w-192 max-w-full flex-none items-center gap-3 px-4 pt-4 empty:hidden"
+              className="flex w-full flex-none items-center gap-3 px-4 pt-1 empty:hidden"
             >
               {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
               <div className="ml-auto flex flex-none items-center gap-0.5 empty:hidden">
@@ -119,7 +119,10 @@ export function PageShell({
             {bleed ? (
               children
             ) : (
-              <div data-testid="page-col" className="mx-auto w-192 max-w-full pt-4">
+              <div
+                data-testid="page-col"
+                className={embedded ? 'w-full pt-1' : 'mx-auto w-192 max-w-full pt-4'}
+              >
                 {children}
               </div>
             )}

@@ -85,7 +85,17 @@ for (const theme of ['light', 'dark'] as const) {
       expect(first.value.idleInk).toBe('rgb(102, 102, 102)');
     }
     for (const { name, value } of faces.slice(1)) {
-      expect({ name, ...value }).toEqual({ name, ...first.value });
+      const { trackHeight, optionHeight, ...rest } = value;
+      const { trackHeight: firstTrack, optionHeight: firstOption, ...firstRest } = first.value;
+      expect({ name, ...rest }).toEqual({ name, ...firstRest });
+      if (name === 'settings appearance') {
+        expect({ trackHeight, optionHeight }).toEqual({ trackHeight: 28, optionHeight: 24 });
+      } else {
+        expect({ trackHeight, optionHeight }).toEqual({
+          trackHeight: firstTrack,
+          optionHeight: firstOption,
+        });
+      }
     }
   });
 }

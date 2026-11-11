@@ -103,36 +103,68 @@ test('old resource URLs land on their settings section with the query intact', a
   }
 });
 
-test('search narrows the section list and says when nothing matches', async ({ page }) => {
+test('search lists matching sections and rows, jumps to the pick and highlights the row', async ({
+  page,
+}) => {
   await page.goto(`/app/settings/account?${FLEET}`);
   const search = settings(page).getByLabel('搜索设置');
   await search.fill('机');
-  await expect(settings(page).locator('[data-settings-section]')).toHaveCount(1);
-  await expect(navItem(page, 'machines')).toBeVisible();
+  await expect(settings(page).getByTestId('settings-search-results')).toBeVisible();
+  await expect(settings(page).locator('[data-settings-result="machines"]')).toBeVisible();
+  await search.fill('color');
+  const option = settings(page).getByRole('option');
+  await expect(option).toHaveCount(1);
+  await expect(option).toContainText('外观');
+  await expect(option).toContainText('颜色主题');
+  await search.press('Enter');
+  await expect(page).toHaveURL(/\/app\/settings\/appearance\?/);
+  await expect(search).toHaveValue('');
+  const row = settings(page).locator('[data-settings-label="颜色主题"]');
+  await expect(row).toHaveAttribute('data-match', '');
+  await settings(page).getByTestId('settings-body').click({ position: { x: 5, y: 300 } });
+  await expect(row).not.toHaveAttribute('data-match', '');
   await search.fill('zzz');
   await expect(settings(page).getByText('没有匹配的设置')).toBeVisible();
 });
 
-test('appearance section switches the theme', async ({ page }) => {
+test('search keeps the slash shortcut and Escape clears it without closing', async ({ page }) => {
+  await page.goto(`/app/settings/account?${FLEET}`);
+  await page.keyboard.press('/');
+  const search = settings(page).getByLabel('搜索设置');
+  await expect(search).toBeFocused();
+  await search.fill('密');
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(settings(page)).toBeVisible();
+});
+
+test('appearance section switches the theme between system, light and dark', async ({ page }) => {
   await page.goto(`/app/settings/appearance?${FLEET}`);
+  await expect(settings(page).getByRole('radio', { name: '跟随系统' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
   await settings(page).getByRole('radio', { name: '深色' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await settings(page).getByRole('radio', { name: '浅色' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
-test('phone: the list comes first, a section opens full screen with a way back', async ({
+test('phone: a scrollable tab strip switches sections inside a full-screen modal', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/app/settings?${FLEET}`);
-  await expect(navItem(page, 'providers')).toBeVisible();
-  await expect(page.getByTestId('settings-content')).toBeHidden();
+  await expect(navItem(page, 'account')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('settings-content')).toBeVisible();
   await navItem(page, 'providers').click();
-  await expect(navItem(page, 'providers')).toBeHidden();
+  await expect(navItem(page, 'providers')).toHaveAttribute('aria-current', 'page');
   await expect(settings(page).getByTestId('provider-instance').first()).toBeVisible();
-  await settings(page).getByRole('link', { name: '返回设置' }).click();
-  await expect(navItem(page, 'providers')).toBeVisible();
+  const strip = page.getByTestId('settings-tabs');
+  const scrolls = await strip.evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(scrolls).toBe(true);
+  await settings(page).getByRole('button', { name: '关闭设置' }).click();
+  await expect(settings(page)).toHaveCount(0);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );

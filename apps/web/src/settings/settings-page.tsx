@@ -1,10 +1,10 @@
-import { cn } from 'cn';
 import {
   Archive,
-  ArrowLeft,
   KeyRound,
   Layers,
   type LucideIcon,
+  Monitor,
+  Moon,
   Palette,
   Plug,
   Puzzle,
@@ -12,6 +12,7 @@ import {
   Server,
   ShieldEllipsis,
   Smartphone,
+  Sun,
   User,
   Waypoints,
   X,
@@ -25,11 +26,23 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Link, type To, useLocation, useSearchParams } from 'react-router';
+import { type To, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { SettingsNav, type SettingsNavGroup } from '../components/settings/settings-nav.js';
-import { SettingsCard, SettingsRow, SettingsSegmented } from '../components/settings-list.js';
+import { useMediaQuery } from '../board/use-narrow.js';
+import {
+  SettingsNav,
+  type SettingsNavGroup,
+  SettingsTabStrip,
+} from '../components/settings/settings-nav.js';
+import { SettingsSearch } from '../components/settings/settings-search.js';
+import {
+  SettingsCard,
+  SettingsMatchProvider,
+  SettingsRow,
+  SettingsRows,
+  SettingsSegmented,
+} from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -45,7 +58,7 @@ import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
-import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
+import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
 import { ArchivedProjectsSection } from './archived-projects-section.js';
 import { SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
 
@@ -53,6 +66,7 @@ interface Section {
   id: SettingsSectionId;
   label: string;
   Icon: LucideIcon;
+  rows?: true;
   element: () => ReactNode;
 }
 
@@ -64,7 +78,7 @@ interface Group {
 function AppearanceSection() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
-  const [theme, setTheme] = useState<Theme>(() => readStoredTheme(safeLocalStorage()));
+  const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
   return (
     <PageShell
       route={`${SETTINGS_HREF}/appearance`}
@@ -72,17 +86,19 @@ function AppearanceSection() {
       fixture={resolveScenario(searchParams)}
     >
       <SettingsCard>
-        <SettingsRow label={t('颜色主题')} hint={t('只影响这台设备')}>
+        <SettingsRow label={t('颜色主题')}>
           <SettingsSegmented
             label={t('外观')}
             value={theme}
+            className="h-7 [&_[data-segmented=option]]:size-6 [&_[data-segmented=option]]:px-0"
             onChange={(next) => {
               applyTheme(next);
               setTheme(next);
             }}
             options={[
-              { value: 'light', label: t('浅色') },
-              { value: 'dark', label: t('深色') },
+              { value: 'system', icon: <Monitor />, ariaLabel: t('跟随系统') },
+              { value: 'light', icon: <Sun />, ariaLabel: t('浅色') },
+              { value: 'dark', icon: <Moon />, ariaLabel: t('深色') },
             ]}
           />
         </SettingsRow>
@@ -95,12 +111,19 @@ const GROUPS: Group[] = [
   {
     heading: null,
     sections: [
-      { id: 'account', label: '账号', Icon: User, element: () => <AccountPage /> },
-      { id: 'appearance', label: '外观', Icon: Palette, element: () => <AppearanceSection /> },
+      { id: 'account', label: '账号', Icon: User, rows: true, element: () => <AccountPage /> },
+      {
+        id: 'appearance',
+        label: '外观',
+        Icon: Palette,
+        rows: true,
+        element: () => <AppearanceSection />,
+      },
       {
         id: 'projects',
         label: '项目',
         Icon: Archive,
+        rows: true,
         element: () => <ArchivedProjectsSection />,
       },
     ],
@@ -130,7 +153,12 @@ const GROUPS: Group[] = [
     heading: '安全',
     sections: [
       { id: 'secrets', label: '密钥', Icon: ShieldEllipsis, element: () => <SecretsPage /> },
-      { id: 'api-keys', label: 'API 密钥', Icon: KeyRound, element: () => <ApiKeysPage /> },
+      {
+        id: 'api-keys',
+        label: 'API 密钥',
+        Icon: KeyRound,
+        element: () => <ApiKeysPage />,
+      },
       {
         id: 'remote',
         label: '远程访问',
@@ -142,6 +170,8 @@ const GROUPS: Group[] = [
 ];
 
 const SECTIONS = GROUPS.flatMap((group) => group.sections);
+
+const SETTINGS_TABS_QUERY = '(max-width: 767px)';
 
 function useMachineBadge(): string | undefined {
   const [searchParams] = useSearchParams();
@@ -167,7 +197,7 @@ function isEditable(target: EventTarget | null): boolean {
 function trapTab(event: ReactKeyboardEvent<HTMLElement>): void {
   if (event.key !== 'Tab' || !event.currentTarget.contains(event.target as Node)) return;
   const tabbable = [...event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE)].filter(
-    (el) => el.offsetParent !== null,
+    (el) => el.offsetParent !== null && el.tabIndex >= 0,
   );
   const first = tabbable[0];
   const last = tabbable[tabbable.length - 1];
@@ -194,7 +224,9 @@ export function SettingsDialog({
 }) {
   const { t } = useI18n();
   const { search } = useLocation();
-  const [query, setQuery] = useState('');
+  const navigate = useNavigate();
+  const tabs = useMediaQuery(SETTINGS_TABS_QUERY);
+  const [matchLabel, setMatchLabel] = useState<string | null>(null);
   const machineBadge = useMachineBadge();
   const titleId = useId();
   const section = SECTIONS.find((s) => s.id === sectionParam) ?? null;
@@ -245,6 +277,22 @@ export function SettingsDialog({
       ...(s.id === 'machines' && machineBadge !== undefined ? { badge: machineBadge } : {}),
     })),
   }));
+  const searchField = (
+    <SettingsSearch
+      inputRef={searchRef}
+      sections={SECTIONS.map((s) => ({ id: s.id, label: t(s.label), Icon: s.Icon }))}
+      onPick={(pick) => {
+        navigate(hrefFor(pick.section), { replace: true });
+        setMatchLabel(pick.row);
+      }}
+    />
+  );
+  const body =
+    shown === undefined ? null : shown.rows ? (
+      <SettingsRows>{shown.element()}</SettingsRows>
+    ) : (
+      shown.element()
+    );
   return (
     <>
       <div
@@ -260,75 +308,60 @@ export function SettingsDialog({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={trapTab}
-        className="fixed inset-0 z-(--z-panel-low) flex overflow-hidden bg-background text-ui text-foreground outline-none md:inset-auto md:top-1/2 md:left-1/2 md:h-[min(40rem,calc(100%-3rem))] md:w-[min(56rem,calc(100%-3rem))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-(--radius-card) md:shadow-(--e3) md:ring-1 md:ring-border"
+        className="fixed inset-0 z-(--z-panel-low) flex flex-col overflow-hidden bg-dialog-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-ui text-foreground outline-none md:inset-auto md:top-1/2 md:left-1/2 md:h-(--settings-h) md:w-(--settings-w) md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-(--radius-sheet) md:p-0 md:shadow-(--e3)"
       >
-        <div
-          className={cn(
-            'w-full flex-none bg-(--surface-1) md:w-48 md:border-r md:border-border',
-            section !== null && 'max-md:hidden',
+        <header
+          data-testid="settings-title"
+          className="flex h-11 flex-none items-center justify-between gap-2 border-b border-border pr-3 pl-4"
+        >
+          <h1 id={titleId} className="m-0 text-card-title font-semibold text-foreground">
+            {t('设置')}
+          </h1>
+          <Button variant="ghost" size="icon-sm" aria-label={t('关闭设置')} onClick={onClose}>
+            <X />
+          </Button>
+        </header>
+        <div className="flex min-h-0 flex-auto">
+          {!tabs && (
+            <div
+              onClickCapture={() => setMatchLabel(null)}
+              className="w-(--settings-nav-w) flex-none border-r border-border"
+            >
+              <SettingsNav
+                groups={groups}
+                current={shown?.id ?? null}
+                hrefFor={hrefFor}
+                search={searchField}
+              />
+            </div>
           )}
-        >
-          <SettingsNav
-            groups={groups}
-            current={shown?.id ?? null}
-            hrefFor={hrefFor}
-            query={query}
-            onQuery={setQuery}
-            searchRef={searchRef}
-            top={
-              <div className="flex items-center justify-between px-2">
-                <span id={titleId} className="text-meta text-content-tertiary">
-                  {t('设置')}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="md:hidden"
-                  aria-label={t('关闭设置')}
-                  onClick={onClose}
-                >
-                  <X />
-                </Button>
-              </div>
-            }
-          />
-        </div>
-        <div
-          data-testid="settings-content"
-          className={cn('flex min-w-0 flex-auto flex-col', section === null && 'max-md:hidden')}
-        >
           <div
-            data-testid="settings-head"
-            className="flex h-12 flex-none items-center gap-2 px-4 md:pl-5"
+            data-testid="settings-content"
+            onPointerDownCapture={() => setMatchLabel(null)}
+            className="flex min-w-0 flex-auto flex-col"
           >
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="-ml-2 md:hidden"
-              aria-label={t('返回设置')}
-              render={<Link to={{ pathname: SETTINGS_HREF, search }} replace />}
-            >
-              <ArrowLeft />
-            </Button>
+            {tabs && (
+              <div
+                onClickCapture={() => setMatchLabel(null)}
+                className="flex flex-none flex-col gap-2 pt-3"
+              >
+                <div className="px-4">{searchField}</div>
+                <SettingsTabStrip groups={groups} current={shown?.id ?? null} hrefFor={hrefFor} />
+              </div>
+            )}
             {shown !== undefined && (
-              <h1 className="m-0 min-w-0 flex-1 truncate text-card-title font-semibold text-foreground">
+              <h2
+                data-testid="settings-head"
+                className="m-0 flex-none truncate px-4 pt-4 pb-3 text-card-title font-semibold text-foreground"
+              >
                 {t(shown.label)}
-              </h1>
+              </h2>
             )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="ml-auto max-md:hidden"
-              aria-label={t('关闭设置')}
-              onClick={onClose}
-            >
-              <X />
-            </Button>
-          </div>
-          <div data-testid="settings-body" className="flex min-h-0 flex-auto">
-            {shown !== undefined && (
-              <EmbeddedShell.Provider value>{shown.element()}</EmbeddedShell.Provider>
-            )}
+            <div data-testid="settings-body" className="flex min-h-0 flex-auto">
+              <SettingsMatchProvider value={matchLabel}>
+                <EmbeddedShell.Provider value>{body}</EmbeddedShell.Provider>
+              </SettingsMatchProvider>
+            </div>
           </div>
         </div>
       </div>

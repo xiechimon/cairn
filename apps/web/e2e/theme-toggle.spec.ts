@@ -7,6 +7,7 @@ const lightSeg = (page: Page) =>
   page.getByRole('radio', { name: '浅色' });
 const darkSeg = (page: Page) =>
   page.getByRole('radio', { name: '深色' });
+const systemSeg = (page: Page) => page.getByRole('radio', { name: '跟随系统' });
 
 const rootTheme = (page: Page) =>
   page.evaluate(() => ({
@@ -14,11 +15,14 @@ const rootTheme = (page: Page) =>
     light: document.documentElement.classList.contains('light'),
   }));
 
-test('default dark: `深色` active; `浅色` click repaints instantly + persists', async ({ page }) => {
+test('default follows the system (dark here): `跟随系统` active; `浅色` click repaints instantly + persists', async ({
+  page,
+}) => {
   await page.goto(ROUTE);
 
   expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
-  await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'true');
+  await expect(systemSeg(page)).toHaveAttribute('aria-checked', 'true');
+  await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'false');
   await expect(lightSeg(page)).toHaveAttribute('aria-checked', 'false');
 
   await lightSeg(page).click();
@@ -98,6 +102,40 @@ test('theme flip rides the transition suppression and drops it after the paint',
       page.evaluate(() => document.documentElement.classList.contains('theme-suppress')),
     )
     .toBe(false);
+});
+
+test('system follows the emulated colour scheme live and stores the preference', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto(ROUTE);
+  expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
+  await expect(systemSeg(page)).toHaveAttribute('aria-checked', 'true');
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect.poll(() => rootTheme(page)).toEqual({ theme: 'dark', light: false });
+
+  await lightSeg(page).click();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
+
+  await systemSeg(page).click();
+  expect(await page.evaluate((k) => localStorage.getItem(k), THEME_KEY)).toBe('system');
+  expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect.poll(() => rootTheme(page)).toEqual({ theme: 'light', light: true });
+
+  await page.reload();
+  expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
+  await expect(systemSeg(page)).toHaveAttribute('aria-checked', 'true');
+});
+
+test('stored legacy values keep their choice regardless of the system scheme', async ({ page }) => {
+  await page.addInitScript((k) => localStorage.setItem(k, 'dark'), THEME_KEY);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto(ROUTE);
+  expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
+  await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'true');
 });
 
 test('icon + apple-touch-icon carry prefers-color-scheme variants that resolve', async ({

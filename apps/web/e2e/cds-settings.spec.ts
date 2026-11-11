@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('CDS settings: reading col 768, cards at --radius-card 12px no shadow, input 8px/32px', async ({ page }) => {
-  await page.goto('/app/account?scenario=01');
+  await page.goto('/app/settings/api-keys?scenario=01');
   await page.waitForSelector('[data-testid="page-col"], .settings-card, .account-card');
 
   const m = await page.evaluate(() => {
@@ -9,7 +9,7 @@ test('CDS settings: reading col 768, cards at --radius-card 12px no shadow, inpu
       document.querySelector('[data-testid="page-col"]') ??
       document.querySelector('main .mx-auto');
     const card = document.querySelector('.settings-card, .account-card, [data-testid="resource-group"]');
-    const input = document.querySelector('[data-slot="input"]');
+    const input = document.querySelector('[data-testid="page-col"] [data-slot="input"]');
     const root = getComputedStyle(document.documentElement);
     const colCs = col ? getComputedStyle(col) : null;
     const cardCs = card ? getComputedStyle(card) : null;

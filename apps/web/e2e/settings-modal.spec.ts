@@ -79,9 +79,10 @@ test('the dialog is labelled by its title', async ({ page }) => {
 test('groups follow the design: models, execution, security', async ({ page }) => {
   await page.goto(`/app/settings/appearance?${FLEET}`);
   const nav = settings(page).getByRole('navigation', { name: '设置分区' });
-  for (const heading of ['模型', '执行环境', '安全']) {
-    await expect(nav.getByText(heading, { exact: true })).toBeVisible();
-  }
+  await expect(nav).toContainText('模型');
+  await expect(nav).toContainText('执行环境');
+  await expect(nav).toContainText('安全');
+  await expect(nav.locator('hr')).toHaveCount(3);
   const order = await nav.locator('[data-settings-section]').evaluateAll((els) =>
     els.map((el) => el.getAttribute('data-settings-section')),
   );
@@ -90,11 +91,13 @@ test('groups follow the design: models, execution, security', async ({ page }) =
   expect(order).toContain('work-routing');
 });
 
-test('phone: full screen with the section list first', async ({ page }) => {
+test('phone: full screen with the title row and a section tab strip', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/app/settings?${FLEET}`);
   const box = await settings(page).boundingBox();
   expect(box).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
+  await expect(page.getByTestId('settings-tabs')).toBeVisible();
+  await expect(settings(page).getByTestId('settings-head')).toHaveText('账号');
 });
 
 test('sidebar footer: a green dot and the online count', async ({ page }) => {

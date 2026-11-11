@@ -670,7 +670,7 @@ Reach:
 
 - Web routes: `/app/settings/:section?`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `settings-backdrop`, `settings-body`, `settings-content`, `settings-head`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `settings-backdrop`, `settings-body`, `settings-content`, `settings-head`, `settings-title`
 - Verify recipes: [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md), [.claude/skills/verify-cairn/features/persona-verify.md](features/persona-verify.md)
 - Research: [docs/research/ai-frontend-quality-2026-11-06.md](../../../docs/research/ai-frontend-quality-2026-11-06.md) (not on main), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/settings](../../../docs/design/references/settings)

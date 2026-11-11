@@ -94,6 +94,10 @@
   --cds-radius-md: 6px;
   --cds-radius-lg: 8px;
   --radius-card: 12px;
+  --radius-sheet: 17px;
+  --settings-w: min(1040px, calc(100vw - 2rem));
+  --settings-h: 88dvh;
+  --settings-nav-w: 215px;
   --cds-radius-xl: 12px;
   --radius-popover: 14px;
   --menu-pad: 4px;

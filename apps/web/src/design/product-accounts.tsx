@@ -20,6 +20,7 @@ import {
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
+import { SettingsSearch } from '../components/settings/settings-search.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { SettingsScopeSentence, TEAM_SCOPE } from '../components/settings-scope.js';
 import {
@@ -241,7 +242,6 @@ function ProviderPanelSpecimen() {
 
 function SettingsNavSpecimen() {
   const [current, setCurrent] = useState('providers');
-  const [query, setQuery] = useState('');
   return (
     <MemoryRouter>
       <div className="h-80 w-60 rounded-(--radius-card) bg-(--surface-1)">
@@ -266,11 +266,15 @@ function SettingsNavSpecimen() {
           hrefFor={(id) => {
             return { hash: id };
           }}
-          query={query}
-          onQuery={(next) => {
-            setQuery(next);
-            if (next === '') setCurrent('providers');
-          }}
+          search={
+            <SettingsSearch
+              sections={[
+                { id: 'account', label: 'Account', Icon: User },
+                { id: 'appearance', label: 'Appearance', Icon: Palette },
+              ]}
+              onPick={(pick) => setCurrent(pick.section)}
+            />
+          }
         />
       </div>
     </MemoryRouter>

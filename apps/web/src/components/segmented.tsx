@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import { type KeyboardEvent, type ReactNode, useRef } from 'react';
+import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from './ui/tabs.js';
 
@@ -153,7 +154,7 @@ export function SegmentedRadio<T extends string>({
     >
       {options.map((option, index) => {
         const checked = option.value === value;
-        return (
+        const button = (
           <Button
             key={option.value}
             ref={(el) => {
@@ -180,6 +181,13 @@ export function SegmentedRadio<T extends string>({
           >
             <OptionContent option={option} />
           </Button>
+        );
+        return option.ariaLabel === undefined ? (
+          button
+        ) : (
+          <IconTooltip key={option.value} label={option.ariaLabel} trigger={button}>
+            <OptionContent option={option} />
+          </IconTooltip>
         );
       })}
     </div>

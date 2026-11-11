@@ -8,7 +8,7 @@ const detail = (page: Page) => settings(page).getByTestId('machine-detail');
 
 test('the breadcrumb is the only page title: no second heading repeats it', async ({ page }) => {
   await page.goto(MACHINES);
-  await expect(settings(page).getByRole('heading', { level: 1 })).toHaveText('机器');
+  await expect(settings(page).getByTestId('settings-head')).toHaveText('机器');
   await expect(settings(page).getByRole('heading', { name: '机器', exact: true })).toHaveCount(1);
   await expect(settings(page).getByTestId('page-topbar')).toHaveCount(0);
   await expect(settings(page).getByTestId('settings-head')).toContainText('机器');
@@ -21,7 +21,7 @@ test('other sections keep one heading for the page, the breadcrumb', async ({ pa
     ['skills', '技能'],
   ] as const) {
     await page.goto(`/app/settings/${section}?scenario=providers-fleet`);
-    await expect(settings(page).getByRole('heading', { level: 1 })).toHaveText(label);
+    await expect(settings(page).getByTestId('settings-head')).toHaveText(label);
     await expect(settings(page).getByRole('heading', { name: label, exact: true })).toHaveCount(1);
   }
 });

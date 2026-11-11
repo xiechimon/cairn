@@ -3,7 +3,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 export const NARROW_QUERY = '(max-width: 640px)';
 export const PANEL_DOCKED_QUERY = '(min-width: 1101px)';
 
-function useMediaQuery(query: string): boolean {
+export function useMediaQuery(query: string): boolean {
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       const mql = window.matchMedia(query);

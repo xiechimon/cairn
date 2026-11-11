@@ -5,13 +5,14 @@ import { App } from './App.js';
 import { applyLocaleLang, readStoredLocale } from './i18n/locale.js';
 import { trackPointerFocus } from './pointer-focus.js';
 import { safeLocalStorage } from './safe-storage.js';
-import { applyTheme, readStoredTheme } from './theme.js';
+import { followSystemTheme, paintTheme, readStoredTheme } from './theme.js';
 import './styles/fonts.css';
 import './styles/motion.css';
 import './styles/app.css';
 
 const bootStorage = safeLocalStorage();
-applyTheme(readStoredTheme(bootStorage), bootStorage);
+paintTheme(readStoredTheme(bootStorage));
+followSystemTheme(bootStorage);
 applyLocaleLang(readStoredLocale(bootStorage));
 trackPointerFocus();
 
