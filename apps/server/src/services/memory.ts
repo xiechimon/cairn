@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   ISSUE_FENCE_OPEN,
+  MAIL_FENCE_OPEN,
   MEMORY_INDEX_ID_PREFIX,
   MEMORY_INDEX_TITLE,
   MEMORY_QUOTA_PER_AGENT,
@@ -16,10 +17,15 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 export function validateMemoryText(title: string, content: string): void {
-  if (title.includes(ISSUE_FENCE_OPEN) || content.includes(ISSUE_FENCE_OPEN)) {
+  if (
+    title.includes(ISSUE_FENCE_OPEN) ||
+    content.includes(ISSUE_FENCE_OPEN) ||
+    title.includes(MAIL_FENCE_OPEN) ||
+    content.includes(MAIL_FENCE_OPEN)
+  ) {
     throw new HttpError(
       400,
-      'invalid params.content: text quoted from a GitHub issue fence is third-party data and is not saved as memory',
+      'invalid params.content: text quoted from a GitHub issue or mail fence is third-party data and is not saved as memory',
     );
   }
 }

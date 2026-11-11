@@ -21,6 +21,9 @@ import type {
   EvidenceStore,
   INTAKE_SOURCE_KIND,
   MachineCapabilities,
+  MailAccountStatus,
+  MailEventStatus,
+  MailRank,
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
@@ -1498,4 +1501,94 @@ export const threadEntry = sqliteTable(
     entryId: text('entryId').notNull(),
   },
   (t) => [index('thread_entry_thread_idx').on(t.threadId, t.conversationId)],
+);
+
+export const mailAccount = sqliteTable(
+  'mail_account',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id),
+    provider: text('provider').$type<'gmail' | 'imap'>().notNull(),
+    mailbox: text('mailbox').notNull(),
+    status: text('status').$type<MailAccountStatus>().notNull(),
+    generation: integer('generation').notNull().default(0),
+    historyWatermark: text('historyWatermark'),
+    uidValidity: text('uidValidity'),
+    lastReconciledUid: integer('lastReconciledUid'),
+    pushServiceAccountEmail: text('pushServiceAccountEmail'),
+    secretId: text('secretId').references(() => secret.id),
+    watchExpiration: epochMs('watchExpiration'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    index('mail_account_team_idx').on(t.teamId),
+    check(
+      'mail_account_status',
+      sql`${t.status} in ('disconnected', 'connecting', 'watching', 'degraded', 'revoked')`,
+    ),
+    check('mail_account_provider', sql`${t.provider} in ('gmail', 'imap')`),
+  ],
+);
+
+export const mailEvent = sqliteTable(
+  'mail_event',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('accountId')
+      .notNull()
+      .references(() => mailAccount.id),
+    externalId: text('externalId').notNull(),
+    status: text('status').$type<MailEventStatus>().notNull(),
+    rank: text('rank').$type<MailRank | null>(),
+    ruleId: text('ruleId'),
+    ruleName: text('ruleName'),
+    dropReason: text('dropReason'),
+    generation: integer('generation').notNull(),
+    displayName: text('displayName'),
+    fromAddress: text('fromAddress'),
+    subject: text('subject'),
+    excerpt: text('excerpt'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('mail_event_account_external_unique').on(t.accountId, t.externalId),
+    check('mail_event_status', sql`${t.status} in ('received', 'ranked', 'delivered', 'dropped')`),
+    check(
+      'mail_event_rank',
+      sql`${t.rank} is null or ${t.rank} in ('needs_you', 'can_wait', 'drop')`,
+    ),
+    check('mail_event_drop_reason', sql`${t.status} != 'dropped' or ${t.dropReason} is not null`),
+    check(
+      'mail_event_dropped_body',
+      sql`${t.status} != 'dropped' or (${t.excerpt} is null and ${t.subject} is null and ${t.displayName} is null and ${t.fromAddress} is null)`,
+    ),
+  ],
+);
+
+export const mailRule = sqliteTable(
+  'mail_rule',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('accountId')
+      .notNull()
+      .references(() => mailAccount.id),
+    name: text('name').notNull(),
+    matchKind: text('matchKind').$type<'sender_allow' | 'subject_contains'>().notNull(),
+    pattern: text('pattern').notNull(),
+    rank: text('rank').$type<MailRank>().notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('mail_rule_account_idx').on(t.accountId, t.createdAt, t.id),
+    check('mail_rule_kind', sql`${t.matchKind} in ('sender_allow', 'subject_contains')`),
+    check('mail_rule_rank', sql`${t.rank} in ('needs_you', 'can_wait', 'drop')`),
+    check('mail_rule_pattern', sql`length(trim(${t.pattern})) > 0`),
+  ],
 );
