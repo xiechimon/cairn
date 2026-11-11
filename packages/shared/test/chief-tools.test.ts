@@ -161,6 +161,28 @@ describe('47-item vocabulary', () => {
   });
 });
 
+describe('Coordinator task text contract', () => {
+  it('keeps routing references out of verbatim task text', () => {
+    const tool = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo');
+    expect(tool?.description).toContain('copied character for character');
+    expect(tool?.description).toContain('You add routing only');
+  });
+
+  it('leaves title derivation to the server and bounds the update_todo summary title', () => {
+    const create = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo');
+    expect(create?.description).toContain('starts with a placeholder title cut from them');
+    expect(create?.parameters).not.toHaveProperty('properties.title');
+    const update = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'update_todo')?.parameters as {
+      properties: Record<string, { description: string }>;
+    };
+    expect(update.properties.title?.description).toContain('≤50 chars');
+    for (const name of ['create_todo', 'update_todo']) {
+      const tool = CHIEF_REMOTE_TOOLS.find((t) => t.name === name);
+      expect(tool?.description).not.toContain('first sentence');
+    }
+  });
+});
+
 describe('D60 router tools', () => {
   it('are six tools outside the 47-item base vocabulary, so the base count stays 47', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([

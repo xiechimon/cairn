@@ -447,8 +447,8 @@ describe('the chief tool surface (rescanned source + delete_skills struck from t
         { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir },
         s.team.id,
       );
-      expect(prompt).toContain('skills:');
-      expect(prompt).toContain('"id":"deploy"');
+      expect(prompt).toMatch(/^- deploy：部署流程$/m);
+      expect(prompt).not.toContain('"id":"deploy"');
     } finally {
       s.dispose();
     }

@@ -1502,6 +1502,8 @@ describe('github_overlap Coordinator read', () => {
       w.s.team.id,
     ).text;
     expect(prompt).toContain('github_overlap');
+    expect(prompt).toContain('带编号的查重结果（包括「没有重复」）写在给用户的回复里');
+    expect(prompt).not.toContain('in the todo spec');
     expect(prompt).not.toContain('scripts/github-overlap.mjs');
     expect(buildWorkBranchNote('server/example')).toContain('scripts/github-overlap.mjs');
   });
