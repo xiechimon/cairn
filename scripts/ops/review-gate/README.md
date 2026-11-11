@@ -15,7 +15,7 @@ Agents must resolve a Codex thread once its finding is fixed (GraphQL `resolveRe
 
 ## Security review (D84 / D88)
 
-The live check requires the Codex code review only (ian, 2026-11-06). A security-surface PR follows `AGENTS.md`: run `/security-review`, fix findings or record them in Risk, then enter the queue once required CI passes and the code review has no unresolved P0/P1. Path class does not add `coordinator-hold` and does not send the PR to ian (ian, 2026-11-11).
+The live check requires the Codex code review only (ian, 2026-11-06). A security-surface PR follows `AGENTS.md`: run `/security-review`, fix findings or record them in Risk, then enter the queue once required CI passes and the code review has no unresolved P0/P1. `pr-evidence` keeps that disposition bound to the head. Path class does not add `coordinator-hold` and does not send the PR to ian (ian, 2026-11-11).
 
 The `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json` name those surfaces. An incomplete or unavailable PR file list fails the check for every PR.
 

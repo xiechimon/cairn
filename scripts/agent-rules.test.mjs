@@ -34,6 +34,7 @@ test('security surfaces merge on the queue after a recorded security review', ()
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /\/security-review/);
   assert.match(agents, /fixed or recorded/);
+  assert.match(agents, /`pr-evidence` fails without that line/);
   assert.match(agents, /does not add `coordinator-hold`/);
   assert.match(agents, /cairnwright\[bot\]` author uses the bot queue/);
   assert.doesNotMatch(agents, /Codex `security_review` state on the exact head/);
