@@ -45,7 +45,7 @@ Rules are owner-written and deterministic. No model ranks mail. A model ranker w
 
 `mail_account`: `disconnected`, `connecting`, `watching`, `degraded`, `revoked`.
 
-`mail_event`: `received`, `ranked`, `delivered`, `dropped`. Unique on `(accountId, externalId)`. Gmail `externalId` is the message id, not the history id. IMAP `externalId` is `uidvalidity:uid`, so a UID reused after `UIDVALIDITY` changes is a new event, not a duplicate. The account also stores the history watermark and the current `UIDVALIDITY`.
+`mail_event`: `received`, `ranked`, `delivered`, `dropped`. Unique on `(accountId, externalId)`. Gmail `externalId` is the message id, not the history id. IMAP `externalId` is `uidvalidity:uid`, so a UID reused after `UIDVALIDITY` changes is a new event, not a duplicate. The account also stores the history watermark, current `UIDVALIDITY`, configured push service-account email, and a monotonic generation. Every connect/disconnect advances the generation; async work captures it and may commit events, watermarks, retries, or delivery only while it still matches an active account. Disconnect and these commits serialize in the database.
 
 `mail_rule`: owner rows. Match kind is sender allow or subject contains. Rank is `needs_you`, `can_wait`, or `drop`. No match means `can_wait`.
 
@@ -62,7 +62,7 @@ A secret row holds the refresh token or the app password. Its name is not granta
 | `degraded` | `watching` | Renew or reconnect succeeded. |
 | `watching` or `degraded` | `revoked` | Provider rejected the token. Stop the socket and the watch. Do not retry the token. |
 | `revoked` | `connecting` | Owner reconnects. New secret. Old cipher deleted. |
-| any | `disconnected` | Owner disconnects. Delete secret, events stay as ids without bodies. |
+| any | `disconnected` | Owner disconnects through the cleanup path below. Events stay as ids without bodies. |
 
 Event: webhook or IDLE line accepted → `received` (ids only) → fetch metadata inside the connector → `ranked` by rules → `delivered` or `dropped`. A `dropped` row stores the id and the reason, not the body.
 
@@ -72,7 +72,7 @@ Event: webhook or IDLE line accepted → `received` (ids only) → fetch metadat
 |---|---|---|---|
 | Connect (owner, new route beside `oauth.ts`) | owner-set public API origin, existing account | secret via `createSecret`, account `connecting` then `watching`, `due_event` renew row | Origin unset, not public `https`, or provider error: account `disconnected`, no secret left, no watch registered. |
 | `openSecretValues` / `get_secret` | secret names granted to a step | nothing for mail | Mail names are refused even if a routing rule lists them. The step sees the same miss as an unknown name. The value is not logged. |
-| Gmail webhook (new path, own verifier, not added to `isExempt` without that verifier) | account by the push's mailbox id, OIDC audience | `mail_event` `received`, or nothing | Bad token, wrong audience, or unknown mailbox: 401, no row, no wake. Body is not logged. |
+| Gmail webhook (new path, own verifier, not added to `isExempt` without that verifier) | account by the push's mailbox id, configured push service-account email and audience, generation | `mail_event` `received`, or nothing | Verify Google signature, issuer, audience, `email_verified=true`, and exact `email` match to the configured push service account. Bad identity or unknown mailbox: 401, no row, no wake. Inactive account: acknowledge without work. Body is not logged. |
 | History fetch (connector only) | watermark, secret opened in-process | event external ids, watermark only after a full page | Fetch fails: watermark unchanged, account `degraded`, `due_event` retry. No wake. |
 | IMAP IDLE (connector only) | account, secret opened in-process | one event per `uidvalidity:uid` | Disconnect: `degraded`, backoff reconnect. `UIDVALIDITY` change stores the new value and drops in-flight UIDs from the old epoch. A repeated `uidvalidity:uid` is an idempotent no-op. A bare UID from a new epoch is not. |
 | Watch renew (`due_event` kind, handler next to the scheduler map) | account, secret in-process | `watchExpiration`, next due time | Failure: `degraded`, backoff, no second watch if the old one might still be live. 401: `revoked`. |
@@ -81,7 +81,7 @@ Event: webhook or IDLE line accepted → `received` (ids only) → fetch metadat
 | Deliver `needs_you` | event, coordinator thread, existing step id | one outbox row keyed by event id; chief step id is that event id (`enqueueChiefStep` already takes `id`); provenance `mail:<eventId>`; `notifyChiefMessage`; `pushToUserSafely` with `delivery.id` equal to the event id | Step insert and the move to `delivered` commit together. A retry that finds the step does not insert another. Notice id `${userId}:${threadId}` upserts. Push no-subscription, expired, or viewing the thread: in-app row still stands; push is not a reason to open a second turn. VAPID null: in-app only. |
 | Deliver `can_wait` | event | `queuePushDigest` item, no chief step | Digest send fails: existing sweep keeps the item. No Coordinator turn. |
 | Deliver `drop` | event | `dropped`, no notice, no wake | — |
-| Disconnect | account, secret id | account `disconnected`, secret deleted | Secret already gone: still mark `disconnected`. |
+| Disconnect / cleanup retry | account generation, secret id, socket, watch | Atomically mark `disconnected`, advance generation, cancel renew/reconnect jobs and pending delivery, and persist cleanup work; close the live IDLE socket and cancel in-flight fetches; call Gmail `users.stop` before deleting its secret | Cleanup failure stays visible as pending cleanup with bounded backoff; retain the sealed credential only for stop until success or known watch expiry, then delete. Reconnect waits for cleanup so an old stop cannot cancel a new watch. Old callbacks cannot write, wake, push, or rearm jobs. |
 
 User-visible push title and body are a fixed template naming the rule that matched, not the subject or the body. The href is the Coordinator thread, so `isViewingThread` suppresses push while that thread is open. The in-app snippet is the same template. Raw mail never enters `push.ts` or `notification.snippet`.
 
@@ -95,6 +95,10 @@ The live wake is untrusted only if the Coordinator's own prompt says so. `buildC
 
 - `read_history` may return the fenced body. The fence stays on that text.
 - Server-side refusal, not the prompt, blocks `notify_user`, `ask_user`, memory writes, computer tools, shell, and `get_secret` on this provenance.
+
+## Failure acceptance
+
+Implementation must first fail tests for: a valid Google token with the right audience but another service-account email; missing or false `email_verified`; disconnect during IDLE, renew, history pagination, and queued delivery; failed `users.stop` across restart; reconnect while cleanup is pending. Assert no post-disconnect event, watermark, wake, push, or renewal; assert the socket closes, stop retries persist, the secret is eventually deleted, and old-generation callbacks cannot affect a new connection. These contracts are review safeguards only: this docs-only PR cannot enforce them in absent connector code.
 
 ## Risks
 
